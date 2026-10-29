@@ -31,10 +31,10 @@ const run = promisify(execFile)
 const defaultWorkspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 /** Command-line markers this repository owns, for the opt-in pattern sweep. */
-export const defaultScratchPatterns = ['--profile dshx-boot', 'fake-provider-main.js']
+const defaultScratchPatterns = ['--profile dshx-boot', 'fake-provider-main.js']
 
 /** A Host is only reaped once its own run had time to stop it: the `After` hook can take seconds. */
-export const defaultMinAgeMs = 60_000
+const defaultMinAgeMs = 60_000
 
 export const scratchLedgerPath = workspaceRoot => resolve(workspaceRoot, '.turbo/e2e-scratch-hosts.jsonl')
 
@@ -168,7 +168,7 @@ export const reapRecordedScratchProcessesFromLedgers = async options => {
 }
 
 /** Roots returned by jj include all project and thread workspaces, unlike a single checkout's local `.turbo` ledger. */
-export const listJjWorkspaceRoots = async workspaceRoot => {
+const listJjWorkspaceRoots = async workspaceRoot => {
   const { stdout } = await run('jj', ['workspace', 'list', '--ignore-working-copy', '--template', 'self.root() ++ "\\n"'], {
     cwd: workspaceRoot,
     timeout: 10_000,

@@ -5,7 +5,7 @@ export type ProcessCategory = (typeof processCategoryValues)[number]
 
 export const emptyCategoryBytes = () => ({ 'dev-server': 0, tests: 0, build: 0, dsh: 0, services: 0, other: 0 }) satisfies Record<ProcessCategory, number>
 
-export const memoryPressureValues = ['normal', 'warning', 'critical', 'unknown'] as const
+const memoryPressureValues = ['normal', 'warning', 'critical', 'unknown'] as const
 export type MemoryPressure = (typeof memoryPressureValues)[number]
 
 /**
@@ -14,10 +14,10 @@ export type MemoryPressure = (typeof memoryPressureValues)[number]
  * - `detached`: a process tree re-parented to init that still runs inside a workspace: a daemon a command started on
  *   purpose (`dshx dev up`), or one an earlier DSH process or a finished command left behind.
  */
-export const processOriginValues = ['job', 'host', 'detached'] as const
+const processOriginValues = ['job', 'host', 'detached'] as const
 export type ProcessOrigin = (typeof processOriginValues)[number]
 
-export const processTreeSchema = z.object({
+const processTreeSchema = z.object({
   pid: z.number().int().positive(),
   startedAt: z.number().int().nonnegative(),
   name: z.string().max(120),
@@ -33,7 +33,7 @@ export const processTreeSchema = z.object({
 })
 export type ProcessTree = z.infer<typeof processTreeSchema>
 
-export const workspaceThreadSchema = z.object({
+const workspaceThreadSchema = z.object({
   sessionId: z.string().max(128),
   title: z.string().max(300).nullable(),
   createdAt: z.number().nullable().optional(),
@@ -43,9 +43,9 @@ export const workspaceThreadSchema = z.object({
 export type WorkspaceThread = z.infer<typeof workspaceThreadSchema>
 
 /** `project` is a registered workspace; `workspace` a thread or jj sibling checkout of one; `elsewhere` collects Host children outside every workspace. */
-export const workspaceGroupKindValues = ['project', 'workspace', 'elsewhere'] as const
+const workspaceGroupKindValues = ['project', 'workspace', 'elsewhere'] as const
 
-export const workspaceGroupSchema = z.object({
+const workspaceGroupSchema = z.object({
   key: z.string().max(1024),
   title: z.string().max(300),
   path: z.string().max(1024),
@@ -60,6 +60,30 @@ export const workspaceGroupSchema = z.object({
 })
 export type WorkspaceGroup = z.infer<typeof workspaceGroupSchema>
 
+const nodeProcessSampleSchema = z.object({
+  pid: z.number().int().positive(),
+  rssBytes: z.number().nonnegative(),
+})
+export type NodeProcessSample = z.infer<typeof nodeProcessSampleSchema>
+
+const nodeProcessOriginSchema = z.object({
+  name: z.string().max(120),
+  source: z.string().max(120).nullable(),
+  cwd: z.string().max(1024).nullable(),
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  samples: z.array(nodeProcessSampleSchema).max(5),
+})
+export type NodeProcessOrigin = z.infer<typeof nodeProcessOriginSchema>
+
+const nodeProcessSummarySchema = z.object({
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  truncated: z.boolean(),
+  origins: z.array(nodeProcessOriginSchema).max(100),
+})
+export type NodeProcessSummary = z.infer<typeof nodeProcessSummarySchema>
+
 export const memorySnapshotSchema = z.object({
   takenAt: z.number(),
   supported: z.boolean(),
@@ -71,8 +95,17 @@ export const memorySnapshotSchema = z.object({
   detachedCount: z.number().int().nonnegative(),
   categoryBytes: z.record(z.enum(processCategoryValues), z.number().nonnegative()),
   groups: z.array(workspaceGroupSchema).max(200),
+  nodeProcesses: nodeProcessSummarySchema.optional(),
 })
 export type MemorySnapshot = z.infer<typeof memorySnapshotSchema>
+
+export const pressureSnapshotSchema = z.object({
+  takenAt: z.number(),
+  supported: z.boolean(),
+  pressure: z.enum(memoryPressureValues),
+  systemBytes: z.number().nonnegative(),
+})
+export type PressureSnapshot = z.infer<typeof pressureSnapshotSchema>
 
 export const stopTargetSchema = z
   .object({

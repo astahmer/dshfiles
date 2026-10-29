@@ -2,8 +2,9 @@ import { expect, type Page, type TestInfo } from '@playwright/test'
 import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-
 import { materializeNonblankThread } from '../thread-composer.js'
+
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
 const toolkit = (page: Page) => page.getByTestId('agent-toolkit')
 const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', { name })
 
@@ -73,7 +74,7 @@ Then('only the agent toolkit plugin, its API and no tool remain', async ({ page 
 
 When('a thread {string} is started from the composer', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }, text: string) => {
   await materializeNonblankThread(page, text, $testInfo)
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: THREAD_COMPOSER })).toBeVisible()
 })
 
 When('the Agent toolkit is opened from the command palette', async ({ page }: { page: Page }) => {

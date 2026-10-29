@@ -11,9 +11,19 @@ import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
+import {
+  createApiClient,
+  defineClient,
+  provideSettingsPageRenderer,
+  publishSettingsSearchEntries,
+  settingsSearchEntries,
+  subscribeSettingsSearchEntries,
+  useApiQuery,
+  type SettingsPageRendererProps,
+  type SettingsSectionSearchProps,
+} from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { workbenchPanels, NativeAsideOwners } from '@dshfiles/workbench/registry'
 import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -40,6 +50,7 @@ import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { preferredSurface, type SettingsSurface } from './settings-preference.js'
+import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
 import { SettingsDialog, SettingsSidePanel, SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
@@ -51,6 +62,7 @@ const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 /** The Editor plugin's right-pane tab and its cross-plugin open request (`@dshfiles/editor` README). */
 const EDITOR_PANE_ID = '@dshfiles/editor/files'
+const PUBLISH_SETTLE_MS = 250
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 /** The right-sidebar tab type Settings opens as; the panel's guide offers it beside the other panel cards. */
@@ -378,6 +390,47 @@ export default defineClient({
         }
       },
     )
+    const publishedVersion = identityVersion(() => settingsSearchEntries())
+    const reportedInvalid = new Set<string>()
+    const sectionEntries = ledgerProjection<readonly SectionEntryRow[]>(
+      () =>
+        SettingsSearch.entryRows({
+          sections: sections.getSnapshot(),
+          published: settingsSearchEntries(),
+          onInvalid: failure => {
+            if (reportedInvalid.has(failure.sectionId)) return
+            reportedInvalid.add(failure.sectionId)
+            console.warn(`settings-shell: ignored the search entries of settings section ${failure.sectionId}: ${failure.message}`)
+          },
+        }),
+      () => `${ctx.slots.getVersion('settings.section')}:${ctx.locale.getSnapshot().revision}:${publishedVersion()}`,
+      listener => {
+        const offSections = sections.subscribe(listener)
+        const offPublished = subscribeSettingsSearchEntries(listener)
+        return () => {
+          offSections()
+          offPublished()
+        }
+      },
+    )
+    // The General rows are this plugin's own: the ledger never carries metadata for an imperative registration.
+    ctx.effect(() => {
+      let unpublish = (): void => {}
+      const publish = (): void => {
+        unpublish()
+        unpublish = publishSettingsSearchEntries({
+          sectionId: 'general',
+          entries: [{ id: 'developer-tools', title: t('developerTools.title'), description: t('developerTools.description'), keywords: 'developer devtools' }],
+        })
+      }
+      publish()
+      const offLocale = ctx.locale.subscribe(publish)
+      return () => {
+        offLocale()
+        unpublish()
+      }
+    }, 'settings-shell: General search entries')
+
     const onboardingSteps = ledgerProjection<readonly OnboardingStep[]>(
       () =>
         // Winners only: this plugin shadows the native welcome step under the same id.
@@ -399,6 +452,7 @@ export default defineClient({
 
     const fieldTarget: ObservableSnapshot<FieldTarget | undefined> = { getSnapshot: () => actor.getSnapshot().context.field, subscribe: subscribeActor }
     const searchQuery: ObservableSnapshot<string> = { getSnapshot: () => actor.getSnapshot().context.query, subscribe: subscribeActor }
+    const sectionTarget: ObservableSnapshot<string | undefined> = { getSnapshot: () => actor.getSnapshot().context.target, subscribe: subscribeActor }
     // Sections get the native `close` plus the navigation the dshx Settings-target contract describes.
     const sectionOwner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
@@ -435,10 +489,14 @@ export default defineClient({
       readonly activeId: string | undefined
       readonly pluginPages: readonly PluginSettingsPage[]
       readonly field: FieldTarget | undefined
+      readonly entries: readonly SectionEntryRow[]
+      readonly target: string | undefined
       readonly query: string
     }): Omit<SettingsViewProps, 'variant' | 'onClose'> => ({
       rows: input.rows,
       activeId: input.activeId,
+      sectionEntries: input.entries,
+      sectionTarget: input.target,
       renderSlot: input.renderSlot,
       pluginPages: input.pluginPages,
       renderPluginPage: (page: PluginSettingsPage) => (
@@ -456,6 +514,7 @@ export default defineClient({
       sectionOwner,
       t: input.t,
       onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
+      onReveal: entry => actor.send({ type: 'reveal', sectionId: entry.sectionId, target: entry.target }),
       onSearch: (next: string) => actor.send({ type: 'search', query: next }),
       // Only the side panel drills in and out of sections; the other frames leave `onBack` unused.
       onBack: () => actor.send({ type: 'back' }),
@@ -474,11 +533,13 @@ export default defineClient({
       const pages = useObservable(pluginPages)
       const field = useObservable(fieldTarget)
       const query = useObservable(searchQuery)
+      const entries = useObservable(sectionEntries)
+      const target = useObservable(sectionTarget)
       useEffect(() => {
         void describe.ensure()
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
-      const view = settingsViewProps({ renderSlot: props.renderSlot, t: props.t, rows, activeId, pluginPages: pages, field, query })
+      const view = settingsViewProps({ renderSlot: props.renderSlot, t: props.t, rows, activeId, pluginPages: pages, field, entries, target, query })
       // The side panel owns its frame: it renders whenever its tab is mounted, whatever the dialog or main view shows.
       const sidePanel = sidePanelHost === null ? null : <SettingsSidePanel {...view} host={sidePanelHost} onClose={undefined} variant="sidebar" />
       if (variant === 'closed') return sidePanel
@@ -518,7 +579,14 @@ export default defineClient({
               sections,
               pages: pluginPages,
               closeSettings: deps.closeSettings,
-              view: input => settingsViewProps({ ...input, renderSlot: (...args) => renderSlot.current(...args), t }),
+              view: input =>
+                settingsViewProps({
+                  ...input,
+                  entries: sectionEntries.getSnapshot(),
+                  target: sectionTarget.getSnapshot(),
+                  renderSlot: (...args) => renderSlot.current(...args),
+                  t,
+                }),
             }),
           },
           sections,
@@ -632,10 +700,14 @@ export default defineClient({
       if (request.setting !== undefined && openSettingsTarget(request.setting, requested)) return
       if (requested === 'sidebar') {
         openSidePanelSettings(request.section)
+        if (request.section !== undefined && request.target !== undefined) actor.send({ type: 'reveal', sectionId: request.section, target: request.target })
         if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
         return
       }
-      actor.send(request.section === undefined ? { type: 'open', surface: requested } : { type: 'open', surface: requested, sectionId: request.section })
+      const openEvent: { type: 'open'; surface: typeof requested; sectionId?: string; target?: string } = { type: 'open', surface: requested }
+      if (request.section !== undefined) openEvent.sectionId = request.section
+      if (request.target !== undefined) openEvent.target = request.target
+      actor.send(openEvent)
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 
@@ -692,19 +764,20 @@ export default defineClient({
       return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
     }, 'settings-shell: open-settings requests')
 
+    const addPaletteAction = (action: PaletteAction): (() => void) => metadata?.plugin?.add(PaletteActions, action) ?? (() => {})
     ctx.effect(() => {
       let registered: Array<() => void> = []
       const register = (): void => {
         registered.forEach(dispose => dispose())
         registered = [
-          PaletteApi.registerAction({
+          addPaletteAction({
             id: '@dshfiles/settings-shell/open',
             label: () => t('palette.open'),
             aliases: ['settings', 'preferences', 'options'],
             group: 'command',
             run: () => openSettings(),
           }),
-          PaletteApi.registerAction({
+          addPaletteAction({
             id: '@dshfiles/settings-shell/open-side-panel',
             label: () => t('palette.sidePanel'),
             aliases: ['settings', 'preferences', 'side panel'],
@@ -712,7 +785,7 @@ export default defineClient({
             run: () => openSidePanelSettings(),
           }),
           ...[...sections.getSnapshot(), ...pluginPages.getSnapshot().map(page => ({ id: page.pageId, label: page.title }))].map(row =>
-            PaletteApi.registerAction({
+            addPaletteAction({
               id: `@dshfiles/settings-shell/section/${row.id}`,
               label: () => t('palette.section', { section: row.label }),
               aliases: ['settings', 'preferences'],
@@ -791,11 +864,41 @@ export default defineClient({
       ),
     )
 
+    const api = createApiClient(ctx, settingsShellApi, metadata?.packageId)
+    // `settings_list` searches the same section entries for an Agent; a Host without the method just refuses it.
+    ctx.effect(() => {
+      let published: readonly SectionEntryRow[] | undefined
+      let pending: ReturnType<typeof setTimeout> | undefined
+      // Every section that registers changes the list, so boot would send one request per section; send the settled set.
+      const publish = (): void => {
+        if (pending !== undefined) clearTimeout(pending)
+        pending = setTimeout(() => {
+          pending = undefined
+          const entries = sectionEntries.getSnapshot()
+          if (entries === published) return
+          published = entries
+          void api.safe.publishSearchEntries({ entries: [...entries] })
+        }, PUBLISH_SETTLE_MS)
+      }
+      // A reconnect may reach a restarted Host that lost the last set.
+      const republish = (): void => {
+        published = undefined
+        publish()
+      }
+      publish()
+      const offEntries = sectionEntries.subscribe(publish)
+      const offConnection = connection.state.subscribe(republish)
+      return () => {
+        if (pending !== undefined) clearTimeout(pending)
+        offEntries()
+        offConnection()
+      }
+    }, 'settings-shell: section entries for the Agent')
+
     // Native policy: only a loopback page gets the privileged document actions (and the path they reveal).
     if (ctx.remote.$host.isLoopback) {
       const documentController = new SettingsDocumentStore(ctx.configForms.describe(), () => ctx.remote.settings.openSettingsDocument())
       ctx.effect(() => () => documentController.dispose(), 'settings-shell: document action')
-      const api = createApiClient(ctx, settingsShellApi, metadata?.packageId)
       const editorLoaded = (): boolean => ctx.slots.entries('sidebar.right.pane.tab').some(entry => entry.options.key === EDITOR_PANE_ID)
       const openers: ConfigFileOpeners = {
         documentPath: async () => {
@@ -838,7 +941,9 @@ export default defineClient({
           locale: SHELL_LOCALE_NAMESPACE,
           children: { 'settings.general.item': { kind: 'list', scope: 'root' } },
         },
-        (props: PropsRenderSlots<'settings.general.item'>) => <GeneralSection renderSlot={props.renderSlot} />,
+        (props: PropsRenderSlots<'settings.general.item'> & SettingsSectionSearchProps) => (
+          <GeneralSection renderSlot={props.renderSlot} target={props.target} />
+        ),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>

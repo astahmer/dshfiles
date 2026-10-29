@@ -12,7 +12,15 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import type { RequestMessagesStatus } from './contract.ts'
 
-type AdapterStream = (this: unknown, options: GenerateOptions, prepared?: unknown) => AsyncIterable<StreamChunk>
+/**
+ * The runtime's opaque prepared-call handle: `adapterStream` receives it when the caller went through
+ * `prepareCall`, and this plugin only forwards it untouched.
+ */
+interface PreparedCallHandle {
+  readonly dispatch: (options: GenerateOptions) => AsyncIterable<StreamChunk>
+}
+
+type AdapterStream = (this: LlmRuntime, options: GenerateOptions, prepared?: PreparedCallHandle) => AsyncIterable<StreamChunk>
 
 /**
  * Shared by every loaded copy of this bundle, so the method is wrapped once and the
@@ -99,7 +107,7 @@ export const installRequestMessages = (ctx: Context): RequestMessagesStatus => {
   if (!isAdapterStream(original))
     return { active: false, reason: 'this DSH llm runtime has no adapterStream method, so agent/request-messages cannot be dispatched' }
   const installation: Installation = { ownDescriptor: Reflect.getOwnPropertyDescriptor(runtime, 'adapterStream'), hosts: new Map([[token, ctx]]) }
-  const wrapped: AdapterStream = async function* (this: unknown, options, prepared) {
+  const wrapped: AdapterStream = async function* (this: LlmRuntime, options, prepared) {
     const host = installation.hosts.values().next().value
     const sent = host === undefined ? options : await requestOptions(host, options)
     yield* original.call(this, sent, prepared)

@@ -27,8 +27,8 @@ const run = async (input: {
       apiKey: 'test-key',
       fetch: stubFetch as typeof fetch,
       headers: { 'user-agent': 'dsh-test', 'x-dropped': null },
-      ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning }),
-      ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
+      ...(input.reasoning !== undefined && { reasoning: input.reasoning }),
+      ...(input.sessionId !== undefined && { sessionId: input.sessionId }),
     },
   })
   const events: AssistantMessageEvent[] = []

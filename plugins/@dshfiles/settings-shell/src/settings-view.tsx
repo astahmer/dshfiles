@@ -1,4 +1,5 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import {
   IconAgentPresetOutlineMedium,
   IconArchiveOutlineMedium,
@@ -31,7 +32,7 @@ import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { searchSettings, type SettingsSearchResult } from './settings-search.js'
+import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult } from './settings-search.js'
 
 export interface SectionRow {
   readonly id: string
@@ -70,11 +71,16 @@ export interface SettingsViewProps {
   /** Matching settings of one page, drawn with the query highlighted. */
   readonly renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], query: string) => ReactNode
   readonly activeId: string | undefined
+  /** Controls live sections publish, searched while their sections stay unmounted. */
+  readonly sectionEntries: readonly SectionEntryRow[]
+  /** The entry id the active section scrolls to, when search opened it. */
+  readonly sectionTarget: string | undefined
   readonly query: string
   readonly renderSlot: ShellRenderSlot
   readonly sectionOwner: SettingsSectionOwnerProps
   readonly t: ShellTranslate
   readonly onSelect: (sectionId: string) => void
+  readonly onReveal: (entry: { readonly sectionId: string; readonly target: string }) => void
   readonly onSearch: (query: string) => void
   /** Leaves the drilled-in side-panel section for the section list; a no-op elsewhere. */
   readonly onBack: () => void
@@ -114,6 +120,23 @@ const NavCell = (props: {
   </button>
 )
 
+/** Matching entries grouped by their section, in section order. */
+const entryGroups = (
+  entries: readonly SectionEntryRow[],
+): ReadonlyArray<{ readonly sectionId: string; readonly label: string; readonly entries: readonly SectionEntryRow[] }> => {
+  const groups = new Map<string, { readonly sectionId: string; readonly label: string; readonly entries: SectionEntryRow[] }>()
+  for (const entry of entries) {
+    const group = groups.get(entry.sectionId) ?? { sectionId: entry.sectionId, label: entry.sectionLabel, entries: [] }
+    group.entries.push(entry)
+    groups.set(entry.sectionId, group)
+  }
+  return [...groups.values()]
+}
+
+/** The machine sets a target only together with its section, so the active section is the one it belongs to. */
+const sectionOwnerWithTarget = (props: SettingsViewProps): SettingsSectionOwnerProps & SettingsSectionSearchProps =>
+  props.sectionTarget === undefined ? props.sectionOwner : { ...props.sectionOwner, target: props.sectionTarget }
+
 const pageIcon = <PuzzleIcon className="dshx:size-3.5 dshx:flex-none dshx:text-[var(--dsw-alias-label-secondary)]" />
 
 /** VS Code's results view: a flat list of matching settings grouped by the page that holds them. */
@@ -141,6 +164,43 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
           </div>
         </section>
       )}
+      {entryGroups(result.entries).map(group => (
+        <section
+          aria-label={group.label}
+          className="dshx:flex dshx:scroll-mt-4 dshx:flex-col dshx:gap-1"
+          data-results-page={group.sectionId}
+          key={group.sectionId}
+        >
+          <button
+            className="dshx:flex dshx:cursor-pointer dshx:items-baseline dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
+            onClick={() => props.onSelect(group.sectionId)}
+            type="button"
+          >
+            <h3 className="dshx:m-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground dshx:hover:underline">
+              <Highlight query={props.query} text={group.label} />
+            </h3>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: group.entries.length })}</span>
+          </button>
+          {group.entries.map(entry => (
+            <button
+              className="dshx:flex dshx:cursor-pointer dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:px-2 dshx:py-2 dshx:text-left dshx:hover:bg-accent"
+              data-settings-result-entry={entry.id}
+              key={entry.id}
+              onClick={() => props.onReveal({ sectionId: entry.sectionId, target: entry.id })}
+              type="button"
+            >
+              <span className="dshx:text-[14px] dshx:text-foreground">
+                <Highlight query={props.query} text={entry.title} />
+              </span>
+              {entry.description !== undefined && (
+                <span className="dshx:text-[12px] dshx:text-muted-foreground">
+                  <Highlight query={props.query} text={entry.description} />
+                </span>
+              )}
+            </button>
+          ))}
+        </section>
+      ))}
       {result.pages.map(hit => (
         <section aria-label={hit.page.title} className="dshx:flex dshx:scroll-mt-4 dshx:flex-col" data-results-page={hit.page.pageId} key={hit.page.pageId}>
           <button
@@ -165,7 +225,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   const { t } = props
   const sidebar = props.variant === 'sidebar'
   const searching = props.query.trim() !== ''
-  const result = searchSettings({ query: props.query, sections: props.rows, pages: props.pluginPages })
+  const result = SettingsSearch.search({ query: props.query, sections: props.rows, pages: props.pluginPages, entries: props.sectionEntries })
   const activePage = props.pluginPages.find(page => page.pageId === props.activeId)
   const active = activePage?.pageId ?? props.rows.find(row => row.id === props.activeId)?.id ?? props.rows[0]?.id
   // A narrow side panel shows one column: the section list until the user picks one, that section afterwards.
@@ -379,7 +439,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           <div className="dshx:max-w-[880px]">
             {searching && <SearchResults {...props} result={result} />}
             {!searching && activePage !== undefined && props.renderPluginPage(activePage)}
-            {!searching && activePage === undefined && active !== undefined && props.renderSlot('settings.section', props.sectionOwner, { only: active })}
+            {!searching &&
+              activePage === undefined &&
+              active !== undefined &&
+              props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: active })}
           </div>
         </div>
       </div>

@@ -106,4 +106,13 @@ describe('formatUsd', () => {
     expect(CostEstimateModel.formatUsd(0.4234)).toBe('$0.42')
     expect(CostEstimateModel.formatUsd(1234.5)).toBe('$1,235')
   })
+
+  it('marks estimates as approximate or a lower bound', () => {
+    const estimate = CostEstimateModel.estimateCost({
+      groups: [{ provider: 'codex-emialex', model: 'gpt-6-luna', band: 0, requests: 1, tokens: tokens({ uncachedInputTokens: 1_000_000 }) }],
+      quotes: new Map([['codex-emialex/gpt-6-luna', quote('codex-emialex', 'gpt-6-luna', luna)]]),
+    })
+    expect(CostEstimateModel.formatEstimate(estimate)).toBe('≈$0.10')
+    expect(CostEstimateModel.formatEstimate({ ...estimate, partial: true })).toBe('≥$0.10')
+  })
 })

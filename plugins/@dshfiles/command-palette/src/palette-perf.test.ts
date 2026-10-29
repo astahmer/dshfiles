@@ -29,15 +29,21 @@ const syntheticActions = (count: number) =>
 
 const RUNS_PER_KEYSTROKE = 9
 
+// This thread's CPU time, so time spent waiting for a core while other suites run in parallel does not count.
+const cpuMilliseconds = (): number => {
+  const usage = process.threadCpuUsage()
+  return (usage.user + usage.system) / 1000
+}
+
 const worstKeystroke = (query: string, rank: (query: string) => void): number => {
   for (let warmup = 0; warmup < 5; warmup++) rank(query)
   let worst = 0
   for (let length = 1; length <= query.length; length++) {
     let fastest = Infinity
     for (let run = 0; run < RUNS_PER_KEYSTROKE; run++) {
-      const started = performance.now()
+      const started = cpuMilliseconds()
       rank(query.slice(0, length))
-      fastest = Math.min(fastest, performance.now() - started)
+      fastest = Math.min(fastest, cpuMilliseconds() - started)
     }
     worst = Math.max(worst, fastest)
   }
@@ -74,13 +80,13 @@ test('opening the palette prepares 2,000 threads, 20,000 files and 200 frecency 
   for (let use = 0; use < 200; use++) frecency = PaletteFrecency.recordUse(frecency, `command:${use}`, Date.now())
   let fastest = Infinity
   for (let run = 0; run < RUNS_PER_KEYSTROKE; run++) {
-    const started = performance.now()
+    const started = cpuMilliseconds()
     const threadIndex = PaletteRules.indexThreads(threads)
     PaletteRules.rankThreads({ index: threadIndex, query: '', limit: 20 })
     const fileIndex = PaletteRules.indexFiles(paths)
     const boosts = PaletteFrecency.boosts(frecency, Date.now())
     PaletteRules.rankFiles({ index: fileIndex, query: '', limit: 50, boost: path => boosts.get(path) ?? 0 })
-    fastest = Math.min(fastest, performance.now() - started)
+    fastest = Math.min(fastest, cpuMilliseconds() - started)
   }
   assert.ok(fastest < 50, `fastest open ${fastest.toFixed(2)}ms exceeds the 50 ms open budget`)
 })

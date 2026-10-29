@@ -1,3 +1,4 @@
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import { SIDEBAR_AUTO_COLLAPSE } from './native/client/columns.ts'
 import type { createLayoutStore } from './native/client/stores.ts'
@@ -31,7 +32,7 @@ export class FrameWidthsModel {
     try {
       const raw = localStorage.getItem(FRAME_WIDTHS_KEY)
       if (raw === null) return null
-      const parsed = frameWidthsSchema.safeParse(JSON.parse(raw))
+      const parsed = decodeJsonSafe(frameWidthsSchema, raw)
       return parsed.success ? parsed.data : null
     } catch {
       return null

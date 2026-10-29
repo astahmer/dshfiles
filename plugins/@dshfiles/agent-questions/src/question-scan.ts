@@ -187,7 +187,7 @@ export class QuestionScan {
                 // Availability flags change what the read answers, so they are part of the shared scope.
                 key: `${target.sessionId}:${String(target.sessionLive)}:${String(target.sessionPersisted)}:${String(target.targetIsLiveRoot)}`,
                 start: signal => input.load(target, signal),
-                ...(input.signal === undefined ? {} : { callerSignal: input.signal }),
+                ...(input.signal !== undefined && { callerSignal: input.signal }),
               })
         if (loaded.facts === undefined) return { target, facts: undefined, projectionUnavailable: loaded.projectionUnavailable, reused: false }
         input.cache?.store(target, loaded.facts, input.now)

@@ -8,6 +8,13 @@ profile manifest by hand. A profile with a seed in this repository
 other profile gets every owned bundle. `--bundle <name>` adds or refreshes one bundle and
 leaves the rest alone.
 
+For one plugin plus its row config, `dshx add <package> [--profile <name>]
+[--option key=value ...] [--dry-run]` does it in one step: it runs this
+sync with `--bundle` for an owned bundle (or `dsh plugin add` for a registry
+package) and merges the options into the plugin's row in `cordis.patch.yml`,
+idempotently. See the
+[CLI reference](../tooling/dshx/docs/cli-reference.md#dshx-add-package-install-a-plugin-into-a-profile).
+
 ```sh
 dsh --profile web --dump-config          # full composed tree
 dsh --profile web --dump-config-schema   # JSON Schema for entries and patches

@@ -7,7 +7,9 @@ import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from '@dshfiles/plug
 import { useState } from 'react'
 import { z } from 'zod'
 import { settingsShellApi } from './shell-api.js'
+import type { DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const RELEASE_STATUS_QUERY_KEY = ['settings-shell', 'release-status'] as const
 const RELEASE_STATUS_REFRESH_MS = 6 * 60 * 60 * 1000
@@ -23,6 +25,19 @@ const useReleaseStatus = () => {
   })
 }
 
+const noticeMessage = (props: {
+  readonly t: ShellTranslate
+  readonly updateAvailable: boolean
+  readonly isError: boolean
+  readonly status: DshReleaseStatus | undefined
+}): string => {
+  if (props.updateAvailable) return props.t('releaseNotice.available', { version: props.status?.latestVersion ?? '' })
+  if (props.isError) return props.t('releaseNotice.failed')
+  if (props.status?.comparisonKnown === false) return props.t('releaseNotice.unknown', { version: props.status.currentVersion ?? '' })
+  if (props.status?.comparisonKnown === true) return props.t('releaseNotice.current', { version: props.status.currentVersion ?? '' })
+  return props.t('releaseNotice.checking')
+}
+
 export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.Element | null => {
   const status = useReleaseStatus()
   const dismissed = dismissedRelease.useValue()
@@ -31,7 +46,7 @@ export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.
   const label = props.t('releaseNotice.badge', { version })
   return (
     <Tooltip label={label} side="right">
-      <span aria-label={label} className="dshx:absolute dshx:end-0 dshx:top-0 dshx:size-1.5 dshx:rounded-full dshx:bg-warning" role="img" />
+      <StatusDot aria-label={label} size="sm" tone="warning" className="dshx:absolute dshx:end-0 dshx:top-0" />
     </Tooltip>
   )
 }
@@ -49,15 +64,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
         <div className="dshx:min-w-0 dshx:flex-1">
           <div className="dshx:text-[14px] dshx:leading-5 dshx:font-medium">
-            {updateAvailable
-              ? props.t('releaseNotice.available', { version: releaseStatus.latestVersion ?? '' })
-              : status.isError
-                ? props.t('releaseNotice.failed')
-                : releaseStatus?.comparisonKnown === false
-                  ? props.t('releaseNotice.unknown', { version: releaseStatus.currentVersion ?? '' })
-                  : releaseStatus?.comparisonKnown === true
-                    ? props.t('releaseNotice.current', { version: releaseStatus.currentVersion ?? '' })
-                    : props.t('releaseNotice.checking')}
+            {noticeMessage({ t: props.t, updateAvailable, isError: status.isError, status: releaseStatus })}
           </div>
           {updateAvailable && (
             <div className="dshx:mt-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">

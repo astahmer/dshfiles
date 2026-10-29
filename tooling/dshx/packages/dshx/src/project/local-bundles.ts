@@ -3,6 +3,8 @@ import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 import type { BootProfileBundle } from './boot-profile.js'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { ScratchProfileRuntime } from './scratch-profile.js'
@@ -41,17 +43,18 @@ export interface LocalBootBundle extends BootProfileBundle {
 }
 
 /** Owned Cordis bundles under plugins/@dshfiles, sorted by package id. */
-const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
-  const entries = await readdir(pluginsRoot, { withFileTypes: true })
+const listLocalBootBundles = async (options: { readonly pluginsRoot?: string } = {}): Promise<LocalBootBundle[]> => {
+  const root = options.pluginsRoot ?? pluginsRoot
+  const entries = await readdir(root, { withFileTypes: true })
   const bundles: LocalBootBundle[] = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const projectRoot = join(pluginsRoot, entry.name)
+    const projectRoot = join(root, entry.name)
     const source = await readFile(join(projectRoot, 'package.json'), 'utf8').catch(() => undefined)
     if (source === undefined) continue
-    let rawManifest: unknown
+    let rawManifest: JsonValue
     try {
-      rawManifest = JSON.parse(source)
+      rawManifest = decodeJson(jsonValueSchema, source)
     } catch (error) {
       throw new Error(`Cannot read ${join(projectRoot, 'package.json')}: ${error instanceof Error ? error.message : String(error)}.`)
     }
@@ -152,19 +155,21 @@ export const buildPlugin = async (projectRoot: string, packageId: string): Promi
   }
 }
 
+const portAddressSchema = z.object({ port: z.number() })
+
 /** Reserve a port by binding it and letting go, so the Host can take it. */
 export const findFreePort = async (): Promise<number> =>
   new Promise<number>((resolvePort, reject) => {
     const server = createServer()
     server.on('error', reject)
     server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      if (address === null || typeof address === 'string') {
+      const address = portAddressSchema.safeParse(server.address())
+      if (!address.success) {
         server.close()
         reject(new Error('could not reserve a port'))
         return
       }
-      const { port } = address
+      const { port } = address.data
       server.close(() => resolvePort(port))
     })
   })

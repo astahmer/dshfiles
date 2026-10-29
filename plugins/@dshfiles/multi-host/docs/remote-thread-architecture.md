@@ -165,8 +165,7 @@ C splits into two implementations, and one of them is much cheaper here:
   own — `session/list` adds them, `session/follow`/`page` re-serve the remote frames
   verbatim (same wire contract), `prompt`/`cancel`/`updateQueue` and model selection
   forward, and the model catalog, uploads and file references come from that runtime.
-  The native composer and chat render the remote thread; JJ/workspace path proxies,
-  approval answers and terminal access remain on the host UI.
+  The native composer and chat render the remote thread. A minimal read-only `sessionJjRepositories(sessionId)` proxy resolves the owning runtime and reads its repository/workspace status without sending a path. Path-scoped JJ operations, approval answers and terminal access remain on the host UI.
 
 `session/follow` frames are the same JSON events on both sides (same DSH version),
 which is what makes C2 tractable at all: the mirror re-emits, it does not translate.
@@ -218,9 +217,8 @@ absolute-path refusal messaging, remain unverified.
 
 ## Remaining boundaries
 
-- In-client answers to questions and tool approvals, terminal access, and JJ/workspace
-  path operations are not mirrored; the native thread still offers the host UI for
-  those operations.
+- `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
+- In-client question/approval answers and terminal access are not mirrored. The remote waterfall payload/answer RPC is only delivered to the owner Host's client. The local transcript's open tool-call name is not sufficient authorization to fabricate an answer or approve a call; Host UI is the safe fallback.
 - The loopback SSH E2E tests Host API transport for remote file references and uploads,
   but does not drive the browser's model picker or attachment picker.
 - The implementation routes selected local files through the owning runtime's upload

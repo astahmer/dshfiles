@@ -1,10 +1,11 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
-import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -23,6 +24,9 @@ import type { ActivityTimelineTranslate } from './locales.js'
 
 const feedKey = ['activity-timeline', 'feed'] as const
 const statsKey = ['activity-timeline', 'stats'] as const
+
+/** A stable empty page, so a feed with nothing loaded keeps the merge memo from re-evaluating every render. */
+const NO_ITEMS: readonly CondensedItem[] = []
 
 const badgeVariant = (item: CondensedItem): 'default' | 'secondary' | 'outline' | 'destructive' => {
   if (item.level === 'attention') return 'destructive'
@@ -115,9 +119,9 @@ export const ActivityTimelinePanel = (props: {
         request: hostSignal =>
           api.page(
             {
-              ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-              ...(sources.length === 0 ? {} : { sources: [...sources] }),
-              ...(attentionOnly ? { levels: [...attentionLevels] } : {}),
+              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
+              ...(sources.length !== 0 && { sources: [...sources] }),
+              ...(attentionOnly && { levels: [...attentionLevels] }),
               detailed,
               limit: 80,
             },
@@ -141,9 +145,9 @@ export const ActivityTimelinePanel = (props: {
           api.page(
             {
               cursor,
-              ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-              ...(sources.length === 0 ? {} : { sources: [...sources] }),
-              ...(attentionOnly ? { levels: [...attentionLevels] } : {}),
+              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
+              ...(sources.length !== 0 && { sources: [...sources] }),
+              ...(attentionOnly && { levels: [...attentionLevels] }),
               detailed,
               limit: 80,
             },
@@ -191,7 +195,7 @@ export const ActivityTimelinePanel = (props: {
     },
     retry: false,
   })
-  const newestItems = feedQuery.data?.items ?? []
+  const newestItems = feedQuery.data?.items ?? NO_ITEMS
   const items = useMemo(() => {
     const merged = mergeFeedItems({ older, newest: newestItems, previous: mergedItems.current })
     mergedItems.current = merged
@@ -260,39 +264,29 @@ export const ActivityTimelinePanel = (props: {
   return (
     <div className="dshx-root dshx:@container">
       <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-          <div>
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Badge variant="secondary">
-              {statsQuery.data?.retained ?? 0} {t('retained')}
-            </Badge>
-            <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
-              {statsQuery.data?.attention ?? 0} {t('attention')}
-            </Badge>
-            <Badge variant="outline">
-              {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
-            </Badge>
-            <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
-              <RefreshCwIcon aria-hidden /> {t('refresh')}
-            </Button>
-          </div>
-        </header>
+        <PageHeader heading={t('title')} description={t('subtitle')}>
+          <Badge variant="secondary">
+            {statsQuery.data?.retained ?? 0} {t('retained')}
+          </Badge>
+          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
+            {statsQuery.data?.attention ?? 0} {t('attention')}
+          </Badge>
+          <Badge variant="outline">
+            {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
+          </Badge>
+          <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
+            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          </Button>
+        </PageHeader>
         {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
-          <InputGroup className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('search')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={event => setSearch(event.currentTarget.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+            aria-label={t('search')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={event => setSearch(event.currentTarget.value)}
+          />
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
             {(['session', 'communication', 'integration'] as const).map(source => (
               <Button

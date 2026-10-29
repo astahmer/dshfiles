@@ -1,6 +1,7 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
 import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CircleStopIcon, InboxIcon, MessagesSquareIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
@@ -11,6 +12,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const threadReasons = {
   completed: { label: 'finished and waits for review', Icon: CircleCheckIcon, tone: 'dshx:text-success' },
@@ -136,10 +138,7 @@ export const InboxView = (props: {
                 )}
               >
                 {isUnread(item) || threads.length > 0 ? (
-                  <span
-                    aria-label="Unread"
-                    className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:size-1.5 dshx:-translate-y-1/2 dshx:rounded-full dshx:bg-info"
-                  />
+                  <StatusDot aria-label="Unread" size="sm" tone="info" className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:-translate-y-1/2" />
                 ) : null}
                 {item.proposal !== null && item.attention === 'none' ? (
                   <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-violet/15 dshx:text-violet">
@@ -170,31 +169,39 @@ export const InboxView = (props: {
                         className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground"
                       >
                         <reason.Icon aria-hidden className={cn('dshx:size-3.5', reason.tone)} />
-                        <button
-                          type="button"
-                          aria-label={`Open thread ${thread.title}`}
-                          onClick={event => {
-                            event.stopPropagation()
-                            props.openThread(thread.sessionId)
-                          }}
-                          title={thread.title}
-                          className="dshx:min-w-0 dshx:max-w-full dshx:truncate dshx:font-medium dshx:text-foreground dshx:hover:underline"
-                        >
-                          {thread.title}
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Open thread ${thread.title}`}
+                              onClick={event => {
+                                event.stopPropagation()
+                                props.openThread(thread.sessionId)
+                              }}
+                              className="dshx:min-w-0 dshx:max-w-full dshx:truncate dshx:font-medium dshx:text-foreground dshx:hover:underline"
+                            >
+                              {thread.title}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>{thread.title}</TooltipContent>
+                        </Tooltip>
                         <span>{reason.label}</span>
-                        <button
-                          type="button"
-                          aria-label={`Acknowledge thread ${thread.title}`}
-                          title="Acknowledge (also clears it in the sidebar)"
-                          onClick={event => {
-                            event.stopPropagation()
-                            props.acknowledgeThread(thread)
-                          }}
-                          className="dshx:rounded-md dshx:p-1 dshx:hover:bg-accent dshx:hover:text-foreground"
-                        >
-                          <CheckIcon className="dshx:size-3.5" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Acknowledge thread ${thread.title}`}
+                              onClick={event => {
+                                event.stopPropagation()
+                                props.acknowledgeThread(thread)
+                              }}
+                              className="dshx:rounded-md dshx:p-1 dshx:hover:bg-accent dshx:hover:text-foreground"
+                            >
+                              <CheckIcon className="dshx:size-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Acknowledge (also clears it in the sidebar)</TooltipContent>
+                        </Tooltip>
                       </div>
                     )
                   })}
@@ -224,19 +231,23 @@ export const InboxView = (props: {
                   </p>
                 </div>
                 {hasItemReason ? (
-                  <button
-                    type="button"
-                    aria-label="Resolve"
-                    title={item.attention === 'none' ? 'Dismiss the suggestion' : 'Mark resolved'}
-                    onClick={event => {
-                      event.stopPropagation()
-                      if (item.attention === 'none') actions.dismissProposal.mutate(item.id)
-                      else actions.update.mutate({ id: item.id, attention: 'none' })
-                    }}
-                    className="dshx:self-start dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:hover:bg-accent dshx:hover:text-foreground"
-                  >
-                    <CheckIcon className="dshx:size-3.5" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Resolve"
+                        onClick={event => {
+                          event.stopPropagation()
+                          if (item.attention === 'none') actions.dismissProposal.mutate(item.id)
+                          else actions.update.mutate({ id: item.id, attention: 'none' })
+                        }}
+                        className="dshx:self-start dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:hover:bg-accent dshx:hover:text-foreground"
+                      >
+                        <CheckIcon className="dshx:size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{item.attention === 'none' ? 'Dismiss the suggestion' : 'Mark resolved'}</TooltipContent>
+                  </Tooltip>
                 ) : null}
               </li>
             </BacklogItemMenu>

@@ -11,7 +11,7 @@ import { loopbackAccessApi } from './api.js'
 import type { NetworkTranslate } from './locales.js'
 import { networkFormSchema, networkSnapshotSchema, type NetworkForm, type NetworkSnapshot } from './network-api.js'
 
-export const networkQueryKey = ['loopback-access', 'network'] as const
+const networkQueryKey = ['loopback-access', 'network'] as const
 
 type NetworkSaveInput = NetworkForm & { readonly expectedRevision: number }
 

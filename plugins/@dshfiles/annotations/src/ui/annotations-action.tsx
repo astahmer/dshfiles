@@ -4,12 +4,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
 import { formatAnnotationBlock } from '../draft.js'
+import { annotationsListPollMs } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
 import { annotationsUi } from './state.js'
@@ -26,8 +27,22 @@ const statusVariant = (annotation: Annotation): 'default' | 'secondary' | 'outli
   return 'outline'
 }
 
+const pickFailureMessage = ({
+  reason,
+  noPage,
+}: {
+  readonly reason: 'cancelled' | 'timeout' | 'unavailable' | 'no-page'
+  readonly noPage: string
+}): string | null => {
+  if (reason === 'no-page') return noPage
+  if (reason === 'timeout') return 'The pick timed out; click Pick again.'
+  if (reason === 'cancelled') return null
+  return 'Could not reach that tab.'
+}
+
 export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const api = useApi(annotationsApi)
+  const plugin = usePlugin()
   const queryClient = useQueryClient()
   const sessionId = props.sessionId
   const [open, setOpen] = useState(false)
@@ -49,9 +64,14 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     queryKey: ['annotations', sessionId],
     queryFn: ({ signal }) =>
       runHostRequest({ signal, request: hostSignal => api.list({ sessionId, statuses: [...OPEN_STATUSES], limit: 50 }, { signal: hostSignal }) }),
-    refetchInterval: 4_000,
+    refetchInterval: annotationsListPollMs(open),
+    refetchOnWindowFocus: !open,
     retry: 1,
   })
+  const refetchList = list.refetch
+  useEffect(() => {
+    if (open) void refetchList()
+  }, [refetchList, open])
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
@@ -111,15 +131,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     mutationFn: async () => runHostRequest({ request: signal => api.chromePick({}, { signal }) }),
     onSuccess: result => {
       if (!result.ok) {
-        setActionError(
-          result.reason === 'no-page'
-            ? 'No annotatable tab yet; open a page in that window.'
-            : result.reason === 'timeout'
-              ? 'The pick timed out; click Pick again.'
-              : result.reason === 'cancelled'
-                ? null
-                : 'Could not reach that tab.',
-        )
+        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'No annotatable tab yet; open a page in that window.' }))
         return
       }
       setActionError(null)
@@ -131,15 +143,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     mutationFn: async (pageId: string) => runHostRequest({ request: signal => api.chromePick({ pageId }, { signal }) }),
     onSuccess: result => {
       if (!result.ok) {
-        setActionError(
-          result.reason === 'no-page'
-            ? 'That tab is gone; refresh the list.'
-            : result.reason === 'timeout'
-              ? 'The pick timed out; click Pick again.'
-              : result.reason === 'cancelled'
-                ? null
-                : 'Could not reach that tab.',
-        )
+        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'That tab is gone; refresh the list.' }))
         return
       }
       setActionError(null)
@@ -345,7 +349,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     size="sm"
                     variant="ghost"
                     className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                    onClick={() => void navigator.clipboard.writeText(setupQuery.data?.extensionPath ?? '')}
+                    onClick={() => void plugin.system.copy(setupQuery.data?.extensionPath ?? '')}
                   >
                     Copy
                   </Button>
@@ -386,7 +390,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     size="sm"
                     variant="ghost"
                     className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                    onClick={() => void navigator.clipboard.writeText(tokenQuery.data?.token ?? '')}
+                    onClick={() => void plugin.system.copy(tokenQuery.data?.token ?? '')}
                   >
                     Copy
                   </Button>

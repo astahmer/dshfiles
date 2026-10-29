@@ -32,9 +32,10 @@ import type { AccountDraft, AccountsFile } from './api.js'
 import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
 import { QuotaSection } from './quota-section.js'
-import { AccountUsageDashboard } from './account-usage-dashboard.js'
+import { AccountUsageSlot } from './account-usage-view.js'
 import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const AccountDetail = (props: {
   readonly state: AccountsPanelState
@@ -89,7 +90,7 @@ export const AccountDetail = (props: {
             )}
           >
             <span className="dshx:flex dshx:items-center dshx:gap-2">
-              <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+              <StatusDot tone="current" />
               {status?.label ?? 'Not connected'}
             </span>
             <small className="dshx:mt-1 dshx:block dshx:text-[10px]">
@@ -196,7 +197,7 @@ export const AccountDetail = (props: {
           <AccountSettings draft={draft} file={props.file} state={props.state} folderPicker={props.folderPicker} onConnect={connect} />
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="usage">
-          <AccountUsageDashboard accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
+          <AccountUsageSlot accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
           <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
             <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-semibold">Subscription quota & history</summary>
             <p className="dshx:my-3 dshx:text-xs dshx:text-muted-foreground">

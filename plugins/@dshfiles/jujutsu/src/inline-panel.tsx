@@ -9,6 +9,7 @@ interface InlinePanelProps {
   readonly tone?: 'default' | 'destructive'
   readonly onCancel: () => void
   readonly children: ReactNode
+  readonly className?: string
 }
 
 /** The one shape every revision-row action uses instead of a modal: a bordered panel inside the row it acts on. */
@@ -18,6 +19,7 @@ export const InlinePanel = (props: InlinePanelProps): JSX.Element => (
     className={cn(
       'dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3',
       props.tone === 'destructive' ? 'dshx:border-destructive/40 dshx:bg-destructive/5' : 'dshx:border-primary/40 dshx:bg-primary/5',
+      props.className,
     )}
     onKeyDown={event => {
       if (event.key !== 'Escape') return

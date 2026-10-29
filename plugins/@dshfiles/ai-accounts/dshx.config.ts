@@ -11,6 +11,7 @@ export default defineConfig({
     'model-fallback-api': 'src/model-fallback-api.ts',
     'model-fast-mode-api': 'src/model-fast-mode-api.ts',
     'thread-account-api': 'src/thread-account-api.ts',
+    'account-usage-view': 'src/account-usage-view.tsx',
   },
   client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },

@@ -1,6 +1,10 @@
 import { SdkSetupRuntime } from '../sdk/setup.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { DshxError } from '../diagnostics.js'
+import { BrowserBroker } from './broker.js'
+import { IsolationModel } from './isolation.js'
+import type { PluginContext } from './plugin-context.js'
+import { PluginRuntimeModel } from './plugin-runtime.js'
 import type {
   ClientComponentDecorator,
   ClientConversationContribution,
@@ -17,12 +21,14 @@ import { ApiClientLifecycle } from '../api/client.js'
 import { BrowserTraceTransportModel } from '../tracing/browser-transport.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { registerPluginPageSettings } from '../settings/plugin-page.js'
+import { SettingsSearchEntriesModel } from '../settings/section-entries.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
 import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
 
 const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup'])
-const LOCALE_IDS = ['zh', 'en'] as const
+const LOCALE_ID_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u
+const SETTINGS_SECTION_SLOT = 'settings.section'
 
 /** Project identity embedded by the Client compiler. */
 export interface ClientPluginMetadata {
@@ -57,6 +63,7 @@ interface ClientConversationEventsService {
 
 interface ClientLocaleService {
   register(namespace: string, dictionaries: LocaleDictionaries): () => void
+  register(namespace: string, locale: string, dictionary: Readonly<Record<string, string>>): () => void
 }
 
 type ClientRuntimeContext = ClientContext & {
@@ -72,7 +79,7 @@ function fail(
   hint: string,
 ): never {
   throw new DshxError(code, message, {
-    ...(metadata.sourceFile === undefined ? {} : { file: metadata.sourceFile }),
+    ...(metadata.sourceFile !== undefined && { file: metadata.sourceFile }),
     hint,
   })
 }
@@ -134,7 +141,7 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
       'DSHX2401',
       `Client Locale contribution at index ${index} must be an object returned by defineLocale().`,
       metadata,
-      'Use defineLocale("namespace", { zh: { ... }, en: { ... } }) inside defineClient({ locales: [...] }).',
+      'Use defineLocale("namespace", { en: { ... }, zh: { ... } }) inside defineClient({ locales: [...] }).',
     )
   }
   const { namespace, dictionaries } = LocaleNamespaceModel.parts(value)
@@ -149,23 +156,31 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
   if (typeof dictionaries !== 'object' || dictionaries === null || Array.isArray(dictionaries)) {
     fail(
       'DSHX2402',
-      `Client Locale contribution at index ${index} must provide complete zh/en dictionaries.`,
+      `Client Locale contribution at index ${index} must provide locale dictionaries.`,
       metadata,
-      'Pass { zh: { key: "..." }, en: { key: "..." } } as the second defineLocale() argument.',
+      'Pass { en: { key: "..." }, zh: { key: "..." } } as the second defineLocale() argument.',
     )
   }
-  const localeIds = Object.keys(dictionaries)
-  if (localeIds.length !== LOCALE_IDS.length || LOCALE_IDS.some(locale => !Object.hasOwn(dictionaries, locale))) {
+  const english: unknown = dictionaries.en
+  if (typeof english !== 'object' || english === null || Array.isArray(english)) {
     fail(
       'DSHX2402',
-      `Client Locale contribution at index ${index} must provide exactly the zh and en dictionaries.`,
+      `Client Locale contribution at index ${index} must provide an en dictionary.`,
       metadata,
-      'Add the missing shipped locale or remove unsupported locale ids.',
+      'Add the complete English dictionary; other locales fall back to it for missing keys.',
     )
   }
-  let expectedKeys: readonly string[] | undefined
-  for (const locale of LOCALE_IDS) {
-    const dictionary = dictionaries[locale] as unknown
+  const invalidLocaleId = Object.keys(dictionaries).find(locale => !LOCALE_ID_PATTERN.test(locale))
+  if (invalidLocaleId !== undefined) {
+    fail(
+      'DSHX2402',
+      `Client Locale contribution at index ${index} has an invalid locale id ${JSON.stringify(invalidLocaleId)}.`,
+      metadata,
+      'Use BCP 47-style locale ids such as "en", "zh" or "pt-BR".',
+    )
+  }
+  const englishKeys = new Set(Object.keys(english))
+  for (const [locale, dictionary] of Object.entries(dictionaries)) {
     if (typeof dictionary !== 'object' || dictionary === null || Array.isArray(dictionary)) {
       fail('DSHX2402', `Client Locale contribution at index ${index} has an invalid ${locale} dictionary.`, metadata, 'Use a flat key-to-string object.')
     }
@@ -178,16 +193,15 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
         'Use non-empty keys and string translation values.',
       )
     }
-    const keys = entries.map(([key]) => key).sort()
-    if (expectedKeys !== undefined && (keys.length !== expectedKeys.length || keys.some((key, keyIndex) => key !== expectedKeys?.[keyIndex]))) {
+    const extraKey = entries.find(([key]) => !englishKeys.has(key))?.[0]
+    if (extraKey !== undefined) {
       fail(
         'DSHX2402',
-        `Client Locale contribution at index ${index} must use identical keys in every dictionary.`,
+        `Client Locale contribution at index ${index} has key ${JSON.stringify(extraKey)} in ${locale} that the en dictionary lacks.`,
         metadata,
-        'Add or remove keys until the zh and en dictionaries have the same shape.',
+        'English defines the key set: add the key to en or remove it from the other locale.',
       )
     }
-    expectedKeys = keys
   }
   return value
 }
@@ -292,18 +306,45 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
 type ComponentDecorator = ClientComponentDecorator
 
 function normalizedSlotOptions(options: SlotRegistrationOptions): SlotRegistrationOptions {
-  if (!LocaleNamespaceModel.isDefinition(options.locale)) return options
-  return { ...options, locale: LocaleNamespaceModel.parts(options.locale).namespace }
+  const { metadata: _metadata, ...registration } = options
+  if (!LocaleNamespaceModel.isDefinition(registration.locale)) return registration
+  return { ...registration, locale: LocaleNamespaceModel.parts(registration.locale).namespace }
+}
+
+/** The ledger drops registration metadata, so a section's search entries live as long as its registration in the shared seat. */
+function registerSlot(client: ClientRuntimeContext, name: string, options: SlotRegistrationOptions, component: unknown): unknown {
+  const dispose = client.slots.register({ name, ...normalizedSlotOptions(options) }, component)
+  const sectionId = options.id
+  if (name !== SETTINGS_SECTION_SLOT || typeof sectionId !== 'string') return dispose
+  const entries = options.metadata?.searchEntries
+  if (entries === undefined) return dispose
+  const unpublish = SettingsSearchEntriesModel.publish({ sectionId, entries })
+  return () => {
+    unpublish()
+    if (typeof dispose === 'function') dispose()
+  }
 }
 
 function registerLocales(client: ClientRuntimeContext, definition: ClientDefinition): void {
   for (const locale of definition.locales ?? []) {
     const { namespace, dictionaries } = LocaleNamespaceModel.parts(locale)
-    client.effect(() => client.locale.register(namespace, dictionaries))
+    const registration = LocaleNamespaceModel.registration(dictionaries)
+    client.effect(() => client.locale.register(namespace, registration.builtIn))
+    for (const { locale: localeId, dictionary } of registration.additional) {
+      client.effect(() => client.locale.register(namespace, localeId, dictionary))
+    }
   }
 }
 
-function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator): void {
+const slotContributionId = (name: string, options: Record<string, unknown>): string => {
+  const key = typeof options.id === 'string' ? options.id : typeof options.key === 'string' ? options.key : undefined
+  return key === undefined ? name : `${name}:${key}`
+}
+
+const isolated = (component: unknown, owner: string, id: string): unknown =>
+  typeof component === 'function' ? IsolationModel.isolate(component as (props: Readonly<Record<string, unknown>>) => null, { owner, id }) : component
+
+function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator, owner: string): void {
   for (const conversation of definition.conversations ?? []) {
     const { definition: conversationDefinition, renderer } = ConversationContributionModel.parts(conversation)
     client.conversationEvents.register(conversationDefinition)
@@ -311,7 +352,23 @@ function registerContributions(client: ClientRuntimeContext, definition: ClientD
   }
   for (const slot of definition.slots ?? []) {
     const { name, options, component } = ClientContributionModel.parts(slot)
-    client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(component)))
+    const id = slotContributionId(name, options as Record<string, unknown>)
+    client.slots.inject(name, () => registerSlot(client, name, options, decorate(isolated(component, owner, id))))
+  }
+}
+
+const invokeSetup = (
+  definition: ClientDefinition,
+  client: ClientRuntimeContext,
+  decorate: ComponentDecorator,
+  metadata: ClientPluginMetadata,
+  plugin: PluginContext,
+): ReturnType<typeof SdkSetupRuntime.invokeClient> => {
+  try {
+    return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, { ...metadata, plugin })
+  } catch (error) {
+    BrowserBroker.reportFailure({ owner: metadata.packageId, kind: 'setup', id: 'setup', error })
+    throw error
   }
 }
 
@@ -364,10 +421,11 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       registerLocales(client, definition)
       const settings = metadata.settingsCapability === true ? createSettingsClientRuntime(ctx) : undefined
       if (!hasApiCapability) {
-        const decorate = ((component: unknown): unknown =>
+        const baseDecorate = ((component: unknown): unknown =>
           settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
-        registerContributions(client, definition, decorate)
-        return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
+        const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+        registerContributions(client, definition, runtime.decorate, metadata.packageId)
+        return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
       }
       const apiClient = ApiClientLifecycle.create(ctx, metadata.packageId)
       if (typeof client.effect === 'function') client.effect(() => BrowserTraceTransportModel.connect(client))
@@ -375,12 +433,13 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       // function type than the component it wraps. The contract callers rely on
       // is "renders the same component", so the wrapper is asserted once here
       // rather than leaking provider props into every registration site.
-      const decorate = ((component: unknown): unknown => {
+      const baseDecorate = ((component: unknown): unknown => {
         const apiComponent = ApiClientLifecycle.provide(component as any, apiClient)
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
       }) as ComponentDecorator
-      registerContributions(client, definition, decorate)
-      return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
+      const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+      registerContributions(client, definition, runtime.decorate, metadata.packageId)
+      return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
     },
   }
 }
@@ -402,8 +461,8 @@ export function createClientModule(source: Record<string, unknown>, metadata: Cl
   const apply = source.apply as (ctx: Context | ClientContext, config?: unknown) => unknown
   return {
     name: (source.name as string | undefined) ?? fallbackName(metadata),
-    ...(source.inject === undefined ? {} : { inject: source.inject }),
-    ...(source.Config === undefined ? {} : { Config: source.Config }),
+    ...(source.inject !== undefined && { inject: source.inject }),
+    ...(source.Config !== undefined && { Config: source.Config }),
     apply(ctx, config) {
       registerPluginPage(ctx, metadata)
       return apply(ctx, config)

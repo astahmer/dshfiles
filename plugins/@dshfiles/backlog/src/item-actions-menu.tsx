@@ -25,9 +25,14 @@ import { deleteSelection as deleteSelectedItems } from './delete-selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { backlogItemMarkdown } from './item-markdown.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
+import { BacklogTweetContext } from './backlog-tweet-context.js'
+import { BacklogNotices } from './notices.js'
 
 const NO_PROJECT = 'no-project'
-type BacklogMenuItem = Pick<BacklogSummaryView, 'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links'> & {
+type BacklogMenuItem = Pick<
+  BacklogSummaryView,
+  'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links' | 'tweetContextUrls' | 'attachments'
+> & {
   readonly attention?: BacklogSummaryView['attention'] | undefined
   readonly preview?: BacklogSummaryView['preview'] | undefined
   readonly body?: string | undefined
@@ -61,6 +66,23 @@ export const BacklogItemMenu = (props: {
   /** Every action applies to the whole selection; the count says so before the click. */
   const countSuffix = many ? ` (${String(selection.length)})` : ''
   const selectedIds = selection.map(selected => selected.id)
+  const tweetUrl = many ? undefined : BacklogTweetContext.urlsForItem(item)[0]
+  const importTweet = async (): Promise<void> => {
+    if (tweetUrl === undefined) return
+    try {
+      const result = await actions.enrichTweet.mutateAsync({ id: item.id, url: tweetUrl })
+      const count = result.ok ? result.value.item.attachments.length - item.attachments.length : 0
+      BacklogNotices.show({
+        text: result.ok
+          ? `Retrieved tweet content for b:${String(item.id)}${count > 0 ? ` · ${String(count)} images` : ''}`
+          : `Backlog item b:${String(item.id)} no longer exists.`,
+        kind: result.ok ? 'success' : 'failure',
+        sessionId: null,
+      })
+    } catch (error) {
+      BacklogNotices.show({ text: errorMessage(error, 'Tweet content could not be retrieved.'), kind: 'failure', sessionId: null })
+    }
+  }
   const deleteSelection = async (): Promise<void> => {
     await deleteSelectedItems({
       ids: selectedIds,
@@ -104,6 +126,12 @@ export const BacklogItemMenu = (props: {
             <CopyIcon aria-hidden className="dshx:size-3.5" />
             Copy item as Markdown
           </ContextMenuItem>
+          {tweetUrl === undefined ? null : (
+            <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" disabled={actions.enrichTweet.isPending} onSelect={() => void importTweet()}>
+              <LinkIcon aria-hidden className="dshx:size-3.5" />
+              Retrieve tweet content
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator />
           <ContextMenuSub>
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">

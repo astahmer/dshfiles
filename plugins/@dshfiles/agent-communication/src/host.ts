@@ -23,9 +23,41 @@ import { RecipientDirectoryModel } from './recipient-directory.js'
 import { SessionHistoryModel } from './session-history.js'
 import { UnreadNudgeRules } from './unread-nudge.js'
 
+/**
+ * The `communication-message` payload this bundle emits on `dshfiles/activity/event`;
+ * `@dshfiles/activity-timeline` decodes it by `kind` into one Activity item.
+ */
+interface CommunicationMessageActivityPayload {
+  readonly kind: 'communication-message'
+  readonly value: {
+    readonly at: number
+    readonly messageId: string
+    readonly senderId: string
+    readonly recipientCount: number
+    readonly intent: 'notice' | 'request'
+    readonly topic: string | null
+    readonly correlationId?: string | undefined
+    readonly sessionId: string | null
+  }
+}
+
+/** The `communication-activity` payload for one tracked tool call on the same event. */
+interface CommunicationOperationActivityPayload {
+  readonly kind: 'communication-activity'
+  readonly value: {
+    readonly at: number
+    readonly sessionId: string
+    readonly operation: CommunicationActivityOperation
+    readonly outcome: 'success' | 'failure'
+    readonly callId: ToolRunContext['callId']
+    readonly rootCallId: string | null
+    readonly errorCode: string | null
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/event'(payload: CommunicationMessageActivityPayload | CommunicationOperationActivityPayload): void
     'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
   }
 }
@@ -344,10 +376,10 @@ const publishTool = defineTool({
           sender,
           topic: args.topic,
           text: args.text,
-          ...(args.intent === undefined ? {} : { intent: args.intent }),
+          ...(args.intent !== undefined && { intent: args.intent }),
           priority: args.priority ?? 'normal',
-          ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
-          ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
+          ...(args.correlationId !== undefined && { correlationId: args.correlationId }),
+          ...(args.dedupeKey !== undefined && { dedupeKey: args.dedupeKey }),
         })
         hostContext?.emit('dshfiles/activity/event', {
           kind: 'communication-message',
@@ -358,7 +390,7 @@ const publishTool = defineTool({
             recipientCount: message.recipients.length,
             intent: message.intent,
             topic: message.topic,
-            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            ...(message.correlationId !== null && { correlationId: message.correlationId }),
             sessionId: sender.id,
           },
         })
@@ -403,10 +435,10 @@ const sendTool = defineTool({
           sender,
           toAgentId: args.toAgentId,
           text: args.text,
-          ...(args.intent === undefined ? {} : { intent: args.intent }),
+          ...(args.intent !== undefined && { intent: args.intent }),
           priority: args.priority ?? 'normal',
-          ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
-          ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
+          ...(args.correlationId !== undefined && { correlationId: args.correlationId }),
+          ...(args.dedupeKey !== undefined && { dedupeKey: args.dedupeKey }),
         })
         hostContext?.emit('dshfiles/activity/event', {
           kind: 'communication-message',
@@ -417,7 +449,7 @@ const sendTool = defineTool({
             recipientCount: message.recipients.length,
             intent: message.intent,
             topic: message.topic,
-            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            ...(message.correlationId !== null && { correlationId: message.correlationId }),
             sessionId: sender.id,
           },
         })
@@ -658,7 +690,7 @@ const setupHost = (context: Context): Effect<void> => {
               recipientCount: message.recipients.length,
               intent: message.intent,
               topic: message.topic,
-              ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+              ...(message.correlationId !== null && { correlationId: message.correlationId }),
               sessionId: message.sender.kind === 'agent' ? message.sender.id : null,
             },
           })

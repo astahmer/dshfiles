@@ -51,7 +51,18 @@ const threadMarker = (context: Context): MarkThread => {
 export const startAlerts = (input: { readonly context: Context; readonly traces: TraceStore; readonly path: string }): (() => void) => {
   const logger = input.context.logger('traces')
   const alerts = openAlertStore({ path: input.path })
-  const engine = createAlertEngine({ samples: input.traces, alerts, markThread: threadMarker(input.context) })
+  const engine = createAlertEngine({
+    samples: input.traces,
+    alerts,
+    markThread: threadMarker(input.context),
+    runningSessionIds: () =>
+      new Set(
+        input.context.agents
+          .list()
+          .filter(agent => agent.status === 'running')
+          .map(agent => String(agent.id)),
+      ),
+  })
   const active: AlertsRuntime = { engine }
   runtime = active
   const evaluate = (): void => {

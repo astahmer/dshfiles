@@ -22,6 +22,7 @@ export const sessionProjectPath = (
   const visited = new Set([sessionId])
   let parentId = session.parentId
   while (parentId !== undefined && !visited.has(parentId)) {
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: the `.find` callback needs the narrowed string while the loop reassigns parentId.
     const currentParentId = parentId
     visited.add(currentParentId)
     const parentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(currentParentId))

@@ -15,7 +15,7 @@ import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabili
 import { installedLocaleNamespaces } from './installed.js'
 import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
-import { clientGuardPlugin, singleClientChunkPlugin } from './guards.js'
+import { ClientCompilerGuards } from './guards.js'
 import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
 
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
@@ -38,12 +38,21 @@ const CLIENT_SDK_PATH = fileURLToPath(new URL('../../sdk/client.js', import.meta
 const CLIENT_LOCALE_PATH = fileURLToPath(new URL('../../client/locale.js', import.meta.url))
 const CLIENT_HOST_COMMANDS_PATH = fileURLToPath(new URL('../../client/host-commands.js', import.meta.url))
 const CLIENT_API_PATH = fileURLToPath(new URL('../../api/client.js', import.meta.url))
+const CLIENT_BROKER_PATH = fileURLToPath(new URL('../../client/broker.js', import.meta.url))
+const CLIENT_APP_SERVICES_PATH = fileURLToPath(new URL('../../client/app-services.js', import.meta.url))
+const CLIENT_REGISTRIES_PATH = fileURLToPath(new URL('../../client/registries.js', import.meta.url))
+const CLIENT_STORE_PATH = fileURLToPath(new URL('../../client/store.js', import.meta.url))
+const CLIENT_HOOKS_PATH = fileURLToPath(new URL('../../client/hooks.js', import.meta.url))
+const CLIENT_PLUGIN_CONTEXT_PATH = fileURLToPath(new URL('../../client/plugin-context.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
+const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_PATH = fileURLToPath(new URL('../../settings/section-entries.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const CONVERSATION_DEFINE_PATH = fileURLToPath(new URL('../../conversation/define.js', import.meta.url))
 
 /** Options for producing one DSH-compatible lazy-CJS client bundle. */
@@ -147,22 +156,49 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { LocaleNamespaceModel } from ${JSON.stringify(CLIENT_LOCALE_PATH)}`,
           'export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace',
           'export const defineLocale = LocaleNamespaceModel.define',
+          'export const plural = LocaleNamespaceModel.plural',
           `import { HostCommandsModel } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
-          `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { useApi, useApiEvent, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `import { ApiClientEventsModel } from ${JSON.stringify(API_CLIENT_EVENTS_PATH)}`,
+          'export const subscribeApiEvent = ApiClientEventsModel.subscribe',
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           `import { SettingsPageRendererModel } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           'export const provideSettingsPageRenderer = SettingsPageRendererModel.provide',
+          `import { BrowserBroker } from ${JSON.stringify(CLIENT_BROKER_PATH)}`,
+          'export const defineContract = BrowserBroker.defineContract',
+          'export const defineRegistry = BrowserBroker.defineRegistry',
+          'export const contributionFailures = BrowserBroker.failures',
+          `import { PluginContextModel } from ${JSON.stringify(CLIENT_PLUGIN_CONTEXT_PATH)}`,
+          'export const constantSource = PluginContextModel.constant',
+          'export const createSource = PluginContextModel.signal',
+          `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
+          `export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
+          `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
+          'export const defineStore = StoreModel.define',
+          `import { PluginHooksModel } from ${JSON.stringify(CLIENT_HOOKS_PATH)}`,
+          'export const usePlugin = PluginHooksModel.usePlugin',
+          'export const useSubscribable = PluginHooksModel.useSubscribable',
+          'export const useContract = PluginHooksModel.useContract',
+          'export const useRegistry = PluginHooksModel.useRegistry',
+          'export const useContributionFailures = PluginHooksModel.useContributionFailures',
+          'export const useKeyed = PluginHooksModel.useKeyed',
+          'export const useLatest = PluginHooksModel.useLatest',
+          `import { SettingsSearchEntriesModel } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_PATH)}`,
+          'export const settingsSearchEntries = SettingsSearchEntriesModel.current',
+          'export const subscribeSettingsSearchEntries = SettingsSearchEntriesModel.subscribe',
+          'export const publishSettingsSearchEntries = SettingsSearchEntriesModel.publish',
           '',
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {
         return [
-          `import { useApi as useApiImplementation, useApiQuery as useApiQueryImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
+          `import { useApi as useApiImplementation, useApiEvent as useApiEventImplementation, useApiQuery as useApiQueryImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
           'export function useApi(...args) { return useApiImplementation(...args) }',
+          'export function useApiEvent(...args) { return useApiEventImplementation(...args) }',
           'export function useApiQuery(...args) { return useApiQueryImplementation(...args) }',
           '',
         ].join('\n')
@@ -181,6 +217,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner',
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
+          'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')
@@ -189,6 +226,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
+          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }
@@ -490,6 +528,17 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     options.shared === undefined
       ? undefined
       : await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
+  const provided = new Map<string, string>()
+  const provide = (specifiers: Iterable<string>, reason: (specifier: string) => string): void => {
+    for (const specifier of specifiers) if (!provided.has(specifier)) provided.set(specifier, reason(specifier))
+  }
+  provide(protectedModules, specifier => `DSH loads ${JSON.stringify(specifier)} for every Client`)
+  // DSH serves its own packages whole. An owned package can publish dshx modules next to its Client, and every
+  // consumer bundles those contracts on purpose; its exact specifier always stays external anyway.
+  const dshPackages = (specifiers: readonly string[] = []): readonly string[] => specifiers.filter(specifier => specifier.startsWith('@deepseek-ai/'))
+  provide(dshPackages(options.inject), specifier => `the Host loads ${JSON.stringify(specifier)} first through dsh.client.inject`)
+  provide(dshPackages(options.external), specifier => `the Host serves ${JSON.stringify(specifier)} through dsh.client.external`)
+  provide(supplier?.modules.keys() ?? [], specifier => `shared runtime ${JSON.stringify(options.shared)} provides ${JSON.stringify(specifier)}`)
   let sheetHash: string | undefined
   const assetsInlineLimit = (): boolean => true
   const output = {
@@ -513,7 +562,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     plugins: [
       clientEntryPlugin(paths, options),
       ...(watch ? [clientSetupServiceGuardPlugin(paths, options)] : []),
-      clientGuardPlugin(externals, options.packageId, bundleDependencies),
+      ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
       CompilerKernel.artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
       CompilerKernel.dependencyManifestPlugin({ face: 'client', root: paths.root, outDir: paths.outDir, entryFile: 'client.js' }),
@@ -540,6 +589,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         },
       }),
       clientCapabilitiesPlugin(options),
+      ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies }),
       CompilerKernel.boundaryPlugin({
         face: 'client',
         root: paths.root,
@@ -550,7 +600,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         output,
         cssCodeSplit: false,
       }),
-      singleClientChunkPlugin(),
+      ClientCompilerGuards.singleClientChunkPlugin(),
     ],
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
@@ -614,5 +664,5 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  return CompilerKernel.buildReport(await build(config), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
+  return CompilerKernel.buildReport(await build(config).catch(CompilerKernel.surfaceGuardError), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
 }

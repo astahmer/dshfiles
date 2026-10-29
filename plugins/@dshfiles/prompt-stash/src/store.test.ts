@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import type { SavedDraft } from './draft-store.js'
 import type { SavedPrompt } from './library.js'
 import { PromptStashModel } from './store.js'
 
@@ -38,8 +37,7 @@ const memoryTable = <Value extends { readonly id: string }>(initial: readonly Va
 
 const emptyStore = (now: () => number) => {
   const prompts = memoryTable<SavedPrompt>()
-  const drafts = memoryTable<SavedDraft>()
-  return { prompts, drafts, store: PromptStashModel.createStore({ prompts, drafts, now }) }
+  return { prompts, store: PromptStashModel.createStore({ prompts, now }) }
 }
 
 test('saves prompts durably, newest edit first, with a monotone revision', async () => {
@@ -83,27 +81,6 @@ test('stops at the library limit instead of dropping a stored prompt', async () 
   const overLimit = await store.save({ prompt: prompt(51), expectedRevision: null })
   assert.equal(overLimit.kind, 'limit')
   assert.equal(overLimit.prompts.length, 50)
-})
-
-test('saves drafts, rejects a duplicate id, and removes one', async () => {
-  const { drafts, store } = emptyStore(() => 8_000)
-  const draft = { id: prompt(1).id, title: 'Planning prompt', text: 'Draft body to keep', now: '2026-10-05T12:00:00.000Z' }
-
-  const saved = await store.saveDraft(draft)
-  assert.equal(saved.kind, 'applied')
-  assert.equal(saved.drafts[0]?.title, 'Planning prompt')
-
-  const duplicate = await store.saveDraft({ ...draft, title: 'Other title' })
-  assert.equal(duplicate.kind, 'rejected')
-  if (duplicate.kind === 'rejected') assert.equal(duplicate.reason, 'duplicate-id')
-
-  await store.flush()
-  assert.equal(drafts.rows.size, 1)
-
-  const removed = await store.removeDraft(draft.id)
-  assert.deepEqual(removed.drafts, [])
-  await store.flush()
-  assert.equal(drafts.rows.size, 0)
 })
 
 test('orders equally recent prompts by identity for a stable list', () => {

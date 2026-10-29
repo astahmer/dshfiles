@@ -123,7 +123,7 @@ export class AgentDispatch {
   }
 
   /** The schedules catalog, narrowed to the threads one agent started; decoded once at the client boundary. */
-  static schedules(value: unknown, sessionIds: readonly string[]): AgentScheduleRow[] {
+  static schedules(value: z.input<typeof scheduleCatalogSchema>, sessionIds: readonly string[]): AgentScheduleRow[] {
     const wanted = new Set(sessionIds)
     return scheduleCatalogSchema
       .parse(value)

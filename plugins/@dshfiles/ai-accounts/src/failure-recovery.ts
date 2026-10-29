@@ -16,7 +16,7 @@ const RATE_LIMIT_CODES: ReadonlySet<string> = new Set(['RATE_LIMIT', 'RATE_LIMIT
 const AUTH_CODES: ReadonlySet<string> = new Set(['AUTH', 'MISSING_CREDENTIAL', 'INVALID_CREDENTIAL', 'ACCOUNT_SIGNED_OUT', 'ACCOUNT_SIGN_IN_REQUIRED'])
 const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'OVERLOADED', 'LLM_STREAM_IDLE_TIMEOUT', 'SERVER', 'STREAM_CLOSED'])
 /** Consecutive transport failures on one account before it cools like a rate-limited one. */
-export const TRANSPORT_FAILURE_LIMIT = 3
+const TRANSPORT_FAILURE_LIMIT = 3
 const OPENAI_RETRY_HINT = /An error occurred while processing your request\.\s+You can retry your request\b/i
 const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large\b/i
 /**

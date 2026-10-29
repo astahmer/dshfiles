@@ -445,7 +445,7 @@ const simpleHelpCommand = (command: CliCommand, details: Partial<Pick<CliOptionC
     }),
   )
 
-const helpCommands: Record<CliCommand, CommandDef> = {
+const helpCommands = {
   create: simpleHelpCommand('create'),
   test: simpleHelpCommand('test'),
   package: simpleHelpCommand('package'),
@@ -470,7 +470,7 @@ const helpCommands: Record<CliCommand, CommandDef> = {
   runtime: runtimeHelp,
   workspace: workspaceHelp,
   comm: communicationHelp,
-}
+} satisfies Record<CliCommand, CommandDef>
 
 const dshxHelpCommand = defineCommand({
   meta: {

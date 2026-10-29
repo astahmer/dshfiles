@@ -1,4 +1,5 @@
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { once } from 'node:events'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -30,7 +31,7 @@ const startCollector = async (
       received.push({
         path: request.url,
         headers: request.headers,
-        body: otlpMetricsRequestSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8'))),
+        body: decodeJson(otlpMetricsRequestSchema, Buffer.concat(chunks).toString('utf8')),
         receivedAt: Date.now(),
       })
       const reply = respond(received.length - 1)

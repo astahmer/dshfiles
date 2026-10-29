@@ -22,6 +22,8 @@ export default defineClient({
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'workspaces'],
   setup(ctx, decorate) {
     ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
+    // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
+    const isMainPanelId = (panelId: string): panelId is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === panelId)
     const openThread = (sessionId: string): void => {
       const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate.id === sessionId)
       if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
@@ -43,7 +45,7 @@ export default defineClient({
           openThread={openThread}
           openInMemory={focus => {
             MemoryFocusModel.request(focus)
-            ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+            if (isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
           }}
         />
       </PluginQueryProvider>

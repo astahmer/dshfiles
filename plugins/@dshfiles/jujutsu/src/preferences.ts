@@ -1,4 +1,5 @@
 import { useSettings } from '@dshfiles/dshx/client'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { useEffect } from 'react'
 import { z } from 'zod'
 import { jujutsuSettings } from './settings.js'
@@ -44,8 +45,9 @@ export const decodePreferences = (value: unknown): JujutsuPreferences => {
 const PREFERENCE_KEYS = Object.keys(DEFAULT_PREFERENCES).filter((key): key is keyof JujutsuPreferences => key in DEFAULT_PREFERENCES)
 
 const parseStored = (raw: string | null): JujutsuPreferences => {
+  if (raw === null) return decodePreferences({})
   try {
-    return decodePreferences(raw === null ? {} : JSON.parse(raw))
+    return decodeJson(preferencesSchema, raw)
   } catch {
     return DEFAULT_PREFERENCES
   }

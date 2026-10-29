@@ -4,12 +4,9 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isIPv4 } from 'node:net'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import WebSocket, { type RawData } from 'ws'
 import { createDshxApiCaller, type DshxApiCall } from './dshx-api.js'
-
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
-)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -240,7 +237,7 @@ const rpcResponseSchema = z.object({
   type: z.literal('server-response'),
   rpcId: z.string(),
   result: z.union([
-    z.object({ ok: z.literal(true), value: z.unknown() }),
+    z.object({ ok: z.literal(true), value: jsonValueSchema }),
     z.object({
       ok: z.literal(false),
       error: z.object({
@@ -439,7 +436,7 @@ export interface ChangeResult {
 }
 
 export interface DshPlatformTransport {
-  rpc(namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown>
+  rpc(namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<JsonValue>
   sessionCursor(sessionId: string): Promise<number>
   archivedSessionIds?(sessionIds: readonly string[]): Promise<readonly string[] | undefined>
   /** Optional composed finder served by the installed Memory plugin; absent means an older Host. */
@@ -510,9 +507,9 @@ export class DshPlatformError extends Error {
   }
 }
 
-function parseJson(body: string, context: string): unknown {
+function parseJson(body: string, context: string): JsonValue {
   try {
-    return JSON.parse(body)
+    return decodeJson(jsonValueSchema, body)
   } catch {
     throw new DshPlatformError('invalid-response', `${context} returned invalid JSON.`)
   }
@@ -530,12 +527,7 @@ function decodeJsonValue(value: unknown, context: string): JsonValue {
   return result.data
 }
 
-const loopbackLaunchUrl = (
-  value: string,
-): {
-  readonly origin: string
-  readonly token: string
-} => {
+const loopbackLaunchUrl = (value: string) => {
   let url: URL
   try {
     url = new URL(value)
@@ -554,7 +546,7 @@ const loopbackLaunchUrl = (
   return { origin: url.origin, token }
 }
 
-function mapSession(value: unknown, archived?: boolean): SessionSummary {
+function parseSession(value: unknown, archived?: boolean): SessionSummary {
   const parsed = sessionSummarySchema.parse(value)
   const summary = {
     sessionId: parsed.sessionId,
@@ -562,43 +554,43 @@ function mapSession(value: unknown, archived?: boolean): SessionSummary {
     running: parsed.running,
     blank: parsed.blank,
     agentAvailable: parsed.agentAvailable,
-    ...(parsed.parentSessionId === undefined ? {} : { parentSessionId: parsed.parentSessionId }),
-    ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
-    ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
-    ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
+    ...(parsed.parentSessionId !== undefined && { parentSessionId: parsed.parentSessionId }),
+    ...(parsed.origin !== undefined && { origin: parsed.origin }),
+    ...(parsed.cwd !== undefined && { cwd: parsed.cwd }),
+    ...(parsed.projections !== undefined && { projections: parsed.projections }),
   }
   if (archived === undefined) return summary
   return { ...summary, archived }
 }
 
-function mapPlugin(value: unknown): PluginSummary {
+function parsePlugin(value: unknown): PluginSummary {
   const parsed = pluginSchema.parse(value)
   return {
     id: parsed.entryId,
     moduleName: parsed.moduleName,
-    ...(parsed.meta === undefined ? {} : { meta: parsed.meta }),
+    ...(parsed.meta !== undefined && { meta: parsed.meta }),
     enabled: parsed.enabled,
     phase: parsed.fiberPhase,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
+    ...(parsed.readOnlyReason !== undefined && { readOnlyReason: parsed.readOnlyReason }),
   }
 }
 
-function mapBundle(value: unknown): BundleSummary {
+function parseBundle(value: unknown): BundleSummary {
   const parsed = bundleSchema.parse(value)
   return {
     name: parsed.name,
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
     enabled: parsed.enabled,
     installed: parsed.installed,
     optional: parsed.optional,
     removable: parsed.removable,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
-    ...(parsed.error === undefined ? {} : { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
-    ...(parsed.rows === undefined ? {} : { rowCount: parsed.rows.length }),
+    ...(parsed.readOnlyReason !== undefined && { readOnlyReason: parsed.readOnlyReason }),
+    ...(parsed.error !== undefined && { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
+    ...(parsed.rows !== undefined && { rowCount: parsed.rows.length }),
   }
 }
 
-function mapSettings(value: unknown): SettingsDescription {
+function parseSettings(value: unknown): SettingsDescription {
   const parsed = settingsDescriptionSchema.parse(value)
   return {
     writable: parsed.writable,
@@ -615,7 +607,7 @@ function mapSettings(value: unknown): SettingsDescription {
   }
 }
 
-function mapChangeResult(value: unknown): ChangeResult {
+function parseChangeResult(value: unknown): ChangeResult {
   const parsed = z
     .object({
       application: z.enum(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
@@ -636,30 +628,28 @@ function mapChangeResult(value: unknown): ChangeResult {
   return {
     application: parsed.application,
     changed: parsed.changed,
-    ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
+    ...(parsed.enabled !== undefined && { enabled: parsed.enabled }),
     warnings: parsed.warnings ?? [],
     stage: parsed.stage,
     target: parsed.target,
-    ...(parsed.error === undefined
-      ? {}
-      : {
-          error: {
-            code: parsed.error.code,
-            ...(parsed.error.diagnostic === undefined ? {} : { diagnostic: parsed.error.diagnostic }),
-            ...(parsed.error.incompatible === undefined ? {} : { incompatible: parsed.error.incompatible }),
-          },
-        }),
+    ...(parsed.error !== undefined && {
+      error: {
+        code: parsed.error.code,
+        ...(parsed.error.diagnostic !== undefined && { diagnostic: parsed.error.diagnostic }),
+        ...(parsed.error.incompatible !== undefined && { incompatible: parsed.error.incompatible }),
+      },
+    }),
   }
 }
 
-function mapPluginInspection(value: unknown): PluginInspection {
+function parsePluginInspection(value: unknown): PluginInspection {
   const parsed = pluginInspectionSchema.parse(value)
   if (parsed.status === 'refused') {
     return {
       status: parsed.status,
       problem: parsed.problem,
       reason: parsed.reason,
-      ...(parsed.registries === undefined ? {} : { registries: parsed.registries }),
+      ...(parsed.registries !== undefined && { registries: parsed.registries }),
     }
   }
   return {
@@ -667,10 +657,10 @@ function mapPluginInspection(value: unknown): PluginInspection {
     kind: parsed.kind,
     bundle: parsed.bundle,
     registry: parsed.registry,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.version === undefined ? {} : { version: parsed.version }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
-    ...(parsed.host === undefined ? {} : { host: parsed.host }),
+    ...(parsed.name !== undefined && { name: parsed.name }),
+    ...(parsed.version !== undefined && { version: parsed.version }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
+    ...(parsed.host !== undefined && { host: parsed.host }),
   }
 }
 
@@ -678,29 +668,29 @@ function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPr
   return {
     id: value.id,
     isDefault: value.isDefault,
-    ...(value.name === undefined ? {} : { name: value.name }),
-    ...(value.description === undefined ? {} : { description: value.description }),
-    ...(value.broken === undefined ? {} : { broken: value.broken }),
+    ...(value.name !== undefined && { name: value.name }),
+    ...(value.description !== undefined && { description: value.description }),
+    ...(value.broken !== undefined && { broken: value.broken }),
   }
 }
 
-function mapAgentPresetDocument(value: unknown): AgentPresetDocument {
+function parseAgentPresetDocument(value: unknown): AgentPresetDocument {
   const parsed = agentPresetDocumentSchema.parse(value)
   return {
     agentPreset: parsed.agentPreset,
     content: parsed.content,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    ...(parsed.name !== undefined && { name: parsed.name }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
   }
 }
 
-function mapModelCatalog(value: unknown): ModelCatalog {
+function parseModelCatalog(value: unknown): ModelCatalog {
   const parsed = modelCatalogSchema.parse(value)
   return {
     default: {
       provider: parsed.default.provider,
       model: parsed.default.model,
-      ...(parsed.default.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.default.reasoningEffort }),
+      ...(parsed.default.reasoningEffort !== undefined && { reasoningEffort: parsed.default.reasoningEffort }),
     },
     routableProviders: parsed.routableProviders,
     groups: parsed.groups.map(group => ({
@@ -709,19 +699,17 @@ function mapModelCatalog(value: unknown): ModelCatalog {
       models: group.models.map(model => ({
         id: model.id,
         name: model.name,
-        ...(model.description === undefined ? {} : { description: model.description }),
-        ...(model.reasoning === undefined
-          ? {}
-          : {
-              reasoning: {
-                efforts: model.reasoning.efforts.map(effort => ({
-                  id: effort.id,
-                  name: effort.name,
-                  ...(effort.description === undefined ? {} : { description: effort.description }),
-                })),
-                ...(model.reasoning.defaultEffort === undefined ? {} : { defaultEffort: model.reasoning.defaultEffort }),
-              },
-            }),
+        ...(model.description !== undefined && { description: model.description }),
+        ...(model.reasoning !== undefined && {
+          reasoning: {
+            efforts: model.reasoning.efforts.map(effort => ({
+              id: effort.id,
+              name: effort.name,
+              ...(effort.description !== undefined && { description: effort.description }),
+            })),
+            ...(model.reasoning.defaultEffort !== undefined && { defaultEffort: model.reasoning.defaultEffort }),
+          },
+        }),
       })),
     })),
     failures: parsed.failures.map(failure => ({
@@ -732,12 +720,12 @@ function mapModelCatalog(value: unknown): ModelCatalog {
   }
 }
 
-function mapModelSelection(value: unknown): ModelSelection {
+function parseModelSelection(value: unknown): ModelSelection {
   const parsed = modelSelectionSchema.parse(value)
   return {
     provider: parsed.provider,
     model: parsed.model,
-    ...(parsed.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.reasoningEffort }),
+    ...(parsed.reasoningEffort !== undefined && { reasoningEffort: parsed.reasoningEffort }),
   }
 }
 
@@ -746,8 +734,8 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
     name: value.name,
     description: value.description,
     modelInvocable: value.modelInvocable,
-    ...(value.path === undefined ? {} : { path: value.path }),
-    ...(value.whenToUse === undefined ? {} : { whenToUse: value.whenToUse }),
+    ...(value.path !== undefined && { path: value.path }),
+    ...(value.whenToUse !== undefined && { whenToUse: value.whenToUse }),
   }
 }
 
@@ -770,7 +758,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     const sessionIds = result.items.map(item => item.sessionId)
     const archivedSessionIds = await transport.archivedSessionIds?.(sessionIds)
     const archivedSessionIdSet = archivedSessionIds === undefined ? undefined : new Set(archivedSessionIds)
-    return result.items.map(item => mapSession(item, archivedSessionIdSet?.has(item.sessionId)))
+    return result.items.map(item => parseSession(item, archivedSessionIdSet?.has(item.sessionId)))
   }
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
@@ -779,7 +767,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         request: {
           address: { kind: 'session', sessionId },
           throughSeq,
-          ...(beforeSeq === undefined ? {} : { beforeSeq }),
+          ...(beforeSeq !== undefined && { beforeSeq }),
           maxMessages,
         },
       }),
@@ -787,7 +775,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     return { records: result.records, hasMore: result.hasMore }
   }
 
-  const describe = async (): Promise<SettingsDescription> => mapSettings(await transport.rpc('settings', 'describe', {}))
+  const describe = async (): Promise<SettingsDescription> => parseSettings(await transport.rpc('settings', 'describe', {}))
 
   const findThreadsFor = async (input: ThreadFinderCallInput): Promise<ThreadFinderAttempt> => (await transport.findThreads?.(input)) ?? { kind: 'absent' }
 
@@ -806,9 +794,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
       fork: async (sessionId, atSeq) =>
-        z
-          .object({ sessionId: z.string() })
-          .parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq === undefined ? {} : { atSeq }) } })),
+        z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq !== undefined && { atSeq }) } })),
       cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', { request: { sessionId } })),
       rename: async (sessionId, title) =>
         z
@@ -881,15 +867,15 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     plugins: {
       list: async () => {
         const values = z.array(pluginSchema).parse(await transport.rpc('pluginManager', 'listPlugins', {}))
-        return values.map(mapPlugin)
+        return values.map(parsePlugin)
       },
-      check: async spec => mapPluginInspection(await transport.rpc('pluginManager', 'inspect', { spec, options: {} })),
-      setEnabled: async (id, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setPluginEnabled', { id, enabled })),
+      check: async spec => parsePluginInspection(await transport.rpc('pluginManager', 'inspect', { spec, options: {} })),
+      setEnabled: async (id, enabled) => parseChangeResult(await transport.rpc('pluginManager', 'setPluginEnabled', { id, enabled })),
     },
     bundles: {
       list: async () => {
         const values = z.array(bundleSchema).parse(await transport.rpc('pluginManager', 'listBundles', {}))
-        return values.map(mapBundle)
+        return values.map(parseBundle)
       },
       install: async (spec, signal) => {
         if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH bundle installation was cancelled by the caller.')
@@ -900,7 +886,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         }
         signal?.addEventListener('abort', cancelInstall, { once: true })
         try {
-          const result = mapChangeResult(await transport.rpc('pluginManager', 'installBundle', { spec, options: { requestId } }))
+          const result = parseChangeResult(await transport.rpc('pluginManager', 'installBundle', { spec, options: { requestId } }))
           if (signal?.aborted && result.application === 'cancelled')
             throw new DshPlatformError('cancelled', 'DSH bundle installation was cancelled and its profile files were restored.')
           return result
@@ -909,19 +895,19 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
           if (cancellation !== undefined) await cancellation
         }
       },
-      remove: async name => mapChangeResult(await transport.rpc('pluginManager', 'removeBundle', { name })),
-      setEnabled: async (name, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', { name, enabled })),
+      remove: async name => parseChangeResult(await transport.rpc('pluginManager', 'removeBundle', { name })),
+      setEnabled: async (name, enabled) => parseChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', { name, enabled })),
     },
     presets: {
       list: async () => agentPresetRosterSchema.parse(await transport.rpc('agentPresets', 'list', {})).presets.map(mapAgentPresetRow),
-      show: async id => mapAgentPresetDocument(await transport.rpc('agentPresets', 'read', { agentPreset: id })),
+      show: async id => parseAgentPresetDocument(await transport.rpc('agentPresets', 'read', { agentPreset: id })),
     },
     models: {
-      list: async () => mapModelCatalog(await transport.rpc('session', 'modelCatalog', {})),
+      list: async () => parseModelCatalog(await transport.rpc('session', 'modelCatalog', {})),
       select: async (sessionId, selection) => {
         const request = { sessionId, ...selection }
         const result = z.object({ selected: modelSelectionSchema }).parse(await transport.rpc('session', 'selectModel', { request }))
-        return mapModelSelection(result.selected)
+        return parseModelSelection(result.selected)
       },
     },
     skills: {
@@ -934,10 +920,10 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       list: async sessionId => {
         const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', { agentId: sessionId }))
         return values.map(item => ({
-          ...(item.definitionId === undefined ? {} : { definitionId: item.definitionId }),
+          ...(item.definitionId !== undefined && { definitionId: item.definitionId }),
           name: item.name,
           description: item.description,
-          ...(item.input === undefined ? {} : { input: item.input }),
+          ...(item.input !== undefined && { input: item.input }),
         }))
       },
       execute: async (sessionId, line, signal) => {
@@ -1011,7 +997,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
   }
   if (!cookie) throw new DshPlatformError('authentication-failed', 'DSH did not issue an authenticated session cookie for the launch URL.')
 
-  const rpc = async (namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown> => {
+  const rpc = async (namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<JsonValue> => {
     const rpcId = randomUUID()
     let response: Response
     try {
@@ -1025,7 +1011,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
           method: `${namespace}/${method}`,
           payload: { args },
         }),
-        ...(signal === undefined ? {} : { signal }),
+        ...(signal !== undefined && { signal }),
       })
     } catch {
       if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH command request was cancelled by the caller.')

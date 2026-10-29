@@ -1,3 +1,4 @@
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { z } from 'zod'
 import { describe, expect, it, vi } from 'vitest'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
@@ -222,6 +223,43 @@ describe('API registry', () => {
         userInvocable: true,
       },
     ])
+    await host.dispose()
+  })
+
+  it('registers a context-bound tool with plugin ownership and disposes it on unload', async () => {
+    const host = await createTestHost()
+    let factoryCalls = 0
+    const definition = defineHost({
+      inject: ['commands'],
+      tools: [
+        ctx => {
+          factoryCalls += 1
+          const commands = ctx.commands
+          return {
+            name: 'test_bound',
+            description: 'Read the injected Host commands service.',
+            parameters: { type: 'object', properties: {} },
+            output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+            execute: async () => typeof commands.find,
+          }
+        },
+      ],
+    })
+    expect(factoryCalls).toBe(0)
+    const mounted = await host.mount(definition, { packageId: '@test/bound' })
+    expect(factoryCalls).toBe(1)
+    const result = await host.tools.execute({ callId: ToolCallId('bound-call'), name: 'test_bound', arguments: {}, signal: new AbortController().signal })
+    expect(result.isError).toBe(false)
+    expect(result.content).toEqual([{ type: 'text', text: 'function' }])
+    await host.mount(callerHost, { packageId: '@test/caller' })
+    const list = async (): Promise<RegistryListing> => {
+      const response = await host.connection.requestApi({ packageId: dshxRegistryApi.owner!, apiId: dshxRegistryApi.id, method: 'list', version: 1, input: {} })
+      return listingResponse.parse(await response.json()).result.value.output
+    }
+    expect((await list()).tools.find(entry => entry.name === 'test_bound')).toMatchObject({ source: 'plugin', owner: '@test/bound' })
+    await mounted.dispose()
+    expect(host.tools.schemas().some(entry => entry.name === 'test_bound')).toBe(false)
+    expect((await list()).tools.some(entry => entry.name === 'test_bound')).toBe(false)
     await host.dispose()
   })
 

@@ -55,6 +55,8 @@ interface PagingPosition {
 
 const READING_INTENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'beforematch'] as const
 const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
+/** How long after a wheel, touch or key a scroll still belongs to the reader; wheel momentum keeps renewing it. */
+const READER_GESTURE_MS = 300
 
 /** Owns one Chat scrollport's DOM operations, event listeners, and size observer. */
 export class ChatViewport {
@@ -69,6 +71,8 @@ export class ChatViewport {
   private tailRequested = false
   /** Switches the running batch to a tail landing; null while no batch runs. */
   private retarget: (() => void) | null = null
+  /** When the reader last started a scrolling gesture, and whether a pointer (a scrollbar drag) is still held. */
+  private gesture = { at: Number.NEGATIVE_INFINITY, pointerHeld: false }
   /** Transition state and row callbacks owned by this viewport's attachment. */
   readonly motion = createFlowMotion(
     () => this.foldDriver(),
@@ -93,6 +97,8 @@ export class ChatViewport {
     scroller.addEventListener('scroll', this.onScroll, { passive: true })
     scroller.addEventListener('scrollend', this.onScrollEnd, { passive: true, capture: true })
     for (const type of READING_INTENTS) scroller.addEventListener(type, this.onIntent, { passive: true, capture: true })
+    scroller.ownerDocument.addEventListener('pointerup', this.onPointerRelease, { passive: true, capture: true })
+    scroller.ownerDocument.addEventListener('pointercancel', this.onPointerRelease, { passive: true, capture: true })
     if (typeof ResizeObserver !== 'undefined') {
       this.observer = new ResizeObserver(() => {
         if (this.elements !== elements) return
@@ -114,6 +120,9 @@ export class ChatViewport {
     this.elements?.scroller.removeEventListener('scroll', this.onScroll)
     this.elements?.scroller.removeEventListener('scrollend', this.onScrollEnd, true)
     for (const type of READING_INTENTS) this.elements?.scroller.removeEventListener(type, this.onIntent, true)
+    this.elements?.scroller.ownerDocument.removeEventListener('pointerup', this.onPointerRelease, true)
+    this.elements?.scroller.ownerDocument.removeEventListener('pointercancel', this.onPointerRelease, true)
+    this.gesture = { at: Number.NEGATIVE_INFINITY, pointerHeld: false }
     this.observer?.disconnect()
     this.observer = null
     this.elements = null
@@ -753,8 +762,14 @@ export class ChatViewport {
     if (this.observation.landing !== null && this.elements.scroller.scrollTop === this.observation.top) return
     this.invalidate()
     if (this.paging !== null) {
-      this.events?.resize()
-      return
+      // A paging anchor may be armed between a gesture's intent and the scroll it causes; that scroll is the
+      // reader's, so the anchor yields to it instead of putting the rows back.
+      if (!this.readerGesturing()) {
+        this.events?.resize()
+        return
+      }
+      this.stopPreserving()
+      this.events?.interact()
     }
     const scroll = this.readScroll()
     if (scroll !== null) this.events?.scroll(scroll)
@@ -767,11 +782,20 @@ export class ChatViewport {
     } else if (event.target instanceof HTMLElement && event.target.hasAttribute('data-step-process-body')) this.events?.scrollEnd(false)
   }
 
+  private readerGesturing(): boolean {
+    return this.gesture.pointerHeld || performance.now() - this.gesture.at < READER_GESTURE_MS
+  }
+
+  private readonly onPointerRelease = (): void => {
+    this.gesture.pointerHeld = false
+  }
+
   private readonly onIntent = (event: Event): void => {
     if (event.type === 'keydown' || event.type === 'pointerdown') {
       if (event.target instanceof Element && event.target.closest('[data-composer-seat]') !== null) return
       if (event.type === 'keydown' && (!(event instanceof KeyboardEvent) || !SCROLL_KEYS.has(event.key))) return
     }
+    this.gesture = { at: performance.now(), pointerHeld: this.gesture.pointerHeld || event.type === 'pointerdown' }
     this.events?.intent?.()
     if (this.paging === null) return
     this.stopPreserving()

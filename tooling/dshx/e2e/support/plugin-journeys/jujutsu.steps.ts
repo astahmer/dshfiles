@@ -1,7 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -17,6 +18,11 @@ interface JujutsuFixture {
 }
 
 const fixtures = new WeakMap<Page, JujutsuFixture>()
+const cleanupFolderNames = { selected: 'stale-cleanup-selected', preserved: 'stale-cleanup-preserved' } as const
+const cleanupFolderPaths = (fixture: JujutsuFixture) => ({
+  selected: join(fixture.temporaryRoot, 'repo-threads', cleanupFolderNames.selected),
+  preserved: join(fixture.temporaryRoot, 'repo-threads', cleanupFolderNames.preserved),
+})
 const sourceDescription = 'Branch source fixture'
 const childDescription = 'Branch child fixture'
 const targetDescription = 'Destination target fixture'
@@ -110,14 +116,13 @@ const fixtureFor = (page: Page): JujutsuFixture => {
   return fixture
 }
 
-const revisionRow = (page: Page, description: string) =>
-  page.getByRole('region', { name: 'Revisions', exact: true }).first().locator('article').filter({ hasText: description })
+const revisionRow = (page: Page, description: string) => page.locator('article[data-commit-id]').filter({ hasText: description })
 
 const dispatchDrop = async (
   page: Page,
-  input: { readonly source: string; readonly target: string; readonly kind: 'revision' | 'bookmark' },
+  input: { readonly source: string; readonly target: string; readonly kind: 'revision' | 'bookmark'; readonly hideTransferData?: boolean },
 ): Promise<boolean> =>
-  page.evaluate(({ source, target, kind }) => {
+  page.evaluate(({ source, target, kind, hideTransferData }) => {
     const findRow = (description: string): HTMLElement | undefined =>
       Array.from(document.querySelectorAll<HTMLElement>('[role="region"] article')).find(row => row.textContent?.includes(description))
     const sourceRow = findRow(source)
@@ -128,6 +133,10 @@ const dispatchDrop = async (
     }
     const dataTransfer = new DataTransfer()
     dragSource.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }))
+    if (hideTransferData) {
+      Object.defineProperty(dataTransfer, 'types', { configurable: true, value: [] })
+      Object.defineProperty(dataTransfer, 'getData', { configurable: true, value: () => '' })
+    }
     targetRow.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }))
     targetRow.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }))
     const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer })
@@ -179,7 +188,9 @@ Then('revision and bookmark moves preview in the target context without changing
   })
 
   await recordAssertion(page, 'jujutsu-valid-branch-drop-is-cancelled-by-the-row-handler', async () =>
-    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'revision' })).toBe(true),
+    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'revision', hideTransferData: true })).toBe(
+      true,
+    ),
   )
   const branchPreview = page.getByRole('group', { name: 'Preview branch rebase', exact: true })
   await recordAssertion(page, 'jujutsu-rebase-drop-renders-context-and-host-preview', async () => {
@@ -351,31 +362,63 @@ After(async ({ page }: { page: Page }) => {
   const fixture = fixtures.get(page)
   if (fixture === undefined) return
   fixtures.delete(page)
-  await rm(fixture.temporaryRoot, { recursive: true, force: true })
+  await rm(fixture.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** The repository state before the cleanup dialog opened, so its preview is proven to remove nothing. */
 const cleanupSnapshots = new WeakMap<Page, string>()
 
-When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
-  cleanupSnapshots.set(page, snapshotRepository(fixtureFor(page)))
-  await page.getByRole('button', { name: 'Repository actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Clean up thread workspaces…', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
+When('two stale untracked folders exist beside the repository', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
+  for (const path of Object.values(paths)) {
+    await mkdir(path, { recursive: true })
+    await utimes(path, new Date(0), new Date(0))
+  }
 })
 
-Then('a custom cleanup threshold previews workspaces without removing anything', async ({ page }: { page: Page }) => {
+When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
-  const dialog = page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })
-  const customHours = dialog.getByRole('spinbutton', { name: 'Custom hours', exact: true })
-  await customHours.fill('12')
-  await expect(customHours).toHaveValue('12')
-  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'false')
-  await recordAssertion(page, 'jujutsu-cleanup-custom-threshold-previews-before-removing', async () =>
+  cleanupSnapshots.set(page, snapshotRepository(fixture))
+  await page.getByRole('button', { name: 'Repository actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Clean up JJ workspaces…', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
+})
+
+Then('the cleanup dialog shows age presets without removing anything', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(dialog.getByRole('radio', { name: '7d', exact: true })).toBeVisible()
+  await recordAssertion(page, 'jujutsu-cleanup-age-preset-preview-does-not-remove-items', async () =>
     expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await dialog.getByRole('button', { name: /Untracked folders/ }).click()
+  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })).toBeVisible()
+  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.preserved}`, exact: true })).toBeVisible()
+  expect(existsSync(paths.selected)).toBe(true)
+  expect(existsSync(paths.preserved)).toBe(true)
+  expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
+  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
+})
+
+When('only one stale untracked folder is selected for cleanup', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  const selectedFolder = dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })
+  await selectedFolder.click()
+  await expect(selectedFolder).toBeChecked()
+  await expect(dialog.getByRole('button', { name: 'Clean up 1', exact: true })).toBeEnabled()
+})
+
+Then('cleanup removes only the selected folder', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await dialog.getByRole('button', { name: 'Clean up 1', exact: true }).click()
   await expect(dialog).toBeHidden()
+  await expect.poll(() => existsSync(paths.selected), { timeout: 20_000 }).toBe(false)
+  expect(existsSync(paths.preserved)).toBe(true)
   expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
   await finishJourneyAssertions(page)

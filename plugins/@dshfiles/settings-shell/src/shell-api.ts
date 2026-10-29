@@ -1,9 +1,15 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { settingsSearchEntrySchema } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
 export const settingsPatchSchema = z.record(z.string(), z.json())
+
+/** One control a live settings section publishes to search, with the section that opens at it. */
+const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
+
+const MAX_LISTED_ENTRIES = 50
 
 export const settingsShellApi = defineApi({
   id: 'settings-shell',
@@ -49,6 +55,14 @@ export const settingsShellApi = defineApi({
       },
     }),
     /**
+     * The controls the browser's live Settings sections publish to search, so `list` can search them for an Agent. The
+     * Host keeps the last set any page reported: every page loads the same plugins.
+     */
+    publishSearchEntries: method({
+      input: z.object({ entries: z.array(sectionEntrySchema).max(2000) }).strict(),
+      output: z.object({ count: z.number() }).strict(),
+    }),
+    /**
      * Every settings namespace the profile serves, with the revision a write must expect. Naming one namespace also
      * returns its redacted JSON value, so an Agent can read a setting before changing it.
      */
@@ -71,26 +85,33 @@ export const settingsShellApi = defineApi({
                 .strict(),
             )
             .max(500),
+          entries: z.array(sectionEntrySchema).max(MAX_LISTED_ENTRIES).optional(),
         })
         .strict(),
       description:
-        'List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. Read-only.',
+        'List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. A query also searches the controls Settings sections publish (title, description, keywords), returning each with its section id and entry id. Read-only.',
       tool: {
         name: 'settings_list',
         readOnly: true,
-        render: output =>
-          output.namespaces
-            .map(row =>
-              [
-                `${row.namespace} · revision ${String(row.revision)}`,
-                row.autoGenerate ? undefined : 'no generated page',
-                row.secretFields === 0 ? undefined : `${String(row.secretFields)} secret field(s)`,
-                row.valueTooLarge === true ? 'value too large to show' : row.value,
-              ]
-                .filter(part => part !== undefined)
-                .join(' · '),
-            )
-            .join('\n') || (output.writable ? 'No settings namespaces.' : 'No settings namespaces; this profile is read-only.'),
+        render: output => {
+          const namespaces = output.namespaces.map(row =>
+            [
+              `${row.namespace} · revision ${String(row.revision)}`,
+              row.autoGenerate ? undefined : 'no generated page',
+              row.secretFields === 0 ? undefined : `${String(row.secretFields)} secret field(s)`,
+              row.valueTooLarge === true ? 'value too large to show' : row.value,
+            ]
+              .filter(part => part !== undefined)
+              .join(' · '),
+          )
+          const entries = (output.entries ?? []).map(
+            entry =>
+              `Settings › ${entry.sectionLabel || entry.sectionId} › ${entry.title}${entry.description === undefined ? '' : ` — ${entry.description}`} (section ${entry.sectionId}, entry ${entry.id})`,
+          )
+          const lines = [...namespaces, ...entries]
+          if (lines.length > 0) return lines.join('\n')
+          return output.writable ? 'No settings namespaces.' : 'No settings namespaces; this profile is read-only.'
+        },
       },
     }),
     /** Merge fields into one namespace's user section, validated by the Host against that namespace's schema. */

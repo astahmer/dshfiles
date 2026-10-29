@@ -12,7 +12,7 @@ import { ThreadAccountModel } from './thread-account-model.js'
 
 const threadModels = (ctx: Context) => createHostApiClient(ctx, threadModelApi, '@dshfiles/ai-accounts')
 
-export const previewThreadAccount = async (
+const previewThreadAccount = async (
   ctx: Context,
   input: { readonly sessionId?: string | undefined; readonly instanceId: string },
   caller: ApiCaller,

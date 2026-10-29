@@ -25,9 +25,17 @@ type NoUnknownEventTypes<Events extends ConversationEventDescriptors> = Record<E
 const PUBLICATIONS = new Set<ConversationPublication>(['none', 'animation-frame', 'immediate'])
 const contributionParts = new WeakMap<object, ConversationContributionParts>()
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+/** What validateDefinition reads from one user-authored event descriptor. */
+interface ConversationEventDescriptorInput {
+  readonly role: 'start' | 'update'
+  readonly id: (event: never) => string
+  readonly publication?: ConversationPublication
 }
+
+const isObjectValue = (value: unknown): value is object => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isEventDescriptorInput = (value: unknown): value is ConversationEventDescriptorInput =>
+  isObjectValue(value) && 'role' in value && (value.role === 'start' || value.role === 'update') && 'id' in value && typeof value.id === 'function'
 
 function validateDefinition(definition: {
   readonly kind: string
@@ -37,18 +45,18 @@ function validateDefinition(definition: {
   readonly project?: unknown
 }): void {
   if (definition.kind.trim() === '') throw new TypeError('Conversation kind must be a non-empty string.')
-  if (!isRecord(definition.events)) throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} events must be an object.`)
+  if (!isObjectValue(definition.events)) throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} events must be an object.`)
   const entries = Object.entries(definition.events)
   if (entries.length === 0) throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} must declare at least one event.`)
   let hasStart = false
   let hasUpdate = false
   for (const [type, value] of entries) {
-    if (!isRecord(value) || (value.role !== 'start' && value.role !== 'update') || typeof value.id !== 'function') {
+    if (!isEventDescriptorInput(value)) {
       throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} event ${JSON.stringify(type)} must declare role and id(event).`)
     }
     if (value.role === 'start') hasStart = true
     else hasUpdate = true
-    if (value.publication !== undefined && !PUBLICATIONS.has(value.publication as ConversationPublication)) {
+    if (value.publication !== undefined && !PUBLICATIONS.has(value.publication)) {
       throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} event ${JSON.stringify(type)} has invalid publication.`)
     }
   }
@@ -75,6 +83,7 @@ function descriptorFor<Events extends ConversationEventDescriptors>(
   events: Events,
   event: { readonly type: string },
 ): ConversationEventDescriptor<ConversationEventType<Events>> | undefined {
+  // SAFETY: the Session runtime only delivers an event whose type belongs to this definition's descriptor map.
   return events[event.type as ConversationEventType<Events>] as ConversationEventDescriptor<ConversationEventType<Events>> | undefined
 }
 
@@ -96,6 +105,7 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
       return { id, role: descriptor.role }
     },
     start(context, match) {
+      // SAFETY: the runtime starts this node only for a match this definition produced, so both carry its own types.
       return definitionOptions.initial(context as ConversationNodeContext<never>, match.event as never)
     },
     update(context, match) {
@@ -104,6 +114,7 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
     },
     buildViewNode(context) {
       if (context.state === undefined) return null
+      // SAFETY: the guard above proves the runtime already reduced this node to State.
       const stateContext = context as ConversationNodeContext<State> & { readonly state: State }
       const data = project(context.state, stateContext)
       const node: ConversationRendererNode<Kind, Data> = {
@@ -118,16 +129,16 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
       }
       return node
     },
-    ...(Object.values(lifecycle.events).some(value => value?.publication !== undefined)
-      ? {
-          publication(match: ConversationMatch) {
-            return descriptorFor(lifecycle.events, match.event)?.publication ?? 'immediate'
-          },
-        }
-      : {}),
+    ...(Object.values(lifecycle.events).some(value => value?.publication !== undefined) && {
+      publication(match: ConversationMatch) {
+        return descriptorFor(lifecycle.events, match.event)?.publication ?? 'immediate'
+      },
+    }),
   }
   const renderer = (props: ConversationRendererSlotProps<Kind, Data>) =>
+    // SAFETY: the runtime passes the slot props this renderer narrows, with the node data project() produced.
     createElement(authorComponent, { ...props, data: props.node.data } as ConversationRendererProps<Kind, Data>)
+  // SAFETY: the empty object is an identity token; every part the runtime reads lives in contributionParts.
   const contribution = {} as ConversationContribution<Kind, State, Data>
   contributionParts.set(contribution, {
     definition,
@@ -162,6 +173,8 @@ type ConversationDefinitionInput<Kind extends string, Events extends Conversatio
   readonly project?: (state: State, context: ConversationNodeContext<State> & { readonly state: State }) => Data
 }
 
+const identityProject = <State>(state: State, _context: ConversationNodeContext<State> & { readonly state: State }): State => state
+
 /** Without `project`, the renderer receives the reduced state itself. */
 function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State>(
   definition: ConversationDefinitionInput<Kind, Events, State, State>,
@@ -175,7 +188,7 @@ function defineConversation(
   definition: ConversationDefinitionInput<string, ConversationEventDescriptors, unknown, unknown>,
 ): ConversationLifecycle<string, ConversationEventDescriptors, unknown, unknown> {
   validateDefinition(definition)
-  const project = definition.project ?? ((state: unknown) => state)
+  const project = definition.project ?? identityProject
   const lifecycle: ConversationLifecycle<string, ConversationEventDescriptors, unknown, unknown> = {
     kind: definition.kind,
     events: definition.events,

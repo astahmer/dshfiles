@@ -49,6 +49,7 @@ const summarySchema = z
     project: z.string().nullable(),
     tags: z.array(z.string()),
     links: z.array(BacklogItems.linkSchema),
+    tweetContextUrls: z.array(z.string().url().max(2_048)).max(20).optional(),
     attachments: z.array(BacklogItems.attachmentSchema).default([]),
     actors: BacklogItems.itemSchema.shape.actors,
     pinned: z.boolean(),
@@ -321,6 +322,12 @@ export const backlogApi = defineApi({
       output: transcriptionSchema,
       description: 'Transcribe one browser microphone recording through the Host voice-input bundle. Not an agent tool.',
     }),
+    enrichTweet: method({
+      input: z.object({ id: idSchema, url: z.string().url().max(2_048) }).strict(),
+      output: detailResultSchema,
+      description: `Retrieve public tweet text and media for a URL already in one backlog item. Use it when the user asked; this sends the post ID to FxEmbed and appends quoted, untrusted tweet text plus available images without replacing the existing description.`,
+      tool: { name: 'backlog_enrich_tweet', readOnly: false, render: renderDetailPreview },
+    }),
     update: method({
       input: z
         .object({
@@ -426,7 +433,21 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
     }),
     editComment: method({
-      input: z.object({ id: idSchema, commentId: z.string().min(1).max(128), text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),
+      input: z
+        .object({
+          id: idSchema,
+          commentId: z.string().min(1).max(128),
+          text: z.string().max(BacklogItems.maxBodyChars),
+          files: z
+            .array(fileInputSchema)
+            .max(BacklogItems.maxAttachments)
+            .optional()
+            .describe('Replacement images or files; omit to preserve the existing attachments, or pass an empty list to remove them.'),
+        })
+        .strict()
+        .refine(input => input.text.trim().length > 0 || (input.files?.length ?? 0) > 0, {
+          message: 'A reply needs text or at least one attachment.',
+        }),
       output: detailResultSchema,
       description: 'Edit one of the current user’s previous replies in the backlog panel.',
     }),

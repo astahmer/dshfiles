@@ -187,6 +187,32 @@ describe('trace store', () => {
     expect(store.summary()).toEqual({ spans: 0, traces: 0, logs: 0, metricPoints: 0, oldestMs: null, newestMs: null })
   })
 
+  test('prunes oldest traces in bounded pages without breaking retained resources', () => {
+    const store = openStore()
+    const spans = Array.from({ length: 260 }, (_, index) => {
+      const current = index + 1
+      const currentTraceId = traceId(current)
+      const firstSpanId = spanId(current * 2 - 1)
+      const resource = { 'service.name': current <= 100 ? 'old' : 'recent' }
+      return [
+        makeSpan({ traceId: currentTraceId, spanId: firstSpanId, startUs: NOW * 1000 + current, resource }),
+        makeSpan({
+          traceId: currentTraceId,
+          spanId: spanId(current * 2),
+          parentSpanId: firstSpanId,
+          startUs: NOW * 1000 + current + 1,
+          resource,
+        }),
+      ]
+    }).flat()
+    store.ingest(spans, { ...retention, maxSpans: 600 })
+    expect(store.summary()).toMatchObject({ traces: 260, spans: 520 })
+    expect(store.prune({ ...retention, maxSpans: 128 })).toBe(196)
+    expect(store.summary()).toMatchObject({ traces: 64, spans: 128 })
+    expect(store.list({ limit: 128 }).traces.map(trace => trace.traceId)).toEqual(Array.from({ length: 64 }, (_, index) => traceId(260 - index)))
+    expect(store.trace(traceId(260)).spans[0]?.resource).toEqual({ 'service.name': 'recent' })
+  })
+
   test('searches logs by service, severity, text, attribute, trace and span, newest first with paging', () => {
     const store = openStore()
     const log = (index: number, overrides: Partial<NormalizedLog>): NormalizedLog => ({
@@ -211,6 +237,7 @@ describe('trace store', () => {
       ],
       retention,
     )
+    expect(store.summary().logs).toBe(3)
     const bodies = (query: Parameters<typeof store.searchLogs>[0]) => store.searchLogs(query).logs.map(entry => entry.body)
     expect(bodies({})).toEqual(['100% done', 'disk full', 'cart is empty'])
     expect(bodies({ service: 'db' })).toEqual(['disk full'])
@@ -241,6 +268,7 @@ describe('trace store', () => {
       resource: {},
     })
     store.ingestLogs([log('a'), log('b'), log('c')], { ...retention, maxLogs: 2 })
+    expect(store.summary().logs).toBe(2)
     expect(
       store
         .searchLogs({})
@@ -275,7 +303,8 @@ describe('trace store', () => {
   })
 
   test('lists metrics and charts a cumulative counter as its increase, per attribute set', () => {
-    const store = openStore()
+    const clock = { now: NOW }
+    const store = openStore(clock)
     const point = (
       offsetSeconds: number,
       value: number,
@@ -309,6 +338,7 @@ describe('trace store', () => {
       ],
       retention,
     )
+    expect(store.summary().metricPoints).toBe(5)
     expect(store.listMetrics({ windowMinutes: 60 }).map(metric => [metric.name, metric.type, metric.points, metric.series, metric.lastValue])).toEqual([
       ['cpu.usage', 'gauge', 1, 1, 0.4],
       ['http.requests', 'sum', 4, 2, null],
@@ -321,6 +351,15 @@ describe('trace store', () => {
     ])
     expect(store.metricSeries({ name: 'cpu.usage', service: 'web', windowMinutes: 60 }).valueKind).toBe('value')
     expect(() => store.metricSeries({ name: 'missing', service: 'web', windowMinutes: 60 })).toThrow(/No points/)
+    store.ingestMetrics([point(30, 9, { route: '/c' })], { ...retention, maxMetricPoints: 5 })
+    expect(store.summary().metricPoints).toBe(5)
+    expect(store.clear().removedMetricPoints).toBe(5)
+    expect(store.summary().metricPoints).toBe(0)
+    store.ingestMetrics([point(40, 1, {})], retention)
+    expect(store.summary().metricPoints).toBe(1)
+    clock.now += 25 * 3_600_000
+    store.prune(retention)
+    expect(store.summary().metricPoints).toBe(0)
   })
 })
 

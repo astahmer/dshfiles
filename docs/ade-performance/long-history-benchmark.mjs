@@ -21,7 +21,7 @@ if (statePath === undefined || !Number.isSafeInteger(turns) || turns < 1 || turn
   throw new Error('Usage: long-history-benchmark.mjs <scratch-state.json> [turns=100] [output.json]')
 }
 if (outputPath !== undefined && (!isWithin(planDirectory, outputPath) || dirname(outputPath) !== planDirectory || !outputPath.endsWith('.json'))) {
-  throw new Error('The output JSON must stay directly inside plans/ade-performance.')
+  throw new Error('The output JSON must stay directly inside docs/ade-performance.')
 }
 
 const resolvedStatePath = resolve(statePath)

@@ -123,9 +123,10 @@ export const CLIENT_SLOT_REFERENCES: readonly ClientSlotReference[] = [
     scope: 'root',
     identity: 'id',
     registration: ['id', 'order', 'label'],
-    registrationMetadata: ['settingsTargets?: readonly string[]'],
+    registrationMetadata: ['settingsTargets?: readonly string[]', 'searchEntries?: readonly { id; title; description?; keywords? }[]'],
     ownerProps: ['close: () => void', 'openSection(id)', 'openSettingsTarget(target)', 'target?', 'acknowledgeTarget(requestId)'],
-    purpose: 'A settings dialog section. Advertise handled ConfigForm entry ids in settingsTargets; the Host routes matching field targets here.',
+    purpose:
+      'A settings dialog section. Advertise handled ConfigForm entry ids in settingsTargets; the Host routes matching field targets here. Publish searchEntries so Settings search finds its controls unmounted.',
     shippedOccupants: [],
     replaces: [],
     childObligations: [],

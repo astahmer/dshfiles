@@ -55,6 +55,7 @@
     "@deepseek-ai/dsh-workspace": "catalog:",
     "@types/node": "22.19.20",
     "@types/react": "catalog:",
+    "jsdom": "26.1.0",
     "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -14,7 +14,7 @@ export const CopilotSignIn = (props: {
   readonly onConnected?: () => void
   readonly onCancelled?: () => void
 }): JSX.Element => {
-  const { instanceId, onConnected } = props
+  const { instanceId, onConnected, operationId } = props
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
   const operation = props.operationId === undefined ? {} : { operationId: props.operationId }
@@ -28,9 +28,10 @@ export const CopilotSignIn = (props: {
     alive.current = true
     return () => {
       alive.current = false
-      if (ownsAttempt.current) void accounts.cancelCopilotLogin({ instanceId, confirm: true, ...operation }).catch(() => undefined)
+      if (ownsAttempt.current)
+        void accounts.cancelCopilotLogin({ instanceId, confirm: true, ...(operationId !== undefined && { operationId }) }).catch(() => undefined)
     }
-  }, [accounts, instanceId, props.operationId])
+  }, [accounts, instanceId, operationId])
   const begin = useMutation({
     mutationFn: () => beginLoginQuery(queryClient, queryKey, () => accounts.beginCopilotLogin({ instanceId: instanceId, ...operation })),
     onSuccess: next => {

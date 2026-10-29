@@ -37,13 +37,23 @@ const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void>
     for (let row = 1; row <= rowCount; row++) {
       events.push({ type: 'turn/start', seq: seq++, time: 300 + row * 10, data: { turn: row } })
       events.push({
-        type: 'user/message', seq: seq++, time: 301 + row * 10, surfaceOp: 'append',
+        type: 'user/message',
+        seq: seq++,
+        time: 301 + row * 10,
+        surfaceOp: 'append',
         data: createUserMessage({ content: [{ type: 'text', text: `Transcript question ${row}` }], source: { kind: 'user' } }),
       })
       events.push({ type: 'step/start', seq: seq++, time: 302 + row * 10, data: { turn: row, step: 1 } })
-      const source = { provider: 'fixture', model: 'fixture', ...(row === rowCount ? { replayState: { response: { id: 'fixture_response', stopReason: 'toolUse' }, blocks: [{ signature: replayMarker }] } } : {}) }
+      const source = {
+        provider: 'fixture',
+        model: 'fixture',
+        ...(row === rowCount ? { replayState: { response: { id: 'fixture_response', stopReason: 'toolUse' }, blocks: [{ signature: replayMarker }] } } : {}),
+      }
       events.push({
-        type: 'assistant/message', seq: seq++, time: 303 + row * 10, surfaceOp: 'append',
+        type: 'assistant/message',
+        seq: seq++,
+        time: 303 + row * 10,
+        surfaceOp: 'append',
         data: { turn: row, step: 1, message: createAssistantMessage({ content: [{ type: 'text', text: `Transcript answer ${row}` }], source }), stream: [] },
       })
       events.push({ type: 'step/end', seq: seq++, time: 304 + row * 10, data: { turn: row, step: 1 } })
@@ -103,12 +113,20 @@ const openTranscriptFixture = async (page: Page, rowCount: number): Promise<void
   const profile = profileFor(page)
   await seedTranscript(profile.homeRoot, rowCount)
   const fixture = page.getByRole('treeitem', { name: /Untitled|Chat transcript window fixture/ })
-  await expect.poll(async () => {
-    await page.reload()
-    if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
-    await fixture.first().waitFor({ state: 'attached', timeout: 3_000 }).catch(() => undefined)
-    return fixture.count()
-  }, { timeout: 30_000 }).toBeGreaterThan(0)
+  await expect
+    .poll(
+      async () => {
+        await page.reload()
+        if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
+        await fixture
+          .first()
+          .waitFor({ state: 'attached', timeout: 3_000 })
+          .catch(() => undefined)
+        return fixture.count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
   await fixture.first().click()
 }
 
@@ -125,16 +143,62 @@ Then('the latest transcript rows are visible and older rows appear when scrollin
   await scrollport.hover()
   for (let attempt = 0; attempt < 12; attempt++) await page.mouse.wheel(0, -600)
   await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible({ timeout: 10_000 })
-  await recordAssertion(page, 'chat-windowed-transcript-mounts-older-rows-on-scroll', async () =>
-    await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible(),
+  await recordAssertion(
+    page,
+    'chat-windowed-transcript-mounts-older-rows-on-scroll',
+    async () => await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible(),
   )
+  await finishJourneyAssertions(page)
+})
+
+Then('each upward wheel step moves the rows under the reader by the wheel distance', async ({ page }: { page: Page }) => {
+  await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible()
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  await scrollport.hover()
+  const wheelStep = 240
+  // One wheel tick of slack: a burst can split across a frame boundary in a headless browser.
+  const wheelTick = wheelStep / 4
+  const readerRow = () =>
+    page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-conversation-scroll]')
+      if (scroller === null) return null
+      const scrollerTop = scroller.getBoundingClientRect().top
+      const row = [...scroller.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')].find(
+        candidate => candidate.getBoundingClientRect().top >= scrollerTop + 40,
+      )
+      return row === undefined ? null : { key: row.dataset.chatAnchorKey ?? '', top: row.getBoundingClientRect().top, scrollTop: scroller.scrollTop }
+    })
+  const rowTop = (key: string) =>
+    page.evaluate(anchorKey => {
+      const row = [...document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')].find(candidate => candidate.dataset.chatAnchorKey === anchorKey)
+      return row === undefined ? null : row.getBoundingClientRect().top
+    }, key)
+  const jumps: string[] = []
+  for (let step = 0; step < 40; step++) {
+    const before = await readerRow()
+    if (before === null || before.scrollTop <= 0) break
+    for (let burst = 0; burst < 4; burst++) await page.mouse.wheel(0, -wheelTick)
+    await page.waitForTimeout(350)
+    const after = await rowTop(before.key)
+    if (after === null) {
+      jumps.push(`step ${step}: ${before.key.slice(0, 40)} unmounted`)
+      continue
+    }
+    const moved = after - before.top
+    const expected = Math.min(wheelStep, before.scrollTop)
+    if (Math.abs(moved - expected) > wheelTick)
+      jumps.push(`step ${step}: ${before.key.slice(0, 40)} moved ${Math.round(moved)}px for a ${expected}px wheel (scrollTop ${Math.round(before.scrollTop)})`)
+  }
+  await recordAssertion(page, 'chat-windowed-transcript-scrolls-without-jumps', () => expect(jumps).toEqual([]))
   await finishJourneyAssertions(page)
 })
 
 When('a real Host session with provider replay data is opened', async ({ page }: { page: Page }) => {
   const frames: string[] = []
   browserFrames.set(page, frames)
-  page.on('websocket', socket => socket.on('framereceived', frame => frames.push(typeof frame.payload === 'string' ? frame.payload : frame.payload.toString('utf8'))))
+  page.on('websocket', socket =>
+    socket.on('framereceived', frame => frames.push(typeof frame.payload === 'string' ? frame.payload : frame.payload.toString('utf8'))),
+  )
   await openTranscriptFixture(page, 1)
 })
 
@@ -149,7 +213,7 @@ Then('the browser renders the response without receiving provider replay blocks'
   await finishJourneyAssertions(page)
 })
 
-When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
+const openImageLinkFixture = async (page: Page): Promise<void> => {
   const profile = profileFor(page)
   await seedChatImageLinkSession({ homeRoot: profile.homeRoot })
   const fixture = page.getByRole('treeitem', { name: /Untitled|Chat image link fixture/ })
@@ -168,11 +232,72 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
     )
     .toBeGreaterThan(0)
   await fixture.first().click()
+  await page
+    .getByText(/^Completed in /)
+    .last()
+    .click()
+}
+
+When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
   const imageLink = page.getByRole('button', { name: 'red.png', exact: true })
   await imageLink.scrollIntoViewIfNeeded()
   const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
   await expect(backToBottom).toBeVisible()
   await imageLink.click()
+})
+
+When('a read image tool summary path is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
+  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  await page.getByRole('button', { name: 'blue.png', exact: true }).click()
+})
+
+When('thread gallery scope is selected and a read image path is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Settings/ }).click()
+  await page.getByRole('button', { name: 'Current turn', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Entire thread', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  await page.getByRole('button', { name: 'blue.png', exact: true }).click()
+})
+
+Then('the thread gallery includes images from other turns', async ({ page }: { page: Page }) => {
+  const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+  await recordAssertion(page, 'chat-thread-gallery-includes-older-turns', async () => {
+    await expect(lightbox).toBeVisible()
+    await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 1 of 3', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 3 of 3', exact: true })).toBeVisible()
+  })
+  await lightbox.getByRole('button', { name: 'Next image', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+  const thirdThumbnail = lightbox.getByRole('button', { name: 'Image 3 of 3', exact: true })
+  await thirdThumbnail.click()
+  await expect(thirdThumbnail).toHaveAttribute('aria-current', 'true')
+  await page.keyboard.press('Escape')
+  await expect(lightbox).toBeHidden()
+  await finishJourneyAssertions(page)
+})
+
+Then('the read image tool path opens in a navigable gallery rather than a side panel', async ({ page }: { page: Page }) => {
+  const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+  await recordAssertion(page, 'chat-read-image-opens-turn-gallery', async () => {
+    await expect(lightbox).toBeVisible()
+    await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 1 of 2', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 2 of 2', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open right sidebar', exact: true })).toBeVisible()
+  })
+  await lightbox.getByRole('button', { name: 'Next image', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+  await lightbox.getByRole('button', { name: 'Image 1 of 2', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(lightbox).toBeHidden()
+  await finishJourneyAssertions(page)
 })
 
 Then('the image link opens in the gallery rather than a side panel', async ({ page }: { page: Page }) => {

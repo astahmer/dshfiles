@@ -23,9 +23,11 @@ const BOOKMARK = /^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/u
 export const CHAT_REFERENCE_PREFIX = 'jj:'
 
 export const chatReferenceQueryKeys = {
+  localTitle: (cwd: string, reference: string) => ['jujutsu', 'reference-local-title', cwd, reference] as const,
   search: (cwd: string, reference: string) => ['jujutsu', 'reference-search', cwd, reference] as const,
   projects: ['jujutsu', 'reference-projects'] as const,
   repository: (path: string) => ['jujutsu', 'reference-repository', path] as const,
+  repositories: (paths: readonly string[]) => ['jujutsu', 'reference-repositories', [...paths].sort().join('\n')] as const,
 }
 
 const referenceOf = (token: string): ChatReference | undefined => {
@@ -75,9 +77,11 @@ export const chatReferencePreviewDismissEvent = 'dshfiles:jujutsu-reference-prev
 export const chatReferenceTitleRequestEvent = 'dshfiles:jujutsu-reference-title-request'
 export const chatReferenceTitleResolvedEvent = 'dshfiles:jujutsu-reference-title-resolved'
 
+const sessionIdSchema = z.string().min(1).max(256)
 const referenceIdentitySchema = z.object({ value: z.string().min(1).max(255), kind: z.enum(['revision', 'bookmark']) })
 
 export const chatReferencePreviewRequestSchema = z.object({
+  sessionId: sessionIdSchema,
   /** The Session repository the reference is read in; the Host resolves its repoId from this path. */
   cwd: z.string().min(1).max(2048),
   reference: referenceIdentitySchema,
@@ -85,7 +89,7 @@ export const chatReferencePreviewRequestSchema = z.object({
 })
 
 export const chatReferenceTitleRequestSchema = z.object({
-  sessionId: z.string().min(1).max(256),
+  sessionId: sessionIdSchema,
   cwd: z.string().min(1).max(2048),
   reference: referenceIdentitySchema,
 })

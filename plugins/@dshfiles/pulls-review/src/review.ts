@@ -4,7 +4,7 @@ import { JjCommandError, JjUnavailableError, type JjRun } from './jj.js'
 import { groupPatch } from './scopes.js'
 
 /** Base bookmarks tried in order when the caller does not name one. */
-export const BASE_CANDIDATES = ['main', 'master', 'trunk'] as const
+const BASE_CANDIDATES = ['main', 'master', 'trunk'] as const
 const HEAD_REVISION = '@'
 const REVISION_TEMPLATE = 'commit_id.short()'
 

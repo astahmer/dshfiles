@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.js'
 import { createDshPlatformClientFromTransport } from '../src/platform/client.js'
-import type { DshPlatformClient, JsonValue, SessionSummary } from '../src/platform/client.js'
+import type { DshPlatformClient, JsonValue } from '../src/platform/client.js'
 import { SessionDigestModel } from '../src/platform/session-digest.js'
 
 const fixtureSchema = z.object({
@@ -21,7 +21,7 @@ const fixtureSchema = z.object({
 })
 
 // Captured from a scratch DSH driven by a scripted Messages endpoint; paths rewritten to /tmp/dshx-digest.
-const loadFixture = (name: string): { readonly summary: SessionSummary; readonly records: readonly JsonValue[] } => {
+const loadFixture = (name: string) => {
   const fixture = fixtureSchema.parse(JSON.parse(readFileSync(new URL(`./fixtures/session-digest/${name}.json`, import.meta.url), 'utf8')))
   return {
     summary: {
@@ -30,8 +30,8 @@ const loadFixture = (name: string): { readonly summary: SessionSummary; readonly
       running: fixture.summary.running,
       blank: fixture.summary.blank,
       agentAvailable: fixture.summary.agentAvailable,
-      ...(fixture.summary.cwd === undefined ? {} : { cwd: fixture.summary.cwd }),
-      ...(fixture.summary.projections === undefined ? {} : { projections: fixture.summary.projections }),
+      ...(fixture.summary.cwd !== undefined && { cwd: fixture.summary.cwd }),
+      ...(fixture.summary.projections !== undefined && { projections: fixture.summary.projections }),
     },
     records: fixture.records,
   }

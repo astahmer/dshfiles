@@ -179,18 +179,16 @@ describe('foldRecords', () => {
     const records = names.flatMap((name, index) => {
       const callId = `call-${String(index)}`
       const seq = index * 2 + 1
+      const callData =
+        name === 'skill'
+          ? { callId, name, arguments: JSON.stringify({ name: 'verify-dsh' }), turn: 1, step: index + 1 }
+          : { callId, name, turn: 1, step: index + 1 }
       return [
         {
           type: 'tool/call',
           seq,
           time: seq * 100,
-          data: {
-            callId,
-            name,
-            arguments: name === 'skill' ? JSON.stringify({ name: 'verify-dsh' }) : undefined,
-            turn: 1,
-            step: index + 1,
-          },
+          data: callData,
         },
         {
           type: 'tool/result',
@@ -253,7 +251,7 @@ describe('foldRecords', () => {
       },
     ]
     const first = fold(records.slice(0, 1))
-    const second = UsageFoldModel.foldRecords({ state: JSON.parse(JSON.stringify(first.state)), records: records.slice(1), sessionId: 'session-a' })
+    const second = UsageFoldModel.foldRecords({ state: structuredClone(first.state), records: records.slice(1), sessionId: 'session-a' })
     expect(second.rows).toEqual(fold(records).rows)
     expect(second.rows[0]?.ttftMs).toBe(40)
   })

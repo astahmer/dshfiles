@@ -1,4 +1,5 @@
 import { WebError, type WebSearchRequest, type WebSearchResult, type WebSearchSource } from '@deepseek-ai/dsh-web'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 
@@ -57,9 +58,9 @@ export class BraveSearchModel {
 
   /** The I/O boundary: decode the wire text once, naming its shape for every later step. */
   static parseResponse(text: string): BraveResponse {
-    let payload: unknown
+    let payload: JsonValue
     try {
-      payload = JSON.parse(text)
+      payload = decodeJson(jsonValueSchema, text)
     } catch (cause) {
       throw new WebError('Brave search returned invalid JSON.', 'WEB_PROVIDER_ERROR', { cause })
     }

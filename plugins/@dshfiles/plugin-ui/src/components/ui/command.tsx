@@ -19,14 +19,14 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 }
 
 function CommandDialog({
-  title = 'Command Palette',
+  heading = 'Command Palette',
   description = 'Search for a command to run...',
   children,
   className,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  title?: string
+  heading?: string
   description?: string
   className?: string
   showCloseButton?: boolean
@@ -34,7 +34,7 @@ function CommandDialog({
   return (
     <Dialog {...props}>
       <DialogHeader className="dshx:sr-only">
-        <DialogTitle>{title}</DialogTitle>
+        <DialogTitle>{heading}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent className={cn('dshx:overflow-hidden dshx:p-0', className)} showCloseButton={showCloseButton}>

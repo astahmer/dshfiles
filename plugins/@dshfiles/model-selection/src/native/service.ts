@@ -13,20 +13,18 @@
  * per-session singleton with no global layer to merge.
  */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
+import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type {} from '@dshfiles/session-controller/draft-client'
 import { Service } from '@deepseek-ai/cordis'
+import { createRegisteredApiClient } from '@dshfiles/dshx/client'
+import { z } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values'
 import { ModelCatalogDirectory } from './catalog.ts'
 import { ModelDirectory } from './directory.ts'
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    modelDirectories: ModelDirectoryResolver
-  }
-}
 
 /** Live mutable state in one holder (service methods run behind the caller-ctx tracker). */
 interface LiveState {
@@ -36,16 +34,23 @@ interface LiveState {
 
 /** The `ctx.modelDirectories` session model-selection service. */
 export class ModelDirectoryResolver extends Service {
-  static inject = ['sessions', 'sessionDrafts', 'remote', 'remote.session']
+  static inject = ['sessions', 'sessionDrafts', 'remote', 'remote.session', 'remote.commands']
 
   private readonly live: LiveState = { directories: new WeakMapWithValues() }
   private readonly catalog: ModelCatalogDirectory
+  private readonly handoff: ReturnType<typeof createRegisteredApiClient>
 
   /**
    * @param ctx - owning root context (the service registers itself as `models`).
    */
   constructor(ctx: Context) {
     super(ctx, 'modelDirectories')
+    this.handoff = createRegisteredApiClient(ctx, {
+      owner: '@dshfiles/model-effort-picker',
+      id: 'model-handoff',
+      version: 1,
+      methods: ['contextWindow'],
+    })
     this.catalog = new ModelCatalogDirectory(ctx)
     void this.catalog.load().catch(() => { /* selectors expose the shared error */ })
     ctx.on('connection/reset', () => {
@@ -64,6 +69,15 @@ export class ModelDirectoryResolver extends Service {
    * @param sessionId - the owning session.
    * @returns the resident directory both entries share.
    */
+  private async resolveContextWindow(route: Pick<ModelSelection, 'provider' | 'model'>): Promise<number | null> {
+    const contextWindow = this.handoff.safe.contextWindow
+    if (contextWindow === undefined) return null
+    const result = await contextWindow(route)
+    if (!result.ok) return null
+    const decoded = z.number().int().positive().nullable().safeParse(result.value)
+    return decoded.success ? decoded.data : null
+  }
+
   directoryFor(sessionId: SessionId): ModelDirectory {
     const { live } = this
     const sessions = this.ctx.sessions
@@ -79,7 +93,16 @@ export class ModelDirectoryResolver extends Service {
       () => sessions.subagentAddress(sessionId) === undefined,
       this.catalog,
       binding.session.projections.faceOf('modelSelection'),
+      binding.session.projections.faceOf('contextPressure'),
       () => binding.session.getSnapshot().blank,
+      route => this.resolveContextWindow(route),
+      async () => {
+        const result = await this.ctx.remote.commands.execute(sessionId, '/compact', [])
+        if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
+        if (result.value === undefined) return false
+        if (result.value.result.kind === 'error') throw new Error(result.value.result.text ?? 'Compaction failed.')
+        return true
+      },
       (name, attributes) => this.ctx.get('productAnalytics')?.track(name, attributes),
       this.ctx.sessionDrafts,
     )

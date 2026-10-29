@@ -47,6 +47,11 @@ import { NewViewTabs } from './new-view.js'
 import { TabRows } from './tab-row-visibility.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
 
+const DROP_DIRECTIONS = { top: 'above', bottom: 'below', left: 'left', right: 'right', center: 'within' } as const satisfies Record<
+  NonNullable<WorkbenchPanelDrop['position']>,
+  'above' | 'below' | 'left' | 'right' | 'within'
+>
+
 // A literal so dshx's slot-occupancy check can read the id; `satisfies` keeps it equal to the exported contract.
 const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID
 const RIGHT_PANE_ID = '@dshfiles/workbench/side-panel'
@@ -475,16 +480,7 @@ export default defineClient({
     const handleDrop =
       (region: WorkbenchRegionId) =>
       (drop: WorkbenchPanelDrop): void => {
-        const direction: 'above' | 'below' | 'left' | 'right' | 'within' =
-          drop.position === 'top'
-            ? 'above'
-            : drop.position === 'bottom'
-              ? 'below'
-              : drop.position === 'left'
-                ? 'left'
-                : drop.position === 'right'
-                  ? 'right'
-                  : 'within'
+        const direction = drop.position === undefined ? 'within' : DROP_DIRECTIONS[drop.position]
         const position = drop.group === undefined ? undefined : { referenceGroup: drop.group, direction }
         adoptPanel(position === undefined ? { region, api: drop.api, panelId: drop.panelId } : { region, api: drop.api, panelId: drop.panelId, position })
       }
@@ -519,10 +515,13 @@ export default defineClient({
           const active = api.activePanel
           // API insertion order is not visual order (Navigation was inserted
           // above Threads). Seat the former footer below the lowest docked group.
-          const reference = api.groups.filter(group => group.api.location.type === 'grid').reduce<DockviewGroupPanel | undefined>((bottom, candidate) => {
-            if (bottom === undefined) return candidate
-            return candidate.element.getBoundingClientRect().bottom > bottom.element.getBoundingClientRect().bottom ? candidate : bottom
-          }, undefined) ?? api.addGroup()
+          const reference =
+            api.groups
+              .filter(group => group.api.location.type === 'grid')
+              .reduce<DockviewGroupPanel | undefined>((bottom, candidate) => {
+                if (bottom === undefined) return candidate
+                return candidate.element.getBoundingClientRect().bottom > bottom.element.getBoundingClientRect().bottom ? candidate : bottom
+              }, undefined) ?? api.addGroup()
           api.addPanel({
             id: preview.id,
             component: WORKBENCH_COMPONENT,
@@ -731,14 +730,12 @@ export default defineClient({
       )
     })
 
-    const destinationLabel = (region: WorkbenchRegionId): string =>
-      region === 'main'
-        ? translate('moveToMainView')
-        : region === 'bottom'
-          ? translate('moveToBottomPanel')
-          : region === 'left'
-            ? translate('moveToLeft')
-            : translate('moveToDock')
+    const destinationLabel = (region: WorkbenchRegionId): string => {
+      if (region === 'main') return translate('moveToMainView')
+      if (region === 'bottom') return translate('moveToBottomPanel')
+      if (region === 'left') return translate('moveToLeft')
+      return translate('moveToDock')
+    }
 
     /**
      * Move a panel to another region, or to its own full main-view page. The

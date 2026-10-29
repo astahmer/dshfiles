@@ -164,10 +164,13 @@ describe('CleanupJobModel.sameRequest', () => {
     expect(CleanupJobModel.skippedSummary(result({ workspaces: 1 }))).toBeUndefined()
   })
 
-  it('separates a different age, folder or kind set', () => {
+  it('separates a different age, folder, kind set or selected targets', () => {
     expect(CleanupJobModel.sameRequest(request, { ...request, olderThanHours: 24 })).toBe(false)
     expect(CleanupJobModel.sameRequest(request, { ...request, path: null })).toBe(false)
     expect(CleanupJobModel.sameRequest(request, { ...request, kinds: ['empty'] })).toBe(false)
+    const selected = { ...request, targets: [{ repoRoot: '/work/sample', name: 'thread-one', kind: 'empty' as const }] }
+    expect(CleanupJobModel.sameRequest(selected, { ...selected, targets: [{ repoRoot: '/work/sample', name: 'thread-two', kind: 'empty' }] })).toBe(false)
+    expect(CleanupJobModel.sameRequest(selected, { ...selected, targets: [...selected.targets].reverse() })).toBe(true)
   })
 })
 

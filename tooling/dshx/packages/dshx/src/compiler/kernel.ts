@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import type { InlineConfig, Plugin, PluginOption, ResolvedConfig, Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
@@ -164,14 +165,41 @@ const dependencyManifestPlugin = (options: {
     },
     async writeBundle() {
       const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()
+      // Content hashes let a freshness check ignore a checkout that rewrote a source without changing it.
+      const hashes = Object.fromEntries(
+        await Promise.all(
+          sources
+            .filter(source => !source.includes('node_modules/'))
+            .map(async source => {
+              const content = await readFile(resolve(options.root, source)).catch(() => undefined)
+              return [source, content === undefined ? null : createHash('sha256').update(content).digest('hex')] as const
+            }),
+        ),
+      )
       await mkdir(options.outDir, { recursive: true })
       await writeFile(
         resolve(options.outDir, `${options.entryFile}.deps.json`),
-        `${JSON.stringify({ version: 1, face: options.face, sources }, null, 2)}\n`,
+        `${JSON.stringify({ version: 1, face: options.face, sources, hashes }, null, 2)}\n`,
         'utf8',
       )
     },
   }
+}
+
+/**
+ * Rolldown reports a hook's thrown error inside an aggregate and moves its code to `pluginCode`. Rethrow the DshxError a
+ * DSHX guard threw with its own code, file and hint, so the CLI prints the guard's diagnostic.
+ */
+const surfaceGuardError = (error: unknown): never => {
+  const errors = typeof error === 'object' && error !== null && 'errors' in error && Array.isArray(error.errors) ? (error.errors as unknown[]) : []
+  const guard = errors.find(item => item instanceof DshxError)
+  if (guard === undefined) throw error
+  const code = 'pluginCode' in guard && typeof guard.pluginCode === 'string' ? guard.pluginCode : guard.code
+  throw new DshxError(code, guard.message.replace(/^DSHX\d+\n\n/u, ''), {
+    cause: error,
+    ...(guard.file !== undefined && { file: guard.file }),
+    ...(guard.hint !== undefined && { hint: guard.hint }),
+  })
 }
 
 export class CompilerKernel {
@@ -181,4 +209,5 @@ export class CompilerKernel {
   static readonly dependencyManifestPlugin = dependencyManifestPlugin
   static readonly buildReport = buildReport
   static readonly buildWatcher = buildWatcher
+  static readonly surfaceGuardError = surfaceGuardError
 }

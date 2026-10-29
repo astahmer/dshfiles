@@ -46,7 +46,14 @@
     "antislop/no-reflect-apply": "error",
     "antislop/no-reflect-get": "error",
     "antislop/no-passthrough-variable": "error",
-    "antislop/no-runtime-typeof": "warn",
+    "antislop/no-runtime-typeof": [
+      "warn",
+      {
+        "allowInTypeGuards": true,
+        "allowWhenStaticallyTyped": true,
+        "allowInBoundaryFunctions": true
+      }
+    ],
     "antislop/no-unsafe-dictionary-type": "warn",
     "antislop/no-unknown-parameters": "warn",
     "antislop/no-unknown-returns": "warn",

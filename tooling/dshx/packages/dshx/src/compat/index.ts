@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { DshxError } from '../diagnostics.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
 import { gt, intersects, prerelease, satisfies, subset, valid, validRange } from 'semver'
@@ -9,26 +10,6 @@ import type {
   DshCompatibilityResolution,
   DshDeclaredRangeAnalysis,
   DshProjectCompatibilityAssessment,
-} from './types.js'
-
-export { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
-export type {
-  DshCompatibility,
-  DshCompatibilityLifecycle,
-  DshCompatibilityMatrixEntry,
-  DshCompatibilityResolution,
-  DshClientConversationCompatibility,
-  DshConnectionCompatibility,
-  DshHostContributionCompatibility,
-  DshInspectCompatibility,
-  DshProfileCompatibility,
-  DshSessionCompatibility,
-  DshDeclaredRangeAnalysis,
-  DshDeclaredRangeStatus,
-  DshProjectCompatibilityAssessment,
-  DshSupportStatus,
-  DshVerifiedVersions,
-  DshxRuntimePluginSpec,
 } from './types.js'
 
 const ADAPTERS = [PROTOCOL_2_COMPATIBILITY] as const
@@ -82,32 +63,37 @@ export function getCompatibilitySmokeMatrix(): readonly DshCompatibilityMatrixEn
   })
 }
 
+/** The slice of an installed package manifest the compatibility check reads. */
+interface InstalledDshManifest {
+  readonly version?: unknown
+}
+
 /** Read the project-local official DSH package without invoking a command. */
 export function detectInstalledDshVersion(projectPackageFile: string): string | undefined {
   try {
     const require = createRequire(projectPackageFile)
     const packageFile = require.resolve('@deepseek-ai/dsh/package.json')
-    const manifest = require(packageFile) as { version?: unknown }
+    const manifest: InstalledDshManifest = require(packageFile)
     return typeof manifest.version === 'string' && manifest.version !== '' ? manifest.version : undefined
   } catch {
     return undefined
   }
 }
 
-function dependencySpecifier(manifest: Readonly<Record<string, unknown>>, field: 'devDependencies' | 'peerDependencies'): string | undefined {
+function dependencySpecifier(manifest: JsonObject, field: 'devDependencies' | 'peerDependencies'): string | undefined {
   const section = manifest[field]
-  if (typeof section !== 'object' || section === null || Array.isArray(section)) return undefined
-  const value = (section as Record<string, unknown>)['@deepseek-ai/dsh']
+  if (!isJsonObject(section)) return undefined
+  const value = section['@deepseek-ai/dsh']
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
 }
 
 /** Public DSH support declared by the plugin package. */
-export function declaredDshRange(manifest: Readonly<Record<string, unknown>>): string | undefined {
+export function declaredDshRange(manifest: JsonObject): string | undefined {
   return dependencySpecifier(manifest, 'peerDependencies')
 }
 
 /** Concrete DSH specifier used only to build and test the plugin locally. */
-export function developmentDshSpecifier(manifest: Readonly<Record<string, unknown>>): string | undefined {
+export function developmentDshSpecifier(manifest: JsonObject): string | undefined {
   return dependencySpecifier(manifest, 'devDependencies')
 }
 
@@ -125,7 +111,7 @@ export function analyzeDeclaredDshRange(range: string, adapters: readonly DshCom
 }
 
 /** Select a build adapter from the plugin's public DSH peer range without starting DSH. */
-export function resolveDeclaredCompatibility(manifest: Readonly<Record<string, unknown>>): DshCompatibilityResolution | undefined {
+export function resolveDeclaredCompatibility(manifest: JsonObject): DshCompatibilityResolution | undefined {
   const range = declaredDshRange(manifest)
   if (range === undefined) return undefined
   const analysis = analyzeDeclaredDshRange(range)
@@ -168,7 +154,7 @@ export function getCompatibilityCapabilities(compatibility: DshCompatibility): r
 }
 
 /** Collect the version facts used consistently by build, dev, and check. */
-export function assessProjectCompatibility(manifest: Readonly<Record<string, unknown>>, installedVersion?: string): DshProjectCompatibilityAssessment {
+export function assessProjectCompatibility(manifest: JsonObject, installedVersion?: string): DshProjectCompatibilityAssessment {
   const declaredRange = declaredDshRange(manifest)
   const developmentSpecifier = developmentDshSpecifier(manifest)
   const rangeAnalysis = declaredRange === undefined ? undefined : analyzeDeclaredDshRange(declaredRange)
@@ -179,12 +165,12 @@ export function assessProjectCompatibility(manifest: Readonly<Record<string, unk
     installedWithinDeclaredRange = satisfies(installedVersion, declaredRange, { includePrerelease: true })
   }
   return {
-    ...(declaredRange === undefined ? {} : { declaredRange }),
-    ...(developmentSpecifier === undefined ? {} : { developmentSpecifier }),
-    ...(rangeAnalysis === undefined ? {} : { rangeAnalysis }),
-    ...(installedVersion === undefined ? {} : { installedVersion }),
-    ...(installedWithinDeclaredRange === undefined ? {} : { installedWithinDeclaredRange }),
-    ...(resolution === undefined ? {} : { resolution }),
+    ...(declaredRange !== undefined && { declaredRange }),
+    ...(developmentSpecifier !== undefined && { developmentSpecifier }),
+    ...(rangeAnalysis !== undefined && { rangeAnalysis }),
+    ...(installedVersion !== undefined && { installedVersion }),
+    ...(installedWithinDeclaredRange !== undefined && { installedWithinDeclaredRange }),
+    ...(resolution !== undefined && { resolution }),
     compatibility,
     capabilities: getCompatibilityCapabilities(compatibility),
   }
@@ -198,6 +184,8 @@ export function assessProjectCompatibility(manifest: Readonly<Record<string, unk
  * appears at boot, as `failed to import`, which is the worst time to learn it.
  */
 const HOST_PROVIDED_SCOPE = '@deepseek-ai/'
+
+const isJsonObject = (value: JsonValue | undefined): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /**
  * Packages under the Host scope that are ordinary libraries rather than Host
@@ -216,10 +204,10 @@ const HOST_SCOPE_LIBRARIES = new Set(['@deepseek-ai/schemastery'])
  * `devDependencies` for local typechecking, which is what the DSH range check
  * above already asks for.
  */
-export function projectHostProvidedDependencyDiagnostics(manifest: Readonly<Record<string, unknown>>, packageFile: string): readonly DshxDiagnostic[] {
+export function projectHostProvidedDependencyDiagnostics(manifest: JsonObject, packageFile: string): readonly DshxDiagnostic[] {
   const section = manifest['dependencies']
-  if (section === null || typeof section !== 'object' || Array.isArray(section)) return []
-  const offenders = Object.keys(section as Record<string, unknown>)
+  if (!isJsonObject(section)) return []
+  const offenders = Object.keys(section)
     .filter(name => name.startsWith(HOST_PROVIDED_SCOPE) && !HOST_SCOPE_LIBRARIES.has(name))
     .sort()
   if (offenders.length === 0) return []

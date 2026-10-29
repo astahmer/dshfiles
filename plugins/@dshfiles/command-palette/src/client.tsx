@@ -10,7 +10,7 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
@@ -20,7 +20,17 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
-import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
+import { ContributedCommandsModel } from './contributed-commands.js'
+import {
+  CommandPalette,
+  PaletteActions,
+  type CommandPaletteState,
+  type PaletteAction,
+  type PaletteActionContext,
+  type PaletteMode,
+  type PaletteWorkspace,
+} from './palette-contract.js'
+import { PaletteApi } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
@@ -282,7 +292,27 @@ export default defineClient({
   name: '@dshfiles/command-palette',
   locales: [commandPaletteLocale],
   inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection', 'remote', 'remote.session'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      plugin.keyed(plugin.list(Command), ContributedCommandsModel.list)
+      plugin.keyed(plugin.list(PaletteActions), ContributedCommandsModel.listActions)
+      let lastState: CommandPaletteState = { mode: null, recentLimit: 10 }
+      plugin.provide(CommandPalette, {
+        open: PaletteApi.open,
+        close: PaletteApi.close,
+        setRecentLimit: PaletteApi.setRecentLimit,
+        state: {
+          get: () => {
+            const snapshot = PaletteApi.getSnapshot()
+            if (snapshot.mode !== lastState.mode || snapshot.recentLimit !== lastState.recentLimit)
+              lastState = { mode: snapshot.mode, recentLimit: snapshot.recentLimit }
+            return lastState
+          },
+          subscribe: PaletteApi.subscribe,
+        },
+      })
+    }
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))
@@ -352,18 +382,6 @@ export default defineClient({
         ),
       'command-palette: shell overlay',
     )
-    ctx.effect(() => {
-      const onRequest = (event: Event): void => {
-        const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
-        const probe = typeof detail === 'object' && detail !== null && 'probe' in detail && detail.probe === true
-        const requestedMode = typeof detail === 'object' && detail !== null && 'mode' in detail ? detail.mode : undefined
-        event.preventDefault()
-        if (probe) return
-        PaletteApi.open(requestedMode === 'threads' || requestedMode === 'files' ? requestedMode : 'all')
-      }
-      window.addEventListener(PALETTE_EVENT, onRequest)
-      return () => window.removeEventListener(PALETTE_EVENT, onRequest)
-    }, 'command-palette: open request')
     const shortcutId = 'commandPalette.open'
     if (isShortcutCommandId(shortcutId))
       ctx.effect(
@@ -412,7 +430,7 @@ export default defineClient({
         try {
           return register(true)
         } catch (error) {
-          console.warn(`command-palette: ${newThreadShortcutId} keeps no default binding`, error)
+          console.debug(`command-palette: ${newThreadShortcutId} keeps no default binding (${error instanceof Error ? error.message : String(error)})`)
           try {
             return register(false)
           } catch {

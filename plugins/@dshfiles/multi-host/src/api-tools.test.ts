@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { multiHostApi } from './api.js'
+import { multiHostApi, resourceSnapshotSchema } from './api.js'
 
 describe('multi-host tool exposure', () => {
   test('every remote/host action a human can take is a named tool', () => {
@@ -7,6 +7,7 @@ describe('multi-host tool exposure', () => {
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'multi_host_browse',
       'multi_host_checkout_sync',
+      'multi_host_clone_project',
       'multi_host_create_thread',
       'multi_host_doctor',
       'multi_host_exec',
@@ -15,6 +16,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_forget_thread',
       'multi_host_identity',
       'multi_host_list',
+      'multi_host_local_project_files',
       'multi_host_mkdir',
       'multi_host_models',
       'multi_host_open_folder',
@@ -23,10 +25,13 @@ describe('multi-host tool exposure', () => {
       'multi_host_remove_host',
       'multi_host_remove_runtime',
       'multi_host_reorder_hosts',
+      'multi_host_resource_pool',
+      'multi_host_resource_snapshot',
       'multi_host_runtime_control',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
       'multi_host_save_ssh_host',
+      'multi_host_session_jj_repositories',
       'multi_host_set_host_hidden',
       'multi_host_ssh_hosts',
       'multi_host_start_thread',
@@ -37,6 +42,49 @@ describe('multi-host tool exposure', () => {
       'multi_host_thread_transcript',
       'multi_host_threads',
     ])
+  })
+
+  test('remote cloning accepts safe destinations and complete local-file selections', async () => {
+    const inputSchema = multiHostApi.methods.runtimeCloneProject.input
+    if (inputSchema === undefined) throw new Error('The remote clone API must define an input schema.')
+    const accepts = async (repositoryUrl: string, destinationPath: string): Promise<boolean> => {
+      const result = await inputSchema['~standard'].validate({ runtimeId: 'runtime', repositoryUrl, destinationPath })
+      return !('issues' in result)
+    }
+    expect(await accepts('https://github.com/owner/repo.git', '~/repo')).toBe(true)
+    expect(await accepts('git@github.com:owner/repo.git', '/home/user/repo')).toBe(true)
+    expect(await accepts('file:///etc/passwd', '/home/user/repo')).toBe(false)
+    expect(await accepts('https://github.com/owner/repo.git; touch /tmp/pwned', '/home/user/repo')).toBe(false)
+    expect(await accepts('https://github.com/owner/repo.git', '~/../outside')).toBe(false)
+    const cloneInput = multiHostApi.methods.runtimeCloneProject.input
+    if (cloneInput === undefined) throw new Error('The remote clone API must define an input schema.')
+    const copyInput = {
+      runtimeId: 'runtime',
+      repositoryUrl: 'https://github.com/owner/repo.git',
+      destinationPath: '~/repo',
+      copyFromPath: '/work/project',
+      copyPaths: ['.env.example', 'notes.txt'],
+    }
+    expect('issues' in (await cloneInput['~standard'].validate(copyInput))).toBe(false)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, includeIgnored: true }))).toBe(false)
+    expect(
+      'issues' in
+        (await cloneInput['~standard'].validate({
+          runtimeId: 'runtime',
+          repositoryUrl: copyInput.repositoryUrl,
+          destinationPath: '~/repo',
+          includeIgnored: true,
+        })),
+    ).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['../outside'] }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['bad\0path'] }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: undefined }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyFromPath: undefined }))).toBe(true)
+    const scanInput = multiHostApi.methods.localProjectFiles.input
+    if (scanInput === undefined) throw new Error('The local project file scan must define an input schema.')
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project' }))).toBe(false)
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project', includeIgnored: true }))).toBe(false)
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project', includeIgnored: 'yes' }))).toBe(true)
   })
 
   test('remote model results preserve reasoning choices', async () => {
@@ -66,6 +114,53 @@ describe('multi-host tool exposure', () => {
     expect(validation.value.groups[0]?.models[0]?.reasoning?.efforts[0]?.id).toBe('high')
   })
 
+  test('resource snapshots reject impossible machine metrics', () => {
+    const snapshot = {
+      sampledAt: '2026-10-28T05:00:00.000Z',
+      platform: 'linux',
+      cpuCount: 8,
+      loadAverage1m: 1.25,
+      memoryTotalBytes: 100,
+      memoryFreeBytes: 60,
+    }
+
+    expect(resourceSnapshotSchema.safeParse(snapshot).success).toBe(true)
+    expect(resourceSnapshotSchema.safeParse({ ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
+    expect(resourceSnapshotSchema.safeParse({ ...snapshot, loadAverage1m: -1 }).success).toBe(false)
+  })
+
+  test('the remote JJ repository proxy validates bounded read-only data', async () => {
+    const outputSchema = multiHostApi.methods.sessionJjRepositories.output
+    if (outputSchema === undefined) throw new Error('The remote JJ repository API must define an output schema.')
+    const valid = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: {
+        repositories: [
+          { repoRoot: '/remote/project', title: 'project', workspaceId: 'workspace-1', threads: [], futureStatus: { detail: 'ignored by this client' } },
+        ],
+      },
+    })
+    if ('issues' in valid) throw new Error('The remote JJ repository fixture was rejected.')
+    if (!valid.value.ok) throw new Error('The remote JJ repository fixture must be successful.')
+    expect(valid.value.repositories.repositories[0]).not.toHaveProperty('futureStatus')
+    const backwardCompatible = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: { repositories: [], refreshing: false },
+    })
+    if ('issues' in backwardCompatible) throw new Error('The remote JJ response without optional newer fields was rejected.')
+    const invalid = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: { repositories: [{ repoRoot: '/remote/project', title: 'project', workspaceId: 'workspace-1', threads: [{ name: 'thread' }] }] },
+    })
+    expect('issues' in invalid).toBe(true)
+    const missingApi = await outputSchema['~standard'].validate({
+      ok: false,
+      code: 'api-owner-missing',
+      message: 'The remote runtime does not serve this API.',
+    })
+    if ('issues' in missingApi) throw new Error('The missing remote API result was rejected.')
+    expect(missingApi.value.ok).toBe(false)
+  })
   test('inspection stays read-only and every write needs the user to have asked', () => {
     const readOnly = Object.values(multiHostApi.methods)
       .filter(method => method.tool?.readOnly === true)
@@ -77,9 +172,13 @@ describe('multi-host tool exposure', () => {
       'multi_host_file_references',
       'multi_host_identity',
       'multi_host_list',
+      'multi_host_local_project_files',
       'multi_host_models',
+      'multi_host_resource_pool',
+      'multi_host_resource_snapshot',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
+      'multi_host_session_jj_repositories',
       'multi_host_ssh_hosts',
       'multi_host_status',
       'multi_host_thread_transcript',

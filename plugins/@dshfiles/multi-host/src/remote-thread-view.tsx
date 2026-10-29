@@ -23,13 +23,13 @@ const age = (updatedAt: number, now: number): string => {
  */
 export const RemoteThreadView = (props: { readonly onOpenSession: (sessionId: SessionId) => void }) => {
   const api = useApi(multiHostApi)
-  const threads = useQuery({ queryKey: multiHostKeys.threads, queryFn: ({ signal }) => api.threadList(undefined, { signal }), refetchInterval: 15_000 })
+  const threads = useQuery({ queryKey: multiHostKeys.threads, queryFn: ({ signal }) => api.threadList(undefined, { signal }), refetchInterval: 30_000 })
   const directory = useQuery(multiHostQueries.directory(api))
   const runtimes = directory.data?.runtimes ?? []
   const hosts = directory.data?.hosts ?? []
   const hostNameFor = (runtimeId: string, fallback: string): string =>
     hosts.find(host => host.id === (runtimes.find(runtime => runtime.id === runtimeId)?.hostId ?? ''))?.name ?? fallback
-  const statuses = useQueries({ queries: runtimes.map(runtime => multiHostQueries.status(api, runtime.id, 30_000)) })
+  const statuses = useQueries({ queries: runtimes.map(runtime => multiHostQueries.status(api, runtime.id, 60_000)) })
   const inventoryStatuses: readonly InventoryStatus[] = statuses.flatMap((result, index) => {
     const runtime = runtimes[index]
     if (runtime === undefined || result.data === undefined) return []

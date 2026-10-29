@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 export const PROMPT_LIBRARY_STORAGE_KEY = 'dshfiles.prompt-stash.v1'
@@ -63,9 +64,9 @@ export type PromptMutation =
 const readPromptLibraryWithSource = (serialized: string | null): PromptLibraryStoredRead => {
   if (serialized === null) return { kind: 'missing', store: emptyPromptLibraryStore() }
 
-  let value: unknown
+  let value: JsonValue
   try {
-    value = JSON.parse(serialized)
+    value = decodeJson(jsonValueSchema, serialized)
   } catch {
     return { kind: 'invalid' }
   }

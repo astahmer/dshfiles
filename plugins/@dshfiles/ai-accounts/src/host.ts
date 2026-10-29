@@ -6,7 +6,6 @@ import { threadAccountHostApi } from './thread-account-host.js'
 import { threadModelApi, threadModelPolicySchema, type ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
 import { ThreadRequestPolicy } from './thread-request-policy.js'
 import { configFromAccountsFile } from './account-config.js'
-export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
@@ -30,7 +29,8 @@ import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
-import { AccountStoreModel, accountStoreService, type AccountStoreFile } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
+import { accountStoreService, type AccountStoreFile } from './account-store.js'
 import { createAccountSetupService } from './account-setup-service.js'
 import { verifyAccountConnection } from './account-connection-verification.js'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -80,7 +80,6 @@ import { createQuotaContinuationService } from './quota-continuation.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
 import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
-export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -140,12 +139,10 @@ export default definePlugin({
         return verifyAccountConnection({
           ...request,
           readCopilotCredential: async id => runtime.copilotLogin?.readPending(id) ?? copilotCredentialReader(id),
-          ...(pendingHome === undefined
-            ? {}
-            : {
-                readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
-                  probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
-              }),
+          ...(pendingHome !== undefined && {
+            readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
+              probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
+          }),
         })
       },
       saveKey: async (reference, _owner, value, accepted) => {
@@ -173,14 +170,14 @@ export default definePlugin({
         if (
           file.accounts.some(
             account =>
-              AccountStoreModel.containsConfiguredHome(draft.homePath, account.homePath) ||
-              AccountStoreModel.containsConfiguredHome(draft.homePath, account.shadowHomePath),
+              AccountHomePolicy.containsConfiguredHome(draft.homePath, account.homePath) ||
+              AccountHomePolicy.containsConfiguredHome(draft.homePath, account.shadowHomePath),
           )
         )
           return
         if (draft.kind !== 'codex' && draft.kind !== 'claude') return
         const path = draft.homePath
-        if (!AccountStoreModel.isManagedSetupHome(path, draft.kind)) return
+        if (!AccountHomePolicy.isManagedSetupHome(path, draft.kind)) return
         try {
           // Check exact trusted absolute target and all resolved ancestors before recursive removal.
           if (realpathSync(path) !== path || !lstatSync(path).isDirectory()) throw new Error('Unsafe pending account home')
@@ -215,7 +212,11 @@ export default definePlugin({
       void usageHistory.close().catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
       void fastModeUsageHistory.close().catch(() => ctx.logger.warn('ai-accounts: Fast mode usage storage could not close cleanly'))
     })
-    runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
+    runtime.usageCache = createUsageCache({
+      ttlMs: 30_000,
+      timeoutMs: 30_000,
+      read: signal => AccountsHostApiModel.readAccountsUsage(ctx, signal),
+    })
     ctx.on('credentials/reference-updated', ref => {
       if (accountStoreService.readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
     })
@@ -951,7 +952,7 @@ export default definePlugin({
                   step,
                   provider,
                   requestProvider,
-                  ...(routedAccountId === undefined ? {} : { routedAccountId }),
+                  ...(routedAccountId !== undefined && { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
                   canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,

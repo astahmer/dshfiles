@@ -49,6 +49,7 @@ import {
   TextCursorInputIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   useCallback,
@@ -78,7 +79,8 @@ import {
   type ThreadRowAction,
 } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
-import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
+import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
+import { PaletteBridge } from './palette-bridge.js'
 import { KeyboardShortcutModel, parseChord } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -122,7 +124,8 @@ type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMeta
 const NAVIGATION_SETTLE_MS = 1500
 /** Holding Back or Forward this long opens the history menu, as browsers do. */
 const HISTORY_HOLD_MS = 450
-const PLUGIN_UPDATE_CHECK_MS = 60_000
+// A rebuilt plugin is noticed on the next check or on returning to the window; five minutes is often enough.
+const PLUGIN_UPDATE_CHECK_MS = 300_000
 const DRAG_THRESHOLD_PX = 5
 
 const rowActionLabelKeys = {
@@ -540,7 +543,9 @@ const expandedRowClass: Record<NavigationDensity, string> = {
 }
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
-  const { collapsed, renderSlot, selectPanel, startSession, toggleSidebar } = props
+  const { collapsed, readFooterSnapshot, renderSlot, selectPanel, startSession, subscribeFooterSnapshot, toggleSidebar } = props
+  // History steps stamp their settle window from the gesture, not from render.
+  const readNow = useCallback(() => Date.now(), [])
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
@@ -606,7 +611,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const refetchClientUpdates = clientUpdates.refetch
   const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
   const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
-  const [launchUrlCopied, setLaunchUrlCopied] = useState(false)
+  const launchUrlCopy = useCopyFeedback()
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -770,11 +775,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }, [pluginUpdatesSupported, refetchPluginUpdates, refetchClientUpdates])
 
   useEffect(() => {
-    const sync = (): void => setFooterSnapshot(props.readFooterSnapshot())
-    const unsubscribe = props.subscribeFooterSnapshot(sync)
+    const sync = (): void => setFooterSnapshot(readFooterSnapshot())
+    const unsubscribe = subscribeFooterSnapshot(sync)
     sync()
     return unsubscribe
-  }, [props.readFooterSnapshot, props.subscribeFooterSnapshot])
+  }, [readFooterSnapshot, subscribeFooterSnapshot])
 
   useEffect(() => {
     const location = ThreadNavigationHistoryModel.currentLocation({ panelId: activePanelId, threadId: selectedThreadId })
@@ -795,7 +800,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const goToHistoryEntry = (index: number): void => {
     const step = ThreadNavigationHistoryModel.jumpHistory(history, index)
     if (step === null) return
-    pendingStep.current = { target: step.target, until: Date.now() + NAVIGATION_SETTLE_MS }
+    pendingStep.current = { target: step.target, until: readNow() + NAVIGATION_SETTLE_MS }
     setHistory(step.history)
     if (step.target.kind === 'thread') {
       props.openSession(step.target.id)
@@ -1135,10 +1140,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     ],
   )
 
-  useEffect(() => {
-    const disposers = paletteActions.map(action => PaletteApi.registerAction(action))
-    return () => disposers.forEach(dispose => dispose())
-  }, [paletteActions])
+  useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])
 
   const renderCustomizeRow = (options: {
     entry: { id: string; label: string }
@@ -1787,21 +1789,20 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             </Popover>
           ) : null}
           {launchUrl === null ? null : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="dshx:shrink-0 dshx:text-muted-foreground"
-              aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
-              title={text(props.t, 'threadSidebarCopyLaunchUrl')}
-              onClick={() =>
-                void navigator.clipboard.writeText(launchUrl).then(() => {
-                  setLaunchUrlCopied(true)
-                  window.setTimeout(() => setLaunchUrlCopied(false), 1500)
-                })
-              }
-            >
-              {launchUrlCopied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="dshx:shrink-0 dshx:text-muted-foreground"
+                  aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
+                  onClick={() => void launchUrlCopy.copy(launchUrl)}
+                >
+                  {launchUrlCopy.copied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{text(props.t, 'threadSidebarCopyLaunchUrl')}</TooltipContent>
+            </Tooltip>
           )}
           {visibleFooterEntries.map((entry, index) => {
             const concealed = !footerEntryInline(entry, index)
@@ -1835,17 +1836,21 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             )
           })}
           <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
-                aria-label={text(props.t, 'threadSidebarMore')}
-                title={text(props.t, 'threadSidebarMore')}
-              >
-                <IconEllipsisOutlineRegular size={16} />
-              </Button>
-            </PopoverTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
+                    aria-label={text(props.t, 'threadSidebarMore')}
+                  >
+                    <IconEllipsisOutlineRegular size={16} />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">{text(props.t, 'threadSidebarMore')}</TooltipContent>
+            </Tooltip>
             <PopoverContent
               side={wide ? 'top' : 'right'}
               align={wide ? 'end' : 'start'}

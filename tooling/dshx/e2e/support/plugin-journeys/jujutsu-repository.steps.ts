@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
@@ -191,9 +191,8 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
     element.scrollTop = element.scrollHeight
   })
   await expect(revisionRow(page, 'Needle hidden beyond the first page')).toBeVisible({ timeout: 10_000 })
-  const rootRow = revisionsRegion(page)
-    .locator('article')
-    .filter({ has: page.locator('[title^="zzzzzzzz"]') })
+  const rootCommitId = jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'root()', '-T', 'commit_id']).trim()
+  const rootRow = revisionsRegion(page).locator(`article[data-commit-id="${rootCommitId}"]`)
   await expect(rootRow).toHaveCount(1)
   const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
   await hideImmutable.click()
@@ -215,7 +214,8 @@ Then('its row shows the edit, the creation, or both as the Revision date setting
   }
   await recordAssertion(page, 'jujutsu-row-age-is-the-last-content-edit', async () => {
     await expect(age).toHaveText(/^(now|\d+m)$/)
-    await expect(age).toHaveAttribute('title', /Created .*\nLast edited .*\nLast rewritten /)
+    await age.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(/^Created .*2020.*Last edited .*Last rewritten .*$/su)
   })
   await chooseRevisionDate('Created')
   await recordAssertion(page, 'jujutsu-row-age-can-show-the-creation', async () => {
@@ -266,10 +266,16 @@ Then('its changed files keep literal paths and track review progress', async ({ 
     await expect(row.getByRole('checkbox', { name: 'Mark reviewed feature.txt', exact: true })).toBeVisible()
   })
   await row.getByRole('button', { name: 'Full diff', exact: true }).click()
-  await recordAssertion(page, 'jujutsu-full-diff-shows-every-changed-file', async () => {
-    const diff = page.getByRole('group', { name: /^Full diff of Feature work by Ada · \w+ · 2 files$/ })
-    await expect(diff.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
-    await expect(diff.getByRole('code').filter({ hasText: 'feature' })).toBeVisible()
+  await recordAssertion(page, 'jujutsu-full-diff-reveals-the-patch-section', async () => {
+    await expect(row.getByText('Patch', { exact: true })).toBeVisible()
+    await expect(row.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
+    await expect(row.getByRole('group', { name: /^Full diff of/ })).toHaveCount(0)
+  })
+  await row.getByRole('button', { name: 'Open full-page diff in a tab', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-full-page-diff-opens-in-panel-tab', async () => {
+    await expect(page.getByRole('tab', { name: 'Diff', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Diff', exact: true })).toHaveAttribute('data-state', 'active')
+    await expect(page.getByRole('group', { name: /^Full diff of Feature work by Ada · \w+ · 2 files$/ })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -324,6 +330,9 @@ When('the repository is registered and a thread is started in it', async ({ page
   await writeFile(join(threadPath, 'review-one.txt'), 'First reviewed file.\n')
   await writeFile(join(threadPath, 'review-two.txt'), 'Second reviewed file.\n')
   jj(threadRepository, ['describe', '-m', 'Two-file review fixture'])
+  const workspaceDiff = jj(threadRepository, ['diff', '--from', 'main', '--to', '@', '--summary'])
+  expect(workspaceDiff).toContain('review-one.txt')
+  expect(workspaceDiff).toContain('review-two.txt')
 })
 
 /** Register the fixture repository and let its thread answer `prompt`, so the answer renders as markdown. */
@@ -331,7 +340,7 @@ When('the repository is registered and its thread answers {string}', async ({ pa
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
   await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
-  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
 })
 
@@ -369,8 +378,9 @@ Then('hovering the reference previews the revision graph around it', async ({ pa
     await expect(page.getByText('Revision graph · main', { exact: true })).toBeVisible()
     await expect(page.getByText(/^Commit ID: [a-f0-9]{8}$/u)).toBeVisible()
     await expect(page.getByText(/^Change ID: [k-z]{8,64}$/u)).toBeVisible()
-    const fullCommitId = page.locator('[data-dshfiles-jj-preview] code[title]')
-    await expect(fullCommitId).toHaveAttribute('title', /^[a-f0-9]{40,64}$/u)
+    const shortCommitId = page.locator('[data-dshfiles-jj-preview] code').filter({ hasText: /^[a-f0-9]{8}$/u })
+    await shortCommitId.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(/^[a-f0-9]{40,64}$/u)
     const graph = page.getByRole('list', { name: 'Revision graph', exact: true })
     await expect(graph).toBeVisible()
     await expect(graph).toContainText('main')
@@ -415,13 +425,13 @@ When("both repositories are registered and the first repository's thread answers
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, foreignRepositoryFor(page).path)
   await registerWorkspaceFolder(page, repository.path)
-  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
 })
 
 const foreignReferenceLink = (page: Page) => {
   const foreign = foreignRepositoryFor(page)
-  return page.getByRole('link', { name: `Jujutsu bookmark: ${foreign.description} (${foreign.bookmark})`, exact: true })
+  return page.getByRole('link', { name: new RegExp(`\\(${foreign.bookmark}\\)$`, 'u') })
 }
 
 Then('hovering the foreign reference previews its revision graph from the other repository', async ({ page }: { page: Page }) => {
@@ -477,10 +487,12 @@ Then('the composer summary shows an exact revision count against main', async ({
   const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
-  const review = page.locator('[data-review-surface][data-review-source="workspace"]')
+  const review = page.getByTestId('pulls-review-diffs')
   await recordAssertion(page, 'jujutsu-composer-summary-opens-multi-file-workspace-review', async () => {
     await expect(review).toBeVisible()
-    await expect(review.locator('[data-review-file-path]')).toHaveCount(2)
+    await expect(review.getByText('review-one.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('review-two.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('base.txt', { exact: true })).toHaveCount(0)
   })
 })
 

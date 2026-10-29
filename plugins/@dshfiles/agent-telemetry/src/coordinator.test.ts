@@ -1,7 +1,11 @@
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { recordSpans, startSpan, tracingEnabled, withSpan, type RecordedSpan, type SpanRecorder } from '@dshfiles/dshx/tracing'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createCoordinator, type ObservedLlmRequest, type ObservedSession, type ObservedToolResult } from './coordinator.js'
+import { z } from 'zod'
+import { createCoordinator, type ObservedEvent, type ObservedLlmRequest, type ObservedSession, type ObservedToolResult } from './coordinator.js'
+
+const bigintSchema = z.bigint()
 
 let capture = false
 const warnings: string[] = []
@@ -14,7 +18,11 @@ afterEach(() => {
 
 const session = (id: string, header: ObservedSession['header'] = {}): ObservedSession => ({ id, header: { cwd: '/repo', ...header } })
 
-const emit = (observer: ReturnType<typeof coordinator>, observed: ObservedSession, type: string, data: unknown) => observer.onEvent(observed, { type, data })
+/** A value the replacer sees while JSON-rendering recorded spans: JSON fields beside bigint nanosecond times. */
+type RenderedSpanValue = JsonValue | bigint | undefined
+
+const emit = (observer: ReturnType<typeof coordinator>, observed: ObservedSession, type: string, data: ObservedEvent['data']) =>
+  observer.onEvent(observed, { type, data })
 
 const toolResult = (callId: string, isError = false) => ({
   role: 'user',
@@ -173,7 +181,9 @@ describe('LoongSuite parity', () => {
       status: { code: 'error', message: 'ABORTED' },
       attributes: { 'dsh.turn.end_reason': 'aborted' },
     })
-    expect(JSON.stringify(recorder.spans, (_key, value: unknown) => (typeof value === 'bigint' ? String(value) : value))).not.toContain('PRIVATE-PROMPT')
+    expect(JSON.stringify(recorder.spans, (_key, value: RenderedSpanValue) => (bigintSchema.safeParse(value).success ? String(value) : value))).not.toContain(
+      'PRIVATE-PROMPT',
+    )
   })
 })
 
@@ -418,7 +428,7 @@ describe('content capture', () => {
     using recorder = recordSpans()
     await runTurn(coordinator(), session('s-10'))
     const chat = recorder.span('chat kilo-auto/free').attributes
-    expect(JSON.parse(String(chat['gen_ai.input.messages']))).toEqual([{ role: 'user', parts: [{ type: 'text', content: 'PROMPT-SECRET' }] }])
+    expect(decodeJson(jsonValueSchema, String(chat['gen_ai.input.messages']))).toEqual([{ role: 'user', parts: [{ type: 'text', content: 'PROMPT-SECRET' }] }])
     expect(String(chat['gen_ai.output.messages'])).toContain('REPLY-SECRET')
     expect(String(chat['gen_ai.system_instructions'])).toContain('SYSTEM-SECRET')
     expect(recorder.span('execute_tool bash').attributes['gen_ai.tool.call.arguments']).toBe('{"command":"ARGS-SECRET"}')

@@ -27,7 +27,7 @@ if (
   outputPath !== undefined &&
   (!isWithin(planDirectory, outputPath) || dirname(outputPath) !== planDirectory || !/^streaming-results-[a-z0-9-]+\.json$/u.test(basename(outputPath)))
 ) {
-  throw new Error('The output JSON must stay directly inside plans/ade-performance and use a streaming-results-*.json name.')
+  throw new Error('The output JSON must stay directly inside docs/ade-performance and use a streaming-results-*.json name.')
 }
 const resolvedStatePath = resolve(statePath)
 if (basename(resolvedStatePath) !== 'state.json' || !isWithin(tmpdir(), resolvedStatePath)) {

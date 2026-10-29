@@ -4,9 +4,10 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { AssistantChatData as NativeAssistantChatData } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import type { AssistantChatData } from '../contract/chat-nodes.ts'
+import type { AssistantChatData, ReasoningBlockTiming } from '../contract/chat-nodes.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 import {
   emptyAssistantBlock, isTokenDelta, toAssistantBlock, toAssistantBlocks,
@@ -22,7 +23,7 @@ declare module '../contract/chat-nodes.ts' {
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationStepDataMap {
     /** Streaming, settled, or interrupted Assistant material for this Step. */
-    'assistant-step': AssistantChatData
+    'assistant-step': NativeAssistantChatData
   }
 }
 
@@ -30,6 +31,7 @@ interface AssistantState {
   readonly turn: number
   readonly step: number
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  readonly reasoningTimings: readonly (ReasoningBlockTiming | undefined)[]
   readonly visibleBlocks: number
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
@@ -43,6 +45,7 @@ function initialState(turn: number, step: number): AssistantState {
     turn,
     step,
     blocks: [],
+    reasoningTimings: [],
     visibleBlocks: 0,
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
@@ -54,6 +57,13 @@ function initialState(turn: number, step: number): AssistantState {
 
 function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): AssistantBlock[] {
   return blocks.filter((block): block is AssistantBlock => block !== undefined)
+}
+
+function compactReasoningTimings(
+  blocks: readonly (AssistantBlock | undefined)[],
+  timings: readonly (ReasoningBlockTiming | undefined)[],
+): (ReasoningBlockTiming | undefined)[] {
+  return blocks.flatMap((block, index) => block === undefined ? [] : [timings[index]])
 }
 
 function blockIsVisible(block: AssistantBlock | undefined): boolean {
@@ -99,6 +109,7 @@ function updateChunk(
       && (state.firstTokenTime !== undefined || !isTokenDelta(chunk))) return state
   }
   const blocks = [...state.blocks]
+  const reasoningTimings = [...state.reasoningTimings]
   let changedIndex = -1
   let previousVisible = false
   switch (chunk.type) {
@@ -106,6 +117,7 @@ function updateChunk(
       changedIndex = chunk.index
       previousVisible = blockIsVisible(blocks[chunk.index])
       blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
+      if (chunk.blockType === 'reasoning') reasoningTimings[chunk.index] = { startedAt: time }
       break
     case 'text-delta': {
       const previous = blocks[chunk.index]
@@ -119,6 +131,7 @@ function updateChunk(
       changedIndex = chunk.index
       previousVisible = blockIsVisible(previous)
       blocks[chunk.index] = { kind: 'reasoning', text: (previous?.kind === 'reasoning' ? previous.text : '') + chunk.text }
+      reasoningTimings[chunk.index] ??= { startedAt: time }
       break
     }
     case 'tool-call-delta': {
@@ -138,6 +151,10 @@ function updateChunk(
       changedIndex = chunk.index
       previousVisible = blockIsVisible(blocks[chunk.index])
       blocks[chunk.index] = toAssistantBlock(chunk.block)
+      if (chunk.block.type === 'reasoning') {
+        const timing = reasoningTimings[chunk.index]
+        if (timing !== undefined) reasoningTimings[chunk.index] = { ...timing, endedAt: time }
+      }
       break
     case 'usage':
       return { ...state, usage: chunk.usage }
@@ -151,6 +168,7 @@ function updateChunk(
   return {
     ...state,
     blocks,
+    reasoningTimings,
     visibleBlocks,
     ...visibleBlocks > 0 && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: seq, firstVisibleTime: time }
@@ -167,9 +185,16 @@ function settleMessage(
   event: SessionEvent<'assistant/message'>,
 ): AssistantState {
   const blocks = toAssistantBlocks(event.data.message.content)
+  const reasoningTimings = [...state.reasoningTimings]
+  for (let index = 0; index < state.blocks.length; index++) {
+    if (state.blocks[index]?.kind !== 'reasoning') continue
+    const timing = reasoningTimings[index]
+    if (timing !== undefined && timing.endedAt === undefined) reasoningTimings[index] = { ...timing, endedAt: event.time }
+  }
   return {
     ...state,
     blocks,
+    reasoningTimings,
     visibleBlocks: countVisibleBlocks(blocks),
     final: match,
     usage: event.data.usage,
@@ -263,6 +288,11 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
   const status = settled?.interrupted === true
     ? 'interrupted'
     : settled === undefined ? 'running' : 'settled'
+  const reasoningTimings = settled?.interrupted === true
+    ? state.reasoningTimings.map(timing => timing === undefined || timing.endedAt !== undefined
+      ? timing
+      : { ...timing, endedAt: settled.time })
+    : state.reasoningTimings
   const anchorSeq = (settled?.interrupted === true ? settled.seq : state.firstVisibleSeq ?? settled?.seq)
     ?? context.matches[0]?.event.seq ?? 0
   const time = settled?.time ?? state.firstVisibleTime ?? context.matches[0]?.event.time ?? 0
@@ -275,6 +305,7 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
       turn: state.turn,
       step: state.step,
       blocks,
+      reasoningTimings: compactReasoningTimings(state.blocks, reasoningTimings),
       time,
       ...state.usage === undefined ? {} : { usage: state.usage },
       ...settled === undefined ? {} : { finalNode: settled },

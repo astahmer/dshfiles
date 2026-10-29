@@ -25,9 +25,9 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
           </Button>
         </>
       }
-      title="Quota"
+      heading="Quota"
     >
-      <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
+      <UsageCardView now={usage?.readAt ?? 0} usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
       <h4 className="dshx:mt-5 dshx:text-sm dshx:font-medium">Remaining quota over time</h4>
       <QuotaHistoryChart
         ariaLabel={`Remaining quota over the last ${String(historyDays)} days`}

@@ -92,7 +92,7 @@ const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => 
 }
 
 /** Ask the shared card to show one agent above an element the caller rendered itself. */
-export const previewAgentReference = (handle: string, element: Element): boolean => {
+const previewAgentReference = (handle: string, element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
   const parsed = agentReferencePreviewRequestSchema.safeParse({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })

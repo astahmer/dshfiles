@@ -1,18 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 
 import { ActivityDescription } from './activity-description.js'
 
 const render = (description: string, threadId: string): string =>
   renderToStaticMarkup(
-    <p>
-      <ActivityDescription
-        description={description}
-        threadId={threadId}
-        threadLabel={() => 'we probably can skip calling jev to decide stuff'}
-        openThread={() => undefined}
-      />
-    </p>,
+    <TooltipProvider>
+      <p>
+        <ActivityDescription
+          description={description}
+          threadId={threadId}
+          threadLabel={() => 'we probably can skip calling jev to decide stuff'}
+          openThread={() => undefined}
+        />
+      </p>
+    </TooltipProvider>,
   )
 
 describe('activity description thread link', () => {
@@ -20,8 +23,8 @@ describe('activity description thread link', () => {
     const html = render('moved it inbox → doing (mentioned in a thread)', 'session-abc123')
 
     expect(html).not.toContain('<button')
-    expect(html).toBe(
-      '<p>moved it inbox → doing (mentioned in <a href="?thread=session-abc123" title="Open thread we probably can skip calling jev to decide stuff" class="dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground">a thread “we probably can skip calling jev to decide stuff”</a>)</p>',
+    expect(html).toMatch(
+      /^<p>moved it inbox → doing \(mentioned in <a href="\?thread=session-abc123"[^>]*>a thread “we probably can skip calling jev to decide stuff”<\/a>\)<\/p>$/,
     )
   })
 

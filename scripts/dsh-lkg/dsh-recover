@@ -73,11 +73,17 @@ if [ "${DSH_LKG_CLEAN:-0}" != 1 ] && [ -d "$LIVE_HOME" ]; then
   done
   find "$HOME_DIR/sessions" -name session.lock -delete 2>/dev/null || true
 fi
-# The snapshot is frozen on purpose (uchg); the state this instance runs from must
-# be writable, or the Host cannot maintain its own profile. `cp -R` carries uchg
-# over and then fails to set times on the locked copies, so copy without flags.
+# On macOS the snapshot is frozen on purpose (uchg); the state this instance runs
+# from must be writable, or the Host cannot maintain its own profile. `cp -R`
+# carries uchg over and then fails to set times on the locked copies, so copy
+# without flags through the system bsdtar: a dev shell may put GNU tar first, and
+# GNU tar has no --no-fflags. Linux has no uchg, so a plain copy is enough there.
 mkdir "$HOME_DIR/profiles/web"
-tar -cf - -C "$VERSION/profile" . | tar -xf - --no-fflags -C "$HOME_DIR/profiles/web"
+if [ "$(uname -s)" = Darwin ]; then
+  /usr/bin/tar -cf - -C "$VERSION/profile" . | /usr/bin/tar -xf - --no-fflags -C "$HOME_DIR/profiles/web"
+else
+  cp -R "$VERSION/profile/." "$HOME_DIR/profiles/web"
+fi
 
 echo "dsh-recover: last known good $(basename "$VERSION")"
 echo "dsh-recover: state $HOME_DIR (DSH_LKG_CLEAN=1 starts without live data)"

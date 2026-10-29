@@ -1,0 +1,7 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["dshx.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
+}

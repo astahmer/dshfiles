@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
-import type { AnyApiMethodDefinition, ApiCaller } from './types.js'
+import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiCaller } from './types.js'
 
 /** An API request or response payload: opaque JSON until the owner's schemas decode it. */
 export type ApiPayload = Parameters<ConnectionRpcHandler>[1]
@@ -23,7 +23,15 @@ export interface RegisteredApi {
   readonly id: string
   readonly version: number
   readonly methods: Readonly<Record<string, AnyApiMethodDefinition>>
+  /** Absent when an older dshx served the API. */
+  readonly events?: Readonly<Record<string, AnyApiEventDefinition>>
   readonly dispatch: ApiDispatch
+}
+
+/** One open browser event stream: `write` sends one SSE chunk, `close` ends the response. */
+export interface ApiEventStream {
+  readonly write: (chunk: string) => void
+  readonly close: () => void
 }
 
 export interface RegistryMember {
@@ -46,6 +54,8 @@ export interface ApiRegistry {
    * unloaded tool needs no cleanup; absent when an older dshx created the registry.
    */
   toolOwners?: WeakMap<object, string>
+  /** Browser event streams the leading Host serves; absent when an older dshx created the registry. */
+  eventStreams?: Set<ApiEventStream>
 }
 
 const REGISTRY_KEY = Symbol.for('@dshfiles/dshx.api-registry.v1')

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 're
 
 import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { InlineCompletion } from './inline-completion.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { replyTextAtSubmit } from './reply-input.js'
@@ -42,9 +43,35 @@ export const BacklogTextBox = (props: {
   const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
-  const completion = useMentionCompletion({ text: props.value, caret, threads: props.threads, projects: props.projects, tags: props.tags })
+  const completion = useMentionCompletion({
+    text: props.value,
+    caret,
+    threads: props.threads,
+    projects: props.projects,
+    tags: props.tags,
+    files: props.attachments.files,
+  })
   const rows = dismissed ? [] : completion.suggestions
-  const drop = useFileDrop({ onFiles: files => void props.attachments.add(files) })
+  const addFiles = async (files: readonly File[]): Promise<void> => {
+    const result = await props.attachments.add(files)
+    if (result.added.length === 0) return
+    const element = input.current
+    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
+      text: element?.value ?? props.value,
+      start: element?.selectionStart ?? props.value.length,
+      end: element?.selectionEnd ?? props.value.length,
+      files: result.added,
+      firstImageNumber: result.firstImageNumber,
+    })
+    if (insertion.text === (element?.value ?? props.value)) return
+    props.onChange(insertion.text)
+    setCaret(insertion.caret)
+    requestAnimationFrame(() => {
+      element?.focus()
+      element?.setSelectionRange(insertion.caret, insertion.caret)
+    })
+  }
+  const drop = useFileDrop({ onFiles: files => void addFiles(files) })
   const reply = props.variant === 'reply'
 
   useEffect(() => {
@@ -101,7 +128,7 @@ export const BacklogTextBox = (props: {
         rows={reply ? 1 : 3}
         value={props.value}
         placeholder={props.placeholder}
-        onPaste={event => pasteFiles(event, files => void props.attachments.add(files))}
+        onPaste={event => pasteFiles(event, files => void addFiles(files))}
         onChange={event => {
           props.onChange(event.currentTarget.value)
           setCaret(event.currentTarget.selectionStart)
@@ -167,7 +194,7 @@ export const BacklogTextBox = (props: {
       {reply ? (
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
           <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
-            <AttachFilesButton onFiles={files => void props.attachments.add(files)} />
+            <AttachFilesButton onFiles={files => void addFiles(files)} />
             <span>
               <Kbd>↵</Kbd> send
             </span>
@@ -178,7 +205,7 @@ export const BacklogTextBox = (props: {
         </div>
       ) : (
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
-          <AttachFilesButton onFiles={files => void props.attachments.add(files)} label="Attach an image or file to this item" />
+          <AttachFilesButton onFiles={files => void addFiles(files)} label="Attach an image or file to this item" />
           <span>
             Markdown · <code>@</code> items, threads and agents · <Kbd>⌘</Kbd>
             <Kbd>↵</Kbd> to save

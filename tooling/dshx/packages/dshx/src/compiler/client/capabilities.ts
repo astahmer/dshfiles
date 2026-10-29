@@ -158,7 +158,7 @@ const sourceCapabilities = (source: string, file: string): SourceCapabilityAnaly
         if (node.callee.type === 'Super') return
         const name = bindings.importedName(node.callee)
         if (name === 'useSettings') settings = true
-        if (name === 'useApi' || name === 'useApiQuery' || name === 'createApiClient') api = true
+        if (name === 'useApi' || name === 'useApiQuery' || name === 'useApiEvent' || name === 'createApiClient') api = true
       },
     },
   })

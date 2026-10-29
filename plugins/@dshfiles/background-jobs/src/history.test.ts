@@ -1,4 +1,5 @@
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -80,7 +81,7 @@ describe('job history index', () => {
     await second.load()
     await second.pass()
     expect([...second.historyRows].map(row => row.id).sort()).toEqual(['bash-1', 'bash-2', 'bash-3'])
-    expect(JSON.parse(await readFile(statePath, 'utf8'))).toMatchObject({ schemaVersion: 1 })
+    expect(decodeJson(jsonObjectSchema, await readFile(statePath, 'utf8'))).toMatchObject({ schemaVersion: 1 })
   })
 
   it('keeps the durable record when a state file is malformed', async () => {

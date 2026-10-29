@@ -19,6 +19,7 @@ import { ApiDefinitionModel } from './define.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
+import { HostApiEventsModel } from './host-events.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
 import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
@@ -321,7 +322,7 @@ async function listSkills(ctx: Context, options: { readonly cwd?: string; readon
       name: skill.name,
       description: skill.description,
       provider: skill.provider,
-      ...(skill.source === undefined ? {} : { source: skill.source }),
+      ...(skill.source !== undefined && { source: skill.source }),
       modelInvocable: skill.invocation.modelInvocable,
       userInvocable: skill.invocation.userInvocable,
     }))
@@ -417,6 +418,23 @@ async function mountBrowserTraces(ctx: Context): Promise<() => Promise<void>> {
   }
 }
 
+/** The browser event stream rides with the registry too: one route per process, served by the leader. */
+async function mountEvents(ctx: Context, registry: ApiRegistry): Promise<() => Promise<void>> {
+  const connection = ctx.get('connection') as HostConnectionHandle | undefined
+  if (connection?.fetch?.register === undefined) return async () => undefined
+  const events = HostApiEventsModel.route(registry)
+  try {
+    const remove = connection.fetch.register(events.route)
+    return async () => {
+      events.closeStreams()
+      await remove()
+    }
+  } catch (cause) {
+    warn(ctx, `dshx registry: API events are not served: ${describeFailure(cause)}`)
+    return async () => undefined
+  }
+}
+
 async function lead(registry: ApiRegistry): Promise<void> {
   const member = registry.members[0]
   if (member === undefined || registry.leader !== undefined) return
@@ -425,6 +443,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
   try {
     const unmount = (await mountApi(member.ctx, ApiDefinitionModel.registryOwner, registration)).dispose
     const unmountBrowserTraces = await mountBrowserTraces(member.ctx)
+    const unmountEvents = await mountEvents(member.ctx, registry)
     const tools = toolsOf(member.ctx)
     const unregister = tools?.register(capabilitiesTool(registry))
     member.stop = async () => {
@@ -433,6 +452,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
       } catch {
         // The tools layer may already have released it with the Host fiber.
       }
+      await unmountEvents()
       await unmountBrowserTraces()
       await unmount()
     }
@@ -488,10 +508,18 @@ async function mountApi(
   if (!servesClients) {
     warn(ctx, `API ${contract.id} serves Host plugins only: the DSH Connection provider is not loaded.`)
   }
-  const served: RegisteredApi = { owner: packageId, id: contract.id, version: contract.version, methods: contract.methods, dispatch }
+  const served: RegisteredApi = {
+    owner: packageId,
+    id: contract.id,
+    version: contract.version,
+    methods: contract.methods,
+    events: contract.events ?? {},
+    dispatch,
+  }
   owners.set(channel, owner)
   channelOwners.set(root, owners)
   registry.apis.set(key, served)
+  if (contract.events !== undefined) HostApiEventsModel.announceCatalog(registry)
   const unregisterTools: Array<() => void> = []
   const exposed = Object.entries(contract.methods).filter(([, definition]) => definition.tool !== undefined)
   if (exposed.length > 0) {
@@ -507,6 +535,7 @@ async function mountApi(
   }
   const dispose = async (): Promise<void> => {
     if (registry.apis.get(key) === served) registry.apis.delete(key)
+    if (contract.events !== undefined) HostApiEventsModel.announceCatalog(registry)
     if (owners.get(channel) === owner) owners.delete(channel)
     if (owners.size === 0) channelOwners.delete(root)
     for (const unregister of unregisterTools) {

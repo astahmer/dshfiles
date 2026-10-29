@@ -1,6 +1,6 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { ArrowUpRightIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
+import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useRef, useState } from 'react'
 import type { WorkbenchPanelDefinition } from './registry.js'
 
@@ -36,17 +36,13 @@ export const NewViewChooser = (props: {
           <h2 className="dshx:text-lg dshx:font-semibold">Choose a view</h2>
           <p className="dshx:text-muted-foreground">Choose a workspace view. Open conversations from the thread list.</p>
         </div>
-        <div className="dshx:relative">
-          <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:top-2 dshx:left-3 dshx:size-4 dshx:text-muted-foreground" />
-          <Input
-            ref={searchInput}
-            aria-label="Search views"
-            placeholder="Search views"
-            value={search}
-            onChange={event => setSearch(event.currentTarget.value)}
-            className="dshx:pl-9"
-          />
-        </div>
+        <SearchInput
+          ref={searchInput}
+          aria-label="Search views"
+          placeholder="Search views"
+          value={search}
+          onChange={event => setSearch(event.currentTarget.value)}
+        />
         {views.length > 0 && (
           <div className="dshx:flex dshx:flex-col dshx:gap-1">
             <p className="dshx:mb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Workspace views</p>

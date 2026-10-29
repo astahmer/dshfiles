@@ -1,5 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
+import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep, type ReachPosition } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
@@ -23,7 +25,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
     const catalogFile = join(pluginsRoot, entry.name, 'dshx.features.json')
     const source = await readFile(catalogFile, 'utf8').catch(() => undefined)
     if (source === undefined) continue
-    const catalog = DshxFeatureCatalogSchema.safeParse(JSON.parse(source))
+    const catalog = DshxFeatureCatalogSchema.safeParse(decodeJson(jsonValueSchema, source))
     if (!catalog.success) continue
     for (const feature of catalog.data.features) {
       features.push({
@@ -31,7 +33,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
         catalogFile,
         id: feature.id,
         title: feature.title,
-        ...(feature.reach === undefined ? {} : { reach: feature.reach }),
+        ...(feature.reach !== undefined && { reach: feature.reach }),
       })
     }
   }
@@ -152,7 +154,13 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed.action === 'seed') {
           const alreadySeeded = seeded.some(applied => applied.seed === parsed.seed)
           // Thread-scoped state can drift between reaches, so these seeds recreate and select a fresh target each time.
-          if (!alreadySeeded || parsed.seed === 'tool-call-thread' || parsed.seed === 'rebase-ready-thread' || parsed.seed === 'otlp-session-turns') {
+          if (
+            !alreadySeeded ||
+            parsed.seed === 'tool-call-thread' ||
+            parsed.seed === 'rebase-ready-thread' ||
+            parsed.seed === 'otlp-session-turns' ||
+            parsed.seed === 'app-dialog-sample'
+          ) {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
             const outcome = await ScratchSeedRuntime.applySeed({ state, seed: parsed.seed, page, timeoutMs })
             if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
@@ -162,7 +170,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
             if (fakeProvider !== undefined) next.fakeProvider = fakeProvider
             await ScratchStateRuntime.write(next)
           }
-          if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
+          // A page seed lives in this page (an open dialog), so reloading the root after it would discard it.
+          const pageSeed = parsed.seed === 'app-dialog-sample'
+          if (!pageSeed && feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')
           await ScratchDriveRuntime.composerFileInput(page).setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
         else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
@@ -228,18 +238,16 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
       steps,
       ok,
       path: new URL(page.url()).pathname,
-      ...(failureShot === undefined ? {} : { failureShot }),
+      ...(failureShot !== undefined && { failureShot }),
     }
   } finally {
     await browser.close()
   }
 }
 
-interface BrowserEvent {
-  readonly at: string
-  readonly kind: string
-  readonly detail: string
-}
+const browserEventSchema = z.object({ at: z.string(), kind: z.string(), detail: z.string() })
+
+type BrowserEvent = z.infer<typeof browserEventSchema>
 
 export interface ShotResult {
   readonly screenshot: string
@@ -271,7 +279,7 @@ export const scratchShot = async (state: ScratchState, label: string, outDir: st
   const events = (await readFile(state.browserEvents, 'utf8').catch(() => ''))
     .split('\n')
     .filter(line => line.trim() !== '')
-    .map((line): BrowserEvent => JSON.parse(line))
+    .map((line): BrowserEvent => decodeJson(browserEventSchema, line))
   const count = (kind: string): number => events.filter(event => event.kind === kind).length
   const errorEvents = events.filter(event => event.kind !== 'console.warning')
   const result: ShotResult = {

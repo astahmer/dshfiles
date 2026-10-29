@@ -21,7 +21,7 @@ import { collapseWhitespaceRule, trimWhitespaceRule } from './user-text/whitespa
 import type { ViewTab } from './contract/views.ts'
 import type {
   ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
-  ConversationSessionInjected, DraftFileUploads, UserTextInjected,
+  ConversationSessionInjected, DraftFileUploads, RemoteSessionWorkspaceOwnership, UserTextInjected,
 } from './contract/slots.ts'
 import type { InputNotice } from './contract/input.ts'
 import type { ReferenceInsert } from './contract/draft-editor.ts'
@@ -86,6 +86,10 @@ const ABSENT_NOTICES = {
 }
 const ABSENT_BLOCK = {
   getSnapshot: (): ComposerBlock | undefined => undefined,
+  subscribe: () => () => {},
+}
+const ABSENT_REMOTE_WORKSPACE = {
+  getSnapshot: (): RemoteSessionWorkspaceOwnership | undefined => undefined,
   subscribe: () => () => {},
 }
 const EMPTY_LEXICON: ReadonlyMap<'/' | '@', readonly string[]> = new Map()
@@ -411,37 +415,46 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       views: { scope: 'session' },
       widthControls: { scope: 'root' },
     },
-    inject: (sessionId: SessionId | undefined): ConversationInjected => ({
-      hooks: {
-        composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
-        draftWorkspace: {
-          getSnapshot: () => sessionId === undefined ? undefined : ctx.sessionDrafts.list.getSnapshot()[sessionId]?.workspaceId,
-          subscribe: listener => ctx.sessionDrafts.list.subscribe(listener),
+    inject: (sessionId: SessionId | undefined): ConversationInjected => {
+      const remoteWorkspace = sessionId === undefined
+        ? ABSENT_REMOTE_WORKSPACE
+        : concreteConversation(ctx).remoteWorkspaceFor(sessionId)
+      return {
+        hooks: {
+          composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+          draftWorkspace: {
+            getSnapshot: () => sessionId === undefined ? undefined : ctx.sessionDrafts.list.getSnapshot()[sessionId]?.workspaceId,
+            subscribe: listener => ctx.sessionDrafts.list.subscribe(listener),
+          },
+          remoteWorkspace,
         },
-      },
-      selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
-        if (sessionId === undefined || nextId === sessionId) return
-        const from = inputHub.shell(sessionId)
-        const carriesDraft = from.snapshot.draft !== '' || from.snapshot.attachmentIds.length > 0
-        if (!carriesDraft) return
-        const destinationSessionReady = sessions.binding(nextId) !== undefined
-        if (!destinationSessionReady) {
-          from.notify('info', t('workspace.draftTransferRefused'))
-          return
-        }
-        const next = inputHub.shell(nextId)
-        const handoff = transferComposerDraft({
-          source: from,
-          destination: next,
-          sourceSessionId: sessionId,
-          destinationSessionId: nextId,
-          destinationSessionReady,
-          rebindAttachments: (targetSessionId, attachmentIds) =>
-            concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds),
-        })
-        if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
-      }),
-    }),
+        resolveRemoteWorkspace: () => sessionId === undefined
+          ? Promise.resolve()
+          : concreteConversation(ctx).resolveRemoteWorkspace(sessionId),
+        selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
+          if (sessionId === undefined || nextId === sessionId) return
+          const from = inputHub.shell(sessionId)
+          const carriesDraft = from.snapshot.draft !== '' || from.snapshot.attachmentIds.length > 0
+          if (!carriesDraft) return
+          const destinationSessionReady = sessions.binding(nextId) !== undefined
+          if (!destinationSessionReady) {
+            from.notify('info', t('workspace.draftTransferRefused'))
+            return
+          }
+          const next = inputHub.shell(nextId)
+          const handoff = transferComposerDraft({
+            source: from,
+            destination: next,
+            sourceSessionId: sessionId,
+            destinationSessionId: nextId,
+            destinationSessionReady,
+            rebindAttachments: (targetSessionId, attachmentIds) =>
+              concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds),
+          })
+          if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
+        }),
+      }
+    },
   }, createConversationContentSurface(ConversationContent))
 
   const registerConversationSession = () => slots.register({

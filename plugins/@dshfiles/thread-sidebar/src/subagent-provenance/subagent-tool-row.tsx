@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ComponentProps } from 'react'
 import { z } from 'zod'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -44,17 +44,19 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined
+  /** The native row names its visible header through `title`; that is a heading, not hover help. */
+  const disclosureProps: ComponentProps<typeof DisclosureRow> = {
+    icon: <IconAgentPresetOutlineRegular />,
+    title,
+    open: disclosure.expanded,
+    expandable,
+    onToggle: disclosure.toggle,
+    running: props.phase === 'preparing' || props.phase === 'start',
+  }
 
   return (
     <div className="dshx-root">
-      <DisclosureRow
-        icon={<IconAgentPresetOutlineRegular />}
-        title={title}
-        open={disclosure.expanded}
-        expandable={expandable}
-        onToggle={disclosure.toggle}
-        running={props.phase === 'preparing' || props.phase === 'start'}
-      >
+      <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">
           {prompt === undefined || prompt === '' ? null : (
             <pre className="dshx:max-h-64 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:break-words">{prompt}</pre>

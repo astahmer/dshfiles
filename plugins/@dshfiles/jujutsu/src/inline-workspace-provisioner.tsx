@@ -1,6 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useState } from 'react'
 import { workspaceNameSchema, type Mutation, type Revision } from './api.js'
@@ -22,59 +23,68 @@ export const InlineWorkspaceProvisioner = (props: {
   const description = props.revision.description.split('\n')[0] || '(no description)'
 
   return (
-    <InlinePanel label="Create workspace at this revision" onCancel={props.onCancel}>
-      <p className="dshx:text-xs dshx:text-muted-foreground">
-        A sibling jj workspace checked out at <code className="dshx:font-mono! dshx:text-foreground">{props.revision.shortestChangeId}</code> · {description}.
-        This repository’s working files stay as they are.
-      </p>
-      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-        <Label className="dshx:text-xs dshx:text-muted-foreground" htmlFor="jj-inline-workspace-name">
-          Workspace name
-        </Label>
-        <Input
-          aria-invalid={name.length > 0 && !validName}
-          aria-label="Workspace name"
-          autoFocus
-          className="dshx:h-7 dshx:font-mono! dshx:text-xs dshx:md:text-xs"
-          id="jj-inline-workspace-name"
-          onChange={event => setName(event.target.value)}
-          placeholder="review-feature"
-          value={name}
+    <TooltipProvider delayDuration={500}>
+      <InlinePanel label="Create workspace at this revision" onCancel={props.onCancel}>
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          A sibling jj workspace checked out at <code className="dshx:font-mono! dshx:text-foreground">{props.revision.shortestChangeId}</code> · {description}.
+          This repository’s working files stay as they are.
+        </p>
+        <div className="dshx:flex dshx:flex-col dshx:gap-1">
+          <Label className="dshx:text-xs dshx:text-muted-foreground" htmlFor="jj-inline-workspace-name">
+            Workspace name
+          </Label>
+          <Input
+            aria-invalid={name.length > 0 && !validName}
+            aria-label="Workspace name"
+            autoFocus
+            className="dshx:h-7 dshx:font-mono! dshx:text-xs dshx:md:text-xs"
+            id="jj-inline-workspace-name"
+            onChange={event => setName(event.target.value)}
+            placeholder="review-feature"
+            value={name}
+          />
+        </div>
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
+            Choose parent directory
+          </Button>
+          {parentPath.length === 0 ? (
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">No parent directory selected</span>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{parentPath}</span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{parentPath}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        <InlinePanelActions
+          autoFocusConfirm={false}
+          confirmDisabled={parentPath.length === 0 || !validName}
+          confirmLabel="Preview workspace setup"
+          onCancel={props.onCancel}
+          onConfirm={() => props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: props.revision.commitId })}
         />
-      </div>
-      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-        <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
-          Choose parent directory
-        </Button>
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={parentPath || undefined}>
-          {parentPath || 'No parent directory selected'}
-        </span>
-      </div>
-      <InlinePanelActions
-        autoFocusConfirm={false}
-        confirmDisabled={parentPath.length === 0 || !validName}
-        confirmLabel="Preview workspace setup"
-        onCancel={props.onCancel}
-        onConfirm={() => props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: props.revision.commitId })}
-      />
-      {pickerOpen && (
-        <ProjectFolderPicker
-          directoryPicker={props.directoryPicker}
-          mode="directories"
-          onClose={() => setPickerOpen(false)}
-          onRegisterWorkspace={props.registerWorkspace}
-          onUseAbsolutePath={path => {
-            setPickerOpen(false)
-            setParentPath(path)
-          }}
-          onSelect={selected => {
-            setPickerOpen(false)
-            setParentPath(selected.canonicalPath)
-          }}
-          projects={[]}
-          title="Choose the parent directory"
-        />
-      )}
-    </InlinePanel>
+        {pickerOpen && (
+          <ProjectFolderPicker
+            directoryPicker={props.directoryPicker}
+            heading="Choose the parent directory"
+            mode="directories"
+            onClose={() => setPickerOpen(false)}
+            onRegisterWorkspace={props.registerWorkspace}
+            onUseAbsolutePath={path => {
+              setPickerOpen(false)
+              setParentPath(path)
+            }}
+            onSelect={selected => {
+              setPickerOpen(false)
+              setParentPath(selected.canonicalPath)
+            }}
+            projects={[]}
+          />
+        )}
+      </InlinePanel>
+    </TooltipProvider>
   )
 }

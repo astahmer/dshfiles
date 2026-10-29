@@ -1,14 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import type { SavedDraft } from './draft-store.js'
 import type { SavedPrompt } from './library.js'
-import { draftMutationSchema, draftSnapshotSchema, promptStashMutationSchema, promptStashStateSchema } from './library-api.js'
+import { promptStashMutationSchema, promptStashStateSchema } from './library-api.js'
 
 /**
  * Wiring check for the Host half: the built bundle serves the shared prompt
- * library and draft stash through its API, over the storage-domain tables it
- * declares. The store unit test covers the record logic; this proves the
+ * library through its API and leaves legacy draft rows declared in the domain.
+ * The store unit test covers the record logic; this proves the
  * plugin opens the domain, registers the contract and writes rows.
  */
 
@@ -45,14 +44,6 @@ const prompt = (index: number): SavedPrompt => ({
   updatedAt: 1_700_000_000_000 + index,
 })
 
-const draft = (): SavedDraft => ({
-  id: '30000000-0000-4000-8000-000000000001',
-  title: 'Planning prompt',
-  text: 'Draft body to keep',
-  createdAt: '2026-10-05T12:00:00.000Z',
-  updatedAt: '2026-10-05T12:00:00.000Z',
-})
-
 const memoryTable = <Value extends { readonly id: string }>(rows: Map<string, Value>) => ({
   get: (key: string) => rows.get(key),
   entries: () => rows.entries(),
@@ -76,7 +67,6 @@ const memoryTable = <Value extends { readonly id: string }>(rows: Map<string, Va
 const startHarness = async () => {
   const plugin: BuiltPlugin = await import(builtEntry)
   const prompts = new Map<string, SavedPrompt>()
-  const drafts = new Map<string, SavedDraft>()
   const routes = new Map<string, FetchRoute>()
   const disposers: (() => void)[] = []
   const opened: DomainSpec[] = []
@@ -96,7 +86,7 @@ const startHarness = async () => {
     open: async (spec: DomainSpec) => {
       opened.push(spec)
       return {
-        table: (name: string) => (name === 'prompts' ? memoryTable(prompts) : memoryTable(drafts)),
+        table: () => memoryTable(prompts),
         close: async () => {
           closed += 1
         },
@@ -162,7 +152,6 @@ const startHarness = async () => {
 
   return {
     prompts,
-    drafts,
     opened,
     call,
     closed: () => closed,
@@ -215,24 +204,6 @@ describe('prompt-stash Host wiring', () => {
     })
     expect(removed.kind).toBe('applied')
     expect(harness.prompts.has(prompt(1).id)).toBe(false)
-    await harness.disposeAll()
-  })
-
-  it('serves saved drafts through the same Host store', async () => {
-    const harness = await startHarness()
-
-    expect((await harness.call({ method: 'drafts', schema: draftSnapshotSchema })).drafts).toEqual([])
-
-    const outcome = await harness.call({
-      method: 'saveDraft',
-      input: { draft: { id: draft().id, title: draft().title, text: draft().text, now: draft().createdAt } },
-      schema: draftMutationSchema,
-    })
-    expect(outcome.kind).toBe('applied')
-    expect(harness.drafts.get(draft().id)?.title).toBe(draft().title)
-
-    const removed = await harness.call({ method: 'removeDraft', input: { id: draft().id }, schema: draftSnapshotSchema })
-    expect(removed.drafts).toEqual([])
     await harness.disposeAll()
   })
 })

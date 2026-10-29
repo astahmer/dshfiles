@@ -61,31 +61,41 @@ export class SidebarSessionViews {
     if (this.closed || this.restoringResources) return
     this.restoringResources = true
     try {
-    for (const id of this.resourceSessions) {
-      if (this.openingResources.size >= 4) break
-      if (this.views.has(id)) continue
-      this.ensure(id, 'sidebarResourceView')
-      const reference = this.views.get(id)?.reference
-      if (reference === undefined) continue
-      this.openingResources.set(id, reference)
-      const settled = (): void => {
-        if (this.openingResources.get(id) !== reference) return
-        this.openingResources.delete(id)
-        this.pumpResourceRestores()
-        this.publish()
+      for (const id of this.resourceSessions) {
+        if (this.openingResources.size >= 4) break
+        if (this.views.has(id)) continue
+        this.ensure(id, 'sidebarResourceView')
+        const reference = this.views.get(id)?.reference
+        if (reference === undefined) continue
+        this.openingResources.set(id, reference)
+        const settled = (): void => {
+          if (this.openingResources.get(id) !== reference) return
+          this.openingResources.delete(id)
+          this.pumpResourceRestores()
+          this.publish()
+        }
+        void reference.ready.then(settled, settled)
       }
-      void reference.ready.then(settled, settled)
+    } finally {
+      this.restoringResources = false
     }
-    } finally { this.restoringResources = false }
   }
 
   private ensure(sessionId: SessionId, source: 'sidebarView' | 'sidebarResourceView'): void {
     if (this.views.has(sessionId)) return
-    const view = new SidebarSessionView(sessionId, this.sessions, disposed => {
-      this.viewsByReference.delete(disposed.reference)
-      // A same-id replacement can mount before the retired generation finishes unmounting.
-      if (!this.views.has(disposed.sessionId)) this.onRetired(disposed.sessionId)
-    }, released => { this.prune(released) }, source)
+    const view = new SidebarSessionView(
+      sessionId,
+      this.sessions,
+      disposed => {
+        this.viewsByReference.delete(disposed.reference)
+        // A same-id replacement can mount before the retired generation finishes unmounting.
+        if (!this.views.has(disposed.sessionId)) this.onRetired(disposed.sessionId)
+      },
+      released => {
+        this.prune(released)
+      },
+      source,
+    )
     this.views.set(sessionId, view)
     this.viewsByReference.set(view.reference, view)
   }
@@ -123,8 +133,15 @@ export class SidebarSessionViews {
   }
 
   private publish(): void {
-    this.source.set([...this.views.values()].sort((a, b) => a.sessionId.localeCompare(b.sessionId)).map(view => ({
-      sessionId: view.sessionId, reference: view.reference, selected: view.sessionId === this.selected, retainTab: view.retainTab,
-    })))
+    this.source.set(
+      [...this.views.values()]
+        .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
+        .map(view => ({
+          sessionId: view.sessionId,
+          reference: view.reference,
+          selected: view.sessionId === this.selected,
+          retainTab: view.retainTab,
+        })),
+    )
   }
 }

@@ -10,21 +10,23 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
-import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
@@ -191,9 +193,14 @@ const JobLine = (props: {
               {row.kind} · {durationLabel(row, props.now)} · {formatStarted(row.startedAt, props.now)}
             </span>
           </div>
-          <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs" title={row.label}>
-            {row.label}
-          </code>
+          <TooltipProvider delayDuration={500}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{row.label}</code>
+              </TooltipTrigger>
+              <TooltipContent>{row.label}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.owner === null ? row.id : props.sessionLabel(row.owner)}</span>
         </div>
         {running ? (
@@ -268,10 +275,16 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
     return next
   }, [scope, categories, debouncedSearch])
 
+  const boardEvents = useApiEvent(backgroundJobsApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: boardKey }))
+  // Changes made while the event stream was down are not replayed.
+  useEffect(() => {
+    if (boardEvents === 'live') void queryClient.invalidateQueries({ queryKey: boardKey })
+  }, [boardEvents, queryClient])
+
   const board = useQuery({
     queryKey: [...boardKey, filter],
     queryFn: async ({ signal }) => api.board(filter, { signal }),
-    refetchInterval: scope === 'running' ? POLL_LIVE_MS : POLL_IDLE_MS,
+    refetchInterval: boardEvents === 'live' ? false : scope === 'running' ? POLL_LIVE_MS : POLL_IDLE_MS,
   })
 
   const refresh = useMutation({
@@ -358,26 +371,20 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
   return (
     <div className="dshx-root dshx:@container">
       <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-          <div>
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Badge variant="secondary">
-              {value?.runningCount ?? 0} {t('running')}
-            </Badge>
-            <Badge variant="outline">
-              {value?.finishedCount ?? 0} {t('finished')}
-            </Badge>
-            <Badge variant="outline">
-              {value?.indexing.historyRows ?? 0} {t('historyRows')}
-            </Badge>
-            <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-              <RefreshCwIcon aria-hidden /> {t('refresh')}
-            </Button>
-          </div>
-        </header>
+        <PageHeader heading={t('title')} description={t('subtitle')}>
+          <Badge variant="secondary">
+            {value?.runningCount ?? 0} {t('running')}
+          </Badge>
+          <Badge variant="outline">
+            {value?.finishedCount ?? 0} {t('finished')}
+          </Badge>
+          <Badge variant="outline">
+            {value?.indexing.historyRows ?? 0} {t('historyRows')}
+          </Badge>
+          <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          </Button>
+        </PageHeader>
 
         {value !== undefined && !value.liveAvailable ? (
           <Alert>
@@ -405,17 +412,13 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
             <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
             <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
           </ToggleGroup>
-          <InputGroup className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('search')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={event => setSearch(event.currentTarget.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+            aria-label={t('search')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={event => setSearch(event.currentTarget.value)}
+          />
           <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
             <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
               <SelectValue />
@@ -482,18 +485,24 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
                 <h2 className="dshx:text-sm dshx:font-medium">{section.label}</h2>
                 <Badge variant="outline">{section.rows.length}</Badge>
                 {group === 'session' && section.key.startsWith('session-') ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={sessionTarget(props.sessions, section.key) === undefined}
-                    title={sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}
-                    onClick={() => {
-                      const target = sessionTarget(props.sessions, section.key)
-                      if (target !== undefined) props.uiWorkspace.openSession(target)
-                    }}
-                  >
-                    {t('openSession')}
-                  </Button>
+                  <TooltipProvider delayDuration={500}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={sessionTarget(props.sessions, section.key) === undefined}
+                          onClick={() => {
+                            const target = sessionTarget(props.sessions, section.key)
+                            if (target !== undefined) props.uiWorkspace.openSession(target)
+                          }}
+                        >
+                          {t('openSession')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : null}
               </div>
               <div className="dshx:flex dshx:flex-col dshx:gap-2">

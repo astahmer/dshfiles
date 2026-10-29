@@ -9,6 +9,7 @@ export type MultiHostClient = ApiClient<(typeof multiHostApi)['methods']>
 export const multiHostKeys = {
   all: ['multi-host'] as const,
   directory: ['multi-host', 'directory'] as const,
+  resourcePool: ['multi-host', 'resource-pool'] as const,
   status: (runtimeId: string) => ['multi-host', 'status', runtimeId] as const,
   models: (runtimeId: string) => ['multi-host', 'models', runtimeId] as const,
   browse: (runtimeId: string, path: string | undefined) => ['multi-host', 'browse', runtimeId, path ?? '~'] as const,
@@ -25,16 +26,28 @@ export const multiHostQueries = {
       refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
       retry: false,
     }),
+  resourcePool: (api: MultiHostClient, refetchInterval: number | false = false) =>
+    queryOptions({
+      queryKey: multiHostKeys.resourcePool,
+      queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 10_000, request: hostSignal => api.resourcePool(undefined, { signal: hostSignal }) }),
+      staleTime: 5_000,
+      refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
+      retry: false,
+    }),
   /** Connects the host if needed, so it doubles as the status probe of the chip menu. */
   status: (api: MultiHostClient, runtimeId: string, refetchInterval: number | false) =>
     queryOptions({
       queryKey: multiHostKeys.status(runtimeId),
       queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 40_000, request: hostSignal => api.runtimeStatus({ runtimeId }, { signal: hostSignal }) }),
-      refetchInterval: query =>
-        runtimeStatusRefreshRefetchInterval({
+      staleTime: 15_000,
+      refetchInterval: query => {
+        const status = query.state.data
+        return runtimeStatusRefreshRefetchInterval({
           intervalMs: isApiOwnerMissing(query.state.error) ? false : refetchInterval,
-          refreshing: query.state.data?.refreshing === true,
-        }),
+          refreshing: status?.refreshing === true,
+          available: status === undefined ? undefined : status.ok === false && status.refreshing !== true ? false : true,
+        })
+      },
       retry: false,
     }),
   models: (api: MultiHostClient, runtimeId: string) =>

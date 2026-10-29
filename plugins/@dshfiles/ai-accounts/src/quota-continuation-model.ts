@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const quotaContinuationStateSchema = z.enum(['waiting', 'queued', 'invalidated', 'completed'])
+const quotaContinuationStateSchema = z.enum(['waiting', 'queued', 'invalidated', 'completed'])
 
 export const quotaContinuationRecordSchema = z
   .object({

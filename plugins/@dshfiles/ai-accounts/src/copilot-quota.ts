@@ -33,7 +33,7 @@ const WINDOWS = [
   ['chat', 'Chat'],
 ] as const
 
-export class CopilotQuotaModel {
+class CopilotQuotaModel {
   /** Card for one decoded `copilot_internal/user` response, or null when it carries no quota the card can show. */
   static cardFrom(user: CopilotUser): UsageCard | null {
     const resetsAt = user.quota_reset_date === undefined ? Number.NaN : Date.parse(user.quota_reset_date)

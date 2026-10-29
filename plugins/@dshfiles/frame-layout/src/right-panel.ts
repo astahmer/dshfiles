@@ -8,13 +8,17 @@ export function createRightPanelSeat(
   const registrations = new Map<symbol, DockPaneActions>()
   let disposed = false
   return {
-    setMode: mode => { if (!disposed) instance.actions.setMode(mode) },
+    setMode: mode => {
+      if (!disposed) instance.actions.setMode(mode)
+    },
     mode: () => instance.getSnapshot().layoutInfo.rightPanelMode,
     registerDock: actions => {
       if (disposed) return () => undefined
       const key = Symbol('dock pane')
       registrations.set(key, actions)
-      return () => { registrations.delete(key) }
+      return () => {
+        registrations.delete(key)
+      }
     },
     dock: () => {
       let current: DockPaneActions | undefined

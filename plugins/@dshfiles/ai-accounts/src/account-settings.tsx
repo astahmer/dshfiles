@@ -1,10 +1,10 @@
-import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { BarChart3Icon, CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon, SlidersHorizontalIcon, UserRoundIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { KIND_LABEL, routedKind } from './account-labels.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
@@ -14,6 +14,7 @@ import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const cardClass =
   'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-card dshx:p-5 dshx:@max-pane-narrow:p-4'
@@ -63,7 +64,7 @@ const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Eleme
     </span>
   </label>
 )
-export const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
+const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
   <section aria-label="Routing and priority" className={cardClass}>
     <header className="dshx:flex dshx:items-start dshx:gap-3">
       <BarChart3Icon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
@@ -83,7 +84,7 @@ export const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
   </section>
 )
 
-export const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
+const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
   const profile = props.state.selected
   const status = profile === null ? null : accountConnectionStatus(profile, props.state.usage)
   return (
@@ -152,7 +153,7 @@ export const AccountInlineSettings = (props: SettingsProps & { readonly onConnec
 
 export const AccountSettings = (props: SettingsProps & { readonly folderPicker: WorkspacePickerPorts; readonly onConnect: () => void }): JSX.Element => {
   const [editing, setEditing] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const accountIdCopy = useCopyFeedback()
   const selected = props.state.selected
   const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
   return (
@@ -195,8 +196,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
             <Button
               aria-label="Copy account ID"
               onClick={() =>
-                void writeClipboard(props.draft.instanceId).then(success => {
-                  setCopied(success)
+                void accountIdCopy.copy(props.draft.instanceId).then(success => {
                   if (!success) props.state.setNotice('Could not copy the account ID. Select and copy the route text instead.')
                 })
               }
@@ -204,14 +204,14 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
               type="button"
               variant="ghost"
             >
-              {copied ? <CheckIcon /> : <CopyIcon />}
+              {accountIdCopy.copied ? <CheckIcon /> : <CopyIcon />}
             </Button>
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Authentication</dt>
           <dd>{accountAuthenticationLabel(props.draft)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Token status</dt>
           <dd className={cn('dshx:inline-flex dshx:items-center dshx:gap-2', status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
-            <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+            <StatusDot tone="current" />
             {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Last checked</dt>

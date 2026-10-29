@@ -201,7 +201,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     const readText = options.readText
     return {
       list: (path, signal) => options.list(sessionId, path === '' ? '.' : path, signal),
-      ...(readText === undefined ? {} : { readText: (path: string, signal: AbortSignal) => readText(sessionId, path, signal) }),
+      ...(readText !== undefined && { readText: (path: string, signal: AbortSignal) => readText(sessionId, path, signal) }),
     }
   }
 

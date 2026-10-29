@@ -1,7 +1,8 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it } from 'vitest'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
-import { tabsMachine, type HostTarget, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import { tabsMachine, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import type { HostTarget } from '@dshfiles/workbench/tabs'
 
 const legacyPreferences: TabPreferences = Object.freeze({ enabled: false, openMode: 'preview', maxTabs: 12, persistence: 'project' })
 const thread = (sessionId: string): HostTarget => ({ kind: 'thread', sessionId })

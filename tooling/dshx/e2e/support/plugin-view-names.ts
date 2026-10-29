@@ -21,7 +21,7 @@ const reusableViewNames = new Map([
 export const reusableViewName = (fixtureName: string): string => reusableViewNames.get(fixtureName) ?? fixtureName
 
 /** Core-owned navigation metadata stays original outside Workbench; the owned Navigation seat qualifies it. */
-export const globalPanelName = (fixtureName: string): string =>
+const globalPanelName = (fixtureName: string): string =>
   fixtureName === 'Plugins' || fixtureName === 'Automation tasks' ? fixtureName : reusableViewName(fixtureName)
 
 export const globalPanelLink = (page: Page, fixtureName: string): Locator =>
@@ -30,3 +30,5 @@ export const globalPanelLink = (page: Page, fixtureName: string): Locator =>
     .getByRole('navigation', { name: 'Navigation', exact: true })
     .getByRole('button', { name: reusableViewName(fixtureName), exact: true })
     .or(page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: globalPanelName(fixtureName), exact: true }))
+    .or(page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: reusableViewName(fixtureName), exact: true }))
+    .first()

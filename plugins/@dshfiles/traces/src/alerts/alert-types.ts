@@ -10,11 +10,10 @@ export type AlertSeverity = z.infer<typeof alertSeveritySchema>
 export const alertComparatorSchema = z.enum(['above', 'below'])
 export type AlertComparator = z.infer<typeof alertComparatorSchema>
 
-export const ALERT_PERCENTILES = [50, 90, 95, 99] as const
-export const alertPercentileSchema = z.union([z.literal(50), z.literal(90), z.literal(95), z.literal(99)])
+const alertPercentileSchema = z.union([z.literal(50), z.literal(90), z.literal(95), z.literal(99)])
 
 export const MAX_ALERT_RULES = 50
-export const MAX_ALERT_WINDOW_MINUTES = 24 * 60
+const MAX_ALERT_WINDOW_MINUTES = 24 * 60
 
 /** Which spans a rule counts; every set field must match. */
 export const spanFilterSchema = z
@@ -99,7 +98,7 @@ export const alertRuleSchema = z
   .strict()
 export type AlertRule = z.infer<typeof alertRuleSchema>
 
-export const alertStatusSchema = z.enum(['ok', 'firing'])
+const alertStatusSchema = z.enum(['ok', 'firing'])
 export type AlertStatus = z.infer<typeof alertStatusSchema>
 
 export const alertStateSchema = z
@@ -136,7 +135,7 @@ export const alertEventSchema = z
   .strict()
 export type AlertEvent = z.infer<typeof alertEventSchema>
 
-export const alertRuleViewSchema = alertRuleSchema.extend({ state: alertStateSchema }).strict()
+const alertRuleViewSchema = alertRuleSchema.extend({ state: alertStateSchema }).strict()
 export type AlertRuleView = z.infer<typeof alertRuleViewSchema>
 
 export const alertsSnapshotSchema = z

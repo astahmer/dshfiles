@@ -9,8 +9,7 @@ import { z } from 'zod'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { buildHost } from '../src/compiler/index.js'
-import { watchHost } from '../src/compiler/host/build.js'
+import { buildHost, watchHost } from '../src/compiler/host/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
@@ -20,6 +19,10 @@ const hostPluginShape = z.object({
   Config: z.unknown().optional(),
   apply: z.function({ input: [z.unknown().optional(), z.unknown().optional()], output: z.unknown() }),
 })
+
+interface ApplyContext {
+  received?: unknown
+}
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-host-'))
@@ -465,13 +468,9 @@ describe('host compiler', () => {
     }
 
     await expect(buildHost(options)).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          name: 'DshxError',
-          pluginCode: 'DSHX4005',
-          message: expect.stringContaining('@deepseek-ai/dsh-llm, @deepseek-ai/dsh-scope'),
-        }),
-      ]),
+      name: 'DshxError',
+      code: 'DSHX4005',
+      message: expect.stringContaining('@deepseek-ai/dsh-llm, @deepseek-ai/dsh-scope'),
     })
 
     const packageFile = resolve(root, 'package.json')
@@ -549,7 +548,7 @@ describe('host compiler', () => {
     })
     const output = resolve(root, 'dist/index.js')
     const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
-    const ctx = { received: undefined }
+    const ctx: ApplyContext = {}
     const config = { enabled: true }
     expect(plugin.name).toBe('native-host')
     expect(plugin.inject).toEqual({ agents: { mode: 'test' } })

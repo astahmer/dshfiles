@@ -2,11 +2,12 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { ChevronDownIcon, ChevronRightIcon, SearchIcon, WaypointsIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronRightIcon, WaypointsIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -83,9 +84,12 @@ export const LogRow = (props: { readonly log: LogRecord; readonly onOpenTrace: (
         onClick={() => setOpen(current => !current)}
       >
         {open ? <ChevronDownIcon className="dshx:mt-0.5 dshx:size-3 dshx:shrink-0" /> : <ChevronRightIcon className="dshx:mt-0.5 dshx:size-3 dshx:shrink-0" />}
-        <span className="dshx:w-20 dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground" title={new Date(log.timeMs).toLocaleString()}>
-          {TraceFormat.clock(log.timeMs)}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:w-20 dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground">{TraceFormat.clock(log.timeMs)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{new Date(log.timeMs).toLocaleString()}</TooltipContent>
+        </Tooltip>
         <Badge variant={severityVariant(log.severityNumber)} className="dshx:w-14 dshx:shrink-0 dshx:justify-center">
           {severityLabel(log)}
         </Badge>
@@ -149,17 +153,13 @@ export const LogsView = (props: {
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <InputGroup className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full">
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label={t('searchLogs')}
-            placeholder={t('searchLogsPlaceholder')}
-            value={view.search}
-            onChange={event => update({ search: event.target.value })}
-          />
-        </InputGroup>
+        <SearchInput
+          className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full"
+          aria-label={t('searchLogs')}
+          placeholder={t('searchLogsPlaceholder')}
+          value={view.search}
+          onChange={event => update({ search: event.target.value })}
+        />
         <Select value={view.service ?? ALL} onValueChange={value => update({ service: value === ALL ? null : value })}>
           <SelectTrigger size="sm" aria-label={t('logService')} className="dshx:w-44 dshx:@max-pane-narrow:w-full">
             <SelectValue />

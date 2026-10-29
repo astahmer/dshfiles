@@ -1,6 +1,7 @@
 /** Completed-Turn token usage action and its accounting details dialog. */
 
 import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import { IconDatabaseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TurnTokenUsage } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
@@ -11,6 +12,7 @@ import dialogCss from './stat-dialog.module.css'
 
 export interface TurnUsagePanelProps {
   usage: TurnTokenUsage
+  estimatedCost: ReactNode
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -28,7 +30,7 @@ function formatExactCount(value: number, t: ChatViewSlotProps['t']): string {
  * @param props - Turn usage buckets and locale seat.
  * @returns The trigger and, while open, its portaled dialog anchored above the trigger.
  */
-export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
+export function TurnUsagePanel({ usage, estimatedCost, t }: TurnUsagePanelProps) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
 
   const cacheHit = usage.cacheReadTokens === undefined
@@ -101,6 +103,12 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
                 </span>
               )}
             </dd>
+            {estimatedCost === null || estimatedCost === undefined ? null : (
+              <>
+                <dt>{t('message.turnUsage.cost')}</dt>
+                <dd>{estimatedCost}</dd>
+              </>
+            )}
           </dl>
         </div>,
         document.body,

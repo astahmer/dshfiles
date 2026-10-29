@@ -5,6 +5,7 @@ import type {
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { deriveTurnTokenUsage } from '@deepseek-ai/dsh-token-meter/client'
+import type { TurnTailChatData as NativeTurnTailChatData } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {
   AssistantChatData, FinalAssistantChatData, TurnTailChatData,
 } from '../contract/chat-nodes.ts'
@@ -20,7 +21,7 @@ declare module '../contract/chat-nodes.ts' {
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationTurnDataMap {
     /** Closing Assistant and footer facts derived for this completed Turn. */
-    'turn-tail': TurnTailChatData
+    'turn-tail': NativeTurnTailChatData
   }
 }
 

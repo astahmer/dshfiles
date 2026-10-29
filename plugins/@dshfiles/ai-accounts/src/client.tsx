@@ -23,9 +23,11 @@ import { QuotaForecastPanel } from './quota-forecast-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
+import { TurnCostEstimate } from './turn-cost-estimate.js'
 import { CredentialRecoveryMessage } from './credential-recovery-message.js'
 // Type-only: the owned Chat fork's seat beside Resume on a failed turn.
 import type {} from '@dshfiles/chat/turn-error-action'
+import type { TurnUsageCostOwnerProps } from '@dshfiles/chat/turn-usage-cost'
 import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
@@ -184,6 +186,11 @@ export default defineClientPlugin({
         <SessionCostDockEntry useProjection={props.useProjection} />
       </PluginQueryProvider>
     )
+    const TurnCostEstimateView = (props: TurnUsageCostOwnerProps): JSX.Element | null => (
+      <PluginQueryProvider>
+        <TurnCostEstimate {...props} />
+      </PluginQueryProvider>
+    )
     const CredentialRecoveryMessageView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
       <CredentialRecoveryMessage
         turn={props.turn}
@@ -244,6 +251,7 @@ export default defineClientPlugin({
 
     // Its own id beside the shipped `stats` cell: reusing `stats` would replace the token readout.
     api.ui.register({ name: 'conversation.composer.dock', id: 'ai-accounts-session-cost', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SessionCostView)
+    api.ui.register({ name: 'conversation.chat.turnUsageCost', id: 'ai-accounts-turn-cost', order: 0 }, TurnCostEstimateView)
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-credential-recovery', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
       CredentialRecoveryMessageView,

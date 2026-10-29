@@ -147,7 +147,12 @@ export class ClientSessionDrafts implements SessionDrafts {
 
   stageModel(sessionId: SessionId, selection: ModelSelection): boolean {
     const record = this.records.get(sessionId)
-    if (this.closed || record === undefined || record.materialized) return false
+    if (this.closed || record === undefined) return false
+    if (record.materialized) {
+      if (!record.hostCreated || record.hasContent) return false
+      record.materialized = false
+      record.hostCreated = false
+    }
     record.metadata = { ...record.metadata, model: { ...selection } }
     record.revision++
     this.dirtyMetadata.add(sessionId)
@@ -195,6 +200,7 @@ export class ClientSessionDrafts implements SessionDrafts {
         record.created.resolve(id)
         changed = true
       } else if (hostIds.has(id) && !record.materialized) {
+        if (!record.hasContent && !record.hostCreated) continue
         record.hostCreated = true
         if (record.metadata.model !== undefined || record.metadata.agentPreset !== undefined) {
           void this.materialize(record).catch(() => undefined)

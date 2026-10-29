@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Cross-plugin entry point: any plugin opens a file in the editor with
  * `window.dispatchEvent(new CustomEvent('dshfiles:open-file', { detail, cancelable: true }))`.
  * The editor calls `preventDefault()` when it took the request, so `dispatchEvent` returning false means handled
- * (same contract as `dshfiles:command-palette`).
+ * (same contract as `dshfiles:open-settings`).
  */
 export const OPEN_FILE_EVENT = 'dshfiles:open-file'
 

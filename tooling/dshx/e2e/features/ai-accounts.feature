@@ -89,6 +89,12 @@ Feature: AI Accounts
     When the AI Accounts settings section is opened
     Then the AI Accounts list on the Models page can be hidden and restored
 
+  @scenario:ai-accounts.custom-model-removal
+  Scenario: Remove a manually added model from an account
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Codex account with a manually added model is configured
+    Then the custom model can be removed from its picker list
+
   @scenario:ai-accounts.quota-display
   Scenario: Read account quota windows from the provider
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

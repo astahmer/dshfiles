@@ -32,13 +32,18 @@ const referenceMapSchema = zod.record(zod.string(), zod.unknown()).transform(val
 const schemaLinks = zod.union([referenceSchema.transform(value => [String(value)]), referenceListSchema, referenceMapSchema])
 const SAFE_SECRET_CONTAINERS = new Set(['object', 'dict', 'array'])
 
-function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; readonly unsafe: boolean } {
+interface SecretAnalysis {
+  readonly contains: boolean
+  readonly unsafe: boolean
+}
+
+function secretAnalysis(schema: z<any, object>): SecretAnalysis {
   const json = serializedSchema.safeParse(schema.toJSON())
   if (!json.success) return { contains: false, unsafe: false }
   const refs = json.data.refs
-  const memo = new Map<string, { readonly contains: boolean; readonly unsafe: boolean }>()
+  const memo = new Map<string, SecretAnalysis>()
   const active = new Set<string>()
-  const visit = (id: string): { readonly contains: boolean; readonly unsafe: boolean } => {
+  const visit = (id: string): SecretAnalysis => {
     const cached = memo.get(id)
     if (cached !== undefined) return cached
     if (active.has(id)) return { contains: false, unsafe: false }
@@ -132,17 +137,15 @@ function defineSettings<const Schema extends z<any, object>>(definition: any): S
     namespace: definition.namespace,
     schema: definition.schema,
     applies: definition.applies ?? 'live',
-    ...(definition.client === undefined
-      ? {}
-      : {
-          client: {
-            decode(value: unknown): any {
-              const decoded = definition.client!.decode(value)
-              if (decoded === undefined) throw new TypeError(`Settings ${JSON.stringify(definition.namespace)} client.decode returned undefined.`)
-              return decoded
-            },
-          },
-        }),
+    ...(definition.client !== undefined && {
+      client: {
+        decode(value: unknown): any {
+          const decoded = definition.client!.decode(value)
+          if (decoded === undefined) throw new TypeError(`Settings ${JSON.stringify(definition.namespace)} client.decode returned undefined.`)
+          return decoded
+        },
+      },
+    }),
     host(options: SettingsHostOptions<SettingsValue<Schema>>): SettingsHostContribution<Schema, any> {
       // SAFETY: this opaque token is registered in settingsHostContributions before it escapes;
       // authenticity and payload access use that WeakMap, never properties on the token.

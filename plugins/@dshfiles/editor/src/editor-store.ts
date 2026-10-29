@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-files/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { OpenFileAddress, type OpenFileRequest } from './open-file.js'
 
-export const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
+const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 
 const IMAGE_TYPES: Readonly<Record<string, string>> = {
   png: 'image/png',

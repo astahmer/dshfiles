@@ -33,15 +33,19 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: tooling/dshx/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install the DSHX workspace
+      - name: Install the workspace
         run: pnpm install --frozen-lockfile
-        working-directory: tooling/dshx
 
       - name: Test dynamic plugin inventory
         run: pnpm run test:inventory
         working-directory: tooling/dshx
+
+      - name: Build dshx and create-dshx for the catalog test and Gherkin discovery
+        run: |
+          pnpm --dir tooling/dshx/packages/create-dshx run build
+          pnpm --dir tooling/dshx/packages/dshx run build
 
       - name: Test feature catalog invariants
         run: pnpm run test:feature-coverage

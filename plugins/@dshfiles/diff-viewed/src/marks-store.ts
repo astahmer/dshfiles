@@ -2,7 +2,7 @@ import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { MAX_VIEWED_MARKS, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
-export const viewedMarkSchema = z
+const viewedMarkSchema = z
   .object({
     key: z.string().min(1),
     version: z.number().int().positive(),
@@ -51,7 +51,7 @@ const createViewedMarksStore = ({
   let revision = Math.max(now(), ...[...records.values()].map(mark => mark.version))
   let writes: Promise<void> = Promise.resolve()
 
-  const enqueue = (operation: () => Promise<unknown>): Promise<void> => {
+  const enqueue = <Result>(operation: () => Promise<Result>): Promise<void> => {
     const result = writes.then(operation).then(() => undefined)
     writes = result.catch(() => undefined)
     return result

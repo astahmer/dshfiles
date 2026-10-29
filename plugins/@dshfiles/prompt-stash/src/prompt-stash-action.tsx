@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, type RecentPrompt } from './recent-prompts.js'
@@ -11,10 +12,11 @@ import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, type SavedPrompt } from './library
 import { usePromptLibrary, type PromptLibraryClient } from './library-client.js'
 import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-form.js'
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
-import { PromptDrafts } from './draft-store.js'
+import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
 
-const PromptStashAction = (props: PromptActionProps): JSX.Element => {
+const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']> }): JSX.Element => {
   const input = props.useInput(state => state)
+  useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
   const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
   const libraryClientRef = useRef<PromptLibraryClient | null>(null)
   const inputActionsRef = useRef(props.inputActions)
@@ -58,13 +60,13 @@ const PromptStashAction = (props: PromptActionProps): JSX.Element => {
     editorTarget !== null &&
     editorTarget.id !== null &&
     prompts.find(prompt => prompt.id === editorTarget.id)?.revision !== editorTarget.expectedRevision
-  const currentDraftBlock = PromptDrafts.saveBlock({
-    phase: input.phase,
-    text: input.draft,
-    attachmentCount: input.attachmentIds.length,
-    referenceCount: input.occurrences.length,
-  })
-  const currentPromptSaveDisabled = currentDraftBlock !== null || input.draft.length > MAX_PROMPT_TEXT_LENGTH || prompts.length >= MAX_PROMPTS
+  const currentPromptSaveDisabled =
+    input.phase !== 'plain' ||
+    input.attachmentIds.length > 0 ||
+    input.occurrences.length > 0 ||
+    input.draft.trim().length === 0 ||
+    input.draft.length > MAX_PROMPT_TEXT_LENGTH ||
+    prompts.length >= MAX_PROMPTS
   const [recentPrompts, setRecentPrompts] = useState<readonly RecentPrompt[]>([])
   const triggerId = useId()
 
@@ -153,17 +155,23 @@ const PromptStashAction = (props: PromptActionProps): JSX.Element => {
                 <Button type="button" size="xs" disabled={currentPromptSaveDisabled} onClick={saveCurrentPrompt}>
                   Save current
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-xs"
-                  aria-label="New prompt"
-                  title="New prompt"
-                  disabled={prompts.length >= MAX_PROMPTS}
-                  onClick={beginNewPrompt}
-                >
-                  <PlusIcon />
-                </Button>
+                <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="New prompt"
+                        disabled={prompts.length >= MAX_PROMPTS}
+                        onClick={beginNewPrompt}
+                      >
+                        <PlusIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>New prompt</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             ) : null}
           </div>

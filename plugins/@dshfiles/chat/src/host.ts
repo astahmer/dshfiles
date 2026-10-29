@@ -2,17 +2,11 @@
 import type {} from '@deepseek-ai/dsh-settings'
 
 import type { Volatile, Context } from '@deepseek-ai/cordis'
-import type { ChatSettings, CollapseTiming, LinkOpening, PerformanceUsageMode } from './chat-settings.ts'
+import type { ChatSettings, CollapseTiming, ImageGalleryScope, LinkOpening, PerformanceUsageMode } from './chat-settings.ts'
 import z from '@deepseek-ai/schemastery'
-import { TRANSCRIPT_VIEW_FIELD } from './chat-settings.ts'
+import { IMAGE_GALLERY_SCOPE_FIELD, TRANSCRIPT_VIEW_FIELD } from './chat-settings.ts'
 
 import { ChatSettingsFields } from './chat-settings.ts'
-
-export {
-  CHAT_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, LEGACY_TRANSCRIPT_VIEW_MODE,
-  LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE, TRANSCRIPT_VIEW_FIELD,
-  TRANSCRIPT_VIEW_MODES, type ChatSettings, type TranscriptViewMode,
-} from './chat-settings.ts'
 
 /** Runtime preferences projected to the browser. */
 export interface Config {
@@ -24,6 +18,7 @@ export interface Config {
   performanceUsage: Volatile<PerformanceUsageMode>
   /** Default destination for Chat HTTP(S) links. */
   linkOpening: Volatile<LinkOpening>
+  imageGalleryScope: Volatile<ImageGalleryScope>
 }
 
 /** Live preferences projected to the browser. */
@@ -32,6 +27,7 @@ export const Config = z.object({
   collapseTiming: ChatSettingsFields.collapseTiming.volatile(),
   performanceUsage: ChatSettingsFields['performanceUsage'].volatile(),
   linkOpening: ChatSettingsFields.linkOpening.volatile(),
+  [IMAGE_GALLERY_SCOPE_FIELD]: ChatSettingsFields[IMAGE_GALLERY_SCOPE_FIELD].volatile(),
 })
 
 /** Host preferences are consumed through the configuration form projection.

@@ -1,7 +1,8 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { PaletteApi, type PaletteMode } from '@dshfiles/command-palette/api'
+import type { PaletteMode } from '@dshfiles/command-palette/palette-contract'
+import { PaletteBridge } from './palette-bridge.js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
@@ -140,8 +141,8 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       storageWarning,
       hostBacked,
       threadViewWritePending,
-      openPalette: PaletteApi.open,
-      closePalette: PaletteApi.close,
+      openPalette: PaletteBridge.open,
+      closePalette: PaletteBridge.close,
       selectedThreadId,
       setSelectedThreadId,
       threadTitle,

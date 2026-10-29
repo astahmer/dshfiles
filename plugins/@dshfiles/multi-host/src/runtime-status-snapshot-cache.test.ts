@@ -41,6 +41,20 @@ it('coalesces refreshes, caches results, and traces the remote work unit', async
   expect(cache.read('runtime-a')).toEqual({ status: undefined, stale: true, refreshing: false })
 })
 
+it('uses the domain span name for resource refreshes', async () => {
+  const cache = createRuntimeStatusCache<Status>({
+    now: () => 1_000,
+    successTtlMs: 100,
+    failureTtlMs: 500,
+    spanName: 'multi-host resource snapshot refresh',
+  })
+  using recorder = recordSpans()
+
+  await cache.refresh('runtime-a', async () => ({ ok: true, value: 'ready' }))
+
+  expect(recorder.span('multi-host resource snapshot refresh').attributes).toMatchObject({ 'dshx.multi-host.runtime_id': 'runtime-a' })
+})
+
 it('keeps failures cached for the longer retry window', async () => {
   let now = 5_000
   const cache = createRuntimeStatusCache<Status>({ now: () => now, successTtlMs: 100, failureTtlMs: 500 })

@@ -11,7 +11,7 @@ export interface ThreadMute {
 
 export type ThreadMutes = Readonly<Record<string, ThreadMute>>
 
-export const threadMuteSchema = z.object({ until: z.number().int().nonnegative().nullable(), activityAt: z.number().nonnegative() }).strict()
+const threadMuteSchema = z.object({ until: z.number().int().nonnegative().nullable(), activityAt: z.number().nonnegative() }).strict()
 
 export const threadMutesSchema = z.record(z.string().min(1).max(256), threadMuteSchema).refine(value => Object.keys(value).length <= 5000)
 

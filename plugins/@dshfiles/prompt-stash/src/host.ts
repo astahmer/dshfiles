@@ -21,7 +21,7 @@ const openStash = async (ctx: Context): Promise<OpenedStash> => {
   if (storage === undefined) throw new Error('Prompt stash storage is unavailable.')
   const domain = await storage.open(promptStashDomain)
   return {
-    store: PromptStashModel.createStore({ prompts: domain.table('prompts'), drafts: domain.table('drafts') }),
+    store: PromptStashModel.createStore({ prompts: domain.table('prompts') }),
     close: () => domain.close(),
   }
 }
@@ -54,9 +54,6 @@ const promptStashApiHost = promptStashApi.host({
   state: async ({ ctx }) => (await stashFor(ctx)).snapshot(),
   save: async ({ ctx, input }) => (await stashFor(ctx)).save(input),
   remove: async ({ ctx, input }) => (await stashFor(ctx)).remove(input),
-  drafts: async ({ ctx }) => (await stashFor(ctx)).draftsSnapshot(),
-  saveDraft: async ({ ctx, input }) => (await stashFor(ctx)).saveDraft(input.draft),
-  removeDraft: async ({ ctx, input }) => (await stashFor(ctx)).removeDraft(input.id),
 })
 
 export default defineHost({

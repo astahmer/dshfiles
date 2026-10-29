@@ -12,9 +12,19 @@ describe('backlog settings', () => {
     expect(backlogSettings.schema({ idleThreadNudgeDays: 7 }).idleThreadNudgeDays).toBe(7)
   })
 
-  it('defaults reply routing to keywords and routed-thread notices to in-app', () => {
+  it('keeps plain replies as context unless smart thread routing is enabled', () => {
     const settings = backlogSettings.schema({})
-    expect(settings.smartThreadRouting).toBe(true)
+    expect(settings.smartThreadRouting).toBe(false)
+    expect(backlogSettings.schema({ smartThreadRouting: true }).smartThreadRouting).toBe(true)
+    expect(settings.threadStartNotifications).toBe('in-app')
+    expect(settings.replyThreadThreshold).toBe(0.7)
+    expect(settings.smartReplyAnswers).toBe(true)
+    expect(settings.replyAgent).toBe('')
+    expect(settings.replyAgentOrder).toBe('preferred')
+  })
+
+  it('keeps reply-answer defaults and thread notices', () => {
+    const settings = backlogSettings.schema({})
     expect(settings.threadStartNotifications).toBe('in-app')
     expect(settings.replyThreadThreshold).toBe(0.7)
     expect(settings.smartReplyAnswers).toBe(true)

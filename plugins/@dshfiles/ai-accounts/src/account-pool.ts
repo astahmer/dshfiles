@@ -16,7 +16,7 @@ import { MAX_RESET_WAIT_MS } from './reset-hint.js'
  * cools a failed account here and binds the conversation to a stand-in.
  */
 
-export const DISTRIBUTIONS = ['sticky', 'priority', 'round-robin', 'balanced'] as const
+const DISTRIBUTIONS = ['sticky', 'priority', 'round-robin', 'balanced'] as const
 export type Distribution = (typeof DISTRIBUTIONS)[number]
 export const DEFAULT_DISTRIBUTION: Distribution = 'sticky'
 

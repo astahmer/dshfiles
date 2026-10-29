@@ -1,11 +1,12 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 export const MAX_VIEWED_MARKS = 2000
 
 const sessionIdSchema = z.string().min(1).max(128)
 
-export const viewedFileSchema = z
+const viewedFileSchema = z
   .object({
     sessionId: sessionIdSchema,
     seq: z.number().int().nonnegative(),
@@ -24,9 +25,9 @@ export const viewedKey = (file: ViewedFile): string => JSON.stringify([file.sess
 const viewedKeyPartsSchema = z.tuple([sessionIdSchema, z.number().int().nonnegative(), z.string().min(1)])
 
 export const viewedFileFromKey = (key: string): ViewedFile | null => {
-  let parsed: unknown
+  let parsed: JsonValue
   try {
-    parsed = JSON.parse(key)
+    parsed = decodeJson(jsonValueSchema, key)
   } catch {
     return null
   }
@@ -34,7 +35,7 @@ export const viewedFileFromKey = (key: string): ViewedFile | null => {
   return parts.success ? { sessionId: parts.data[0], seq: parts.data[1], path: parts.data[2] } : null
 }
 
-export const viewedMarksSnapshotSchema = z
+const viewedMarksSnapshotSchema = z
   .object({
     /** Monotone across Host restarts so a stale read never replaces a newer write. */
     revision: z.number().int().positive(),

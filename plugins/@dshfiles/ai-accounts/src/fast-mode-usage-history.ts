@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60_000
 const MAX_FAST_MODE_EVENTS = 10_000
 const MAX_RETENTION_DAYS = 365
 
-export const fastModeUsageDomain = defineDomain({
+const fastModeUsageDomain = defineDomain({
   name: 'ai_accounts_fastmode',
   version: 1,
   layout: 'per-record',
@@ -103,4 +103,3 @@ export const createFastModeUsageHistoryService = (
 }
 
 export type FastModeUsageHistoryService = ReturnType<typeof createFastModeUsageHistoryService>
-export type { FastModeUsageEvent, FastModeUsageObservation } from './fast-mode-usage-model.js'

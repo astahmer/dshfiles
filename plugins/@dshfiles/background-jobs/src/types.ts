@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { jobCategoryValues } from './classify.js'
 
-export const jobCategorySchema = z.enum(jobCategoryValues)
-export const jobStatusSchema = z.enum(['running', 'stopping', 'completed', 'killed', 'failed', 'interrupted'])
+const jobCategorySchema = z.enum(jobCategoryValues)
+const jobStatusSchema = z.enum(['running', 'stopping', 'completed', 'killed', 'failed', 'interrupted'])
 export type JobStatus = z.infer<typeof jobStatusSchema>
-export const jobScopeSchema = z.enum(['running', 'finished', 'all'])
+const jobScopeSchema = z.enum(['running', 'finished', 'all'])
 export type JobScope = z.infer<typeof jobScopeSchema>
 
 export const jobSessionSchema = z
@@ -17,7 +17,7 @@ export const jobSessionSchema = z
   .strict()
 export type JobSession = z.infer<typeof jobSessionSchema>
 
-export const jobRowSchema = z
+const jobRowSchema = z
   .object({
     id: z.string().min(1).max(128),
     kind: z.string().min(1).max(64),

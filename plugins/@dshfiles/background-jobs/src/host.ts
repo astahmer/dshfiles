@@ -1,7 +1,7 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-jobs'
-import { defineHost } from '@dshfiles/dshx/host'
+import { defineHost, publishApiEvent } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { backgroundJobsApi } from './api.js'
 import { HistoryIndex } from './history.js'
@@ -11,6 +11,8 @@ const INDEX_INTERVAL_MS = 30_000
 const CATCH_UP_DELAY_MS = 1_000
 const DEFAULT_FILES_PER_PASS = 120
 const DEFAULT_BUDGET_MS = 8_000
+/** Job output can change the board many times a second; browsers hear about it at most this often. */
+const CHANGE_EVENT_INTERVAL_MS = 1_000
 
 const persistenceConfigSchema = z.object({ config: z.object({ root: z.string().min(1) }) })
 
@@ -25,6 +27,7 @@ interface JobsRuntime {
   readonly history: HistoryIndex
   pass: Promise<void> | null
   timer: ReturnType<typeof setTimeout> | null
+  changeTimer: ReturnType<typeof setTimeout> | null
   stopped: boolean
 }
 
@@ -66,7 +69,25 @@ const setupHost = (context: Context): Effect<void> => {
     filesPerPass: DEFAULT_FILES_PER_PASS,
     budgetMs: DEFAULT_BUDGET_MS,
   })
-  const active: JobsRuntime = { board: new JobsBoard({ history }), history, pass: null, timer: null, stopped: false }
+  const reportFailure = (step: string, error: unknown): void => {
+    context.logger.warn('background-jobs: %s failed: %s', step, error instanceof Error ? error.message : String(error))
+  }
+  const reportStepFailure = (error: unknown): void => reportFailure('history indexing step', error)
+  const announceChange = (): void => {
+    if (active.changeTimer !== null || active.stopped) return
+    active.changeTimer = setTimeout(() => {
+      active.changeTimer = null
+      publishApiEvent(context, backgroundJobsApi, 'changed', {}).catch((error: unknown) => reportFailure('board change event', error))
+    }, CHANGE_EVENT_INTERVAL_MS)
+  }
+  const active: JobsRuntime = {
+    board: new JobsBoard({ history, onChange: announceChange }),
+    history,
+    pass: null,
+    timer: null,
+    changeTimer: null,
+    stopped: false,
+  }
   runtime = active
   context.inject(['jobs'], scoped => {
     const registry = scoped.get('jobs')
@@ -76,9 +97,6 @@ const setupHost = (context: Context): Effect<void> => {
       return () => active.board.detachLive()
     }, 'background-jobs: live job tracking')
   })
-  const reportStepFailure = (error: unknown): void => {
-    context.logger.warn('background-jobs: history indexing step failed: %s', error instanceof Error ? error.message : String(error))
-  }
   const step = async (): Promise<void> => {
     if (active.stopped) return
     await runPass(active)
@@ -94,6 +112,7 @@ const setupHost = (context: Context): Effect<void> => {
       yield async () => {
         active.stopped = true
         if (active.timer !== null) clearTimeout(active.timer)
+        if (active.changeTimer !== null) clearTimeout(active.changeTimer)
         await active.pass
         if (runtime === active) runtime = undefined
       }

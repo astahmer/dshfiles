@@ -30,6 +30,24 @@ dshx check --runtime --json
 
 Runtime mode additionally requires a supported DSH installation, the configured Profile link, Composition/runtime readiness, optional runtime plugin state, and Inspect bridge state. JSON output always separates `static`, `typecheck`, and `runtime` status; offline output reports runtime as `skipped`.
 
+### Repository health: `dshx check repo`
+
+`check repo` checks the repository around the plugins instead of one project: this monorepo, or a standalone plugin repository made by `create-dshx`. It finds the root from `--cwd` (the nearest `pnpm-workspace.yaml`, else the nearest `package.json`) and reads the workspace packages from `pnpm-workspace.yaml`, or the root package alone. It runs offline and needs no DSH.
+
+| Check           | Reports                                                                                                                                                                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cycles`        | Workspace packages that depend on each other through any dependency field, peer and optional dependencies included, at the `package.json` line of one edge.                                                                                                 |
+| `boundaries`    | `relative-dist-import`: a plugin importing another plugin's `dist/` by relative path. `contract-imports-provider`: a contract module (a `dshx.config.ts` `modules` entry calling `defineContract`/`defineRegistry`), or a file it imports relatively, importing a plugin that imports that module. |
+| `stale-bundles` | A built bundle older than a source its last build read whose content differs from the hash in `dist/*.js.deps.json`. Packages never built are counted, not reported; `scripts/profile-sync.ts` uses the same check for linked bundles.                       |
+
+```bash
+dshx check repo
+dshx check repo --only cycles
+dshx check repo --json
+```
+
+Each finding names `file:line`, the rule and a `fix`. `--json` prints `{ schemaVersion, command: "check repo", ok, data: { root, checks: [{ name, ok, inspected, findings }] } }`, or `error: { code, message, hint }`. Exit codes: 0 no findings, 1 findings or error, 2 usage. In this repository `pnpm check:repo` runs it after the plugin build in `check:green`, and `pnpm check:cycles` (`scripts/workspace-cycles.mjs`) runs the cycle check from dshx source before anything is built.
+
 ## `dshx build`
 
 ```bash
@@ -37,6 +55,8 @@ dshx build [--cwd <project>] [--verbose]
 ```
 
 Build runs the offline manifest, migration, compatibility, and TypeScript checks before compiling. It builds enabled Host and Client faces through the bounded Vite kernel, emits declarations by default, and verifies the artifact shape. Its only writes are build outputs.
+
+Every face writes into a hidden sibling staging directory (`.dist.dshx-<pid>-<id>/`). Only when all faces succeed does the build replace `dist/` with it, by renaming the old directory away and the staged one in. A running Host that polls bundles therefore sees one complete change per plugin, and a file the build no longer produces (a renamed module, a disabled face, a sourcemap or declaration turned off) leaves with the old directory. A failed build keeps the last good `dist/`. Anything else written into `dist/` is replaced too, so keep other generators' output elsewhere. `dshx dev` watchers still write in place.
 
 ## `dshx dev`
 
@@ -88,7 +108,22 @@ dshx add command --name <name> [--description <text>]
 dshx add hook --event <event>
 ```
 
-All add commands accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add settings`, `add prompt`, or `add conversation` commands.
+All scaffold targets accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add settings`, `add prompt`, or `add conversation` commands.
+
+### `dshx add <package>`: install a plugin into a profile
+
+```bash
+dshx add <package|path> [--profile <name>] [--option key=value ...] [--home <dir>] [--dry-run] [--json]
+```
+
+Any operand that is not a scaffold target installs one plugin into a DSH profile in one step:
+
+- An owned bundle (`@dshfiles/<name>`, or a path to `plugins/@dshfiles/<name>`) is linked and installed with `scripts/profile-sync.ts --bundle <name>`, the same path as `pnpm profile:sync --bundle`. A registry package goes through `dsh plugin --profile <name> add <package>`. Either step is skipped when the profile already lists the package.
+- Each `--option key=value` (value parsed as a YAML scalar) merges into the plugin's Loader row config in the profile's `cordis.patch.yml`. The row id is read from the bundle's own `cordis.patch.yml` insert (the scope-kept slug, e.g. `dshfiles-shortcuts`). A patch entry replaces the row's whole `config`, so a new override starts from the bundle's row config; an existing override keeps its other keys. Comments and `!!js` values elsewhere in the patch are preserved.
+- Options are validated against the `Config` the plugin's built Host entry exports (Standard Schema, or a callable Schemastery schema) before anything is installed. When the entry is not built or exports none, options pass through with a warning.
+- Client `dsh.client.inject` edges come from the bundle's own manifest; the plan lists them.
+
+The plan names every command and file. Running it twice changes nothing and reports `up to date`. Any change needs **Restart the DSH host process**, which `dshx add` never does. `--profile` defaults to `probe`; `web` is only touched when named explicitly. A missing profile, an unknown `@dshfiles/*` package and options the schema rejects exit 1; usage errors exit 2.
 
 ## Shared options
 

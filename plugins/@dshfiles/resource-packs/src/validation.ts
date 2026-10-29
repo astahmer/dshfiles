@@ -73,7 +73,6 @@ export class ResourceValidation {
     }
   }
 
-  // oxlint-disable antislop/no-runtime-typeof -- Zod already parsed the union; a persisted pack dynamically selects the required member of that domain union.
   private static validValue(property: PropertyDefinition, value: PropertyValue): boolean {
     if (value === null) return true
     switch (property.type) {
@@ -104,7 +103,6 @@ export class ResourceValidation {
       }
     }
   }
-  // oxlint-enable antislop/no-runtime-typeof
 
   // oxlint-disable-next-line antislop/no-unknown-parameters -- Submitted patches and SQLite JSON are parsed here before any domain checks or persistence.
   static parseValues(definition: PackDefinition, input: unknown, caller?: ApiCaller, owner?: string): PropertyValues {

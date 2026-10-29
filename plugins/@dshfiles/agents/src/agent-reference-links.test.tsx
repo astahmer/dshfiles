@@ -80,7 +80,9 @@ describe('agent reference links', () => {
     document.body.innerHTML = '<div data-conversation-session="s"><p>Working with @luna.</p></div>'
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
-      if (event instanceof CustomEvent) handlesSeen.push(String((event.detail as { handle: unknown }).handle))
+      if (!(event instanceof CustomEvent)) return
+      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
+      if (parsed.success) handlesSeen.push(parsed.data.handle)
     }
     window.addEventListener(agentReferencePreviewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
@@ -104,7 +106,9 @@ describe('agent reference links', () => {
     ].join('')
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
-      if (event instanceof CustomEvent) handlesSeen.push(String((event.detail as { handle: unknown }).handle))
+      if (!(event instanceof CustomEvent)) return
+      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
+      if (parsed.success) handlesSeen.push(parsed.data.handle)
     }
     window.addEventListener(agentReferencePreviewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })

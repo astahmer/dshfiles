@@ -5,19 +5,10 @@
  * entries. They may change while the build and compatibility protocol evolves.
  * @experimental
  */
-export { buildClient, buildHost, buildModule, watchClient, watchHost } from '../compiler/index.js'
-export type {
-  BuildArtifact,
-  BuildClientOptions,
-  BuildEvent,
-  BuildHostOptions,
-  BuildReport,
-  BuildWatcher,
-  ClientBuildResult,
-  HostBuildResult,
-  HostGenerationBuild,
-  ViteExtensionOptions,
-} from '../compiler/index.js'
+export { buildClient, watchClient, type BuildClientOptions, type ClientBuildResult } from '../compiler/client/build.js'
+export { buildHost, watchHost, type BuildHostOptions, type HostGenerationBuild, type HostBuildResult } from '../compiler/host/build.js'
+export { buildModule } from '../compiler/module/build.js'
+export type { BuildArtifact, BuildEvent, BuildReport, BuildWatcher, ViteExtensionOptions } from '../compiler/types.js'
 export {
   resolveCompatibility,
   classifyCompatibility,
@@ -44,7 +35,7 @@ export type {
   DshProjectCompatibilityAssessment,
   DshSupportStatus,
   DshxRuntimePluginSpec,
-} from '../compat/index.js'
+} from '../compat/types.js'
 export { resolveDshxConfig } from '../config/resolve.js'
 export type { ResolvedDshxConfig, ResolveDshxConfigOptions } from '../config/types.js'
 export { DshxError } from '../diagnostics.js'
@@ -53,5 +44,5 @@ export { parseCliArgs, CliUsageError } from '../cli/args.js'
 export type { CliAddTarget, CliArgs, CliCommand, CliInspectTarget } from '../cli/args.js'
 export { runCli } from '../cli/run.js'
 export type { CliIO, CliRunOptions, CliRuntime } from '../cli/run.js'
-export { checkPackageTargets, ManifestRepairService } from '../project/index.js'
-export type { ManifestRepairOptions, ManifestRepairPlan } from '../project/index.js'
+export { checkPackageTargets } from '../project/package-targets.js'
+export { ManifestRepairService, type ManifestRepairOptions, type ManifestRepairPlan } from '../project/repair.js'

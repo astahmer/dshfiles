@@ -35,6 +35,7 @@ import { CaptureProject } from './capture-project.js'
 import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { composerLinkLabel } from './composer-link-label.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { fileInput } from './composer-files.js'
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
@@ -119,7 +120,7 @@ const ReferenceDialog = (props: {
   })
   const title = props.mode === 'item' ? 'Link a backlog item' : 'Link a thread'
   return (
-    <CommandDialog open={open} onOpenChange={next => (next ? undefined : props.onClose())} title={title} description="Search by name">
+    <CommandDialog open={open} onOpenChange={next => (next ? undefined : props.onClose())} heading={title} description="Search by name">
       <CommandInput
         placeholder="Search by title…"
         value={query}
@@ -263,7 +264,7 @@ export const Composer = (props: {
   )
 
   const projectCommand = BacklogProjectCommand.at(text, caret)
-  const mention = useMentionCompletion({ text, caret, threads: props.threads, projects: props.projects, tags: props.tags })
+  const mention = useMentionCompletion({ text, caret, threads: props.threads, projects: props.projects, tags: props.tags, files: attachments.files })
   const suggestions = useMemo((): readonly Suggestion[] => {
     if (projectCommand === null) return mention.suggestions
     const query = projectCommand.query.trim().toLowerCase()
@@ -328,7 +329,26 @@ export const Composer = (props: {
     })
   }
 
-  const drop = useFileDrop({ onFiles: files => void attachments.add(files) })
+  const addFiles = async (files: readonly File[]): Promise<void> => {
+    const result = await attachments.add(files)
+    if (result.added.length === 0) return
+    const element = input.current
+    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
+      text: element?.value ?? text,
+      start: element?.selectionStart ?? text.length,
+      end: element?.selectionEnd ?? text.length,
+      files: result.added,
+      firstImageNumber: result.firstImageNumber,
+    })
+    if (insertion.text === (element?.value ?? text)) return
+    setText(insertion.text)
+    setCaret(insertion.caret)
+    requestAnimationFrame(() => {
+      element?.focus()
+      element?.setSelectionRange(insertion.caret, insertion.caret)
+    })
+  }
+  const drop = useFileDrop({ onFiles: files => void addFiles(files) })
   const addFromPicker = (): void => fileInputRef.current?.click()
 
   const stopVoice = async (): Promise<void> => {
@@ -397,7 +417,10 @@ export const Composer = (props: {
     setStatus('inbox')
     setFailed(null)
     props.onClearStatus?.()
-    const serializedText = serializeProjectReferenceDraft(text, props.projects)
+    const serializedText = serializeProjectReferenceDraft(
+      ImageAttachmentReferenceModel.markdownImageReferences(submitted.text, submitted.files),
+      props.projects,
+    )
     const payload: Parameters<typeof api.capture>[0] = {
       text: serializedText.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : serializedText,
     }
@@ -459,7 +482,7 @@ export const Composer = (props: {
         multiple
         hidden
         onChange={event => {
-          void attachments.add([...(event.currentTarget.files ?? [])])
+          void addFiles([...(event.currentTarget.files ?? [])])
           event.currentTarget.value = ''
         }}
       />
@@ -471,7 +494,7 @@ export const Composer = (props: {
         autoFocus={props.autoFocus}
         placeholder={props.placeholder}
         value={text}
-        onPaste={event => pasteFiles(event, files => void attachments.add(files))}
+        onPaste={event => pasteFiles(event, files => void addFiles(files))}
         onChange={event => {
           setText(event.currentTarget.value)
           setCaret(event.currentTarget.selectionStart)

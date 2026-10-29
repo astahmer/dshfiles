@@ -34,6 +34,22 @@ const stored = (id: string, title: string, body: string, cwd = '/dev/dshfiles'):
   return { header, events: [...thread.log().events] }
 }
 
+type StoredRead = { readonly eventState: 'shared-frozen'; readonly events: readonly SessionEvent[] }
+
+type StoredHandle = {
+  readonly id: SessionId
+  readonly header: SessionHeader
+  readonly inheritedEventCount: number
+  readonly read: () => Promise<StoredRead>
+  readonly close: () => Promise<void>
+}
+
+/** The persistence surface the installed engine observes: its corpus listing and one cold session read. */
+type ObservedPersistence = {
+  readonly list: (options?: { readonly signal?: AbortSignal }) => Promise<readonly { readonly header: SessionHeader; readonly revision: string }[]>
+  readonly open: (sessionId: string) => Promise<StoredHandle>
+}
+
 /** A persistence backend whose `list()` revisions are scripted per call, so the engine's observation window can be made to move. */
 const scriptedPersistence = (session: Stored, revisions: readonly string[]) => {
   const state = { listCalls: 0 }
@@ -54,7 +70,7 @@ const scriptedPersistence = (session: Stored, revisions: readonly string[]) => {
   }
 }
 
-const boot = async (persistence: unknown) => {
+const boot = async (persistence: ObservedPersistence) => {
   const ctx = new Context()
   ctx.provide('sessions', { list: () => [], get: () => undefined })
   ctx.provide('sessionPersistence', persistence)

@@ -77,6 +77,9 @@ export class LauncherConfig {
     }
     if (config.path !== undefined) result.PATH = config.path
     if (config.nodePath !== undefined) result.NODE_PATH = config.nodePath
+    // Reusing compiled modules across Host starts halves boot (5-6 s to about 2.5 s measured with the web profile).
+    if (result.NODE_COMPILE_CACHE === undefined || result.NODE_COMPILE_CACHE === '')
+      result.NODE_COMPILE_CACHE = join(result.XDG_CACHE_HOME || join(result.HOME ?? homedir(), '.cache'), 'dshfiles', 'node-compile-cache')
     return result
   }
 

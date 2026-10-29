@@ -18,10 +18,12 @@ interface RevisionActionClient {
 export type DragOrigin =
   | { readonly kind: 'revision'; readonly sourceId: string }
   | { readonly kind: 'bookmark'; readonly sourceId: string; readonly bookmark: string }
+  | { readonly kind: 'workspace'; readonly sourceId: string; readonly workspace: string }
 
 export type DropPresentation =
   | { readonly kind: 'rebase'; readonly sourceId: string; readonly destinationId: string }
   | { readonly kind: 'bookmark-move'; readonly sourceId: string; readonly destinationId: string; readonly bookmark: string }
+  | { readonly kind: 'workspace-move'; readonly sourceId: string; readonly destinationId: string; readonly workspace: string }
 
 interface RevisionActionContext {
   readonly client: RevisionActionClient
@@ -64,17 +66,35 @@ const failureMessage = (error: unknown, fallback: string): string => {
 
 const idleContext = { dragOrigin: null, dropTarget: null, dropPresentation: null, preview: null, action: null } as const
 
+interface RevisionActionInput {
+  readonly client: RevisionActionClient
+}
+
+interface RevisionActionEmitted {
+  readonly type: 'confirmed'
+  readonly workspacePath: string | null
+}
+
+interface RevisionActionSettled {
+  readonly type: 'settled'
+  readonly repoId: string
+}
+
+/** xstate reads this as type declarations only; nothing in it exists at runtime. */
+interface RevisionActionMachineTypes {
+  readonly context: RevisionActionContext
+  readonly events: RevisionActionEvent
+  readonly input: RevisionActionInput
+  readonly emitted: RevisionActionEmitted | RevisionActionSettled
+}
+
 /**
  * drag → drop → prepare → preview → confirm, plus prepare from menus. Leaving a busy state stops its actor, which aborts
  * the Host call; `settled` fires after every confirm attempt so the caller can refresh the repository.
  */
 export const revisionActionMachine = setup({
-  types: {
-    context: {} as RevisionActionContext,
-    events: {} as RevisionActionEvent,
-    input: {} as { readonly client: RevisionActionClient },
-    emitted: {} as { readonly type: 'confirmed'; readonly workspacePath: string | null } | { readonly type: 'settled'; readonly repoId: string },
-  },
+  // SAFETY: xstate's `types` reads these declarations only; the cast object is never evaluated.
+  types: {} as RevisionActionMachineTypes,
   actors: {
     prepare: fromPromise<ActionPreview, { readonly client: RevisionActionClient; readonly repoId: string; readonly action: Mutation }>(({ input, signal }) =>
       input.client.prepare({ repoId: input.repoId, action: input.action }, { signal }),

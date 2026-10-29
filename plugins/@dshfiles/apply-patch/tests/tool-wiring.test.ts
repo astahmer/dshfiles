@@ -20,9 +20,16 @@ describe('apply_patch wiring', () => {
     expect(tool).not.toContain('execution.agent?.ctx')
   })
 
+  it('resolves the write sandbox from the caller Session', () => {
+    const tool = source('patch-tool.ts')
+    expect(tool).toContain('ctx.sessions.get(agent.id)')
+    expect(tool).toContain('policy?.resolve(session === undefined ? {} : { session })')
+    expect(tool).toContain('execution.signal, sandboxPolicy)')
+  })
+
   it('registers the tool from setup so it closes over that context', () => {
     expect(host.setup).toBeTypeOf('function')
     expect(source('host.ts')).not.toContain('tools: [')
-    expect(host.inject).toEqual(expect.arrayContaining(['tools', 'fs', 'workingDirectory']))
+    expect(host.inject).toEqual(expect.arrayContaining(['tools', 'fs', 'workingDirectory', 'sessions']))
   })
 })

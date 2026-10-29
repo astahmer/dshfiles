@@ -52,7 +52,7 @@ export const tabInfoFactory: SlotHookFactory<'sidebar.right.pane.tab', UseSideba
           refreshShortcut: shortcuts.find(row => row.id === 'page.refresh'),
         },
       }
-    }, [layout, navigation, tabId, title, fullscreen, active, embedded, signal, actions, shortcuts])
+    }, [layout, navigation])
   }
 }
 
@@ -62,5 +62,4 @@ export const tabInfoFactory: SlotHookFactory<'sidebar.right.pane.tab', UseSideba
  * @param useTabInfo - the enclosing tab's framework-bound reader.
  * @returns the same reader for the replacement.
  */
-export const guideTabInfoFactory =
-  (_standard: unknown, useTabInfo: UseSidebarRightTabInfo): UseSidebarRightTabInfo => useTabInfo
+export const guideTabInfoFactory = (_standard: unknown, useTabInfo: UseSidebarRightTabInfo): UseSidebarRightTabInfo => useTabInfo

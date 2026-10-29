@@ -188,6 +188,12 @@
           "id": "queue-reorder.queued-message-preview-unit-unicode-safe-limit",
           "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
           "testName": "clips by Unicode code point and appends one ellipsis"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queued-message-preview-unit-preserves-reference-text",
+          "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
+          "testName": "preserves complete text blocks for rich reference rendering"
         }
       ],
       "telemetry": [

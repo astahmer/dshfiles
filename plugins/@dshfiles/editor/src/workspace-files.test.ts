@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles, type WorkspaceFilesReply } from './workspace-files.js'
 
-type Tree = { [name: string]: Tree | 'file' }
+interface Tree {
+  [name: string]: Tree | 'file'
+}
 
 const lister = (tree: Tree, failing: ReadonlySet<string> = new Set()) => {
   const listed: string[] = []
@@ -213,14 +215,14 @@ describe('walkWorkspaceFiles with .gitignore', () => {
         app: { '.gitignore': 'file', 'keep.log': 'file', 'index.ts': 'file', generated: { 'types.ts': 'file' } },
       },
     }
-    const gitignores: Record<string, string> = {
-      '.gitignore': '# build output\n/dist/\n*.log\n',
-      'packages/app/.gitignore': 'generated/\n!keep.log\n',
-    }
+    const gitignores = new Map([
+      ['.gitignore', '# build output\n/dist/\n*.log\n'],
+      ['packages/app/.gitignore', 'generated/\n!keep.log\n'],
+    ])
     const { list, listed } = lister(tree)
     const result = await walkWorkspaceFiles({
       list,
-      readText: async path => gitignores[path] ?? '',
+      readText: async path => gitignores.get(path) ?? '',
       signal: new AbortController().signal,
       onProgress: () => undefined,
     })

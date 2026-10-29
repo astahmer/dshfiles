@@ -3,6 +3,7 @@ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { detachedFlow, detachedView } from './detached-injected.ts'
 import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
+import type { ImageGalleryScope } from './chat-settings.ts'
 
 const policy: ChatPresentationPolicy = {
   mode: 'standard',
@@ -18,9 +19,14 @@ const presentation: ObservableSnapshot<ChatPresentationPolicy> = {
   subscribe: () => () => {},
 }
 
+const imageGalleryScope: ObservableSnapshot<ImageGalleryScope> = {
+  getSnapshot: () => 'turn',
+  subscribe: () => () => {},
+}
+
 describe('detached Chat injection', () => {
   it('resolves empty node sources instead of throwing for a session without a binding', () => {
-    const flow = detachedFlow(presentation)
+    const flow = detachedFlow(presentation, imageGalleryScope)
     expect(flow.keyedHooks.chatNode('missing').getSnapshot()).toBeUndefined()
     expect(flow.keyedHooks.chatNodeBottom('missing').getSnapshot()).toBe(false)
     expect(flow.keyedHooks.chatNodeProcess('missing').getSnapshot()).toBeUndefined()
@@ -28,7 +34,7 @@ describe('detached Chat injection', () => {
   })
 
   it('keeps every view action inert so a gap renders nothing and never throws', async () => {
-    const view = detachedView(presentation)
+    const view = detachedView(presentation, imageGalleryScope)
     expect(() => {
       view.openExternalLink('https://example.invalid')
       view.loadOlder()

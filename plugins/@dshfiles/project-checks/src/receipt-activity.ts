@@ -7,7 +7,7 @@ const revisionSchema = z
   .regex(/^[a-f0-9]{40,64}$/)
   .nullable()
 
-export const projectChecksActivitySummarySchema = z
+const projectChecksActivitySummarySchema = z
   .object({
     receiptId: z.string().uuid(),
     sessionId: z.string().min(1).max(128),

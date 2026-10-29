@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -41,7 +42,7 @@ test('explicit core arguments go only to fake core with inherited HOME and isola
   assert.deepEqual(JSON.parse(readFileSync(f.output, 'utf8')), { args: ['--version'], home: f.home, dshHome: f.env.DSH_HOME, profile: 'web' })
 })
 
-test('no arguments use configured source supervisor under flock, never a live profile', async t => {
+test('no arguments use configured source supervisor under the launch lock, never a live profile', async t => {
   const f = fixture(t)
   assert.equal(await launchDsh([], f.config, f.env), 0)
   const child = JSON.parse(readFileSync(f.output, 'utf8'))
@@ -49,6 +50,21 @@ test('no arguments use configured source supervisor under flock, never a live pr
   assert.equal(child.home, f.home)
   assert.equal(child.profile, 'web')
   assert.deepEqual(child.args, [])
+  assert.equal(existsSync(join(f.env.DSH_HOME, 'runtime/source-launch.lock')), false)
+})
+
+test('a live launch lock holder prevents a second supervisor; a dead holder is taken over', async t => {
+  const f = fixture(t)
+  const lock = join(f.env.DSH_HOME, 'runtime/source-launch.lock')
+  mkdirSync(dirname(lock), { recursive: true })
+  writeFileSync(lock, `${process.pid}\n`)
+  await assert.rejects(launchDsh([], f.config, f.env), /already launching/)
+  assert.throws(() => readFileSync(f.output), /ENOENT/)
+
+  writeFileSync(lock, `${spawnSync(process.execPath, ['-e', '']).pid}\n`)
+  assert.equal(await launchDsh([], f.config, f.env), 0)
+  assert.deepEqual(JSON.parse(readFileSync(f.output, 'utf8')).args, [])
+  assert.equal(existsSync(lock), false)
 })
 
 test('existing or unknown process status prevents any supervisor execution', async t => {

@@ -143,6 +143,45 @@
       ]
     },
     {
+      "id": "contributed-commands",
+      "title": "List commands other plugins contribute through dshx",
+      "summary": "Show every scoped, visible dshx Command under Commands, grey out disabled ones and follow them as plugins load, reload or withdraw them.",
+      "reach": ["press Meta+Shift+P", "fill combobox \"Search the command palette\" \"Toggle sidebar\"", "expect option \"Toggle sidebar*\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["listed", "disabled", "hidden", "withdrawn"],
+      "failureModes": [
+        "A command without the package scope is warned about and left out instead of breaking the registry.",
+        "A withdrawn command stays listed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.contributed-command",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.contributed-commands-unit-listing",
+          "file": "plugins/@dshfiles/command-palette/src/contributed-commands.test.ts",
+          "testName": "lists scoped, visible commands and withdraws them together"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.contributed-commands-unit-availability",
+          "file": "plugins/@dshfiles/command-palette/src/contributed-commands.test.ts",
+          "testName": "marks a disabled command unavailable and runs an enabled one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: contributed commands are listed and run in the browser, so no Host work exists to trace."
+        }
+      ]
+    },
+    {
       "id": "frecency-ranking",
       "title": "Rank recently used actions and files",
       "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",

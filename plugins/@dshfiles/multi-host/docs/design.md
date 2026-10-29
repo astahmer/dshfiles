@@ -126,7 +126,7 @@ identical cwds keep separate Session namespaces, HTTP mutation and WebSocket
 history through a real byte forwarder, a token from one runtime fails on the
 other, a dropped tunnel leaves the other runtime usable without replay, and
 history survives a restart on the same home. The real-SSH suite is
-`scripts/smoke-multi-host-ssh.mjs` plus the package's live tests (see the
+`tooling/dshx/scripts/smoke-multi-host-ssh.mjs` plus the package's live tests (see the
 README's Checks).
 
 ## Open questions

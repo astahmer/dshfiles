@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const MAX_NOTE_CHARS = 2000
+const MAX_NOTE_CHARS = 2000
 export const MAX_TEXT_CHARS = 240
 export const MAX_SELECTOR_CHARS = 600
 export const MAX_ATTRIBUTES = 8
@@ -9,21 +9,20 @@ export const MAX_STYLES = 16
 export const MAX_URL_CHARS = 400
 export const MAX_DRAFT_ITEMS = 8
 export const MAX_DRAFT_CHARS = 4000
-export const MAX_ITEMS_PER_CREATE = 8
+const MAX_ITEMS_PER_CREATE = 8
 export const MAX_THREAD_MESSAGES = 50
 export const MAX_ANNOTATIONS_PER_SESSION = 2000
 export const MAX_UNASSIGNED = 100
-export const MAX_INGEST_BYTES = 64 * 1024
 
-export const annotationStatusSchema = z.enum(['pending', 'acknowledged', 'resolved', 'dismissed', 'stale'])
-export const annotationIntentSchema = z.enum(['fix', 'change', 'question', 'approve'])
-export const annotationSeveritySchema = z.enum(['blocking', 'important', 'suggestion'])
-export const annotationSurfaceSchema = z.enum(['dsh', 'preview', 'external'])
-export const annotationKindSchema = z.enum(['element', 'region', 'text'])
-export const annotationStaleReasonSchema = z.enum(['element-missing', 'text-changed', 'route-changed'])
-export const annotationOriginSchema = z.enum(['dsh', 'extension'])
+const annotationStatusSchema = z.enum(['pending', 'acknowledged', 'resolved', 'dismissed', 'stale'])
+const annotationIntentSchema = z.enum(['fix', 'change', 'question', 'approve'])
+const annotationSeveritySchema = z.enum(['blocking', 'important', 'suggestion'])
+const annotationSurfaceSchema = z.enum(['dsh', 'preview', 'external'])
+const annotationKindSchema = z.enum(['element', 'region', 'text'])
+const annotationStaleReasonSchema = z.enum(['element-missing', 'text-changed', 'route-changed'])
+const annotationOriginSchema = z.enum(['dsh', 'extension'])
 
-export const annotationRectSchema = z
+const annotationRectSchema = z
   .object({
     x: z.number(),
     y: z.number(),
@@ -32,7 +31,7 @@ export const annotationRectSchema = z
   })
   .strict()
 
-export const annotationSourceSchema = z
+const annotationSourceSchema = z
   .object({
     file: z.string().min(1).max(400),
     line: z.number().int().positive(),
@@ -56,7 +55,7 @@ export const annotationTargetSchema = z
   })
   .strict()
 
-export const annotationThreadMessageSchema = z
+const annotationThreadMessageSchema = z
   .object({
     id: z.string().min(1).max(40),
     role: z.enum(['human', 'agent']),
@@ -99,7 +98,7 @@ export const annotationDraftSchema = z
   })
   .strict()
 
-export const annotationCountsSchema = z
+const annotationCountsSchema = z
   .object({
     pending: z.number().int().nonnegative(),
     acknowledged: z.number().int().nonnegative(),
@@ -131,8 +130,6 @@ export const shownOutputSchema = z
     counts: annotationCountsSchema,
   })
   .strict()
-
-export const idInputSchema = z.object({ sessionId: z.string().min(1).max(200), id: z.string().regex(/^ann_[1-9][0-9]*$/) }).strict()
 
 export const ackInputSchema = z
   .object({
@@ -185,7 +182,7 @@ export const previewOutputSchema = z.union([
   z.object({ ok: z.literal(false), error: z.enum(['outside-workspace', 'unsupported', 'missing', 'too-large']) }).strict(),
 ])
 
-export const chromePageSchema = z.object({ id: z.string().max(200), title: z.string().max(400), url: z.string().max(600) }).strict()
+const chromePageSchema = z.object({ id: z.string().max(200), title: z.string().max(400), url: z.string().max(600) }).strict()
 
 export const chromeStatusOutputSchema = z
   .object({
@@ -235,7 +232,7 @@ export const sourceInputSchema = z
   })
   .strict()
 
-export const sourceMatchSchema = z
+const sourceMatchSchema = z
   .object({
     name: z.string().min(1).max(MAX_SELECTOR_CHARS),
     file: z.string().min(1).max(400),
@@ -249,7 +246,7 @@ export const sourceOutputSchema = z.object({ matches: z.array(sourceMatchSchema)
 
 export const intakeInputSchema = z.object({ limit: z.number().int().min(1).max(100).optional() }).strict()
 
-export const unassignedIdSchema = z.string().regex(/^ext_[1-9][0-9]*$/)
+const unassignedIdSchema = z.string().regex(/^ext_[1-9][0-9]*$/)
 
 export const attachInputSchema = z
   .object({

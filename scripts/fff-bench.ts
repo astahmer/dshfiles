@@ -19,6 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync } fr
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 const Task = z.object({
   id: z.string(),
@@ -28,8 +29,6 @@ const Task = z.object({
 })
 type Task = z.infer<typeof Task>
 const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
-
-const decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
 
 const AssistantEvent = z.object({
   type: z.literal('assistant'),
@@ -61,6 +60,13 @@ const ResultEvent = z.object({
   }),
 })
 const StreamEvent = z.discriminatedUnion('type', [AssistantEvent, UserEvent, ResultEvent])
+const decodeStreamEvent = (line: string): z.output<typeof StreamEvent> | undefined => {
+  try {
+    return decodeJson(StreamEvent, line)
+  } catch {
+    return undefined
+  }
+}
 
 const RunRecord = z.object({
   task: z.string(),
@@ -169,9 +175,8 @@ const runOnce = async (options: {
   let result: z.infer<typeof ResultEvent> | undefined
   for (const line of stdout.split('\n')) {
     if (line.trim() === '') continue
-    const parsed = StreamEvent.safeParse(JSON.parse(line))
-    if (!parsed.success) continue
-    const event = parsed.data
+    const event = decodeStreamEvent(line)
+    if (event === undefined) continue
     if (event.type === 'assistant') {
       for (const part of event.message.content) {
         if (part.type === 'tool_use' && part.name !== undefined) toolCalls[part.name] = (toolCalls[part.name] ?? 0) + 1

@@ -129,6 +129,39 @@ test('workspace-add creates a sibling at the chosen revision and preserves dirty
   assert.match(sourceStatus, /draft\.txt/)
 })
 
+test('workspace-edit moves one workspace without moving another on the same revision', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-edit-'))
+  const repo = join(home, 'repo')
+  const parent = join(home, 'workspaces')
+  const firstWorkspace = join(parent, 'review-a')
+  const secondWorkspace = join(parent, 'review-b')
+  await mkdir(repo)
+  await mkdir(parent)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+
+  runJj(repo, home, ['git', 'init', '--no-colocate'])
+  await writeFile(join(repo, 'base.txt'), 'base\n')
+  runJj(repo, home, ['status'])
+  const baseId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  runJj(repo, home, ['workspace', 'add', '--name', 'review-a', '--revision', baseId, firstWorkspace])
+  runJj(repo, home, ['workspace', 'add', '--name', 'review-b', '--revision', baseId, secondWorkspace])
+  const firstWorkingCopyId = runJj(firstWorkspace, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  runJj(secondWorkspace, home, ['edit', firstWorkingCopyId])
+  assert.equal(runJj(secondWorkspace, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim(), firstWorkingCopyId)
+  runJj(repo, home, ['new', baseId])
+  const destinationId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  assert.notEqual(destinationId, baseId)
+
+  const action: Mutation = { kind: 'workspace-edit', name: 'review-b', commitId: destinationId }
+  runJj(secondWorkspace, home, JujutsuMutationModel.buildMutationArgv(action))
+  const workingCopyId = (cwd: string): string => runJj(cwd, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+
+  assert.deepEqual(
+    { first: workingCopyId(firstWorkspace), second: workingCopyId(secondWorkspace), default: workingCopyId(repo) },
+    { first: firstWorkingCopyId, second: destinationId, default: destinationId },
+  )
+}, 20_000)
+
 test('workspace-forget unregisters a secondary workspace and leaves its folder and files in place', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-forget-'))
   const repo = join(home, 'repo')

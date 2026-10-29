@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, test } from 'node:test'
@@ -143,6 +144,32 @@ test('the checked-in web seed links only owned bundles from this checkout', () =
     .map(line => line.slice(4))
   assert.deepEqual(added, webSeed.dsh.profile.bundles)
   assert.equal(readFileSync(join(dryRunHome, 'profiles/web/package.json'), 'utf8').includes('stale-fixture'), true)
+})
+
+test('warns about a linked bundle only when a source it was built from changed', () => {
+  const directory = join(root, 'checkout/plugins/@dshfiles/alpha')
+  const sourcePath = join(directory, 'src/host.ts')
+  const bundlePath = join(directory, 'dist/index.js')
+  writeJson(join(directory, 'package.json'), { name: '@dshfiles/alpha', version: '0.0.0', scripts: { build: 'dshx build' } })
+  write(sourcePath, 'export const value = 1\n')
+  write(bundlePath, 'export const value = 1\n')
+  writeJson(join(directory, 'dist/index.js.deps.json'), {
+    version: 1,
+    face: 'host',
+    sources: ['src/host.ts'],
+    hashes: { 'src/host.ts': createHash('sha256').update('export const value = 1\n').digest('hex') },
+  })
+  const builtAt = new Date(Date.now() - 60_000)
+  utimesSync(bundlePath, builtAt, builtAt)
+
+  const rewritten = sync()
+  assert.equal(rewritten.status, 0, rewritten.output)
+  assert.doesNotMatch(rewritten.output, /older than their sources/)
+
+  write(sourcePath, 'export const value = 2\n')
+  const changed = sync()
+  assert.equal(changed.status, 0, changed.output)
+  assert.match(changed.output, /older than their sources and DSH will load the old code: @dshfiles\/alpha$/m)
 })
 
 test('adds only the named bundle with --bundle', () => {

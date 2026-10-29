@@ -44,15 +44,21 @@ export const useComposerFiles = (props: {
   )
   const remaining = Math.max(0, BacklogItems.maxAttachments - files.length)
   const add = useCallback(
-    async (dropped: readonly File[]): Promise<void> => {
-      if (dropped.length === 0) return
+    async (dropped: readonly File[]): Promise<{ readonly added: readonly ComposerFile[]; readonly firstImageNumber: number }> => {
+      if (dropped.length === 0) return { added: [], firstImageNumber: composerDraftFiles.get(draftKey).filter(file => file.kind === 'image').length }
       onError(null)
       try {
         const next: ComposerFile[] = []
         for (const file of dropped.slice(0, remaining)) next.push(await readComposerFile(file))
-        replaceFiles([...composerDraftFiles.get(draftKey), ...next].slice(0, BacklogItems.maxAttachments))
+        const existing = composerDraftFiles.get(draftKey)
+        const allFiles = [...existing, ...next].slice(0, BacklogItems.maxAttachments)
+        const added = allFiles.slice(existing.length)
+        const firstImageNumber = existing.filter(file => file.kind === 'image').length
+        replaceFiles(allFiles)
+        return { added, firstImageNumber }
       } catch (error) {
         onError(errorMessage(error, 'That file could not be read.'))
+        return { added: [], firstImageNumber: composerDraftFiles.get(draftKey).filter(file => file.kind === 'image').length }
       }
     },
     [draftKey, onError, remaining, replaceFiles],

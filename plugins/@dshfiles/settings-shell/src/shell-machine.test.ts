@@ -52,6 +52,32 @@ describe('settings shell machine', () => {
     expect(actor.getSnapshot().context.field).toBeUndefined()
   })
 
+  it('reveals a section entry from search, clearing the query, and drops the target on the next navigation', () => {
+    const { actor } = start()
+    actor.send({ type: 'open', surface: 'modal' })
+    actor.send({ type: 'search', query: 'theme' })
+    actor.send({ type: 'reveal', sectionId: 'appearance', target: 'theme' })
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'appearance', target: 'theme', field: undefined, query: '' })
+    actor.send({ type: 'select', sectionId: 'general' })
+    expect(actor.getSnapshot().context.target).toBeUndefined()
+    actor.send({ type: 'reveal', sectionId: 'appearance', target: 'theme' })
+    actor.send({ type: 'focus', field: { sectionId: 'plugin:thread-sidebar', fieldPath: ['maxChildren'] } })
+    expect(actor.getSnapshot().context.target).toBeUndefined()
+  })
+
+  it('opens a closed Settings at a section entry and forgets it on close', () => {
+    const { actor, calls } = start()
+    actor.send({ type: 'open', surface: 'tab', sectionId: 'appearance', target: 'theme' })
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'appearance', target: 'theme' })
+    expect(calls).toEqual(['show'])
+    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
+    expect(actor.getSnapshot().context.target).toBeUndefined()
+    actor.send({ type: 'open', surface: 'modal', target: 'orphan' })
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'models', target: undefined })
+    actor.send({ type: 'close' })
+    expect(actor.getSnapshot().context.target).toBeUndefined()
+  })
+
   it('keeps the query when the main view hides the tab and shows it again', () => {
     const { actor } = start()
     actor.send({ type: 'open', surface: 'tab' })

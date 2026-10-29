@@ -4,6 +4,8 @@ import { spawn } from 'node:child_process'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY, classifyCompatibility } from '../compat/index.js'
 import { DshxError } from '../diagnostics.js'
+import { decodeJson, jsonObjectSchema, jsonValueSchema } from '../json.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { runProjectDsh } from './command.js'
 import type {
@@ -70,7 +72,7 @@ async function runDsh(project: ProfileProject, args: readonly string[], timeoutM
       cwd: project.root,
       env: environmentOf(options),
       timeoutMs,
-      ...(options.executable === undefined ? {} : { executable: options.executable }),
+      ...(options.executable !== undefined && { executable: options.executable }),
     })
   } catch (cause) {
     return { stdout: '', stderr: '', cause }
@@ -162,7 +164,7 @@ const resolveDshInstallation = async (project: ProfileProject, options: ProfileO
   }
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -275,9 +277,9 @@ async function resolveDependencyPath(project: ProfileProject, packageId: string,
 }
 
 async function parseDependencies(project: ProfileProject, source: string): Promise<InstalledProfile> {
-  let value: unknown
+  let value: JsonValue
   try {
-    value = JSON.parse(source)
+    value = decodeJson(jsonValueSchema, source)
   } catch (cause) {
     throw new DshxError('DSHX4302', 'DSH returned invalid JSON while inspecting the target profile.', {
       cause,
@@ -309,7 +311,7 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
       })
     })
   }
-  if (rawDependencies === undefined) return { dependencies: [], ...(profileRoot === undefined ? {} : { profileRoot }) }
+  if (rawDependencies === undefined) return { dependencies: [], ...(profileRoot !== undefined && { profileRoot }) }
   if (!isObject(rawDependencies)) {
     throw new DshxError('DSHX4302', 'The inspected profile dependencies must be an object.', {
       file: project.packageFile,
@@ -328,7 +330,7 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
       return { packageId, path }
     }),
   )
-  return { dependencies, ...(profileRoot === undefined ? {} : { profileRoot }) }
+  return { dependencies, ...(profileRoot !== undefined && { profileRoot }) }
 }
 
 /** Inspect whether this exact package id and real project path are linked. */
@@ -372,7 +374,7 @@ const inspectProjectProfile = async (project: ProfileProject, options: ProfileOr
     profile: project.profile,
     packageId: project.packageId,
     root: project.root,
-    ...(profileRoot === undefined ? {} : { profileRoot }),
+    ...(profileRoot !== undefined && { profileRoot }),
   }
 }
 
@@ -393,7 +395,7 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
   const existing = await inspectProjectProfile(project, {
     ...options,
     compatibility: dsh.compatibility,
-    ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
+    ...(dsh.executable !== undefined && { executable: dsh.executable }),
   })
   if (existing.state === 'linked') {
     return {
@@ -413,9 +415,9 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
   }
   const profileRoot = existing.profileRoot
   const manifestFile = join(profileRoot, 'package.json')
-  let manifest: Record<string, unknown>
+  let manifest: JsonObject
   try {
-    manifest = JSON.parse(await readFile(manifestFile, 'utf8')) as Record<string, unknown>
+    manifest = decodeJson(jsonObjectSchema, await readFile(manifestFile, 'utf8'))
   } catch (cause) {
     throw new DshxError('DSHX4304', `The profile manifest is not valid JSON: ${manifestFile}`, {
       cause,
@@ -423,7 +425,7 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
       hint: 'Repair the profile manifest before linking this project.',
     })
   }
-  const dependencies = isObject(manifest.dependencies) ? { ...manifest.dependencies } : {}
+  const dependencies = isObject(manifest.dependencies) ? manifest.dependencies : {}
   const existingLink = dependencies[project.packageId]
   if (typeof existingLink === 'string' && existingLink !== `link:${project.root}`) {
     throw new DshxError('DSHX4303', `The profile already links ${JSON.stringify(project.packageId)} from ${existingLink}.`, {
@@ -431,16 +433,15 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
       hint: `Remove the dependency from ${manifestFile} if it is stale, then retry.`,
     })
   }
-  const dshConfig = isObject(manifest.dsh) ? { ...manifest.dsh } : {}
-  const profileConfig = isObject(dshConfig.profile) ? { ...dshConfig.profile } : {}
-  const bundles = Array.isArray(profileConfig.bundles) ? [...(profileConfig.bundles as unknown[])] : []
-  const withoutProject = bundles.filter(bundle => bundle !== project.packageId)
-  dependencies[project.packageId] = `link:${project.root}`
-  manifest.dependencies = dependencies
-  profileConfig.bundles = [...withoutProject, project.packageId]
-  dshConfig.profile = profileConfig
-  manifest.dsh = dshConfig
-  await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  const dshConfig = isObject(manifest.dsh) ? manifest.dsh : {}
+  const profileConfig = isObject(dshConfig.profile) ? dshConfig.profile : {}
+  const bundles: readonly JsonValue[] = Array.isArray(profileConfig.bundles) ? profileConfig.bundles : []
+  const document: JsonObject = {
+    ...manifest,
+    dependencies: { ...dependencies, [project.packageId]: `link:${project.root}` },
+    dsh: { ...dshConfig, profile: { ...profileConfig, bundles: [...bundles.filter(bundle => bundle !== project.packageId), project.packageId] } },
+  }
+  await writeFile(manifestFile, `${JSON.stringify(document, null, 2)}\n`, 'utf8')
   const install = options.install ?? defaultInstall(profileRoot, options)
   try {
     await install(profileRoot)
@@ -459,7 +460,7 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
   const installed = await inspectProjectProfile(project, {
     ...options,
     compatibility: dsh.compatibility,
-    ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
+    ...(dsh.executable !== undefined && { executable: dsh.executable }),
   })
   if (installed.state !== 'linked') {
     throw new DshxError('DSHX4304', 'The profile install finished, but the project is still absent from the profile.', {

@@ -1,4 +1,4 @@
-import type { PaletteAction } from '@dshfiles/command-palette/api'
+import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 import { storedNotificationSoundsMuted, storedNotificationsMuted } from './thread-notifications.js'
 

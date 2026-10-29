@@ -1,7 +1,7 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 
-export const parentQuestionOptionSchema = z
+const parentQuestionOptionSchema = z
   .object({
     id: z.string().trim().min(1).max(80),
     label: z.string().trim().min(1).max(120),

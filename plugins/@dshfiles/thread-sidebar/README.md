@@ -177,6 +177,19 @@ notice (`src/settle-request.ts`): the sidebar owns this status, so the notice as
 through the cancelable `dshfiles:thread-settle` window event instead of writing a
 second copy.
 
+Settled exists because auto-archive used to push idle threads into the native
+archived state, and native navigation drops an archived Session from the main
+view right after it opens, so clicking an idle thread fought that cleanup.
+Threads already natively archived stay archived; there is no migration sweep.
+The Host no-wake gate (`src/settled-gate.ts`) walks the subagent lineage through
+live agents' headers plus the child's recorded `parentSession`, so a settled
+grandparent whose intermediate subagent is no longer live is not detected; the
+client refuses to settle a thread with a running descendant, which covers the
+case that matters. Every preference decoder field needs the same default as the
+Host schema: Schemastery drops a null-valued union field from its resolved
+output, and one field without a default once made the strict decoder reject
+every Host document, silently falling back to browser storage.
+
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
 own **Settings › Thread sidebar** section (`src/settings-tab.tsx`, registered by
@@ -358,9 +371,8 @@ points:
 - Host `session.search` (⌥⌘K on the web, ⌘K on desktop) opens thread search:
   the native browser stays registered under this one, and its request store is
   followed through the slot ledger.
-- Any bundle can dispatch the cancelable `dshfiles:command-palette` window
-  event with `{ mode: 'all' | 'threads' }`; a `{ probe: true }` detail is only
-  acknowledged (`/goto` uses it).
+- Any bundle opens the palette through the `CommandPalette` contract of
+  `@dshfiles/command-palette/palette-contract`.
 
 **Footer** entries render on one row and never shrink or wrap. Entries that do
 not fit move into More (⋯) together with entries hidden in Customize; overflow
@@ -383,7 +395,7 @@ launcher, brand and reopen badge remain sidebar chrome; Settings already has its
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after @session:<id> :` prefilled and the caret on the next line; normal workspace isolation applies.
+unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
 
 **Continue in project** (row menu and thread header menu) fixes a thread that
 started in the wrong folder, or whose work moved to another repository. It lists

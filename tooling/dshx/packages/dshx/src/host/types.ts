@@ -27,11 +27,14 @@ export interface PromptContextContribution<Prompt extends PromptContext = Prompt
 /** One official system-prompt contribution registered by a DSHX Host. */
 export type PromptContribution = PromptSectionContribution | PromptContextContribution
 
+/** A tool definition or a factory bound to the Host's injected Cordis context. */
+export type HostToolContribution = ToolDefinition | ((ctx: Context) => ToolDefinition)
+
 /** Author-facing Host definition backed by the official Cordis context and Tool model. */
 export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = StandardSchemaV1> {
   readonly name?: string
   readonly inject?: readonly string[]
-  readonly tools?: readonly ToolDefinition[]
+  readonly tools?: readonly HostToolContribution[]
   readonly commands?: readonly CommandDefinition[]
   readonly prompts?: readonly PromptContribution[]
   /** Native Loader Config schema for profile-owned fields that are not DSHX Settings. */

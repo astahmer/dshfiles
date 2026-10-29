@@ -38,7 +38,10 @@
       "surfaces": ["client"],
       "configuration": [],
       "states": ["thread-opened", "latest-rows-visible", "older-rows-mounted"],
-      "failureModes": ["A navigation or find target outside the mounted rows widens the window before it scrolls."],
+      "failureModes": [
+        "A navigation or find target outside the mounted rows widens the window before it scrolls.",
+        "Rows the reader scrolls past must not snap back when older rows mount: a paging anchor armed mid-gesture yields to the reader's scroll."
+      ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
@@ -52,6 +55,11 @@
           "kind": "gherkin",
           "id": "chat.windowed-transcript",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.windowed-transcript-steady-scroll",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],
       "telemetry": [
@@ -64,16 +72,32 @@
     {
       "id": "image-links",
       "title": "Open image links in the gallery",
-      "summary": "Opening a local or HTTP(S) image link from Chat shows it in the shared image gallery; other links keep their existing destination.",
+      "summary": "Opening an image link or read_image path shows it in the shared gallery, with the clicked image selected; the gallery defaults to the current Turn and can be configured to include the entire thread.",
       "surfaces": ["client"],
-      "configuration": [],
-      "states": ["link-idle", "gallery-open"],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect text \"Image gallery scope\""],
+      "configuration": [
+        {
+          "key": "imageGalleryScope",
+          "defaultValue": "turn",
+          "constraints": "Choose current Turn or all images in the thread; older history loads when needed.",
+          "choices": ["turn", "thread"],
+          "coveredBy": ["chat.read-image-gallery", "chat.image-gallery-thread-scope"]
+        }
+      ],
+      "states": ["link-idle", "turn-gallery-open", "thread-gallery-open"],
       "failureModes": [
         "A supported image link opens the side panel instead of the gallery.",
+        "The current-Turn gallery includes images from another Turn.",
         "The sidebar and composer remain visually at the same layer as the gallery."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.image-gallery-scope",
+          "file": "plugins/@dshfiles/chat/tests/image-gallery.test.ts",
+          "testName": "defaults to the current turn and accepts thread scope in saved Chat settings"
+        },
         {
           "kind": "unit-test",
           "id": "chat.markdown-image-links",
@@ -83,6 +107,16 @@
         {
           "kind": "gherkin",
           "id": "chat.image-links",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.read-image-gallery",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.image-gallery-thread-scope",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],

@@ -4,7 +4,6 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ServerView } from './api.js'
 import { CatalogBrowser, SignInNotice } from './catalog-browser.js'
@@ -14,6 +13,7 @@ import { ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
 import { McpServerStatusModel } from './server-status.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 interface QuickPanelEditor {
   readonly key: number
@@ -169,7 +169,7 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                   <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                     <p className="dshx:truncate dshx:text-sm dshx:font-medium">{server.name}</p>
                     <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                      <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', McpServerStatusModel.lifecycleDotClassName(server))} />
+                      <StatusDot size="sm" className={McpServerStatusModel.lifecycleDotClassName(server)} />
                       <span className="dshx:truncate">
                         {server.oauth === 'needs-sign-in'
                           ? t('signInRequired')

@@ -286,7 +286,7 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\"", "expect searchbox \"Search models\""],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
@@ -323,7 +323,8 @@
         "A provider rate limit cools the account that served the request and may rebind its retry.",
         "All eligible accounts are cooling down and no route can be selected.",
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
-        "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts."
+        "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts.",
+        "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned."
       ],
       "externalDependencies": [
         {
@@ -336,6 +337,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.model-curation",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.custom-model-removal",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
@@ -597,7 +603,7 @@
     {
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
-      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, and apply explicit price overrides without persisting provider response payloads.",
+      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads.",
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {
@@ -642,6 +648,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "ai-accounts.turn-cost-projection",
+          "file": "plugins/@dshfiles/ai-accounts/src/cost-projection.test.ts",
+          "testName": "replaces a turn sample without losing earlier turn groups"
+        },
+        {
+          "kind": "unit-test",
           "id": "ai-accounts.pricing-cost-unit-cache-fallback",
           "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
           "testName": "fetches, trims and caches the catalog, then serves the cache offline"
@@ -670,7 +682,12 @@
       "id": "quota-forecast",
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
       "summary": "The AI Accounts: Quota forecast view projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
-      "reach": ["click button \"AI Accounts: Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
+      "reach": [
+        "click button \"AI Accounts: Quota forecast\"",
+        "expect tab \"Forecast\"",
+        "click tab \"Hand-off\"",
+        "expect text \"Enable an account with quota to see where it is heading.\""
+      ],
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {
@@ -776,7 +793,7 @@
         {
           "key": "costEstimates",
           "defaultValue": "true",
-          "constraints": "Boolean; enable composer cost estimates.",
+          "constraints": "Boolean; enable composer and completed-turn cost estimates.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.luna-reserve"]
         }

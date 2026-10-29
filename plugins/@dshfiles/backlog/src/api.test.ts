@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BacklogViews, type BacklogDetailInput, type BacklogSummaryInput } from './api.js'
+import { backlogApi, BacklogViews, type BacklogDetailInput, type BacklogSummaryInput } from './api.js'
 
 const legacySummary = {
   id: 1,
@@ -40,6 +40,27 @@ const legacyItem = {
   lastActivityAt: 2,
   events: [{ at: 1, actor: 'user', kind: 'created', detail: 'backlog crash when i clicked open' }],
 } satisfies Omit<BacklogDetailInput['item'], 'freshness'>
+
+describe('API input schemas', () => {
+  it('preserves reply attachments when omitted and accepts explicit replacement lists', async () => {
+    const schema = backlogApi.methods.editComment.input
+    if (schema === undefined) throw new Error('Edit reply input schema is missing')
+    const validate = (value: unknown) => schema['~standard'].validate(value)
+    const replacement = {
+      id: 'reply-image-1',
+      kind: 'image',
+      name: 'replacement.png',
+      mediaType: 'image/png',
+      bytes: 4,
+      data: 'iVBORw==',
+    }
+
+    expect((await validate({ id: 1, commentId: 'reply-1', text: 'Edited reply' })).issues).toBeUndefined()
+    expect((await validate({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [replacement] })).issues).toBeUndefined()
+    expect((await validate({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [] })).issues).toBeUndefined()
+    expect((await validate({ id: 1, commentId: 'reply-1', text: '', files: [] })).issues).toBeDefined()
+  })
+})
 
 describe('client decode', () => {
   it('fills the attachment list a Host that predates attachments omits', () => {

@@ -32,6 +32,10 @@
       "types": "./src/thread-account-api.ts",
       "default": "./dist/thread-account-api.js"
     },
+    "./account-usage-view": {
+      "types": "./src/account-usage-view.tsx",
+      "default": "./dist/account-usage-view.js"
+    },
     "./model-fast-mode-api": {
       "types": "./src/model-fast-mode-api.ts",
       "default": "./dist/model-fast-mode-api.js"
@@ -143,17 +147,13 @@
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@dshfiles/session-controller": "workspace:*",
-    "@dshfiles/usage": "workspace:*"
+    "@dshfiles/session-controller": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@dshfiles/session-controller": {
       "optional": true
     },
     "@deepseek-ai/dsh-token-meter": {
-      "optional": true
-    },
-    "@dshfiles/usage": {
       "optional": true
     },
     "@deepseek-ai/dsh-schedule": {

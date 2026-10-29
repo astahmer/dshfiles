@@ -17,7 +17,7 @@ export const tracesViewSchema = z
 
 export type TracesView = z.infer<typeof tracesViewSchema>
 
-export const defaultTracesView: TracesView = {
+const defaultTracesView: TracesView = {
   tab: 'traces',
   search: '',
   service: null,

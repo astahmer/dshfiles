@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { describe, expect, test } from 'vitest'
 import { z } from 'zod'
 import type { NativeRpcRequest } from '../src/api.js'
@@ -23,7 +24,7 @@ describe('native mutation outcome recovery', () => {
       request.on('end', () => {
         let requestId: string
         try {
-          requestId = requestEnvelopeSchema.parse(JSON.parse(body.join(''))).rpcId
+          requestId = decodeJson(requestEnvelopeSchema, body.join('')).rpcId
         } catch {
           response.writeHead(400).end()
           return

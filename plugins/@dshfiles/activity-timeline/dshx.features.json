@@ -173,7 +173,12 @@
       "id": "verification-receipts",
       "title": "Inspect verification receipts in the Activity Timeline",
       "summary": "Project Checks publishes a strict, bounded receipt summary after persistence; the timeline deduplicates replay, marks failures and timeouts for attention, and opens only a currently listed Session.",
-      "reach": ["seed tool-call-thread", "click button \"Activity Timeline: Activity\"", "click button \"Agent started work*\"", "expect button \"Open Session\""],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Activity Timeline: Activity\"",
+        "click button \"Agent started work*\"",
+        "expect button \"Open Session\""
+      ],
       "surfaces": ["client", "host", "integration", "storage"],
       "configuration": [],
       "states": ["passed", "failed", "timed-out", "cancelled", "backfilled", "deduplicated", "session-opened"],

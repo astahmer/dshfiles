@@ -1,3 +1,4 @@
+import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 /**
@@ -273,14 +274,11 @@ const hasValueAt = (value: JsonValue | undefined, path: readonly string[]): bool
 
 /** A JSON draft typed in the fallback editor, or undefined when it does not parse into a JSON value. */
 const parseJsonDraft = (text: string): JsonValue | undefined => {
-  let decoded: unknown
   try {
-    decoded = JSON.parse(text)
+    return decodeJson(jsonValueSchema, text)
   } catch {
     return undefined
   }
-  const value = jsonValueSchema.safeParse(decoded)
-  return value.success ? value.data : undefined
 }
 
 /** The value a new list item or record entry starts with. */

@@ -39,7 +39,15 @@ const harness = async () => {
   const adapter = new CatalogAdapter()
   const registration = ctx.llm.registerAdapter(['codex'], adapter)
   const cache = new SessionModelCatalog(ctx)
-  return { ctx, adapter, registration, cache, setDefault: (next: typeof selection) => { selection = next } }
+  return {
+    ctx,
+    adapter,
+    registration,
+    cache,
+    setDefault: (next: typeof selection) => {
+      selection = next
+    },
+  }
 }
 
 it('reuses one in-flight and settled snapshot while its inputs are unchanged', async () => {
@@ -75,7 +83,9 @@ it('invalidates same-id model changes announced by a configurable-provider updat
 it('does not let an older in-flight snapshot poison reads after route commit', async () => {
   const { ctx, adapter, cache } = await harness()
   let release: () => void = () => {}
-  adapter.gate = new Promise<void>(resolve => { release = resolve })
+  adapter.gate = new Promise<void>(resolve => {
+    release = resolve
+  })
   const old = cache.read()
   await Promise.resolve()
   expect(adapter.reads).toBe(1)
@@ -92,7 +102,8 @@ it('does not let an older in-flight snapshot poison reads after route commit', a
 })
 
 it.each(['settings/document-updated', 'credentials/record-updated', 'credentials/reference-updated'] as const)(
-  'invalidates %s without eagerly rebuilding before its owner commits', async event => {
+  'invalidates %s without eagerly rebuilding before its owner commits',
+  async event => {
     const { ctx, adapter, cache, registration } = await harness()
     const before = cache.read()
     await before

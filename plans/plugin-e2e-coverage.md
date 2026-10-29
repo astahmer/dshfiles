@@ -18,9 +18,6 @@ catalog file that is not linked.
       so it separates failing, unrun and browser-verified features.
 - [ ] **Fresh green baseline on stock rc.2.** Run `test:e2e` end to end; most
       journeys landed 2026-10-13 and have not run together since.
-- [ ] **Fix `command-palette.content-search`.** It boots
-      `@dshfiles/dsh-core-runtime`, which was deleted, so it cannot pass.
-      Recompose it on stock DSH or drop the feature.
 - [ ] **Contain Host egress.** Only the browser is restricted; the Host can
       still reach the network during a journey.
 - [ ] **Failed-entry boot scenario.** The step "every client entry that failed

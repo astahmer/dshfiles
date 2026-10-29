@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, statSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LauncherConfig } from './launcher-config.mjs'
@@ -33,6 +33,34 @@ const run = (command, args, options) =>
     })
   })
 
+const processAlive = pid => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+/**
+ * Hold an exclusive launch lock without `flock(1)`, which macOS does not ship. A lock left by a process that no longer
+ * exists is taken over; a live holder fails fast like `flock -n`.
+ */
+const acquireLaunchLock = path => {
+  try {
+    const descriptor = openSync(path, 'wx', 0o600)
+    writeSync(descriptor, `${process.pid}\n`)
+    closeSync(descriptor)
+    return () => rmSync(path, { force: true })
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+  }
+  const holder = Number.parseInt(readFileSync(path, 'utf8'), 10)
+  if (Number.isInteger(holder) && processAlive(holder)) throw new Error('DSH is already launching; nothing started')
+  rmSync(path, { force: true })
+  return acquireLaunchLock(path)
+}
+
 export async function launchDsh(args, config = LauncherConfig.load(), inherited = process.env) {
   const core = LauncherConfig.requireCoreEntry(config)
   const env = LauncherConfig.environment(config, inherited)
@@ -48,7 +76,12 @@ export async function launchDsh(args, config = LauncherConfig.load(), inherited 
   if (running !== 1) throw new Error('Could not check running DSH processes; nothing started')
   const runtime = join(config.dshHome, 'runtime')
   mkdirSync(runtime, { recursive: true, mode: 0o700 })
-  return run('flock', ['-n', join(runtime, 'source-launch.lock'), config.nodeBinary, supervisor], { cwd: config.sourceRoot, env, stdio: 'inherit' })
+  const release = acquireLaunchLock(join(runtime, 'source-launch.lock'))
+  try {
+    return await run(config.nodeBinary, [supervisor], { cwd: config.sourceRoot, env, stdio: 'inherit' })
+  } finally {
+    release()
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -262,6 +262,27 @@ describe('client-only draft lifecycle', () => {
     expect(backend.materialize).not.toHaveBeenCalled()
   })
 
+  it('stages a model on an existing Host blank and attaches it before first send', async () => {
+    const { drafts, backend } = fixture()
+    const existingId = id(100)
+    const chosen = { provider: 'account', model: 'chosen', reasoningEffort: 'high' }
+    backend.lookup.mockReturnValue({ ...options, sessionId: existingId, preview: '' })
+    backend.materialize.mockImplementation(async metadata => metadata.sessionId)
+
+    drafts.update(existingId, { text: '', hasAttachments: false })
+
+    expect(drafts.stageModel(existingId, chosen)).toBe(true)
+    drafts.reconcile(new Set(), new Set([existingId]))
+    expect(backend.materialize).not.toHaveBeenCalled()
+    expect(backend.selectModel).not.toHaveBeenCalled()
+
+    drafts.update(existingId, { text: 'first message', hasAttachments: false })
+    await drafts.whenCreated(existingId)
+
+    expect(backend.materialize).toHaveBeenCalledExactlyOnceWith({ ...options, sessionId: existingId, preview: 'first message', model: chosen })
+    expect(backend.selectModel).toHaveBeenCalledExactlyOnceWith(existingId, chosen)
+  })
+
   it('resolves restored readiness from actual Host presence and releases the provisional overlay', async () => {
     const { drafts, backend, storage } = fixture()
     const original = drafts.create(options)

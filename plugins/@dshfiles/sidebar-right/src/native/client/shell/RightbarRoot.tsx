@@ -14,16 +14,28 @@ export interface RightbarRootInjected {
 
 type RootProps = PropsRuntime<'rightbar'> & PropsRenderSlots<'rightbar.session'> & InjectFace<RightbarRootInjected>
 
-function SessionView({ view, visible, SessionProvider, renderSlot, mountView, width, viewportWidth, canShow }:
-  Pick<RootProps, 'SessionProvider' | 'renderSlot' | 'mountView' | 'width' | 'viewportWidth' | 'canShow'>
-  & { readonly view: SidebarSessionViewSnapshot; readonly visible: boolean }) {
+function SessionView({
+  view,
+  visible,
+  SessionProvider,
+  renderSlot,
+  mountView,
+  width,
+  viewportWidth,
+  canShow,
+}: Pick<RootProps, 'SessionProvider' | 'renderSlot' | 'mountView' | 'width' | 'viewportWidth' | 'canShow'> & {
+  readonly view: SidebarSessionViewSnapshot
+  readonly visible: boolean
+}) {
   useLayoutEffect(() => mountView(view.reference), [mountView, view.reference])
   const active = visible && view.selected
-  return <div className={css.session} hidden={!active} data-sidebar-right-session={view.sessionId}>
-    <SessionProvider session={view.reference}>
-      {renderSlot('rightbar.session', { width, viewportWidth, canShow, active, retainTab: view.retainTab })}
-    </SessionProvider>
-  </div>
+  return (
+    <div className={css.session} hidden={!active} data-sidebar-right-session={view.sessionId}>
+      <SessionProvider session={view.reference}>
+        {renderSlot('rightbar.session', { width, viewportWidth, canShow, active, retainTab: view.retainTab })}
+      </SessionProvider>
+    </div>
+  )
 }
 
 /**
@@ -33,8 +45,14 @@ function SessionView({ view, visible, SessionProvider, renderSlot, mountView, wi
  */
 export function RightbarRoot({ usePanelInfo, useViews, useWorkbenchMode, ...props }: RootProps) {
   const native = usePanelInfo(info => info.activePanelId === null)
-  const workbench = useWorkbenchMode(value => value)
+  const workbench = useWorkbenchMode(value => value, Object.is)
   const visible = native || workbench
-  const views = useViews(value => value)
-  return <>{views.map(view => <SessionView key={view.sessionId} {...props} view={view} visible={visible} />)}</>
+  const views = useViews(value => value, Object.is)
+  return (
+    <>
+      {views.map(view => (
+        <SessionView key={view.sessionId} {...props} view={view} visible={visible} />
+      ))}
+    </>
+  )
 }

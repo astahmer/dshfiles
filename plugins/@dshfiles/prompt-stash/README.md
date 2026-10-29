@@ -1,8 +1,10 @@
 # Prompt Stash
 
-![Keep draft attachments across thread navigation](docs/screenshots/draft-attachment-retention.png)
+![Manage reusable prompt snippets](docs/screenshots/prompt-library.png)
 
-Prompt Stash provides two composer actions. Both keep prompt text in this browser and use DSH's revision-guarded insertion API; neither submits a message. Prompt data stays in this browser and is not sent to the Host or synced across devices.
+![Shared prompt library in the composer](docs/screenshots/prompt-library.png)
+
+Prompt Stash provides one composer action for reusable prompts. It uses DSH's revision-guarded insertion API and never submits a message. The Host owns the shared prompt library, so it is available in every browser.
 
 ## Prompts
 
@@ -10,13 +12,9 @@ The Prompts action manages up to 50 reusable text prompts, with up to 20,000 cha
 
 Its Recent tab reads up to 20 direct user-text messages from the loaded Chat snapshot, scanning no more than 1,000 nodes. Recent messages are not persisted. Unsupported content, references, and attachments are excluded.
 
-## Drafts
+## Composer drafts
 
-The Drafts action can save up to 20 snapshots of the current plain-text composer draft. Saving is disabled while the composer is busy, for empty text, when it has attachment ids or reference chips, or when the text exceeds 24,000 characters. The store is limited to 512 KiB. These snapshots remain in this browser's local storage.
-
-Drafts also shows up to 50 text-only sent prompts from the loaded conversation; this history is not copied into local storage. Both actions capture the insertion position and reject insertion if the composer changed while the panel was open, preserving the current text and supported assets.
-
-Neither action syncs prompt data between browsers or devices.
+Unsaved text remains owned by DSH's native per-thread composer. The plugin does not keep a second stash of in-progress drafts. Older saved-draft records and browser-local fallback data are left untouched; the plugin no longer reads or writes them.
 
 ## Draft attachments
 

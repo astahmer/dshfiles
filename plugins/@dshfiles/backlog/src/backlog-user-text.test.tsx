@@ -51,6 +51,7 @@ describe('backlog sent mentions', () => {
       const button = container.querySelector('button')
       expect(button?.textContent).toBe('b:12 · Composer drops chips')
       expect(button?.getAttribute('data-ref-chip')).toBe('backlog')
+      expect(container.querySelector('[aria-label="Copy b:12 reference"]')).not.toBeNull()
 
       await act(async () => button?.click())
 

@@ -100,12 +100,7 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
 }
 
 /** Rows in the order they render, for keyboard movement in the panel. */
-export const itemsOrder = (
-  items: readonly BacklogSummaryView[],
-  by: GroupBy,
-  collapsed: ReadonlySet<string>,
-  sort: BacklogSort = 'updated',
-): BacklogSummaryView[] =>
+const itemsOrder = (items: readonly BacklogSummaryView[], by: GroupBy, collapsed: ReadonlySet<string>, sort: BacklogSort = 'updated'): BacklogSummaryView[] =>
   groupsOf(items, by)
     .filter(group => !collapsed.has(group.key))
     .flatMap(group => sortBacklogItems(group.items, sort).sort((left, right) => Number(right.pinned) - Number(left.pinned)))
@@ -201,7 +196,7 @@ const Row = (props: {
           {rename.renaming ? (
             <BacklogInlineTitle
               id={item.id}
-              title={item.title}
+              value={item.title}
               cancel={rename.endRename}
               className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
             />

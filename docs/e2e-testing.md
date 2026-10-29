@@ -39,7 +39,7 @@ The boot smoke composes the checked-in `profiles/web` seed in a scratch
 `failed`, naming the entry. `pending` is a pass: the smoke runs no
 conversation, so entries waiting on `sessions` or `remote.*` cannot become
 `active` there. Bundles are discovered from their DSH manifests, so a new
-bundle is tested without editing a registry. `scripts/boot-ignore.json` may
+bundle is tested without editing a registry. `tooling/dshx/scripts/boot-ignore.json` may
 skip one, but each entry needs a known package id, a reason, an owner and a
 removal condition, and an expired entry fails the check (validated uncached on
 every run, since no cache key sees the date).

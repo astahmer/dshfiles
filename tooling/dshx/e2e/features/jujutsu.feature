@@ -81,7 +81,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.composer-context
   Scenario: One composer chip summarizes the thread's repository context
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/pulls-review" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/pulls-review, @dshfiles/multi-host" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And the repository is registered and a thread is started in it
     Then the composer dock names the project, thread workspace and bookmark in one chip
@@ -96,7 +96,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.chat-references
   Scenario: An explicit reference in an answer opens its revision
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And two Jujutsu bookmarks have long titles
     And a Command Code account backed by a local fake provider is added
@@ -108,7 +108,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.chat-references-foreign-repository
   Scenario: A reference to a revision of another registered repository previews and opens that repository
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And a second disposable Jujutsu repository has a bookmark "foreign-ref" on "Foreign only revision"
     And a Command Code account backed by a local fake provider is added
@@ -118,7 +118,10 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.workspace-cleanup
   Scenario: The repository menu previews a background cleanup before removing anything
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/home, @dshfiles/multi-host" is booted
     When a disposable Jujutsu repository is selected
+    And two stale untracked folders exist beside the repository
     And the repository actions menu opens the workspace cleanup
-    Then a custom cleanup threshold previews workspaces without removing anything
+    Then the cleanup dialog shows age presets without removing anything
+    When only one stale untracked folder is selected for cleanup
+    Then cleanup removes only the selected folder

@@ -5,13 +5,13 @@ export type AttributeValue = z.infer<typeof attributeValueSchema>
 
 const attributesSchema = z.record(z.string(), attributeValueSchema)
 
-export const spanStatusSchema = z.enum(['unset', 'ok', 'error'])
+const spanStatusSchema = z.enum(['unset', 'ok', 'error'])
 export type SpanStatus = z.infer<typeof spanStatusSchema>
 
-export const spanKindSchema = z.enum(['unspecified', 'internal', 'server', 'client', 'producer', 'consumer'])
+const spanKindSchema = z.enum(['unspecified', 'internal', 'server', 'client', 'producer', 'consumer'])
 export type SpanKind = z.infer<typeof spanKindSchema>
 
-export const traceSummarySchema = z
+const traceSummarySchema = z
   .object({
     traceId: z.string(),
     rootName: z.string(),
@@ -30,9 +30,9 @@ export type TraceSummary = z.infer<typeof traceSummarySchema>
 export const traceListSchema = z.object({ traces: z.array(traceSummarySchema), nextCursor: z.string().nullable() }).strict()
 export type TraceList = z.infer<typeof traceListSchema>
 
-export const spanEventSchema = z.object({ name: z.string(), offsetMs: z.number(), attributes: attributesSchema }).strict()
+const spanEventSchema = z.object({ name: z.string(), offsetMs: z.number(), attributes: attributesSchema }).strict()
 
-export const spanRowSchema = z
+const spanRowSchema = z
   .object({
     spanId: z.string(),
     parentSpanId: z.string().nullable(),
@@ -65,7 +65,7 @@ export const traceDetailSchema = z
   .strict()
 export type TraceDetail = z.infer<typeof traceDetailSchema>
 
-export const latencySchema = z
+const latencySchema = z
   .object({
     count: z.number().int().nonnegative(),
     errorCount: z.number().int().nonnegative(),
@@ -78,12 +78,12 @@ export const latencySchema = z
   .strict()
 export type Latency = z.infer<typeof latencySchema>
 
-export const operationStatsSchema = latencySchema.extend({ service: z.string(), name: z.string() }).strict()
+const operationStatsSchema = latencySchema.extend({ service: z.string(), name: z.string() }).strict()
 export type OperationStats = z.infer<typeof operationStatsSchema>
 
-export const serviceStatsSchema = latencySchema.extend({ service: z.string() }).strict()
+const serviceStatsSchema = latencySchema.extend({ service: z.string() }).strict()
 
-export const modelUsageSchema = z
+const modelUsageSchema = z
   .object({
     service: z.string(),
     provider: z.string().nullable(),
@@ -107,7 +107,7 @@ export const traceStatsSchema = z
   .strict()
 export type TraceStats = z.infer<typeof traceStatsSchema>
 
-export const serviceEdgeSchema = latencySchema.extend({ source: z.string(), target: z.string() }).strict()
+const serviceEdgeSchema = latencySchema.extend({ source: z.string(), target: z.string() }).strict()
 export type ServiceEdge = z.infer<typeof serviceEdgeSchema>
 
 export const serviceMapSchema = z
@@ -171,7 +171,7 @@ export const errorGroupSchema = z
   .strict()
 export type ErrorGroup = z.infer<typeof errorGroupSchema>
 
-export const logRecordSchema = z
+const logRecordSchema = z
   .object({
     id: z.number().int(),
     timeMs: z.number(),
@@ -192,7 +192,7 @@ export type LogRecord = z.infer<typeof logRecordSchema>
 export const logListSchema = z.object({ logs: z.array(logRecordSchema), nextCursor: z.string().nullable() }).strict()
 export type LogList = z.infer<typeof logListSchema>
 
-export const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
+const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
 
 export const metricSummarySchema = z
   .object({
@@ -230,10 +230,10 @@ export const metricSeriesSchema = z
   .strict()
 export type MetricSeries = z.infer<typeof metricSeriesSchema>
 
-export const receiverStateSchema = z.enum(['starting', 'listening', 'port-in-use', 'disabled', 'failed'])
+const receiverStateSchema = z.enum(['starting', 'listening', 'port-in-use', 'disabled', 'failed'])
 export type ReceiverState = z.infer<typeof receiverStateSchema>
 
-export const viewerModeSchema = z.enum(['plugin', 'external', 'both'])
+const viewerModeSchema = z.enum(['plugin', 'external', 'both'])
 export type ViewerMode = z.infer<typeof viewerModeSchema>
 
 const signalCountsSchema = z
@@ -247,13 +247,13 @@ const exportTargetSchema = z
   })
   .strict()
 
-export const diagnosisCodeSchema = z.enum(['receiving', 'waiting', 'exporting-elsewhere', 'no-exporter', 'external-mode', 'port-in-use', 'failed', 'starting'])
+const diagnosisCodeSchema = z.enum(['receiving', 'waiting', 'exporting-elsewhere', 'no-exporter', 'external-mode', 'port-in-use', 'failed', 'starting'])
 export type DiagnosisCode = z.infer<typeof diagnosisCodeSchema>
 
-export const diagnosisSchema = z.object({ code: diagnosisCodeSchema, message: z.string() }).strict()
+const diagnosisSchema = z.object({ code: diagnosisCodeSchema, message: z.string() }).strict()
 export type Diagnosis = z.infer<typeof diagnosisSchema>
 
-export const exportersSchema = z
+const exportersSchema = z
   .object({
     traces: exportTargetSchema.describe("Where this Host process's dshx spans go now."),
     metrics: exportTargetSchema.describe("Where this Host process's usage metrics push goes now."),

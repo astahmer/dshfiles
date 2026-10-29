@@ -9,7 +9,7 @@ import { aiAccountsApi } from './api.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { nativeProviderStatus } from './native-providers-list.js'
 import type { AccountSection } from './account-connection-status.js'
-import { AccountUsageDashboard } from './account-usage-dashboard.js'
+import { AccountUsageSlot } from './account-usage-view.js'
 
 export const NativeProviderDetail = (props: {
   readonly entryId: string
@@ -109,7 +109,7 @@ export const NativeProviderDetail = (props: {
           {activeRoute === undefined ? (
             <p className="dshx:text-sm dshx:text-muted-foreground">Usage cannot be attributed without a provider route.</p>
           ) : (
-            <AccountUsageDashboard accountId={activeRoute} displayName={provider.label} onOpenUsageHistory={props.onOpenUsageHistory} />
+            <AccountUsageSlot accountId={activeRoute} displayName={provider.label} onOpenUsageHistory={props.onOpenUsageHistory} />
           )}
         </TabsContent>
       </Tabs>

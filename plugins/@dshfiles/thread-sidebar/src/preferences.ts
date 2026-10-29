@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
+  PROJECT_COLOR_PALETTES,
   DEFAULT_PREFERENCES,
   SIDEBAR_ORDER_SECTIONS,
   SIDEBAR_SECTIONS,
@@ -26,6 +27,7 @@ const sidebarSectionSchema = z.enum(SIDEBAR_SECTIONS)
 const sidebarOrderSectionSchema = z.enum(SIDEBAR_ORDER_SECTIONS)
 const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
+const projectColorPaletteSchema = z.enum(PROJECT_COLOR_PALETTES)
 
 /**
  * Auto-archive became auto-settle: the same idle scan now writes our own soft status instead of the
@@ -101,6 +103,7 @@ const preferencesInputSchema = z
     threadRowDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.threadRowDensity),
     threadRowProject: z.boolean().default(DEFAULT_PREFERENCES.threadRowProject),
     threadRowProjectColor: z.boolean().default(DEFAULT_PREFERENCES.threadRowProjectColor),
+    projectColorPalette: projectColorPaletteSchema.default(DEFAULT_PREFERENCES.projectColorPalette),
     threadRowTitle: z.boolean().default(DEFAULT_PREFERENCES.threadRowTitle),
     threadRowMachine: z.boolean().default(DEFAULT_PREFERENCES.threadRowMachine),
     threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),

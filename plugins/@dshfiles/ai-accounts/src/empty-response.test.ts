@@ -20,7 +20,7 @@ const frame = (delta: Record<string, unknown>, finish: string | null): string =>
     id: 'c1',
     object: 'chat.completion.chunk',
     model: 'stealth/space-bunny-alpha',
-    choices: [{ index: 0, delta, ...(finish === null ? {} : { finish_reason: finish }) }],
+    choices: [{ index: 0, delta, ...(finish !== null && { finish_reason: finish }) }],
   }
   return `data: ${JSON.stringify(chunk)}\n\n`
 }

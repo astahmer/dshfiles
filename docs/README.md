@@ -4,9 +4,11 @@ This directory holds repository-wide operational guidance. Product and API docum
 
 | Document                                                     | Purpose                                                                                                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `dshx check repo`.                                       |
 | [Fork maintenance](fork-maintenance.md)                      | Upstream sync, selective plugin PRs, ownership policy, sanitized publication history, and the separate deployment boundary.                             |
 | [Personal configuration](personal-configuration.md)          | Machine-local launcher choices, private paths and deployment settings.                                                                                  |
 | [25 October upstream sync](upstream-sync-20261025.md)        | Isolated candidate, deliberate conflict resolutions, verification evidence and deployment caveats.                                                      |
+| [26 October upstream sync](upstream-sync-20261026.md)        | Historical receipt: six accepted upstream PRs, rollback reference, conflict resolutions and verification.                                              |
 | [Recovering a broken DSH](recovery.md)                       | Start the last known good DSH, find what broke, refresh the snapshot, and upgrade DSH through the gate.                                                 |
 | [`profile-installs.md`](profile-installs.md)                 | Local profile installs, pnpm behavior, peer dependencies, and composition.                                                                              |
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                                                          |
@@ -28,5 +30,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                                            |
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: the weekly evidence review, mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger. |
 | [Observability](observability.md)                            | Which source answers which question; OpenTelemetry spans for turns, model calls, tools and plugin code, one trace.                                      |
+| [Reference repositories](reference-repos.md)                 | Upstream and peer projects checked out locally for comparison, and why each is kept.                                                                    |
+| [Harness landscape](research/harness-landscape/README.md)    | Dated comparison of DSH against ten coding harnesses, one report per product.                                                                           |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).

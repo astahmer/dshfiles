@@ -68,6 +68,31 @@ function describeIssues(issues: readonly StandardSchemaV1.Issue[]): string {
   return `: ${described.join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}`
 }
 
+const isStructuredJsonValue = <T>(value: T): value is T & object =>
+  value !== null && Object(value) === value && Object.prototype.toString.call(value) !== '[object Function]'
+const isBigIntValue = <T>(value: T): boolean => Object.prototype.toString.call(value) === '[object BigInt]'
+
+function formatStableJson(value: unknown, seen = new Set<object>()): string {
+  if (!isStructuredJsonValue(value)) {
+    if (isBigIntValue(value)) throw new TypeError('API query input must be JSON serializable.')
+    return JSON.stringify(value) ?? 'undefined'
+  }
+  if (seen.has(value)) throw new TypeError('API query input must not contain cycles.')
+  seen.add(value)
+  try {
+    const jsonValue = 'toJSON' in value && typeof value.toJSON === 'function' ? value.toJSON() : value
+    if (jsonValue !== value) return formatStableJson(jsonValue, seen)
+    if (Array.isArray(value))
+      return `[${value.map(item => (item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 'null' : formatStableJson(item, seen))).join(',')}]`
+    const entries = Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol')
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${formatStableJson(entry, seen)}`).join(',')}}`
+  } finally {
+    seen.delete(value)
+  }
+}
+
 const OWNER_MISSING = 'owner-missing'
 
 export class ApiProtocolModel {
@@ -81,8 +106,19 @@ export class ApiProtocolModel {
     return value instanceof InternalApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[API_ERROR] === true)
   }
 
+  /** Key-sorted JSON of a call input, so equal inputs written in another key order share one fingerprint. */
+  static readonly stableJson = (value: unknown): string => formatStableJson(value)
+
   static apiChannel(packageId: string, apiId: string): string {
     return `/dshx-${stableHash(`${packageId}\0${apiId}`)}`
+  }
+
+  /** The one browser event stream of a DSH process, below Connection's authenticated `/api` channel. */
+  static readonly eventsPath = '/api/dshx-events'
+
+  /** `<channel>/<event>`: the key a browser subscribes to, unique per owner, API and event. */
+  static eventKey(owner: string, apiId: string, event: string): string {
+    return `${ApiProtocolModel.apiChannel(owner, apiId).slice(1)}/${event}`
   }
 
   static jsonBytes(value: unknown): number {

@@ -14,7 +14,7 @@ import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { JevInlineSetup } from './jev-inline-setup.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
-import { createWorkspacePickerPorts } from './workspace-picker-adapter.js'
+import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 
 const PANEL_ID = 'secret-catalog'
 

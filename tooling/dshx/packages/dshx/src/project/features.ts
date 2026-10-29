@@ -74,7 +74,9 @@ const externalDependencySchema = z
  * `queue-preview-thread` holds a fake-provider turn while queuing an image and file, for queue preview UI;
  * `otlp-sample-trace` posts one synthetic OTLP JSON trace (two services, a failing nested span) its logs and four metric exports to the traces receiver;
  * `otlp-session-turns` posts two synthetic agent turns (invoke_agent, chat with token usage, execute_tool with a nested
- * dshx span, one failed model attempt) and two logs tagged with the open thread's dsh.session.id, then returns to that thread.
+ * dshx span, one failed model attempt) and two logs tagged with the open thread's dsh.session.id, then returns to that thread;
+ * `app-dialog-sample` opens a danger confirm and a sticky toast through the page's Dialogs and Toasts providers
+ * (needs @dshfiles/dialogs), as another plugin's `api.dialogs.confirm` / `api.toast.show` call does.
  */
 export const REACH_SEEDS = [
   'rebase-ready-thread',
@@ -90,6 +92,7 @@ export const REACH_SEEDS = [
   'queue-preview-thread',
   'otlp-sample-trace',
   'otlp-session-turns',
+  'app-dialog-sample',
 ] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 
@@ -137,9 +140,9 @@ export const parseReachStep = (
   if (action === 'click' || action === 'rightclick' || action === 'hover') {
     const x = match[5]
     const y = match[6]
-    return { action, by: match[2], name: match[3], ...(x === undefined || y === undefined ? {} : { position: { x: Number(x), y: Number(y) } }) }
+    return { action, by: match[2], name: match[3], ...(!(x === undefined || y === undefined) && { position: { x: Number(x), y: Number(y) } }) }
   }
-  return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4].replace(/\\(.)/gu, '$1') }) }
+  return { action, by: match[2], name: match[3], ...(match[4] !== undefined && { value: match[4].replace(/\\(.)/gu, '$1') }) }
 }
 
 const reachSchema = z

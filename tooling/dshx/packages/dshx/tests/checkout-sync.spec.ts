@@ -251,7 +251,8 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
       envelope: { command: 'checkout sync', ok: true, data: { status: 'would-sync' } },
     })
     const revision = commitOf(lander, 'main')
-    expect(await run(['checkout', 'sync', '--cwd', lander, '--revision', revision, '--dry-run', '--json'])).toMatchObject({
+    const pinned = await run(['checkout', 'sync', '--cwd', lander, '--revision', revision, '--dry-run', '--json'])
+    expect(pinned, JSON.stringify(pinned.envelope.error)).toMatchObject({
       code: 0,
       envelope: { command: 'checkout sync', ok: true, data: { status: 'would-sync', to: revision } },
     })

@@ -19,6 +19,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./model-handoff-api": {
+      "types": "./src/model-handoff-api.ts",
+      "default": "./dist/model-handoff-api.js"
     }
   },
   "scripts": {
@@ -52,16 +56,17 @@
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
-    "@dshfiles/session-controller": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
@@ -73,6 +78,7 @@
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@dshfiles/ai-accounts": ">=0.1.0"

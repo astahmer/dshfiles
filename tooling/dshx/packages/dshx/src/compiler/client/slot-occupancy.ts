@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import type { Expression } from 'oxc-parser'
 import { SourceSyntax } from '../../project/syntax.js'
-import { CLIENT_SLOT_REFERENCES } from '../../client/slot-reference.js'
+import { CLIENT_SLOT_REFERENCES } from 'create-dshx/slot-capabilities'
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
 
@@ -88,7 +88,7 @@ const objectOrder = (expression: Expression | undefined): number | undefined => 
   return value === undefined ? undefined : numericValue(value)
 }
 
-const sourceLocation = (source: string, offset: number): { readonly line: number; readonly column: number } => {
+const sourceLocation = (source: string, offset: number) => {
   const before = source.slice(0, offset)
   const lastNewline = before.lastIndexOf('\n')
   return { line: before.split('\n').length, column: offset - lastNewline }
@@ -136,12 +136,12 @@ const registrationsIn = (source: string, file: string): SlotRegistration[] => {
     const location = sourceLocation(source, offset)
     found.push({
       slot,
-      ...(id === undefined ? {} : { id }),
-      ...(key === undefined ? {} : { key }),
+      ...(id !== undefined && { id }),
+      ...(key !== undefined && { key }),
       file,
       ...location,
-      ...(order === undefined ? {} : { order }),
-      ...(priority === undefined ? {} : { priority }),
+      ...(order !== undefined && { order }),
+      ...(priority !== undefined && { priority }),
       via,
     })
   }

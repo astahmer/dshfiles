@@ -1,6 +1,6 @@
 import type { AccountProfile, UsageCard } from './api.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
-import { AccountStoreModel } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
 import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { readCopilotUsage } from './copilot-quota.js'
@@ -29,7 +29,7 @@ export const readAccountUsage = async (input: {
     case 'codex': {
       let home: string
       try {
-        home = AccountStoreModel.codexLayoutFor(account, input.shadowRoot).effectiveHomePath
+        home = AccountHomePolicy.codexLayoutFor(account, input.shadowRoot).effectiveHomePath
       } catch (cause) {
         return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'The Codex home is invalid.')
       }
@@ -64,7 +64,12 @@ export const readAccountUsage = async (input: {
  * the sidebar footer and the edge overlay each poll, and without this each
  * would make its own authenticated request per account per minute.
  */
-export const createUsageCache = <Value>(input: { readonly ttlMs: number; readonly read: () => Promise<Value>; readonly now?: () => number }) => {
+export const createUsageCache = <Value>(input: {
+  readonly ttlMs: number
+  readonly timeoutMs: number
+  readonly read: (signal: AbortSignal) => Promise<Value>
+  readonly now?: () => number
+}) => {
   const now = input.now ?? Date.now
   let cached: { readonly at: number; readonly value: Value } | undefined
   let inFlight: Promise<Value> | undefined
@@ -73,13 +78,21 @@ export const createUsageCache = <Value>(input: { readonly ttlMs: number; readonl
     if (inFlight !== undefined) return inFlight
     // oxlint-disable-next-line antislop/no-passthrough-variable -- Capture the generation before async I/O; this snapshot must not follow later invalidations.
     const started = generation
-    const pending = input
-      .read()
+    const controller = new AbortController()
+    let timeout: ReturnType<typeof setTimeout>
+    const timedOut = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort()
+        reject(new Error(`Account usage read timed out after ${String(input.timeoutMs)} ms.`))
+      }, input.timeoutMs)
+    })
+    const pending = Promise.race([Promise.resolve().then(() => input.read(controller.signal)), timedOut])
       .then(value => {
         if (started === generation) cached = { at: now(), value }
         return value
       })
       .finally(() => {
+        clearTimeout(timeout)
         if (inFlight === pending) inFlight = undefined
       })
     inFlight = pending

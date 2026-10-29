@@ -173,8 +173,8 @@ export const createAnnotationStore = ({
         createdAt: timestamp,
         updatedAt: timestamp,
         origin,
-        ...(draft.intent === undefined ? {} : { intent: draft.intent }),
-        ...(draft.severity === undefined ? {} : { severity: draft.severity }),
+        ...(draft.intent !== undefined && { intent: draft.intent }),
+        ...(draft.severity !== undefined && { severity: draft.severity }),
       }
       await storeRecord(record)
       created.push(record)
@@ -225,7 +225,7 @@ export const createAnnotationStore = ({
       const record = find({ sessionId, id })
       if (record === undefined) return { ok: false, error: 'missing' }
       if (record.revision !== revision) return { ok: false, error: 'revision' }
-      const resolution = { revision, ...(summary === undefined ? {} : { summary }) }
+      const resolution = { revision, ...(summary !== undefined && { summary }) }
       return {
         ok: true,
         value: await mutate(record, {

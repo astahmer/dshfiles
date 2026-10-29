@@ -14,6 +14,7 @@ import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 /** Cards mounted per column before scrolling near the end reveals another batch. */
@@ -43,7 +44,7 @@ const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element =>
   if (item.status === 'done')
     return (
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-        <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-success" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
+        <StatusDot size="sm" tone="success" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
       </span>
     )
   return <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
@@ -67,7 +68,7 @@ const CardFace = (props: {
         {props.renaming === true && props.onRenameDone !== undefined ? (
           <BacklogInlineTitle
             id={item.id}
-            title={item.title}
+            value={item.title}
             cancel={props.onRenameDone}
             className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
           />

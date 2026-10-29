@@ -147,6 +147,25 @@ The benchmark runs the real SQLite session-query engine and the real store over 
 on every probe kind; related suggestions recover every labeled sibling at precision@5 0.67, which is why they stay an
 opt-in second call.
 
+Why the finder is shaped this way:
+
+- **The flake is fixed at the caller, not in the backend.** The stock `@deepseek-ai/dsh-session-query-sqlite`
+  gives up after two corpus observations (`_observeStable`, `STABLE_OBSERVATION_ATTEMPTS = 2`) and raises
+  `SESSION_QUERY_PERSISTENCE_FAILED`; the code is lost across the session-controller RPC, so the finder also classifies
+  the `gateway/internal` message. This repository carries no core patches, so a bounded caller retry plus a labeled
+  fallback keeps results honest. The gap is recorded in [`plans/dsh-host-gaps.md`](../../../plans/dsh-host-gaps.md).
+- **It lives in memory, with no second index and no default embeddings.** Memory already owns cross-thread retrieval
+  and reads `sessionQuery`. `find_threads` / `related_threads` do not collide with the core `session_*` tool names;
+  typed trajectory reads stay with upstream `@deepseek-ai/dsh-tool-session-query`.
+- **A failure crosses the dshx API as a `PluginApiError`** (`search-unavailable`), which `dshx sessions search` reports
+  as `session-search-unavailable`. A thrown error would otherwise reach the caller as an unactionable
+  `internal — API handler failed`.
+
+To check the caller path without the live Host, boot a scratch Host (`dshx dev up --plugin @dshfiles/memory` with a
+temporary `DSH_HOME`), then run `dshx sessions search` with the index set to `openAt: "never"` (expect a labeled
+degraded page), with a query nothing matches (expect exit 1 and `session-search-unavailable`), and with the index
+enabled (expect one deduped hit carrying several `sources`). Tear it down with `dshx dev down`.
+
 ## Per-project roll-up (designed, not built)
 
 A roll-up would rewrite one short summary per project at most once a day, out of band, from what changed since the

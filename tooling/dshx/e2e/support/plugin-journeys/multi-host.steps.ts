@@ -3,7 +3,8 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:https'
+import { chmod, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
@@ -11,14 +12,14 @@ import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile, type BootedProfile } from '../boot.js'
 import { startMutationResponseProxy } from '../mutation-response-proxy.mjs'
 import { reserveLoopbackPort, startLoopbackSshd } from '../loopback-sshd.mjs'
-import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
+import { startFakeCommandCode } from '../fake-command-code.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
-const jjIntegrationPackageId = '@dshfiles/jj-integration'
 const multiHostApiId = 'multi-host'
 const scratchRemoteName = 'Scratch SSH runtime'
 
@@ -53,7 +54,21 @@ const connectionTestSchema = z.discriminatedUnion('ok', [
 ])
 
 const transcriptSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), cwd: z.string(), entries: z.array(z.unknown()) }).passthrough(),
+  z
+    .object({
+      ok: z.literal(true),
+      cwd: z.string(),
+      entries: z.array(
+        z
+          .object({
+            seq: z.number().int(),
+            kind: z.enum(['user', 'assistant', 'tool', 'status']),
+            text: z.string(),
+          })
+          .passthrough(),
+      ),
+    })
+    .passthrough(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
 ])
 
@@ -82,6 +97,8 @@ const runtimeDirectorySchema = z.object({
   hosts: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()),
   runtimes: z.array(z.object({ id: z.string(), hostId: z.string(), name: z.string(), remoteHome: z.string(), connected: z.boolean() }).passthrough()),
 })
+
+const runtimeOpenViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
 
 const promptAcceptedSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: z.object({ accepted: z.literal(true) }).passthrough() }),
@@ -140,6 +157,16 @@ type JourneyObservation = {
 
 const observations = new WeakMap<Page, JourneyObservation>()
 
+type AutoDestinationObservation = {
+  readonly runtimeId: string
+  readonly folderPath: string
+  readonly previousSessionIds: readonly string[]
+  readonly sessionId: string
+  readonly prompt?: string
+}
+
+const autoDestinationObservations = new WeakMap<Page, AutoDestinationObservation>()
+
 const updateObservation = (page: Page, update: Partial<JourneyObservation>): void => {
   const previous = observations.get(page)
   if (previous === undefined) throw new Error('The remote thread journey did not produce an observation.')
@@ -190,16 +217,166 @@ const isProcessRunning = (processId: number): boolean => {
 
 const hostApi = async (profile: BootedProfile) => connectDshxApi({ url: profile.url, packageId: multiHostPackageId, apiId: multiHostApiId, version: 1 })
 
+const runScratchGit = (input: { readonly args: readonly string[]; readonly cwd: string }): void => {
+  const result = spawnSync('git', [...input.args], {
+    cwd: input.cwd,
+    encoding: 'utf8',
+    timeout: 10_000,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' },
+  })
+  if (result.error !== undefined || result.status !== 0) {
+    throw new Error(`The scratch Git repository could not be prepared: ${result.error?.message ?? result.stderr.trim()}`)
+  }
+}
+
+const startScratchGitServer = async (input: { readonly projectPath: string; readonly scratchRoot: string }) => {
+  const repositoryPath = join(input.scratchRoot, 'source-project.git')
+  runScratchGit({ args: ['clone', '--bare', input.projectPath, repositoryPath], cwd: input.scratchRoot })
+  const keyPath = join(input.scratchRoot, 'git-server.key')
+  const certificatePath = join(input.scratchRoot, 'git-server.crt')
+  const certificateResult = spawnSync(
+    'openssl',
+    ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', certificatePath, '-days', '1', '-subj', '/CN=127.0.0.1'],
+    { cwd: input.scratchRoot, encoding: 'utf8', timeout: 10_000 },
+  )
+  if (certificateResult.error !== undefined || certificateResult.status !== 0) {
+    throw new Error(`The scratch Git HTTPS certificate could not be created: ${certificateResult.error?.message ?? certificateResult.stderr.trim()}`)
+  }
+
+  const [key, certificate] = await Promise.all([readFile(keyPath), readFile(certificatePath)])
+  let serverPort = 0
+  const server = createServer({ key, cert: certificate }, (request, response) => {
+    const requestUrl = new URL(request.url ?? '/', 'https://127.0.0.1')
+    if (!requestUrl.pathname.startsWith('/source-project.git/')) {
+      response.writeHead(404).end()
+      return
+    }
+    const requestChunks: Buffer[] = []
+    request.on('data', chunk => requestChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+    request.on('end', () => {
+      const requestBody = Buffer.concat(requestChunks)
+      const result = spawnSync('git', ['http-backend'], {
+        cwd: input.scratchRoot,
+        input: requestBody,
+        timeout: 15_000,
+        maxBuffer: 8_000_000,
+        env: {
+          ...process.env,
+          CONTENT_LENGTH: request.headers['content-length'] ?? String(requestBody.byteLength),
+          CONTENT_TYPE: request.headers['content-type'] ?? '',
+          GATEWAY_INTERFACE: 'CGI/1.1',
+          GIT_HTTP_EXPORT_ALL: '1',
+          GIT_PROJECT_ROOT: input.scratchRoot,
+          HTTP_HOST: request.headers.host ?? '127.0.0.1',
+          PATH_INFO: requestUrl.pathname,
+          QUERY_STRING: requestUrl.search.slice(1),
+          REMOTE_ADDR: '127.0.0.1',
+          REQUEST_METHOD: request.method ?? 'GET',
+          SERVER_NAME: '127.0.0.1',
+          SERVER_PORT: String(serverPort),
+          SERVER_PROTOCOL: 'HTTP/1.1',
+        },
+      })
+      if (result.error !== undefined || result.status !== 0) {
+        response.writeHead(502, { 'Content-Type': 'text/plain' })
+        response.end(result.error?.message ?? (result.stderr.toString('utf8').trim() || 'Git HTTP backend failed.'))
+        return
+      }
+      const crlfSeparator = Buffer.from('\r\n\r\n')
+      const lfSeparator = Buffer.from('\n\n')
+      const crlfOffset = result.stdout.indexOf(crlfSeparator)
+      const separatorOffset = crlfOffset === -1 ? result.stdout.indexOf(lfSeparator) : crlfOffset
+      const separatorLength = crlfOffset === -1 ? 2 : 4
+      if (separatorOffset === -1) {
+        response.writeHead(502, { 'Content-Type': 'text/plain' })
+        response.end('Git HTTP backend returned an invalid response.')
+        return
+      }
+      let statusCode = 200
+      const responseHeaders: Record<string, string> = {}
+      for (const line of result.stdout.subarray(0, separatorOffset).toString('utf8').split(/\r?\n/u)) {
+        const colonOffset = line.indexOf(':')
+        if (colonOffset === -1) continue
+        const name = line.slice(0, colonOffset).trim()
+        const value = line.slice(colonOffset + 1).trim()
+        if (name.toLowerCase() === 'status') statusCode = Number.parseInt(value, 10)
+        else responseHeaders[name] = value
+      }
+      response.writeHead(statusCode, responseHeaders)
+      response.end(result.stdout.subarray(separatorOffset + separatorLength))
+    })
+  })
+  await new Promise<void>((resolveServer, rejectServer) => {
+    server.once('error', rejectServer)
+    server.listen(0, '127.0.0.1', resolveServer)
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') {
+    await new Promise<void>((resolveServer, rejectServer) => server.close(error => (error === undefined ? resolveServer() : rejectServer(error))))
+    throw new Error('The scratch Git HTTPS server did not bind to a TCP port.')
+  }
+  serverPort = address.port
+  return {
+    repositoryUrl: `https://127.0.0.1:${serverPort}/source-project.git`,
+    close: async (): Promise<void> =>
+      await new Promise<void>((resolveServer, rejectServer) => server.close(error => (error === undefined ? resolveServer() : rejectServer(error)))),
+  }
+}
+
 Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
-  const sshd = await startLoopbackSshd()
+  const fakeCommandCode = await startFakeCommandCode(page)
+  const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
   let remote: BootedProfile | undefined
   let manager: BootedProfile | undefined
   try {
-    remote = await bootComposedPluginProfile({ packageIds: [multiHostPackageId], profileLabel: 'multi-host-remote' })
+    remote = await bootComposedPluginProfile({
+      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts'],
+      profileLabel: 'multi-host-remote',
+      hostEnv: { DSH_E2E_REMOTE_KEY: 'e2e-fake-key-ALPHA1' },
+      seedHome: async homeRoot => {
+        const accountsPath = join(homeRoot, 'plugins', 'ai-accounts', 'accounts.json')
+        await mkdir(dirname(accountsPath), { recursive: true })
+        await writeFile(
+          accountsPath,
+          `${JSON.stringify(
+            {
+              distribution: 'sticky',
+              cooldownMs: 300_000,
+              shadowRoot: '',
+              accounts: [
+                {
+                  instanceId: 'commandcode_work',
+                  kind: 'commandcode',
+                  displayName: 'Command Code 1',
+                  enabled: true,
+                  homePath: '',
+                  shadowHomePath: '',
+                  apiKeyEnv: 'DSH_E2E_REMOTE_KEY',
+                  apiBaseUrl: fakeCommandCode.baseUrl,
+                  badge: '',
+                  accentColor: '',
+                  providerIcon: '',
+                  additionalModelIds: [],
+                },
+              ],
+            },
+            null,
+            2,
+          )}\n`,
+        )
+      },
+    })
     let wrapperInvocationLogPath: string | undefined
     let tunnelProcessLogPath: string | undefined
     manager = await bootComposedPluginProfile({
-      packageIds: [multiHostPackageId, jjIntegrationPackageId],
+      packageIds: [
+        '@dshfiles/multi-host',
+        '@dshfiles/thread-sidebar',
+        '@dshfiles/jj-integration',
+        '@dshfiles/rich-composer',
+        '@dshfiles/session-controller',
+        '@dshfiles/model-effort-picker',
+      ],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
         const seeded = await sshd.seedClientHome(homeRoot)
@@ -229,8 +406,9 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
-  await page.getByRole('button', { name: 'Run on Local', exact: true }).click()
-  await page.getByText('Add host…', { exact: true }).click()
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
+  await page.getByRole('button', { name: 'Add host', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'SSH destination', exact: true }).click()
@@ -241,11 +419,212 @@ When('the scratch remote is added from the host UI', async ({ page }: { readonly
   await expect(dialog.getByRole('button', { name: 'SSH destination', exact: true })).toContainText(pair.sshd.targetAlias)
   await dialog.getByLabel('Name').fill(scratchRemoteName)
   await dialog.getByLabel('Remote DSH home').fill(pair.remote.homeRoot)
+  await dialog.getByRole('button', { name: 'Test connection', exact: true }).click()
+  const connectionTest = dialog.getByRole('list', { name: 'Connection test' })
+  await expect(connectionTest).toBeVisible({ timeout: 30_000 })
+  await expect(connectionTest).toContainText('SSH login')
+  await expect(connectionTest).toContainText('DSH runtime')
+  await expect(connectionTest).toContainText('multi-host identity')
   await dialog.getByRole('button', { name: 'Add host', exact: true }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
+  await expect(page.getByText(scratchRemoteName, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'New thread', exact: true }).click()
   const wrapperCalls = (await readFile(pair.wrapperInvocationLogPath, 'utf8')).trim().split(/\r?\n/)
   expect(wrapperCalls).toContain('invoked')
+})
+
+When('Auto creates a thread through the remote folder picker', async ({ page }: { readonly page: Page }) => {
+  let threadCreateRequests = 0
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.endsWith('/threadCreate')) threadCreateRequests += 1
+  })
+  const pair = pairFor(page)
+  const call = await hostApi(pair.manager)
+  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const host = directory.hosts.find(item => item.name === scratchRemoteName)
+  if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
+  const runtime = directory.runtimes.find(item => item.hostId === host.id)
+  if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
+  const previousSessionIds = remoteThreadListSchema.parse(await call('threadList')).threads.map(thread => thread.sessionId)
+  const folderPath = join(pair.remote.homeRoot, 'projects', `auto-${randomUUID()}`)
+  await mkdir(folderPath, { recursive: true })
+  const canonicalFolderPath = await realpath(folderPath)
+
+  const initialFolderPicker = page.getByRole('dialog', { name: /^Choose a project/u })
+  if ((await initialFolderPicker.count()) > 0) {
+    await page.keyboard.press('Escape')
+    await expect(initialFolderPicker).toBeHidden()
+  }
+  await page.getByRole('button', { name: /^Run on /u }).click()
+  const autoOption = page.getByRole('option', { name: /^Auto/u })
+  await expect(autoOption).toContainText(scratchRemoteName, { timeout: 30_000 })
+  await expect(autoOption).toBeEnabled({ timeout: 30_000 })
+  await autoOption.click()
+  await page.locator('[data-remote-folder]').click()
+
+  const folderPicker = page.getByRole('dialog', { name: /^Choose a project/u })
+  const pathInput = folderPicker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
+  await pathInput.fill(folderPath)
+  await pathInput.press('Enter')
+  await expect(folderPicker.locator('p').filter({ hasText: folderPath }).first()).toBeVisible({ timeout: 30_000 })
+  await folderPicker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await expect(folderPicker).toBeHidden()
+  expect(threadCreateRequests).toBe(1)
+  let remoteSessionId: string | undefined
+  await expect
+    .poll(
+      async () => {
+        remoteSessionId = remoteThreadListSchema
+          .parse(await call('threadList'))
+          .threads.find(thread => !previousSessionIds.includes(thread.sessionId))?.sessionId
+        return remoteSessionId
+      },
+      { timeout: 30_000 },
+    )
+    .toBeDefined()
+  if (remoteSessionId === undefined) throw new Error('The manager did not list the new remote Session.')
+  const conversation = page.locator('[data-conversation-content]')
+  await expect.poll(() => conversation.getAttribute('data-conversation-session')).toBe(remoteSessionId)
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await expect(composer).toBeVisible({ timeout: 30_000 })
+  await expect(composer).toBeEnabled()
+
+  autoDestinationObservations.set(page, { runtimeId: runtime.id, folderPath: canonicalFolderPath, previousSessionIds, sessionId: remoteSessionId })
+})
+
+When('the remote model picker selects its model', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const picker = page.getByRole('button', { name: /deepseek-flash, reasoning Default/u })
+  await expect(picker).toBeVisible()
+  await picker.click()
+  const models = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  await expect(models).toBeVisible()
+  const model = models.getByRole('button', { name: /gpt-6-luna/u })
+  await expect(model).toBeVisible()
+  await model.click()
+  await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
+})
+
+When('the native composer sends a prompt to the remote Session', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const prompt = `remote-composer-${randomUUID()}`
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill(prompt)
+  const send = page.getByRole('button', { name: 'Send message', exact: true })
+  await expect(send).toBeEnabled()
+  await send.click()
+  autoDestinationObservations.set(page, { ...observation, prompt })
+})
+
+When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
+})
+
+Then('the Hosts page shows live resource metrics', async ({ page }: { readonly page: Page }) => {
+  const hostsPage = page.getByTestId('dshfiles-hosts-page')
+  await expect(hostsPage.getByText('Auto destination', { exact: true })).toBeVisible()
+  await expect(hostsPage.getByText('Load · 1m', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(hostsPage.getByText('Memory used', { exact: true }).first()).toBeVisible()
+  await expect(hostsPage.getByTestId(/^host-resources-/).first()).toBeVisible()
+  await expect(hostsPage.getByText(/^Every machine this one can run threads on/)).toHaveCount(0)
+})
+
+Then('the new thread is owned by the automatically selected remote runtime', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await expect
+    .poll(async () => remoteThreadListSchema.parse(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId), {
+      timeout: 30_000,
+    })
+    .toBeDefined()
+  const threads = remoteThreadListSchema.parse(await call('threadList')).threads
+  const created = threads.find(thread => thread.sessionId === observation.sessionId)
+  if (created === undefined) throw new Error('The manager did not list the new remote thread.')
+  expect(created.runtimeId).toBe(observation.runtimeId)
+  const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: SessionId(created.sessionId) }))
+  expect(ownership).toMatchObject({ ok: true, runtimeId: observation.runtimeId })
+  if (observation.prompt === undefined) throw new Error('The native composer did not submit a prompt.')
+  await expect
+    .poll(
+      async () => {
+        const transcript = transcriptSchema.parse(
+          await call('threadTranscript', {
+            runtimeId: observation.runtimeId,
+            sessionId: observation.sessionId,
+          }),
+        )
+        if (!transcript.ok) throw new Error(`The remote transcript could not be read: ${transcript.code}.`)
+        expect(transcript.cwd).toBe(observation.folderPath)
+        return transcript.entries.some(entry => entry.kind === 'user' && entry.text.includes(observation.prompt))
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+})
+
+When('a Git project is cloned with selected local files', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const sourceProjectPath = join(pair.sshd.scratchRoot, 'source-project')
+  const destinationPath = join(pair.sshd.scratchRoot, 'remote-project')
+  await mkdir(sourceProjectPath, { recursive: true })
+  await Promise.all([
+    writeFile(join(sourceProjectPath, '.gitignore'), 'selected-ignored.txt\n'),
+    writeFile(join(sourceProjectPath, 'tracked.txt'), 'tracked from the cloned repository\n'),
+    writeFile(join(sourceProjectPath, 'selected-untracked.txt'), 'selected untracked file\n'),
+    writeFile(join(sourceProjectPath, 'selected-ignored.txt'), 'selected ignored file\n'),
+    writeFile(join(sourceProjectPath, 'unselected.txt'), 'this file must stay local\n'),
+  ])
+  runScratchGit({ args: ['init', '--quiet'], cwd: sourceProjectPath })
+  runScratchGit({ args: ['add', '.gitignore', 'tracked.txt'], cwd: sourceProjectPath })
+  runScratchGit({
+    args: ['-c', 'user.name=DSH E2E', '-c', 'user.email=dsh-e2e@example.invalid', 'commit', '--quiet', '-m', 'scratch project'],
+    cwd: sourceProjectPath,
+  })
+  const gitServer = await startScratchGitServer({ projectPath: sourceProjectPath, scratchRoot: pair.sshd.scratchRoot })
+
+  try {
+    await page.getByRole('button', { name: /^Run on /u }).click()
+    const cloneTargetGroup = page.getByRole('group', { name: 'Add project to another machine' })
+    const cloneTarget = cloneTargetGroup.getByRole('option', { name: scratchRemoteName, exact: true })
+    await expect(cloneTarget).toBeVisible()
+    await cloneTarget.click()
+
+    const dialog = page.getByRole('dialog', { name: `Clone project to ${scratchRemoteName}`, exact: true })
+    await expect(dialog).toBeVisible()
+    await dialog.getByLabel('Git repository URL').fill(gitServer.repositoryUrl)
+    await dialog.getByLabel(`Folder on ${scratchRemoteName}`).fill(destinationPath)
+    await dialog.getByRole('checkbox', { name: 'Copy selected local files', exact: true }).check()
+    await dialog.getByLabel('Local project folder').fill(sourceProjectPath)
+    await dialog.getByRole('checkbox', { name: 'Also scan ignored files', exact: true }).check()
+    await dialog.getByRole('button', { name: 'Find files', exact: true }).click()
+
+    const selectedUntracked = dialog.getByRole('checkbox', { name: /selected-untracked\.txt/u })
+    const selectedIgnored = dialog.getByRole('checkbox', { name: /selected-ignored\.txt/u })
+    const unselected = dialog.getByRole('checkbox', { name: /unselected\.txt/u })
+    await expect(selectedUntracked).toBeVisible()
+    await expect(selectedIgnored).toBeVisible()
+    await expect(unselected).toBeVisible()
+    await selectedUntracked.check()
+    await selectedIgnored.check()
+    await unselected.uncheck()
+    await expect(selectedUntracked).toBeChecked()
+    await expect(selectedIgnored).toBeChecked()
+    await expect(unselected).not.toBeChecked()
+
+    await dialog.getByRole('button', { name: 'Clone project', exact: true }).click()
+    await expect(dialog.getByText('Project cloned and added. Copied 2 local file(s).', { exact: true })).toBeVisible({ timeout: 30_000 })
+    expect(await readFile(join(destinationPath, 'tracked.txt'), 'utf8')).toBe('tracked from the cloned repository\n')
+    expect(await readFile(join(destinationPath, 'selected-untracked.txt'), 'utf8')).toBe('selected untracked file\n')
+    expect(await readFile(join(destinationPath, 'selected-ignored.txt'), 'utf8')).toBe('selected ignored file\n')
+    expect(existsSync(join(destinationPath, 'unselected.txt'))).toBe(false)
+    await dialog.getByRole('button', { name: 'Done', exact: true }).click()
+  } finally {
+    await gitServer.close()
+  }
 })
 
 When('a remote thread is created and read over SSH', async ({ page }: { readonly page: Page }) => {
@@ -276,6 +655,33 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
   observations.set(page, { runtimeId: runtime.id, remoteHome: runtime.remoteHome, sessionId, transcriptCwd: transcript.cwd })
 })
 
+When('the mirrored thread opens its owning host UI', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The remote thread composer journey did not produce an observation.')
+
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Show remote threads in a separate group', exact: true }).check()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Remote threads started from this DSH', exact: true }).click()
+
+  const remoteThread = page.locator('[data-remote-thread-id]').filter({ hasText: scratchRemoteName })
+  await expect(remoteThread).toHaveAttribute('data-remote-thread-id', `${observation.runtimeId}:${observation.sessionId}`, { timeout: 30_000 })
+  await remoteThread.click()
+
+  const conversation = page.locator('[data-conversation-content]:visible')
+  await expect.poll(() => conversation.getAttribute('data-conversation-session')).toBe(observation.sessionId)
+  const openRemoteHost = page.getByRole('button', { name: 'Open on remote host', exact: true })
+  await expect(openRemoteHost).toBeVisible({ timeout: 30_000 })
+  const call = await hostApi(pairFor(page).manager)
+  const view = runtimeOpenViewSchema.parse(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+  allowLoopbackBrowserOrigin(page, view.launchUrl)
+  const [remotePage] = await Promise.all([page.context().waitForEvent('page', { timeout: 30_000 }), openRemoteHost.click()])
+  await expect.poll(() => remotePage.url(), { timeout: 30_000 }).not.toBe('about:blank')
+  await expect(remotePage.getByRole('button', { name: 'New session', exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(new URL(remotePage.url()).origin).not.toBe(new URL(page.url()).origin)
+  await finishJourneyAssertions(page)
+})
+
 When('the remote composer resolves @file suggestions on SSH', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
   const observation = observations.get(page)
@@ -284,15 +690,17 @@ When('the remote composer resolves @file suggestions on SSH', async ({ page }: {
   const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: observation.sessionId }))
   if (!ownership.ok) throw new Error(`The owning runtime could not be resolved: ${ownership.code}.`)
   expect(ownership.runtimeId).toBe(observation.runtimeId)
-  const result = fileReferencesSchema.parse(await call('runtimeFileReferences', {
-    runtimeId: observation.runtimeId,
-    sessionId: SessionId(observation.sessionId),
-    query: 'remote-composer-reference',
-  }))
+  const result = fileReferencesSchema.parse(
+    await call('runtimeFileReferences', {
+      runtimeId: observation.runtimeId,
+      sessionId: SessionId(observation.sessionId),
+      query: 'remote-composer-reference',
+    }),
+  )
   if (!result.ok) throw new Error(`Remote file-reference discovery failed: ${result.code}: ${result.message}.`)
-  expect(result.candidates).toEqual(expect.arrayContaining([
-    expect.objectContaining({ kind: 'file', path: expect.stringContaining('remote-composer-reference.txt') }),
-  ]))
+  expect(result.candidates).toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'file', path: expect.stringContaining('remote-composer-reference.txt') })]),
+  )
 })
 
 When('a remote file attachment is staged on its owning SSH host', async ({ page }: { readonly page: Page }) => {
@@ -301,12 +709,14 @@ When('a remote file attachment is staged on its owning SSH host', async ({ page 
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
   const content = 'A file staged by the native remote composer.\n'
-  const result = fileUploadSchema.parse(await call('sessionUploadFile', {
-    runtimeId: observation.runtimeId,
-    sessionId: observation.sessionId,
-    data: Buffer.from(content).toString('base64'),
-    name: 'remote-composer-attachment.txt',
-  }))
+  const result = fileUploadSchema.parse(
+    await call('sessionUploadFile', {
+      runtimeId: observation.runtimeId,
+      sessionId: observation.sessionId,
+      data: Buffer.from(content).toString('base64'),
+      name: 'remote-composer-attachment.txt',
+    }),
+  )
   if (!result.ok) throw new Error(`Remote attachment upload failed: ${result.code}: ${result.message}`)
   expect(result.value.file).toMatchObject({ name: 'remote-composer-attachment.txt', bytes: Buffer.byteLength(content) })
 })
@@ -568,7 +978,12 @@ Then('the manager lists it as started on the host', async ({ page }: { readonly 
   const call = await hostApi(pair.manager)
   const directory = runtimeDirectorySchema.parse(await call('list'))
   const hostName = observed.hostName
-  const status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  // The Host answers `runtime-status-refreshing` while its first snapshot loads asynchronously, so one call is not a verdict.
+  let status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  for (let attempt = 0; attempt < 40 && !status.ok && status.code === 'runtime-status-refreshing'; attempt += 1) {
+    await delay(500)
+    status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  }
   if (!status.ok) throw new Error(`The scratch runtime status was unavailable: ${status.code}.`)
   expect(directory.hosts.some(host => host.name === hostName)).toBe(true)
   const row = mergeInventory({

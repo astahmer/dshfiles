@@ -20,12 +20,20 @@ export interface FieldTarget {
 }
 
 type ShellEvent =
-  | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget; readonly query?: string }
+  | {
+      readonly type: 'open'
+      readonly surface: ShellSurface
+      readonly sectionId?: string
+      readonly field?: FieldTarget
+      readonly target?: string
+      readonly query?: string
+    }
   | { readonly type: 'search'; readonly query: string }
   | { readonly type: 'close' }
   | { readonly type: 'back' }
   | { readonly type: 'select'; readonly sectionId: string }
   | { readonly type: 'focus'; readonly field: FieldTarget }
+  | { readonly type: 'reveal'; readonly sectionId: string; readonly target: string }
   | { readonly type: 'expand' }
   | { readonly type: 'restore' }
   | { readonly type: 'moveToTab' }
@@ -37,20 +45,28 @@ interface ShellContext {
   /** The selected nav section; undefined shows the first one. */
   readonly sectionId: string | undefined
   readonly field: FieldTarget | undefined
+  /** The search entry id the selected section scrolls to, when it was opened from one. */
+  readonly target: string | undefined
   /** The search field's text; non-empty replaces the section with matching settings. */
   readonly query: string
 }
 
 const focusRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ event }) => {
   if (event.type !== 'focus') return {}
-  return { sectionId: event.field.sectionId, field: event.field, query: '' }
+  return { sectionId: event.field.sectionId, field: event.field, target: undefined, query: '' }
+})
+
+const revealRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ event }) => {
+  if (event.type !== 'reveal') return {}
+  return { sectionId: event.sectionId, field: undefined, target: event.target, query: '' }
 })
 
 const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ context, event }) => {
   if (event.type !== 'open') return {}
   const query = event.query ?? (event.field === undefined && event.sectionId === undefined ? context.query : '')
-  if (event.field !== undefined) return { sectionId: event.field.sectionId, field: event.field, query }
-  return { sectionId: event.sectionId ?? context.sectionId, field: undefined, query }
+  if (event.field !== undefined) return { sectionId: event.field.sectionId, field: event.field, target: undefined, query }
+  if (event.sectionId !== undefined && event.target !== undefined) return { sectionId: event.sectionId, field: undefined, target: event.target, query }
+  return { sectionId: event.sectionId ?? context.sectionId, field: undefined, target: undefined, query }
 })
 
 /**
@@ -66,8 +82,9 @@ export const shellMachine = setup({
     leavePanel: ({ context }) => context.ports.leavePanel(),
     selectRequested,
     focusRequested,
+    revealRequested,
     // Hiding the main view closes the surface but keeps its query, so a tab switch restores the search; an explicit close clears it.
-    forgetSection: assign({ sectionId: undefined, field: undefined }),
+    forgetSection: assign({ sectionId: undefined, field: undefined, target: undefined }),
     forgetQuery: assign({ query: '' }),
     search: assign({ query: ({ event }) => (event.type === 'search' ? event.query : '') }),
   },
@@ -76,13 +93,14 @@ export const shellMachine = setup({
   },
 }).createMachine({
   id: 'settings-shell',
-  context: ({ input }) => ({ ports: input.ports, sectionId: undefined, field: undefined, query: '' }),
+  context: ({ input }) => ({ ports: input.ports, sectionId: undefined, field: undefined, target: undefined, query: '' }),
   initial: 'closed',
   on: {
-    select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined, query: '' }) },
+    select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined, target: undefined, query: '' }) },
     // The side panel keeps Settings outside this machine's surfaces: it still shares the section and the query.
     back: { actions: ['forgetSection', 'forgetQuery'] },
     focus: { actions: 'focusRequested' },
+    reveal: { actions: 'revealRequested' },
     search: { actions: 'search' },
   },
   states: {

@@ -13,6 +13,13 @@ const sessionIdSchema = z.string().min(1).max(256)
 const brandedSessionIdSchema = z.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+export type LocalProjectFileCandidate = {
+  readonly path: string
+  readonly bytes: number
+  readonly ignored: boolean
+  readonly copyable: boolean
+  readonly copyReason?: 'potential-secret' | 'too-large' | undefined
+}
 
 export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
@@ -79,6 +86,46 @@ const runtimeStatusSchema = z.discriminatedUnion('ok', [
     lastSeenAt: z.string().datetime().optional(),
   }),
 ])
+
+export const resourceSnapshotSchema = z
+  .object({
+    sampledAt: z.string().datetime(),
+    platform: z.string().min(1).max(32),
+    cpuCount: z.number().int().nonnegative().max(4096),
+    loadAverage1m: z.number().finite().nonnegative().nullable(),
+    memoryTotalBytes: z.number().int().nonnegative(),
+    memoryFreeBytes: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(snapshot => snapshot.memoryFreeBytes <= snapshot.memoryTotalBytes, 'Free memory cannot exceed total memory.')
+
+const resourceProbeSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), snapshot: resourceSnapshotSchema }),
+  z.object({ ok: z.literal(false), code: z.string().max(128), message: z.string().max(512) }),
+])
+
+const resourcePoolEntrySchema = z.object({
+  hostId: idSchema,
+  hostName: z.string().min(1).max(120),
+  runtimeId: idSchema.nullable(),
+  destination: z
+    .object({ kind: z.literal('runtime'), runtimeId: idSchema })
+    .strict()
+    .nullable(),
+  hidden: z.boolean(),
+  probe: resourceProbeSchema,
+  stale: z.boolean(),
+  refreshing: z.boolean(),
+})
+
+const resourceSelectionSchema = z.object({
+  hostId: idSchema,
+  hostName: z.string().min(1).max(120),
+  runtimeId: idSchema,
+  score: z.number().finite().nonnegative(),
+})
+
+const resourcePoolSchema = z.object({ hosts: z.array(resourcePoolEntrySchema).max(64), selected: resourceSelectionSchema.nullable() }).strict()
 
 const failedSchema = failureSchema.extend({ ok: z.literal(false) })
 const runtimeRegistrationSchema = z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }), failedSchema])
@@ -173,6 +220,62 @@ const remoteThreadSchema = z.object({
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = z.enum(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+export const jjRevisionSchema = z
+  .object({
+    changeId: z.string(),
+    commitId: z.string(),
+    description: z.string(),
+    conflict: z.boolean(),
+  })
+  .strip()
+
+export const jjThreadSchema = z
+  .object({
+    name: z.string(),
+    path: z.string(),
+    workspaceId: z.string().nullable(),
+    workspaceTitle: z.string().optional(),
+    sessionIds: z.array(z.string()).max(10_000),
+    finished: z.boolean(),
+    canRebase: z.boolean().optional(),
+    missing: z.boolean(),
+    behind: z.boolean(),
+    behindCount: z.number().int().nonnegative().optional(),
+    rebasedAt: z.number().int().nonnegative().optional(),
+    rebasedTipChangeId: z.string().min(1).max(128).optional(),
+    integrationQueuedAt: z.number().int().nonnegative().optional(),
+    integrationQueueEvents: z
+      .array(z.object({ at: z.number().int().nonnegative(), kind: z.enum(['queued', 'unqueued']) }).strict())
+      .max(10_000)
+      .optional(),
+    integrations: z
+      .array(z.object({ at: z.number().int().nonnegative(), tipChangeId: z.string().min(1).max(128).optional() }).strict())
+      .max(10_000)
+      .optional(),
+    unlanded: z.array(jjRevisionSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositorySchema = z
+  .object({
+    repoRoot: z.string().max(4096),
+    title: z.string().max(512),
+    workspaceId: z.string().nullable(),
+    bookmarks: z.array(z.string().max(512)).max(10_000).default([]),
+    threads: z.array(jjThreadSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositoriesSchema = z
+  .object({
+    repositories: z.array(jjRepositorySchema).max(200),
+    refreshing: z.boolean().optional(),
+    refreshFailed: z.boolean().optional(),
+  })
+  .strip()
+export type JjRevisionView = z.infer<typeof jjRevisionSchema>
+export type JjThreadView = z.infer<typeof jjThreadSchema>
+export type JjRepositoryView = z.infer<typeof jjRepositorySchema>
 
 export const nativeRpcSchema = nativeRpcRequestSchema
 
@@ -214,6 +317,46 @@ const remotePathSchema = z
   .min(2)
   .max(4096)
   .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)
+const cloneDestinationSchema = z.union([
+  remotePathSchema,
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(4096)
+    .regex(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u),
+])
+const localProjectPathSchema = z.string().trim().min(1).max(4096)
+const localProjectFilePathSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(path => !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..'))
+const repositoryUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .regex(
+    /^(?:https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?|git@[A-Za-z0-9.-]+:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?)$/u,
+  )
+const cloneProjectInputSchema = z
+  .object({
+    runtimeId: idSchema,
+    repositoryUrl: repositoryUrlSchema,
+    destinationPath: cloneDestinationSchema,
+    copyFromPath: localProjectPathSchema.optional(),
+    copyPaths: z.array(localProjectFilePathSchema).max(128).optional(),
+    includeIgnored: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if ((input.copyFromPath === undefined) !== (input.copyPaths === undefined)) {
+      context.addIssue({ code: 'custom', message: 'Local source folder and selected file list must be supplied together.' })
+    }
+    if (input.includeIgnored === true && input.copyFromPath === undefined) {
+      context.addIssue({ code: 'custom', message: 'Scanning ignored files requires an explicit local source folder.' })
+    }
+  })
 
 const profileNameSchema = z
   .string()
@@ -327,6 +470,18 @@ export const multiHostApi = defineApi({
       output: runtimeIdentitySchema,
       description: 'Identity of this DSH runtime as other hosts see it. Read-only.',
       tool: { name: 'multi_host_identity', readOnly: true, render: compactJson },
+    }),
+    resourceSnapshot: method({
+      input: z.void(),
+      output: resourceSnapshotSchema,
+      description: 'Read CPU load and memory capacity for this DSH machine. Read-only.',
+      tool: { name: 'multi_host_resource_snapshot', readOnly: true, render: compactJson },
+    }),
+    resourcePool: method({
+      input: z.void(),
+      output: resourcePoolSchema,
+      description: 'Read resource snapshots for registered hosts and the least-pressured eligible remote destination. Read-only.',
+      tool: { name: 'multi_host_resource_pool', readOnly: true, render: compactJson },
     }),
     list: method({
       input: z.void(),
@@ -445,6 +600,48 @@ export const multiHostApi = defineApi({
         'Register a folder on a remote runtime as a workspace, so the remote jj-integration can describe and isolate it. Call only when the user asked to open that folder there.',
       tool: { name: 'multi_host_open_folder', render: compactJson },
     }),
+    localProjectFiles: method({
+      input: z.object({ path: localProjectPathSchema, includeIgnored: z.boolean().optional() }).strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          root: z.string(),
+          files: z.array(
+            z
+              .object({
+                path: z.string(),
+                bytes: z.number().int().nonnegative(),
+                ignored: z.boolean(),
+                copyable: z.boolean(),
+                copyReason: z.enum(['potential-secret', 'too-large']).optional(),
+              })
+              .strict(),
+          ),
+          truncated: z.boolean(),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'List untracked files under one local Git project without reading contents. Ignored files appear only when includeIgnored is explicitly true; credential-like paths are marked non-copyable. Read-only.',
+
+      tool: { name: 'multi_host_local_project_files', readOnly: true, render: compactJson },
+    }),
+    runtimeCloneProject: method({
+      input: cloneProjectInputSchema,
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          workspaceId: z.string(),
+          path: z.string(),
+          copiedFileCount: z.number().int().nonnegative().optional(),
+          copyWarning: z.string().max(2048).optional(),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'Clone a Git repository to one remote host and register the clone as a project workspace. Optionally copy individually selected local files; ignored files require includeIgnored: true, no file is selected automatically, and credential-like paths are blocked. Call only when the user asked to clone there.',
+      tool: { name: 'multi_host_clone_project', render: compactJson },
+    }),
     runtimeBrowse: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),
       output: z.discriminatedUnion('ok', [directoryListingSchema.extend({ ok: z.literal(true) }), failedSchema]),
@@ -475,6 +672,12 @@ export const multiHostApi = defineApi({
       input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtimeId: idSchema.nullable() }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
+    }),
+    sessionJjRepositories: method({
+      input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), repositories: jjRepositoriesSchema }), failedSchema]),
+      description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
+      tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
     }),
     runtimeFileReferences: method({
       input: z.object({ runtimeId: idSchema, sessionId: brandedSessionIdSchema, query: z.string().max(4096) }).strict(),
@@ -737,5 +940,10 @@ export type RuntimeSummary = z.infer<typeof runtimeSummarySchema>
 export type WorkspaceSummary = z.infer<typeof workspaceSchema>
 export type SessionSummary = z.infer<typeof sessionSchema>
 export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>
+export type ResourceSnapshot = z.infer<typeof resourceSnapshotSchema>
+export type ResourceProbe = z.infer<typeof resourceProbeSchema>
+export type ResourcePoolEntry = z.infer<typeof resourcePoolEntrySchema>
+export type ResourceSelection = z.infer<typeof resourceSelectionSchema>
+export type ResourcePool = z.infer<typeof resourcePoolSchema>
 export type NativeRpcRequest = z.infer<typeof nativeRpcSchema>
 export type NativeRpcResult = z.infer<typeof nativeRpcResultSchema>

@@ -8,7 +8,7 @@ one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
 Manage hosts on a dedicated page:
 
-![Manage hosts on a dedicated page](docs/screenshots/host-management.png)
+![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
 The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
 
@@ -32,10 +32,22 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
   Every registered host is listed in the destination picker's order: drag a
   row or use the up/down arrows to reorder, the eye hides a host from the
   picker without deleting it (its runtimes, threads and remote data stay), and
-  reconnect, edit and remove stay on the row. **Add host** keeps the dialog,
-  with the SSH destination picker, **Find** and the stepwise **Test
-  connection**. Removing keeps remote data and the local record of threads
-  started there; they come back if the host is added again.
+  reconnect, edit and remove stay on the row. **Add folder** registers an
+  existing remote directory; **Clone project** clones an HTTPS or SSH Git URL
+  into a remote path and registers it as a workspace. Local-file copying is an explicit second
+  step: scan untracked files, optionally opt in to scanning ignored files, then
+  select each file individually. Nothing is preselected; common credential-like
+  filenames are blocked and `node_modules` is excluded. Review the remaining
+  names before selecting them, since file contents are not inspected. Transfers
+  cap at 128 files / 50 MB. Existing remote files are never overwritten;
+  symlinked destination paths refuse the copy without undoing the clone.
+  The Run on menu
+
+  pre-fills the current project path; the Hosts page accepts a local path too.
+  **Add host** keeps the dialog, with the SSH destination picker,
+  **Find** and the stepwise **Test connection**. Removing keeps remote data and
+  the local record of threads started there; they come back if the host is added
+  again.
 
 With a host chosen:
 
@@ -76,7 +88,12 @@ With a host chosen:
   `ask_user_question` (or `ask_parent_question`), and **Waiting on <tool>**
   when any other call has stayed open for more than a minute, since the log
   cannot tell a slow command from a pending approval. Both offer **Host UI**;
-  answering and approving stay in the host's own DSH.
+  answering and approving stay in the host's own DSH. The mirrored thread header
+  offers **Open on remote host**; it opens the owner's DSH home in a new tab, and
+  you select the thread there. The current runtime view API cannot deep-link to a
+  Session, so it does not open the exact conversation automatically. The mirror
+  sees an open tool call, not the native waterfall payload or approval request; it
+  never fabricates a question, submits an inferred answer, or approves a tool call.
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
@@ -187,10 +204,19 @@ title}` for threads started here, so the sidebar and view can list them.
 - The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
   streamed; the conversation is still written and read on the host.
 - DSH writes no question-request or approval-request event, so a pending
-  question is only visible as an open `tool/call`. That is why a generic tool
-  wait is announced after a minute rather than immediately, and why answering
-  or approving always happens in the host's own DSH.
-- No session handoff between machines, and no answer/approve action from here.
+  question is only visible as an open `tool/call`. The host-local
+  `user-questions/request` waterfall and answer RPC are not delivered to this
+  mirror. The `agent-questions` API only supports continued forms on live root
+  Sessions; it cannot answer open waterfalls, child Sessions, or stopped
+  Sessions, and is not a general approval API. There is no safe generic proxy
+  for these interactions: **Host UI** opens the owning runtime's DSH, where
+  questions and approvals must be completed.
+- Remote JJ data can be read through the read-only
+  `sessionJjRepositories(sessionId)` API, which resolves the Session's owner and
+  reads that runtime's repository/workspace status. It sends no path and cannot
+  mutate JJ state. Per-session JJ panels/path operations, workspace changes,
+  thread landing, terminal interactions, and session handoff are not proxied;
+  use the owning Host UI for these operations.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 

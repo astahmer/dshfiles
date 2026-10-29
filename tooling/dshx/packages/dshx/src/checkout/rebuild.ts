@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 export class CheckoutSyncError extends Error {
   readonly code: string
@@ -76,12 +77,12 @@ const bundledSources = (root: string, directory: string, bundle: string): Readon
   const distDirectory = join(root, directory, 'dist')
   const manifestPath = join(distDirectory, `${bundle}.js.deps.json`)
   if (existsSync(manifestPath)) {
-    const manifest = dependencyManifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')))
+    const manifest = dependencyManifestSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
     if (manifest.success) return new Set(manifest.data.sources.map(source => relative(root, resolve(join(root, directory), source))))
   }
   const mapPath = join(distDirectory, `${bundle}.js.map`)
   if (!existsSync(mapPath)) return new Set()
-  const parsed = sourceMapSchema.safeParse(JSON.parse(readFileSync(mapPath, 'utf8')))
+  const parsed = sourceMapSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(mapPath, 'utf8')))
   if (!parsed.success) return new Set()
   return new Set(parsed.data.sources.map(source => relative(root, resolve(dirname(mapPath), source))))
 }
@@ -96,7 +97,7 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
       const directory = join(PLUGINS_DIRECTORY, scope.name, entry.name)
       const manifestPath = join(root, directory, 'package.json')
       if (!entry.isDirectory() || !existsSync(manifestPath)) continue
-      const manifest = manifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')))
+      const manifest = manifestSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
       if (!manifest.success || manifest.data.scripts?.build === undefined) continue
       const distDirectory = join(root, directory, 'dist')
       const hasClientBundle = manifest.data.dsh?.client !== undefined
@@ -189,12 +190,11 @@ const fingerprint = (path: string): string | null => (existsSync(path) ? createH
 const runCommand = (input: {
   readonly argv: readonly [string, ...string[]]
   readonly cwd: string
-  readonly env?: NodeJS.ProcessEnv | undefined
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<{ readonly exitCode: number; readonly output: string }> =>
   new Promise(resolvePromise => {
     const [command, ...args] = input.argv
-    const child = spawn(command, args, { cwd: input.cwd, env: input.env ?? process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(command, args, { cwd: input.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     const collect = (chunk: Buffer): void => {
       const text = chunk.toString('utf8')
@@ -223,18 +223,14 @@ const runRebuild = async (input: {
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<RebuildOutcome> => {
   const installed: string[] = []
-  const step = async (name: string, argv: readonly [string, ...string[]], cwd: string, env?: NodeJS.ProcessEnv) => {
+  const step = async (name: string, argv: readonly [string, ...string[]], cwd: string) => {
     input.onProgress?.(`${name}: ${argv.join(' ')}`)
-    const result = await runCommand({ argv, cwd, env, onOutput: input.onOutput })
+    const result = await runCommand({ argv, cwd, onOutput: input.onOutput })
     return result.exitCode === 0 ? null : { step: name, command: `(cd ${cwd} && ${argv.join(' ')})`, output: result.output }
   }
 
   for (const directory of input.plan.installRoots) {
-    // The desktop app's lockfile pulls Electron; dsh web never needs its binary.
-    const failure = await step(`install ${directory}`, ['pnpm', 'install', '--frozen-lockfile'], join(input.root, directory), {
-      ...process.env,
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
-    })
+    const failure = await step(`install ${directory}`, ['pnpm', 'install', '--frozen-lockfile'], join(input.root, directory))
     if (failure !== null) return { installed, dshx: false, plugins: [], failure }
     installed.push(directory)
   }

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { decodeJson, type JsonValue, jsonValueSchema } from '../json.js'
 import { resolve } from 'node:path'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
@@ -21,7 +22,7 @@ export interface ManifestRepairOptions {
   readonly compatibility?: DshCompatibility
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: JsonValue | undefined): value is Record<string, JsonValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -35,7 +36,7 @@ function repairDiff(file: string, before: string, after: string): string {
   return [`--- ${file}`, `+++ ${file}`, ...oldLines.map(line => `-${line}`), ...newLines.map(line => `+${line}`), ''].join('\n')
 }
 
-function addMissing(record: Record<string, unknown>, key: string, value: unknown): boolean {
+function addMissing(record: Record<string, JsonValue>, key: string, value: JsonValue): boolean {
   if (record[key] !== undefined) return false
   record[key] = value
   return true
@@ -64,9 +65,9 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       diff: '',
     }
   }
-  let manifest: unknown
+  let manifest: JsonValue
   try {
-    manifest = JSON.parse(source)
+    manifest = decodeJson(jsonValueSchema, source)
   } catch (error) {
     return {
       root: config.root,
@@ -95,13 +96,14 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       diff: '',
     }
   }
+  const document = { ...manifest }
   const diagnostics: DshxDiagnostic[] = []
   let changed = false
 
-  let exportsField: Record<string, unknown>
+  let exportsField: Record<string, JsonValue>
   if (manifest.exports === undefined) {
     exportsField = {}
-    manifest.exports = exportsField
+    document.exports = exportsField
     changed = true
   } else if (isObject(manifest.exports)) {
     exportsField = manifest.exports
@@ -122,10 +124,10 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
   changed = addMissing(exportsField, './package.json', './package.json') || changed
   if (config.clientEntry !== undefined) changed = addMissing(exportsField, './client', './dist/client.js') || changed
 
-  let dsh: Record<string, unknown>
+  let dsh: Record<string, JsonValue>
   if (manifest.dsh === undefined) {
     dsh = {}
-    manifest.dsh = dsh
+    document.dsh = dsh
     changed = true
   } else if (isObject(manifest.dsh)) {
     dsh = manifest.dsh
@@ -141,7 +143,7 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     )
     dsh = {}
   }
-  let bundle: Record<string, unknown>
+  let bundle: Record<string, JsonValue>
   if (dsh.bundle === undefined) {
     bundle = {}
     dsh.bundle = bundle
@@ -187,7 +189,7 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     )
 
   if (config.clientEntry !== undefined) {
-    let client: Record<string, unknown>
+    let client: Record<string, JsonValue>
     if (dsh.client === undefined) {
       client = {}
       dsh.client = client
@@ -230,17 +232,17 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       }
     }
     if (Array.isArray(client.inject) && client.inject.every(value => typeof value === 'string')) {
-      const inject = client.inject as string[]
+      const inject: JsonValue[] = client.inject
       for (const provider of providers)
         if (!inject.includes(provider)) {
           inject.push(provider)
           changed = true
         }
       if (inject.length > 0) {
-        let peerDependencies: Record<string, unknown> | undefined
+        let peerDependencies: Record<string, JsonValue> | undefined
         if (manifest.peerDependencies === undefined) {
           peerDependencies = {}
-          manifest.peerDependencies = peerDependencies
+          document.peerDependencies = peerDependencies
           changed = true
         } else if (isObject(manifest.peerDependencies)) {
           peerDependencies = manifest.peerDependencies
@@ -256,13 +258,13 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
           )
         }
         if (peerDependencies !== undefined) {
-          for (const provider of inject) changed = addMissing(peerDependencies, provider, compatibility.dshRange) || changed
+          for (const provider of inject) if (typeof provider === 'string') changed = addMissing(peerDependencies, provider, compatibility.dshRange) || changed
         }
       }
     }
   }
 
-  const after = changed ? `${JSON.stringify(manifest, null, 2)}\n` : source
+  const after = changed ? `${JSON.stringify(document, null, 2)}\n` : source
   const files = changed ? [{ file: config.packageFile, before: source, after }] : []
   return {
     root: config.root,
@@ -278,7 +280,7 @@ const applyManifestRepairPlan = async (plan: ManifestRepairPlan): Promise<void> 
   if (plan.files.length === 0) return
   if (plan.diagnostics.some(item => item.severity === 'error')) {
     throw new DshxError('DSHX4144', 'The manifest repair plan contains errors and cannot be applied.', {
-      ...(plan.files[0] === undefined ? {} : { file: plan.files[0].file }),
+      ...(plan.files[0] !== undefined && { file: plan.files[0].file }),
       hint: 'Resolve the reported manifest diagnostics manually before applying a repair plan.',
     })
   }

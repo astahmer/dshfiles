@@ -21,7 +21,7 @@
  * from another package does — `ui-sidebar-documentpreview` is the live proof.
  */
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
-import { observeSidebarFocus } from './focus.ts'
+import { SidebarFocus } from './focus.ts'
 import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { ClientContext } from '@dshfiles/dshx/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -51,34 +51,6 @@ import { GUIDE_ID, guideDefinition } from './tabs/guide/definition.ts'
 import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
-
-export type { SidebarRightTarget } from './focus.ts'
-export type { RightbarSeatProps, SidebarRightInjected, SidebarRightPresentation } from './shell/SidebarRight.tsx'
-export type { GuideBodyProps, GuideInjected } from './tabs/guide/GuideBody.tsx'
-export type { ExpandButtonProps } from './shell/ExpandButton.tsx'
-export type { SidebarRightState, SurfaceState } from './stores.ts'
-export type {
-  ISidebarRight, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
-  SidebarRightPlacement, SidebarRightCloseHandler, SurfaceActions,
-} from './service.ts'
-export type {
-  SidebarRightGuideBox, SidebarRightGuideEntry, SidebarRightTabClaim, SidebarRightTabDefinition,
-  SidebarRightTabPriority,
-} from './tab-registry.ts'
-export type {
-  SidebarRightTabInfo, SidebarRightTabInjected, UseSidebarRightTabInfo, SidebarRightTabActions,
-  SidebarRightTabMenuOwnerProps, SidebarRightTabNavigation, SidebarRightTabPlacement, SidebarRightGuideEntryOwnerProps,
-} from './contract/slots.ts'
-export type {
-  SidebarRightNavigationParams, SidebarRightResourceParams, SidebarRightResourceParamsMap,
-  SidebarRightTabParams, SidebarRightTabParamsFor, SidebarRightTabParamsMap,
-} from './contract/params.ts'
-// The layout ids and rectangle the navigation face takes, so a caller needs no import from the kit.
-export type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
-export type { PinResource, SidebarRightNavigator, TabOccurrence, SidebarRightOccurrenceId } from './tab-domain.ts'
-export type { SidebarRightKey } from './locales.ts'
-export type { OpenContentIntent } from './stores.ts'
-export type { SidebarRightOpenTab } from './tab-inventory.ts'
 
 /** This package's copy namespace. */
 const NS = 'sidebarRight'
@@ -120,10 +92,15 @@ export function apply(ctx: ClientContext): void {
   }
   ctx.effect(() => {
     const current = ctx.uiSession.adapter.current
-    const sync = (): void => { views.select(current.getSnapshot().key as SessionId | undefined) }
+    const sync = (): void => {
+      views.select(current.getSnapshot().key as SessionId | undefined)
+    }
     const unsubscribe = current.subscribe(sync)
     sync()
-    return () => { unsubscribe(); views.dispose() }
+    return () => {
+      unsubscribe()
+      views.dispose()
+    }
   }, 'ui-sidebar-right: retained Session views')
   const layout: ILayout = ctx.layout
   // The automatic fullscreen rule as the seats last rendered it: the frame
@@ -131,21 +108,32 @@ export function apply(ctx: ClientContext): void {
   let autoFullscreen = false
   const { controller, adopt, forget, show, measure } = createSidebarRightController(
     tabs,
-    (address, signal) => { ctx.resources.pin(address, signal) },
+    (address, signal) => {
+      ctx.resources.pin(address, signal)
+    },
     {
       workbench: workbenchMode.getSnapshot,
       dock: () => ctx.get('rightPanel')?.dock?.(),
       autoFullscreen: () => autoFullscreen,
-      openWithFocus: (sessionId, open) => { openWithPaneFocus(document, sessionId, open) },
-      closeWithFocus: (sessionId, paneId, close) => { closeWithPaneFocus(document, sessionId, paneId, close) },
+      openWithFocus: (sessionId, open) => {
+        openWithPaneFocus(document, sessionId, open)
+      },
+      closeWithFocus: (sessionId, paneId, close) => {
+        closeWithPaneFocus(document, sessionId, paneId, close)
+      },
     },
   )
   ctx.effect(() => {
     const sync = (): void => {
       const ids = workbenchMode.getSnapshot()
-        ? [...new Set(controller.openTabs.getSnapshot()
-          .filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel')
-          .map(tab => tab.sessionId))].filter(id => ctx.sessions.list.getSnapshot().ids.includes(id))
+        ? [
+            ...new Set(
+              controller.openTabs
+                .getSnapshot()
+                .filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel')
+                .map(tab => tab.sessionId),
+            ),
+          ].filter(id => ctx.sessions.list.getSnapshot().ids.includes(id))
         : []
       views.retainResourceSessions(ids)
     }
@@ -153,7 +141,12 @@ export function apply(ctx: ClientContext): void {
     const unsubscribeMode = workbenchMode.subscribe(sync)
     const unsubscribeCatalog = ctx.sessions.list.subscribe(sync)
     sync()
-    return () => { unsubscribeTabs(); unsubscribeMode(); unsubscribeCatalog(); views.retainResourceSessions([]) }
+    return () => {
+      unsubscribeTabs()
+      unsubscribeMode()
+      unsubscribeCatalog()
+      views.retainResourceSessions([])
+    }
   }, 'sidebar-right: saved resource Session references')
   // The Session on screen: the selected one while the Conversation fills the
   // main column. Both sources notify before React renders their change, so the
@@ -181,72 +174,107 @@ export function apply(ctx: ClientContext): void {
   // type that reaches for them. provide()'s disposer settles asynchronously;
   // teardown is synchronous fire-and-forget, matching ui-layout's root entry.
   // Unloading aborts every tab occurrence, which releases every pin.
-  ctx.effect(() => () => {
-    controller.tabDomain.dispose()
-    void disposeService()
-    void disposeRegistry()
-  }, 'ui-sidebar-right: service faces')
+  ctx.effect(
+    () => () => {
+      controller.tabDomain.dispose()
+      void disposeService()
+      void disposeRegistry()
+    },
+    'ui-sidebar-right: service faces',
+  )
 
-  ctx.effect(() => resourcePanels.registerPageOpener?.((kind, beforePublish) =>
-    controller.openWorkbenchPage(kind, (sessionId, tabId) => beforePublish(SidebarResourcePanelModel.id(sessionId, tabId)))) ?? (() => {}),
-  'sidebar-right: Workbench page admission')
+  ctx.effect(
+    () =>
+      resourcePanels.registerPageOpener?.((kind, beforePublish) =>
+        controller.openWorkbenchPage(kind, (sessionId, tabId) => beforePublish(SidebarResourcePanelModel.id(sessionId, tabId))),
+      ) ?? (() => {}),
+    'sidebar-right: Workbench page admission',
+  )
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar-right: dictionaries')
-  ctx.effect(() => registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
-    void ctx.shortcuts.closeWindow().catch((error: unknown) => { console.error('Window close failed', error) })
-  }), 'ui-sidebar-right: shortcuts')
-  if (typeof document !== 'undefined') ctx.effect(() => observeSidebarFocus(document), 'ui-sidebar-right: focus')
+  ctx.effect(
+    () =>
+      registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
+        void ctx.shortcuts.closeWindow().catch((error: unknown) => {
+          console.error('Window close failed', error)
+        })
+      }),
+    'ui-sidebar-right: shortcuts',
+  )
+  if (typeof document !== 'undefined') ctx.effect(() => SidebarFocus.observe(document), 'ui-sidebar-right: focus')
 
   ctx.effect(() => {
     const handle = createSidebarRightStore(() => defaultSeed(tabs))
     // Each Session Context generation owns one Store. Background tab actions
     // use the latest adoption for that Session.
-    const adoptions = sessionReleases
     const store: typeof handle = {
       ...handle,
-      create: (scopeKey) => {
+      create: scopeKey => {
         const instance = handle.create(scopeKey)
         if (scopeKey !== undefined) {
           const sessionId = scopeKey as SessionId
-          adoptions.get(sessionId)?.()
+          sessionReleases.get(sessionId)?.()
           const releaseAdoption = adopt(sessionId, instance)
           let releaseProjection: (() => void) | undefined
           const navigationSubscriptions = new Map<TabId, () => void>()
           const sync = (): void => {
-            const rows = Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {})
-              .filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel')
+            // Only the on-screen Session projects into the Workbench: every loaded Session keeps its own store, and
+            // projecting them all opened one dock panel per Session for the same tab kind.
+            const rows =
+              controller.mounted.getSnapshot() !== sessionId
+                ? []
+                : Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {}).filter(
+                    tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel',
+                  )
             for (const [tabId, unsubscribe] of navigationSubscriptions) {
-              if (!rows.some(tab => tab.id === tabId)) { unsubscribe(); navigationSubscriptions.delete(tabId) }
+              if (!rows.some(tab => tab.id === tabId)) {
+                unsubscribe()
+                navigationSubscriptions.delete(tabId)
+              }
             }
             for (const tab of rows) {
-              if (!navigationSubscriptions.has(tab.id)) navigationSubscriptions.set(tab.id,
-                controller.tabDomain.occurrence(sessionId, tab).navigation.subscribe(sync))
+              if (!navigationSubscriptions.has(tab.id))
+                navigationSubscriptions.set(tab.id, controller.tabDomain.occurrence(sessionId, tab).navigation.subscribe(sync))
             }
+            // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `releaseProjection` is reassigned before the old projection is released.
             const previous = releaseProjection
-            releaseProjection = resourcePanels.publish(sessionId, rows.map(tab => ({
-              id: SidebarResourcePanelModel.id(sessionId, tab.id), sessionId, tabId: tab.id,
-              kind: tab.kind, title: tab.title, address: tab.contentId,
-              navigationRevision: controller.tabDomain.occurrence(sessionId, tab).navigation.getSnapshot().revision,
-            })), tabId => controller.closeIn(sessionId, tabId as TabId))
+            releaseProjection = resourcePanels.publish(
+              sessionId,
+              rows.map(tab => ({
+                id: SidebarResourcePanelModel.id(sessionId, tab.id),
+                sessionId,
+                tabId: tab.id,
+                kind: tab.kind,
+                title: tab.title,
+                address: tab.contentId,
+                navigationRevision: controller.tabDomain.occurrence(sessionId, tab).navigation.getSnapshot().revision,
+              })),
+              tabId => controller.closeIn(sessionId, tabId as TabId),
+            )
             // New projection owns the key before old cleanup: observers never see a false close.
             previous?.()
           }
           const unsubscribe = instance.subscribe(sync)
           const unsubscribeMode = workbenchMode.subscribe(sync)
+          const unsubscribeMounted = controller.mounted.subscribe(sync)
           sync()
-          adoptions.set(sessionId, () => {
+          sessionReleases.set(sessionId, () => {
             unsubscribe()
             unsubscribeMode()
+            unsubscribeMounted()
             releaseProjection?.()
             for (const unsubscribe of navigationSubscriptions.values()) unsubscribe()
             navigationSubscriptions.clear()
             releaseAdoption()
           })
         }
-        return { ...instance, clearPersisted() {
-          instance.clearPersisted()
-          if (scopeKey !== undefined) forget(scopeKey as SessionId)
-        } }
+        return {
+          ...instance,
+          clearPersisted() {
+            instance.clearPersisted()
+            if (scopeKey !== undefined) forget(scopeKey as SessionId)
+          },
+        }
       },
     }
     const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
@@ -257,10 +285,19 @@ export function apply(ctx: ClientContext): void {
         if (shown) layout.openRightbar(track, fullscreen)
         else layout.closeRightbar()
       },
-      reportAutoFullscreen: (value) => { autoFullscreen = value },
-      splitPane: (paneId) => { controller.split(paneId) },
-      toggleFullscreen: () => { const target = controller.commandTarget(); if (target !== undefined) controller.toggleFullscreen(target) },
-      openTab: (kind, options) => { controller.openTab(kind, options) },
+      reportAutoFullscreen: value => {
+        autoFullscreen = value
+      },
+      splitPane: paneId => {
+        controller.split(paneId)
+      },
+      toggleFullscreen: () => {
+        const target = controller.commandTarget()
+        if (target !== undefined) controller.toggleFullscreen(target)
+      },
+      openTab: (kind, options) => {
+        controller.openTab(kind, options)
+      },
       hooks: {
         shortcuts: ctx.shortcuts.catalog,
         tabTypes: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.entries() },
@@ -269,45 +306,61 @@ export function apply(ctx: ClientContext): void {
 
     const disposeTypes = [tabs.register(guideDefinition(t))]
     const disposeSeat = ctx.slots.inject('rightbar', function* () {
-      yield ctx.slots.register({
-        name: 'rightbar',
-        children: { 'rightbar.session': { kind: 'single', scope: 'session' } },
-        inject: (): RightbarRootInjected => ({
-          hooks: { views: views.source, workbenchMode },
-          mountView: reference => views.mount(reference),
-        }),
-      }, RightbarRoot)
-      yield ctx.slots.register({
-        name: 'rightbar.session',
-        locale: NS,
-        children: {
-          'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
-          'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
-          'sidebar.right.tab.menu.item': { kind: 'list', scope: 'session' },
+      yield ctx.slots.register(
+        {
+          name: 'rightbar',
+          children: { 'rightbar.session': { kind: 'single', scope: 'session' } },
+          inject: (): RightbarRootInjected => ({
+            hooks: { views: views.source, workbenchMode },
+            mountView: reference => views.mount(reference),
+          }),
         },
-        store,
-        inject: (sessionId): SidebarRightInjected & ResourceSeatInjected => ({
-          ...injected,
-          hooks: { ...injected.hooks, workbenchMode, resourceTargets: resourcePanels.targets },
-          measureRoom: (canSplitPane) => { measure(sessionId, canSplitPane) },
-          closeTab: (tabId) => {
-            try { controller.closeIn(sessionId, tabId) }
-            catch (error) { console.error('Sidebar tab close failed:', error) }
+        RightbarRoot,
+      )
+      yield ctx.slots.register(
+        {
+          name: 'rightbar.session',
+          locale: NS,
+          children: {
+            'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
+            'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: tabInfoFactory } } },
+            'sidebar.right.tab.menu.item': { kind: 'list', scope: 'session' },
           },
-          keyedHooks: { tabNavigation: key => controller.tabDomain.occurrence(sessionId, { id: key as TabId }).navigation },
-          occurrence: tab => controller.tabDomain.occurrence(sessionId, tab),
-        }),
-      }, ResourceSeat)
+          store,
+          inject: (sessionId): SidebarRightInjected & ResourceSeatInjected => ({
+            ...injected,
+            hooks: { ...injected.hooks, workbenchMode, resourceTargets: resourcePanels.targets },
+            measureRoom: canSplitPane => {
+              measure(sessionId, canSplitPane)
+            },
+            closeTab: tabId => {
+              try {
+                controller.closeIn(sessionId, tabId)
+              } catch (error) {
+                console.error('Sidebar tab close failed:', error)
+              }
+            },
+            keyedHooks: { tabNavigation: key => controller.tabDomain.occurrence(sessionId, { id: key as TabId }).navigation },
+            occurrence: tab => controller.tabDomain.occurrence(sessionId, tab),
+          }),
+        },
+        ResourceSeat,
+      )
     })
     // Native expansion still shares the Session store. In Workbench the same
     // header opener reads and opens the registered global dock instead, never
     // a retained native carrier. Its separate corner seat moves no utilities.
-    const disposeExpand = ctx.slots.inject('conversation.session.header.corner', () => ctx.slots.register({
-      name: 'conversation.session.header.corner',
-      locale: NS,
-      store,
-      inject: () => ({ dock: () => ctx.get('rightPanel')?.dock?.(), hooks: { shortcuts: ctx.shortcuts.catalog, workbenchMode } }),
-    }, ExpandButton))
+    const disposeExpand = ctx.slots.inject('conversation.session.header.corner', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.corner',
+          locale: NS,
+          store,
+          inject: () => ({ dock: () => ctx.get('rightPanel')?.dock?.(), hooks: { shortcuts: ctx.shortcuts.catalog, workbenchMode } }),
+        },
+        ExpandButton,
+      ),
+    )
     // Stage two for the guide: it declares the chain child it hosts and reads
     // the registry's entry boxes, which an ordinary type has no reason to do.
     const guideInjected: GuideInjected = {
@@ -316,31 +369,39 @@ export function apply(ctx: ClientContext): void {
         guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() },
       },
     }
-    const disposeGuide = ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
-      name: 'sidebar.right.pane.tab',
-      key: GUIDE_ID,
-      children: {
-        'sidebar.right.tab.guide.entry': {
-          kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: guideTabInfoFactory } },
+    const disposeGuide = ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register(
+        {
+          name: 'sidebar.right.pane.tab',
+          key: GUIDE_ID,
+          children: {
+            'sidebar.right.tab.guide.entry': {
+              kind: 'keyed',
+              scope: 'session',
+              inject: { hooks: { tabInfo: guideTabInfoFactory } },
+            },
+            'sidebar.right.tab.guide': {
+              kind: 'chain',
+              scope: 'session',
+              inject: { hooks: { tabInfo: guideTabInfoFactory } },
+            },
+          },
+          inject: () => guideInjected,
         },
-        'sidebar.right.tab.guide': {
-          kind: 'chain', scope: 'session', inject: { hooks: { tabInfo: guideTabInfoFactory } },
-        },
-      },
-      inject: () => guideInjected,
-    }, GuideBody))
-    const disposeGuideTitle = ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
-      { name: 'sidebar.right.pane.tab.title', key: GUIDE_ID },
-      GuideTitle,
-    ))
+        GuideBody,
+      ),
+    )
+    const disposeGuideTitle = ctx.slots.inject('sidebar.right.pane.tab.title', () =>
+      ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: GUIDE_ID }, GuideTitle),
+    )
     return () => {
       disposeGuideTitle()
       disposeGuide()
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()
-      for (const release of adoptions.values()) release()
-      adoptions.clear()
+      for (const release of sessionReleases.values()) release()
+      sessionReleases.clear()
     }
   }, 'ui-sidebar-right: seats and shipped tab type')
 }

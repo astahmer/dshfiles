@@ -2,7 +2,7 @@
   "name": "@dshfiles/worktree-memory",
   "version": "0.1.0",
   "private": true,
-  "description": "Memory of every process the threads spawned, grouped by workspace: running jobs, dev servers and the ones an earlier DSH process leaked.",
+  "description": "Resident memory of DSH process trees by workspace and deterministic origins for current-user Node processes.",
   "files": [
     "dist",
     "cordis.patch.yml"

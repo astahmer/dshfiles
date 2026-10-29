@@ -11,6 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { usePlugin, type NotificationPermissionState } from '@dshfiles/dshx/client'
 import { useId, useState } from 'react'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
@@ -26,11 +27,6 @@ import {
   type ThreadNotificationSound,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
-
-export type BrowserNotificationPermission = NotificationPermission | 'unsupported'
-
-export const readBrowserNotificationPermission = (): BrowserNotificationPermission =>
-  typeof window === 'undefined' || !('Notification' in window) ? 'unsupported' : window.Notification.permission
 
 const categoryLabelKeys = {
   'approval-needed': 'threadSidebarApprovalNeeded',
@@ -59,7 +55,7 @@ const permissionLabelKeys = {
   granted: 'threadSidebarNotificationsAllowed',
   denied: 'threadSidebarNotificationsPermission',
   unsupported: 'threadSidebarNotificationsUnavailable',
-} satisfies Record<BrowserNotificationPermission, Parameters<ThreadSidebarTranslate>[0]>
+} satisfies Record<NotificationPermissionState, Parameters<ThreadSidebarTranslate>[0]>
 
 const deliveryOptions: readonly ThreadNotificationDelivery[] = ['off', 'in-app', 'system', 'both']
 const soundOptions: readonly ThreadNotificationSound[] = ['soft', 'chime', 'bright', 'low']
@@ -90,7 +86,8 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
   const id = useId()
   const placementId = `${id}-placement`
   const timeoutId = `${id}-timeout`
-  const [permission, setPermission] = useState(readBrowserNotificationPermission)
+  const plugin = usePlugin()
+  const [permission, setPermission] = useState(plugin.notifications.permission)
   const [audioUnavailable, setAudioUnavailable] = useState(false)
   const notificationSoundsMuted = storedNotificationSoundsMuted.useValue()
   const notificationsMuted = storedNotificationsMuted.useValue()
@@ -101,18 +98,6 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
   const updateCategory = (category: ThreadNotificationCategory, patch: Partial<ThreadNotificationCategories[ThreadNotificationCategory]>): void => {
     props.onChange({ ...props.categories, [category]: { ...props.categories[category], ...patch } })
     if (patch.sound === true) void ThreadNotificationAudioModel.unlock().then(available => setAudioUnavailable(!available))
-  }
-
-  const requestPermission = async (): Promise<void> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPermission('unsupported')
-      return
-    }
-    try {
-      setPermission(await window.Notification.requestPermission())
-    } catch {
-      setPermission(readBrowserNotificationPermission())
-    }
   }
 
   const previewSound = async (category: ThreadNotificationCategory): Promise<void> => {
@@ -335,7 +320,13 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
         <div className="dshx:grid dshx:gap-1">
           <span className="dshx:text-xs dshx:font-medium">{props.t('threadSidebarSystemNotifications')}</span>
           {permission === 'default' ? (
-            <Button size="sm" type="button" variant="outline" className="dshx:justify-start" onClick={() => void requestPermission()}>
+            <Button
+              size="sm"
+              type="button"
+              variant="outline"
+              className="dshx:justify-start"
+              onClick={() => void plugin.notifications.requestPermission().then(setPermission)}
+            >
               {props.t('threadSidebarAllowSystemNotifications')}
             </Button>
           ) : null}

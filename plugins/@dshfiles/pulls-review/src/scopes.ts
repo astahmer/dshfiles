@@ -3,7 +3,7 @@ import { createPasteSource } from '@pulls.review/core/paste'
 import { MAX_FILES, scopeKeySchema, type ReviewFile, type ReviewScope } from './api.js'
 
 /** pulls.review's own rule-based copy, so a scope reads the same here and on the site. */
-export const RULE_TEXTS = {
+const RULE_TEXTS = {
   docs: { label: 'Docs', summary: 'Documentation updates.' },
   code: { label: 'Code', summary: 'Source changes.' },
   tests: { label: 'Tests', summary: 'Test coverage for the change.' },

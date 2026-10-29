@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import writeFileAtomic from 'write-file-atomic'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import {
   communicationActivityEventSchema,
   communicationAgentSchema,
@@ -970,8 +971,7 @@ export class CommunicationService {
     }
     if (Buffer.byteLength(text) > MAX_STATE_BYTES) throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')
     try {
-      const value: unknown = JSON.parse(text)
-      const persistedState = persistedCommunicationStateSchema.parse(value)
+      const persistedState = persistedCommunicationStateSchema.parse(decodeJson(jsonValueSchema, text))
       const state = persistedState.schemaVersion === 4 ? persistedState : migrateLegacyState(persistedState)
       const cleaned = cleanState(state, this.#now())
       this.#cachedState = { revision, at: this.#now(), state: cleaned }

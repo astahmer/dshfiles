@@ -42,6 +42,18 @@ const categoryForJob = (phase: IntegrationJobPhase): ThreadIntegrationCategory =
   return 'no-changes'
 }
 
+const liveCategoryOf = (props: {
+  readonly hasPendingWork: boolean
+  readonly blockers: readonly ThreadIntegrationBlocker[]
+  readonly missing: boolean
+  readonly rebasedAt: number | undefined
+}): ThreadIntegrationCategory => {
+  if (props.hasPendingWork) return props.blockers.length === 0 ? 'ready' : blockedCategory(props.blockers)
+  if (props.missing) return 'unknown'
+  if (props.rebasedAt === undefined) return 'no-changes'
+  return 'integrated'
+}
+
 /**
  * One answer to "what does this workspace need", used by the row, the filter counts and the batch action so they
  * cannot drift. It classifies; it never authorizes an integration — the Host re-checks activity, descriptions and
@@ -92,15 +104,7 @@ export class ThreadIntegrationModel {
       if (undescribedRevisions > 0) blockers.push('description')
     }
 
-    const liveCategory: ThreadIntegrationCategory = hasPendingWork
-      ? blockers.length === 0
-        ? 'ready'
-        : blockedCategory(blockers)
-      : thread.missing
-        ? 'unknown'
-        : thread.rebasedAt === undefined
-          ? 'no-changes'
-          : 'integrated'
+    const liveCategory = liveCategoryOf({ hasPendingWork, blockers, missing: thread.missing, rebasedAt: thread.rebasedAt })
 
     const category = input.jobPhase === undefined ? liveCategory : categoryForJob(input.jobPhase)
     const assessment: ThreadIntegrationAssessment = {

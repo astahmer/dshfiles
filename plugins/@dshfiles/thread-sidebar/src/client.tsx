@@ -21,7 +21,7 @@ import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section
 import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
@@ -44,6 +44,7 @@ import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   ContextMenu,
@@ -125,7 +126,8 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
-import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
+import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
+import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
@@ -221,6 +223,7 @@ import {
   type ThreadMute,
   type ThreadMuteOption,
 } from './thread-mute.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const sessionActivityAt = (options: {
   readonly session: Pick<SessionSummary, 'id' | 'updatedAt'>
@@ -492,6 +495,7 @@ interface RowStyle {
   readonly density: ThreadRowDensity
   readonly project: boolean
   readonly projectColor: boolean
+  readonly projectPalette: SidebarPreferences['projectColorPalette']
   readonly title: boolean
   readonly machine: boolean
   readonly path: boolean
@@ -580,7 +584,7 @@ const MutedMarker = (props: { readonly mute: ThreadMute; readonly t: ThreadSideb
   </Tooltip>
 )
 
-const StatusDot = (props: {
+const SessionStatusDot = (props: {
   readonly session: SessionSummary
   readonly unread: boolean
   readonly unreadLabel: string
@@ -594,14 +598,7 @@ const StatusDot = (props: {
     unread,
     running: props.session.running,
   })
-  return (
-    <span
-      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', dotClass)}
-      role={unread ? 'img' : undefined}
-      aria-label={unread ? props.unreadLabel : undefined}
-      aria-hidden={unread ? undefined : true}
-    />
-  )
+  return <StatusDot className={dotClass} aria-label={unread ? props.unreadLabel : undefined} />
 }
 
 const ChildThreadList = (props: {
@@ -648,7 +645,7 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
-          <StatusDot
+          <SessionStatusDot
             session={child}
             unread={props.unreadSessionIds.has(child.id)}
             unreadLabel={t('threadSidebarUnread')}
@@ -1113,7 +1110,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
                   {rowStyle.statusDot ? (
-                    <StatusDot
+                    <SessionStatusDot
                       session={session}
                       unread={unread}
                       unreadLabel={t('threadSidebarUnread')}
@@ -1178,7 +1175,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:truncate dshx:font-medium',
-                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle),
+                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette),
                         (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0',
                       )}
                     >
@@ -1223,10 +1220,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 {props.childThreads.slice(0, 3).map(child => {
                   const attentionLabel = props.childAttentionLabels.get(child.id)
                   return (
-                    <span
+                    <StatusDot
                       key={child.id}
                       className={cn(
-                        'dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background',
+                        'dshx:ring-1 dshx:ring-background',
                         ThreadAttentionPresentationModel.attentionDotClass({
                           attentionLabel,
                           attentionColors: rowStyle.attentionColors,
@@ -1308,6 +1305,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // Both surfaces can be mounted at once: URL ownership, notifications, attention polling and the auto-archive/settle
   // scans stay with the sidebar mount, so one session change is never handled twice.
   const isPrimarySurface = !isBoard
+  const plugin = usePlugin()
   const hostSessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const subscribeDrafts = useCallback((listener: () => void) => props.drafts?.subscribe(listener) ?? (() => undefined), [props.drafts])
   const readDrafts = useCallback(() => props.drafts?.getSnapshot() ?? EMPTY_UNSENT_DRAFTS, [props.drafts])
@@ -1456,6 +1454,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false)
   const [now, setNow] = useState(() => Date.now())
+  // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
+  const readNow = useCallback(() => Date.now(), [])
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
   const notice = noticeQueueState.current
@@ -1568,13 +1568,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
+  const defaultProjectTitle = props.tSidebar('threadSidebarDefaultProject')
   const displayWorkspaces = useMemo(
     () =>
       SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({
         id: workspace.workspaceId,
-        title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
+        title: workspace.title.length > 0 ? workspace.title : defaultProjectTitle,
       })),
-    [props.tSidebar, workspaceState.items],
+    [defaultProjectTitle, workspaceState.items],
   )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
@@ -1996,24 +1997,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     refreshAttention()
   }, [isPrimarySurface, refreshAttention, runningSignature])
-  useEffect(() => {
-    if (!isPrimarySurface) return
-    const refresh = (): void => refreshAttention()
-    const onVisibility = (): void => {
-      if (document.visibilityState === 'visible') refresh()
-    }
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', onVisibility)
-    // Another browser can acknowledge a thread at any time; this keeps this tab's list honest.
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refresh()
-    }, 15_000)
-    return () => {
-      window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.clearInterval(timer)
-    }
-  }, [isPrimarySurface, refreshAttention])
+  // The shared attention store owns the page-wide poll and its focus/visibility catch-up, so this
+  // mount only refreshes when the running set changes (the one fact that makes attention stale fast).
   const selectedAttention = selectedSessionId === undefined ? undefined : attention.records.get(selectedSessionId)
   const acknowledgeAttention = attention.acknowledge
   const acknowledgeManualUnread = attention.clearUnread
@@ -2198,10 +2183,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-1.5"
                 aria-label={`${props.tSidebar(label)}: ${props.tSidebar('threadSidebarAttentionColor')} ${colorLabel}`}
               >
-                <span
-                  className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(color))}
-                  aria-hidden="true"
-                />
+                <StatusDot className={ThreadAttentionPresentationModel.attentionColorDotClass(color)} />
                 <span className="dshx:truncate">{colorLabel}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -2216,10 +2198,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               >
                 {attentionColorOptions.map(option => (
                   <DropdownMenuRadioItem key={option} value={option}>
-                    <span
-                      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(option))}
-                      aria-hidden="true"
-                    />
+                    <StatusDot className={ThreadAttentionPresentationModel.attentionColorDotClass(option)} />
                     {props.tSidebar(attentionColorLabelKeys[option])}
                   </DropdownMenuRadioItem>
                 ))}
@@ -2378,7 +2357,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         status: { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt },
         parkedSessionIds: preferences.parkedSessionIds,
         sessionIds,
-        now: Date.now(),
+        now: readNow(),
       }),
     )
     void SettledThreadsModel.unpinSettledThreads({
@@ -2418,7 +2397,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return session === undefined || session.blank ? [] : [session]
     })
     if (targets.length === 0) return
-    changePreferences({ mutedThreads: muteSessions({ mutes: preferences.mutedThreads, sessions: targets, until: muteUntil(option, Date.now()) }) })
+    changePreferences({ mutedThreads: muteSessions({ mutes: preferences.mutedThreads, sessions: targets, until: muteUntil(option, readNow()) }) })
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
@@ -2511,14 +2490,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (
       storedNotificationsMuted.get() === true ||
       !ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) ||
-      isMuteActive(mutedThreads[sessionId], Date.now())
+      isMuteActive(mutedThreads[sessionId], readNow())
     )
       return
     const session = sessionState.byId[sessionId]
     if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
     const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
     const systemRequested = ThreadNotificationModel.notificationRouteHasSystem(categoryPreferences.delivery)
-    const system = systemRequested && 'Notification' in window && window.Notification.permission === 'granted'
+    const system = systemRequested && plugin.notifications.permission() === 'granted'
     if (!inApp && !system && !categoryPreferences.sound) return
     if (!ThreadNotificationModel.claimThreadNotification(eventId)) return
     if (inApp) {
@@ -2533,18 +2512,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         },
       })
     }
-    if (system) {
-      try {
-        const notification = new window.Notification(title, { body: fallbackBody })
-        notification.onclick = () => {
-          window.focus()
-          openThread(sessionId)
-          notification.close()
-        }
-      } catch {
-        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
-      }
-    }
+    if (system && !plugin.notifications.notify({ title, body: fallbackBody, onClick: () => openThread(sessionId) }))
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
     if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
   }
 
@@ -2627,14 +2596,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const idleSectionOverrides = { ...preferences.idleSectionOverrides }
     for (const targetId of targets) {
       if (plan.idleOverride === null) delete idleSectionOverrides[targetId]
-      else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: Date.now() }
+      else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: readNow() }
     }
     // A drop opens the destination instead of folding it: the section the row was dragged inside is already open,
     // so toggling would fold it and hide the row that just landed.
     const nextCollapsedSections = collapsedSections.filter(item => item !== section)
     const nextPreferences = {
       parkedSessionIds: [...nextParked],
-      ...(plan.settle ? SettledThreadsModel.settle(status, targets, Date.now()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
+      ...(plan.settle ? SettledThreadsModel.settle(status, targets, readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
       idleSectionOverrides,
     }
     if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
@@ -2722,7 +2691,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const dueSessionIds = new Set<string>()
 
       if (SidebarOrganization.shouldScanForAutoSettle(latest.preferences)) {
-        const now = Date.now()
+        const now = readNow()
         for (const session of latest.sessions) {
           const isCandidate = SidebarOrganization.isAutoSettleCandidate({
             session,
@@ -3651,6 +3620,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       density: preferences.threadRowDensity,
       project: preferences.threadRowProject,
       projectColor: preferences.threadRowProjectColor,
+      projectPalette: preferences.projectColorPalette,
       title: preferences.threadRowTitle,
       machine: preferences.threadRowMachine,
       path: preferences.threadRowPath,
@@ -3662,6 +3632,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [
       preferences.attentionColors,
       preferences.maxChildren,
+      preferences.projectColorPalette,
       preferences.threadRowDensity,
       preferences.threadRowMachine,
       preferences.threadRowPath,
@@ -3687,13 +3658,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     else changePreferences({ workspaceFilter: projectFilter })
   }
 
-  const projectOptions = [
-    { id: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
-    { id: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
-    ...displayWorkspaces.map(workspace => ({ id: workspace.id, label: workspace.title })),
+  const projectOptions: readonly ComboboxOption[] = [
+    { value: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
+    { value: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
+    ...displayWorkspaces.map(workspace => ({ value: workspace.id, label: workspace.title })),
   ]
 
-  const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
+  const projectFilterLabel = projectOptions.find(option => option.value === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
   const showGroupControl = isBoard || threadViewSettings.showGroupControl
   const showFilterControl = isBoard || threadViewSettings.showFilterControl
 
@@ -3822,11 +3793,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   useEffect(() => {
     if (!isPrimarySurface) return
-    PaletteApi.setRecentLimit(preferences.paletteRecentLimit)
+    PaletteBridge.setRecentLimit(preferences.paletteRecentLimit)
   }, [isPrimarySurface, preferences.paletteRecentLimit])
   useEffect(() => {
     if (!isPrimarySurface) return
-    return () => PaletteApi.setRecentLimit(10)
+    return () => PaletteBridge.setRecentLimit(PaletteBridge.defaultRecentLimit)
   }, [isPrimarySurface])
   useEffect(() => {
     if (!isPrimarySurface) return
@@ -3899,9 +3870,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         },
       },
     ]
-    const disposers = actions.map(action => PaletteApi.registerAction(action))
-    return () => disposers.forEach(dispose => dispose())
-  }, [isPrimarySurface])
+    return PaletteBridge.addActions(actions)
+  }, [asideOpener, isPrimarySurface])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
     return {
@@ -4158,7 +4128,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       key={`${thread.runtimeId}:${thread.sessionId}`}
       runtimeId={thread.runtimeId}
       sessionId={thread.sessionId}
-      title={thread.title}
+      label={thread.title}
       cwd={thread.cwd}
       hostName={thread.hostName}
       connected={thread.connected}
@@ -4273,39 +4243,29 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
           {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
           <div className={cn('dshx:flex dshx:items-center dshx:gap-1', isBoard && 'dshx:shrink-0')}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:px-2.5 dshx:font-medium',
-                    isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
-                  )}
-                >
-                  <span className="dshx:truncate">{projectFilterLabel}</span>
+            <Combobox
+              contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
+              emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
+              label={props.tSidebar('threadSidebarProjectFilter')}
+              onValueChange={selectProject}
+              options={projectOptions}
+              searchAbove={0}
+              searchLabel={props.tSidebar('threadSidebarProjectSearch')}
+              searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
+              triggerClassName={cn(
+                'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
+                isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
+              )}
+              triggerContent={
+                <>
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
                   <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
                     <IconChevronDownOutlineRegular size={14} />
                   </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="dshx-root dshx:w-(--radix-dropdown-menu-trigger-width) dshx:min-w-56">
-                <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
-                  {projectOptions.map(option => (
-                    <DropdownMenuRadioItem key={option.id} value={option.id}>
-                      <span className="dshx:truncate">{option.label}</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                {isBoard ? null : (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
-                      {props.tSidebar('threadSidebarThreadListSettings')}
-                    </DropdownMenuCheckboxItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </>
+              }
+              value={projectFilterValue}
+            />
             {isBoard ? null : (
               <Button
                 type="button"
@@ -4334,15 +4294,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
                 .map(entry => entry.thread.id)
               const clearViewUnread = (): void => {
-                for (const sessionId of matchingThreadIds) {
+                const entries = matchingThreadIds.flatMap(sessionId => {
                   const record = attention.records.get(sessionId)
-                  if (record !== undefined) attention.clearUnread(sessionId, record.version)
-                }
+                  return record === undefined ? [] : [{ sessionId, version: record.version }]
+                })
+                if (entries.length > 0) attention.clearUnreadMany(entries)
               }
               const markViewUnread = (): void => {
-                for (const sessionId of matchingThreadIds) {
-                  if (!attention.records.has(sessionId)) attention.markUnread(sessionId)
-                }
+                const sessionIds = matchingThreadIds.filter(sessionId => !attention.records.has(sessionId))
+                if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
               }
               const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
               const accessibleLabel =
@@ -4378,11 +4338,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         <span className="dshx:truncate">{label}</span>
                       )}
                       {attentionLabel === undefined ? null : (
-                        <span
-                          aria-hidden="true"
+                        <StatusDot
+                          size="sm"
                           data-testid="thread-view-attention-dot"
                           className={cn(
-                            'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
                             ThreadAttentionPresentationModel.attentionDotClass({
                               attentionLabel,
                               attentionColors: preferences.attentionColors,
@@ -4891,7 +4850,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         headerClassName={stickyHeaderClass}
                         onOpen={props.openRemoteThreads}
                         onOpenSession={props.openRemoteSession}
-                        title={props.tSidebar('threadSidebarSectionReorderHint')}
+                        hint={props.tSidebar('threadSidebarSectionReorderHint')}
                         keepEmpty
                         onHeaderRef={element => {
                           sectionHeaderRefs.current[index] = element

@@ -9,6 +9,7 @@ export const createRuntimeStatusCache = <Status extends CachedStatus>(input: {
   readonly successTtlMs: number
   readonly failureTtlMs: number
   readonly maxEntries?: number
+  readonly spanName?: string
 }) => {
   const entries = new Map<string, StatusEntry<Status>>()
   const refreshes = new Map<string, Promise<void>>()
@@ -29,7 +30,7 @@ export const createRuntimeStatusCache = <Status extends CachedStatus>(input: {
 
     const generation = generations.get(runtimeId) ?? 0
     const pending = withSpan(
-      'multi-host runtime status refresh',
+      input.spanName ?? 'multi-host runtime status refresh',
       { attributes: pluginAttributes({ plugin: 'multi-host', attributes: { runtime_id: runtimeId } }) },
       async () => {
         const status = await load()

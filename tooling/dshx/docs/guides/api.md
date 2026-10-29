@@ -150,6 +150,25 @@ type ApiCallResult<T> =
   | { readonly ok: false; readonly error: ApiError };
 ```
 
+## Read-only methods share in-flight requests
+
+Mark a method without side effects `readOnly: true` (a method whose `tool.readOnly` is true counts too):
+
+```ts
+board: method({ input: boardFilterSchema, output: boardSchema, readOnly: true }),
+```
+
+Client calls of such a method with the same contract, method, version and input (compared as key-sorted JSON) that
+overlap in time share one Connection request. Every caller gets its own copy of the result. A caller that aborts
+leaves with an `aborted` error while the others keep waiting; the request itself is aborted only when every caller
+left. Calls of any other method always send their own request, so a mutation never runs fewer times than it was
+called. Host-to-Host calls (`createHostApiClient`) are in process and are not coalesced.
+
+Calls are not batched into one HTTP request. Each method is its own exact Connection route, admitted and traced on
+its own; a batch route would re-implement dispatch, per-call abort and trace propagation inside one envelope, and
+every call of a tick would wait for the slowest one. Coalescing removes the duplicate-read storms batching was meant
+for without that head-of-line blocking.
+
 ## `useApiQuery`
 
 ```tsx
@@ -198,7 +217,64 @@ type ApiQueryResult<T> =
 - `enabled: false` disables automatic reads; `refetch()` still executes one read.
 - A caller-provided abort becomes an `ApiError` with `kind: 'aborted'`.
 - Structured inputs use a stable JSON fingerprint. Query inputs must be JSON-serializable and acyclic.
-- There is no global cache, dedupe, optimistic update, business retry, or persisted query state.
+- Identical in-flight reads of a `readOnly` method share one request (see [Read-only methods](#read-only-methods-share-in-flight-requests)); there is no optimistic update, business retry, or persisted query state.
+
+## Host events
+
+A contract may declare events next to its methods. The Host publishes them; every connected browser can follow them
+instead of polling.
+
+```ts
+import { defineApi, event, method } from "@dshfiles/dshx/api";
+
+export const jobsApi = defineApi({
+  id: "jobs",
+  version: 1,
+  owner: "@acme/jobs",
+  methods: { board: method({ output: boardSchema, readOnly: true }) },
+  events: {
+    changed: event({ schema: z.object({ running: z.number() }).strict(), description: "The job board changed." }),
+  },
+});
+```
+
+```ts
+// Host: anywhere you hold the plugin's Context, once the API is served
+import { publishApiEvent } from "@dshfiles/dshx/host";
+await publishApiEvent(ctx, jobsApi, "changed", { running: 3 });
+```
+
+```tsx
+// Browser
+const status = useApiEvent(jobsApi, "changed", () => void board.refetch());
+const board = useQuery({ ..., refetchInterval: status === "live" ? false : 5_000 });
+```
+
+Outside React, `subscribeApiEvent(client, event, { onEvent, onStatus })` takes a client from `useApi` or
+`createApiClient` and returns its unsubscribe function.
+
+- `publishApiEvent` validates the payload with the event's `schema` and rejects an invalid payload or an undeclared
+  event. It sends nothing while no browser listens; nothing is queued or replayed.
+- The browser checks the contract version and validates the payload with the same `schema` before the listener runs,
+  and drops (with a console warning) a payload that fails. The schema runs on both sides, so it must accept its own
+  output: no one-way transforms.
+- `useApiEvent` returns `ApiEventStatus`: `connecting` until the Host's stream answers or while it reconnects, `live`
+  once the Host lists the event, `unavailable` when the Host does not publish it (the owner is not loaded or built
+  with an older dshx) or serves no event stream. Keep a polling fallback for every status but `live`, and read once
+  more when it turns `live`: events sent while a browser was disconnected are lost.
+- Keep payloads small and publish at a bounded rate (coalesce bursts on the Host); every connected page receives
+  every event of every API.
+
+### Event transport
+
+The first loaded dshx Host with an API (the one serving `dshxRegistryApi`) also registers one exact `GET` Fetch route,
+`/api/dshx-events`, through `connection.fetch.register()`, so the stream sits behind Connection's Host/Origin checks
+and browser authentication like every API route. It answers `text/event-stream`: a `catalog` frame listing the
+events served now (sent again whenever an API with events mounts or unmounts), then one frame per published event.
+Each page opens one `EventSource` for all plugins (the page-wide hub lives on `globalThis`), which
+`@dshfiles/shared-streams` further shares across tabs. The stream closes when its leader unloads; the browser
+reconnects to the next one. A page without `EventSource`, or a Host whose leader predates events, reports
+`unavailable`; dshx tries again when the Connection generation comes back.
 
 ## Errors
 
@@ -292,4 +368,4 @@ Plugins built with an older dshx do not join the registry until they are rebuilt
 
 ## Automatic Client wiring
 
-If `useApi` or `useApiQuery` survives final tree-shaking, compiler module metadata enables the Client `connection` service. The project must also declare `@deepseek-ai/dsh-client-connection` in `dsh.client.inject`; `dshx check` reports the edge early and `build` is authoritative.
+If `useApi`, `useApiQuery` or `useApiEvent` survives final tree-shaking, compiler module metadata enables the Client `connection` service. The project must also declare `@deepseek-ai/dsh-client-connection` in `dsh.client.inject`; `dshx check` reports the edge early and `build` is authoritative.

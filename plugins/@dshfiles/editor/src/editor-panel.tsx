@@ -22,6 +22,7 @@ import type { EditorStore, OpenDocument } from './editor-store.js'
 import { editorEngineLoaderMachine } from './editor-engine-machine.js'
 import { FileTree } from './file-tree.js'
 import { useEditorSaveMachine } from './use-editor-save-machine.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
@@ -110,6 +111,13 @@ const FilePreview = (props: { readonly document: OpenDocument; readonly remote: 
       {openExternally.isError && <p className="dshx:text-xs dshx:text-destructive">{errorMessage(openExternally.error, 'Could not open the file.')}</p>}
     </div>
   )
+}
+
+const documentStatusOf = (document: OpenDocument): string => {
+  if (document.content.kind !== 'text') return 'Read-only'
+  if (document.dirty) return 'Unsaved'
+  if (document.sha256 === null && document.status === 'ready') return 'New file'
+  return 'Saved'
 }
 
 /** File tree, tabs and one editor surface for the session on screen. Usable as a right-pane tab or a docked panel. */
@@ -295,7 +303,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
               >
                 {document.name}
               </button>
-              {document.dirty && <span aria-label="Unsaved changes" className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-warning" />}
+              {document.dirty && <StatusDot aria-label="Unsaved changes" size="sm" tone="warning" className="dshx:flex-none" />}
               <button
                 aria-label={`Close ${document.name}`}
                 className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded-sm dshx:opacity-60 dshx:hover:bg-background dshx:hover:opacity-100"
@@ -359,17 +367,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         </span>
         {savePending && <span>Saving…</span>}
         {saveSnapshot.context.failure !== null && <span className="dshx:text-destructive">{saveSnapshot.context.failure}</span>}
-        {active !== undefined && !savePending && (
-          <span>
-            {active.content.kind !== 'text'
-              ? 'Read-only'
-              : active.dirty
-                ? 'Unsaved'
-                : active.sha256 === null && active.status === 'ready'
-                  ? 'New file'
-                  : 'Saved'}
-          </span>
-        )}
+        {active !== undefined && !savePending && <span>{documentStatusOf(active)}</span>}
       </div>
       <AlertDialog
         onOpenChange={open => {

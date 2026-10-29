@@ -27,8 +27,8 @@ import { ServerEditor, ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { ServerSelectionModel } from './server-selection.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { McpServerStatusModel } from './server-status.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 interface EditorState {
   readonly key: number
@@ -335,7 +335,7 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
           {server.transport === 'stdio' ? server.commandLine : server.url}
         </ItemDescription>
         <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-          <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', McpServerStatusModel.lifecycleDotClassName(server))} />
+          <StatusDot size="sm" className={McpServerStatusModel.lifecycleDotClassName(server)} />
           {McpServerStatusModel.lifecycleText({ server, t })} · {server.registeredToolCount} {t('registeredTools')}
           {processText ? ` · ${processText}` : null}
         </p>

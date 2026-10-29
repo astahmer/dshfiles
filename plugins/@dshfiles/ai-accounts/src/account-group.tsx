@@ -25,6 +25,7 @@ import { KIND_LABEL, routedKind } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
 import { ActionHint, ProviderGlyph } from './panel-primitives.js'
 import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** Selection is cosmetic; ordering always uses the full canonical provider group. */
 export const AccountGroup = (props: {
@@ -101,7 +102,7 @@ export const AccountGroup = (props: {
                       status.tone === 'success' ? 'dshx:text-success' : status.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground',
                     )}
                   >
-                    <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+                    <StatusDot tone="current" />
                     <span className={status.tone === 'warning' ? undefined : 'dshx:@max-pane-narrow:hidden'}>{status.label}</span>
                   </span>
                 </ActionHint>

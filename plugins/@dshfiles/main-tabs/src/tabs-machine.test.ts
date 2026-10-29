@@ -1,6 +1,7 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_TAB_PREFERENCES, tabsMachine, type HostTarget, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import { DEFAULT_TAB_PREFERENCES, tabsMachine, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import type { HostTarget } from '@dshfiles/workbench/tabs'
 
 const thread = (sessionId: string): HostTarget => ({ kind: 'thread', sessionId })
 const panel = (panelId: string, scope?: string): HostTarget => (scope === undefined ? { kind: 'panel', panelId } : { kind: 'panel', panelId, scope })

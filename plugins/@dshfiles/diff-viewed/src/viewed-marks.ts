@@ -2,7 +2,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import { MAX_VIEWED_MARKS, viewedFileFromKey, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
-export const VIEWED_MARKS_STORAGE_KEY = 'dshfiles.diffViewed.v1'
+const VIEWED_MARKS_STORAGE_KEY = 'dshfiles.diffViewed.v1'
 
 /** The browser hands its whole cap over on the first Host snapshot; small batches keep that cheap. */
 const MIGRATION_BATCH_SIZE = 20

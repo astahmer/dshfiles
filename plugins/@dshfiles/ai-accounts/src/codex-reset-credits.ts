@@ -53,7 +53,7 @@ export interface CodexResetCredits {
   readonly resets: readonly BankedReset[]
 }
 
-export const emptyResetCredits: CodexResetCredits = { available: 0, resets: [] }
+const emptyResetCredits: CodexResetCredits = { available: 0, resets: [] }
 
 const parseCredits = (value: unknown): CodexResetCredits => {
   const parsed = resetCreditsSchema.safeParse(value)

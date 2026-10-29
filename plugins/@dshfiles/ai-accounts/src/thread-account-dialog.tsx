@@ -24,7 +24,7 @@ export const ThreadAccountSurface = (props: {
 }
 
 /** The immutable dialog key captures one thread and account; server revision checks reject a stale confirmation. */
-export const ThreadAccountDialog = (props: { readonly sessionId: string; readonly instanceId: string; readonly close: () => void }): JSX.Element => {
+const ThreadAccountDialog = (props: { readonly sessionId: string; readonly instanceId: string; readonly close: () => void }): JSX.Element => {
   const api = useApi(threadAccountApi)
   const preview = useQuery({
     queryKey: ['ai-accounts', 'thread-switch', props.sessionId, props.instanceId],

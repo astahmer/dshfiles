@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 
@@ -16,6 +17,10 @@ import { z } from 'zod'
 
 const EVENTS_ROUTE = 'plugins/events'
 const ROW_ID = 'dshfiles-hmr-gate'
+const RECOVERY_KEY = 'dshfiles.hmr-gate.slot-recovery-at'
+const RECOVERY_INTERVAL_MS = 30_000
+// Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
+const RECOVERY_DELAY_MS = 1_500
 
 const deferredPackageSchema = z.object({ id: z.string().min(1), reason: z.string().min(1) })
 
@@ -63,8 +68,8 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
   return (
     <section className="dshx-root dshx:flex dshx:flex-col dshx:gap-3">
       <p className="dshx:min-w-0 dshx:text-muted-foreground dshx:text-sm">
-        A plugin's browser half rebuilt while its Host half still runs from before the rebuild. The browser keeps the
-        last-good code until the Host loads the new half, so nothing runs out of step.
+        A plugin's browser half rebuilt while its Host half still runs from before the rebuild. The browser keeps the last-good code until the Host loads the
+        new half, so nothing runs out of step.
       </p>
       {packages.length === 0 ? (
         <p className="dshx:text-muted-foreground dshx:text-sm">Nothing is waiting. Every rebuilt plugin is in step with the Host.</p>
@@ -78,9 +83,7 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
           ))}
         </ul>
       )}
-      {packages.length === 0 ? null : (
-        <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH to load the new Host code, then reload this page.</p>
-      )}
+      {packages.length === 0 ? null : <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH to load the new Host code, then reload this page.</p>}
     </section>
   )
 }
@@ -91,9 +94,9 @@ export default defineClient({
   inject: ['modules', 'slots'],
   setup(ctx) {
     const receive = (data: string): void => {
-      let decoded: unknown
+      let decoded: JsonValue
       try {
-        decoded = JSON.parse(data)
+        decoded = decodeJson(jsonValueSchema, data)
       } catch {
         return
       }
@@ -113,6 +116,32 @@ export default defineClient({
       }
       publish(frame.data.packages)
     }
+
+    // A recomposition can leave a slot with no adapter or registration for one render; the stock renderer then throws
+    // SlotAssemblyError past every error boundary and the shell has none, so React unmounts the page. Reload once the
+    // swap settles instead of leaving it blank; the timestamp keeps a deterministic failure from looping.
+    ctx.effect(() => {
+      let pending: ReturnType<typeof setTimeout> | undefined
+      const onError = (event: ErrorEvent): void => {
+        if (!(event.error instanceof Error) || event.error.name !== 'SlotAssemblyError' || pending !== undefined) return
+        let last = 0
+        try {
+          last = Number(sessionStorage.getItem(RECOVERY_KEY) ?? 0)
+        } catch {}
+        if (Date.now() - last < RECOVERY_INTERVAL_MS) return
+        pending = setTimeout(() => {
+          try {
+            sessionStorage.setItem(RECOVERY_KEY, String(Date.now()))
+          } catch {}
+          window.location.reload()
+        }, RECOVERY_DELAY_MS)
+      }
+      window.addEventListener('error', onError)
+      return () => {
+        window.removeEventListener('error', onError)
+        if (pending !== undefined) clearTimeout(pending)
+      }
+    }, 'hmr-gate: recover from a slot assembly crash')
 
     ctx.effect(() => {
       const source = new EventSource(EVENTS_ROUTE)

@@ -6,10 +6,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, runHostCommand, useApi, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, runHostCommand, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { MainSurfaceSeat } from '@dshfiles/frame-layout/regions'
-import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
+import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -24,8 +24,10 @@ import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-
 import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { TabMenuItems } from './tab-menu-items.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
+import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
-import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type HostTarget, type TabPreferences, type TabsEvent } from './tabs-machine.js'
+import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent } from './tabs-machine.js'
+import type { HostTarget } from '@dshfiles/workbench/tabs'
 import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, StripMount } from './strip-mount.js'
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
 import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
@@ -33,7 +35,6 @@ import { createWorkbenchTabsPublication } from './workbench-tabs-publication.js'
 import { requestThreadAside } from './thread-aside.js'
 import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
-import { clearTabAttention } from './tab-attention.js'
 import './client.css'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
@@ -149,12 +150,27 @@ export default defineClient({
       return () => actor.stop()
     }, 'main-tabs: tabs machine')
 
+    /** Open a listed thread in the strip; false means nothing took it and the caller keeps its own behavior. */
+    const requestThreadTab = (sessionId: string, newTab: boolean): boolean => {
+      if (!actor.getSnapshot().matches('on')) return false
+      const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === sessionId)
+      if (listed === undefined) return false
+      actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: listed }, newTab })
+      return true
+    }
+
+    // A same-origin thread link is a tab, not a document load: inside an installed PWA loading the app again looks
+    // like the current page reloading, which is what a clicked thread link used to do.
+    ctx.effect(
+      () => installThreadLinkClicks({ document, origin: window.location.origin, openThread: sessionId => requestThreadTab(sessionId, true) }),
+      'main-tabs: open a clicked thread link in a tab',
+    )
+
     ctx.effect(() => {
       const onOpenThread = (event: Event): void => {
         const request = event instanceof CustomEvent ? openThreadRequestSchema.safeParse(event.detail) : undefined
-        if (request?.success !== true || !actor.getSnapshot().matches('on')) return
+        if (request?.success !== true || !requestThreadTab(request.data.sessionId, request.data.newTab)) return
         event.preventDefault()
-        actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: request.data.sessionId }, newTab: request.data.newTab })
       }
       const onReplaceThreadTab = (event: Event): void => {
         const request = event instanceof CustomEvent ? replaceThreadTabRequestSchema.safeParse(event.detail) : undefined
@@ -345,35 +361,21 @@ export default defineClient({
             [byId, workspaceItems],
           )
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
-          // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
-          const attention = useApiQuery(threadSidebarAttentionApi, 'state')
-          const attentionApi = useApi(threadSidebarAttentionApi)
-          const attentionRefresh = attention.refetch
+          // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
+          // and both read the one page-wide poll instead of each holding their own interval.
+          const attention = useThreadAttention({ enabled: true })
+          const { records: attentionRecords, clearUnread: clearAttention } = attention
           useLayoutEffect(() => {
+            // An explicit tab selection clears only the attention version the browser rendered.
             clearSelectedAttention = sessionId => {
-              void clearTabAttention(sessionId, attention.data, attentionApi.clearUnread, attentionRefresh).catch(() => undefined)
+              const record = attentionRecords.get(sessionId)
+              if (record !== undefined) clearAttention(sessionId, record.version)
             }
             return () => {
               clearSelectedAttention = undefined
             }
-          }, [attention.data, attentionApi, attentionRefresh])
-          useEffect(() => {
-            const refresh = (): void => attentionRefresh()
-            const onVisibility = (): void => {
-              if (document.visibilityState === 'visible') refresh()
-            }
-            window.addEventListener('focus', refresh)
-            document.addEventListener('visibilitychange', onVisibility)
-            const timer = window.setInterval(() => {
-              if (document.visibilityState === 'visible') refresh()
-            }, 5_000)
-            return () => {
-              window.removeEventListener('focus', refresh)
-              document.removeEventListener('visibilitychange', onVisibility)
-              window.clearInterval(timer)
-            }
-          }, [attentionRefresh])
-          const attentionSessionIds = useMemo(() => new Set((attention.data?.sessions ?? []).map(record => record.sessionId)), [attention.data])
+          }, [attentionRecords, clearAttention])
+          const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
           const host = useStripHost(mainSurface)

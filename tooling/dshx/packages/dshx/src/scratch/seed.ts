@@ -3,8 +3,11 @@ import { randomBytes } from 'node:crypto'
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 import type { Page } from 'playwright'
 import { z } from 'zod'
+import type { DialogsService, ToastsService } from '../client/app-services.js'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { FAKE_COMMAND_CODE_MODEL, FAKE_COMMAND_CODE_MODEL_ID } from './fake-command-code.js'
@@ -273,10 +276,10 @@ type FakeProviderAccount = z.infer<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts
 /** What ai-accounts persisted for the fake route, read from its store in the scratch home: the panel's draft can differ. */
 const readFakeProviderAccount = async (home: string): Promise<FakeProviderAccount | undefined> => {
   const source = await readFile(join(home, 'plugins', 'ai-accounts', 'accounts.json'), 'utf8').catch(() => '')
-  let json: unknown
+  let json: JsonValue
   // The store is rewritten in place; a read mid-write is not JSON yet and counts as no account.
   try {
-    json = JSON.parse(source)
+    json = decodeJson(jsonValueSchema, source)
   } catch {
     return undefined
   }
@@ -734,7 +737,7 @@ const seedMultiHostHosts = async (state: ScratchState): Promise<void> => {
 
 const OTLP_SAMPLE_TRACE_ID = '5ca1ab1e0000400080000000000d5e11'
 
-const otlpSampleExport = (): unknown => {
+const otlpSampleExport = () => {
   const startNs = BigInt(Date.now() - 60_000) * 1_000_000n
   const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
   const text = (key: string, value: string) => ({ key, value: { stringValue: value } })
@@ -750,7 +753,7 @@ const otlpSampleExport = (): unknown => {
   }) => ({
     traceId: OTLP_SAMPLE_TRACE_ID,
     spanId: input.spanId,
-    ...(input.parentSpanId === undefined ? {} : { parentSpanId: input.parentSpanId }),
+    ...(input.parentSpanId !== undefined && { parentSpanId: input.parentSpanId }),
     name: input.name,
     kind: input.kind,
     startTimeUnixNano: at(input.from),
@@ -814,14 +817,14 @@ const otlpSampleExport = (): unknown => {
   }
 }
 
-const otlpSampleLogs = (): unknown => {
+const otlpSampleLogs = () => {
   const at = (offsetMs: number): string => ((BigInt(Date.now() - 60_000) + BigInt(offsetMs)) * 1_000_000n).toString()
   const record = (offsetMs: number, severityNumber: number, body: string, spanId: string | null, orderId: string) => ({
     timeUnixNano: at(offsetMs),
     severityNumber,
     body: { stringValue: body },
     attributes: [{ key: 'order.id', value: { stringValue: orderId } }],
-    ...(spanId === null ? {} : { traceId: OTLP_SAMPLE_TRACE_ID, spanId }),
+    ...(spanId !== null && { traceId: OTLP_SAMPLE_TRACE_ID, spanId }),
   })
   return {
     resourceLogs: [
@@ -844,7 +847,7 @@ const otlpSampleLogs = (): unknown => {
   }
 }
 
-const otlpSampleMetrics = (offsetMs: number, requests: number): unknown => {
+const otlpSampleMetrics = (offsetMs: number, requests: number) => {
   const timeNs = ((BigInt(Date.now()) + BigInt(offsetMs)) * 1_000_000n).toString()
   const route = (value: string) => [{ key: 'http.route', value: { stringValue: value } }]
   return {
@@ -908,7 +911,7 @@ const otlpSessionTurns = (sessionId: string) => {
     }) => ({
       traceId,
       spanId: span.spanId,
-      ...(span.parentSpanId === undefined ? {} : { parentSpanId: span.parentSpanId }),
+      ...(span.parentSpanId !== undefined && { parentSpanId: span.parentSpanId }),
       name: span.name,
       kind: span.name.startsWith('chat') ? 3 : 1,
       startTimeUnixNano: at(span.from),
@@ -1118,7 +1121,7 @@ const tracesReceiverEndpoint = async (input: {
   await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
     timeout: timeoutMs,
   })
-  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('title') : null
+  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('data-endpoint') : null
   if (endpoint === null) {
     throw new ScratchError(
       'seed-receiver-not-listening',
@@ -1151,6 +1154,26 @@ const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: n
   }
 }
 
+/** Open one danger confirm and one sticky toast through the page's Dialogs and Toasts providers, as another plugin's call does. */
+const seedAppDialogSample = async (page: Page, timeoutMs: number): Promise<void> => {
+  await page.waitForFunction(
+    () => ['dshx.dialogs', 'dshx.toasts'].every(id => globalThis.__dshxBrokerV1?.contracts.get(id)?.live.status === 'active'),
+    undefined,
+    { timeout: timeoutMs },
+  )
+  await page.evaluate(() => {
+    const toastsLive = globalThis.__dshxBrokerV1?.contracts.get('dshx.toasts')?.live
+    const dialogsLive = globalThis.__dshxBrokerV1?.contracts.get('dshx.dialogs')?.live
+    if (toastsLive?.status !== 'active' || dialogsLive?.status !== 'active') throw new Error('dshx.dialogs and dshx.toasts are not provided')
+    // SAFETY: the broker stores contract values untyped; `dshx.toasts` is only ever provided with a ToastsService.
+    const toasts = toastsLive.value as ToastsService
+    // SAFETY: likewise, `dshx.dialogs` is only ever provided with a DialogsService.
+    const dialogs = dialogsLive.value as DialogsService
+    toasts.show({ title: 'Draft saved', description: 'Old draft moved to the archive.', tone: 'success', duration: 0 })
+    void dialogs.confirm({ title: 'Delete Old draft?', description: 'This removes the draft and its attachments.', confirm: 'Delete', danger: true })
+  })
+}
+
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
 const applySeed = async (input: {
   readonly state: ScratchState
@@ -1177,6 +1200,10 @@ const applySeed = async (input: {
   }
   if (input.seed === 'otlp-session-turns') {
     await seedOtlpSessionTurns(input.state, input.page, input.timeoutMs)
+    return {}
+  }
+  if (input.seed === 'app-dialog-sample') {
+    await seedAppDialogSample(input.page, input.timeoutMs)
     return {}
   }
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }

@@ -1,14 +1,12 @@
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { errorMessage, keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { jjIntegrationApi, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
+import { jjIntegrationApi, type CleanupKindView, type CleanupResult, type CleanupTarget } from '@dshfiles/jj-integration/api'
+import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { CleanupJobTrailModel, cleanupJobsKey, requestWorkspaceCleanup, useCleanupJobs } from './cleanup-jobs-queries.js'
 import { cleanupPreviewLoadingLabel } from './workspace-cleanup-preview.js'
@@ -18,13 +16,14 @@ const AGE_CHOICES = [
   { hours: 1, label: '1h' },
   { hours: 6, label: '6h' },
   { hours: 24, label: '24h' },
+  { hours: 168, label: '7d' },
 ] as const
 
-const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string; readonly hint: string }[] = [
-  { kind: 'empty', label: 'Empty', hint: 'never landed anything' },
-  { kind: 'integrated', label: 'Already integrated', hint: 'landed, nothing left' },
-  { kind: 'secondary', label: 'Other JJ workspaces', hint: 'manual only; the working copy must be clean and no work may be unlanded' },
-  { kind: 'untracked', label: 'Untracked folders', hint: 'folders and files in the threads directory no jj workspace owns' },
+const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string }[] = [
+  { kind: 'empty', label: 'Empty' },
+  { kind: 'integrated', label: 'Already integrated' },
+  { kind: 'untracked', label: 'Untracked folders' },
+  { kind: 'secondary', label: 'Other JJ workspaces' },
 ]
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
@@ -35,22 +34,26 @@ const formatAge = (at: number): string => {
   return age.unit === 'now' ? 'now' : `${String(age.n)}${AGE_SUFFIX[age.unit]} ago`
 }
 
-const cleanupRows = (result: CleanupResult) => [
+interface CleanupRow {
+  readonly key: string
+  readonly target: CleanupTarget
+  readonly at: number
+}
+
+const cleanupRows = (result: CleanupResult): CleanupRow[] => [
   ...result.workspaces.map(workspace => ({
-    key: `${workspace.repoRoot}:${workspace.name}`,
-    name: workspace.name,
-    kind: workspace.kind,
+    key: JSON.stringify([workspace.repoRoot, workspace.name, workspace.kind]),
+    target: { repoRoot: workspace.repoRoot, name: workspace.name, kind: workspace.kind },
     at: workspace.lastUsedAt,
-    title: workspace.path,
   })),
   ...result.untracked.map(entry => ({
-    key: `${entry.repoRoot}:untracked:${entry.name}`,
-    name: entry.name,
-    kind: 'untracked',
+    key: JSON.stringify([entry.repoRoot, entry.name, 'untracked']),
+    target: { repoRoot: entry.repoRoot, name: entry.name, kind: 'untracked' as const },
     at: entry.modifiedAt,
-    title: entry.path,
   })),
 ]
+
+const selectedCount = (rows: readonly CleanupRow[], selected: ReadonlySet<string>): number => rows.filter(row => selected.has(row.key)).length
 
 export const WorkspaceCleanupDialog = (props: {
   readonly open: boolean
@@ -60,185 +63,224 @@ export const WorkspaceCleanupDialog = (props: {
 }) => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
-  const [presetHours, setPresetHours] = useState<number | null>(6)
-  const [customHours, setCustomHours] = useState('')
-  const olderThanHours = WorkspaceCleanupSummary.resolveAgeHours({ presetHours, customHours })
-  const [kinds, setKinds] = useState<CleanupKindView[]>(['empty', 'integrated', 'untracked'])
-  const request = olderThanHours === undefined ? null : { path: props.path, olderThanHours, kinds }
+  const [olderThanHours, setOlderThanHours] = useState(6)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
+  const [expanded, setExpanded] = useState<ReadonlySet<CleanupKindView>>(() => new Set())
+  const kinds = KIND_CHOICES.map(choice => choice.kind)
+  const request = { path: props.path, olderThanHours, kinds }
   const preview = useQuery({
     queryKey: ['jujutsu', 'workspace-cleanup-preview', props.path, olderThanHours, kinds],
-    enabled: props.open && olderThanHours !== undefined && kinds.length > 0,
+    enabled: props.open,
     placeholderData: keepPreviousData,
     retry: false,
-    queryFn: ({ signal }) => {
-      if (olderThanHours === undefined) throw new Error('Enter a whole number of hours greater than 0.')
-      return api.cleanupWorkspaces({ path: props.path, olderThanHours, kinds, apply: false }, { signal })
-    },
+    queryFn: ({ signal }) => api.cleanupWorkspaces({ ...request, apply: false }, { signal }),
   })
   const running = useCleanupJobs().data?.jobs.find(CleanupJobTrailModel.isActive)
   const cleanup = useMutation({
     mutationFn: () => {
-      if (request === null) throw new Error('Enter a whole number of hours greater than 0.')
-      return requestWorkspaceCleanup(api, request)
+      const rows = preview.data === undefined ? [] : cleanupRows(preview.data)
+      const targets = rows.filter(row => selected.has(row.key)).map(row => row.target)
+      if (targets.length === 0 && emptyRevisionCount === 0) throw new Error('Select at least one workspace or folder to clean up.')
+      return requestWorkspaceCleanup(api, { ...request, targets })
     },
-    // The removal runs on the Host: the dialog is done the moment the job starts, and the panel trail reports the rest.
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: cleanupJobsKey })
+      setSelected(new Set())
       props.onCleaned()
       props.onOpenChange(false)
     },
   })
-  const toggleKind = (kind: CleanupKindView, checked: boolean): void =>
-    setKinds(current => (checked ? [...new Set([...current, kind])] : current.filter(existing => existing !== kind)))
-  const shown = olderThanHours === undefined ? undefined : preview.data
+  const shown = preview.data
+  const rows = shown === undefined ? [] : cleanupRows(shown)
   const previewLoadingLabel = cleanupPreviewLoadingLabel({ isFetching: preview.isFetching, hasData: shown !== undefined })
-  const candidates = shown === undefined ? [] : cleanupRows(shown)
-  const removable = shown === undefined ? 0 : shown.workspaces.length + shown.untracked.length
+  const selectedRows = rows.filter(row => selected.has(row.key))
+  const removable = selectedRows.length
   const emptyRevisionCount = shown?.emptyRevisions.length ?? 0
-  const nothingToDo = removable === 0 && emptyRevisionCount === 0
+  const nothingToDo = rows.length === 0 && emptyRevisionCount === 0
   const progress = running === undefined ? '' : CleanupJobTrailModel.progressLabel(running)
+  const allSelected = rows.length > 0 && removable === rows.length
+  const partiallySelected = removable > 0 && !allSelected
+
+  const toggleRow = (row: CleanupRow, checked: boolean): void => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (checked) next.add(row.key)
+      else next.delete(row.key)
+      return next
+    })
+  }
+  const toggleRows = (targets: readonly CleanupRow[], checked: boolean): void => {
+    setSelected(current => {
+      const next = new Set(current)
+      for (const row of targets) {
+        if (checked) next.add(row.key)
+        else next.delete(row.key)
+      }
+      return next
+    })
+  }
+  const toggleExpanded = (kind: CleanupKindView): void => {
+    setExpanded(current => {
+      const next = new Set(current)
+      if (next.has(kind)) next.delete(kind)
+      else next.add(kind)
+      return next
+    })
+  }
 
   return (
-    <Dialog onOpenChange={open => props.onOpenChange(open)} open={props.open}>
-      <DialogContent className="dshx-root dshx:sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Clean up JJ workspaces</DialogTitle>
-          <DialogDescription>
-            Removes idle thread workspaces with no unlanded work and stale folders no workspace owns, then abandons the empty revisions nothing builds on. Other
-            JJ workspaces are manual-only and opt-in. JJ snapshots working-copy files before checking them; unlanded work, uncommitted changes, busy Sessions,
-            and unverifiable workspaces are always kept.
+    <Dialog
+      onOpenChange={open => {
+        if (!open) setSelected(new Set())
+        props.onOpenChange(open)
+      }}
+      open={props.open}
+    >
+      <DialogContent className="dshx-root dshx:sm:max-w-xl dshx:gap-0 dshx:p-0">
+        <DialogHeader className="dshx:px-5 dshx:pb-4 dshx:pt-5">
+          <DialogTitle>Clean up workspaces</DialogTitle>
+          <DialogDescription className="dshx:sr-only">
+            Select idle workspaces and untracked folders to remove. Unlanded work, uncommitted changes, and active sessions are always kept.
           </DialogDescription>
         </DialogHeader>
-        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:text-xs">
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <span className="dshx:text-muted-foreground">Unused for</span>
-            <div aria-label="Unused for at least" className="dshx:flex dshx:gap-1" role="radiogroup">
-              {AGE_CHOICES.map(choice => (
-                <Button
-                  aria-checked={presetHours === choice.hours}
-                  key={choice.hours}
-                  onClick={() => {
-                    setPresetHours(choice.hours)
-                    setCustomHours('')
-                  }}
-                  role="radio"
-                  size="xs"
-                  type="button"
-                  variant={presetHours === choice.hours ? 'secondary' : 'ghost'}
-                >
-                  {choice.label}
-                </Button>
-              ))}
-            </div>
-            <Label className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:font-normal">
-              Custom
-              <Input
-                aria-invalid={presetHours === null && olderThanHours === undefined}
-                aria-label="Custom hours"
-                className="dshx:h-7 dshx:w-16 dshx:px-2"
-                min={1}
-                onChange={event => {
-                  setPresetHours(null)
-                  setCustomHours(event.currentTarget.value)
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-5 dshx:pb-4 dshx:text-xs">
+          <span className="dshx:text-muted-foreground">Idle for</span>
+          <div aria-label="Idle for at least" className="dshx:flex dshx:gap-1" role="radiogroup">
+            {AGE_CHOICES.map(choice => (
+              <Button
+                aria-checked={olderThanHours === choice.hours}
+                key={choice.hours}
+                onClick={() => {
+                  setOlderThanHours(choice.hours)
+                  setSelected(new Set())
                 }}
-                placeholder="Hours"
-                step={1}
-                type="number"
-                value={customHours}
-              />
-              <span className="dshx:text-muted-foreground">h</span>
-            </Label>
+                role="radio"
+                size="xs"
+                type="button"
+                variant={olderThanHours === choice.hours ? 'secondary' : 'ghost'}
+              >
+                {choice.label}
+              </Button>
+            ))}
           </div>
-          {presetHours === null && olderThanHours === undefined && (
-            <p className="dshx:text-destructive" role="alert">
-              Enter a whole number of hours greater than 0.
-            </p>
+          <Button className="dshx:ml-auto" disabled={preview.isFetching} onClick={() => void preview.refetch()} size="xs" type="button" variant="ghost">
+            {preview.isFetching ? <Spinner className="dshx:size-3" /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3" />}
+            Rescan
+          </Button>
+        </div>
+        {previewLoadingLabel === undefined ? null : (
+          <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-5 dshx:pt-3 dshx:text-xs dshx:text-muted-foreground" role="status">
+            <Spinner aria-hidden="true" className="dshx:size-3" />
+            {previewLoadingLabel}
+          </p>
+        )}
+        <div aria-busy={preview.isFetching} className="dshx:max-h-[min(55vh,28rem)] dshx:overflow-y-auto">
+          {preview.isError && (
+            <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>
           )}
-          <TooltipProvider delayDuration={500}>
-            <div className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
-              {KIND_CHOICES.map(choice => (
-                <Tooltip key={choice.kind}>
-                  <TooltipTrigger asChild>
-                    <span className="dshx:inline-flex">
-                      <Label className="dshx:gap-1.5 dshx:text-xs dshx:font-normal">
-                        <Checkbox checked={kinds.includes(choice.kind)} onCheckedChange={checked => toggleKind(choice.kind, checked === true)} />
-                        {choice.label}
-                      </Label>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{choice.hint}</TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-            {previewLoadingLabel === undefined ? null : (
-              <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground" role="status">
-                <Spinner aria-hidden="true" className="dshx:size-3" />
-                {previewLoadingLabel}
-              </p>
-            )}
-            <div
-              aria-busy={preview.isFetching}
-              aria-live="polite"
-              className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2"
-            >
-              {preview.isError && <p className="dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>}
-              {shown !== undefined && candidates.length === 0 && <p className="dshx:text-muted-foreground">No workspace qualifies.</p>}
-              {candidates.map(row => (
-                <Tooltip key={row.key}>
-                  <TooltipTrigger asChild>
-                    <div aria-label={row.title} className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:font-mono">
-                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.name}</span>
-                      <span className="dshx:text-muted-foreground">{row.kind}</span>
-                      <span className="dshx:text-muted-foreground">{formatAge(row.at)}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{row.title}</TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </TooltipProvider>
+          <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-5 dshx:py-3">
+            <Checkbox
+              aria-label="Select all eligible items"
+              checked={allSelected ? true : partiallySelected ? 'indeterminate' : false}
+              disabled={rows.length === 0}
+              onCheckedChange={checked => toggleRows(rows, checked === true)}
+            />
+            <span className="dshx:text-sm">Select all</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{rows.length} eligible</span>
+            <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground">{removable} selected</span>
+          </div>
+          {KIND_CHOICES.map(choice => {
+            const groupRows = rows.filter(row => row.target.kind === choice.kind)
+            if (groupRows.length === 0) return null
+            const groupSelected = selectedCount(groupRows, selected)
+            const checked = groupSelected === groupRows.length ? true : groupSelected > 0 ? 'indeterminate' : false
+            const isExpanded = expanded.has(choice.kind)
+            return (
+              <section className="dshx:border-b dshx:border-border dshx:last:border-b-0" key={choice.kind}>
+                <div className="dshx:flex dshx:min-h-12 dshx:items-center dshx:gap-3 dshx:px-5 dshx:py-2">
+                  <Checkbox aria-label={`Select ${choice.label}`} checked={checked} onCheckedChange={value => toggleRows(groupRows, value === true)} />
+                  <Button
+                    aria-expanded={isExpanded}
+                    className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-0 dshx:text-left"
+                    onClick={() => toggleExpanded(choice.kind)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {isExpanded ? (
+                      <ChevronDownIcon aria-hidden="true" className="dshx:size-3" />
+                    ) : (
+                      <ChevronRightIcon aria-hidden="true" className="dshx:size-3" />
+                    )}
+                    <span className="dshx:truncate">{choice.label}</span>
+                    <span className="dshx:rounded dshx:bg-muted dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{groupRows.length}</span>
+                  </Button>
+                  {groupSelected > 0 && <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{groupSelected} selected</span>}
+                </div>
+                {isExpanded && (
+                  <ul className="dshx:space-y-1 dshx:px-5 dshx:pb-3 dshx:pl-12">
+                    {groupRows.map(row => (
+                      <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:py-1.5" key={row.key}>
+                        <Checkbox
+                          aria-label={`Select ${row.target.name}`}
+                          checked={selected.has(row.key)}
+                          onCheckedChange={checkedValue => toggleRow(row, checkedValue === true)}
+                        />
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{row.target.name}</span>
+                        <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatAge(row.at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )
+          })}
+          {shown !== undefined && rows.length === 0 && <p className="dshx:px-5 dshx:py-5 dshx:text-sm dshx:text-muted-foreground">No workspace qualifies.</p>}
+          {shown === undefined && !preview.isError && previewLoadingLabel === undefined && (
+            <p className="dshx:px-5 dshx:py-5 dshx:text-sm dshx:text-muted-foreground">No workspace qualifies.</p>
+          )}
           {shown === undefined ? null : (
-            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-muted-foreground" aria-live="polite">
+            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-5 dshx:py-3 dshx:text-xs dshx:text-muted-foreground" aria-live="polite">
               {WorkspaceCleanupSummary.format({
                 emptyRevisionCount,
                 skippedReasons: shown.skipped.map(workspace => workspace.reason),
               }).map(line => (
                 <p key={line}>{line}</p>
               ))}
-              {shown.skipped
-                .filter(workspace => workspace.reason === 'working-copy-dirty' || workspace.reason === 'workspace-state-unknown')
-                .map(workspace => (
-                  <p key={`${workspace.repoRoot}:${workspace.name}:${workspace.reason}`}>
-                    <span className="dshx:font-mono">{workspace.name}</span>: {WorkspaceCleanupSummary.skipLabel(workspace.reason)}
-                  </p>
-                ))}
             </div>
           )}
-          {running === undefined ? null : (
-            <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground" role="status">
-              <Spinner className="dshx:size-3" />
-              {CleanupJobTrailModel.phaseLabel(running)}
-              {progress === '' ? null : <span className="dshx:font-mono">{progress}</span>}
-            </p>
-          )}
-          {cleanup.isError && <p className="dshx:text-destructive">{errorMessage(cleanup.error, 'The cleanup could not start.')}</p>}
         </div>
-        <DialogFooter>
-          <Button onClick={() => props.onOpenChange(false)} size="sm" type="button" variant="ghost">
-            Cancel
-          </Button>
-          <Button
-            disabled={olderThanHours === undefined || nothingToDo || preview.isFetching || cleanup.isPending || kinds.length === 0 || running !== undefined}
-            onClick={() => cleanup.mutate()}
-            size="sm"
-            type="button"
-            variant="destructive"
-          >
-            {cleanup.isPending && <Spinner className="dshx:size-3" />}
-            Remove {WorkspaceCleanupSummary.formatCount(removable, 'item', 'items')}
-            {emptyRevisionCount > 0 && ` + ${WorkspaceCleanupSummary.formatCount(emptyRevisionCount, 'revision', 'revisions')}`}
-          </Button>
-        </DialogFooter>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-5 dshx:py-4">
+          <span className="dshx:text-xs dshx:text-muted-foreground">Unlanded work is always protected</span>
+          <DialogFooter className="dshx:gap-2">
+            <Button onClick={() => props.onOpenChange(false)} size="sm" type="button" variant="ghost">
+              Cancel
+            </Button>
+            <Button
+              disabled={(removable === 0 && emptyRevisionCount === 0) || nothingToDo || preview.isFetching || cleanup.isPending || running !== undefined}
+              onClick={() => cleanup.mutate()}
+              size="sm"
+              type="button"
+              variant="destructive"
+            >
+              {cleanup.isPending && <Spinner className="dshx:size-3" />}
+              Clean up {removable}
+            </Button>
+          </DialogFooter>
+        </div>
+        {running === undefined ? null : (
+          <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-5 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground" role="status">
+            <Spinner className="dshx:size-3" />
+            {CleanupJobTrailModel.phaseLabel(running)}
+            {progress === '' ? null : <span className="dshx:font-mono">{progress}</span>}
+          </p>
+        )}
+        {cleanup.isError && (
+          <p className="dshx:px-5 dshx:pb-3 dshx:text-xs dshx:text-destructive">{errorMessage(cleanup.error, 'The cleanup could not start.')}</p>
+        )}
+        {nothingToDo && shown !== undefined && emptyRevisionCount > 0 && removable === 0 && (
+          <p className="dshx:px-5 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">Empty revisions will be abandoned when cleanup runs.</p>
+        )}
       </DialogContent>
     </Dialog>
   )

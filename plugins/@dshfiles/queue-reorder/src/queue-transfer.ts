@@ -57,7 +57,7 @@ const textOf = (blocks: readonly QueuedBlock[]): string => blocks.flatMap(block 
 const blocksOf = (context: TransferContext): readonly QueuedBlock[] => context.row?.blocks ?? []
 
 // SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
-export const queueTransferMachine = setup({
+const queueTransferMachine = setup({
   types: { context: {} as TransferContext, events: {} as TransferEvent, input: {} as { readonly ports: QueueTransferPorts } },
   actors: {
     load: fromPromise<readonly File[], { readonly ports: QueueTransferPorts; readonly blocks: readonly QueuedBlock[] }>(({ input, signal }) =>

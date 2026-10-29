@@ -20,6 +20,11 @@
   gap: 16px;
 }
 
+/* Markdown soft breaks arrive as newlines in text nodes; preserve them. */
+.body :global(.markdown) {
+  white-space: pre-wrap;
+}
+
 /* Wide markdown tables (the renderer's ≥4-column md-table-wide hook) span
    the whole transcript width instead of clipping at the 748px message
    column, while the table content keeps starting at its normal x (the lead

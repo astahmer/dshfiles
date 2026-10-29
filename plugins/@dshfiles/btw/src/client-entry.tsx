@@ -10,9 +10,10 @@ import type { CommandClaim, InputTriggerSource } from '@dshfiles/input-trigger/c
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
 import { useSelector } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -91,9 +92,14 @@ const CacheReading = (props: { readonly reference: SessionReference; readonly t:
   const reading = PrefixCache.firstRequestAfterFork(events.entries.map(entry => entry.event))
   if (reading === undefined) return <span>{props.t('cacheWaiting')}</span>
   return (
-    <span data-testid="dshfiles-btw-cache" title={`${String(reading.cacheReadTokens)} cached / ${String(reading.inputTokens)} uncached input tokens`}>
-      {props.t('cache', { share: Math.round(reading.cacheReadShare * 100) })}
-    </span>
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span data-testid="dshfiles-btw-cache">{props.t('cache', { share: Math.round(reading.cacheReadShare * 100) })}</span>
+        </TooltipTrigger>
+        <TooltipContent>{`${String(reading.cacheReadTokens)} cached / ${String(reading.inputTokens)} uncached input tokens`}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -114,7 +120,7 @@ export default defineClient({
   name: '@dshfiles/btw',
   locales: [btwLocale],
   inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'inputTriggers', 'resources', 'sidebarRight', 'sidebarRightTabs', 'shortcuts'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     const t: Translate = (key, params) => ctx.locale.bind(BTW_LOCALE_NAMESPACE)(key, params)
 
     const routeOf = (sessionId: SessionId): ModelRoute | null => {
@@ -231,21 +237,17 @@ export default defineClient({
       'dshfiles-btw: side question dialog',
     )
 
-    ctx.effect(
-      () =>
-        PaletteApi.registerAction({
-          id: '@dshfiles/btw/ask',
-          label: () => t('paletteAsk'),
-          aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],
-          icon: <MessageCircleQuestionIcon className="dshx:size-4" />,
-          group: 'action',
-          isAvailable: context => context.thread !== null && !context.thread.archived && listedThread(context.thread.id) !== undefined,
-          run: context => {
-            askAbout(context.thread?.id)
-          },
-        }),
-      'dshfiles-btw: command palette action',
-    )
+    metadata?.plugin?.add(PaletteActions, {
+      id: '@dshfiles/btw/ask',
+      label: () => t('paletteAsk'),
+      aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],
+      icon: <MessageCircleQuestionIcon className="dshx:size-4" />,
+      group: 'action',
+      isAvailable: context => context.thread !== null && !context.thread.archived && listedThread(context.thread.id) !== undefined,
+      run: context => {
+        askAbout(context.thread?.id)
+      },
+    })
 
     if (isShortcutCommandId(ASK_SHORTCUT_ID))
       ctx.effect(() => {
@@ -288,18 +290,24 @@ export default defineClient({
       if (!available) return null
       const label = t('composerChip')
       return (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={label}
-          title={label}
-          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground"
-          onMouseDown={event => event.preventDefault()}
-          onClick={() => askAbout(props.sessionId)}
-        >
-          <MessageCircleQuestionIcon aria-hidden />
-        </Button>
+        <TooltipProvider delayDuration={500}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={label}
+                className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground"
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => askAbout(props.sessionId)}
+              >
+                <MessageCircleQuestionIcon aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )
     }
     // Icon-only and before Prompts (60): it never carries a label, so it adds nothing to the composer's collapse order.

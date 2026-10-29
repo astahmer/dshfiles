@@ -4,40 +4,45 @@ import { createRequire } from 'node:module'
 import { relative, resolve as resolvePath } from 'node:path'
 import { styleText } from 'node:util'
 import { isCancel, select, text } from '@clack/prompts'
-import { buildClient, buildHost, buildModule } from '../compiler/index.js'
+import { buildClient } from '../compiler/client/build.js'
+import { buildHost } from '../compiler/host/build.js'
+import { buildModule } from '../compiler/module/build.js'
+import { StagedOutput } from '../compiler/staged-output.js'
 import { resolveDshxConfig } from '../config/resolve.js'
-import { startDevSession } from '../dev/index.js'
-import type { DevEvent, DevSession } from '../dev/index.js'
+import { startDevSession } from '../dev/orchestrator.js'
+import type { DevEvent, DevSession } from '../dev/types.js'
 import { relative as relativePath } from 'node:path'
 import { packageProject, testProject } from '../toolchain/index.js'
+import type { TestProjectOptions } from '../toolchain/index.js'
 import { packageTargets } from '../project/package-targets.js'
 import { DshxError } from '../diagnostics.js'
-import { ProfileOrchestrator } from '../profile/index.js'
+import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import type { PreparedProjectProfile, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
-import { checkMigrationDiagnostics, checkPackageTargets, checkProjectManifest, ManifestRepairService, typecheckProject } from '../project/index.js'
-import type { ProjectTypecheckResult } from '../project/index.js'
+import { checkMigrationDiagnostics } from '../project/migrations.js'
+import { checkPackageTargets } from '../project/package-targets.js'
+import { checkProjectManifest } from '../project/manifest.js'
+import { ManifestRepairService } from '../project/repair.js'
+import { typecheckProject } from '../project/typecheck.js'
+import type { ProjectTypecheckResult } from '../project/typecheck.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
-import { inspectProjectComposition } from '../inspect/index.js'
-import type { InspectResult, InspectTarget } from '../inspect/index.js'
+import { inspectProjectComposition } from '../inspect/provider.js'
+import type { InspectResult, InspectTarget } from '../inspect/types.js'
 import { inspectBridgeStatus } from '../inspect/bridge.js'
 import type { InspectBridgeStatus } from '../inspect/bridge.js'
 import { inspectRuntimePlugins } from '../runtime-status.js'
 import type { RuntimePluginReport } from '../runtime-status.js'
-import { createCommandScaffold, createHookScaffold, createToolScaffold, createUiScaffold } from '../scaffold/index.js'
+import { createCommandScaffold } from '../scaffold/command.js'
+import { createHookScaffold } from '../scaffold/hook.js'
+import { createToolScaffold } from '../scaffold/tool.js'
+import { createUiScaffold } from '../scaffold/ui.js'
 import type { AddPresetOptions, AddPresetResult } from '../scaffold/preset.js'
-import type {
-  AddCommandOptions,
-  AddCommandResult,
-  AddHookOptions,
-  AddHookResult,
-  AddToolOptions,
-  AddToolResult,
-  AddUiOptions,
-  AddUiResult,
-} from '../scaffold/index.js'
+import type { AddCommandOptions, AddCommandResult } from '../scaffold/command.js'
+import type { AddHookOptions, AddHookResult } from '../scaffold/hook.js'
+import type { AddToolOptions, AddToolResult } from '../scaffold/tool.js'
+import type { AddUiOptions, AddUiResult } from '../scaffold/ui.js'
 import { assessProjectCompatibility, detectInstalledDshVersion, projectCompatibilityDiagnostics } from '../compat/index.js'
-import type { DshProjectCompatibilityAssessment } from '../compat/index.js'
-import { CliUsageError, parseCliArgs, type CliArgs } from './args.js'
+import type { DshProjectCompatibilityAssessment } from '../compat/types.js'
+import { CliOptionMetadata, CliUsageError, parseCliArgs, type CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
@@ -45,7 +50,9 @@ import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../plat
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
+import { runAddPluginCli } from './add-plugin.js'
 import { runCheckoutCli } from './checkout.js'
+import { runRepositoryCheckCli } from './repository-check.js'
 import { SCRATCH_ACTIONS, runScratchCli } from './scratch.js'
 
 export interface CliIO {
@@ -209,7 +216,7 @@ function mergeRuntimePluginStatus(report: RuntimePluginReport, bridge: InspectBr
       packageName: value.packageName,
       provides: value.provides as string[],
       status: value.status,
-      ...(typeof value.message === 'string' ? { message: value.message } : {}),
+      ...(typeof value.message === 'string' && { message: value.message }),
     })
   }
   if (runtime.size === 0) return report
@@ -219,7 +226,7 @@ function mergeRuntimePluginStatus(report: RuntimePluginReport, bridge: InspectBr
   }
 }
 
-function projectSummary(project: ResolvedDshxConfig): Record<string, unknown> {
+function projectSummary(project: ResolvedDshxConfig) {
   return {
     root: project.root,
     packageId: project.packageId,
@@ -245,7 +252,7 @@ function installationSummary(dsh: ResolvedDshInstallation | undefined): Record<s
   }
 }
 
-function compatibilitySummary(assessment: DshProjectCompatibilityAssessment, dshxVersion: string): Record<string, unknown> {
+function compatibilitySummary(assessment: DshProjectCompatibilityAssessment, dshxVersion: string) {
   const support = assessment.installedVersion === undefined ? null : (assessment.resolution?.support ?? 'unsupported')
   return {
     dshxVersion,
@@ -333,6 +340,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   ]
   for (const item of diagnostics) printDiagnostic(io, item)
   if (hasErrors(diagnostics)) return 1
+  const staged = await StagedOutput.create(project.outDir)
   const jobs: Array<{
     readonly fallback: string
     readonly task: Promise<unknown>
@@ -347,12 +355,12 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       packageId: project.packageId,
       logicalName: project.name,
       root: project.root,
-      ...(project.hostEntry === undefined ? {} : { entry: project.hostEntry }),
-      outDir: project.outDir,
+      ...(project.hostEntry !== undefined && { entry: project.hostEntry }),
+      outDir: staged.directory,
       sourcemap: project.build.sourcemap,
       declarations: project.build.declarations ?? true,
       bundleDependencies: project.hostBundleDependencies ?? [],
-      ...(project.hostVitePlugins === undefined ? {} : { vite: { plugins: project.hostVitePlugins } }),
+      ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
       compatibility,
     }),
   })
@@ -371,14 +379,14 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         logicalName: project.name,
         root: project.root,
         entry: project.clientEntry,
-        outDir: project.outDir,
+        outDir: staged.directory,
         sourcemap: project.build.sourcemap,
         declarations: project.build.declarations ?? true,
         minify: project.build.minify ?? false,
         bundleDependencies: project.clientBundleDependencies ?? [],
-        ...(project.clientShared === undefined ? {} : { shared: project.clientShared }),
-        ...(project.clientSharedRuntime === undefined ? {} : { sharedRuntime: project.clientSharedRuntime }),
-        ...(project.clientVitePlugins === undefined ? {} : { vite: { plugins: project.clientVitePlugins } }),
+        ...(project.clientShared !== undefined && { shared: project.clientShared }),
+        ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
+        ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
         external,
         inject,
         compatibility,
@@ -393,7 +401,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         root: project.root,
         name: shared.name,
         entry: shared.entry,
-        outDir: project.outDir,
+        outDir: staged.directory,
         sourcemap: project.build.sourcemap,
       }),
     })
@@ -415,7 +423,11 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
     for (const name of names) artifacts.push(resolvePath(project.outDir, name))
     if (names.length === 0 && fallback !== undefined) artifacts.push(fallback)
   })
-  if (failed) return 1
+  if (failed) {
+    await staged.discard()
+    return 1
+  }
+  await staged.publish()
   const targetDiagnostics = await (runtime.checkPackageTargets ?? checkPackageTargets)(project)
   for (const item of targetDiagnostics) printDiagnostic(io, item)
   if (hasErrors(targetDiagnostics)) return 1
@@ -527,8 +539,8 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
     diagnostics,
     staticDiagnostics,
     runtimeDiagnostics,
-    ...(dsh === undefined ? {} : { dsh }),
-    ...(profile === undefined ? {} : { profile }),
+    ...(dsh !== undefined && { dsh }),
+    ...(profile !== undefined && { profile }),
     runtimePlugins,
     bridge,
     connection,
@@ -542,7 +554,7 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
   return result
 }
 
-function fixSummary(value: CheckFixResult): Record<string, unknown> {
+function fixSummary(value: CheckFixResult) {
   return {
     requested: value.requested,
     dryRun: value.dryRun,
@@ -664,7 +676,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
   return hasErrors(diagnostics) ? 1 : 0
 }
 
-function inspectSummary(project: ResolvedDshxConfig, result: InspectResult): Record<string, unknown> {
+function inspectSummary(project: ResolvedDshxConfig, result: InspectResult) {
   return {
     project: {
       root: project.root,
@@ -745,7 +757,7 @@ async function selectSlotInteractively(io: CliIO, items: readonly { readonly nam
   return isCancel(answer) ? undefined : answer
 }
 
-function addSummary(project: ResolvedDshxConfig, result: AddUiResult): Record<string, unknown> {
+function addSummary(project: ResolvedDshxConfig, result: AddUiResult) {
   return {
     project: projectSummary(project),
     slot: result.slot,
@@ -754,7 +766,7 @@ function addSummary(project: ResolvedDshxConfig, result: AddUiResult): Record<st
     generatedFiles: result.generatedFiles,
     manifestChanged: result.manifestChanged,
     diagnostics: result.diagnostics,
-    ...(result.diff === undefined ? {} : { diff: result.diff }),
+    ...(result.diff !== undefined && { diff: result.diff }),
   }
 }
 
@@ -775,24 +787,22 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
   }
   const addOptions: AddUiOptions = {
     project,
-    ...(args.slot === undefined ? {} : { slot: args.slot }),
-    ...(args.provider === undefined ? {} : { provider: args.provider }),
-    ...(args.file === undefined ? {} : { file: args.file }),
-    ...(args.id === undefined ? {} : { id: args.id }),
-    ...(args.order === undefined ? {} : { order: args.order }),
+    ...(args.slot !== undefined && { slot: args.slot }),
+    ...(args.provider !== undefined && { provider: args.provider }),
+    ...(args.file !== undefined && { file: args.file }),
+    ...(args.id !== undefined && { id: args.id }),
+    ...(args.order !== undefined && { order: args.order }),
     dryRun: args.dryRun,
   }
   const add =
     runtime.addUi ??
     (async (value: AddUiOptions) =>
       createUiScaffold(value, {
-        ...(runtime.inspectComposition === undefined ? {} : { inspectComposition: runtime.inspectComposition }),
-        ...(runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest }),
-        ...(args.slot === undefined
-          ? {
-              selectSlot: (items: readonly { readonly name: string }[]) => selectSlotInteractively(io, items),
-            }
-          : {}),
+        ...(runtime.inspectComposition !== undefined && { inspectComposition: runtime.inspectComposition }),
+        ...(runtime.checkManifest !== undefined && { checkManifest: runtime.checkManifest }),
+        ...(args.slot === undefined && {
+          selectSlot: (items: readonly { readonly name: string }[]) => selectSlotInteractively(io, items),
+        }),
       }))
   let result: AddUiResult
   try {
@@ -817,7 +827,7 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
   return result.diagnostics.some(item => item.severity === 'error') ? 1 : 0
 }
 
-function toolSummary(project: ResolvedDshxConfig, result: AddToolResult): Record<string, unknown> {
+function toolSummary(project: ResolvedDshxConfig, result: AddToolResult) {
   return {
     project: projectSummary(project),
     name: result.name,
@@ -825,7 +835,7 @@ function toolSummary(project: ResolvedDshxConfig, result: AddToolResult): Record
     generatedFiles: result.generatedFiles,
     diagnostics: result.diagnostics,
     dryRun: result.dryRun,
-    ...(result.diff === undefined ? {} : { diff: result.diff }),
+    ...(result.diff !== undefined && { diff: result.diff }),
   }
 }
 
@@ -862,8 +872,8 @@ async function runAddTool(args: CliArgs, options: CliRunOptions, project: Resolv
   const toolOptions: AddToolOptions = {
     project,
     name,
-    ...(args.description === undefined ? {} : { description: args.description }),
-    ...(args.file === undefined ? {} : { file: args.file }),
+    ...(args.description !== undefined && { description: args.description }),
+    ...(args.file !== undefined && { file: args.file }),
     dryRun: args.dryRun,
   }
   let result: AddToolResult
@@ -919,8 +929,8 @@ async function runAddCommand(args: CliArgs, options: CliRunOptions, project: Res
   const commandOptions: AddCommandOptions = {
     project,
     name,
-    ...(args.description === undefined ? {} : { description: args.description }),
-    ...(args.file === undefined ? {} : { file: args.file }),
+    ...(args.description !== undefined && { description: args.description }),
+    ...(args.file !== undefined && { file: args.file }),
     dryRun: args.dryRun,
   }
   let result: AddCommandResult
@@ -952,7 +962,7 @@ async function runAddCommand(args: CliArgs, options: CliRunOptions, project: Res
   return result.diagnostics.some(item => item.severity === 'error') ? 1 : 0
 }
 
-function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record<string, unknown> {
+function hookSummary(project: ResolvedDshxConfig, result: AddHookResult) {
   return {
     project: projectSummary(project),
     event: result.event,
@@ -960,7 +970,7 @@ function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record
     generatedFiles: result.generatedFiles,
     diagnostics: result.diagnostics,
     dryRun: result.dryRun,
-    ...(result.diff === undefined ? {} : { diff: result.diff }),
+    ...(result.diff !== undefined && { diff: result.diff }),
   }
 }
 
@@ -1271,7 +1281,7 @@ async function runAddPreset(args: CliArgs, options: CliRunOptions, project: Reso
           generatedFiles: result.generatedFiles,
           diagnostics: result.diagnostics,
           dryRun: args.dryRun,
-          ...(result.diff === undefined ? {} : { diff: result.diff }),
+          ...(result.diff !== undefined && { diff: result.diff }),
         },
         null,
         2,
@@ -1312,7 +1322,7 @@ async function runAddHook(args: CliArgs, options: CliRunOptions, project: Resolv
   const hookOptions: AddHookOptions = {
     project,
     event,
-    ...(args.file === undefined ? {} : { file: args.file }),
+    ...(args.file !== undefined && { file: args.file }),
     dryRun: args.dryRun,
   }
   let result: AddHookResult
@@ -1457,7 +1467,8 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
  * import to see it" does not require a running Host.
  */
 const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => {
-  const { CLIENT_SLOT_REFERENCES, findClientSlot } = await import('../client/slot-reference.js')
+  const { CLIENT_SLOT_REFERENCES } = await import('create-dshx/slot-capabilities')
+  const { findClientSlot } = await import('../client/slot-reference.js')
   if (args.json) {
     const slots = args.root === undefined ? CLIENT_SLOT_REFERENCES : CLIENT_SLOT_REFERENCES.filter(slot => slot.name === args.root)
     write(io.stdout, `${JSON.stringify({ slots }, null, 2)}\n`)
@@ -1522,6 +1533,9 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (argv[0] === 'dev' && SCRATCH_ACTIONS.has(argv[1] ?? '')) return runScratchCli(argv.slice(1), io)
   if (argv[0] === 'checkout') return runCheckoutCli(argv.slice(1), io)
+  if (argv[0] === 'check' && argv[1] === 'repo') return runRepositoryCheckCli(argv.slice(2), io)
+  const addOperand = argv[0] === 'add' ? argv[1] : undefined
+  if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand)) return runAddPluginCli(argv.slice(1), io)
   if (argv[0] === 'dev' && argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return runScratchCli(['', '--help'], io)
   let args: CliArgs
   try {
@@ -1618,8 +1632,8 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     return runPlatformCli(args, {
       io,
       dshxVersion: options.version ?? VERSION,
-      ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
-      ...(runtime.connectCommunication === undefined ? {} : { connectCommunication: runtime.connectCommunication }),
+      ...(runtime.connectPlatform !== undefined && { connect: runtime.connectPlatform }),
+      ...(runtime.connectCommunication !== undefined && { connectCommunication: runtime.connectCommunication }),
     })
   }
   try {
@@ -1628,9 +1642,8 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     )
     if (args.command === 'build') return await runBuild(args, options, project)
     if (args.command === 'test') {
-      const testOptions: { stdout: Writable; stderr: Writable; file?: string } = { stdout: io.stdout, stderr: io.stderr }
-      if (args.file !== undefined) testOptions.file = args.file
-      return await (runtime.testProject ?? testProject)(project.root, testOptions)
+      const testOutput: TestProjectOptions = { stdout: io.stdout, stderr: io.stderr }
+      return await (runtime.testProject ?? testProject)(project.root, args.file === undefined ? testOutput : { ...testOutput, file: args.file })
     }
     if (args.command === 'package') {
       const exitCode = await runBuild(args, options, project)

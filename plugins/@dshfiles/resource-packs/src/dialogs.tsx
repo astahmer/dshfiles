@@ -211,7 +211,7 @@ function PackFieldRow(props: {
   )
 }
 
-export function packFromDraft(value: PackDraft): PackDefinition {
+function packFromDraft(value: PackDraft): PackDefinition {
   const definition = packDefinitionSchema.parse({
     id: value.id,
     label: value.label,

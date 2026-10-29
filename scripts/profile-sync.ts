@@ -22,6 +22,9 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
+// The dshx source, not its dist: this runs on checkouts where dshx is not built yet.
+import { BundleFreshness } from '../tooling/dshx/packages/dshx/src/repository/bundle-freshness.ts'
+import { decodeJson } from './json.ts'
 
 /**
  * Link owned bundles into a DSH profile and install it. The single reconciler for profiles: `pnpm profile:sync`, the
@@ -64,11 +67,10 @@ const syncStateSchema = z.object({
 })
 type SyncState = z.infer<typeof syncStateSchema>
 
-const parseJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
-const readJson = <Output>(schema: z.ZodType<Output>, path: string): Output => parseJson(schema, readFileSync(path, 'utf8'))
+const readJson = <Schema extends z.ZodType>(schema: Schema, path: string): z.output<Schema> => decodeJson(schema, readFileSync(path, 'utf8'))
 const errorCode = (error: unknown): string | undefined => z.object({ code: z.string() }).safeParse(error).data?.code
 const isOwned = (name: string): boolean => name.startsWith('@dshfiles/')
-const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex')
+const sha256 = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex')
 const log = (message: string): void => console.log(`profile-sync: ${message}`)
 
 const { values } = parseArgs({
@@ -190,7 +192,8 @@ const signalGroup = (processGroupId: number, signal: NodeJS.Signals): void => {
 const installProfile = async (): Promise<void> => {
   const startedAt = Date.now()
   log(`pnpm install in ${profileDirectory}`)
-  const child = spawn('pnpm', ['install', '--prefer-offline'], { cwd: profileDirectory, stdio: 'inherit', detached: true })
+  // The reconciler edits the manifest on purpose; CI=true would otherwise make pnpm refuse to update the lockfile.
+  const child = spawn('pnpm', ['install', '--prefer-offline', '--no-frozen-lockfile'], { cwd: profileDirectory, stdio: 'inherit', detached: true })
   const exited = new Promise<number | null>((resolveExit, rejectExit) => {
     child.once('error', rejectExit)
     child.once('exit', (code, signal) => resolveExit(signal === null ? code : null))
@@ -279,7 +282,7 @@ const syncSeededProfile = async (): Promise<void> => {
 
   await withProfileLock(async () => {
     const currentText = readFileSync(manifestPath, 'utf8')
-    const manifest = parseJson(profileManifestSchema, currentText)
+    const manifest = decodeJson(profileManifestSchema, currentText)
     const previous = readState()
 
     const dependencies = { ...manifest.dependencies }
@@ -366,8 +369,24 @@ const syncOwnedBundles = async (): Promise<void> => {
   })
 }
 
+/** Linked plugins whose bundle is missing or was built from a workspace source that has since changed. */
+const staleLinkedBundles = (): readonly string[] => {
+  if (!existsSync(manifestPath)) return []
+  const manifest = readJson(profileManifestSchema, manifestPath)
+  return Object.entries(manifest.dependencies).flatMap(([name, spec]) => {
+    if (!isOwned(name) || !spec.startsWith('link:')) return []
+    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)), decodeJson })
+    return report.status === 'stale' || report.status === 'unbuilt' ? [name] : []
+  })
+}
+
 try {
   await (values.bundle === undefined && existsSync(seedManifestPath) ? syncSeededProfile() : syncOwnedBundles())
+  const stale = staleLinkedBundles()
+  if (stale.length > 0) {
+    console.warn(`profile-sync: warning: ${stale.length} plugin bundles are older than their sources and DSH will load the old code: ${stale.join(', ')}`)
+    console.warn(`profile-sync: run \`pnpm build --continue\` in ${repositoryRoot}, then restart DSH.`)
+  }
 } catch (error) {
   console.error(`profile-sync: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1

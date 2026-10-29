@@ -1,12 +1,15 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
 import { runCli } from '../src/cli/run.js'
 import type { CliIO } from '../src/cli/run.js'
-import type { DevEvent, DevSession } from '../src/dev/index.js'
+import type { DevEvent, DevSession } from '../src/dev/types.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import type { PreparedProjectProfile } from '../src/profile/index.js'
-import type { InspectOptions, InspectTarget } from '../src/inspect/index.js'
+import type { PreparedProjectProfile } from '../src/profile/types.js'
+import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 function project(): ResolvedDshxConfig {
@@ -30,6 +33,19 @@ function project(): ResolvedDshxConfig {
       peerDependencies: { '@deepseek-ai/dsh': PROTOCOL_2_COMPATIBILITY.dshRange },
     },
   }
+}
+
+const temporaryDirectories: string[] = []
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
+})
+
+/** `dshx build` stages its output beside `outDir`, so a build needs a writable root. */
+async function buildableProject(): Promise<ResolvedDshxConfig> {
+  const root = await mkdtemp(resolve(tmpdir(), 'dshx-cli-build-'))
+  temporaryDirectories.push(root)
+  return { ...project(), root, packageFile: resolve(root, 'package.json'), outDir: resolve(root, 'dist') }
 }
 
 function io(): CliIO & { out: PassThrough; err: PassThrough } {
@@ -198,7 +214,7 @@ describe('CLI commands', () => {
 
   it('uses terminal colors and compact relative artifact paths on a TTY', async () => {
     const streams = ttyIO()
-    const value = project()
+    const value = await buildableProject()
     const code = await runCli(['build'], {
       io: streams,
       runtime: {
@@ -215,12 +231,12 @@ describe('CLI commands', () => {
     const output = await text(streams.out)
     expect(output).toContain('✓ Built @test/plugin')
     expect(output).toContain('dist/index.js')
-    expect(output).not.toContain('/project/plugin/dist/index.js')
+    expect(output).not.toContain(`${value.root}/dist/index.js`)
   })
 
   it('builds a no-op Host root artifact for an explicit Client-only project', async () => {
     const streams = io()
-    const value = project()
+    const value = await buildableProject()
     const { hostEntry: _hostEntry, ...clientOnly } = value
     const calls: string[] = []
     const code = await runCli(['build'], {

@@ -2,9 +2,6 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { MAX_USAGE_HISTORY_POINTS, quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
 import type { QuotaSnapshot } from './usage-history-model.js'
 
-export { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
-export type { QuotaSnapshot, UsageMeta } from './usage-history-model.js'
-
 /**
  * Durable quota history.
  *
@@ -21,7 +18,7 @@ export type { QuotaSnapshot, UsageMeta } from './usage-history-model.js'
  */
 
 // The domain name is a lower-case identifier, so the package's hyphen cannot appear.
-export const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
+const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
 
 const LEGACY_BUCKET_MS = 15 * 60_000
 const MINUTE_MS = 60_000

@@ -109,10 +109,10 @@ const toSecretCreateInput = (form: SecretCreateFormValues): SecretCreateForm => 
   valueMode: form.valueMode,
   value: form.valueMode === 'manual' ? form.value : null,
   type: form.type,
-  ...(form.name.length === 0 ? {} : { name: form.name }),
-  ...(form.source.length === 0 ? {} : { source: form.source }),
-  ...(form.tags.length === 0 ? {} : { tags: form.tags }),
-  ...(form.field.length === 0 ? {} : { field: form.field }),
+  ...(form.name.length !== 0 && { name: form.name }),
+  ...(form.source.length !== 0 && { source: form.source }),
+  ...(form.tags.length !== 0 && { tags: form.tags }),
+  ...(form.field.length !== 0 && { field: form.field }),
 })
 
 export const secretUpdateFormSchema = updateMetadataSchema.required().extend({ renameTo: aliasSchema, clearTags: z.boolean(), value: secretValueSchema })
@@ -143,10 +143,10 @@ const toSecretUpdateInput = (input: {
   alias: input.target.alias,
   scope: input.target.scope,
   environment: input.target.environment,
-  ...(input.form.renameTo.trim().length > 0 && input.form.renameTo.trim() !== input.target.alias ? { newAlias: input.form.renameTo.trim() } : {}),
+  ...(input.form.renameTo.trim().length > 0 && input.form.renameTo.trim() !== input.target.alias && { newAlias: input.form.renameTo.trim() }),
   value: input.form.value.length === 0 ? null : input.form.value,
-  ...(input.form.name.length === 0 ? {} : { name: input.form.name }),
-  ...(input.form.source.length === 0 ? {} : { source: input.form.source }),
+  ...(input.form.name.length !== 0 && { name: input.form.name }),
+  ...(input.form.source.length !== 0 && { source: input.form.source }),
   ...(input.form.clearTags ? { tags: '' } : input.form.tags.length === 0 ? {} : { tags: input.form.tags }),
 })
 

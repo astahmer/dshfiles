@@ -114,9 +114,7 @@ next to the native tools does not change what the model calls.
 
 ## Open work
 
-1. Add `@dshfiles/fff-search` to the `web` profile. This needs a DSH restart,
-   which is the user's call.
-2. Benchmark a larger corpus (≥100k files) with more listing-style tasks at 5
+1. Benchmark a larger corpus (≥100k files) with more listing-style tasks at 5
    reps, and a pass on a reasoning model, not only Flash.
-3. Watch for the fff-mcp hang on repeated identical `grep` calls through the
+2. Watch for the fff-mcp hang on repeated identical `grep` calls through the
    fff-node path, and report it upstream if it reproduces.

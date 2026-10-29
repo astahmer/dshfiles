@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -18,9 +19,11 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import { multiHostApi, type HostSummary, type RuntimeSummary } from '../api.js'
+import { multiHostApi, type HostSummary, type ResourcePoolEntry, type RuntimeSummary } from '../api.js'
+import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
+import { CloneProjectDialog } from './clone-project-dialog.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -30,10 +33,53 @@ const blankDraft: HostDraft = { name: '', sshTarget: '', remoteHome: '' }
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
   new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
 
+const ResourceUsage = (props: { readonly hostName: string; readonly resource: ResourcePoolEntry }) => {
+  if (!props.resource.probe.ok) {
+    return (
+      <p data-testid={`host-resources-${props.resource.hostId}`} className="dshx:text-xs dshx:text-muted-foreground">
+        Resource data unavailable
+      </p>
+    )
+  }
+  const snapshot = props.resource.probe.snapshot
+  const memoryUsed = snapshot.memoryTotalBytes - snapshot.memoryFreeBytes
+  const memoryUsedRatio = snapshot.memoryTotalBytes === 0 ? undefined : memoryUsed / snapshot.memoryTotalBytes
+  const normalizedLoad = snapshot.loadAverage1m === null || snapshot.cpuCount === 0 ? undefined : snapshot.loadAverage1m / snapshot.cpuCount
+  const memoryText =
+    snapshot.memoryTotalBytes === 0 ? '—' : `${(memoryUsed / 1024 ** 3).toFixed(1)} / ${(snapshot.memoryTotalBytes / 1024 ** 3).toFixed(1)} GiB`
+  const loadText = snapshot.loadAverage1m === null ? '—' : `${snapshot.loadAverage1m.toFixed(2)} · ${snapshot.cpuCount} cores`
+
+  const metric = (label: string, value: string, ratio: number | undefined) => (
+    <div className="dshx:min-w-0 dshx:flex-1">
+      <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px]">
+        <span className="dshx:text-muted-foreground">{label}</span>
+        <span className="dshx:truncate dshx:font-mono">{value}</span>
+      </div>
+      <div className="dshx:mt-1 dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted" aria-hidden="true">
+        <div className="dshx:h-full dshx:rounded-full dshx:bg-primary" style={{ width: `${Math.min(100, Math.max(0, (ratio ?? 0) * 100))}%` }} />
+      </div>
+    </div>
+  )
+
+  return (
+    <div
+      role="group"
+      data-testid={`host-resources-${props.resource.hostId}`}
+      aria-label={`Resources for ${props.hostName}`}
+      className="dshx:flex dshx:min-w-0 dshx:gap-4 dshx:pt-1 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:gap-2"
+    >
+      {metric('Load · 1m', loadText, normalizedLoad)}
+      {metric('Memory used', memoryText, memoryUsedRatio)}
+      <span className="dshx:sr-only">{props.resource.stale ? 'Resource sample is stale' : 'Resource sample is current'}</span>
+    </div>
+  )
+}
+
 const HostRow = (props: {
   readonly api: MultiHostClient
   readonly host: HostSummary
   readonly runtime: RuntimeSummary | undefined
+  readonly resource: ResourcePoolEntry | undefined
   readonly index: number
   readonly count: number
   readonly dragging: boolean
@@ -45,6 +91,8 @@ const HostRow = (props: {
   readonly onMove: (direction: 'up' | 'down') => void
   readonly onHide: (hidden: boolean) => void
   readonly onEdit: () => void
+  readonly onAddProject: () => void
+  readonly onCloneProject: () => void
   readonly onRemove: () => void
 }) => {
   const { api, host, runtime } = props
@@ -114,7 +162,13 @@ const HostRow = (props: {
           {runtime?.remoteHome === undefined ? null : (
             <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:@max-pane-compact:hidden">{runtime.remoteHome}</span>
           )}
+          {props.resource?.stale ? (
+            <Badge variant="outline" className="dshx:shrink-0 dshx:text-[10px]">
+              Stale
+            </Badge>
+          ) : null}
         </div>
+        {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
         {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
       </div>
       <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:ml-0 dshx:@max-pane-compact:basis-full">
@@ -150,6 +204,18 @@ const HostRow = (props: {
         >
           {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
         </Button>
+        {host.connector.kind === 'ssh' ? (
+          <>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Add folder
+            </Button>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Clone project
+            </Button>
+          </>
+        ) : null}
         <Button
           size="icon"
           variant="ghost"
@@ -186,11 +252,16 @@ export const HostsPage = () => {
   const api = useApi(multiHostApi)
   const queryClient = useQueryClient()
   const directory = useQuery(multiHostQueries.directory(api, 15_000))
+  const resourcePool = useQuery(multiHostQueries.resourcePool(api, 15_000))
   const hosts = directory.data?.hosts ?? []
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropId, setDropId] = useState<string | null>(null)
   const [pendingOrder, setPendingOrder] = useState<readonly string[] | null>(null)
   const [form, setForm] = useState<HostDraft | null>(null)
+  const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
+  const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
+  const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
+  const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
 
   const updateDirectoryHosts = (nextHosts: readonly HostSummary[]): void => {
     queryClient.setQueryData<DirectoryData>(multiHostKeys.directory, current =>
@@ -220,6 +291,17 @@ export const HostsPage = () => {
   const remove = useMutation({
     mutationFn: (id: string) => api.hostRemove({ id, removeDirectory: true }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.all }),
+  })
+  const addProject = useMutation({
+    mutationFn: async (input: { readonly runtimeId: string; readonly path: string }) => {
+      const result = await api.runtimeOpenFolder(input)
+      if (!result.ok) throw failure(result)
+      return result
+    },
+    onSuccess: () => {
+      setProjectRuntimeId(null)
+      void queryClient.invalidateQueries({ queryKey: multiHostKeys.all })
+    },
   })
 
   const runtimeFor = (host: HostSummary): RuntimeSummary | undefined => directory.data?.runtimes.find(runtime => runtime.hostId === host.id)
@@ -255,10 +337,6 @@ export const HostsPage = () => {
               Add host
             </Button>
           </div>
-          <p className="dshx:text-xs dshx:text-muted-foreground">
-            Every machine this one can run threads on. Drag a row (or use the arrows) to set the order of the destination picker; hidden hosts keep their
-            runtimes and threads.
-          </p>
         </div>
       </header>
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:px-5 dshx:pb-6">
@@ -267,6 +345,22 @@ export const HostsPage = () => {
             <AlertDescription>{errorMessage(directory.error, 'Hosts are unavailable.')}</AlertDescription>
           </Alert>
         ) : null}
+        {resourcePool.isError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{errorMessage(resourcePool.error, 'Host resources are unavailable.')}</AlertDescription>
+          </Alert>
+        ) : null}
+        {resourcePool.data?.selected === null ? (
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm">
+            <span className="dshx:font-medium">Auto destination</span>
+            <Badge variant="secondary">Unavailable</Badge>
+          </div>
+        ) : resourcePool.data?.selected === undefined ? null : (
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm" role="status">
+            <span className="dshx:font-medium">Auto destination</span>
+            <Badge variant="secondary">{resourcePool.data.selected.hostName}</Badge>
+          </div>
+        )}
         {hide.isError ? (
           <Alert variant="destructive">
             <AlertDescription>{errorMessage(hide.error, 'The host visibility could not be saved.')}</AlertDescription>
@@ -282,6 +376,11 @@ export const HostsPage = () => {
             <AlertDescription>{errorMessage(remove.error, 'The host could not be removed.')}</AlertDescription>
           </Alert>
         ) : null}
+        {addProject.isError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{errorMessage(addProject.error, 'The remote project could not be added.')}</AlertDescription>
+          </Alert>
+        ) : null}
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
           <p className="dshx:rounded-lg dshx:border dshx:border-dashed dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
@@ -295,6 +394,7 @@ export const HostsPage = () => {
               api={api}
               host={host}
               runtime={runtimeFor(host)}
+              resource={resourcePool.data?.hosts.find(entry => entry.hostId === host.id)}
               index={index}
               count={ordered.length}
               dragging={draggedId === host.id}
@@ -317,6 +417,8 @@ export const HostsPage = () => {
                 if (next !== order) commitOrder(next)
               }}
               onHide={hidden => hide.mutate({ id: host.id, hidden })}
+              onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
+              onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
               onEdit={() =>
                 setForm({
                   hostId: host.id,
@@ -330,6 +432,30 @@ export const HostsPage = () => {
           ))}
         </ul>
       </div>
+      <CloneProjectDialog
+        api={api}
+        runtime={directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)}
+        hostName={hosts.find(host => directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+        onClose={() => setCloneRuntimeId(null)}
+      />
+      {projectRuntime !== undefined && projectHost !== undefined ? (
+        <ProjectFolderPicker
+          projects={[]}
+          directoryPicker={remoteDirectoryPicker(api, projectRuntime.id)}
+          onRegisterWorkspace={async canonicalPath => {
+            const result = await api.runtimeOpenFolder({ runtimeId: projectRuntime.id, path: canonicalPath })
+            if (!result.ok) throw failure(result)
+            return { workspaceId: result.workspaceId, title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath, canonicalPath }
+          }}
+          onSelect={(selection: ProjectFolderSelection) => addProject.mutate({ runtimeId: projectRuntime.id, path: selection.canonicalPath })}
+          onClose={() => setProjectRuntimeId(null)}
+          mode="directories"
+          disabled={addProject.isPending}
+          showNativePicker={false}
+          machineName={projectHost.name}
+          heading={`Add project · ${projectHost.name}`}
+        />
+      ) : null}
       <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
     </main>
   )

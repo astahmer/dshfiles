@@ -8,7 +8,7 @@ const hex = (bytes: number): string => randomBytes(bytes).toString('hex')
 const receiverEndpoint = async (page: Page): Promise<string> => {
   const badge = page.getByTestId('traces-receiver-state')
   await expect(badge).toHaveAttribute('data-state', 'listening', { timeout: 30_000 })
-  return (await badge.getAttribute('title')) ?? ''
+  return (await badge.getAttribute('data-endpoint')) ?? ''
 }
 
 const alertsView = (page: Page) => page.getByTestId('traces-alerts-view')

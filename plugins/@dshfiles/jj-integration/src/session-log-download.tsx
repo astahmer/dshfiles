@@ -74,7 +74,6 @@ export const SessionLogDownloadRow = (props: {
       disabled={downloading}
       onClick={() => void controller.download(SessionId(props.sessionId))}
       size="sm"
-      title={label}
       type="button"
       variant="ghost"
     >

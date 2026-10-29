@@ -62,6 +62,12 @@ const deferred = <Value,>() => {
   }
 }
 
+const syntheticLoginHints: Partial<Record<AccountKind, string>> = {
+  claude: 'CLAUDE_CONFIG_DIR="/synthetic/claude/shared" claude auth login',
+  codex: 'CODEX_HOME="/synthetic/codex/auth" codex login',
+  commandcode: 'cmd login',
+  cursor: 'cursor-agent login',
+}
 const profile = (kind: AccountKind = 'claude') =>
   accountProfileSchema.parse({
     ...AccountDraftModel.newAccountDraft({ kind, existing: [] }),
@@ -76,16 +82,7 @@ const profile = (kind: AccountKind = 'claude') =>
     plan: null,
     state: 'unconfigured',
     // Synthetic Host metadata, not a client-generated command or a real auth-file read.
-    loginHint:
-      kind === 'claude'
-        ? 'CLAUDE_CONFIG_DIR="/synthetic/claude/shared" claude auth login'
-        : kind === 'codex'
-          ? 'CODEX_HOME="/synthetic/codex/auth" codex login'
-          : kind === 'commandcode'
-            ? 'cmd login'
-            : kind === 'cursor'
-              ? 'cursor-agent login'
-              : '',
+    loginHint: syntheticLoginHints[kind] ?? '',
     detail: null,
   })
 const pending = (operationId: string, kind: AccountKind = 'claude'): AccountConnectionSnapshot => ({

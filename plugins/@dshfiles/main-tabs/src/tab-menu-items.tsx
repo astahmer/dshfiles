@@ -43,14 +43,13 @@ export const TabMenuItems = (props: {
     }
   }
   const openSelectedAside = (): void => {
-    const accepted =
-      props.moveAside !== undefined
-        ? props.moveAside(tab.id)
-        : tab.kind === 'thread'
-          ? requestThreadAside(tab.sessionId)
-          : tab.kind === 'panel'
-            ? requestPanelAside(tab.panelId)
-            : false
+    const requestAside = (): boolean => {
+      if (props.moveAside !== undefined) return props.moveAside(tab.id)
+      if (tab.kind === 'thread') return requestThreadAside(tab.sessionId)
+      if (tab.kind === 'panel') return requestPanelAside(tab.panelId)
+      return false
+    }
+    const accepted = requestAside()
     // The native strip's panel request was historically silent when unavailable.
     if (!accepted && (props.moveAside !== undefined || tab.kind === 'thread')) report(t('sidePanelUnavailable'))
   }

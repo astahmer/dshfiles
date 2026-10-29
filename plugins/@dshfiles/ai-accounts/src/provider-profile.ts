@@ -150,7 +150,7 @@ export class ProviderProfileModel {
     const profile: ResolvedPiAiProviderProfile = {
       provider: params.provider,
       displayName: params.displayName,
-      ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
+      ...(Object.keys(modelOverrides).length !== 0 && { modelOverrides }),
       transport: 'sse',
       streamIdleTimeoutMs: streamIdleTimeoutMsFor(params.upstream.id),
       maxRequestImageBytes: 20_971_520,

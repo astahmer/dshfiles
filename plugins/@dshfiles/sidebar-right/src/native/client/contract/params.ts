@@ -35,9 +35,7 @@ export interface SidebarRightTabParamsMap {}
  * What `openTab(kind)` accepts as `params` for one kind: its declared parameters,
  * or `undefined` for none; a kind that declares none accepts only `undefined`.
  */
-export type SidebarRightTabParamsFor<K extends string> =
-  | (K extends keyof SidebarRightTabParamsMap ? SidebarRightTabParamsMap[K] : never)
-  | undefined
+export type SidebarRightTabParamsFor<K extends string> = (K extends keyof SidebarRightTabParamsMap ? SidebarRightTabParamsMap[K] : never) | undefined
 
 /** Every declared page kind's parameters, or `undefined` for none. */
 export type SidebarRightTabParams = ValuesOf<{

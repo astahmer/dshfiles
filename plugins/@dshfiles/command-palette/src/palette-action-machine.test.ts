@@ -1,6 +1,6 @@
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { expect, test } from 'vitest'
-import type { PaletteAction, PaletteActionContext } from './palette-api.js'
+import type { PaletteAction, PaletteActionContext } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 const context: PaletteActionContext = { thread: null, workspace: null, workspaces: [], themePreference: 'system' }

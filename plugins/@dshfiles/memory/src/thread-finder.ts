@@ -1,4 +1,6 @@
+import { decodeJson } from '@dshfiles/dshx/json'
 import { Utf8 } from '@dshfiles/optmem-core'
+import { z } from 'zod'
 
 /** Where one finder hit was observed. A session can be found by several sources at once. */
 export type ThreadFinderSource = 'session-title' | 'session-metadata' | 'session-content' | 'memory-digest' | 'memory-message' | 'memory-note'
@@ -149,7 +151,10 @@ export class ThreadFinderError extends Error {
   }
 }
 
-export type ThreadFinderLogger = { readonly info: (message: string, fields: Readonly<Record<string, unknown>>) => void }
+/** The scalar fields the finder logs: identifiers, counts and joined labels, never nested values. */
+export type ThreadFinderLogFields = Readonly<Record<string, string | number>>
+
+export type ThreadFinderLogger = { readonly info: (message: string, fields: ThreadFinderLogFields) => void }
 
 export type ThreadFinderRetry = {
   readonly attempts: number
@@ -230,33 +235,28 @@ const overlap = (left: readonly string[], right: readonly string[]): readonly st
 const encodeCursor = (value: { readonly offset: number; readonly stamp: string }): string =>
   Buffer.from(JSON.stringify({ v: cursorVersion, offset: value.offset, stamp: value.stamp }), 'utf8').toString('base64url')
 
-const decodeCursor = (cursor: string): { readonly offset: number; readonly stamp: string } => {
+const cursorPayloadSchema = z.object({ v: z.literal(cursorVersion), offset: z.number().int().nonnegative(), stamp: z.string() })
+
+type CursorPayload = { readonly offset: number; readonly stamp: string }
+
+const decodeCursor = (cursor: string): CursorPayload => {
   try {
-    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { v?: unknown; offset?: unknown; stamp?: unknown }
-    if (
-      parsed.v !== cursorVersion ||
-      typeof parsed.offset !== 'number' ||
-      typeof parsed.stamp !== 'string' ||
-      !Number.isInteger(parsed.offset) ||
-      parsed.offset < 0
-    )
-      throw new Error('shape')
+    const parsed = decodeJson(cursorPayloadSchema, Buffer.from(cursor, 'base64url').toString('utf8'))
     return { offset: parsed.offset, stamp: parsed.stamp }
   } catch {
     throw new ThreadFinderError('invalid-request', 'The cursor is not one this finder issued; start the search again.')
   }
 }
 
-/** The failure contract of the supported full-text backend; anything else is not retried. */
-const isTransientContentFailure = (error: unknown): boolean => {
-  const code = (error as { readonly code?: unknown } | null)?.code
-  return code === 'SESSION_QUERY_PERSISTENCE_FAILED'
-}
+const failureCodeSchema = z.looseObject({ code: z.string() })
 
 const failureCode = (error: unknown): string => {
-  const code = (error as { readonly code?: unknown } | null)?.code
-  return typeof code === 'string' ? code : 'unknown'
+  const parsed = failureCodeSchema.safeParse(error)
+  return parsed.success ? parsed.data.code : 'unknown'
 }
+
+/** The failure contract of the supported full-text backend; anything else is not retried. */
+const isTransientContentFailure = (error: unknown): boolean => failureCode(error) === 'SESSION_QUERY_PERSISTENCE_FAILED'
 
 type Candidate = {
   record: ThreadFinderRecord
@@ -325,7 +325,7 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
   const now = deps.now ?? Date.now
   const correlationId = deps.correlationId ?? (() => Math.random().toString(36).slice(2, 10))
   const retry: ThreadFinderRetry = { ...defaultRetry, ...deps.retry }
-  const log = (fields: Readonly<Record<string, unknown>>): void => deps.logger?.info('thread finder', fields)
+  const log = (fields: ThreadFinderLogFields): void => deps.logger?.info('thread finder', fields)
 
   const inScope = (record: ThreadFinderRecord, query: Pick<ThreadFinderQuery, 'projects' | 'availability' | 'createdFrom' | 'createdTo'>): boolean => {
     if (query.projects.length > 0 && !query.projects.includes(record.project)) return false

@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { loadRuntimePlugins } from '../src/host/runtime-plugins.js'
-import type { DshCompatibility } from '../src/compat/index.js'
+import type { DshCompatibility } from '../src/compat/types.js'
 
 const baseCompatibility: DshCompatibility = {
   id: 'test',

@@ -4,11 +4,11 @@
   "features": [
     {
       "id": "thread-review-scopes",
-      "title": "Group a thread workspace's changes into review scopes",
-      "summary": "Read the current thread workspace's jj diff against its base bookmark, group the changed files with pulls.review's deterministic rules, and review one scope at a time with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
+      "title": "Review project and workspace changes by scope",
+      "summary": "Choose a registered project or workspace and optional base bookmark, read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
       "surfaces": ["client", "host"],
       "configuration": [],
-      "states": ["no-thread", "no-folder", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
+      "states": ["choose-project", "choose-workspace", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
@@ -32,13 +32,17 @@
         "expect text \"main..@\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
-        "click button \"Mark reviewed\"",
-        "expect text \"1/1 reviewed\""
+        "expect text \"Docs\""
       ],
       "verification": [
         {
           "kind": "gherkin",
           "id": "pulls-review.thread-scopes",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.all-scopes-visible",
           "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
         },
         {
@@ -162,13 +166,13 @@
     },
     {
       "id": "batch-reviewed-marks",
-      "title": "Mark a selection of scope files reviewed",
-      "summary": "File rows in the open scope take Shift ranges and Cmd/Ctrl toggles, the scope header selects every visible file, and one action marks or clears the whole selection in local review progress. A plain click still toggles one file.",
+      "title": "Mark a selection of changed files reviewed",
+      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in local review progress. A plain click on Mark reviewed still toggles that file.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [
-        "A mark only ever covers paths of the open scope, so switching scopes or revisions prunes ids the scope no longer lists.",
+        "A mark only ever covers paths in the current review, so changing the workspace or revision prunes ids the diff no longer lists.",
         "The selection is presentation state and never touches the stored reviewed marks until the batch action runs."
       ],
       "externalDependencies": [],
@@ -191,7 +195,7 @@
           "reason": "Client-only: Mark a selection of scope files reviewed renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"pulls.review: Reviews\"", "expect checkbox \"Select all files in this scope\""]
+      "reach": ["click button \"pulls.review: Reviews\"", "expect checkbox \"Select all files in this review\""]
     }
   ]
 }

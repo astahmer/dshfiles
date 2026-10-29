@@ -1,18 +1,31 @@
 import { randomUUID } from 'node:crypto'
+import { Buffer } from 'node:buffer'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
-import { fileUploadValueSchema, multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
+import {
+  fileUploadValueSchema,
+  jjRepositoriesSchema,
+  multiHostApi,
+  resourceSnapshotSchema,
+  type ConnectionTestStep,
+  type ResourcePool,
+  type ResourcePoolEntry,
+  type ResourceProbe,
+  type RuntimeStatus,
+  type SessionSummary,
+} from './api.js'
 import { connectLocal } from './connectors/local.js'
-import { SshConnector } from './connectors/ssh.js'
+import { shellQuote, SshConnector } from './connectors/ssh.js'
 import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { knownSessionRuntime } from './session-runtime.js'
 import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
+import { ResourceSnapshotModel } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -38,6 +51,8 @@ import { reduceTranscript } from './transcript.js'
 import { RemoteThreadStore } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
 import { callNativeRpc } from './native-rpc.js'
+import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
+import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
 
 const profileSchema = z
   .string()
@@ -172,6 +187,13 @@ const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
 const connectionErrors = new Map<string, { readonly code: string; readonly message: string; readonly at: string }>()
 const runtimeStatusCache = createRuntimeStatusCache<RuntimeStatus>({ successTtlMs: 30_000, failureTtlMs: 45_000 })
+const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
+  successTtlMs: 30_000,
+  failureTtlMs: 45_000,
+  maxEntries: 128,
+  spanName: 'multi-host resource snapshot refresh',
+})
+const resourceProbeLimiter = ResourceSnapshotModel.createResourceProbeLimiter(4)
 
 const connectRuntime = async ({
   host,
@@ -185,12 +207,12 @@ const connectRuntime = async ({
   readonly originPort?: number
 }): Promise<Gateway> => {
   if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
-    return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort === undefined ? {} : { originPort }), signal })
+    return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort !== undefined && { originPort }), signal })
   if (runtime.locator.kind === 'ssh' && host.connector.kind === 'ssh')
     return SshConnector.connect({
       sshTarget: host.connector.sshTarget,
       remoteHome: runtime.locator.remoteHome,
-      ...(originPort === undefined ? {} : { originPort }),
+      ...(originPort !== undefined && { originPort }),
       signal,
     })
   throw new GatewayUnavailableError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
@@ -281,7 +303,7 @@ const pool = createGatewayPool({
     const host = await HostDirectoryStore.findHost(runtime.hostId)
     if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime has no recorded host.')
     // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
-    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort === undefined ? {} : { originPort: runtime.originPort }) })
+    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort !== undefined && { originPort: runtime.originPort }) })
     try {
       const identity = await verifyPinnedIdentity(gateway, runtime)
       await HostDirectoryStore.upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
@@ -318,10 +340,10 @@ const runtimeSummary = (record: RuntimeRecord) => ({
   hostId: record.hostId,
   name: record.name,
   identity: record.identity,
-  ...(record.locator.kind === 'ssh' ? { remoteHome: record.locator.remoteHome } : {}),
-  ...(record.lastSeenAt === undefined ? {} : { lastSeenAt: record.lastSeenAt }),
+  ...(record.locator.kind === 'ssh' && { remoteHome: record.locator.remoteHome }),
+  ...(record.lastSeenAt !== undefined && { lastSeenAt: record.lastSeenAt }),
   connected: pool.status(record.id) !== undefined,
-  ...(connectionErrors.has(record.id) ? { lastError: connectionErrors.get(record.id) } : {}),
+  ...(connectionErrors.has(record.id) && { lastError: connectionErrors.get(record.id) }),
 })
 
 const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => ({
@@ -468,8 +490,68 @@ const officialNodeOf = ({ facts, minimum = '22.19.0' }: { readonly facts: Remote
   return facts.node.nix ? official : (facts.node.path ?? official)
 }
 
+const readResourcePool = async (): Promise<ResourcePool> => {
+  const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
+  const remoteHosts = hosts.filter(host => host.connector.kind === 'ssh')
+  const entries: ResourcePoolEntry[] = remoteHosts.map(host => {
+    const runtime = runtimes
+      .filter(item => item.hostId === host.id && item.locator.kind === 'ssh')
+      .sort((left, right) => (right.lastSeenAt ?? right.createdAt).localeCompare(left.lastSeenAt ?? left.createdAt) || left.id.localeCompare(right.id))[0]
+    if (runtime === undefined) {
+      return {
+        hostId: host.id,
+        hostName: host.name,
+        runtimeId: null,
+        destination: null,
+        hidden: host.hidden,
+        probe: { ok: false, code: 'runtime-unavailable', message: 'No remote DSH runtime is registered.' },
+        stale: false,
+        refreshing: false,
+      }
+    }
+
+    const cached = runtimeResourceCache.read(runtime.id)
+    if (cached.stale) {
+      void runtimeResourceCache
+        .refresh(runtime.id, () =>
+          resourceProbeLimiter.run(async () => {
+            try {
+              const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
+              const parsed = resourceSnapshotSchema.safeParse(raw)
+              if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
+              return { ok: true as const, snapshot: parsed.data }
+            } catch (error) {
+              const failure = safeFailure(error)
+              return {
+                ok: false as const,
+                code: failure.code.slice(0, 128),
+                message: 'Resource data is unavailable. Reconnect the runtime or update its multi-host plugin.',
+              }
+            }
+          }),
+        )
+        .catch(() => undefined)
+    }
+    const current = runtimeResourceCache.read(runtime.id)
+    return {
+      hostId: host.id,
+      hostName: host.name,
+      runtimeId: runtime.id,
+      destination: { kind: 'runtime', runtimeId: runtime.id },
+      hidden: host.hidden,
+      probe: current.status ?? { ok: false, code: 'resource-refreshing', message: 'Waiting for a fresh resource snapshot.' },
+      stale: current.stale,
+      refreshing: current.refreshing,
+    }
+  })
+
+  return { hosts: entries, selected: ResourceSnapshotModel.selectAutoHost(entries) }
+}
+
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
+  resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
+  resourcePool: async () => readResourcePool(),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
     return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
@@ -628,7 +710,7 @@ const multiHostHandlers = multiHostApi.host({
         name: input.name.trim(),
         connector,
         hidden: previous?.hidden ?? false,
-        ...(previous?.position === undefined ? {} : { position: previous.position }),
+        ...(previous?.position !== undefined && { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
       const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
@@ -653,7 +735,7 @@ const multiHostHandlers = multiHostApi.host({
       name: input.name.trim(),
       connector,
       hidden: previous?.hidden ?? false,
-      ...(previous?.position === undefined ? {} : { position: previous.position }),
+      ...(previous?.position !== undefined && { position: previous.position }),
       createdAt: previous?.createdAt ?? new Date().toISOString(),
     }
     await HostDirectoryStore.upsertHost(record)
@@ -773,6 +855,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   runtimeReconnect: async ({ input }) => {
     runtimeStatusCache.invalidate(input.runtimeId)
+    runtimeResourceCache.invalidate(input.runtimeId)
     await pool.close(input.runtimeId)
     connectionErrors.delete(input.runtimeId)
     try {
@@ -813,6 +896,97 @@ const multiHostHandlers = multiHostApi.host({
         },
       )
       return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  localProjectFiles: async ({ input, signal }) => {
+    try {
+      const result = await listLocalProjectFiles({ path: input.path, includeIgnored: input.includeIgnored, signal })
+      return { ok: true as const, root: result.root, files: [...result.files], truncated: result.truncated }
+    } catch (error) {
+      return {
+        ok: false as const,
+        ...(error instanceof LocalProjectFilesError
+          ? { code: error.code, message: error.message }
+          : { code: 'local-project-failed', message: 'Could not scan the local Git project.' }),
+      }
+    }
+  },
+  runtimeCloneProject: async ({ input, signal }) => {
+    try {
+      const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
+      if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
+      const host = await HostDirectoryStore.findHost(runtime.hostId)
+      if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
+      const listing = await withRuntime(input.runtimeId, async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', {}, signal)), {
+        mutation: false,
+      })
+      const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
+      let archive: Buffer | undefined
+      if (input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0) {
+        try {
+          archive = await createLocalProjectArchive({
+            root: input.copyFromPath,
+            paths: input.copyPaths,
+            includeIgnored: input.includeIgnored,
+            signal,
+          })
+        } catch (error) {
+          return {
+            ok: false as const,
+            code: error instanceof LocalProjectFilesError ? error.code : 'local-project-failed',
+            message: error instanceof LocalProjectFilesError ? error.message : 'Could not prepare the selected local files.',
+          }
+        }
+      }
+      const cloned = await RemoteExec.run({
+        sshTarget: host.connector.sshTarget,
+        command: `git clone -- ${shellQuote(input.repositoryUrl)} ${shellQuote(destinationPath)}`,
+        timeoutMs: 10 * 60_000,
+        signal,
+      })
+      if (!cloned.ok) return { ok: false as const, code: 'clone-failed', message: cloned.stderr.trim() || 'Git could not clone the repository.' }
+      let copiedFileCount = 0
+      let copyWarning: string | undefined
+      if (archive !== undefined) {
+        try {
+          const copied = await SshConnector.run({
+            sshTarget: host.connector.sshTarget,
+            command: createLocalProjectCopyCommand({ destinationPath, paths: input.copyPaths ?? [] }),
+            stdin: archive,
+            timeoutMs: 120_000,
+            signal,
+          })
+          if (copied.code === 0 && !copied.timedOut && !copied.outputExceeded) copiedFileCount = new Set(input.copyPaths ?? []).size
+          else copyWarning = 'Repository cloned and added, but not every selected local file could be copied. Existing remote files were not overwritten.'
+        } catch {
+          copyWarning = 'Repository cloned and added, but selected local files could not be copied.'
+        }
+      }
+      try {
+        const created = await withRuntime(
+          input.runtimeId,
+          async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
+          { mutation: true },
+        )
+        if (copyWarning !== undefined) {
+          return {
+            ok: true as const,
+            workspaceId: created.workspace.workspaceId,
+            path: created.workspace.path,
+            copiedFileCount,
+            copyWarning,
+          }
+        }
+        return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path, copiedFileCount }
+      } catch {
+        return {
+          ok: false as const,
+          code: 'project-registration-failed',
+          message: 'Repository cloned, but project registration failed. Use Add folder to register it.',
+        }
+      }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -869,7 +1043,7 @@ const multiHostHandlers = multiHostApi.host({
         { mutation: true, broken: brokenRpc },
       )
     } catch (error) {
-      return { ok: false as const, ...safeFailure(error), ...(sessionId === undefined ? {} : { sessionId }) }
+      return { ok: false as const, ...safeFailure(error), ...(sessionId !== undefined && { sessionId }) }
     }
   },
   threadStart: async ({ input }) => {
@@ -883,7 +1057,7 @@ const multiHostHandlers = multiHostApi.host({
           const created = await NativeRpcModel.call(gateway, {
             namespace: 'session',
             method: 'create',
-            args: { request: { cwd: input.cwd, ...(input.agentPreset === undefined ? {} : { agentPreset: input.agentPreset }) } },
+            args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
           sessionId = sessionCreatedSchema.parse(created.value).sessionId
@@ -893,7 +1067,7 @@ const multiHostHandlers = multiHostApi.host({
                 sessionId,
                 provider: input.model.provider,
                 model: input.model.model,
-                ...(input.model.reasoningEffort === undefined ? {} : { reasoningEffort: input.model.reasoningEffort }),
+                ...(input.model.reasoningEffort !== undefined && { reasoningEffort: input.model.reasoningEffort }),
               },
             })
             if (!selected.ok)
@@ -918,7 +1092,7 @@ const multiHostHandlers = multiHostApi.host({
       )
     } catch (error) {
       const failure = safeFailure(error)
-      return { ok: false as const, ...failure, ...(sessionId === undefined ? {} : { sessionId }) }
+      return { ok: false as const, ...failure, ...(sessionId !== undefined && { sessionId }) }
     }
   },
   runtimeModels: async ({ input, signal }) => {
@@ -936,8 +1110,8 @@ const multiHostHandlers = multiHostApi.host({
           models: group.models.map(model => ({
             id: model.id,
             name: model.name,
-            ...(model.description === undefined ? {} : { description: model.description }),
-            ...(model.reasoning === undefined ? {} : { reasoning: model.reasoning }),
+            ...(model.description !== undefined && { description: model.description }),
+            ...(model.reasoning !== undefined && { reasoning: model.reasoning }),
           })),
         })),
         failures: catalog.failures ?? [],
@@ -954,6 +1128,32 @@ const multiHostHandlers = multiHostApi.host({
       }
       const runtimeId = await knownSessionRuntime({ sessionId: input.sessionId, sessionSources: [...activeSessionSources] })
       return { ok: true as const, runtimeId }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  sessionJjRepositories: async ({ input, signal }) => {
+    try {
+      const recordedSessions = await RemoteThreadStore.list()
+      const recorded = recordedSessions.find(thread => thread.sessionId === input.sessionId)
+      const runtimeId = recorded?.runtimeId ?? (await knownSessionRuntime({ sessionId: input.sessionId, sessionSources: [...activeSessionSources] }))
+      if (runtimeId === null) return { ok: false as const, code: 'session/not-remote', message: 'This Session has no known remote owner.' }
+      const authorization = await authorizeRemoteSessionRuntime({
+        sessionId: input.sessionId,
+        runtimeId,
+        recordedSessions,
+        sessionSources: [...activeSessionSources],
+      })
+      if (!authorization.ok) return authorization
+      const repositories = await withRuntime(
+        runtimeId,
+        async gateway =>
+          jjRepositoriesSchema.parse(
+            await gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}, signal),
+          ),
+        { mutation: false },
+      )
+      return { ok: true as const, repositories }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -1000,7 +1200,7 @@ const multiHostHandlers = multiHostApi.host({
               'upload',
               {
                 agentId: input.sessionId,
-                request: { data: input.data, ...(input.name === undefined ? {} : { name: input.name }) },
+                request: { data: input.data, ...(input.name !== undefined && { name: input.name }) },
               },
               signal,
             ),
@@ -1030,10 +1230,10 @@ const multiHostHandlers = multiHostApi.host({
           return {
             ok: true as const,
             cursor: snapshot.cursor,
-            ...(snapshot.header?.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
-            ...(reduced.title === undefined ? {} : { title: reduced.title }),
-            ...(reduced.model === undefined ? {} : { model: reduced.model }),
-            ...(reduced.waiting === undefined ? {} : { waiting: reduced.waiting }),
+            ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
+            ...(reduced.title !== undefined && { title: reduced.title }),
+            ...(reduced.model !== undefined && { model: reduced.model }),
+            ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
             running: reduced.running,
             entries: reduced.entries,
           }

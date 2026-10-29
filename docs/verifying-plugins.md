@@ -34,14 +34,14 @@ checks needed for the affected boundary (for example, the relevant E2E journey
 for a changed user flow). Docs-only changes need no tests. Widen to the plugin's
 full suite or repository-wide checks only when the change crosses broader
 contracts, a pre-landing/release gate requires it, or the focused checks expose
-a reason. See [docs/incremental-checks.md](docs/incremental-checks.md#test-selection)
+a reason. See [docs/incremental-checks.md](incremental-checks.md#test-selection)
 for selection behavior and its full-suite fallbacks.
 
 `node --run <script>` is faster than `pnpm run` and drops a bare argument
 silently, so pass it after `--` or through the check's own environment variable
 (`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The `check:diff`/`check:green`
 split, the Turbo cache and `--force` rules, and the e2e scope rule live in
-[docs/repository-checks.md](docs/repository-checks.md).
+[docs/repository-checks.md](repository-checks.md).
 
 ## Rebuilt plugins reach the browser over HMR
 
@@ -49,7 +49,7 @@ A rebuilt `dist/client.js` reaches the browser without a restart; Host code does
 not, and until a restart the old Host runs under the new client, so decode
 snapshots with defaults and never assume a new field, method or settings
 namespace. What needs a restart, how a failed reload behaves and what to report
-are in [docs/plugin-reload.md](docs/plugin-reload.md).
+are in [docs/plugin-reload.md](plugin-reload.md).
 
 ## Client boot failures are cross-plugin
 

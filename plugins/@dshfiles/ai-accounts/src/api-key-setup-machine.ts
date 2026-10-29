@@ -46,7 +46,7 @@ const persistedWriteActor = fromPromise<WriteOutput, WriteInput>(async ({ input,
 })
 
 // SAFETY: XState uses these empty carriers for inference; the runtime reads the actual machine events and context.
-export const apiKeySetupMachine = setup({
+const apiKeySetupMachine = setup({
   types: {
     context: {} as ApiKeySetupContext,
     events: {} as ApiKeySetupEvent,

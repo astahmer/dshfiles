@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo } from 'react'
 import type { Revision } from './api.js'
@@ -30,43 +31,53 @@ export const ReferenceGraphView = (props: {
   const width = graphWidthFor(METRICS, Math.max(1, ...rows.map(row => row.laneCount)))
 
   return (
-    <ol aria-label="Revision graph" className="dshx:max-h-80 dshx:overflow-auto dshx:py-0.5">
-      {rows.map(layout => {
-        const revision = revisionsById.get(layout.commitId)
-        if (revision === undefined) return null
-        const referenced = revision.commitId === props.referencedCommitId
-        const title = revision.description.trim()
-        return (
-          <li
-            aria-current={referenced ? 'true' : undefined}
-            className={cn(
-              'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:pr-1.5 dshx:text-xs',
-              referenced && 'dshx:bg-accent dshx:text-accent-foreground',
-              revision.immutable && !referenced && 'dshx:text-muted-foreground',
-            )}
-            key={revision.commitId}
-            style={{ height: METRICS.rowHeight }}
-          >
-            <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={revision} width={width} />
-            <code className={cn('dshx:shrink-0 dshx:font-mono! dshx:text-[11px]', referenced ? 'dshx:font-semibold' : 'dshx:text-muted-foreground')}>
-              {revision.shortestChangeId}
-            </code>
-            {revision.workingCopy ? <span className={cn(chipClass, 'dshx:bg-info/15 dshx:text-info')}>@</span> : null}
-            {revision.commitId === props.defaultCommitId ? <span className={cn(chipClass, 'dshx:bg-muted dshx:text-muted-foreground')}>default@</span> : null}
-            {revision.bookmarks.slice(0, 3).map(bookmark => (
-              <span className={cn(chipClass, 'dshx:max-w-28 dshx:truncate dshx:bg-success/15 dshx:text-success')} key={bookmark} title={bookmark}>
-                {bookmark}
-              </span>
-            ))}
-            {revision.bookmarks.length > 3 ? (
-              <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">+{revision.bookmarks.length - 3}</span>
-            ) : null}
-            <span className={cn('dshx:min-w-0 dshx:truncate', title.length === 0 && 'dshx:italic dshx:text-muted-foreground')} title={title}>
-              {title.length > 0 ? title : revision.empty ? '(empty) no description' : 'no description'}
-            </span>
-          </li>
-        )
-      })}
-    </ol>
+    <TooltipProvider delayDuration={500}>
+      <ol aria-label="Revision graph" className="dshx:max-h-80 dshx:overflow-auto dshx:py-0.5">
+        {rows.map(layout => {
+          const revision = revisionsById.get(layout.commitId)
+          if (revision === undefined) return null
+          const referenced = revision.commitId === props.referencedCommitId
+          const title = revision.description.trim()
+          return (
+            <li
+              aria-current={referenced ? 'true' : undefined}
+              className={cn(
+                'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:pr-1.5 dshx:text-xs',
+                referenced && 'dshx:bg-accent dshx:text-accent-foreground',
+                revision.immutable && !referenced && 'dshx:text-muted-foreground',
+              )}
+              key={revision.commitId}
+              style={{ height: METRICS.rowHeight }}
+            >
+              <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={revision} width={width} />
+              <code className={cn('dshx:shrink-0 dshx:font-mono! dshx:text-[11px]', referenced ? 'dshx:font-semibold' : 'dshx:text-muted-foreground')}>
+                {revision.shortestChangeId}
+              </code>
+              {revision.workingCopy ? <span className={cn(chipClass, 'dshx:bg-info/15 dshx:text-info')}>@</span> : null}
+              {revision.commitId === props.defaultCommitId ? <span className={cn(chipClass, 'dshx:bg-muted dshx:text-muted-foreground')}>default@</span> : null}
+              {revision.bookmarks.slice(0, 3).map(bookmark => (
+                <Tooltip key={bookmark}>
+                  <TooltipTrigger asChild>
+                    <span className={cn(chipClass, 'dshx:max-w-28 dshx:truncate dshx:bg-success/15 dshx:text-success')}>{bookmark}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{bookmark}</TooltipContent>
+                </Tooltip>
+              ))}
+              {revision.bookmarks.length > 3 ? (
+                <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">+{revision.bookmarks.length - 3}</span>
+              ) : null}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={cn('dshx:min-w-0 dshx:truncate', title.length === 0 && 'dshx:italic dshx:text-muted-foreground')}>
+                    {title.length > 0 ? title : revision.empty ? '(empty) no description' : 'no description'}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{title.length > 0 ? title : revision.empty ? '(empty) no description' : 'no description'}</TooltipContent>
+              </Tooltip>
+            </li>
+          )
+        })}
+      </ol>
+    </TooltipProvider>
   )
 }

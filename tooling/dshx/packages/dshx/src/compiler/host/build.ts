@@ -18,6 +18,7 @@ const VIRTUAL_HOST_PLATFORM_API_PUBLIC = '\0virtual:dshx-host-platform-api-publi
 const VIRTUAL_HOST_NATIVE_RPC_PUBLIC = '\0virtual:dshx-host-native-rpc-public'
 const VIRTUAL_HOST_SESSION_DIGEST_PUBLIC = '\0virtual:dshx-host-session-digest-public'
 const VIRTUAL_HOST_TRACING_PUBLIC = '\0virtual:dshx-host-tracing-public'
+const VIRTUAL_HOST_JSON_PUBLIC = '\0virtual:dshx-host-json-public'
 const DSHX_HOST_PUBLIC = '@dshfiles/dshx/host'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
 const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
@@ -27,6 +28,7 @@ const DSHX_PLATFORM_HOST_API_PUBLIC = '@dshfiles/dshx/platform/host-api'
 const DSHX_PLATFORM_NATIVE_RPC_PUBLIC = '@dshfiles/dshx/platform/native-rpc'
 const DSHX_PLATFORM_SESSION_DIGEST_PUBLIC = '@dshfiles/dshx/platform/session-digest'
 const DSHX_TRACING_PUBLIC = '@dshfiles/dshx/tracing'
+const DSHX_JSON_PUBLIC = '@dshfiles/dshx/json'
 const HOST_RUNTIME_PATH = fileURLToPath(new URL('../../host/runtime.js', import.meta.url))
 const HOST_DEFINE_PATH = fileURLToPath(new URL('../../host/define.js', import.meta.url))
 const HOST_PROCESS_PATH = fileURLToPath(new URL('../../host/process.js', import.meta.url))
@@ -34,14 +36,17 @@ const HOST_WEB_STARTUP_PATH = fileURLToPath(new URL('../../host/web-startup.js',
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
+const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
 const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/types.js', import.meta.url))
 const PLATFORM_HOST_API_PATH = fileURLToPath(new URL('../../platform/host-api.js', import.meta.url))
 const NATIVE_RPC_SCHEMA_PATH = fileURLToPath(new URL('../../platform/native-rpc.js', import.meta.url))
 const SESSION_DIGEST_PATH = fileURLToPath(new URL('../../platform/session-digest.js', import.meta.url))
 const TRACING_PATH = fileURLToPath(new URL('../../tracing/index.js', import.meta.url))
+const JSON_PATH = fileURLToPath(new URL('../../json.js', import.meta.url))
 const HOST_GENERATION_PATH = fileURLToPath(new URL('../../host/generation.js', import.meta.url))
 
 /** Opt-in in-process Host replacement: publish immutable generations behind a stable wrapper. */
@@ -77,6 +82,7 @@ const VIRTUAL_DSHX_PUBLIC_MODULES: ReadonlyMap<string, string> = new Map([
   [DSHX_PLATFORM_NATIVE_RPC_PUBLIC, VIRTUAL_HOST_NATIVE_RPC_PUBLIC],
   [DSHX_PLATFORM_SESSION_DIGEST_PUBLIC, VIRTUAL_HOST_SESSION_DIGEST_PUBLIC],
   [DSHX_TRACING_PUBLIC, VIRTUAL_HOST_TRACING_PUBLIC],
+  [DSHX_JSON_PUBLIC, VIRTUAL_HOST_JSON_PUBLIC],
 ])
 
 function isInside(parent: string, child: string): boolean {
@@ -119,6 +125,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const createHostApiClient = HostApiClientModel.create',
           'export const isApiServed = HostApiClientModel.isServed',
           'export const listApis = HostApiClientModel.list',
+          `import { HostApiEventsModel } from ${JSON.stringify(API_HOST_EVENTS_PATH)}`,
+          'export const publishApiEvent = HostApiEventsModel.publish',
           '',
         ].join('\n')
       }
@@ -129,6 +137,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner',
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
+          'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')
@@ -137,6 +146,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
+          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }
@@ -157,6 +167,9 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       if (id === VIRTUAL_HOST_TRACING_PUBLIC) {
         return `export * from ${JSON.stringify(TRACING_PATH)}\n`
+      }
+      if (id === VIRTUAL_HOST_JSON_PUBLIC) {
+        return `export * from ${JSON.stringify(JSON_PATH)}\n`
       }
       if (id !== VIRTUAL_HOST_ENTRY) return null
       if (paths.entry === undefined) {
@@ -379,6 +392,13 @@ export async function buildHost(options: BuildHostOptions): Promise<HostBuildRes
   const paths = await resolveOptions(options)
   const config = await hostConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  const report = CompilerKernel.buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
+  const report = CompilerKernel.buildReport(
+    await build(config).catch(CompilerKernel.surfaceGuardError),
+    'host',
+    'index.js',
+    paths.outDir,
+    declarations,
+    'DSHX1304',
+  )
   return options.generation === undefined ? report : hostGenerationReport(report, declarations)
 }

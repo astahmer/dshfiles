@@ -108,7 +108,7 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
     if (!Object.hasOwn(HOST_CAPABILITY_INJECTIONS, capability)) throw new TypeError(`Unknown Host capability ${JSON.stringify(capability)}.`)
   return {
     ...contributions,
-    ...(Config === undefined ? {} : { Config: redactConfigSchema(Config) }),
+    ...(Config !== undefined && { Config: redactConfigSchema(Config) }),
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => HOST_CAPABILITY_INJECTIONS[capability])])],
     setup: SdkSetupRuntime.adaptHost(

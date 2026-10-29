@@ -60,58 +60,10 @@
         dontFixup = true;
       });
 
-      # The desktop shell. Packaging lives here rather than in a checked-in
-      # electron-builder config because machine setup belongs in Nix, and because
-      # Electron is already a cached binary in the pinned nixpkgs — no source build.
-      #
-      # The Host is resolved from PATH at run time rather than baked in: `dsh` is a
-      # pnpm global install, not a Nix output, so pinning a path here would produce
-      # an app that breaks the moment the global store moves. The wrapper passes the
-      # caller's PATH through, and the shell reports a dialog naming the fix when
-      # the executable is absent, which is the failure a GUI launch actually hits.
-      desktop = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
-        pname = "dsh-desktop";
-        version = "0.1.0";
-        src = ./apps/desktop;
-        pnpmDeps = pkgs.fetchPnpmDeps {
-          inherit (finalAttrs) pname version src;
-          pnpm = pkgs.pnpm;
-          fetcherVersion = 4;
-          preFixup = "rm -rf $storePath/v11/links";
-          hash = "sha256-15NhC5oiICDOq4bTcqFNC1AgFBPlbfKD2LB6bpjZNl4=";
-        };
-        nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm pkgs.pnpmConfigHook pkgs.electron ];
-        ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
-        # Electron comes from the binary cache and is never built from source.
-        dontFixup = true;
-
-        buildPhase = ''
-          runHook preBuild
-          pnpm run build
-          runHook postBuild
-        '';
-
-        installPhase = ''
-          runHook preInstall
-          mkdir -p "$out/lib/dsh-desktop"
-          cp -r dist package.json "$out/lib/dsh-desktop/"
-          cp -r node_modules "$out/lib/dsh-desktop/node_modules"
-          mkdir -p "$out/bin"
-          printf '%s\n' \
-            '#!/usr/bin/env bash' \
-            'set -euo pipefail' \
-            'exec "$electron/bin/electron" "$out/lib/dsh-desktop" "$@"' \
-            > "$out/bin/dsh-desktop"
-          chmod +x "$out/bin/dsh-desktop"
-          runHook postInstall
-        '';
-      });
-
     in
     {
       packages = {
         dshx = dshxPkg;
-        desktop = desktop;
         default = dshxPkg;
       };
 
@@ -120,23 +72,19 @@
           type = "app";
           program = "${dshxPkg}/bin/dshx";
         };
-        desktop = {
-          type = "app";
-          program = "${desktop}/bin/dsh-desktop";
-        };
       };
 
       devShell = pkgs.mkShell {
         packages = [ pkgs.fnm ];
 
         # dsh's native loader probe requires the official Node build. fnm only
-        # prepends its directory to PATH, and mkShell leaves ~/.nix-profile/bin
-        # in front of it, so strip the nix node and put fnm's first.
+        # prepends its directory to PATH, so pin that first. The rest of the
+        # profile bin must stay: jj, secret and direnv live only there, and
+        # dropping the whole directory to hide its node broke every one of them.
         shellHook = ''
           eval "$(fnm env --shell bash)"
           fnm use --install-if-missing --silent-if-unchanged
           if [ -n "''${FNM_DIR:-}" ]; then
-            PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "^$HOME/.nix-profile/bin$" | paste -sd: -)"
             export PATH="$FNM_DIR/bin:$PATH"
           fi
           hash -r 2>/dev/null || true

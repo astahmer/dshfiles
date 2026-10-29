@@ -3,7 +3,7 @@ import type { Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { checkProjectManifest } from '../project/index.js'
+import { checkProjectManifest } from '../project/manifest.js'
 import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
@@ -70,7 +70,13 @@ const hasTool = (program: Program, name: string): boolean => {
   return found
 }
 
-function modifyHost(source: string, hostFile: string, toolFile: string, name: string): { source?: string; duplicate: boolean; invalidTools: boolean } {
+interface HostToolEdit {
+  readonly source?: string
+  readonly duplicate: boolean
+  readonly invalidTools: boolean
+}
+
+function modifyHost(source: string, hostFile: string, toolFile: string, name: string): HostToolEdit {
   const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasTool(sourceFile, name)) return { duplicate: true, invalidTools: false }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })
@@ -129,7 +135,7 @@ function result(
     generatedFiles: plan.filter(item => item.before === undefined).map(item => item.file),
     diagnostics,
     dryRun: options.dryRun ?? false,
-    ...(diffText === undefined ? {} : { diff: diffText }),
+    ...(diffText !== undefined && { diff: diffText }),
   }
 }
 
@@ -294,7 +300,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
       [],
     )
   }
-  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined ? { hostEntry: hostFile } : {}) }
+  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined && { hostEntry: hostFile }) }
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)

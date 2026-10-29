@@ -43,7 +43,7 @@ const CONTENT_ATTRIBUTE_PREFIXES = ['gen_ai.prompt.', 'gen_ai.completion.']
 const isContentAttribute = (key: string): boolean => CONTENT_ATTRIBUTE_KEYS.has(key) || CONTENT_ATTRIBUTE_PREFIXES.some(prefix => key.startsWith(prefix))
 
 /** The traces API's own dispatch spans: storing them would make every panel poll a trace of itself. */
-export const SELF_API_ID = 'traces'
+const SELF_API_ID = 'traces'
 const SELF_API_IDS = new Set([SELF_API_ID, 'traces-alerts', 'traces-boards'])
 
 export type NormalizedEvent = {
@@ -137,7 +137,10 @@ const contentPlaceholder = (value: AttributeValue): string => {
 
 export type NormalizeOptions = { readonly redactContent: boolean }
 
-type SpanAttributes = Record<string, AttributeValue>
+/** Attribute values keyed by OTLP attribute name; the wire names them, so the dictionary stays open. */
+interface SpanAttributes {
+  [name: string]: AttributeValue
+}
 
 const attributesOf = (attributes: readonly OtlpKeyValue[] | undefined, options: NormalizeOptions): SpanAttributes => {
   const result: SpanAttributes = {}
@@ -230,7 +233,7 @@ const normalizeTraceRequest = (request: OtlpTraceRequest, options: NormalizeOpti
   return { spans, rejected, skippedSelf }
 }
 
-export const LOG_BODY_BOUND = 8_192
+const LOG_BODY_BOUND = 8_192
 
 export type NormalizedLog = {
   readonly timeUs: number

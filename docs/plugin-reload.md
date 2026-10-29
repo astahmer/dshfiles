@@ -26,7 +26,7 @@ NIX-MANAGED region and, until that row reaches the live file, as a local row.
 A replacement dropped `sessionQuery` and took `session-controller` down twice on
 2026-10-19, so nothing recomposes a live `web` Host today and every plugin
 rebuild waits for a restart (see [recovery](recovery.md) and the
-[HMR gate plan](../plans/hmr-compat-gate/README.md)). What a stock Host reports
+[HMR gate design](../plugins/@dshfiles/hmr-gate/docs/design.md)). What a stock Host reports
 when it does need a restart, which is the user's call:
 
 - a failed or unavailable module comparison, logged as
@@ -47,7 +47,10 @@ replacement leaves the plugin broken in that page — Settings → Plugins → P
 list retries it — and a failed Host replacement stops the plugin and reports its
 entry `failed`. Revisions are bundle metadata (mtime, ctime, size), so a rewrite
 that preserves all three never reloads, while a metadata-only touch reloads the
-plugin with fresh component state. A page also applies graphs only from the
+plugin with fresh component state. `dshx build` stages a plugin's whole `dist/` and
+swaps it in with two renames, so a poll sees one complete rebuild per plugin
+instead of a burst of partial files. A turbo cache restore still writes file by
+file. A page also applies graphs only from the
 release it booted, and it closes `/plugins/events` for good when a restarting
 Host answers that route non-200 before registering it: the page then updates
 nothing and learns of no release change until it is reloaded. Reload a tab you
@@ -70,14 +73,14 @@ Resolve a Session-scoped service where the value is **used**, not while `inject`
 builds its face, and render a degraded/empty face while it is absent. The
 2026-10-23 audit fixed every owned site that threw from `inject`:
 
-| Site | Before | Now |
-| ---- | ------ | --- |
-| `queue-reorder` dock | threw on missing scope/`conversation` | resolves per call, rejects the action with "reconnecting" |
+| Site                         | Before                                                                               | Now                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `queue-reorder` dock         | threw on missing scope/`conversation`                                                | resolves per call, rejects the action with "reconnecting"                                                                            |
 | `rich-composer` composer bar | `concreteConversation` threw during inject; `inputHub.shell` threw without a binding | controller registered before the slots, and the bar renders its absent face without a binding and resolves `conversation` per action |
-| `rich-composer` input hub | `inputTriggers.sessionOf` threw for a scope of a replaced generation | `isRetainedScope` (`src/retained-scope.ts`) checks the binding first |
-| `rich-composer` queue dock | threw on missing scope/`conversation` | same per-call guard as `queue-reorder` |
-| `chat` view + flow | threw on a missing `ctx.sessions.binding` | detached empty faces (`src/detached-injected.ts`) |
-| `input-trigger` slash menu | threw when the Session scope was absent or no longer the retained binding | closed-menu face |
+| `rich-composer` input hub    | `inputTriggers.sessionOf` threw for a scope of a replaced generation                 | `isRetainedScope` (`src/retained-scope.ts`) checks the binding first                                                                 |
+| `rich-composer` queue dock   | threw on missing scope/`conversation`                                                | same per-call guard as `queue-reorder`                                                                                               |
+| `chat` view + flow           | threw on a missing `ctx.sessions.binding`                                            | detached empty faces (`src/detached-injected.ts`)                                                                                    |
+| `input-trigger` slash menu   | threw when the Session scope was absent or no longer the retained binding            | closed-menu face                                                                                                                     |
 
 Registration order alone does not close the window: the old fiber, and its
 `conversation` service, is gone while a stale entry can still render. Keep the

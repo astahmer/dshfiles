@@ -6,6 +6,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type NativeProviders } from './api.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export type NativeProviderRow = NativeProviders['providers'][number]
 export const nativeProviderStatus = (provider: NativeProviderRow, liveReload: boolean): string => {
@@ -67,7 +68,7 @@ export const NativeProvidersList = (props: {
                   provider.enabled && provider.running ? 'dshx:text-success' : 'dshx:text-muted-foreground',
                 )}
               >
-                <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+                <StatusDot tone="current" />
                 <span className="dshx:@max-pane-narrow:hidden">{nativeProviderStatus(provider, state.liveReload)}</span>
               </span>
               <Switch

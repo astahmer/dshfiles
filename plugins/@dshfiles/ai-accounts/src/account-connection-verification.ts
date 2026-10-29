@@ -77,7 +77,7 @@ export const verifyAccountConnection = async (
         await verifyClaudeAuthStatus({
           configDir: ClaudeAccountModel.resolveClaudeConfigDir(account.homePath),
           signal: controller.signal,
-          ...(input.runClaudeAuthStatus === undefined ? {} : { run: input.runClaudeAuthStatus }),
+          ...(input.runClaudeAuthStatus !== undefined && { run: input.runClaudeAuthStatus }),
         })
       } else {
         assertOfficialClaudeBase(account.apiBaseUrl)

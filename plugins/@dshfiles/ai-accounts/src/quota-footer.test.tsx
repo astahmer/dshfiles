@@ -186,6 +186,14 @@ const expectNoSyntheticQuota = (element: Element): void => {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  )
   settings.value.hiddenUsageAccounts = []
   settings.value.usageShortNameOverrides = {}
   settings.value.edgeWidget = false

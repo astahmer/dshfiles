@@ -1,6 +1,7 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_TAB_PREFERENCES, tabsMachine, type TabTarget } from './tabs-machine.js'
+import { DEFAULT_TAB_PREFERENCES, tabsMachine } from './tabs-machine.js'
+import type { TabTarget } from '@dshfiles/workbench/tabs'
 import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
 import { createWorkbenchTabsPublication } from './workbench-tabs-publication.js'
 import { connectWorkbenchTabs, workbenchTabs, type WorkbenchTab, type WorkbenchTabsSnapshot } from './workbench-tabs.js'

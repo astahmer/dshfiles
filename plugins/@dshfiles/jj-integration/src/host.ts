@@ -28,6 +28,7 @@ import {
   jjIntegrationApi,
   type CleanupKindView,
   type CleanupResult,
+  type CleanupTarget,
   type DestinationView,
   type LandResult,
   type RepositoryView,
@@ -35,6 +36,7 @@ import {
   type WorkspaceSyncView,
 } from './api.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
+import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { JsonText } from './json-text.js'
@@ -65,9 +67,29 @@ import { registeredProjects } from './registered-projects.js'
 import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
 import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
+/**
+ * The `workspace` payload this bundle emits on `dshfiles/activity/event`;
+ * `@dshfiles/activity-timeline` decodes it into one Activity item.
+ */
+interface WorkspaceActivityEventPayload {
+  readonly kind: 'workspace'
+  readonly value: {
+    readonly id: string
+    readonly at: number
+    readonly type: string
+    readonly level: ActivityLevel
+    readonly summary: string
+    readonly detail: string | null
+    readonly sessionId: string | null
+    readonly correlationId: string | null
+    readonly workspaceId: string | null
+    readonly workspaceName: string | null
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/event'(payload: WorkspaceActivityEventPayload): void
   }
 }
 
@@ -460,15 +482,19 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
   const repoRoots = [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
   const statusesByRepo = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot => cachedThreadStatuses(active, repoRoot))
-  return repoRoots.map((repoRoot, index) => {
-    const owner = byPath.get(repoRoot)
-    return {
-      repoRoot,
-      title: owner?.title ?? basename(repoRoot),
-      workspaceId: owner?.id ?? null,
-      threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
-    }
-  })
+  return Promise.all(
+    repoRoots.map(async (repoRoot, index) => {
+      const owner = byPath.get(repoRoot)
+      const bookmarks = await active.bookmarks(repoRoot)
+      return {
+        repoRoot,
+        title: owner?.title ?? basename(repoRoot),
+        workspaceId: owner?.id ?? null,
+        bookmarks: [...bookmarks.names],
+        threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
+      }
+    }),
+  )
 }
 
 const repositoryViewsCache = createRepositoryViewsCache({ read: scanRepositories, ttlMs: REPOSITORY_VIEW_TTL_MS })
@@ -550,7 +576,7 @@ const askAgent = async (path: string, sessionId: string | undefined, text: strin
   const archived = new Set<string>(registryOf().archivedSessionIds)
   const target = sessionId ?? [...(workspace?.sessionIds ?? [])].reverse().find(candidate => !archived.has(candidate))
   if (target === undefined) return false
-  // SessionRequestId is a type-only brand over a client-minted unique id.
+  // SAFETY: SessionRequestId is a type-only brand, so the unique id `randomUUID` mints is a valid one.
   const requestId = randomUUID() as SessionRequestId
   await controller.prompt({ requestId, sessionId: SessionId(target), mode: 'queue', content: [{ type: 'text', text }] }, AbortSignal.timeout(15_000))
   return true
@@ -704,12 +730,13 @@ const landThread = async (input: {
   readonly path: string
   readonly sessionId: string | undefined
   readonly fromAgent: boolean
+  readonly bookmark?: string | undefined
   readonly signal?: AbortSignal
   /** A queued integration's last chance to be cancelled: read once the guard passed, right before the rebase. */
   readonly stillQueued?: () => boolean
 }): Promise<LandResult> => {
   recordIntegrationProgress(input.path, 'queued')
-  const bookmark = readSettings().bookmark
+  const bookmark = input.bookmark ?? readSettings().bookmark
   const correlationId = randomUUID()
   const activeThreads = requireThreads()
   const location = await activeThreads.locate(input.path)
@@ -729,6 +756,11 @@ const landThread = async (input: {
       // the deferred retry run it once the Host can read idleness. An Agent's own call still reports why it stopped.
       if (!IntegrationRecovery.queuesInsteadOfRefusing({ fromAgent: input.fromAgent, retrying: input.stillQueued !== undefined })) {
         throw new PluginApiError('Could not verify whether this workspace is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+      }
+      if (input.bookmark !== undefined) {
+        throw new PluginApiError('Could not verify whether this workspace is idle. The selected bookmark was not queued; refresh and retry.', {
+          code: 'thread-activity-unknown',
+        })
       }
       await queueIntegration({ path: input.path, sessionId: input.sessionId })
       throw new PluginApiError('This workspace is not verifiably idle yet; the integration is queued.', { code: 'integration-queued' })
@@ -891,6 +923,7 @@ interface CleanupRequest {
   readonly path?: string | undefined
   readonly olderThanHours: number
   readonly kinds: readonly CleanupKindView[]
+  readonly targets?: readonly CleanupTarget[] | undefined
 }
 
 /** What one scan decided, before anything is removed: the removal pass reports its progress item by item. */
@@ -910,7 +943,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
   const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
   invalidateRepositories()
-  const [repositories, activity, sessionRecords] = await Promise.all([
+  const [registeredRepositories, activity, sessionRecords] = await Promise.all([
     listRepositories(),
     input.apply ? sessionActivity.guard() : sessionActivity.display(),
     kinds.includes('secondary')
@@ -919,6 +952,17 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
           .catch(() => undefined)
       : Promise.resolve([]),
   ])
+  const repositories =
+    scopedRepoRoot === undefined
+      ? registeredRepositories
+      : [
+          registeredRepositories.find(repository => repository.repoRoot === scopedRepoRoot) ?? {
+            repoRoot: scopedRepoRoot,
+            title: basename(scopedRepoRoot),
+            workspaceId: null,
+            threads: [],
+          },
+        ]
   const registry = registryOf()
   const archived = new Set<string>(registry.archivedSessionIds)
   const now = Date.now()
@@ -929,7 +973,6 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
   const untracked: PlannedUntracked[] = []
   for (const repository of repositories) {
-    if (scopedRepoRoot !== undefined && repository.repoRoot !== scopedRepoRoot) continue
     repoRoots.push(repository.repoRoot)
     const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
     for (const thread of repository.threads) {
@@ -1011,7 +1054,12 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
     })
     emptyRevisions.push(...found)
   }
-  return { scopedRepoRoot, repoRoots, skipped, workspaces, workspaceIds, untracked, emptyRevisions }
+  let selected = { workspaces, untracked }
+  if (input.apply) {
+    selected =
+      input.targets === undefined ? filterCleanupTargets({ workspaces, untracked }) : filterCleanupTargets({ targets: input.targets, workspaces, untracked })
+  }
+  return { scopedRepoRoot, repoRoots, skipped, workspaces: selected.workspaces, workspaceIds, untracked: selected.untracked, emptyRevisions }
 }
 
 const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => {
@@ -1077,7 +1125,7 @@ const applyCleanup = async (input: {
         continue
       }
       if (result?.status === 'has-work') {
-        workspaces.push({ ...planned, outcome: 'has-work', ...(result.error === null ? {} : { message: result.error }) })
+        workspaces.push({ ...planned, outcome: 'has-work', ...(result.error !== null && { message: result.error }) })
         report.settleItem('kept')
         continue
       }
@@ -1119,13 +1167,16 @@ const applyCleanup = async (input: {
 
 const cleanupRunner = createCleanupJobRunner({
   execute: async ({ request, report }) => {
-    const scan = await scanCleanup({
+    const scanRequest = {
       path: request.path ?? undefined,
       olderThanHours: request.olderThanHours,
       kinds: request.kinds,
-      apply: true,
+      apply: true as const,
       trigger: request.trigger,
-    })
+    }
+    const scan = await ('targets' in request && request.targets !== undefined
+      ? scanCleanup({ ...scanRequest, targets: request.targets })
+      : scanCleanup(scanRequest))
     report.planned(scan.workspaces.length + scan.untracked.length)
     return await applyCleanup({ scan, trigger: request.trigger, report })
   },
@@ -1186,9 +1237,15 @@ const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   })
 }
 
+const startManualCleanup = (input: CleanupRequest) => {
+  const scope = { path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' as const }
+  if (input.targets === undefined) return cleanupRunner.start(scope)
+  return cleanupRunner.start({ ...scope, targets: [...input.targets] })
+}
+
 const cleanupWorkspaces = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupResult> => {
   if (!input.apply) return await previewCleanup(input)
-  const { done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
+  const { done } = startManualCleanup(input)
   return await done
 }
 
@@ -1423,7 +1480,7 @@ const api = jjIntegrationApi.host({
     return { thread: found?.thread ?? null }
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
-  land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark }),
   queueLand: ({ input }) => queueIntegration({ path: input.path, sessionId: input.sessionId }),
   cancelQueuedLand: ({ input }) => cancelQueuedIntegration(input.path),
   integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
@@ -1442,15 +1499,20 @@ const api = jjIntegrationApi.host({
       path: location.workspaceRoot,
       sessionId: caller.kind === 'agent' ? caller.sessionId : undefined,
       fromAgent: caller.kind === 'agent',
+      bookmark: input.bookmark,
     })
     return { summary: landingMessage(result) ?? JSON.stringify(result), result }
   },
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
   discardMany: ({ input }) => discardThreads(input),
-  cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
+  cleanupWorkspaces: ({ input }) => {
+    const { targets, ...request } = input
+    if (targets === undefined) return cleanupWorkspaces(request)
+    return cleanupWorkspaces({ ...request, targets })
+  },
   startCleanup: ({ input }) => {
-    const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
+    const { job, done } = startManualCleanup(input)
     // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
     void done.catch(() => undefined)
     return { job }

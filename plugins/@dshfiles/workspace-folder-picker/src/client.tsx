@@ -11,6 +11,8 @@ import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
+const directoryFlowLabels = { heading: 'Add workspace' } satisfies { readonly heading: string }
+
 const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element | null => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const directoryPicker: DirectoryPickerPort = {
@@ -22,6 +24,7 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
   return (
     <PluginQueryProvider>
       <ProjectFolderPicker
+        {...directoryFlowLabels}
         directoryPicker={directoryPicker}
         disabled={props.busy}
         mode="directories"
@@ -32,7 +35,6 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
         onSelect={selection => props.onPicked(selection.canonicalPath)}
         placeholder="Browse for a workspace folder…"
         projects={[]}
-        title="Add workspace"
       />
     </PluginQueryProvider>
   )

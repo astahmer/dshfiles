@@ -1,6 +1,7 @@
 // Ported from @loongsuite/dsh-plugin 0.1.3 (src/mapping.ts) and the span attribute rules of
 // @loongsuite/otel-util-genai 0.1.1; Apache-2.0, see NOTICE and UPSTREAM.md.
 import type { StreamChunk, TokenUsage, ToolSchema } from '@deepseek-ai/dsh-llm'
+import { decodeJson } from '@dshfiles/dshx/json'
 import type { SpanAttributeValue } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 
@@ -18,7 +19,7 @@ export const GenAiNames = {
 } as const
 
 /** Attributes whose values are message content; present only when content capture is on. */
-export const CONTENT_ATTRIBUTES = {
+const CONTENT_ATTRIBUTES = {
   inputMessages: 'gen_ai.input.messages',
   outputMessages: 'gen_ai.output.messages',
   systemInstructions: 'gen_ai.system_instructions',
@@ -104,8 +105,11 @@ const isVisibleToken = (chunk: StreamChunk): boolean => {
   return chunk.name !== undefined || chunk.argumentsDelta !== ''
 }
 
-/** JSON with an explicit truncation marker instead of a cut string, so a viewer always parses it. */
-const serializeCaptured = (value: unknown): string => {
+/**
+ * JSON with an explicit truncation marker instead of a cut string, so a viewer always parses it.
+ * Captured content is whatever the harness recorded, so it only ever flows through `JSON.stringify`.
+ */
+const serializeCaptured = <Captured>(value: Captured): string => {
   const serialized = JSON.stringify(value) ?? 'null'
   if (serialized.length <= CONTENT_MAX_CHARS) return serialized
   return JSON.stringify({ truncated: true, original_characters: serialized.length, limit_characters: CONTENT_MAX_CHARS })
@@ -158,7 +162,7 @@ const mapContent = (blocks: readonly LooseBlock[]): GenAiPart[] => blocks.map(bl
 
 const parseToolArguments = (value: string): JsonValue => {
   try {
-    return jsonSchema.parse(JSON.parse(value))
+    return decodeJson(jsonSchema, value)
   } catch {
     return value
   }

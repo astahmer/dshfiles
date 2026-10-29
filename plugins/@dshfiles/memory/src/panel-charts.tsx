@@ -1,4 +1,5 @@
 import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, tooltip } from '@dshfiles/plugin-ui/chart'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
@@ -25,7 +26,7 @@ export type DayPoint = {
 }
 
 /** A compact bar sparkline; empty days keep their slot so the shape matches the range. */
-export const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: string | undefined }): JSX.Element => {
+const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: string | undefined }): JSX.Element => {
   const max = Math.max(...props.values, 1)
   return (
     <span aria-hidden className="dshx:flex dshx:h-8 dshx:items-end dshx:gap-[2px]">
@@ -65,21 +66,24 @@ export const StatCard = (props: {
       <span className="dshx:min-w-0 dshx:flex-1 dshx:text-[11px] dshx:leading-tight dshx:text-muted-foreground">{props.label}</span>
       {props.spark === undefined ? null : <Sparkline values={props.spark} tone={props.sparkTone} />}
     </div>
-    <span className="dshx:text-xl dshx:font-semibold dshx:tabular-nums" title={props.hint}>
-      {props.value}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="dshx:text-xl dshx:font-semibold dshx:tabular-nums">{props.value}</span>
+      </TooltipTrigger>
+      {props.hint === undefined ? null : <TooltipContent>{props.hint}</TooltipContent>}
+    </Tooltip>
     {props.detail === undefined ? null : <span className="dshx:min-h-4 dshx:text-[11px] dshx:text-muted-foreground">{props.detail}</span>}
   </div>
 )
 
 const ChartPanel = (props: {
-  readonly title: string
+  readonly heading: string
   readonly description: string
   readonly children: ReactNode
   readonly className?: string
 }): JSX.Element => (
   <ChartFrame
-    title={props.title}
+    title={props.heading}
     description={props.description}
     className={cn('dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/60 dshx:p-3', props.className)}
   >
@@ -104,7 +108,7 @@ export const DigestActivityChart = (props: { readonly points: readonly DayPoint[
     tooltip: { use: tooltip, format: point => `${point.datum.label}: ${String(point.datum.digests)} digest${point.datum.digests === 1 ? '' : 's'}` },
   })
   return (
-    <ChartPanel title="Digest activity" description="Number of thread digests per day.">
+    <ChartPanel heading="Digest activity" description="Number of thread digests per day.">
       <Chart ariaLabel="Digest activity" ariaDescription="Thread digests per day." definition={definition} height={220} />
     </ChartPanel>
   )
@@ -134,7 +138,7 @@ export const RetrievalChart = (props: { readonly points: readonly DayPoint[] }):
     tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.kind}: ${String(point.datum.count)}` },
   })
   return (
-    <ChartPanel title="Retrieval outcomes" description="Search and read results over time.">
+    <ChartPanel heading="Retrieval outcomes" description="Search and read results over time.">
       <Chart ariaLabel="Retrieval outcomes" ariaDescription="Memory search and read results per day." definition={definition} height={220} />
     </ChartPanel>
   )
@@ -156,7 +160,7 @@ export const CostChart = (props: { readonly points: readonly DayPoint[] }): JSX.
     tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.series}: ${PanelFormat.formatUsd(point.datum.usd)}` },
   })
   return (
-    <ChartPanel title="Cost over time" description="Estimated cost of digest calls.">
+    <ChartPanel heading="Cost over time" description="Estimated cost of digest calls.">
       <Chart ariaLabel="Memory cost over time" ariaDescription="Estimated memory cost per day." definition={definition} height={220} />
     </ChartPanel>
   )

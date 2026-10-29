@@ -427,11 +427,18 @@ const coolDownEndpoint = (ctx: Context, key: string, durationMs: number): void =
   budgets.set(key, { coolingDownUntil: Date.now() + durationMs, inFlight: current.inFlight })
 }
 
+const stepFailureOf = (failure: ProcessResult['failure']): StepResult['failure'] => {
+  if (failure === 'cancelled') return 'cancelled'
+  if (failure === 'timed-out') return 'timed-out'
+  if (failure === null) return null
+  return 'spawn-failed'
+}
+
 const toStepResult = (result: ProcessResult): StepResult => ({
   code: result.exitCode,
   stdout: result.stdout,
   stderr: result.stderr,
-  failure: result.failure === 'cancelled' ? 'cancelled' : result.failure === 'timed-out' ? 'timed-out' : result.failure === null ? null : 'spawn-failed',
+  failure: stepFailureOf(result.failure),
 })
 
 const localGitRunner =
@@ -452,6 +459,12 @@ interface AttemptRun {
   readonly remoteFailure: StoredReceipt['remoteFailure']
 }
 
+const attemptStatusOf = (result: ProcessResult): AttemptRun['status'] => {
+  if (result.failure === 'cancelled') return 'cancelled'
+  if (result.failure === 'timed-out') return 'timed-out'
+  return result.exitCode === 0 ? 'passed' : 'failed'
+}
+
 const runLocalAction = async ({
   ctx,
   action,
@@ -465,7 +478,7 @@ const runLocalAction = async ({
 }): Promise<AttemptRun> => {
   const result = await runManaged(ctx, action.command, action.args, cwd, action.timeoutMs, signal)
   return {
-    status: result.failure === 'cancelled' ? 'cancelled' : result.failure === 'timed-out' ? 'timed-out' : result.exitCode === 0 ? 'passed' : 'failed',
+    status: attemptStatusOf(result),
     failure: result.failure === 'process-group-failed' ? 'process-group-failed' : result.failure === 'spawn-failed' ? 'spawn-failed' : null,
     exitCode: result.exitCode,
     executor: { kind: 'local' },

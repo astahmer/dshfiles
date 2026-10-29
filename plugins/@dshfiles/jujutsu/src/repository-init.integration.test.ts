@@ -7,7 +7,7 @@ import { onTestFinished, test } from 'vitest'
 import { ensureJujutsuRepository, RepositoryInitializationError, type RepositoryInitRunner } from './repository-init.ts'
 
 const fixture = async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-init-'))
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'dshfiles-jj-init-')))
   const repo = join(home, 'repo')
   await mkdir(repo)
   onTestFinished(() => rm(home, { recursive: true, force: true }))
@@ -79,7 +79,8 @@ const dirty = async (repo: string, git: (args: readonly string[]) => string): Pr
   await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 1, 254, 255]))
   git(['add', 'tracked.txt', 'staged-new.bin'])
   await writeFile(join(repo, 'tracked.txt'), 'unstaged\n')
-  await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 2, 253, 255]))
+  // A different size: Git cannot tell a same-size rewrite in the same timestamp tick from its staged copy ("racy clean").
+  await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 2, 253, 255, 7]))
   await rm(join(repo, 'deleted.txt'))
   await writeFile(join(repo, 'untracked.bin'), Buffer.from([0, 9, 128, 255]))
 }
@@ -223,7 +224,7 @@ test('a malformed nested Git marker blocks initialization of its valid outer Git
   assert.equal(await readFile(join(nested, '.git'), 'utf8'), 'not a gitdir pointer\n')
 })
 
-test('a real linked Git worktree initializes on installed JJ and preserves both Git checkouts', async () => {
+test('a real linked Git worktree initializes on installed JJ and preserves both Git checkouts', async context => {
   const f = await fixture()
   await f.createGit()
   const worktree = join(f.home, 'worktree')
@@ -233,7 +234,15 @@ test('a real linked Git worktree initializes on installed JJ and preserves both 
   const before = gitState(worktreeGit)
   const primaryBefore = gitState(f.git)
   const pointer = await readFile(join(worktree, '.git'))
-  assert.deepEqual(await f.open(worktree), { root: worktree, initialized: true })
+  const opened = await f.open(worktree).catch((error: unknown) => {
+    if (error instanceof RepositoryInitializationError && error.message.includes('may not support Git worktrees')) return undefined
+    throw error
+  })
+  if (opened === undefined) {
+    context.skip('The installed JJ cannot initialize a linked Git worktree.')
+    return
+  }
+  assert.deepEqual(opened, { root: worktree, initialized: true })
   assert.deepEqual(gitState(worktreeGit), before)
   assert.deepEqual(gitState(f.git), primaryBefore)
   assert.deepEqual(await readFile(join(worktree, '.git')), pointer)

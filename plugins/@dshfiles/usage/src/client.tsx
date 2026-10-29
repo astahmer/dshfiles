@@ -4,8 +4,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { AccountUsageView, type AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { AccountUsageDashboard } from './account-usage-dashboard.js'
 import type { OpenThread } from './format.js'
 import { UsagePanel } from './panel.js'
 
@@ -29,7 +31,16 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/usage',
   inject: ['slots', 'sessions', 'uiWorkspace'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const Dashboard = (props: AccountUsageViewProps): JSX.Element => (
+        <PluginQueryProvider>
+          <AccountUsageDashboard {...props} />
+        </PluginQueryProvider>
+      )
+      plugin.provide(AccountUsageView, { Dashboard: plugin.bind(Dashboard) })
+    }
     /**
      * Open the thread a request belongs to. A subagent's own session is not
      * always in the thread list; its parent thread is the next best place.

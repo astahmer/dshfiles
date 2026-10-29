@@ -1,6 +1,7 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ActivityIcon,
   BookOpenIcon,
@@ -111,10 +112,10 @@ const EventRow = (props: { readonly event: MemoryEvent; readonly openThread: (id
   )
 }
 
-const PanelCard = (props: { readonly title: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
+const PanelCard = (props: { readonly heading: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/60 dshx:p-3">
     <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
-      <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
+      <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
       {props.description === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.description}</span>}
     </div>
     {props.children}
@@ -188,99 +189,101 @@ export const AnalyticsTab = (props: {
           </SelectContent>
         </Select>
       </div>
-      <div className="dshx:grid dshx:grid-cols-5 dshx:gap-2 dshx:@max-pane-compact:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
-        <StatCard
-          label="Digest calls"
-          value={PanelFormat.formatCount(digestCalls)}
-          detail={`${PanelFormat.formatCount(usage.digests.model)} by a cheap model`}
-          Icon={ActivityIcon}
-          iconTile="dshx:bg-info/10 dshx:text-info"
-          spark={points.map(point => point.digests)}
-        />
-        <StatCard
-          label="Digest cost"
-          value={PanelFormat.formatUsd(usage.costs.total.digest.usd)}
-          detail={`${PanelFormat.formatCount(usage.costs.total.digest.calls)} priced calls`}
-          Icon={CoinsIcon}
-          iconTile="dshx:bg-warning/10 dshx:text-warning"
-          spark={points.map(point => point.digestUsd)}
-          sparkTone="dshx:bg-warning/70"
-        />
-        <StatCard
-          label="Jev calls"
-          value={PanelFormat.formatCount(usage.jev.calls)}
-          detail={PanelFormat.formatUsd(usage.costs.total.jev.usd)}
-          Icon={ZapIcon}
-          iconTile="dshx:bg-violet/10 dshx:text-violet"
-          spark={points.map(point => point.jevCalls)}
-          sparkTone="dshx:bg-violet/70"
-        />
-        <StatCard
-          label="Searches"
-          value={PanelFormat.formatCount(search.calls)}
-          detail={`${PanelFormat.formatCount(search.withResults)} found · ${PanelFormat.formatCount(search.empty)} empty`}
-          Icon={SearchIcon}
-          iconTile="dshx:bg-success/10 dshx:text-success"
-          spark={points.map(point => point.searchFound + point.searchEmpty)}
-          sparkTone="dshx:bg-success/70"
-        />
-        <StatCard
-          label="Reads"
-          value={PanelFormat.formatCount(read.calls)}
-          detail={`${PanelFormat.formatCount(read.withResults)} found · ${PanelFormat.formatCount(read.empty)} missing`}
-          Icon={BookOpenIcon}
-          iconTile="dshx:bg-teal/10 dshx:text-teal"
-          spark={points.map(point => point.readFound + point.readMissing)}
-          sparkTone="dshx:bg-teal/70"
-        />
-        <StatCard
-          label="Citations"
-          value={PanelFormat.formatCount(usage.citations)}
-          detail={`${PanelFormat.formatCount(effectiveness.citations.total)} cited memories`}
-          Icon={QuoteIcon}
-          iconTile="dshx:bg-info/10 dshx:text-info"
-          spark={points.map(point => point.citations)}
-        />
-        <StatCard
-          label="User corrections"
-          value={PanelFormat.formatCount(effectiveness.citations.userCorrected)}
-          detail="heuristic signal"
-          Icon={ThumbsUpIcon}
-          iconTile="dshx:bg-warning/10 dshx:text-warning"
-          spark={points.map(point => point.userCorrected)}
-          sparkTone="dshx:bg-warning/70"
-        />
-        <StatCard
-          label="Start blocks"
-          value={PanelFormat.formatCount(effectiveness.block.threads)}
-          detail={`${PanelFormat.formatCount(usage.blocksServed)} total frozen`}
-          Icon={LayersIcon}
-          iconTile="dshx:bg-primary/10 dshx:text-primary"
-          spark={points.map(point => point.blockRequests)}
-        />
-        <StatCard
-          label="Avg block size"
-          value={PanelFormat.formatBytes(effectiveness.block.meanBytes)}
-          detail={`largest ${PanelFormat.formatBytes(effectiveness.block.maxBytes)}`}
-          Icon={GaugeIcon}
-          iconTile="dshx:bg-muted dshx:text-muted-foreground"
-        />
-        <StatCard
-          label="Model requests"
-          value={PanelFormat.formatCount(effectiveness.block.requests)}
-          detail="carried a start block"
-          Icon={UsersIcon}
-          iconTile="dshx:bg-muted dshx:text-muted-foreground"
-          spark={points.map(point => point.blockRequests)}
-        />
-      </div>
+      <TooltipProvider delayDuration={500}>
+        <div className="dshx:grid dshx:grid-cols-5 dshx:gap-2 dshx:@max-pane-compact:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
+          <StatCard
+            label="Digest calls"
+            value={PanelFormat.formatCount(digestCalls)}
+            detail={`${PanelFormat.formatCount(usage.digests.model)} by a cheap model`}
+            Icon={ActivityIcon}
+            iconTile="dshx:bg-info/10 dshx:text-info"
+            spark={points.map(point => point.digests)}
+          />
+          <StatCard
+            label="Digest cost"
+            value={PanelFormat.formatUsd(usage.costs.total.digest.usd)}
+            detail={`${PanelFormat.formatCount(usage.costs.total.digest.calls)} priced calls`}
+            Icon={CoinsIcon}
+            iconTile="dshx:bg-warning/10 dshx:text-warning"
+            spark={points.map(point => point.digestUsd)}
+            sparkTone="dshx:bg-warning/70"
+          />
+          <StatCard
+            label="Jev calls"
+            value={PanelFormat.formatCount(usage.jev.calls)}
+            detail={PanelFormat.formatUsd(usage.costs.total.jev.usd)}
+            Icon={ZapIcon}
+            iconTile="dshx:bg-violet/10 dshx:text-violet"
+            spark={points.map(point => point.jevCalls)}
+            sparkTone="dshx:bg-violet/70"
+          />
+          <StatCard
+            label="Searches"
+            value={PanelFormat.formatCount(search.calls)}
+            detail={`${PanelFormat.formatCount(search.withResults)} found · ${PanelFormat.formatCount(search.empty)} empty`}
+            Icon={SearchIcon}
+            iconTile="dshx:bg-success/10 dshx:text-success"
+            spark={points.map(point => point.searchFound + point.searchEmpty)}
+            sparkTone="dshx:bg-success/70"
+          />
+          <StatCard
+            label="Reads"
+            value={PanelFormat.formatCount(read.calls)}
+            detail={`${PanelFormat.formatCount(read.withResults)} found · ${PanelFormat.formatCount(read.empty)} missing`}
+            Icon={BookOpenIcon}
+            iconTile="dshx:bg-teal/10 dshx:text-teal"
+            spark={points.map(point => point.readFound + point.readMissing)}
+            sparkTone="dshx:bg-teal/70"
+          />
+          <StatCard
+            label="Citations"
+            value={PanelFormat.formatCount(usage.citations)}
+            detail={`${PanelFormat.formatCount(effectiveness.citations.total)} cited memories`}
+            Icon={QuoteIcon}
+            iconTile="dshx:bg-info/10 dshx:text-info"
+            spark={points.map(point => point.citations)}
+          />
+          <StatCard
+            label="User corrections"
+            value={PanelFormat.formatCount(effectiveness.citations.userCorrected)}
+            detail="heuristic signal"
+            Icon={ThumbsUpIcon}
+            iconTile="dshx:bg-warning/10 dshx:text-warning"
+            spark={points.map(point => point.userCorrected)}
+            sparkTone="dshx:bg-warning/70"
+          />
+          <StatCard
+            label="Start blocks"
+            value={PanelFormat.formatCount(effectiveness.block.threads)}
+            detail={`${PanelFormat.formatCount(usage.blocksServed)} total frozen`}
+            Icon={LayersIcon}
+            iconTile="dshx:bg-primary/10 dshx:text-primary"
+            spark={points.map(point => point.blockRequests)}
+          />
+          <StatCard
+            label="Avg block size"
+            value={PanelFormat.formatBytes(effectiveness.block.meanBytes)}
+            detail={`largest ${PanelFormat.formatBytes(effectiveness.block.maxBytes)}`}
+            Icon={GaugeIcon}
+            iconTile="dshx:bg-muted dshx:text-muted-foreground"
+          />
+          <StatCard
+            label="Model requests"
+            value={PanelFormat.formatCount(effectiveness.block.requests)}
+            detail="carried a start block"
+            Icon={UsersIcon}
+            iconTile="dshx:bg-muted dshx:text-muted-foreground"
+            spark={points.map(point => point.blockRequests)}
+          />
+        </div>
+      </TooltipProvider>
       <div className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
         <DigestActivityChart points={chartPoints} />
         <RetrievalChart points={chartPoints} />
         <CostChart points={chartPoints} />
       </div>
       <div className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-        <PanelCard title="Recall" description="How often retrieval returns useful results.">
+        <PanelCard heading="Recall" description="How often retrieval returns useful results.">
           <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:py-1">
             <div>
               <MetricBar
@@ -300,7 +303,7 @@ export const AnalyticsTab = (props: {
             </div>
           </div>
         </PanelCard>
-        <PanelCard title="Correctness" description="Signals about memory quality and corrections.">
+        <PanelCard heading="Correctness" description="Signals about memory quality and corrections.">
           <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1">
             <MetricBar
               label="Cited memories"
@@ -327,7 +330,7 @@ export const AnalyticsTab = (props: {
         </PanelCard>
       </div>
       <div className="dshx:grid dshx:grid-cols-[1.7fr_1fr] dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-        <PanelCard title="Recent events" description="Latest notable memory-related events.">
+        <PanelCard heading="Recent events" description="Latest notable memory-related events.">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
             {(['all', 'citation', 'digest', 'note'] as const).map(kind => (
               <Button key={kind} size="xs" variant={eventKind === kind ? 'secondary' : 'ghost'} onClick={() => setEventKind(kind)}>
@@ -355,7 +358,7 @@ export const AnalyticsTab = (props: {
             </table>
           </div>
         </PanelCard>
-        <PanelCard title="Top memories by usage" description="Most frequently retrieved.">
+        <PanelCard heading="Top memories by usage" description="Most frequently retrieved.">
           {topNotes.length === 0 ? <p className="dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No cited memory yet.</p> : null}
           <ol className="dshx:flex dshx:flex-col dshx:gap-2">
             {topNotes.map((note, index) => {

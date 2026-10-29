@@ -117,6 +117,46 @@ test('marking a thread unread by hand keeps its finish', async () => {
   )
 })
 
+test('bulk read clears only records no newer than the caller saw, and bulk unread preserves finishes', async () => {
+  const table = memoryTable()
+  let clock = 10_000
+  const store = createAttentionStore({ table, now: () => clock })
+
+  store.recordFinish({ sessionId: 'stale', seq: 1, time: 1_000, reason: 'completed' })
+  store.recordFinish({ sessionId: 'current', seq: 2, time: 2_000, reason: 'error' })
+  const seen = store.snapshot().sessions
+  const staleVersion = seen.find(record => record.sessionId === 'stale')?.version ?? 0
+  const currentVersion = seen.find(record => record.sessionId === 'current')?.version ?? 0
+  clock += 1_000
+  store.recordFinish({ sessionId: 'stale', seq: 3, time: 3_000, reason: 'completed' })
+  await store.flush()
+
+  const read = await store.clearUnreadMany([
+    { sessionId: 'stale', version: staleVersion },
+    { sessionId: 'current', version: currentVersion },
+  ])
+  assert.deepEqual(
+    read.sessions.map(record => record.sessionId),
+    ['stale'],
+  )
+
+  const marked = await store.markUnreadMany(['stale', 'new'])
+  assert.deepEqual(
+    marked.sessions.find(record => record.sessionId === 'stale'),
+    {
+      sessionId: 'stale',
+      version: clock + 1,
+      finishedAt: 3_000,
+      finishedSeq: 3,
+      finishedReason: 'completed',
+      manuallyUnread: true,
+    },
+  )
+  assert.equal(marked.sessions.find(record => record.sessionId === 'new')?.manuallyUnread, true)
+  await store.flush()
+  assert.deepEqual([...table.rows.keys()].sort(), ['new', 'stale'])
+})
+
 test('acknowledging keeps a hand mark, and opening the thread drops the whole record', async () => {
   const table = memoryTable()
   const store = createAttentionStore({ table, now: () => 8_000 })

@@ -214,18 +214,17 @@ export const createAccountLoginService = (input: {
         phase = 'refresh'
         await input.onComplete(id)
       } catch (error) {
-        fail(
-          id,
-          attempt,
-          error instanceof CodexLoginUnsupported ? 'unsupported' : phase === 'home' ? 'unsafe-home' : phase === 'refresh' ? 'refresh-failed' : 'failed',
-          error instanceof CodexLoginUnsupported
-            ? error.message
-            : phase === 'home'
-              ? 'The private Codex home could not be prepared safely. Check its owner, permissions and path; symlinked homes or auth files are not accepted.'
-              : phase === 'refresh'
-                ? 'Codex credentials were saved, but account routes could not refresh. Reload the Accounts page.'
-                : 'Official Codex sign-in failed. The existing login was preserved; check the Host and retry.',
-        )
+        if (error instanceof CodexLoginUnsupported) fail(id, attempt, 'unsupported', error.message)
+        else if (phase === 'home')
+          fail(
+            id,
+            attempt,
+            'unsafe-home',
+            'The private Codex home could not be prepared safely. Check its owner, permissions and path; symlinked homes or auth files are not accepted.',
+          )
+        else if (phase === 'refresh')
+          fail(id, attempt, 'refresh-failed', 'Codex credentials were saved, but account routes could not refresh. Reload the Accounts page.')
+        else fail(id, attempt, 'failed', 'Official Codex sign-in failed. The existing login was preserved; check the Host and retry.')
       } finally {
         clearTimeout(attempt.timer)
         if (staging !== undefined) {

@@ -423,10 +423,8 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
 
 Then('the current thread header identifies its jj workspace', async ({ page }: { page: Page }) => {
   const threadName = provisionedThreadName(page)
-  const repository = repositoryFor(page)
   const indicator = page.getByRole('button', { name: `Current thread workspace: ${threadName}`, exact: true })
   await expect(indicator).toBeVisible()
-  await expect(indicator).toHaveAttribute('title', join(repository.threadsPath, threadName))
   await indicator.click()
   await expect(rebaseButton(page)).toBeVisible()
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
@@ -442,6 +440,7 @@ Then('the thread header names the shared project checkout', async ({ page }: { p
 })
 
 When('the current thread workspace chip is hovered', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: `Current thread workspace: ${provisionedThreadName(page)}`, exact: true }).hover()
 })
 
@@ -903,7 +902,6 @@ Then('Rebase is disabled before there are revisions to rebase', async ({ page }:
   await recordAssertion(page, 'jj-integration-rebase-is-disabled-without-work', async () => {
     await expect(workspaceMenu(page)).toContainText('Nothing to integrate')
     await expect(rebaseButton(page)).toBeDisabled()
-    await expect(rebaseButton(page)).toHaveAttribute('title', 'Integrate this thread into main (0 pending integration)')
   })
 })
 
@@ -1006,7 +1004,6 @@ Then('Rebase reflects the external rebase without reloading', async ({ page }: {
   await recordAssertion(page, 'jj-integration-rebase-refreshes-external-rebase-without-reload', async () => {
     await expect(workspaceMenu(page)).toContainText('Nothing to integrate', { timeout: 10_000 })
     await expect(rebaseButton(page)).toBeDisabled()
-    await expect(rebaseButton(page)).toHaveAttribute('title', 'Integrate this thread into main (0 pending integration)')
     expect(descriptionOf(repository, 'main')).toBe('Follow-up after a steer')
   })
 })
@@ -1019,6 +1016,7 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 })
 
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'All threads', exact: true }).click()
   const settledSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Settled (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
@@ -1088,8 +1086,8 @@ Then('the New thread picker shows its Projects and JJ workspace listings for a d
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   const projects = picker.getByRole('listbox', { name: 'Projects', exact: true })
   await expect(projects.getByRole('option', { name: /^No folder/ }).first()).toBeVisible()
-  await expect(picker.getByRole('tab', { name: 'Everything', exact: true })).toBeVisible()
-  await picker.getByRole('tab', { name: 'Everything', exact: true }).click()
+  await picker.getByRole('button', { name: 'Filter by scope', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Everything', exact: true }).click()
   await expect(picker.getByRole('group', { name: 'JJ workspaces', exact: true })).toContainText(provisionedThreadName(page))
 })
 
@@ -1247,7 +1245,11 @@ Then('the session log downloads from the thread workspace menu', async ({ page }
   await openWorkspaceMenu(page)
   await recordAssertion(page, 'jj-integration-menu-downloads-the-session-log', async () => {
     const row = page.getByRole('button', { name: 'Download session log', exact: true })
-    const [download] = await Promise.all([page.waitForEvent('download'), row.click()])
+    const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/session.export', { timeout: 15_000 })
+    const downloadPromise = page.waitForEvent('download', { timeout: 15_000 })
+    await row.click()
+    const [response, download] = await Promise.all([responsePromise, downloadPromise])
+    expect(response.status()).toBe(200)
     expect(download.suggestedFilename()).toMatch(/\.zip$/u)
   })
 })

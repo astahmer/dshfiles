@@ -59,10 +59,8 @@ export function PropertyInput(props: {
   const { property, value, onChange } = props
   const id = useId()
   const disabled = property.readOnly
-  // oxlint-disable-next-line antislop/no-runtime-typeof -- PropertyValue is the validated Form/domain union; its non-null non-array object variant is ResourceRef.
   const ref = typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null
   const refs = Array.isArray(value) ? value.filter((item): item is ResourceRef => typeof item !== 'string') : []
-  // oxlint-disable-next-line antislop/no-runtime-typeof -- Text/number controls render only the primitive variants of the validated PropertyValue union.
   const string = typeof value === 'string' || typeof value === 'number' ? String(value) : ''
   let input: JSX.Element
   switch (property.type) {

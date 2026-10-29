@@ -4,25 +4,39 @@
   "features": [
     {
       "id": "memory-board",
-      "title": "Process memory by workspace",
-      "summary": "One page shows the resident memory of every process tree the threads started, grouped by workspace: live background jobs with their owning thread, other children of this Host, and detached trees still running inside a workspace after their parent exited, with the memory-pressure level and a confirmed stop per tree, per workspace section from its header, or for every listed tree. The sidebar entry carries a pressure dot and the detached total.",
-      "reach": ["click button \"Worktree Memory: RAM\"", "expect text \"What the threads started*\""],
+      "title": "Process memory and Node origins",
+      "summary": "One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The sidebar entry carries a pressure dot and the detached total.",
+      "reach": ["click button \"Worktree Memory: RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client"],
       "configuration": [],
-      "states": ["loading", "empty", "grouped", "detached", "pressure", "unsupported-platform", "stop-armed", "stopped", "sidebar-badge"],
+      "states": [
+        "loading",
+        "empty",
+        "grouped",
+        "node-origins",
+        "node-origin-limit",
+        "detached",
+        "pressure",
+        "unsupported-platform",
+        "stop-armed",
+        "stopped",
+        "sidebar-badge"
+      ],
       "failureModes": [
         "A supervisor that launched this Host is an orphan inside a workspace too; it is never listed, so it can never be stopped from here.",
         "A pid recycled between the snapshot and the stop is refused instead of signalling an unrelated process.",
         "A job is stopped through the job registry so its Session records the kill; only trees no live job owns are signalled directly.",
         "A bulk stop leaves a job whose owning thread is mid-turn alone, so that turn cannot fail under it; its own Stop stays the only path.",
-        "Orphans outside every workspace (apps, system agents, unrelated daemons) are not listed.",
+        "Orphans outside every workspace (apps, system agents, unrelated daemons) are not listed in the DSH tree view.",
+        "Node summaries inspect only the current OS user’s processes; process names use fixed rules and fall back to a generic label.",
+        "Node RSS is resident memory only, not the compressed or swapped memory shown by some system monitors.",
         "A platform without ps/lsof or /proc reports itself unsupported instead of an empty board."
       ],
       "externalDependencies": [
         {
           "id": "ps/lsof (macOS) and /proc (Linux)",
-          "boundary": "Read-only process table, working directories and memory-pressure level, run through the Host subprocess service; the only writes are the confirmed SIGTERM/SIGKILL of listed trees.",
-          "deterministicFake": "src/process-table.test.ts feeds parsed ps rows, working directories, workspaces, Sessions and live jobs to the pure snapshot builder."
+          "boundary": "Read-only current-user process table, bounded working-directory probes and memory-pressure level, run through the Host subprocess service; the only writes are the confirmed SIGTERM/SIGKILL of listed DSH trees.",
+          "deterministicFake": "src/node-process-summary.test.ts feeds process rows, parent chains and working directories to the pure Node-origin classifier; src/process-table.test.ts covers workspace attribution."
         },
         {
           "id": "@deepseek-ai/dsh-jobs",
@@ -76,6 +90,18 @@
           "id": "worktree-memory.subreaper-adopter",
           "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
           "testName": "treats a systemd --user subreaper as the adopter of a detached tree"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.node-origin-redaction",
+          "file": "plugins/@dshfiles/worktree-memory/src/node-process-summary.test.ts",
+          "testName": "groups Node processes by known script, nearest app, and working directory without returning argv"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.node-origin-limit",
+          "file": "plugins/@dshfiles/worktree-memory/src/node-process-summary.test.ts",
+          "testName": "caps origin details while retaining the totals for every Node process"
         }
       ],
       "telemetry": [

@@ -145,16 +145,16 @@ const summarize = (stderr: string): string => {
   return flattened.length > MESSAGE_LIMIT ? `${flattened.slice(0, MESSAGE_LIMIT - 1)}…` : flattened
 }
 
+const failureReason = (result: StepResult): string => {
+  if (result.failure === 'timed-out') return 'timed out'
+  if (result.failure === 'spawn-failed') return 'could not start ssh'
+  if (result.failure === 'cancelled') return 'was cancelled'
+  return `exited ${result.code ?? 'unknown'}`
+}
+
 const failureMessage = ({ step, result }: { readonly step: string; readonly result: StepResult }): string => {
   const detail = summarize(result.stderr)
-  const reason =
-    result.failure === 'timed-out'
-      ? 'timed out'
-      : result.failure === 'spawn-failed'
-        ? 'could not start ssh'
-        : result.failure === 'cancelled'
-          ? 'was cancelled'
-          : `exited ${result.code ?? 'unknown'}`
+  const reason = failureReason(result)
   return detail.length === 0 ? `${step} ${reason}` : `${step} ${reason}: ${detail}`
 }
 

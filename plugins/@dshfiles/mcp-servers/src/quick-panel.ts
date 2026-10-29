@@ -64,7 +64,7 @@ export const createQuickPanelContribution = (
 ): CommandContribution => {
   return {
     name: 'mcp-servers',
-    ...(icon === undefined ? {} : { icon }),
+    ...(icon !== undefined && { icon }),
     label: () => translate('title'),
     description: () => translate('quickPanelHint'),
     available: () => true,

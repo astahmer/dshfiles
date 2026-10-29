@@ -9,6 +9,7 @@ import type { WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
 import { TabRows } from './tab-row-visibility.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** The main seat's compact action drives the existing tab provider, never a second tab actor. */
 export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.Element | null => {
@@ -28,6 +29,28 @@ export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.El
   )
 }
 
+/** Bulk close for panels without a semantic tab, read from the group when the menu opens. */
+const GroupCloseItems = (props: {
+  readonly panel: IDockviewPanelHeaderProps['api']
+  readonly closePanel: (id: string, params: unknown) => void
+}): JSX.Element => {
+  const panels = [...props.panel.group.panels]
+  const position = panels.findIndex(panel => panel.id === props.panel.id)
+  const closeExcept = (keep: (index: number) => boolean): void => {
+    for (const [index, panel] of panels.entries()) if (!keep(index)) props.closePanel(panel.id, panel.params)
+  }
+  return (
+    <>
+      <ContextMenuItem disabled={panels.length < 2} onSelect={() => closeExcept(index => index === position)}>
+        Close other tabs
+      </ContextMenuItem>
+      <ContextMenuItem disabled={position === panels.length - 1} onSelect={() => closeExcept(index => index <= position)}>
+        Close tabs to the right
+      </ContextMenuItem>
+    </>
+  )
+}
+
 export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
   function WorkbenchTab(props: IDockviewPanelHeaderProps): JSX.Element {
     const channel = workbenchTabs()
@@ -42,14 +65,15 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
-    const close = (): void => {
-      definition?.beforeClose?.()
+    const closePanel = (id: string, params: unknown): void => {
+      registry.get(NewViewTabs.sourceId(params, id))?.beforeClose?.()
       // The semantic/native owner may already retire this occurrence. Retire
       // only the exact surviving presentation, without a second user-close
       // gesture and its automatic neighbor navigation.
-      const panel = props.containerApi.getPanel(props.api.id)
+      const panel = props.containerApi.getPanel(id)
       if (panel !== undefined) props.containerApi.removePanel(panel)
     }
+    const close = (): void => closePanel(props.api.id, props.params)
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -79,12 +103,9 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
           >
             {tab?.pinned && <PinIcon aria-label={channel.label?.('pinned') || 'Pinned'} size={12} />}
             {tab?.status && (
-              <span
+              <StatusDot
                 aria-label={channel.label?.(tab.status) || tab.status}
-                className={cn(
-                  'dshx:size-2 dshx:rounded-full',
-                  tab.status === 'running' ? 'dshx:animate-pulse dshx:bg-info' : tab.status === 'needsYou' ? 'dshx:bg-warning' : 'dshx:bg-primary',
-                )}
+                className={tab.status === 'running' ? 'dshx:animate-pulse dshx:bg-info' : tab.status === 'needsYou' ? 'dshx:bg-warning' : 'dshx:bg-primary'}
               />
             )}
             {renaming && tab?.kind === 'thread' ? (
@@ -137,6 +158,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 <ContextMenuItem onSelect={() => channel.actions.closeToRight(tab.id)}>Close tabs to the right</ContextMenuItem>
               </>
             ))}
+          {tab === undefined && <GroupCloseItems panel={props.api} closePanel={closePanel} />}
           <ContextMenuItem
             onSelect={() => {
               const panel = props.containerApi.getPanel(props.api.id)

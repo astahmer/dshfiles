@@ -1,5 +1,6 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
 import type { settingsPatchSchema } from './shell-api.js'
 
 /** One namespace's field patch, derived from the contract's input schema. */
@@ -28,6 +29,12 @@ export interface SettingsSurface {
   mutate(ns: string, ops: readonly SettingsUnsetOp[], expectedRevision?: number): Promise<void>
 }
 
+/** The controls browser Settings sections last published to search. */
+export interface SearchEntriesStore {
+  readonly read: () => readonly SectionEntryRow[]
+  readonly replace: (entries: readonly SectionEntryRow[]) => void
+}
+
 export interface SettingsListInput {
   readonly namespace?: string | undefined
   readonly query?: string | undefined
@@ -54,6 +61,7 @@ export interface SettingsNamespaceRow {
 const MAX_VALUE_BYTES = 64 * 1024
 const MAX_NAMES_IN_ERROR = 8
 const MAX_MESSAGE = 300
+const MAX_LISTED_ENTRIES = 50
 
 const failureSchema = z.looseObject({ code: z.string().optional(), message: z.string().optional() })
 
@@ -70,8 +78,10 @@ const failureMessage = (error: unknown, fallback: string): string => {
 
 const jsonBytes = (text: string): number => new TextEncoder().encode(text).length
 
-/** Builds the settings tools over the Host settings service, resolved per call. */
-export const createSettingsTools = (settings: () => SettingsSurface) => {
+/** Builds the settings tools over the Host settings service, resolved per call, and the published section entries. */
+export const createSettingsTools = (input: { readonly settings: () => SettingsSurface; readonly searchEntries: SearchEntriesStore }) => {
+  const settings = input.settings
+  const searchEntries = input.searchEntries
   const requireNamespace = (surface: SettingsSurface, namespace: string): SettingsRow => {
     const found = surface.describe({ redactSecrets: true }).find(descriptor => descriptor.ns === namespace)
     if (found !== undefined) return found
@@ -129,7 +139,15 @@ export const createSettingsTools = (settings: () => SettingsSurface) => {
           return { ...row, value: text }
         })
       if (input.namespace !== undefined && namespaces.length === 0) requireNamespace(surface, input.namespace)
-      return { writable: surface.writable, namespaces }
+      if (input.namespace !== undefined || query === undefined || query.length === 0) return { writable: surface.writable, namespaces }
+      const entries = SettingsSearch.matchEntries({ query, entries: searchEntries.read() }).slice(0, MAX_LISTED_ENTRIES)
+      if (entries.length === 0) return { writable: surface.writable, namespaces }
+      return { writable: surface.writable, namespaces, entries }
+    },
+
+    publishSearchEntries: ({ input }: { readonly input: { readonly entries: readonly SectionEntryRow[] } }) => {
+      searchEntries.replace(input.entries)
+      return { count: input.entries.length }
     },
 
     set: async ({ input }: { readonly input: SettingsSetInput }) => {

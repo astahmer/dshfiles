@@ -8,6 +8,7 @@ declare const apiClientInputBrand: unique symbol
 declare const apiHostInputBrand: unique symbol
 declare const apiHostOutputBrand: unique symbol
 declare const apiClientOutputBrand: unique symbol
+declare const apiClientEventsBrand: unique symbol
 
 export type ApiSchema<Input = unknown, Output = Input> = StandardSchemaV1<Input, Output>
 
@@ -29,6 +30,11 @@ export interface ApiMethodMetadata {
   readonly description?: string
   /** Expose the method to the agent; requires input and output schemas that publish Standard JSON Schema. */
   readonly tool?: ApiToolExposure
+  /**
+   * The method has no side effects, so identical in-flight Client calls (same input) share one request. A method
+   * whose `tool.readOnly` is true counts as read-only too. Leave it unset for anything that writes.
+   */
+  readonly readOnly?: boolean
 }
 
 export interface ApiMethodOptions<InputSchema extends ApiSchema = ApiSchema, OutputSchema extends ApiSchema = ApiSchema> extends ApiMethodMetadata {
@@ -48,12 +54,31 @@ export interface ApiMethodDefinition<ClientInput = void, HostInput = ClientInput
 
 export type AnyApiMethodDefinition = ApiMethodDefinition<any, any, any, any>
 
-export interface ApiContract<Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>> {
+/**
+ * A typed event the Host publishes to every connected browser. `schema` validates the payload on the Host before it
+ * is sent and again in the browser before a listener sees it, so it must accept its own output.
+ */
+export interface ApiEventDefinition<HostPayload = unknown, ClientPayload = HostPayload> {
+  readonly schema: ApiSchema<HostPayload, ClientPayload>
+  /** What the event announces, written for another plugin author. */
+  readonly description?: string
+}
+
+export type AnyApiEventDefinition = ApiEventDefinition<any, any>
+export type ApiEventHostPayload<E> = E extends ApiEventDefinition<infer Payload, any> ? Payload : never
+export type ApiEventClientPayload<E> = E extends ApiEventDefinition<any, infer Payload> ? Payload : never
+
+export interface ApiContract<
+  Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>,
+  Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+> {
   readonly id: string
   readonly version: number
   /** Package whose Host serves this API; set it so another plugin's Client can call it. Defaults to the caller's package. */
   readonly owner?: string
   readonly methods: Methods
+  /** Events the Host publishes with `publishApiEvent`; browsers follow them with `useApiEvent`. */
+  readonly events?: Events
   readonly host: <const Handlers extends ApiHandlers<Methods>>(
     handlers: Handlers & Record<Exclude<keyof Handlers, keyof Methods>, never>,
     options?: ApiHostOptions,
@@ -64,10 +89,10 @@ export interface ApiContract<Methods extends Record<string, AnyApiMethodDefiniti
  * What a caller needs to reach an API: identity, version and the methods it may call. A declared contract satisfies
  * it, and so does one assembled from the registry ({@link RegisteredApiSpec}).
  */
-export type ApiClientContract<Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>> = Pick<
-  ApiContract<Methods>,
-  'id' | 'owner' | 'version' | 'methods'
->
+export type ApiClientContract<
+  Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>,
+  Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+> = Pick<ApiContract<Methods, Events>, 'id' | 'owner' | 'version' | 'methods' | 'events'>
 
 export type ApiClientInput<M> = M extends ApiMethodDefinition<infer Input, any, any, any> ? Input : never
 export type ApiHostInput<M> = M extends ApiMethodDefinition<any, infer Input, any, any> ? Input : never
@@ -128,13 +153,25 @@ export type ApiSafeMethodClient<M> =
     ? (input?: undefined, options?: ApiCallOptions) => Promise<ApiCallResult<ApiClientOutput<M>>>
     : (input: ApiClientInput<M>, options?: ApiCallOptions) => Promise<ApiCallResult<ApiClientOutput<M>>>
 
-export type ApiClient<Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>> = {
+export type ApiClient<
+  Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>,
+  Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+> = {
   readonly [K in keyof Methods]: ApiMethodClient<Methods[K]>
 } & {
   readonly safe: {
     readonly [K in keyof Methods]: ApiSafeMethodClient<Methods[K]>
   }
+  /** Type-only: the events `subscribeApiEvent` accepts for this client. */
+  readonly [apiClientEventsBrand]?: Events
 }
+
+/**
+ * Whether a browser receives an event: `live` once the Host's event stream lists it, `connecting` until the stream
+ * answers (or while it reconnects), `unavailable` when the Host does not publish it or has no event stream. Poll
+ * while it is not `live`.
+ */
+export type ApiEventStatus = 'connecting' | 'live' | 'unavailable'
 
 export type ApiCallResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ApiError }
 export type ApiErrorKind = 'transport' | 'remote' | 'contract' | 'aborted' | 'unavailable'
@@ -178,6 +215,8 @@ export type ApiQueryState<T> = ApiQueryResult<T>
 export type ApiQueryBaseOptions = {
   readonly enabled?: boolean
   readonly signal?: AbortSignal
+  /** Reuse a completed read for this many ms on mount; manual refetch and reconnect always fetch. Defaults to 5000. */
+  readonly staleTime?: number
 }
 export type ApiQueryOptions<M> = ApiClientInput<M> extends void ? ApiQueryBaseOptions : ApiQueryBaseOptions & { readonly input: ApiClientInput<M> }
 

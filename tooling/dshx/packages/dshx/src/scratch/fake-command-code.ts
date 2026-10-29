@@ -121,7 +121,7 @@ const toolCalls = (calls: readonly { readonly name: string; readonly argumentsJs
 const toolCall = (name: string, argumentsJson: string): ChatDelta => toolCalls([{ name, argumentsJson }])
 
 const streamAnswer = (delta: ChatDelta, delayBetweenWordsMs = 0): ChatCompletionResult => ({ kind: 'stream', delta, delayBetweenWordsMs })
-const responseAnswer = (payload: unknown, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
+const responseAnswer = <Payload>(payload: Payload, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
 
 const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; readonly key: string; readonly body: unknown }): ChatCompletionResult => {
   const parsed = chatRequestSchema.safeParse(input.body)
@@ -247,11 +247,11 @@ export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
 }
 
 interface ListenableServer {
-  once(event: 'error', listener: (error: Error) => void): unknown
-  off(event: 'error', listener: (error: Error) => void): unknown
-  listen(port: number, host: string, listener: () => void): unknown
+  once(event: 'error', listener: (error: Error) => void): ListenableServer
+  off(event: 'error', listener: (error: Error) => void): ListenableServer
+  listen(port: number, host: string, listener: () => void): ListenableServer
   address(): AddressInfo | string | null
-  close(listener: () => void): unknown
+  close(listener: () => void): ListenableServer
   closeAllConnections?(): void
 }
 

@@ -6,7 +6,12 @@ const COMMIT = 'a'.repeat(40)
 const DEFAULT_COMMIT = 'b'.repeat(40)
 const CHANGE = 'kzyxwvutsrqp'
 
-const runner = (): { readonly run: JjRun; readonly calls: (readonly string[])[] } => {
+interface Runner {
+  readonly run: JjRun
+  readonly calls: (readonly string[])[]
+}
+
+const runner = (): Runner => {
   const calls: (readonly string[])[] = []
   const run: JjRun = async args => {
     calls.push(args)
