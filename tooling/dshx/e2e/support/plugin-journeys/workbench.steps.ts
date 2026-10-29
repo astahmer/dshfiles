@@ -6,7 +6,7 @@ import { tabPanelId } from '../../../../../plugins/@dshfiles/workbench/src/tab-p
 import { OPEN_THREAD_IN_MAIN_TAB_EVENT } from '../../../../../plugins/@dshfiles/thread-sidebar/src/main-tab-request.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { After, Given, Then, When } from '../bdd.js'
-import { globalPanelLink as globalPanel, reusableViewName } from '../plugin-view-names.js'
+import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
@@ -59,7 +59,7 @@ const openWorkbench = async (page: Page): Promise<void> => {
 }
 
 const setPluginEnabled = async (page: Page, packageId: string, enabled: boolean): Promise<void> => {
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   const toggle = page.getByRole('switch', { name: `Enable ${packageId}`, exact: true })
   await toggle.click()
   if (enabled) await expect(toggle).toBeChecked()
@@ -928,7 +928,7 @@ Then('reload and Reset keep only complete fixed-session conversations', async ({
       await openThreadRow(page, ids[index])
       await assertCompleteFixedConversation(page, index)
     }
-    await globalPanel(page, 'Plugins').click()
+    await openGlobalPanel(page, 'Plugins')
     await paneAction(page, mainPane(page), 'Reset layout')
     await assertCompleteFixedConversation(page, 'first')
     await assertNoGlobalConversationAliases(page)
@@ -1294,7 +1294,7 @@ Then('its Dockview tab shows an unread indicator that clears when opened', async
   })
 })
 When('a Jujutsu preview is opened and closed from its Dockview tab', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Jujutsu').click()
+  await openGlobalPanel(page, 'Jujutsu')
   const tab = dockTab(mainDock(page), 'Jujutsu')
   await expect(tab.locator('[data-preview="true"]')).toBeVisible()
   await tab.click({ button: 'right' })
@@ -1628,7 +1628,7 @@ Given('an isolated Workbench profile with saved legacy native preferences is boo
 })
 
 Then('no native surface choice is exposed in Workbench settings', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   await page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true }).click()
   await recordAssertion(page, acceptanceId(page, 'unified-settings-no-native-choice'), async () => {
     await expect(
@@ -1955,7 +1955,7 @@ When('a real Backlog tab is saved inactive beside the current conversation', asy
     .click()
   // The chooser owns a presentation tab. The Navigation action additionally exercises the saved native tab actor
   // from the original inactive-Backlog reload regression, without injecting a tab or persistence payload.
-  await globalPanel(page, 'Backlog').click()
+  await openGlobalPanel(page, 'Backlog')
   await expect(dockTab(mainDock(page), 'Backlog')).toBeVisible()
   await dockTab(mainDock(page), 'Backlog').dblclick()
   await expect(mainSeat(page).getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
@@ -2293,7 +2293,7 @@ const captureResetDraftOwners = async (page: Page, phase: string): Promise<void>
 }
 When('a tool is active while the left thread list is collapsed', async ({ page }: { page: Page }) => {
   // Sessions and their drafts were created before switching away from the default composer.
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   // Explicitly select the real semantic tool tab after opening it beside retained conversations.
   const tool = mainPane(page).getByRole('tab', { name: 'Plugin Manager: Plugins', exact: true })
   await tool.click()

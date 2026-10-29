@@ -225,7 +225,7 @@ const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const SETTINGS_COMMAND_ID = 'settings.open'
 
-const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
+export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
   if (!window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { cancelable: true }))) return
   // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.

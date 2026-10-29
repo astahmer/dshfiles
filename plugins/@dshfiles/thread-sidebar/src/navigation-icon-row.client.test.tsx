@@ -29,24 +29,25 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const renderRow = (options: { readonly overflow: NavigationOverflow; readonly rowWidth: number }) => {
+const renderRow = (options: { readonly overflow: NavigationOverflow; readonly rowWidth: number; readonly withSettings?: boolean }) => {
   // Two 32px icons plus the reserved More button fit in 120px of content after the row's 16px padding.
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(options.rowWidth)
   const run = vi.fn()
   const onCustomize = vi.fn()
+  const openSettings = vi.fn()
   render(
     <TooltipProvider>
       <NavigationIconRow
         items={destinationLabels.map(label => ({ id: label, label, icon: null, active: false, run: () => run(label) }))}
         overflow={options.overflow}
         labels={labels}
-        settings={null}
+        settings={options.withSettings === true ? { label: 'Settings', open: openSettings } : null}
         onCustomize={onCustomize}
         onReorder={() => undefined}
       />
     </TooltipProvider>,
   )
-  return { run, onCustomize }
+  return { run, onCustomize, openSettings }
 }
 
 const rowButtonNames = (): string[] =>
@@ -71,9 +72,22 @@ describe('NavigationIconRow', () => {
     expect(menuOptionNames(openMenu())).toEqual(['Jujutsu: Revision graph', 'Secret Catalog: Secrets', 'Backlog: Items', labels.customize])
   })
 
-  it('drops the More button once every icon fits', () => {
-    renderRow({ overflow: 'menu', rowWidth: 400 })
+  it('keeps the More button for Settings and Customize once every icon fits', () => {
+    renderRow({ overflow: 'menu', rowWidth: 400, withSettings: true })
     expect(rowButtonNames()).toEqual(destinationLabels)
+    expect(menuOptionNames(openMenu())).toEqual(['Settings', labels.customize])
+  })
+
+  it.each(['menu', 'scroll-menu'] as const)('offers Settings in the %s overflow More menu when the Host has settings', overflow => {
+    const { openSettings } = renderRow({ overflow, rowWidth: 136, withSettings: true })
+    const menu = openMenu()
+    expect(menuOptionNames(menu).slice(-2)).toEqual(['Settings', labels.customize])
+    fireEvent.click(within(menu).getByRole('option', { name: 'Settings' }))
+    expect(openSettings).toHaveBeenCalledOnce()
+  })
+
+  it('has no More menu in the scroll overflow mode', () => {
+    renderRow({ overflow: 'scroll', rowWidth: 136, withSettings: true })
     expect(screen.queryByRole('button', { name: labels.more })).toBeNull()
   })
 

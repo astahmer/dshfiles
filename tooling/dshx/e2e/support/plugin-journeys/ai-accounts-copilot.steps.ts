@@ -1,10 +1,10 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 When('a GitHub Copilot account is added', async ({ page }: { page: Page }) => {
-  await globalPanelLink(page, 'AI Accounts: Accounts').click()
+  await openGlobalPanel(page, 'AI Accounts: Accounts')
   await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
   await page.getByRole('button', { name: 'Add account', exact: true }).first().click()
   await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'GitHub Copilot account', exact: true }).click()

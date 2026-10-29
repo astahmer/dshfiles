@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
@@ -83,7 +83,7 @@ When('{string} is opened with Go to file', async ({ page }: { page: Page }, file
 })
 
 When('the editor placement is set to {string} in the plugin settings', async ({ page }: { page: Page }, placement: string) => {
-  await globalPanelLink(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   await page.getByRole('button', { name: 'View @dshfiles/editor', exact: true }).click()
   await page.getByRole('combobox', { name: 'Editor placement', exact: true }).selectOption({ label: placement })
   await page.getByRole('button', { name: 'Save', exact: true }).click()

@@ -1,5 +1,5 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { DatabaseSync } from 'node:sqlite'
 import { zstdCompressSync } from 'node:zlib'
 import { join } from 'node:path'
@@ -89,7 +89,7 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 })
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
-  await globalPanelLink(page, 'Usage: Analytics').click()
+  await openGlobalPanel(page, 'Usage: Analytics')
   await expect(page.getByRole('heading', { name: 'Usage analytics', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('radio', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)

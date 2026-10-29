@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { accountDraftSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
@@ -153,7 +153,7 @@ Given('the isolated model picker profile with a legacy inert Codex account is bo
 
 When('a supported legacy Codex model is selected without validating a new connection', async ({ page }: { page: Page }) => {
   const providerAccounts = page.getByRole('complementary', { name: 'Provider accounts', exact: true })
-  await globalPanelLink(page, 'AI Accounts: Accounts').click()
+  await openGlobalPanel(page, 'AI Accounts: Accounts')
   await expect(providerAccounts).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
   // This pre-existing fixture tests catalog controls only, never provider authentication or new-account admission.

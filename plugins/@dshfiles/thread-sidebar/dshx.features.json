@@ -1474,7 +1474,7 @@
     {
       "id": "footer-more-menu",
       "title": "Reach Settings, sidebar pages, and hidden footer actions from both More menus",
-      "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu offers the same Settings action beside Customize sidebar. A seat whose card yielded to another surface takes no room and can never leave the footer menu empty.",
+      "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu, and the Workbench Navigation view's, offers the same Settings action beside Customize sidebar in both the scroll-and-menu and menu-only overflow modes, even when every destination fits the row. A seat whose card yielded to another surface takes no room and can never leave the footer menu empty.",
       "reach": ["expect button \"More\"", "click button \"More\"", "expect button \"Settings\""],
       "surfaces": ["client", "settings"],
       "configuration": [],
@@ -1483,7 +1483,8 @@
         "A footer seat that renders nothing never overflows and never opens an empty More menu.",
         "A hidden footer action stays reachable from More.",
         "The footer menu lists pages without a group heading.",
-        "The More control keeps its room, so no entry ever sits under it."
+        "The More control keeps its room, so no entry ever sits under it.",
+        "In the menu-only overflow mode the header More control stays when every destination fits, so Settings never disappears."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1497,6 +1498,23 @@
           "id": "thread-sidebar.footer-more-menu-unit-empty-seat",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "a footer seat that renders nothing never overflows and takes no gap"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.navigation-menu-overflow",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-menu-keeps-settings",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-icon-row.client.test.tsx",
+          "testName": "keeps the More button for Settings and Customize once every icon fits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.workbench-navigation-offers-settings",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "offers Settings in the Navigation More menu only while the Host has a settings root"
         }
       ],
       "telemetry": [

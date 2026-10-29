@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { browserDiagnosticsFor, finishJourneyAssertions, recordAssertion, reloadPastProviderSetup } from '../steps.js'
 import { createScratchDirectory } from '../threads.js'
 
@@ -126,7 +126,7 @@ When('a disposable dirty Git-only checkout is opened through the Jujutsu reposit
     await rm(root, { recursive: true, force: true })
     throw error
   }
-  await globalPanelLink(page, 'Jujutsu: Revision graph').first().click()
+  await openGlobalPanel(page, 'Jujutsu: Revision graph')
   await chooseGitCheckout(page, fixtureFor(page))
 })
 
@@ -152,7 +152,7 @@ Then('reselecting and reopening the Git checkout does not initialize JJ again', 
     expect(await snapshotGit(fixture)).toEqual(fixture.before)
   })
   await reloadPastProviderSetup(page)
-  await globalPanelLink(page, 'Jujutsu: Revision graph').first().click()
+  await openGlobalPanel(page, 'Jujutsu: Revision graph')
   await expect(importedCommitRow(page)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
   await recordAssertion(page, 'jujutsu-git-auto-init-reopen-is-idempotent', async () => {

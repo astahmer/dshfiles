@@ -37,6 +37,8 @@ const setup = (footerSources?: FooterSources) => {
   const startSession = vi.fn()
   const searchThreads = vi.fn()
   const customizeSidebar = vi.fn()
+  const hasSettings = createSnapshotStore(false)
+  const openSettings = vi.fn()
   const releaseCustomizationHost = vi.fn()
   const registerCustomizationHost = vi.fn((_host: HTMLElement) => releaseCustomizationHost)
   const footerLabels = createSnapshotStore<Readonly<Record<Parameters<FooterSources['footerTitles']>[0], readonly string[]>>>({
@@ -59,6 +61,9 @@ const setup = (footerSources?: FooterSources) => {
     customizeSidebar,
     registerCustomizationHost,
     sidebarSettingsLabel: 'Sidebar settings',
+    hasSettings,
+    settingsLabel: 'Settings',
+    openSettings,
     navigationLabels: {
       more: 'More sidebar destinations',
       filter: 'Filter destinations…',
@@ -81,6 +86,8 @@ const setup = (footerSources?: FooterSources) => {
     customizeSidebar,
     registerCustomizationHost,
     releaseCustomizationHost,
+    hasSettings,
+    openSettings,
   }
 }
 
@@ -358,6 +365,26 @@ describe('sidebar workbench panels', () => {
     render(<Panel panelId={definition.id} />)
     expect(screen.getByRole('navigation', { name: 'Navigation' })).toBeTruthy()
     expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['More sidebar destinations'])
+    source.dispose()
+  })
+
+  it('offers Settings in the Navigation More menu only while the Host has a settings root', () => {
+    globalThis.ResizeObserver ??= class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    Element.prototype.scrollIntoView ??= () => undefined
+    const source = setup()
+    const definition = source.registry.get('dshfiles-thread-sidebar.workbench-navigation')
+    if (definition === undefined) throw new Error('Navigation source missing')
+    const Panel = definition.component
+    render(<Panel panelId={definition.id} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More sidebar destinations' }))
+    expect(screen.queryByRole('option', { name: 'Settings' })).toBeNull()
+    act(() => source.hasSettings.set(true))
+    fireEvent.click(screen.getByRole('option', { name: 'Settings' }))
+    expect(source.openSettings).toHaveBeenCalledOnce()
     source.dispose()
   })
 })

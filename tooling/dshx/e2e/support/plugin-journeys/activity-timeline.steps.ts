@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { sendMessage } from '../threads.js'
@@ -9,7 +9,7 @@ const rowTitles = async (page: Page): Promise<readonly string[]> =>
   (await feedRows(page).allInnerTexts()).map(text => text.split('\n')[1] ?? '').filter(title => title.length > 0)
 
 export const openActivity = async (page: Page): Promise<void> => {
-  await globalPanelLink(page, 'Activity Timeline: Activity').click()
+  await openGlobalPanel(page, 'Activity Timeline: Activity')
   await expect(page.getByRole('heading', { name: 'Activity', exact: true, level: 1 })).toBeVisible()
 }
 

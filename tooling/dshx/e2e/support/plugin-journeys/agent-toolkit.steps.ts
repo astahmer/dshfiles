@@ -1,5 +1,5 @@
 import { expect, type Page, type TestInfo } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { materializeNonblankThread } from '../thread-composer.js'
@@ -9,7 +9,7 @@ const toolkit = (page: Page) => page.getByTestId('agent-toolkit')
 const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', { name })
 
 When('the Agent toolkit is opened from the sidebar', async ({ page }: { page: Page }) => {
-  await globalPanelLink(page, 'Agent Toolkit: Capabilities').click()
+  await openGlobalPanel(page, 'Agent Toolkit: Capabilities')
   await expect(toolkit(page).getByRole('heading', { name: 'Agent toolkit', exact: true })).toBeVisible()
 })
 

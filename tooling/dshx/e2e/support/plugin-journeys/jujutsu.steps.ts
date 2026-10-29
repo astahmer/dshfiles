@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
@@ -148,7 +148,7 @@ const dispatchDrop = async (
 const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
   await page.evaluate(({ key, path }) => localStorage.setItem(key, JSON.stringify(path)), { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath })
   await page.reload()
-  await globalPanelLink(page, 'Jujutsu: Revision graph').first().click()
+  await openGlobalPanel(page, 'Jujutsu: Revision graph')
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })
 }

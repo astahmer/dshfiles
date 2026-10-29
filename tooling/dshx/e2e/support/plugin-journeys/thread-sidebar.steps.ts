@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
+import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -8,6 +9,8 @@ import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertio
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
+
+const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -52,7 +55,7 @@ const threadBoard = (page: Page) => page.getByRole('region', { name: 'Thread boa
 /** The board is a page of its own, opened from the sidebar's panel list; a reload comes back to the thread view. */
 const openThreadBoard = async (page: Page): Promise<void> => {
   if (await threadBoard(page).isVisible()) return
-  await globalPanelLink(page, 'Thread Sidebar: Board').click()
+  await openGlobalPanel(page, 'Thread Sidebar: Board')
   await expect(threadBoard(page)).toBeVisible()
 }
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
@@ -1428,6 +1431,39 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
   await settings.click()
   await recordAssertion(page, 'thread-sidebar-header-more-opens-settings', async () => {
     await expect(page.getByRole('dialog').filter({ hasText: 'Built-in plugins' })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+// The overflow mode has no Customize control; a browser copy is what the sidebar hands to Host settings on load.
+When('the sidebar header moves overflowing destinations into its More menu only', async ({ page }: { page: Page }) => {
+  await expect(sidebarNavigation(page).getByRole('button', { name: 'More sidebar destinations', exact: true })).toBeVisible()
+  await page.evaluate(
+    ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
+    [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, navigationOverflow: 'menu' })],
+  )
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await expect(sidebarNavigation(page).getByRole('toolbar', { name: 'Sidebar navigation', exact: true })).toHaveCSS('overflow-x', 'hidden')
+})
+
+Then('the header More menu still offers Settings and opens a destination the row left out', async ({ page }: { page: Page }) => {
+  const navigation = sidebarNavigation(page)
+  const toolbar = navigation.getByRole('toolbar', { name: 'Sidebar navigation', exact: true })
+  const menu = page.getByRole('dialog').filter({ has: page.getByPlaceholder('Filter destinations…') })
+  const movedDestination = 'JJ Integration: Thread integration'
+  await recordAssertion(page, 'thread-sidebar-menu-overflow-offers-settings', async () => {
+    await navigation.getByRole('button', { name: 'More sidebar destinations', exact: true }).click()
+    await expect(menu.getByRole('option', { name: movedDestination, exact: true })).toBeVisible()
+    await expect(menu.getByRole('option', { name: 'Settings', exact: true })).toBeVisible()
+    await expect(menu.getByRole('option', { name: 'Customize sidebar', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-menu-overflow-opens-a-moved-destination', async () => {
+    await expect(toolbar.getByRole('button', { name: movedDestination, exact: true })).toHaveCount(0)
+    await openGlobalPanel(page, movedDestination)
+    await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

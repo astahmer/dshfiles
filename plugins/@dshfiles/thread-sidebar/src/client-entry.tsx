@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { SettledThreadDock } from './settled-thread-dock.js'
-import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
+import { requestSettings, SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { SidebarStateProvider } from './sidebar-state.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
@@ -648,6 +648,12 @@ export default defineClient({
               customize: translate('threadSidebarCustomize'),
               navigation: translate('threadSidebarHeaderNavigation'),
             },
+            hasSettings: {
+              subscribe: listener => ctx.slots.subscribe('sidebar.settings', listener),
+              getSnapshot: () => ctx.slots.entriesOfSlot('sidebar.settings').length > 0,
+            },
+            settingsLabel: translate('threadSidebarHostSettings'),
+            openSettings: () => requestSettings(runCommand),
             customizeSidebar: () => customizationActionRef.current?.(),
             registerCustomizationHost,
             decorate,

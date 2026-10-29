@@ -1,5 +1,5 @@
 import { cp, mkdir } from 'node:fs/promises'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
@@ -19,7 +19,7 @@ const OVERSIZED_DIRECTIVE = `[[call bash ${JSON.stringify({ command: OVERSIZED_C
 const fixtureRows = (page: Page) => page.locator('[data-job-id]').filter({ hasText: '/fixture' })
 
 const openJobs = async (page: Page): Promise<void> => {
-  await globalPanelLink(page, 'Background Jobs: Jobs').click()
+  await openGlobalPanel(page, 'Background Jobs: Jobs')
   await expect(page.getByRole('heading', { name: 'Jobs', exact: true, level: 1 })).toBeVisible()
 }
 

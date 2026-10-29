@@ -165,6 +165,12 @@ Feature: Thread sidebar journeys
     When the sidebar header More menu is opened
     Then the header menu offers Settings and Customize sidebar
 
+  @scenario:thread-sidebar.navigation-menu-overflow
+  Scenario: The menu-only overflow mode keeps Settings and the moved destinations behind its More button
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When the sidebar header moves overflowing destinations into its More menu only
+    Then the header More menu still offers Settings and opens a destination the row left out
+
   @scenario:thread-sidebar.palette-search
   Scenario: Thread search reports an empty result from a fresh Host profile
     Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted

@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
@@ -1023,7 +1023,7 @@ Then('the thread appears in the Settled sidebar section', async ({ page }: { pag
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
-  await globalPanelLink(page, 'JJ Integration: Thread integration').click()
+  await openGlobalPanel(page, 'JJ Integration: Thread integration')
   await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
 })
 

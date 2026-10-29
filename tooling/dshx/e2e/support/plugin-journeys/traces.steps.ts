@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { expect, type Page } from '@playwright/test'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
@@ -14,7 +14,7 @@ const freePortPatch = `- id: dshfiles-traces
 const exported = new WeakMap<Page, { readonly traceId: string; readonly clientSpanId: string }>()
 
 const openTraces = async (page: Page): Promise<void> => {
-  await globalPanelLink(page, 'Traces: Explorer').click()
+  await openGlobalPanel(page, 'Traces: Explorer')
   await expect(page.getByRole('heading', { name: 'Traces', exact: true, level: 1 })).toBeVisible()
 }
 

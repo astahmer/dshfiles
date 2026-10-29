@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { rm } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { globalPanelLink as globalPanel, reusableViewName } from '../plugin-view-names.js'
+import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
@@ -29,7 +29,7 @@ const tabSummary = (page: Page): Promise<readonly string[]> =>
     )
 
 const openKept = async (page: Page, name: string): Promise<void> => {
-  await globalPanel(page, name).click()
+  await openGlobalPanel(page, name)
   await expect(tab(page, name)).toHaveAttribute('aria-selected', 'true')
   // Installed ui-plugin-manager registers keyed main `plugins` (not an owned Editor main page).
   if (name === 'Plugins') await expect(tab(page, name)).toHaveAttribute('data-tab-id', 'panel:plugins')
@@ -146,9 +146,9 @@ After(async ({ page }: { page: Page }) => {
 })
 
 When('the Plugins and then Jujutsu are opened from the sidebar', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   await expect(tab(page, 'Plugins')).toBeVisible()
-  await globalPanel(page, 'Jujutsu').click()
+  await openGlobalPanel(page, 'Jujutsu')
 })
 
 Then('Jujutsu replaced the Plugins preview tab', async ({ page }: { page: Page }) => {
@@ -236,7 +236,7 @@ Then('only the pinned Plugins and the thread remain', async ({ page }: { page: P
 })
 
 When('the Plugins page is opened as a tab', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   await expect(tab(page, 'Plugins')).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible()
 })
@@ -396,7 +396,7 @@ When('the Jujutsu panel tab is dragged onto the side panel', async ({ page }: { 
   // Keep the real native guide as the drop target; no Workbench renderer is installed.
   await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
   await expect(page.locator('[data-slot="rightbar"] [data-dockkit-surface]').first()).toBeVisible()
-  await globalPanel(page, 'Jujutsu').click()
+  await openGlobalPanel(page, 'Jujutsu')
   await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
   await threadTab.click()
   await expect(page.locator('[data-slot="rightbar"]')).not.toHaveCount(0)
@@ -445,7 +445,7 @@ Then('the tabs come back with the pin and the Jujutsu tab is active again', asyn
 When('the saved tabs are corrupted and the page is reloaded', async ({ page }: { page: Page }) => {
   await page.evaluate(key => localStorage.setItem(key, '{"sets":"truncated'), STORAGE_KEY)
   await page.reload()
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
 })
 
 Then('the strip starts over from what the main view shows', async ({ page }: { page: Page }) => {
@@ -478,7 +478,7 @@ const MAIN_TAB = '[role="tablist"][aria-label="Open views"] [role="tab"]'
 const DOCK_TAB = '[data-dockkit-tab]'
 
 When('a thread is started and the right panel is opened beside it', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Plugins').click()
+  await openGlobalPanel(page, 'Plugins')
   await tab(page, 'Plugins').dblclick()
   await startNativeThread(page, 'look thread')
   await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()

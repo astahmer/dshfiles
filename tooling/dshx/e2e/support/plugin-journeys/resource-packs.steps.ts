@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { browserDiagnosticsFor, finishJourneyAssertions, recordAssertion, reloadPastProviderSetup } from '../steps.js'
 
@@ -23,7 +23,7 @@ const selectPack = async (page: Page, label: string): Promise<void> => {
 }
 
 When('the Resources page is opened', async ({ page }: { page: Page }) => {
-  await globalPanelLink(page, 'Resource Packs: Resources').click()
+  await openGlobalPanel(page, 'Resource Packs: Resources')
   await expect(page.getByRole('heading', { name: 'Resources', exact: true })).toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Property pack', exact: true })).toBeVisible()
 })
@@ -82,7 +82,7 @@ When('the Resources page is reloaded', async ({ page }: { page: Page }) => {
     if (index >= before && diagnostic === 'requestfailed: eventsource net::ERR_ABORTED') admitted.add(index)
   })
   navigationAborts.set(page, admitted)
-  await globalPanelLink(page, 'Resource Packs: Resources').click()
+  await openGlobalPanel(page, 'Resource Packs: Resources')
   await expect(page.getByRole('heading', { name: 'Resources', exact: true })).toBeVisible()
 })
 

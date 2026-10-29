@@ -47,6 +47,10 @@ interface SidebarWorkbenchSources {
   readonly searchThreadsLabel: string
   readonly sidebarSettingsLabel: string
   readonly navigationLabels: ComponentProps<typeof NavigationIconRow>['labels']
+  /** Whether the Host renders a settings root; the Navigation ⋮ menu offers Settings only then. */
+  readonly hasSettings: HostObservable<boolean>
+  readonly settingsLabel: string
+  readonly openSettings: () => void
   readonly customizeSidebar: () => void
   /** A visible Threads occurrence lends its own content seat, not a native or another plugin's DOM. */
   readonly registerCustomizationHost: (host: HTMLElement) => () => void
@@ -62,6 +66,7 @@ export const registerSidebarWorkbenchPanels = (
     const panels = useSyncExternalStore(sources.panels.subscribe, sources.panels.getSnapshot)
     const definitions = useSyncExternalStore(registry.subscribe, registry.list)
     const info = useSyncExternalStore(sources.panelInfo.subscribe, sources.panelInfo.getSnapshot)
+    const hasSettings = useSyncExternalStore(sources.hasSettings.subscribe, sources.hasSettings.getSnapshot)
     const { preferences, updatePreferences } = useSidebarState()
     const orderedEntries = SidebarOrganization.orderSidebarEntries(
       [
@@ -88,7 +93,7 @@ export const registerSidebarWorkbenchPanels = (
             items={items}
             overflow={preferences.navigationOverflow}
             labels={sources.navigationLabels}
-            settings={null}
+            settings={hasSettings ? { label: sources.settingsLabel, open: sources.openSettings } : null}
             onCustomize={sources.customizeSidebar}
             onReorder={(fromIndex, toIndex) =>
               updatePreferences({

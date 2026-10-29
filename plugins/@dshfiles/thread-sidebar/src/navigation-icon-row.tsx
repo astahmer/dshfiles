@@ -68,7 +68,7 @@ export const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element =>
           drag.to,
         ).flatMap(id => fittingItems.filter(item => item.id === id))
   const menuItems = props.overflow === 'menu' ? props.items.slice(fitting) : props.items
-  const showMenu = props.overflow === 'scroll-menu' || (props.overflow === 'menu' && menuItems.length > 0)
+  const showMenu = props.overflow !== 'scroll'
   const filteredMenuItems = rankByName(
     menuItems.map(item => ({ name: item.label, item })),
     filter.trim(),

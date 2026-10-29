@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { expect, type Page } from '@playwright/test'
 import { openMemoryStore } from '../../../../../plugins/@dshfiles/memory/src/store.ts'
 import { Given, Then, When } from '../bdd.js'
@@ -36,7 +36,7 @@ Given('memory holds the feedback note {string}', async ({ page }: { page: Page }
 })
 
 When('the Memory panel is opened', async ({ page }: { page: Page }) => {
-  await globalPanelLink(page, 'Memory: Browser').click()
+  await openGlobalPanel(page, 'Memory: Browser')
   await expect(page.getByRole('tablist', { name: 'Memory views' })).toBeVisible()
 })
 

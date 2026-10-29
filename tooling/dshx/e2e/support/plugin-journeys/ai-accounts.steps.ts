@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
@@ -258,7 +258,7 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
       },
     }),
   )
-  await globalPanelLink(page, 'Usage: Analytics').click()
+  await openGlobalPanel(page, 'Usage: Analytics')
   await page.getByRole('button', { name: 'Re-index session logs', exact: true }).click()
   await expect.poll(() => page.getByRole('table').getByRole('row').count()).toBeGreaterThan(20)
   await page.reload()
@@ -273,7 +273,7 @@ Then('the account dashboard reference screens fit desktop mobile and dark layout
       if (width >= 1024) {
         const accountSettings = page.getByRole('button', { name: 'AI account settings', exact: true })
         await expect(accountSettings).toBeVisible()
-        await globalPanelLink(page, 'AI Accounts: Usage history').click()
+        await openGlobalPanel(page, 'AI Accounts: Usage history')
         await accountSettings.focus()
         await accountSettings.press('Enter')
         await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
@@ -829,7 +829,7 @@ Then('the rate-limit recovery failover can be changed and restored', async ({ pa
 
 When('two verified loopback accounts are added with Priority distribution', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
-  await globalPanelLink(page, 'AI Accounts: Accounts').click()
+  await openGlobalPanel(page, 'AI Accounts: Accounts')
   await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
   await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-ALPHA1' })
   await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BRAVO2' })
@@ -2028,7 +2028,7 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
   })
   // The account rail reads runtime health with its usage poll; reopening the app reads it now instead of a minute later.
   await page.reload()
-  await globalPanelLink(page, 'AI Accounts: Accounts').click()
+  await openGlobalPanel(page, 'AI Accounts: Accounts')
   await recordAssertion(page, 'ai-accounts-rate-limited-account-is-cooling-down', async () => {
     await expect(accountCard(page, 'Command Code 1').getByText('Rate limited', { exact: true })).toBeVisible()
     await expect(accountCard(page, 'Command Code 2').getByText('Credentials available', { exact: true })).toBeVisible()
@@ -2209,7 +2209,7 @@ Then('the exhausted turn offers an inline route switch and one-minute auto-resum
 
 Then('the quota forecast shows its account and forecast views', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-quota-forecast-account-row', async () => {
-    await globalPanelLink(page, 'AI Accounts: Quota forecast').click()
+    await openGlobalPanel(page, 'AI Accounts: Quota forecast')
     await expect(page.getByRole('tab', { name: 'Forecast', exact: true })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Table', exact: true })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Hand-off', exact: true })).toBeVisible()
