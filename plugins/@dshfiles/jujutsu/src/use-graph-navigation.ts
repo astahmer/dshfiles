@@ -3,6 +3,7 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useState } from 'react'
 import { jujutsuApi, type GraphLandmark, type Revision } from './api.js'
+import { GraphLandmarksQuery } from './graph-landmarks-query.js'
 import { GraphNavigationModel } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
 import {
@@ -58,15 +59,15 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const scopedComparisonOpen = scopeReady && comparisonOpen
   const scopedCustomTargetId = scopeReady ? customTargetId : ''
 
-  const landmarksQuery = useQuery({
-    queryKey: ['jujutsu', input.root, 'graph-navigation', input.repoId, input.refreshedAt],
-    queryFn: async ({ signal }) => readResult(await api.graphNavigation({ repoId: input.repoId ?? '' }, { signal })),
-    enabled: input.repoId !== null && input.onScreen,
-    retry: false,
-    staleTime: JUJUTSU_QUERY_STALE_TIME,
-    gcTime: JUJUTSU_QUERY_GC_TIME,
-    refetchOnWindowFocus: false,
-  })
+  const landmarksQuery = useQuery(
+    GraphLandmarksQuery.options({
+      root: input.root,
+      repoId: input.repoId,
+      refreshedAt: input.refreshedAt,
+      onScreen: input.onScreen,
+      read: async (repoId, signal) => readResult(await api.graphNavigation({ repoId }, { signal })),
+    }),
+  )
   const extraRevisions = useMemo(
     () => GraphNavigationModel.mergeGraphRevisions(navigationView.view?.revisions ?? [], navigationView.revealed),
     [navigationView.view, navigationView.revealed],
