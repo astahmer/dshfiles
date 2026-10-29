@@ -198,7 +198,7 @@ describe('dshx dev scratch commands', () => {
         <dialog id="models" aria-label="Models">
           <button aria-label="${modelId}, reasoning Provider default">${modelId} · Provider default</button>
           <div role="list" aria-label="Models grouped by provider">
-            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${modelId}, reasoning Provider default')">${modelId} gpt-6-luna</button>
+            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${modelId}, reasoning Provider default')"><span>Command Code</span><span>gpt-6-luna</span></button>
           </div>
         </dialog>
       `)
