@@ -30,7 +30,6 @@
       // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.
       "ignoreDependencies": ["oxlint", "@playwright/test", "playwright"],
     },
-    "apps/desktop": {},
     "plugins": {
       "entry": ["scripts/*.ts!"],
     },

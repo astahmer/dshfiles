@@ -44,7 +44,6 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`shared-runtime`](plugins/@dshfiles/shared-runtime/package.json)                | One shared copy of third-party Client modules and the plugin stylesheet for `@dshfiles` UI plugins.                                       |
 | [`shared-streams`](plugins/@dshfiles/shared-streams/README.md)                   | One EventSource per URL across tabs, so several DSH tabs never exhaust the browser's per-origin connections.                              |
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md)                             | Claim keyboard shortcuts before browser defaults.                                                                                         |
-| [`sidebar-commands`](plugins/@dshfiles/sidebar-commands/README.md)               | Use `/goto` to open a sidebar panel or recent session.                                                                                    |
 | [`thread-sidebar`](plugins/@dshfiles/thread-sidebar/README.md)                   | Group project threads and customize DSH navigation.                                                                                       |
 | [`usage`](plugins/@dshfiles/usage/README.md)                                     | Inspect request-level model usage, costs, tokens, cache, timings and failures; in the `web` profile.                                      |
 | [`workbench`](plugins/@dshfiles/workbench/README.md)                             | Persisted docking workbench for registered panels.                                                                                        |
@@ -79,12 +78,6 @@ and other runtime state stay local and are not copied.
 only vendored toolchain in the repository. It provides plugin scaffolding, build and profile checks, runtime inspection, and
 the CLI used by owned plugins. See [`tooling/dshx/FORK.md`](tooling/dshx/FORK.md)
 for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.md).
-
-### Desktop shell
-
-[`apps/desktop`](apps/desktop/README.md) is an unsigned Electron window that
-starts a DSH profile, shows its web UI, and stops the Host on quit
-(`nix run .#desktop`).
 
 ## Documentation
 

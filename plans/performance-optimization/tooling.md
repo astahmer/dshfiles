@@ -72,5 +72,4 @@ Seven implementation work packages. T01 is implemented and verified; T02–T07 a
 - Turbo task dependencies, a bounded root build concurrency of four, shared cache-directory helpers, generated browser input digests, focused test selection and documented force-run policy already exist.
 - Browser journeys are serial deliberately because concurrent Host+Chromium loads were flaky; boot-only checks already use measured concurrency three.
 - Tests with `cache: false` can depend on external binaries/runtime state. Do not enable global caching until all inputs and fresh-run semantics are proven; split deterministic tests only when there is a real stable boundary.
-- Desktop uses the actual DSH renderer. Its small startup/Host lifecycle code was inspected; no supported high-confidence performance redesign was established. Retain process ownership and launch-token safety.
 - Installed/native HMR polling and Host filesystem watch pooling belong to the documented Host boundary, not this register.

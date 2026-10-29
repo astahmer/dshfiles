@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { decodeJson } from './json.ts'
 
-const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts', 'apps/desktop/src']
+const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts']
 
 // Files whose forwarding is the point: each is the target of its package's export map (the public
 // surface of that package), a deliberate vendor shim, or the single JSON decode boundary that turns

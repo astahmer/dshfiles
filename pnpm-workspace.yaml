@@ -3,7 +3,6 @@ packages:
   - plugins/@dshfiles/*
   - tooling/dshx
   - tooling/dshx/packages/*
-  - apps/desktop
 
 # Global virtual-store links split Cordis module augmentations. Keep one local peer identity.
 enableGlobalVirtualStore: false
@@ -114,7 +113,6 @@ publicHoistPattern:
 
 allowBuilds:
   '@ast-grep/cli': true
-  electron: false
   '@deepseek-ai/dsh-subprocess-local': false
   '@google/genai': false
   esbuild: true

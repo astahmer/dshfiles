@@ -2,7 +2,7 @@
 
 ## Context
 
-Repository-wide audit of the 46 owned package directories, dshx, desktop shell, profile/build/check orchestration, and their supported DSH boundaries. Requested outcome: find practical optimization opportunities and plan their fixes, not implement them in this turn.
+Repository-wide audit of the 46 owned package directories, dshx, profile/build/check orchestration, and their supported DSH boundaries. Requested outcome: find practical optimization opportunities and plan their fixes, not implement them in this turn.
 
 - Baseline: stock DSH 0.2.1-rc.2; React 18.3.1; TanStack Query 5.104.1; existing Virtual, XState, shared third-party runtime and one shared stylesheet. Extend the existing owned plugins and dshx, rather than add competing plugins, another authoritative store, or a framework migration.
 - Source audit began from the dedicated thread workspace at commit `ecfd5375f823`, based on `6a82b443dfe3`. Performance-sensitive source was reread; grep/lint matches were not accepted as findings by themselves.

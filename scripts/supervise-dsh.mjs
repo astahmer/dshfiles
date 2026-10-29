@@ -109,7 +109,7 @@ async function main() {
   const home = config.dshHome
   const core = LauncherConfig.requireCoreEntry(config)
   const preparation = [
-    { command: 'pnpm', args: ['--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'], env: { ELECTRON_SKIP_BINARY_DOWNLOAD: '1' } },
+    { command: 'pnpm', args: ['--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
     {
       command: 'pnpm',
       args: ['--dir', root, 'exec', 'turbo', 'run', 'build', '--filter=./plugins/@dshfiles/*', '--concurrency=4', '--output-logs=errors-only'],

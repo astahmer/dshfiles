@@ -190,12 +190,11 @@ const fingerprint = (path: string): string | null => (existsSync(path) ? createH
 const runCommand = (input: {
   readonly argv: readonly [string, ...string[]]
   readonly cwd: string
-  readonly env?: NodeJS.ProcessEnv | undefined
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<{ readonly exitCode: number; readonly output: string }> =>
   new Promise(resolvePromise => {
     const [command, ...args] = input.argv
-    const child = spawn(command, args, { cwd: input.cwd, env: input.env ?? process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(command, args, { cwd: input.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     const collect = (chunk: Buffer): void => {
       const text = chunk.toString('utf8')
@@ -224,18 +223,14 @@ const runRebuild = async (input: {
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<RebuildOutcome> => {
   const installed: string[] = []
-  const step = async (name: string, argv: readonly [string, ...string[]], cwd: string, env?: NodeJS.ProcessEnv) => {
+  const step = async (name: string, argv: readonly [string, ...string[]], cwd: string) => {
     input.onProgress?.(`${name}: ${argv.join(' ')}`)
-    const result = await runCommand({ argv, cwd, env, onOutput: input.onOutput })
+    const result = await runCommand({ argv, cwd, onOutput: input.onOutput })
     return result.exitCode === 0 ? null : { step: name, command: `(cd ${cwd} && ${argv.join(' ')})`, output: result.output }
   }
 
   for (const directory of input.plan.installRoots) {
-    // The desktop app's lockfile pulls Electron; dsh web never needs its binary.
-    const failure = await step(`install ${directory}`, ['pnpm', 'install', '--frozen-lockfile'], join(input.root, directory), {
-      ...process.env,
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
-    })
+    const failure = await step(`install ${directory}`, ['pnpm', 'install', '--frozen-lockfile'], join(input.root, directory))
     if (failure !== null) return { installed, dshx: false, plugins: [], failure }
     installed.push(directory)
   }

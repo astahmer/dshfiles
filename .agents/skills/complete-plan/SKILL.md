@@ -19,7 +19,6 @@ partly done: keep it, trimmed to what is left (step 4).
 - One plugin: its `README.md`, or `plugins/@dshfiles/<x>/docs/<topic>.md` for
   design, research or evidence too long for the README.
 - dshx: `tooling/dshx/docs/`.
-- The desktop app: `apps/desktop/README.md`.
 - Cross-cutting (testing, profiles, repository workflow): `docs/`, and add the
   file to the table in `docs/README.md`.
 
