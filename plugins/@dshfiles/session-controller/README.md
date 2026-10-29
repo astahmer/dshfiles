@@ -88,6 +88,8 @@ const { value } = await sessions.generate({ prompt, jsonSchema: { type: 'object'
 
 | Method                           | What                                                                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`                           | visible threads newest first (title, directory, project, running), filtered by `query` or `projectId`; blank and subagent threads are left out            |
+| `messages`                       | a thread's last user and assistant messages, oldest first, each clipped to 8,000 characters (live or cold thread)                                         |
 | `create`                         | thread in a project or directory, with optional agent preset, title, model and first prompt                                                               |
 | `prompt`                         | user prompt, `queue` (default) or `steer`                                                                                                                 |
 | `command`                        | one slash command line, as typed in the composer                                                                                                          |

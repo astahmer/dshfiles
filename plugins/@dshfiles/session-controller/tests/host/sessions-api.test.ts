@@ -82,6 +82,13 @@ const fixture = async (replies: readonly string[] = []) => {
   const commands = new SessionCommandController(ctx, owner, root)
   ctx.provide('sessionController', {
     resolveAgent: (sessionId: SessionId) => owner.resolveAgent(sessionId),
+    list: async () => ({
+      items: [
+        { sessionId: handle.agent.id, updatedAt: 2, running: handle.agent.status !== 'idle', blank: false, agentAvailable: true, cwd: root },
+        { sessionId: SessionId('blank-thread'), updatedAt: 3, running: false, blank: true, agentAvailable: false },
+        { sessionId: SessionId('older-thread'), updatedAt: 1, running: false, blank: false, agentAvailable: false, cwd: '/elsewhere' },
+      ],
+    }),
     // Native admission also needs the attachment and upload services; a text prompt enters the inbox the same way.
     prompt: async (request: Parameters<SessionCommandController['prompt']>[0]) => {
       const resolved = await owner.resolveAgent(request.sessionId)
@@ -156,6 +163,32 @@ it('names a missing command with a recovery hint and refuses an unknown thread',
     message: expect.stringContaining('composer'),
   })
   await expect(sessions.interrupt({ sessionId: 'not-a-thread' })).rejects.toMatchObject({ remoteCode: 'session-not-found' })
+})
+
+it('lists visible threads newest first, filtered by query, without blank ones', async () => {
+  const { agent, sessions } = await fixture()
+  expect(await sessions.list({ limit: 1 })).toEqual({
+    threads: [{ sessionId: agent.id, cwd: expect.any(String), running: false, updatedAt: 2 }],
+    total: 2,
+    truncated: true,
+  })
+  expect((await sessions.list({ query: 'ELSEWHERE' })).threads.map(thread => thread.sessionId)).toEqual(['older-thread'])
+})
+
+it('reads the recent user and assistant messages of a thread, oldest first', async () => {
+  const { agent, sessions } = await fixture(['First answer.', 'Second answer.'])
+  await sessions.prompt({ sessionId: agent.id, text: 'First question' })
+  await sessions.wait({ sessionId: agent.id, timeoutMs: 10_000 })
+  await sessions.message({ sessionId: agent.id, text: 'Second question', wake: true })
+  await sessions.wait({ sessionId: agent.id, timeoutMs: 10_000 })
+  const read = await sessions.messages({ sessionId: agent.id, limit: 3 })
+  expect(read).toMatchObject({ sessionId: agent.id, running: false, truncated: true })
+  expect(read.entries.map(entry => [entry.role, entry.text])).toEqual([
+    ['assistant', 'First answer.'],
+    ['user', 'Second question'],
+    ['assistant', 'Second answer.'],
+  ])
+  await expect(sessions.messages({ sessionId: 'not-a-thread' })).rejects.toMatchObject({ remoteCode: 'thread-not-found' })
 })
 
 it('generates outside any thread, decoding a JSON Schema reply', async () => {

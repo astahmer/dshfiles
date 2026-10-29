@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-session-query'
 import { MessageId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -9,6 +11,7 @@ import { definePromptSection, generate, pluginStorage } from '@dshfiles/dshx/hos
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type { SessionRequestId } from './native/types.ts'
+import { recentTranscript } from './session-transcript.ts'
 import { sessionsApi } from './sessions-api.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -127,7 +130,79 @@ const sendPrompt = async (ctx: Context, sessionId: SessionId, text: string, mode
   await native(() => controllerOf(ctx).prompt({ requestId, sessionId, mode, content: [{ type: 'text', text }] }, signal))
 }
 
+const projectsBySession = (ctx: Context) => {
+  const registry = ctx.get('workspaceRegistry')
+  const projects = new Map<string, { readonly projectId: string; readonly projectTitle: string }>()
+  for (const workspace of registry?.list() ?? []) {
+    for (const id of workspace.sessionIds) projects.set(id, { projectId: workspace.id, projectTitle: workspace.title })
+  }
+  return { projects, archived: new Set<string>(registry?.archivedSessionIds ?? []) }
+}
+
+const readTitles = async (ctx: Context, sessionIds: readonly SessionId[], signal: AbortSignal): Promise<Map<string, string>> => {
+  const titles = new Map<string, string>()
+  const query = ctx.get('sessionQuery')
+  if (query === undefined || sessionIds.length === 0) return titles
+  for (const result of await query.readTitleSnapshots(sessionIds, signal)) {
+    if (result.status === 'fulfilled' && result.value.title !== undefined) titles.set(result.sessionId, result.value.title.title)
+  }
+  return titles
+}
+
+const sessionQueryNotFound = z.object({ code: z.literal('SESSION_QUERY_SESSION_NOT_FOUND') })
+
+const eventsOf = async (ctx: Context, id: SessionId): Promise<readonly SessionEvent[]> => {
+  const live = ctx.agents.get(id)
+  if (live !== undefined) return live.session.snapshotEvents()
+  const query = ctx.get('sessionQuery')
+  if (query === undefined) throw notFound()
+  try {
+    return (await query.readSession(id)).events
+  } catch (error) {
+    if (sessionQueryNotFound.safeParse(error).success) throw notFound()
+    throw error
+  }
+}
+
 export const sessionsHost = sessionsApi.host({
+  list: async ({ ctx, input, signal }) => {
+    const { items } = await native(() => controllerOf(ctx).list({ projections: [] }, signal))
+    const { projects, archived } = projectsBySession(ctx)
+    const candidates = items
+      .filter(item => !item.blank && item.origin !== 'subagent' && (input.includeArchived || !archived.has(item.sessionId)))
+      .filter(item => input.projectId === undefined || projects.get(item.sessionId)?.projectId === input.projectId)
+      .toSorted((left, right) => right.updatedAt - left.updatedAt)
+    const query = input.query?.toLowerCase()
+    // Only a query needs every title; otherwise the page alone is read.
+    const titles = await readTitles(
+      ctx,
+      (query === undefined || query === '' ? candidates.slice(0, input.limit) : candidates).map(item => item.sessionId),
+      signal,
+    )
+    const rows = candidates.map(item => {
+      const project = projects.get(item.sessionId)
+      const title = titles.get(item.sessionId)
+      return {
+        sessionId: item.sessionId,
+        ...(title === undefined ? undefined : { title }),
+        ...(item.cwd === undefined ? undefined : { cwd: item.cwd }),
+        ...project,
+        running: item.running,
+        updatedAt: item.updatedAt,
+      }
+    })
+    const matching =
+      query === undefined || query === ''
+        ? rows
+        : rows.filter(row => [row.title, row.cwd, row.projectTitle].some(field => field?.toLowerCase().includes(query) === true))
+    return { threads: matching.slice(0, input.limit), total: matching.length, truncated: matching.length > input.limit }
+  },
+  messages: async ({ ctx, input }) => {
+    const id = allowed(ctx, input.sessionId)
+    const transcript = recentTranscript({ events: await eventsOf(ctx, id), limit: input.limit })
+    const agent = ctx.agents.get(id)
+    return { sessionId: id, running: agent !== undefined && isBusy(agent), ...transcript }
+  },
   create: async ({ ctx, input, signal }) => {
     const controller = controllerOf(ctx)
     const created = await native(() =>

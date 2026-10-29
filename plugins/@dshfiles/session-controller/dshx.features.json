@@ -132,7 +132,7 @@
     {
       "id": "drive-threads",
       "title": "Drive threads from another plugin",
-      "summary": "The sessions API lets a plugin or a browser create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt, and make one-off model calls.",
+      "summary": "The sessions API lets a plugin or a browser list threads, read a thread's recent messages, create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt, and make one-off model calls.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["created", "prompted", "message-queued", "running", "idle", "instructions-set"],
@@ -165,6 +165,18 @@
           "id": "session-controller.sessions-api-generate",
           "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
           "testName": "generates outside any thread, decoding a JSON Schema reply"
+        },
+        {
+          "kind": "host-test",
+          "id": "session-controller.sessions-api-list",
+          "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
+          "testName": "lists visible threads newest first, filtered by query, without blank ones"
+        },
+        {
+          "kind": "host-test",
+          "id": "session-controller.sessions-api-messages",
+          "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
+          "testName": "reads the recent user and assistant messages of a thread, oldest first"
         }
       ],
       "telemetry": [

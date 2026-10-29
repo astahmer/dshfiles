@@ -12,6 +12,20 @@ const instructionKey = z
   .max(120)
   .regex(/^[A-Za-z0-9@._:/-]+$/, 'Use a stable key such as "@acme/plugin:style".')
 
+const threadRow = z
+  .object({
+    sessionId: z.string(),
+    title: z.string().optional(),
+    cwd: z.string().optional(),
+    projectId: z.string().optional(),
+    projectTitle: z.string().optional(),
+    running: z.boolean(),
+    updatedAt: z.number(),
+  })
+  .strict()
+
+const transcriptEntry = z.object({ seq: z.number().int(), role: z.enum(['user', 'assistant']), text: z.string() }).strict()
+
 /**
  * Drive threads from another plugin or a browser: create one, prompt it, run its commands, add a message on its
  * behalf, compact, interrupt, wait, switch model or agent, and keep keyed instructions in its prompt. Every method
@@ -23,6 +37,26 @@ export const sessionsApi = defineApi({
   version: 1,
   owner: '@dshfiles/session-controller',
   methods: {
+    list: method({
+      description:
+        'List visible threads newest first, with title, directory, project and whether a turn is running. query matches title, directory or project title.',
+      input: z
+        .object({
+          query: z.string().trim().max(200).optional(),
+          projectId: z.string().min(1).max(256).optional(),
+          includeArchived: z.boolean().default(false),
+          limit: z.number().int().min(1).max(200).default(50),
+        })
+        .strict(),
+      output: z.object({ threads: z.array(threadRow).max(200), total: z.number().int(), truncated: z.boolean() }).strict(),
+      readOnly: true,
+    }),
+    messages: method({
+      description: "A thread's most recent user and assistant messages, oldest first, each clipped to 8,000 characters.",
+      input: z.object({ sessionId, limit: z.number().int().min(1).max(100).default(20) }).strict(),
+      output: z.object({ sessionId: z.string(), running: z.boolean(), entries: z.array(transcriptEntry).max(100), truncated: z.boolean() }).strict(),
+      readOnly: true,
+    }),
     create: method({
       description: 'Start a thread in a project (projectId) or a directory (cwd), optionally with an agent preset, a title, a model and a first prompt.',
       input: z
