@@ -42,7 +42,7 @@
       "failureModes": [
         "The Host streams no shell output while a call runs, so the running state cannot count finished tests.",
         "Vitest's default reporter prints only files with failures; passing files show as a count and their tests stay hidden unless the run used --reporter=verbose.",
-        "Ask to fix and Rerun appear only once the session's composer has mounted; Copy is always available.",
+        "Ask to fix and Rerun appear only while a Composer provider runs; Copy is always available.",
         "Output from another runner, a spilled preview or a persistent shell keeps the native bash card."
       ],
       "externalDependencies": [],

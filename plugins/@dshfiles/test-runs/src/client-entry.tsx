@@ -1,9 +1,9 @@
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import { defineClientPlugin, useSettings, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { Composer, defineClientPlugin, useContract, useSettings } from '@dshfiles/dshx/client'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
-import { createElement, useEffect, useMemo, type ComponentType } from 'react'
+import { createElement, useMemo, type ComponentType } from 'react'
 import { z } from 'zod'
 import { testRunsSettings } from './settings.js'
 import { TestRunCard, TestRunPending, type TestRunActions } from './test-run-card.js'
@@ -26,22 +26,9 @@ const commandOf = (argsRaw: string | undefined): string | undefined => {
   }
 }
 
-const composers = new Map<string, ComposerActionProps['inputActions']>()
-
-/** Renders nothing: it lends the session's composer to the Ask to fix button, which a tool view cannot reach. */
-const ComposerBridge = (props: ComposerActionProps) => {
-  useEffect(() => {
-    composers.set(props.sessionId, props.inputActions)
-    return () => {
-      if (composers.get(props.sessionId) === props.inputActions) composers.delete(props.sessionId)
-    }
-  }, [props.sessionId, props.inputActions])
-  return null
-}
-
 export default defineClientPlugin({
   id: 'test-runs',
-  uses: ['ui', 'composer'],
+  uses: ['ui'],
   setup(api) {
     const slots = api.raw.ctx.slots
     const nativeBashView = (): ComponentType<ToolCallViewProps> | undefined => {
@@ -59,19 +46,15 @@ export default defineClientPlugin({
       const run = useMemo(() => (output?.type === 'text' ? VitestReport.parse(output.text) : undefined), [output])
       const sessionId = props.sessionId
       const settings = useSettings(testRunsSettings).value
+      const composer = useContract(Composer)
       const actions = useMemo<TestRunActions | undefined>(
-        () => ({
-          askToFix: text => {
-            const composer = composers.get(sessionId)
-            return composer === undefined ? false : composer.insertText(text, composer.captureInsertion())
-          },
-        }),
-        [sessionId],
+        () => (composer.status === 'active' ? { askToFix: text => composer.value.insert({ sessionId, text }) } : undefined),
+        [composer, sessionId],
       )
       if (run !== undefined && settings?.enabled !== false)
         return (
           <TestRunCard
-            actions={settings?.composerActions !== false && composers.has(sessionId) ? actions : undefined}
+            actions={settings?.composerActions !== false ? actions : undefined}
             openFailures={settings?.openFailures !== false}
             openFile={(path, options) => props.openFile(run.root === undefined || path.startsWith('/') ? path : `${run.root}/${path}`, options)}
             run={run}
@@ -84,6 +67,5 @@ export default defineClientPlugin({
     }
 
     api.ui.register({ name: 'tool.call.toolview', key: 'bash', priority: PRIORITY, registrant: REGISTRANT, locale: 'conversation' }, BashTestRuns)
-    api.composer.registerAction({ id: 'test-runs-composer-bridge', placement: 'left', order: 1000, component: ComposerBridge })
   },
 })

@@ -44,7 +44,7 @@ The fixtures in `src/fixtures/` are real Vitest 4.1.11 runs of one small suite w
 
 ## Ask to fix and Rerun
 
-A tool view cannot reach the composer, so the plugin also registers an invisible composer action whose only job is to hand its session's `inputActions` to the card. **Ask to fix** inserts a prompt naming the test and quoting its failure; **Rerun** inserts a prompt asking to rerun only that test. Neither sends anything. Both appear once the session's composer has mounted; **Copy** is always there.
+The card reaches its session's composer through dshx's `Composer` contract (provided by `@dshfiles/rich-composer`). **Ask to fix** inserts a prompt naming the test and quoting its failure; **Rerun** inserts a prompt asking to rerun only that test. Neither sends anything. Both appear while a `Composer` provider runs; **Copy** is always there.
 
 ## Limits
 
