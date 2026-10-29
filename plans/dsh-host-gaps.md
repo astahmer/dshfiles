@@ -120,7 +120,7 @@ resources use the supported plugin-owned route in row 65.
 | 89 | First-search SQLite index misses a newly sent message | command-palette | core | upstream | b:354 reports HTTP 200 with no hits. The stock `dsh-session-query-sqlite` database snapshot had generation 0 and no persisted sessions/docs. The installed provider also indexes live Sessions into connection-local temporary tables on each query, so that durable snapshot alone does not tell whether the active Session was observed. The isolated E2E profile loads the stock Loader row (`openAt: first-search`); the same freshly sent-message journey also fails with `openAt: startup`, so lazy-open timing alone is not the fix. Disabling the stock row and composing the owned `session-search` bundle leaves `sessions.search` unavailable on the Host, so a plugin cannot preserve the same native endpoint while replacing the backend there. A controlled E2E confirms the first query can run while only a local submission echo exists; a query after Host admission returns the message. The owned palette now retries an empty result after thread-summary activity, mitigating the visible race without changing SQLite. This does not verify the stock provider's lifecycle. The user declined a source-checkout redirect, so b:354 remains a blocked upstream follow-up for native provider behavior. |
 | 90 | Pre-dispatch context compaction with headroom | context-compaction | host | own | Trace root cause was one summary request replaying the full selected region (~330k tokens against a ~272k context). `@dshfiles/context-compaction` overrides the stock backend's supported `summarize()` hook, sends bounded tool-balanced chunks, then reduces them; native pressure scheduling and durable checkpoint commit stay unchanged. Verified by chunking/overflow regression tests and a scratch profile boot. It fails closed when the prompt/tools or one indivisible unit cannot fit, or image pricing is undeclared. No core patch or upstream ask. |
 
-| 76 | Answered native question form flashes back | agent-questions | core | upstream | Cause confirmed (b:270): answering a `continued` form queues a `user-question-reply` in the Inbox, and the step boundary's `claim()` empties it several awaits before the admitted `user/message` settles the `userQuestions` projection. `publishContinuedQuestions` republishes the card for that gap, so the panel closes, reappears, then closes. Client-only fix, source revision ready to file upstream: `jj:69f2241e`. Patched locally in the installed `lib/client.js` (needs a Host restart; lost on a `dsh` upgrade). Recurring after that? Fork the package — see the row 76 detail below. |
+| 76 | Answered native question form flashes back | agent-questions | core | upstream | Cause confirmed (b:270): answering a `continued` form queues a `user-question-reply` in the Inbox, and the step boundary's `claim()` empties it several awaits before the admitted `user/message` settles the `userQuestions` projection. `publishContinuedQuestions` republishes the card for that gap, so the panel closes, reappears, then closes. Client-only fix, source revision ready to file upstream: `jj:69f2241e`. Carried by the [`@dshfiles/user-questions`](../plugins/@dshfiles/user-questions/README.md) native fork in the `web` profile until upstream ships it. |
 
 ### Row 76 detail — answered native question form flashes back
 
@@ -143,17 +143,9 @@ card keeps its identity, so a discarded reply is still revealable from its tool 
 - Source: workspace `~/dev/dsh-core-question-flash`, `jj:69f2241e`, tests in
   `packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts` (124 pass; the claim-gap test fails
   without the fix).
-- Live patch: a real `pnpm patch`, declared in the global install the `dsh` shim points at
-  (`~/.local/share/pnpm/global/v11/<dir>`, whose `499c6f07…` alias symlinks to the same tree):
-  `patches/@deepseek-ai__dsh-client-ui-user-questions@0.2.1-rc.2.patch` + `patchedDependencies` in its
-  `pnpm-workspace.yaml` and lockfile. pnpm applies it as a patched link-store copy, and
-  `@deepseek-ai/dsh-web-app`'s dependency link resolves there, so the served bundle carries it.
-  The same delta is recorded in this repo as [b270-question-flash.patch](../docs/patches/b270-question-flash.patch)
-  so it can be re-applied — nothing here applies it.
-  Client bundles are read once at activation: it applies on the next Host restart, not a page refresh.
-  A `dsh` upgrade installs into a new global dir, so re-apply the patch there (or drop it once upstream ships).
-- Durable route if it recurs: fork `@deepseek-ai/dsh-client-ui-user-questions` the way `chat` or
-  `rich-composer` do ([native forks](../docs/native-forks.md)), recording the same files as the delta.
+- Carried by the [`@dshfiles/user-questions`](../plugins/@dshfiles/user-questions/README.md) native fork
+  ([native forks](../docs/native-forks.md)), which replaces the stock row in the `web` profile. Drop the fork's
+  delta once a `dsh` release ships the upstream revision.
 
 ## Rich question answers — transport boundary (2026-10-23)
 
