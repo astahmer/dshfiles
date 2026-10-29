@@ -86,7 +86,10 @@ When('a disposable terminal workspace has a selected real conversation', async (
   const root = await createScratchDirectory('dshx-workbench-terminal-')
   const workspace = join(root, 'terminal-project')
   await mkdir(workspace)
+  const bootThreadId = new URL(page.url()).searchParams.get('thread')
   await pane(page, 'left').getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).click()
+  // Boot already shows a blank conversation, so New thread opens a second one; wait for it before using its chip.
+  if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
   await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   await expect(picker).toBeVisible()

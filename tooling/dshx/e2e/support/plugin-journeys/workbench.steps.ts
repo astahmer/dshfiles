@@ -450,11 +450,14 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
   const root = await createScratchDirectory('dshx-workbench-main-e2e-')
   workbenchRoots.set(page, root)
   const workspace = join(root, 'workbench-project')
+  const bootThreadId = new URL(page.url()).searchParams.get('thread')
   await page
     .getByRole('button', { name: 'New thread', exact: true })
     .or(page.getByRole('button', { name: 'New session', exact: true }))
     .first()
     .click()
+  // Boot already shows a blank conversation, so New thread opens a second one; wait for it before using its chip.
+  if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
   // The fresh no-project hero deliberately has a disabled composer. Choose the project before waiting for its
   // enabled textbox name; the project chip is already a real usable control.
   await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toBeVisible()
@@ -501,6 +504,12 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
     // This Session only establishes the project/input precondition. Retire its
     // exact tab before callers create their named chats, so close-all really
     // closes every semantic conversation rather than leaving a hidden fixture.
+    // Close the boot conversation first: New thread starts in the project of the conversation closed last.
+    const bootTab = mainPane(page)
+      .getByRole('tab')
+      .filter({ hasNot: page.locator(`[data-workbench-tab-id=${JSON.stringify(initialPanelId)}]`) })
+      .getByRole('button', { name: 'Close New thread', exact: true })
+    while ((await bootTab.count()) > 0) await bootTab.first().click()
     await initialTab.getByRole('button', { name: 'Close New thread', exact: true }).click()
     await expect(initialTab).toHaveCount(0)
     await expect(chooserIn(mainPane(page))).toBeVisible()
