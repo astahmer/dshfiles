@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "contract": "node scripts/check-workspace-contract.ts",
-    "typecheck": "tsc -p scripts/tsconfig.json && pnpm --dir .. exec turbo run typecheck --filter='./plugins/@dshfiles/*'",
-    "test": "pnpm --dir .. exec turbo run test --filter='./plugins/@dshfiles/*' -- --testTimeout=30000",
-    "build": "pnpm --dir .. exec turbo run build --filter='./plugins/@dshfiles/*'",
+    "typecheck": "tsc -p scripts/tsconfig.json && pnpm --dir .. exec node scripts/turbo.mjs run typecheck --filter='./plugins/@dshfiles/*'",
+    "test": "pnpm --dir .. exec node scripts/turbo.mjs run test --filter='./plugins/@dshfiles/*' -- --testTimeout=30000",
+    "build": "pnpm --dir .. exec node scripts/turbo.mjs run build --filter='./plugins/@dshfiles/*'",
     "check": "pnpm run contract && pnpm run build && pnpm run typecheck && pnpm run test",
     "knip": "pnpm --dir .. run knip --workspace plugins --workspace 'plugins/@dshfiles/*'",
     "test:boot": "node ../tooling/dshx/scripts/boot-check-web.mjs --composed",

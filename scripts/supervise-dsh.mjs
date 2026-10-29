@@ -112,7 +112,7 @@ async function main() {
     { command: 'pnpm', args: ['--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
     {
       command: 'pnpm',
-      args: ['--dir', root, 'exec', 'turbo', 'run', 'build', '--filter=./plugins/@dshfiles/*', '--concurrency=4', '--output-logs=errors-only'],
+      args: ['--dir', root, 'exec', 'node', join(root, 'scripts/turbo.mjs'), 'run', 'build', '--filter=./plugins/@dshfiles/*', '--output-logs=errors-only'],
     },
     { command: config.nodeBinary, args: [join(root, 'scripts/prepare-manuel-source.mjs')] },
   ]
