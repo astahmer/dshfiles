@@ -6,10 +6,15 @@ import type { SidebarPanelMetadata } from '@deepseek-ai/dsh-client-ui-sidebar/cl
 import { resolveSlotLabel, SlotCore, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { createWorkbenchPanelRegistry } from '@dshfiles/workbench/registry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_PREFERENCES } from './organization.js'
+import { storedPreferences } from './preferences.js'
 import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  storedPreferences.remove()
+})
 
 type FooterSources = Pick<Parameters<typeof registerSidebarWorkbenchPanels>[1], 'footerTitles' | 'subscribeFooterTitles'>
 
@@ -54,6 +59,13 @@ const setup = (footerSources?: FooterSources) => {
     customizeSidebar,
     registerCustomizationHost,
     sidebarSettingsLabel: 'Sidebar settings',
+    navigationLabels: {
+      more: 'More sidebar destinations',
+      filter: 'Filter destinations…',
+      empty: 'No matching destinations',
+      customize: 'Customize sidebar',
+      navigation: 'Sidebar navigation',
+    },
   })
   return {
     registry,
@@ -83,6 +95,8 @@ describe('sidebar workbench panels', () => {
       if (definition.id === 'dshfiles-thread-sidebar.workbench-status') {
         expect(section.classList.contains('dshx:py-1')).toBe(true)
         expect(section.classList.contains('dshx:px-3')).toBe(true)
+        expect(section.classList.contains('dshx:p-3')).toBe(false)
+      } else if (definition.id === 'dshfiles-thread-sidebar.workbench-navigation') {
         expect(section.classList.contains('dshx:p-3')).toBe(false)
       } else {
         expect(section.classList.contains('dshx:p-3')).toBe(true)
@@ -293,17 +307,46 @@ describe('sidebar workbench panels', () => {
     })
     const button = screen.getByRole('button', { name: 'Plugin Manager: Plugins' })
     expect(register).toHaveBeenCalledTimes(3)
-    expect(source.calls).toHaveBeenCalledWith('sidebar.panellist', { size: 18, active: false }, { only: nativeId })
+    expect(source.calls).toHaveBeenCalledWith('sidebar.panellist', { size: 16, active: false }, { only: nativeId })
     fireEvent.click(button)
     expect(source.selectPanel).toHaveBeenCalledWith(nativeId)
-    expect(button.querySelector('span.dshx\\:truncate')?.textContent).toBe('Plugin Manager: Plugins')
-    expect(button.querySelector('[title]')).toBeNull()
+    expect(button.textContent).toBe('sidebar.panellist')
     act(() => releaseCanonical())
     expect(screen.getByRole('button', { name: 'Plugins' })).toBe(button)
     expect(source.registry.get(definition.id)?.component).toBe(Panel)
     view.unmount()
     source.dispose()
     releaseNative()
+    releaseRoot()
+  })
+
+  it('lays out visible destinations as one icon row in the saved sidebar order, leaving New thread and Search to Threads', () => {
+    storedPreferences.set({ ...DEFAULT_PREFERENCES, headerOrder: ['panel:jj', 'new-thread', 'panel:plugins'], hiddenHeaderIds: ['panel:backlog'] })
+    const slots = new SlotCore()
+    const releaseRoot = slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' } } }, ({ renderSlot }) =>
+      renderSlot('main', {}, { entryKey: 'plugins' }),
+    )
+    const releaseNative = ['plugins', 'backlog', 'jj'].map(key => slots.register({ name: 'main', key }, () => null))
+    const isRegisteredPanel = (id: string): id is SidebarPanelMetadata['id'] => slots.entriesOfSlot('main').some(entry => entry.options.key === id)
+    const source = setup()
+    source.panels.set(
+      [
+        { id: 'plugins', label: 'Plugins' },
+        { id: 'backlog', label: 'Backlog' },
+        { id: 'jj', label: 'Jujutsu' },
+      ].flatMap(({ id, label }, order) => (isRegisteredPanel(id) ? [{ id, label, order }] : [])),
+    )
+    const definition = source.registry.get('dshfiles-thread-sidebar.workbench-navigation')
+    if (definition === undefined) throw new Error('Navigation source missing')
+    const Panel = definition.component
+    render(<Panel panelId={definition.id} />)
+    const toolbar = screen.getByRole('navigation', { name: 'Navigation' }).querySelector('[role="toolbar"]')
+    if (!(toolbar instanceof HTMLElement)) throw new Error('Navigation icon row missing')
+    expect(toolbar.getAttribute('aria-label')).toBe('Sidebar navigation')
+    expect([...toolbar.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))).toEqual(['Jujutsu', 'Plugins'])
+    expect(screen.getByRole('button', { name: 'More sidebar destinations' })).toBeTruthy()
+    source.dispose()
+    releaseNative.forEach(release => release())
     releaseRoot()
   })
 
@@ -314,7 +357,7 @@ describe('sidebar workbench panels', () => {
     const Panel = definition.component
     render(<Panel panelId={definition.id} />)
     expect(screen.getByRole('navigation', { name: 'Navigation' })).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['More sidebar destinations'])
     source.dispose()
   })
 })
