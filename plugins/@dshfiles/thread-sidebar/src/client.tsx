@@ -21,7 +21,7 @@ import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section
 import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
@@ -1305,6 +1305,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // Both surfaces can be mounted at once: URL ownership, notifications, attention polling and the auto-archive/settle
   // scans stay with the sidebar mount, so one session change is never handled twice.
   const isPrimarySurface = !isBoard
+  const plugin = usePlugin()
   const hostSessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const subscribeDrafts = useCallback((listener: () => void) => props.drafts?.subscribe(listener) ?? (() => undefined), [props.drafts])
   const readDrafts = useCallback(() => props.drafts?.getSnapshot() ?? EMPTY_UNSENT_DRAFTS, [props.drafts])
@@ -2496,7 +2497,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
     const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
     const systemRequested = ThreadNotificationModel.notificationRouteHasSystem(categoryPreferences.delivery)
-    const system = systemRequested && 'Notification' in window && window.Notification.permission === 'granted'
+    const system = systemRequested && plugin.notifications.permission() === 'granted'
     if (!inApp && !system && !categoryPreferences.sound) return
     if (!ThreadNotificationModel.claimThreadNotification(eventId)) return
     if (inApp) {
@@ -2511,18 +2512,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         },
       })
     }
-    if (system) {
-      try {
-        const notification = new window.Notification(title, { body: fallbackBody })
-        notification.onclick = () => {
-          window.focus()
-          openThread(sessionId)
-          notification.close()
-        }
-      } catch {
-        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
-      }
-    }
+    if (system && !plugin.notifications.notify({ title, body: fallbackBody, onClick: () => openThread(sessionId) }))
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
     if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
   }
 
