@@ -9,7 +9,6 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
@@ -94,8 +93,7 @@ const fixture = async () => {
 const connect = async (input: { readonly url: string; readonly token: string }) => {
   const client = new Client({ name: 'test-client', version: '1.0.0' })
   const transport = new StreamableHTTPClientTransport(new URL(input.url), { requestInit: { headers: { authorization: `Bearer ${input.token}` } } })
-  // SAFETY: the SDK declares optional members without `| undefined`, which exactOptionalPropertyTypes rejects.
-  await client.connect(transport as Transport)
+  await client.connect(transport)
   cleanups.push(() => client.close())
   return client
 }

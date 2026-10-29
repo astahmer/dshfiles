@@ -1,6 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { withSpan, type Span } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import type { EndpointStore } from './endpoint-store.js'
@@ -130,7 +129,6 @@ export const createMcpRoute =
         void transport.close()
         void server.close()
       })
-      // SAFETY: the SDK declares its optional callbacks without `| undefined`, which exactOptionalPropertyTypes rejects; the class implements Transport.
-      await server.connect(transport as Transport)
+      await server.connect(transport)
       await transport.handleRequest(request, response, body)
     })
