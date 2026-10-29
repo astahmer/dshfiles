@@ -74,6 +74,8 @@ api.add(ComposerPill, {
 | Registry | Owner |
 | --- | --- |
 | `Command` | `@dshfiles/command-palette` lists it and binds its `keys` |
+| `MenuItem` | `@dshfiles/workbench` lists rows with `menu: 'workbench.new-view'` as Actions in its New tab chooser; a row runs and the chooser closes |
+| `FileViewer` | `@dshfiles/editor` offers a matching viewer as a toggle beside Save and renders it over the text with `{ sessionId, path, text }` (unsaved edits included); the editor's own Markdown preview is one |
 | `LinkHandler` | Markdown renderers: the chat fork's assistant messages and plugin-ui `Markdown` open `[label](scheme:target)` and `<scheme:target>` links through it |
 
 ### Custom link schemes: `LinkHandler`

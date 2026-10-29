@@ -68,6 +68,33 @@ export interface ComposerPillItem {
   usePill(session: { readonly sessionId: string }): ComposerPillState | undefined
 }
 
+/** A row in a menu another plugin owns and renders, picked by `menu` (`workbench.new-view`: the workbench's New tab chooser). */
+export interface MenuRowItem {
+  readonly id: string
+  readonly menu: string
+  readonly title: string
+  readonly keywords?: readonly string[]
+  readonly order?: number
+  run(): void
+}
+
+export interface FileViewerProps {
+  readonly sessionId: string
+  /** Workspace-relative path of the open file. */
+  readonly path: string
+  /** The file's current text, unsaved edits included. */
+  readonly text: string
+}
+
+/** Another way to show a text file the editor has open, such as a rendered Markdown preview; the editor offers it as a toggle. */
+export interface FileViewerItem {
+  readonly id: string
+  /** The toggle's name, e.g. `Preview`. */
+  readonly title: string
+  matches(path: string): boolean
+  readonly component: ComponentType<FileViewerProps>
+}
+
 /** A section in Settings. */
 export interface SettingsSectionItem {
   readonly id: string
@@ -98,6 +125,8 @@ export interface PluginDetailItem {
 export const Panel = BrowserBroker.defineRegistry<PanelItem>('dshx.panel')
 export const ComposerAction = BrowserBroker.defineRegistry<ComposerActionItem>('dshx.composer-action')
 export const ComposerPill = BrowserBroker.defineRegistry<ComposerPillItem>('dshx.composer-pill')
+export const MenuItem = BrowserBroker.defineRegistry<MenuRowItem>('dshx.menu-item')
+export const FileViewer = BrowserBroker.defineRegistry<FileViewerItem>('dshx.file-viewer')
 export const HeaderAction = BrowserBroker.defineRegistry<HeaderActionItem>('dshx.header-action')
 export const SessionRowAccessory = BrowserBroker.defineRegistry<SessionRowAccessoryItem>('dshx.session-row-accessory')
 export const Overlay = BrowserBroker.defineRegistry<OverlayItem>('dshx.overlay')
