@@ -3,9 +3,11 @@ import type { PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { HostObservable, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkbenchPanelDefinition, WorkbenchPanelProps, WorkbenchPanelRegistry } from '@dshfiles/workbench/registry'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useSyncExternalStore, type ComponentProps } from 'react'
+import { NavigationIconRow } from './navigation-icon-row.js'
 import { SidebarSettingsButton } from './sidebar-customization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { SidebarOrganization } from './organization.js'
@@ -44,6 +46,7 @@ interface SidebarWorkbenchSources {
   readonly newThreadLabel: string
   readonly searchThreadsLabel: string
   readonly sidebarSettingsLabel: string
+  readonly navigationLabels: ComponentProps<typeof NavigationIconRow>['labels']
   readonly customizeSidebar: () => void
   /** A visible Threads occurrence lends its own content seat, not a native or another plugin's DOM. */
   readonly registerCustomizationHost: (host: HTMLElement) => () => void
@@ -59,30 +62,46 @@ export const registerSidebarWorkbenchPanels = (
     const panels = useSyncExternalStore(sources.panels.subscribe, sources.panels.getSnapshot)
     const definitions = useSyncExternalStore(registry.subscribe, registry.list)
     const info = useSyncExternalStore(sources.panelInfo.subscribe, sources.panelInfo.getSnapshot)
-    const { preferences } = useSidebarState()
-    const visiblePanels = SidebarOrganization.orderSidebarEntries(
-      panels.map(panel => ({ ...panel, id: `panel:${panel.id}`, panelId: panel.id })),
+    const { preferences, updatePreferences } = useSidebarState()
+    const orderedEntries = SidebarOrganization.orderSidebarEntries(
+      [
+        { id: 'new-thread', order: -2 },
+        { id: 'search', order: -1 },
+        ...panels.map(panel => ({ id: `panel:${panel.id}`, order: panel.order, panelId: panel.id, label: panel.label })),
+      ],
       preferences.headerOrder,
-    ).filter(panel => !preferences.hiddenHeaderIds.includes(panel.id))
+    )
+    const visiblePanels = orderedEntries.flatMap(entry => ('panelId' in entry && !preferences.hiddenHeaderIds.includes(entry.id) ? [entry] : []))
+    const items = visiblePanels.map(panel => ({
+      id: panel.id,
+      label:
+        definitions.find(definition => definition.mainPanelId === panel.panelId && definition.tabId === undefined && !definition.hiddenFromAdd)?.title ??
+        panel.label,
+      icon: sources.renderSlot('sidebar.panellist', { size: 16, active: info.activePanelId === panel.panelId }, { only: panel.panelId }),
+      active: info.activePanelId === panel.panelId,
+      run: () => sources.selectPanel(panel.panelId),
+    }))
     return (
-      <nav aria-label="Navigation" className="dshx:flex dshx:flex-col dshx:gap-1">
-        {visiblePanels.map(panel => (
-          <Button
-            key={panel.id}
-            variant="ghost"
-            className="dshx:min-w-0 dshx:justify-start dshx:gap-2"
-            aria-current={info.activePanelId === panel.panelId ? 'page' : undefined}
-            onClick={() => sources.selectPanel(panel.panelId)}
-          >
-            <span className="dshx:shrink-0">
-              {sources.renderSlot('sidebar.panellist', { size: 18, active: info.activePanelId === panel.panelId }, { only: panel.panelId })}
-            </span>
-            <span className="dshx:min-w-0 dshx:truncate">
-              {definitions.find(definition => definition.mainPanelId === panel.panelId && definition.tabId === undefined && !definition.hiddenFromAdd)?.title ??
-                panel.label}
-            </span>
-          </Button>
-        ))}
+      <nav aria-label="Navigation">
+        <TooltipProvider>
+          <NavigationIconRow
+            items={items}
+            overflow={preferences.navigationOverflow}
+            labels={sources.navigationLabels}
+            settings={null}
+            onCustomize={sources.customizeSidebar}
+            onReorder={(fromIndex, toIndex) =>
+              updatePreferences({
+                headerOrder: SidebarOrganization.reorderVisibleEntry({
+                  orderedIds: orderedEntries.map(entry => entry.id),
+                  visibleIds: visiblePanels.map(entry => entry.id),
+                  fromVisible: fromIndex,
+                  toVisible: toIndex,
+                }),
+              })
+            }
+          />
+        </TooltipProvider>
       </nav>
     )
   }
@@ -114,18 +133,20 @@ export const registerSidebarWorkbenchPanels = (
     )
   }
   const definitions = [
-    { id: 'dshfiles-thread-sidebar.workbench-threads', title: () => 'Thread Sidebar: Threads', component: Threads },
+    { id: 'dshfiles-thread-sidebar.workbench-threads', title: () => 'Thread Sidebar: Threads', component: Threads, padding: 'dshx:p-3' },
     {
       id: 'dshfiles-thread-sidebar.workbench-status',
       title: () => footerTitle('sidebar.footer.above', sources.footerTitles('sidebar.footer.above')),
       component: () => sources.renderSlot('sidebar.footer.above', {}),
+      padding: 'dshx:px-3 dshx:py-1',
     },
     {
       id: 'dshfiles-thread-sidebar.workbench-actions',
       title: () => footerTitle('sidebar.footer.action', sources.footerTitles('sidebar.footer.action')),
       component: () => sources.renderSlot('sidebar.footer.action', { wide: true }),
+      padding: 'dshx:p-3',
     },
-    { id: 'dshfiles-thread-sidebar.workbench-navigation', title: () => 'Thread Sidebar: Navigation', component: Navigation },
+    { id: 'dshfiles-thread-sidebar.workbench-navigation', title: () => 'Thread Sidebar: Navigation', component: Navigation, padding: 'dshx:px-1' },
   ]
   const registrations = definitions.map(definition => {
     const Content = definition.component
@@ -137,10 +158,7 @@ export const registerSidebarWorkbenchPanels = (
             <section
               aria-label={definition.id === 'dshfiles-thread-sidebar.workbench-threads' ? undefined : title}
               data-sidebar-workbench-source={definition.id}
-              className={cn(
-                'dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto',
-                definition.id === 'dshfiles-thread-sidebar.workbench-status' ? 'dshx:px-3 dshx:py-1' : 'dshx:p-3',
-              )}
+              className={cn('dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto', definition.padding)}
             >
               <Content {...props} />
             </section>

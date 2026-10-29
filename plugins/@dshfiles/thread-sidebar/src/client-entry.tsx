@@ -639,6 +639,13 @@ export default defineClient({
             newThreadLabel: translate('threadSidebarNewThread'),
             searchThreadsLabel: translate('threadSidebarSearch'),
             sidebarSettingsLabel: translate('threadSidebarSettings'),
+            navigationLabels: {
+              more: translate('threadSidebarMoreDestinations'),
+              filter: translate('threadSidebarFilterDestinations'),
+              empty: translate('threadSidebarNoDestinations'),
+              customize: translate('threadSidebarCustomize'),
+              navigation: translate('threadSidebarHeaderNavigation'),
+            },
             customizeSidebar: () => customizationActionRef.current?.(),
             registerCustomizationHost,
             decorate,
