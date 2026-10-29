@@ -228,14 +228,12 @@ export class PreviewBrowsers {
     const url = input.url === undefined ? undefined : this.#checkUrl(input.url)
     return pageSpan('preview navigate', entry.id, async () => {
       const options = { waitUntil: 'domcontentloaded' } as const
-      const response =
-        url !== undefined
-          ? await entry.page.goto(url, options)
-          : input.action === 'back'
-            ? await entry.page.goBack(options)
-            : input.action === 'forward'
-              ? await entry.page.goForward(options)
-              : await entry.page.reload(options)
+      const historyStep = {
+        back: () => entry.page.goBack(options),
+        forward: () => entry.page.goForward(options),
+        reload: () => entry.page.reload(options),
+      }
+      const response = url === undefined ? await historyStep[input.action ?? 'reload']() : await entry.page.goto(url, options)
       return this.#navigationResult(entry, response)
     })
   }

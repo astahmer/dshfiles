@@ -3,7 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { TextInput } from './text-input.js'
 import { localCloneUrlSchema, projectFolderNameSchema, type CloneJob, type ProjectLifecycleClient } from './project-lifecycle-api.js'
@@ -26,7 +26,7 @@ const folderNameFromUrl = (url: string): string =>
     .at(-1)
     ?.replace(/\.git$/u, '') ?? ''
 
-const formErrors = (error: z.ZodError): CloneFormErrors => {
+const formErrors = (error: z.ZodError) => {
   const errors: CloneFormErrors = {}
   for (const issue of error.issues) {
     const key = cloneFormSchema.keyof().safeParse(issue.path[0])
@@ -35,12 +35,12 @@ const formErrors = (error: z.ZodError): CloneFormErrors => {
   return errors
 }
 
-const phaseLabels: Record<CloneJob['phase'], string> = {
+const phaseLabels = {
   cloning: 'Cloning',
   colocating: 'Setting up jj',
   registering: 'Adding the project',
   done: 'Done',
-}
+} satisfies Record<CloneJob['phase'], string>
 
 export const ProjectCloneDialog = (props: {
   readonly api: ProjectLifecycleClient
@@ -65,9 +65,12 @@ export const ProjectCloneDialog = (props: {
   const job = jobs.data?.jobs.find(candidate => candidate.id === jobId) ?? start.data
   const cancel = useMutation({ mutationFn: (id: string) => props.api.cancelClone({ jobId: id, confirm: true }) })
 
+  const onCloned = useRef(props.onCloned)
+  onCloned.current = props.onCloned
+  const clonedPath = job?.state === 'succeeded' ? job.path : null
   useEffect(() => {
-    if (job?.state === 'succeeded') props.onCloned(job.path)
-  }, [job?.state])
+    if (clonedPath !== null) onCloned.current(clonedPath)
+  }, [clonedPath])
 
   const change = (patch: Partial<CloneForm>): void => {
     setForm(current => ({ ...current, ...patch }))
