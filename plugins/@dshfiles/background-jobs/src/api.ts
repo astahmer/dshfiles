@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { jobBoardFilterSchema, jobBoardSchema, jobIndexingSchema, jobKillSchema, jobOutputSchema, jobWaitInputSchema, jobWaitSchema } from './types.js'
 
@@ -56,6 +56,12 @@ export const backgroundJobsApi = defineApi({
       description:
         'Block until background jobs settle instead of polling job_output or sleeping. Waits for the given jobIds, or for every job running when the call starts when jobIds is omitted. Returns the final status of each target and which are still running on timeout. Read-only.',
       tool: { name: 'background_jobs_wait', readOnly: true, render: compactJson },
+    }),
+  },
+  events: {
+    changed: event({
+      schema: z.object({}).strict(),
+      description: 'The board changed: a job started, finished or wrote output, or history indexing found more. Read the board again.',
     }),
   },
 })

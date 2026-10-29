@@ -92,6 +92,17 @@ describe('background jobs board', () => {
     expect(second.hasMore).toBe(false)
   })
 
+  it('reports every live job change so the Host can tell browsers to read the board again', () => {
+    let changes = 0
+    const board = new JobsBoard({ history: historySource([]), onChange: () => (changes += 1) })
+    const registry = registryStub()
+    board.attachLive(registry)
+    changes = 0
+    registry.emit({ type: 'registered', job: liveView({ id: jobId('bash-live') }) })
+    registry.emit({ type: 'output', id: jobId('bash-live'), owner: sessionId('session-bbbb'), total: 12 })
+    expect(changes).toBe(2)
+  })
+
   it('counts and filters by the category derived from the command', () => {
     const board = new JobsBoard({
       history: historySource([

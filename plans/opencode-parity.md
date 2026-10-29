@@ -40,7 +40,7 @@ Resume here: pick the next item; A14 unblocks the workbench and chat-focus migra
 | B21 | Typed session API: create, prompt, generate, command, synthetic message, compact, interrupt, wait, switch agent/model, keyed instruction entries                                                                                                                                                   |
 | B22 | `generate`: one-off model call with structured questions                                                                                                                                                                                                                                           |
 | B23 | Plugin key-value storage with prefix scan and pagination through dshx                                                                                                                                                                                                                              |
-| B24 | Typed RPC events pushed from a Host plugin to browsers (dshx APIs are request/response)                                                                                                                                                                                                            |
+| B24 | Done: `event({ schema })` on a contract, `publishApiEvent` on the Host, `useApiEvent`/`subscribeApiEvent` in the browser over one authenticated SSE route (`tooling/dshx/docs/guides/api.md#host-events`); background-jobs' board migrated with a polling fallback |
 
 ## C. Platform and tooling
 

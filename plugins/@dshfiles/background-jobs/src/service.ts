@@ -45,6 +45,8 @@ const boundedText = (text: string): string => (text.length > MAX_OUTPUT_CHUNK ? 
 export interface JobsBoardOptions {
   readonly history: JobHistorySource
   readonly now?: () => number
+  /** Called whenever the merged rows are dropped, so the Host can tell browsers to read again. */
+  readonly onChange?: () => void
 }
 
 interface RankedRow {
@@ -124,6 +126,7 @@ const rowFromLive = (view: JobView): JobRow => {
 export class JobsBoard {
   private readonly history: JobHistorySource
   private readonly now: () => number
+  private readonly onChange: (() => void) | undefined
   private registry: JobRegistrySurface | null = null
   private live: LiveJobs | null = null
   private cachedRows: readonly JobRow[] | null = null
@@ -131,6 +134,7 @@ export class JobsBoard {
   constructor(options: JobsBoardOptions) {
     this.history = options.history
     this.now = options.now ?? (() => Date.now())
+    this.onChange = options.onChange
   }
 
   attachLive(registry: JobRegistrySurface): void {
@@ -151,6 +155,7 @@ export class JobsBoard {
   /** Drop the merged rows; the next read rebuilds them from history and live state. */
   invalidate(): void {
     this.cachedRows = null
+    this.onChange?.()
   }
 
   get liveAvailable(): boolean {

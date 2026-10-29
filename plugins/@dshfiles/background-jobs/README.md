@@ -70,6 +70,11 @@ that goes through the registry's owner fence. Running rows also take a checkbox
 selected stops them all after one confirmation naming the count, and every kill
 still passes the same owner fence.
 
+The board reloads when the Host publishes the API's `changed` event (at most
+once a second, from registry events and history passes). It falls back to
+polling every 5 s (Running) or 15 s (otherwise) while that event is not live,
+for example against a Host whose dshx predates API events.
+
 ## Agent tools
 
 | Tool                      | Kind               | Backing method                    |

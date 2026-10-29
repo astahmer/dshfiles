@@ -26,7 +26,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
@@ -275,10 +275,16 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
     return next
   }, [scope, categories, debouncedSearch])
 
+  const boardEvents = useApiEvent(backgroundJobsApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: boardKey }))
+  // Changes made while the event stream was down are not replayed.
+  useEffect(() => {
+    if (boardEvents === 'live') void queryClient.invalidateQueries({ queryKey: boardKey })
+  }, [boardEvents, queryClient])
+
   const board = useQuery({
     queryKey: [...boardKey, filter],
     queryFn: async ({ signal }) => api.board(filter, { signal }),
-    refetchInterval: scope === 'running' ? POLL_LIVE_MS : POLL_IDLE_MS,
+    refetchInterval: boardEvents === 'live' ? false : scope === 'running' ? POLL_LIVE_MS : POLL_IDLE_MS,
   })
 
   const refresh = useMutation({
