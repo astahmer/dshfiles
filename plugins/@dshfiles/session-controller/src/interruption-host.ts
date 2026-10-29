@@ -11,13 +11,22 @@ export const interruptionHost = interruptionApi.host({
     if (!ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) return { available: false }
     const controller = ctx.get('sessionController')
     if (controller === undefined) return { available: false }
-    return { available: (await controller.interruptedTurn(sessionId)) === input.seq }
+    const stopped = await controller.stoppedTurn(sessionId)
+    return stopped?.seq === input.seq ? { available: true, action: stopped.action } : { available: false }
+  },
+  retry: async ({ ctx, input }) => {
+    const sessionId = SessionId(input.sessionId)
+    if (!ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) return { accepted: false }
+    const controller = ctx.get('sessionController')
+    if (controller === undefined) return { accepted: false }
+    return { accepted: await controller.retryStoppedTurn({ sessionId, seq: input.seq }) }
   },
   resume: async ({ ctx, input }) => {
     const sessionId = SessionId(input.sessionId)
     if (!ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) return { accepted: false }
     const controller = ctx.get('sessionController')
-    if (controller === undefined || (await controller.interruptedTurn(sessionId)) !== input.seq) return { accepted: false }
+    const stopped = await controller?.stoppedTurn(sessionId)
+    if (controller === undefined || stopped?.action !== 'resume' || stopped.seq !== input.seq) return { accepted: false }
     const hash = createHash('sha256').update(`resume-interrupted:${sessionId}:${input.seq}`).digest('hex')
     const requestId = brandString<SessionRequestId>(
       `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`,

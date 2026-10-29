@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { When, Then } from '../bdd.js'
 import { profileFor, recordAssertion, finishJourneyAssertions } from '../steps.js'
-import { seedInterruptedSession } from '../seed-interrupted-session.mjs'
+import { seedFailedFirstRequestSession, seedInterruptedSession } from '../seed-interrupted-session.mjs'
 import { seedChatImageLinkSession } from '../seed-chat-image-link-session.mjs'
 
 const replayMarker = 'provider-replay-private-marker'
@@ -67,10 +67,8 @@ const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void>
   }
 }
 
-When('a thread with two interrupted tasks is opened', async ({ page }: { page: Page }) => {
-  const profile = profileFor(page)
-  await seedInterruptedSession({ homeRoot: profile.homeRoot, profileRoot: `${profile.homeRoot}/profiles/${profile.profile}` })
-  const fixture = page.getByRole('treeitem', { name: /Untitled|Interrupted resume fixture/ })
+const openSeededThread = async (page: Page, title: RegExp): Promise<void> => {
+  const fixture = page.getByRole('treeitem', { name: title })
   await expect
     .poll(
       async () => {
@@ -86,7 +84,42 @@ When('a thread with two interrupted tasks is opened', async ({ page }: { page: P
     )
     .toBeGreaterThan(0)
   await fixture.first().click()
+}
+
+When('a thread with two interrupted tasks is opened', async ({ page }: { page: Page }) => {
+  await seedInterruptedSession({ homeRoot: profileFor(page).homeRoot })
+  await openSeededThread(page, /Untitled|Interrupted resume fixture/)
   await page.getByText('Task stopped', { exact: true }).first().waitFor()
+})
+
+When('a thread whose first request failed is opened', async ({ page }: { page: Page }) => {
+  await seedFailedFirstRequestSession({ homeRoot: profileFor(page).homeRoot })
+  await openSeededThread(page, /Untitled|Failed first request fixture/)
+  await page.getByText('Not logged in', { exact: false }).first().waitFor()
+})
+
+Then('the failed turn offers Retry instead of Resume', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'chat-failed-turn-offers-retry', async () => {
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0)
+  })
+})
+
+When('the failed turn is retried inline', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Retry', exact: true }).click()
+})
+
+Then('the request runs again without a continue prompt', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'chat-retried-turn-adds-no-prompt', async () => {
+    // The seeded thread has no model of its own, so the rerun request fails again on the default route: that second
+    // failure proves the request ran, and only the newest failed turn keeps the action.
+    await expect(page.getByText('This turn failed', { exact: true })).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(1)
+    await expect(page.getByText('Execution requested', { exact: true })).toHaveCount(1)
+    await expect(page.getByText('Continue the interrupted task', { exact: false })).toHaveCount(0)
+    await expect(page.getByText('Say hello', { exact: true })).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('only the latest stopped notice offers Resume', async ({ page }: { page: Page }) => {

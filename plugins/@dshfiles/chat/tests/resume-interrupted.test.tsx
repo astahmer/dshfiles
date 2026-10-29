@@ -18,7 +18,7 @@ it('hides unavailable stopped tasks', async () => {
       <ResumeInterruptedAction
         sessionId="old-task"
         seq={3}
-        api={{ available: async () => ({ available: false }), resume: async () => ({ accepted: false }) }}
+        api={{ available: async () => ({ available: false }), resume: async () => ({ accepted: false }), retry: async () => ({ accepted: false }) }}
       />
     </PluginQueryProvider>,
   )
@@ -38,6 +38,7 @@ it('disables Resume while pending, reports errors, and hides after acceptance', 
         })
       return { accepted: true }
     },
+    retry: async () => ({ accepted: false }),
   }
   render(
     <PluginQueryProvider>
@@ -54,4 +55,40 @@ it('disables Resume while pending, reports errors, and hides after acceptance', 
   fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
   await waitFor(() => expect(screen.queryByRole('button')).toBeNull())
   expect(attempts).toBe(2)
+})
+
+it('offers Retry for a task that produced nothing and sends it to the retry verb, not resume', async () => {
+  const calls: string[] = []
+  const api = {
+    available: async () => ({ available: true, action: 'retry' as const }),
+    resume: async () => {
+      calls.push('resume')
+      return { accepted: true }
+    },
+    retry: async (input: { sessionId: string; seq: number }) => {
+      calls.push(`retry ${input.sessionId} ${String(input.seq)}`)
+      return { accepted: true }
+    },
+  }
+  render(
+    <PluginQueryProvider>
+      <ResumeInterruptedAction sessionId="failed-task" seq={22} api={api} />
+    </PluginQueryProvider>,
+  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+  await waitFor(() => expect(screen.queryByRole('button')).toBeNull())
+  expect(calls).toEqual(['retry failed-task 22'])
+})
+
+it('keeps Resume when an older Host reports no action', async () => {
+  render(
+    <PluginQueryProvider>
+      <ResumeInterruptedAction
+        sessionId="old-host"
+        seq={4}
+        api={{ available: async () => ({ available: true }), resume: async () => ({ accepted: true }), retry: async () => ({ accepted: false }) }}
+      />
+    </PluginQueryProvider>,
+  )
+  expect(await screen.findByRole('button', { name: 'Resume' })).toBeTruthy()
 })

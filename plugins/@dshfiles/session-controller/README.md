@@ -58,7 +58,11 @@ Every other vendored file is byte-identical to the pinned revision.
 
 `interruption-api` serves availability and resume for Chat's latest interrupted
 turn (a Host exit, or a model request that failed after its retries; not a user
-stop or a signed-out account), including the `chat_resume_interrupted` agent tool. Prompt admission checks
+stop or a signed-out account), including the `chat_resume_interrupted` agent tool.
+A stopped turn that recorded no assistant message or tool call (its only request
+failed, signed-out accounts included) is offered as `retry` instead:
+`retryStoppedTurn` wakes it with a `turn-retry` notice (`src/turn-retry.ts`)
+rather than a human "continue" prompt, through `chat_retry_failed_turn`. Prompt admission checks
 the expected ending sequence, idle status, and empty inbox after asynchronous
 attachment validation, immediately before delivery. Intervening work invalidates
 the action; a deterministic request id makes retries idempotent. A message that

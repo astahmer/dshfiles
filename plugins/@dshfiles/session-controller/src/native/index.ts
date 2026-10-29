@@ -23,7 +23,7 @@ import {
   type ApiSessionAgentResult,
 } from './agent.ts'
 import { SessionCommandController, hasPromptContent } from './commands.ts'
-import { latestInterruptedTurn } from '../interrupted-turn.ts'
+import { latestStoppedTurn, type StoppedTurn } from '../interrupted-turn.ts'
 import { SessionControlController } from './control.ts'
 import { SessionHistoryController } from './history.ts'
 import { SessionFileReferences } from './file-references.ts'
@@ -290,11 +290,17 @@ export class SessionController extends TypertRemoteService {
     return this.commands.fork(request, destination)
   }
 
-  async interruptedTurn(sessionId: SessionId): Promise<number | undefined> {
+  /** dshfiles: the latest stopped turn, and whether it should be resumed or retried. */
+  async stoppedTurn(sessionId: SessionId): Promise<StoppedTurn | undefined> {
     const inspection = await this.inspect(sessionId)
     const agent = this.ctx.agents.get(sessionId)
     if (agent !== undefined && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0)) return undefined
-    return latestInterruptedTurn(inspection.events)
+    return latestStoppedTurn(inspection.events)
+  }
+
+  /** dshfiles: Host-only; the chat-resume API checks access first. */
+  retryStoppedTurn(request: { readonly sessionId: SessionId; readonly seq: number }): Promise<boolean> {
+    return this.commands.retryStoppedTurn(request)
   }
 
   /**

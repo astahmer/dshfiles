@@ -482,7 +482,12 @@ The owned Chat's inline **Resume** beside the latest restart-interrupted task
 uses `chat_resume_interrupted`, served by the session-controller's
 `chat-resume.resume` API. Both UI and tool require the exact interrupted ending
 sequence and refuse superseded or busy tasks; the action sends a continuation
-through normal prompt admission, not a replay of unfinished tool calls.
+through normal prompt admission, not a replay of unfinished tool calls. A turn
+that stopped before any reply offers **Retry** instead, through
+`chat_retry_failed_turn` (`chat-resume.retry`): the same request runs again
+behind a `turn-retry` notice, with no continuation prompt.
+`chat_stopped_turn_status` (`chat-resume.available`) reads which of the two
+the latest stopped turn offers.
 
 | Proposed tool                                           | Capability                                   | Backing verb                                                             |
 | ------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |

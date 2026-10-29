@@ -1,69 +1,77 @@
 import { expect, it } from 'vitest'
-import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session/types'
-import { latestInterruptedTurn } from '../../src/interrupted-turn.ts'
+import { SessionSeq, type SessionEvent, type TurnEndReason } from '@deepseek-ai/dsh-session/types'
+import { latestInterruptedTurn, latestStoppedTurn } from '../../src/interrupted-turn.ts'
 
-const interrupted = (seq: number, turn: number): SessionEvent => ({
-  type: 'turn/end',
-  seq: SessionSeq(seq),
-  time: 100,
-  data: { turn, reason: { kind: 'interrupted' } },
-})
+const marker = (seq: number, type: string): SessionEvent =>
+  // SAFETY: the stopped-turn scan reads only the type and seq of these events.
+  ({ type, seq: SessionSeq(seq), time: 200, data: {} }) as never
+
+const ended = (seq: number, reason: TurnEndReason): SessionEvent => ({ type: 'turn/end', seq: SessionSeq(seq), time: 300, data: { turn: 2, reason } })
+
+/** A turn that started answering before it stopped. */
+const answered = (start: number, reason: TurnEndReason): SessionEvent[] => [
+  marker(start, 'turn/start'),
+  marker(start + 1, 'assistant/message'),
+  ended(start + 2, reason),
+]
+/** A turn whose only model request failed: an attempt, never an assistant message. */
+const unanswered = (start: number, reason: TurnEndReason): SessionEvent[] => [
+  marker(start, 'turn/start'),
+  marker(start + 1, 'user/message'),
+  marker(start + 2, 'assistant/attempt'),
+  ended(start + 3, reason),
+]
+
+const interrupted: TurnEndReason = { kind: 'interrupted' }
+const failed = (code: string): TurnEndReason => ({ kind: 'error', error: { message: 'failed', code } })
 
 it('offers only the latest interrupted task and preserves its exact end identity', () => {
   expect(latestInterruptedTurn([])).toBeUndefined()
-  expect(latestInterruptedTurn([interrupted(3, 1), interrupted(8, 2)])).toBe(8)
+  expect(latestInterruptedTurn([...answered(0, interrupted), ...answered(3, interrupted)])).toBe(5)
 })
 
 it('rejects a stopped task after another turn starts or completes', () => {
-  const events: SessionEvent[] = [interrupted(3, 1)]
-  events.push({ type: 'turn/start', seq: SessionSeq(4), time: 200, data: { turn: 2 } })
-  expect(latestInterruptedTurn(events)).toBeUndefined()
-  events.push({ type: 'turn/end', seq: SessionSeq(5), time: 300, data: { turn: 2, reason: { kind: 'completed' } } })
-  expect(latestInterruptedTurn(events)).toBeUndefined()
+  const events: SessionEvent[] = answered(0, interrupted)
+  events.push(marker(3, 'turn/start'))
+  expect(latestStoppedTurn(events)).toBeUndefined()
+  events.push(ended(4, { kind: 'completed' }))
+  expect(latestStoppedTurn(events)).toBeUndefined()
 })
 
 it('keeps offering a stopped task when a later message never started a turn', () => {
-  const userMessage = (seq: number): SessionEvent =>
-    // SAFETY: latestInterruptedTurn reads only the type and seq of a trailing user message.
-    ({ type: 'user/message', seq: SessionSeq(seq), time: 200, data: {} }) as never
-  expect(latestInterruptedTurn([interrupted(3, 1), userMessage(4)])).toBe(3)
-  expect(latestInterruptedTurn([interrupted(3, 1), userMessage(4), interrupted(8, 2)])).toBe(8)
+  expect(latestInterruptedTurn([...answered(0, interrupted), marker(3, 'user/message')])).toBe(2)
+  expect(latestStoppedTurn([...unanswered(0, failed('PI_AI_ERROR')), marker(4, 'user/message')])).toEqual({ seq: 3, action: 'retry' })
 })
 
-const failed = (seq: number, code: string): SessionEvent => ({
-  type: 'turn/end',
-  seq: SessionSeq(seq),
-  time: 300,
-  data: { turn: 2, reason: { kind: 'error', error: { message: 'failed', code } } },
+it('resumes a task a model request failure stopped after it started answering', () => {
+  expect(latestStoppedTurn(answered(0, failed('RATE_LIMIT')))).toEqual({ seq: 2, action: 'resume' })
+  expect(latestStoppedTurn([marker(0, 'turn/start'), marker(1, 'tool/call'), ended(2, failed('SERVER'))])).toEqual({ seq: 2, action: 'resume' })
 })
 
-it('offers a task a model request failure stopped', () => {
-  expect(latestInterruptedTurn([interrupted(3, 1), failed(5, 'RATE_LIMIT')])).toBe(5)
-  expect(latestInterruptedTurn([failed(5, 'SERVER')])).toBe(5)
+it('retries, instead of resuming, a task whose request failed before any reply', () => {
+  expect(latestStoppedTurn(unanswered(0, failed('PI_AI_ERROR')))).toEqual({ seq: 3, action: 'retry' })
+  expect(latestStoppedTurn(unanswered(0, interrupted))).toEqual({ seq: 3, action: 'retry' })
+  expect(latestStoppedTurn(unanswered(0, { kind: 'aborted', reason: { kind: 'disposed' } }))).toEqual({ seq: 3, action: 'retry' })
+  expect(latestInterruptedTurn(unanswered(0, failed('PI_AI_ERROR')))).toBeUndefined()
 })
 
-it('does not resume a signed-out task', () => {
-  expect(latestInterruptedTurn([interrupted(3, 1), failed(5, 'ACCOUNT_SIGNED_OUT')])).toBeUndefined()
+it('retries a signed-out task that produced nothing once the account signs in, but never resumes one', () => {
+  expect(latestStoppedTurn(unanswered(0, failed('ACCOUNT_SIGNED_OUT')))).toEqual({ seq: 3, action: 'retry' })
+  expect(latestStoppedTurn(answered(0, failed('ACCOUNT_SIGNED_OUT')))).toBeUndefined()
 })
 
-it('does not resume a completed task', () => {
-  const completed: SessionEvent = { type: 'turn/end', seq: SessionSeq(5), time: 300, data: { turn: 2, reason: { kind: 'completed' } } }
-  expect(latestInterruptedTurn([interrupted(3, 1), completed])).toBeUndefined()
+it('does not offer a completed task', () => {
+  expect(latestStoppedTurn(answered(0, { kind: 'completed' }))).toBeUndefined()
+  expect(latestStoppedTurn(unanswered(0, { kind: 'completed' }))).toBeUndefined()
 })
 
 it('offers a task the Host shutdown cut off, but not one the user stopped', () => {
-  const aborted = (seq: number, cause: 'disposed' | 'user'): SessionEvent => ({
-    type: 'turn/end',
-    seq: SessionSeq(seq),
-    time: 300,
-    data: { turn: 2, reason: { kind: 'aborted', reason: { kind: cause } } },
-  })
-  expect(latestInterruptedTurn([aborted(5, 'disposed')])).toBe(5)
-  expect(latestInterruptedTurn([aborted(5, 'user')])).toBeUndefined()
+  expect(latestStoppedTurn(answered(0, { kind: 'aborted', reason: { kind: 'disposed' } }))).toEqual({ seq: 2, action: 'resume' })
+  expect(latestStoppedTurn(answered(0, { kind: 'aborted', reason: { kind: 'user' } }))).toBeUndefined()
+  expect(latestStoppedTurn(unanswered(0, { kind: 'aborted', reason: { kind: 'user' } }))).toBeUndefined()
 })
 
-it('offers a task the output-token cap cut off', () => {
-  const capped: SessionEvent = { type: 'turn/end', seq: SessionSeq(5), time: 300, data: { turn: 2, reason: { kind: 'max-tokens' } } }
-  expect(latestInterruptedTurn([interrupted(3, 1), capped])).toBe(5)
-  expect(latestInterruptedTurn([capped, { type: 'turn/start', seq: SessionSeq(6), time: 400, data: { turn: 3 } }])).toBeUndefined()
+it('resumes a task the output-token cap cut off', () => {
+  expect(latestStoppedTurn(answered(0, { kind: 'max-tokens' }))).toEqual({ seq: 2, action: 'resume' })
+  expect(latestStoppedTurn([...answered(0, { kind: 'max-tokens' }), marker(3, 'turn/start')])).toBeUndefined()
 })

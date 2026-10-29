@@ -23,7 +23,9 @@ const ResumeAction = (props: ResumeInterruptedProps) => {
 }
 
 export const ResumeInterruptedAction = (
-  props: ResumeInterruptedProps & { readonly api: Pick<ReturnType<typeof useApi<typeof interruptionApi.methods>>, 'available' | 'resume'> },
+  props: ResumeInterruptedProps & {
+    readonly api: Pick<ReturnType<typeof useApi<typeof interruptionApi.methods>>, 'available' | 'resume' | 'retry'>
+  },
 ) => {
   const api = props.api
   const queryClient = useQueryClient()
@@ -34,21 +36,26 @@ export const ResumeInterruptedAction = (
     refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : resumeAvailabilityRefetchInterval(query.state.data?.available)),
     retry: false,
   })
+  // A Host older than the retry verb reports no action and keeps resuming.
+  const retrying = available.data?.action === 'retry'
   const resume = useMutation({
-    mutationFn: () => api.resume({ sessionId: props.sessionId, seq: props.seq }),
+    mutationFn: () => (retrying ? api.retry : api.resume)({ sessionId: props.sessionId, seq: props.seq }),
     onSuccess: () => {
       queryClient.setQueryData(queryKey, { available: false })
     },
   })
   if (available.data?.available !== true) return null
+  const label = retrying
+    ? { idle: 'Retry', pending: 'Retrying…', failed: 'Could not retry. Try again.' }
+    : { idle: 'Resume', pending: 'Resuming…', failed: 'Could not resume. Try again.' }
   return (
     <span className="dshx-root dshx:flex dshx:flex-col dshx:gap-1">
       <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
-        {resume.isPending ? 'Resuming…' : 'Resume'}
+        {resume.isPending ? label.pending : label.idle}
       </Button>
       {resume.isError && (
         <span role="alert" className="dshx:text-destructive dshx:text-xs">
-          Could not resume. Try again.
+          {label.failed}
         </span>
       )}
     </span>

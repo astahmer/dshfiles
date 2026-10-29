@@ -32,6 +32,41 @@
       ]
     },
     {
+      "id": "retry-failed-turn",
+      "title": "Retry a turn that failed before any reply",
+      "summary": "Retry replaces Resume beside the latest turn that stopped before the model replied (a sign-in, quota or transport failure): the same request runs again behind a compact notice instead of a continue prompt.",
+      "surfaces": ["client", "tool"],
+      "configuration": [],
+      "states": ["failed", "retrying", "retried"],
+      "failureModes": ["A Host without the retry verb keeps offering Resume.", "Retry refuses once the turn is superseded, busy or partly answered."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.retry-action",
+          "file": "plugins/@dshfiles/chat/tests/resume-interrupted.test.tsx",
+          "testName": "offers Retry for a task that produced nothing and sends it to the retry verb, not resume"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.retry-host-turn",
+          "file": "plugins/@dshfiles/session-controller/tests/host/turn-retry.test.ts",
+          "testName": "runs a turn that failed before any reply again, with a notice instead of a continue prompt"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.retry-failed-turn",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
       "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",

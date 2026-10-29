@@ -5,7 +5,8 @@ import { PluginApiError } from '@dshfiles/dshx/api'
 import { annotateThreadModel } from '../thread-model-policy.ts'
 import type { ThreadModelSelect, ThreadModelSnapshot } from '../thread-model-api.ts'
 import { underArchivedSession } from './archived-session-gate.ts'
-import { latestInterruptedTurn } from '../interrupted-turn.ts'
+import { latestInterruptedTurn, latestStoppedTurn } from '../interrupted-turn.ts'
+import { turnRetryMessage } from '../turn-retry.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -415,6 +416,22 @@ export class SessionCommandController {
       return { accepted: true }
     }
     return hasImage ? this.agents.serializeImageAdmission(agent, admit) : admit()
+  }
+
+  /**
+   * dshfiles: run a stopped turn that produced nothing again. Every turn opens from a message, so the request is woken by
+   * a `turn-retry` notice instead of a human prompt asking the model to "continue" work that never started.
+   * @returns whether the retry was queued; false once anything else happened in the Session.
+   */
+  async retryStoppedTurn(request: { readonly sessionId: SessionId; readonly seq: number }): Promise<boolean> {
+    const found = await this.agents.resolveAgent(request.sessionId)
+    if ('error' in found) return false
+    const agent = found.agent
+    if (underArchivedSession(this.ctx, agent) || agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) return false
+    const stopped = latestStoppedTurn(agent.session.snapshotEvents())
+    if (stopped?.action !== 'retry' || stopped.seq !== request.seq) return false
+    agent.followup(turnRetryMessage(request.seq))
+    return true
   }
 
   private async requireModel(selection: Pick<AgentModelSelection, 'provider' | 'model'>): Promise<void> {
