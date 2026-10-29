@@ -3300,6 +3300,9 @@ importers:
       '@deepseek-ai/dsh-session-reference':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(f60b4a1060d11bcc7adfb672501bf6a9)
+      '@dshfiles/main-tabs':
+        specifier: workspace:*
+        version: link:../main-tabs
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5

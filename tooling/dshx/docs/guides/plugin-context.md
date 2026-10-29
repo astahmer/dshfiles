@@ -60,6 +60,21 @@ export default defineClientPlugin({
 | --- | --- |
 | `Command` | `@dshfiles/command-palette` lists it and binds its `keys` |
 
+### Contracts owned plugins provide
+
+Import the token from the owner's dshx module (the owner as a workspace dependency) and follow it with `api.use` or
+`useContract`; it is `pending` while the owner is absent.
+
+| Contract | Module | What |
+| --- | --- | --- |
+| `CommandPalette` | `@dshfiles/command-palette/palette-contract` | `open(mode)`, `close()`, `setRecentLimit(n)`, live `state` |
+| `MainTabs` | `@dshfiles/main-tabs/tabs-contract` | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)` |
+
+```ts
+const tabs = api.use(MainTabs).get()
+if (tabs.status === 'active') tabs.value.open({ kind: 'panel', panelId: 'traces' }, { newTab: true })
+```
+
 ## Your own registry: `defineRegistry`
 
 ```ts

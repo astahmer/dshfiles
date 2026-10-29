@@ -60,6 +60,24 @@ The two-project browser regression uses genuine registered projects and native w
 
 `tabs-machine.ts` (xstate) owns the tab sets, the active tab, order and persistence. The Host's main view stays the truth for what is shown: the client reports it (`host.navigated`, from `layout.panelInfo`, the Session list and Workspaces), and the machine opens or focuses a tab. Picking a tab asks the Host to navigate and ignores its in-between reports until it lands (two-second limit). The Start tab is the one tab with no Host target: while it is active the strip renders `start-page.tsx` below itself and hides the `main` outlet (still mounted, so a thread keeps its state); whatever the Host opens next, from the page or elsewhere, replaces it. Settings are only readable from components, so the machine waits in `gate` until the persistent shell-overlay semantics component reads them (even when workbench mode removes the strip).
 
+## Tabs contract for other plugins
+
+`@dshfiles/main-tabs/tabs-contract` declares the `MainTabs` dshx contract, provided while this plugin runs. Add `@dshfiles/main-tabs` as a workspace dependency (a dev dependency is enough: the module holds only the token) and read it through the plugin context:
+
+```ts
+import { MainTabs } from '@dshfiles/main-tabs/tabs-contract'
+
+const tabs = api.use(MainTabs).get()
+const opened = tabs.status === 'active' ? tabs.value.open({ kind: 'thread', sessionId }, { newTab: true }) : undefined
+if (opened === undefined) openSession(sessionId)
+```
+
+- `tabs`: the current project's tabs in strip order (the same computed view the Workbench reads), empty while tabs are off. `track` it or `useSubscribable` it.
+- `open(target, { newTab?, title? })`: a thread or a main panel (with an optional `scope`); returns the tab id, or undefined while tabs are off or the thread is not listed, so the caller opens it itself.
+- `focus(tabId)` and `close(tabId)`: false when the current strip has no such tab.
+
+`@dshfiles/mentions` opens a Cmd/Ctrl-clicked thread reference this way. The window events above stay for `@dshfiles/thread-sidebar`, which this plugin depends on and so cannot import the contract, and for callers not moved yet.
+
 ## Workbench semantics provider
 
 `@dshfiles/main-tabs/workbench-tabs` is a declared dshx public module with a built runtime export. It re-exports the canonical `@dshfiles/workbench/tabs` contract: placing the neutral channel/types with the renderer avoids a reverse package dependency on main-tabs. The page-global `dshfilesWorkbenchTabsV1` channel survives cross-bundle module duplication; it creates no actor and owns no saved tab state.

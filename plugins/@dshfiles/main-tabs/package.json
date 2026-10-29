@@ -18,6 +18,10 @@
     "./workbench-tabs": {
       "types": "./src/workbench-tabs.ts",
       "default": "./dist/workbench-tabs.js"
+    },
+    "./tabs-contract": {
+      "types": "./src/tabs-contract.ts",
+      "default": "./dist/tabs-contract.js"
     }
   },
   "scripts": {

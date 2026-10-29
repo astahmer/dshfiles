@@ -8,6 +8,7 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-session-reference'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { MainTabs } from '@dshfiles/main-tabs/tabs-contract'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 import { FileMentions } from './file-mentions.js'
 import { MENTIONS_LOCALE_NAMESPACE, mentionsLocale } from './locales.js'
@@ -25,8 +26,6 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 const TIMING_MEASURE = 'dshfiles-mentions:candidates'
-// @dshfiles/main-tabs takes this cancelable window event to open a thread in a tab.
-const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
 // A sent message's in-text session chip (ui-primitives `projectUserText`) and its "Referenced session · …" line (ui-chat).
 const SESSION_CHIP = '[data-ref-chip="session"]'
 // Chips and "Referenced session · …" lines come from the composer; an Agent-written mention is a plain anchor.
@@ -50,7 +49,7 @@ export default defineClient({
   name: '@dshfiles/mentions',
   locales: [mentionsLocale],
   inject: ['inputTriggers', 'sessions', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight', 'uiWorkspace'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     const t = ctx.locale.bind(MENTIONS_LOCALE_NAMESPACE)
     const pickValues = new Map<string, PickValue>()
@@ -91,7 +90,8 @@ export default defineClient({
     const openThread = (sessionId: string, newTab: boolean): boolean => {
       const listed = sessions.list.getSnapshot().ids.find(id => id === sessionId)
       if (listed === undefined) return false
-      if (newTab && !window.dispatchEvent(new CustomEvent(OPEN_THREAD_EVENT, { detail: { sessionId: listed, newTab: true }, cancelable: true }))) return true
+      const tabs = newTab ? metadata?.plugin?.use(MainTabs).get() : undefined
+      if (tabs?.status === 'active' && tabs.value.open({ kind: 'thread', sessionId: listed }, { newTab: true }) !== undefined) return true
       ctx.uiWorkspace.openSession(listed)
       return true
     }

@@ -28,7 +28,7 @@ thread.
   `openReference`), the thread chip in a sent message and its "Referenced
   session · …" line open that thread. A plain click follows
   `@dshfiles/main-tabs`' `openMode`; Cmd/Ctrl-click asks it for a new tab
-  through the `dshfiles:open-thread` event. Sent-message references are native
+  through its `MainTabs` contract. Sent-message references are native
   inert text: the plugin marks them `role="link"` (focusable, Enter opens) and
   resolves a label to its session from the thread's own `session-reference`
   recall events, or from the `dsh-session:` id in the chip's title.
