@@ -1163,7 +1163,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                       ? null
                       : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
                   }
-                  dragHint={text(props.t, 'threadSidebarDragToReorder')}
                   onReorder={(fromIndex, toIndex) =>
                     updatePreferences({
                       headerOrder: SidebarOrganization.reorderVisibleEntry({

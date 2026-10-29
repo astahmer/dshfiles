@@ -40,7 +40,6 @@ const renderRow = (options: { readonly overflow: NavigationOverflow; readonly ro
         items={destinationLabels.map(label => ({ id: label, label, icon: null, active: false, run: () => run(label) }))}
         overflow={options.overflow}
         labels={labels}
-        dragHint="Drag to reorder"
         settings={null}
         onCustomize={onCustomize}
         onReorder={() => undefined}

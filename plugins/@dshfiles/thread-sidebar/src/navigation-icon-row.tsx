@@ -29,7 +29,6 @@ interface NavigationIconRowProps {
   readonly settings: { readonly label: string; readonly open: () => void } | null
   /** Pointer drag within the row; indices are positions among `items`. */
   readonly onReorder: (fromIndex: number, toIndex: number) => void
-  readonly dragHint: string
 }
 
 /** BB's collapsed navigation: one scrollable icon row plus a pinned ⋮ destination menu. */
@@ -181,10 +180,7 @@ export const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element =>
                   {item.icon}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {item.label}
-                <span className="dshx:block dshx:text-xs dshx:opacity-70">{props.dragHint}</span>
-              </TooltipContent>
+              <TooltipContent side="bottom">{item.label}</TooltipContent>
             </Tooltip>
           )
         })}
