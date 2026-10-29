@@ -28,6 +28,8 @@ export type CleanupJobRequest =
       readonly path: string | null
       readonly olderThanHours: number
       readonly kinds: Exclude<CleanupKind, 'secondary'>[]
+      /** Set when a settle names the workspaces; the interval run scans every qualifying one. */
+      readonly targets?: CleanupTarget[]
       readonly trigger: 'automatic'
     }
 
@@ -93,7 +95,10 @@ const emptyProgress: CleanupJobProgress = { total: 0, processed: 0, removed: 0, 
 const isLive = (job: CleanupJobView): boolean => job.state === 'queued' || job.state === 'running'
 
 const copyCleanupRequest = (request: CleanupJobRequest): CleanupJobRequest => {
-  if (request.trigger === 'automatic') return { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'automatic' }
+  if (request.trigger === 'automatic') {
+    const automatic = { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'automatic' as const }
+    return request.targets === undefined ? automatic : { ...automatic, targets: [...request.targets] }
+  }
 
   const scope = { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'manual' as const }
   if (request.targets === undefined) return scope

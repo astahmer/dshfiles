@@ -58,6 +58,7 @@ describe('auto-cleanup settings', () => {
       olderThanHours: 24,
       intervalMinutes: 60,
       activeWithinHours: 2,
+      onSettle: false,
     })
   })
 

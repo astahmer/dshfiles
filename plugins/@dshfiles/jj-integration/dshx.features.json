@@ -819,6 +819,12 @@
           "span": "jj <subcommand>",
           "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
           "testName": "records a jj workspace span with the exit code and marks a failed run"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration settle cleanup",
+          "file": "plugins/@dshfiles/jj-integration/src/settle-cleanup.test.ts",
+          "testName": "records a settle cleanup span with settled, targeted and removed counts"
         }
       ]
     },

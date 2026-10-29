@@ -394,6 +394,16 @@ directory mtimes plus the workspace registry timestamps — never the Session
 list — so it stays cheap on a store with a thousand Sessions. `activeWithinHours:
 0` restores the old behaviour of one job over every registered repository.
 
+`autoCleanup.onSettle` (off by default) also removes a thread workspace the
+moment its last thread is settled or archived: the Host watches the settled ids
+thread-sidebar keeps in its `thread-sidebar` settings document, and when a
+settle finishes a workspace with nothing left to land, it starts the same
+automatic job targeted at that workspace with no age limit. `kinds` still
+applies, and the job rechecks unlanded work, activity and queued integrations
+before removing, so settling never forces work away. Each settle leaves a
+`jj-integration settle cleanup` span with the settled, targeted and removed
+counts.
+
 The activity read is the same Session list a Rebase guard uses (15 s per
 attempt, all waiting on the same read). When the Host's Session list stays
 unreadable, every Session reads as `activity-unknown` and the run removes

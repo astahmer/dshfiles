@@ -39,7 +39,8 @@ import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
-import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
+import { AutoCleanupModel, createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
+import { SETTLED_THREADS_NAMESPACE, SettleCleanupModel, settledStatusSchema } from './settle-cleanup.js'
 import { JsonText } from './json-text.js'
 import { workspaceSyncActivity } from './workspace-sync-outcome.js'
 import { ThreadStatusWarmup } from './thread-status-warmup.js'
@@ -1245,6 +1246,18 @@ const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   })
 }
 
+/** Removes the thread workspaces a settle just finished, through the shared runner so the trail and rechecks match. */
+const cleanupSettledWorkspaces = (input: { readonly justSettled: readonly string[]; readonly settled: readonly string[] }): Promise<number> => {
+  const request = AutoCleanupModel.request(readSettings().autoCleanup, null)
+  return SettleCleanupModel.run({
+    ...input,
+    kinds: request.kinds,
+    repositories: listRepositories,
+    archived: () => new Set(registryOf().archivedSessionIds),
+    remove: targets => cleanupRunner.start({ ...request, olderThanHours: 0, targets }).done,
+  })
+}
+
 const startManualCleanup = (input: CleanupRequest) => {
   const scope = { path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' as const }
   if (input.targets === undefined) return cleanupRunner.start(scope)
@@ -1878,6 +1891,22 @@ const setupHost = (context: Context): Effect<void> => {
     activeProjects: activeRepositoryRoots,
     knownProjects: knownRepositoryRoots,
     onError: error => context.logger.warn('jj-integration: automatic cleanup run failed: %o', error),
+  })
+  const readSettledIds = (): readonly string[] | undefined => {
+    try {
+      return settledStatusSchema.parse(context.settings.describe().find(entry => entry.ns === SETTLED_THREADS_NAMESPACE)?.value).settledSessionIds
+    } catch {
+      return undefined
+    }
+  }
+  let settledSnapshot = readSettledIds()
+  context.on('settings/document-updated', namespace => {
+    if (namespace !== SETTLED_THREADS_NAMESPACE) return
+    const next = readSettledIds()
+    const justSettled = settledSnapshot === undefined || next === undefined ? [] : SettleCleanupModel.newlySettled({ previous: settledSnapshot, next })
+    settledSnapshot = next
+    if (next === undefined || justSettled.length === 0 || !readSettings().autoCleanup.onSettle) return
+    void cleanupSettledWorkspaces({ justSettled, settled: next }).catch(error => context.logger.warn('jj-integration: settle cleanup failed: %o', error))
   })
   const firstSweep = setTimeout(sweep, 30_000)
   const timer = setInterval(sweep, SWEEP_INTERVAL_MS)
