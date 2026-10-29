@@ -52,7 +52,7 @@ describe('official Claude CLI authenticated configuration (not remote validation
         maxBuffer: 64 * 1024,
         killSignal: 'SIGKILL',
         signal: expect.any(AbortSignal),
-        env: { ...base().environment, CLAUDE_CONFIG_DIR: '/synthetic/.claude' },
+        env: base().environment,
       }),
       expect.any(Function),
     )
@@ -86,10 +86,20 @@ describe('official Claude CLI authenticated configuration (not remote validation
     )
   })
 
-  it('pins selected default config directory instead of inheriting another realm', async () => {
+  it('reaches the default login with CLAUDE_CONFIG_DIR unset instead of inheriting another realm', async () => {
     const run = status({ loggedIn: true })
-    await verifyClaudeAuthStatus({ ...base(), run, environment: { CLAUDE_CONFIG_DIR: '/synthetic/inherited' } })
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ environment: { CLAUDE_CONFIG_DIR: '/synthetic/.claude' } }))
+    await verifyClaudeAuthStatus({
+      ...base(),
+      run,
+      environment: { CLAUDE_CONFIG_DIR: '/synthetic/inherited', CLAUDE_SECURESTORAGE_CONFIG_DIR: '/synthetic/inherited' },
+    })
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ environment: {} }))
+  })
+
+  it('pins a custom config directory', async () => {
+    const run = status({ loggedIn: true })
+    await verifyClaudeAuthStatus({ ...base(), configDir: '/synthetic/.claude-work', run, environment: { CLAUDE_CONFIG_DIR: '/synthetic/inherited' } })
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ environment: { CLAUDE_CONFIG_DIR: '/synthetic/.claude-work' } }))
   })
 
   it.each([{}, { loggedIn: false }, { loggedIn: 'true' }, { loggedIn: 1 }])('rejects unsupported status %j', async body => {
@@ -151,8 +161,9 @@ describe('official Claude CLI authenticated configuration (not remote validation
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('pins the default directory in the login hint too', () => {
-    expect(ClaudeAccountModel.claudeLoginHint('/synthetic/.claude')).toBe("CLAUDE_CONFIG_DIR='/synthetic/.claude' claude auth login")
+  it('signs in to the default login without CLAUDE_CONFIG_DIR, which would create a separate keychain item', () => {
+    expect(ClaudeAccountModel.claudeLoginHint('/synthetic/.claude')).toBe('claude auth login')
+    expect(ClaudeAccountModel.claudeLoginHint('/synthetic/.claude-work')).toBe("CLAUDE_CONFIG_DIR='/synthetic/.claude-work' claude auth login")
   })
 
   it('single-quotes custom configuration paths in the login hint', () => {

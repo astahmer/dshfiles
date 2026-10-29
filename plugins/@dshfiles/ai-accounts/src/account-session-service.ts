@@ -84,7 +84,8 @@ export class AccountLogoutProcess {
       .split(delimiter)
       .filter(path => path.startsWith('/'))
       .join(delimiter)
-    env[kind === 'codex' ? 'CODEX_HOME' : 'CLAUDE_CONFIG_DIR'] = home
+    if (kind === 'claude') return ClaudeAccountModel.cliEnvironment({ environment: env, configDir: home })
+    env['CODEX_HOME'] = home
     return env
   }
 }

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { ClaudeAccountModel } from './claude-account.js'
 
 /** Private subprocess result: never returned from account APIs or included in an error. */
 export type ClaudeAuthStatusRunner = (input: {
@@ -66,10 +67,9 @@ export const verifyClaudeAuthStatus = async (input: {
   let rejectCancelled: (() => void) | undefined
   try {
     input.signal.throwIfAborted()
-    const environment = { ...(input.environment ?? process.env) }
+    const environment = ClaudeAccountModel.cliEnvironment({ environment: input.environment ?? process.env, configDir: input.configDir })
     delete environment['ANTHROPIC_API_KEY']
     delete environment['ANTHROPIC_AUTH_TOKEN']
-    environment['CLAUDE_CONFIG_DIR'] = input.configDir
     const cancelled = new Promise<never>((_resolve, reject) => {
       rejectCancelled = () => reject(failure())
       controller.signal.addEventListener('abort', rejectCancelled, { once: true })

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import type { CredentialInfo } from '@deepseek-ai/dsh-credentials'
 import { AccountDraftModel } from './account-draft.js'
+import { ClaudeAccountModel } from './claude-account.js'
 import type { AccountDraft } from './api.js'
 import type { AccountStoreFile } from './account-store.js'
 import { CodexHomeModel } from './codex-home.js'
@@ -258,5 +259,16 @@ describe('account sign-out service ownership', () => {
         '/selected',
       ),
     ).toEqual({ PATH: '/bin', HOME: '/synthetic', CODEX_HOME: '/selected', NO_COLOR: '1', TERM: 'dumb' })
+    expect(AccountLogoutProcess.environment({ PATH: '/bin', CLAUDE_CONFIG_DIR: '/wrong' }, 'claude', '/selected')).toEqual({
+      PATH: '/bin',
+      CLAUDE_CONFIG_DIR: '/selected',
+      NO_COLOR: '1',
+      TERM: 'dumb',
+    })
+    expect(AccountLogoutProcess.environment({ PATH: '/bin', CLAUDE_CONFIG_DIR: '/wrong' }, 'claude', ClaudeAccountModel.resolveClaudeConfigDir(''))).toEqual({
+      PATH: '/bin',
+      NO_COLOR: '1',
+      TERM: 'dumb',
+    })
   })
 })

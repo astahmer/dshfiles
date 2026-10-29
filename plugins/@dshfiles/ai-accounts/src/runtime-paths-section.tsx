@@ -57,8 +57,16 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")
 
 const launchCommandFor = (draft: AccountDraft): string | null => {
   if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return `CODEX_HOME=${shellQuote(draft.shadowHomePath)} codex`
-  if (draft.kind === 'claude' && draft.homePath.trim() !== '') return `CLAUDE_CONFIG_DIR=${shellQuote(draft.homePath)} claude`
+  if (draft.kind === 'claude') return claudeLaunchCommand(draft.homePath.trim())
   return null
+}
+
+/** Claude Code reads its default login only with CLAUDE_CONFIG_DIR unset; a quoted `~` would not expand. */
+const claudeLaunchCommand = (homePath: string): string | null => {
+  if (homePath === '') return null
+  if (/^~\/\.claude\/?$/u.test(homePath)) return 'claude'
+  if (homePath.startsWith('~/')) return `CLAUDE_CONFIG_DIR="$HOME"/${shellQuote(homePath.slice(2))} claude`
+  return `CLAUDE_CONFIG_DIR=${shellQuote(homePath)} claude`
 }
 
 export const RuntimePathsSection = (props: {

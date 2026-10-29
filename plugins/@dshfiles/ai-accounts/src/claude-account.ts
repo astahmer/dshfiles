@@ -142,9 +142,23 @@ export class ClaudeAccountModel {
   static claudeKeychainService = (configDir: string): string =>
     configDir === DEFAULT_CONFIG_DIR ? 'Claude Code-credentials' : `Claude Code-credentials-${createHash('sha256').update(configDir).digest('hex').slice(0, 8)}`
 
+  /**
+   * The environment a `claude` process for this account runs with. Claude Code hashes its keychain item and moves its
+   * profile whenever CLAUDE_CONFIG_DIR is set, even to `~/.claude`, so the default login is only reachable with the
+   * variable unset; setting it made requests read a different, empty login than the one the status check reads.
+   */
+  static cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly configDir: string }): NodeJS.ProcessEnv => {
+    const environment = { ...input.environment }
+    delete environment['CLAUDE_CONFIG_DIR']
+    delete environment['CLAUDE_SECURESTORAGE_CONFIG_DIR']
+    if (input.configDir !== DEFAULT_CONFIG_DIR) environment['CLAUDE_CONFIG_DIR'] = input.configDir
+    return environment
+  }
+
   static shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 
-  static claudeLoginHint = (configDir: string): string => `CLAUDE_CONFIG_DIR=${ClaudeAccountModel.shellQuote(configDir)} claude auth login`
+  static claudeLoginHint = (configDir: string): string =>
+    configDir === DEFAULT_CONFIG_DIR ? 'claude auth login' : `CLAUDE_CONFIG_DIR=${ClaudeAccountModel.shellQuote(configDir)} claude auth login`
 
   /** `utilization` is percent used; a window the plan does not meter arrives as null. */
   static parseClaudeUsage = (raw: JsonValue, plan: string | undefined): UsageCard => {

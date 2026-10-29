@@ -19,6 +19,7 @@ import {
   type TranscriptContext,
 } from '@earendil-works/pi-ai'
 import { z } from 'zod'
+import { ClaudeAccountModel } from './claude-account.js'
 
 /**
  * Claude through the official Claude Code CLI instead of the Messages API.
@@ -166,6 +167,12 @@ interface Session {
 }
 
 type CliEvent = { readonly kind: 'stream'; readonly event: StreamEvent } | { readonly kind: 'failed'; readonly message: string } | { readonly kind: 'exited' }
+
+/** Claude Code answers a missing login with "Not logged in · Please run /login", which names a command DSH has no prompt for. */
+const actionableFailure = (message: string, configDir: string): string =>
+  /not logged in|please run \/login/iu.test(message)
+    ? `Claude Code is not signed in for this account. Sign in again from AI Accounts, or run: ${ClaudeAccountModel.claudeLoginHint(configDir)}. Then retry. (${message})`
+    : message
 
 const fingerprint = (json: string): string => createHash('sha256').update(json).digest('hex').slice(0, 16)
 
@@ -412,11 +419,10 @@ export class ClaudeCliSessions {
       }),
     )
     const configDir = this.options.configDir(input.provider)
-    const environment: NodeJS.ProcessEnv = { ...process.env, MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) }
+    const environment = ClaudeAccountModel.cliEnvironment({ environment: { ...process.env, MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) }, configDir })
     // The CLI prefers an API key from the environment over its login, which would bill the API organization instead.
     delete environment['ANTHROPIC_API_KEY']
     delete environment['ANTHROPIC_AUTH_TOKEN']
-    environment['CLAUDE_CONFIG_DIR'] = configDir
     const args = [
       '-p',
       '--input-format',
@@ -501,7 +507,7 @@ export class ClaudeCliSessions {
         return
       }
       if (value.type === 'result' && 'is_error' in value && value.is_error === true)
-        emit({ kind: 'failed', message: value.result ?? `Claude Code ended the turn with ${value.subtype ?? 'an error'}` })
+        emit({ kind: 'failed', message: actionableFailure(value.result ?? `Claude Code ended the turn with ${value.subtype ?? 'an error'}`, configDir) })
     })
     child.on('exit', code => {
       session.dead = true

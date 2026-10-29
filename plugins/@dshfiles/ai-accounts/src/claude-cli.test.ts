@@ -69,7 +69,57 @@ const finished = async (stream: AssistantMessageEventStream): Promise<AssistantM
 
 const textOf = (message: AssistantMessage): string => message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
 
-it('pins the selected default config directory and preserves native OAuth/cloud environment', async () => {
+const envReport = async (configDir: string): Promise<Record<string, string>> => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-env-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(
+    executable,
+    FAKE_CLAUDE.replace(
+      "'echo ' + process.pid + ': ' + text",
+      'JSON.stringify({ config: process.env.CLAUDE_CONFIG_DIR, storage: process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR })',
+    ),
+  )
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => configDir, executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const context = normalizeContext({ systemPrompt: 'Synthetic.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
+  return JSON.parse(textOf(await finished(cli.stream(model, context, { sessionId: `synthetic-${configDir}` }))))
+}
+
+it('reaches the default login with CLAUDE_CONFIG_DIR unset, the keychain item the account status reads', async () => {
+  vi.stubEnv('CLAUDE_CONFIG_DIR', '/synthetic/unrelated-config')
+  vi.stubEnv('CLAUDE_SECURESTORAGE_CONFIG_DIR', '/synthetic/unrelated-storage')
+  try {
+    expect(await envReport(join(homedir(), '.claude'))).toEqual({})
+    expect(await envReport('/synthetic/.claude-work')).toEqual({ config: '/synthetic/.claude-work' })
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+it('turns Claude Code "Not logged in" into a sign-in recovery naming the account login command', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-signed-out-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(
+    executable,
+    `#!/usr/bin/env node\nrequire('node:readline').createInterface({ input: process.stdin }).on('line', () => { process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login' }) + '\\n') })\n`,
+  )
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => '/synthetic/.claude-work', executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const context = normalizeContext({ systemPrompt: 'Synthetic.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
+  await expect(finished(cli.stream(model, context, { sessionId: 'synthetic-signed-out' }))).rejects.toThrow(
+    "Claude Code is not signed in for this account. Sign in again from AI Accounts, or run: CLAUDE_CONFIG_DIR='/synthetic/.claude-work' claude auth login. Then retry. (Not logged in · Please run /login)",
+  )
+})
+
+it('preserves native OAuth/cloud environment and drops API keys', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'claude-cli-env-'))
   directories.push(directory)
   const executable = join(directory, 'claude')
@@ -91,7 +141,7 @@ it('pins the selected default config directory and preserves native OAuth/cloud 
     if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
     const context = normalizeContext({ systemPrompt: 'Synthetic.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
     const reply = await finished(cli.stream(model, context, { sessionId: 'synthetic-env' }))
-    expect(JSON.parse(textOf(reply))).toEqual({ config: join(homedir(), '.claude'), oauth: 'synthetic-oauth', cloud: 'synthetic-cloud' })
+    expect(JSON.parse(textOf(reply))).toEqual({ oauth: 'synthetic-oauth', cloud: 'synthetic-cloud' })
   } finally {
     vi.unstubAllEnvs()
   }
