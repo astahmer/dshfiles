@@ -47,12 +47,27 @@ export default defineClientPlugin({
 | --- | --- |
 | `Panel` | main view + sidebar navigation row |
 | `ComposerAction` | composer tool row (`placement: 'left' \| 'right'`) |
+| `ComposerPill` | a pill above each session's composer (`conversation.input.dock`) with an optional row menu |
 | `HeaderAction` | session header actions |
 | `SessionRowAccessory` | leading content of each sidebar thread row |
 | `Overlay` | frame-wide floating layer (`shell.overlay`) |
 | `SettingsSection` | a Settings section, with search `entries` |
 | `PluginDetailBadge` | a tag beside a Settings › Plugins detail title |
 | `PluginDetailSection` | a section under a Settings › Plugins detail page |
+
+`ComposerPill.usePill({ sessionId })` runs as a React hook in each composer and returns `{ label, icon?, menu? }`
+or undefined to hide the pill there; a click opens `menu` rows (`{ id, title, disabled?, danger?, run }`) in the
+Host menu above the pill:
+
+```ts
+api.add(ComposerPill, {
+  id: '@acme/plugin.pending',
+  usePill: ({ sessionId }) => {
+    const pending = usePending(sessionId)
+    return pending ? { label: 'Waiting for upload', menu: [{ id: 'cancel', title: 'Cancel', run: pending.cancel }] } : undefined
+  },
+})
+```
 
 ### Registries owned plugins render
 

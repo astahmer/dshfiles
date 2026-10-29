@@ -95,9 +95,12 @@ export type {
   ToastsService,
   ToastTone,
 } from './app-services.js'
-export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from './registries.js'
+export { ComposerAction, ComposerPill, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from './registries.js'
 export type {
   ComposerActionItem,
+  ComposerPillItem,
+  ComposerPillRow,
+  ComposerPillState,
   HeaderActionItem,
   OverlayItem,
   PanelItem,

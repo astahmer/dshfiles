@@ -7,7 +7,7 @@ import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/
 import { PluginHooksModel } from '../src/client/hooks.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from '../src/client/plugin-context.js'
 import { PluginRuntimeModel } from '../src/client/plugin-runtime.js'
-import { Panel, PluginDetailBadge, PluginDetailSection, SettingsSection } from '../src/client/registries.js'
+import { ComposerPill, Panel, PluginDetailBadge, PluginDetailSection, SettingsSection } from '../src/client/registries.js'
 import { StoreModel } from '../src/client/store.js'
 import { SettingsSearchEntriesModel } from '../src/settings/section-entries.js'
 import { defineClientPlugin } from '../src/sdk/client.js'
@@ -237,6 +237,23 @@ describe('registries', () => {
       ['plugins.detail.badge', 'failures', 100],
       ['plugins.detail.section', 'failures', 5],
     ])
+  })
+
+  it('mounts a ComposerPill above each composer and renders its reading, or nothing when it has none', () => {
+    const { plugin, host } = createPlugin('@test/pill')
+    let label: string | undefined = 'Sending after upload'
+    plugin.add(ComposerPill, {
+      id: 'pending',
+      usePill: session => (label === undefined ? undefined : { label: `${label} ${session.sessionId}`, menu: [{ id: 'cancel', title: 'Cancel', run: () => {} }] }),
+    })
+    const [entry] = host.registered
+    expect(entry?.name).toBe('conversation.input.dock')
+    const inject = entry?.options.inject
+    expect(typeof inject === 'function' ? inject('s1') : undefined).toEqual({ sessionId: 's1' })
+    const Frame = entry?.component as (props: { readonly sessionId: string }) => unknown
+    expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toContain('<button type="button" aria-haspopup="menu" aria-expanded="false">Sending after upload s1</button>')
+    label = undefined
+    expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toBe('')
   })
 
   it('reports an invalid native item instead of throwing from add', () => {

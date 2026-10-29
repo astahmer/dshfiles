@@ -179,7 +179,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const createSource = PluginContextModel.signal',
           `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
           `export { LinkHandler, MarkdownLinks } from ${JSON.stringify(CLIENT_LINKS_PATH)}`,
-          `export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
+          `export { ComposerAction, ComposerPill, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
           'export const defineStore = StoreModel.define',
           `import { PluginHooksModel } from ${JSON.stringify(CLIENT_HOOKS_PATH)}`,

@@ -1,4 +1,4 @@
-import { createElement, type ComponentType } from 'react'
+import { createElement, useState, type ComponentType, type ReactNode } from 'react'
 import { BrowserBroker } from './broker.js'
 import { IsolationModel } from './isolation.js'
 import { SettingsSearchEntriesModel, type SettingsSearchEntry } from '../settings/section-entries.js'
@@ -42,6 +42,32 @@ export interface OverlayItem {
   readonly component: ComponentType<never>
 }
 
+/** One row of a composer pill's menu. */
+export interface ComposerPillRow {
+  readonly id: string
+  readonly title: string
+  readonly disabled?: boolean
+  /** Destructive row colors. */
+  readonly danger?: boolean
+  run(): void
+}
+
+/** What a composer pill shows in one session's composer. */
+export interface ComposerPillState {
+  readonly label: string
+  readonly icon?: ReactNode
+  /** Rows a click on the pill opens; without rows the pill is a plain reading. */
+  readonly menu?: readonly ComposerPillRow[]
+}
+
+/** A pill above a session's composer, with an optional row menu. */
+export interface ComposerPillItem {
+  readonly id: string
+  readonly order?: number
+  /** Called as a React hook in each session's composer; undefined hides the pill there. */
+  usePill(session: { readonly sessionId: string }): ComposerPillState | undefined
+}
+
 /** A section in Settings. */
 export interface SettingsSectionItem {
   readonly id: string
@@ -71,6 +97,7 @@ export interface PluginDetailItem {
 
 export const Panel = BrowserBroker.defineRegistry<PanelItem>('dshx.panel')
 export const ComposerAction = BrowserBroker.defineRegistry<ComposerActionItem>('dshx.composer-action')
+export const ComposerPill = BrowserBroker.defineRegistry<ComposerPillItem>('dshx.composer-pill')
 export const HeaderAction = BrowserBroker.defineRegistry<HeaderActionItem>('dshx.header-action')
 export const SessionRowAccessory = BrowserBroker.defineRegistry<SessionRowAccessoryItem>('dshx.session-row-accessory')
 export const Overlay = BrowserBroker.defineRegistry<OverlayItem>('dshx.overlay')
@@ -121,6 +148,87 @@ PluginContextModel.registerNativeMount(ComposerAction, ({ item, owner, slots, de
     item.placement === 'right' ? 'conversation.input.right' : 'conversation.input.left',
     { id: item.id, order: item.order ?? 100 },
     contribution({ component: item.component, owner, id: `composer-action:${item.id}`, decorate }),
+  )
+})
+
+interface PillPrimitives {
+  readonly Pill: ComponentType<{ readonly children?: ReactNode; readonly onClick?: () => void; readonly 'aria-haspopup'?: 'menu'; readonly 'aria-expanded'?: boolean }>
+  readonly Menu: ComponentType<{
+    readonly open: boolean
+    readonly anchor: ReactNode
+    readonly items: readonly { readonly id: string; readonly label: ReactNode; readonly disabled?: boolean; readonly danger?: boolean }[]
+    readonly onSelect: (id: string) => void
+    readonly onClose: () => void
+    readonly side: 'top'
+    readonly portal: boolean
+  }>
+}
+
+const PRIMITIVES_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
+
+const isPillPrimitives = (value: unknown): value is PillPrimitives =>
+  typeof value === 'object' && value !== null && 'Pill' in value && typeof value.Pill === 'function' && 'Menu' in value && typeof value.Menu === 'function'
+
+// The Host serves the primitives as a platform module through the Client loader's `require`; a page without it
+// (a test, another Host) gets plain buttons with the same roles.
+const pillPrimitives = (): PillPrimitives | undefined => {
+  try {
+    const primitives: unknown = typeof require === 'function' ? require(PRIMITIVES_MODULE) : undefined
+    return isPillPrimitives(primitives) ? primitives : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const composerPillFrame = (item: ComposerPillItem): ComponentType<{ readonly sessionId: string }> => {
+  const Frame = (props: { readonly sessionId: string }): ReactNode => {
+    const pill = item.usePill({ sessionId: props.sessionId })
+    const [open, setOpen] = useState(false)
+    if (pill === undefined) return null
+    const content = [pill.icon, pill.label]
+    const rows = pill.menu ?? []
+    const primitives = pillPrimitives()
+    const select = (id: string): void => {
+      setOpen(false)
+      rows.find(row => row.id === id && row.disabled !== true)?.run()
+    }
+    if (primitives !== undefined) {
+      if (rows.length === 0) return createElement(primitives.Pill, null, ...content)
+      return createElement(primitives.Menu, {
+        open,
+        side: 'top',
+        portal: true,
+        anchor: createElement(primitives.Pill, { onClick: () => setOpen(!open), 'aria-haspopup': 'menu', 'aria-expanded': open }, ...content),
+        items: rows.map(row => ({ id: row.id, label: row.title, ...(row.disabled === undefined ? {} : { disabled: row.disabled }), ...(row.danger === undefined ? {} : { danger: row.danger }) })),
+        onSelect: select,
+        onClose: () => setOpen(false),
+      })
+    }
+    if (rows.length === 0) return createElement('span', { 'data-dshx-composer-pill': item.id }, ...content)
+    return createElement(
+      'span',
+      { 'data-dshx-composer-pill': item.id },
+      createElement('button', { type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': open, onClick: () => setOpen(!open) }, ...content),
+      open
+        ? createElement(
+            'span',
+            { role: 'menu' },
+            ...rows.map(row => createElement('button', { key: row.id, type: 'button', role: 'menuitem', disabled: row.disabled === true, onClick: () => select(row.id) }, row.title)),
+          )
+        : null,
+    )
+  }
+  Frame.displayName = `ComposerPill(${item.id})`
+  return Frame
+}
+
+PluginContextModel.registerNativeMount(ComposerPill, ({ item, owner, slots, decorate }) => {
+  assertItemId('ComposerPill', item.id)
+  return registerSlot(
+    slots,
+    'conversation.input.dock',
+    { id: item.id, order: item.order ?? 100, inject: (sessionId: string) => ({ sessionId }) },
+    contribution({ component: composerPillFrame(item), owner, id: `composer-pill:${item.id}`, decorate }),
   )
 })
 
