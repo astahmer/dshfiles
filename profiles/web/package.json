@@ -54,6 +54,7 @@
     "@dshfiles/send-after-upload": "link:../../plugins/@dshfiles/send-after-upload",
     "@dshfiles/session-controller": "link:../../plugins/@dshfiles/session-controller",
     "@dshfiles/session-search": "link:../../plugins/@dshfiles/session-search",
+    "@dshfiles/session-undo": "link:../../plugins/@dshfiles/session-undo",
     "@dshfiles/session-warming": "link:../../plugins/@dshfiles/session-warming",
     "@dshfiles/settings-shell": "link:../../plugins/@dshfiles/settings-shell",
     "@dshfiles/shared-runtime": "link:../../plugins/@dshfiles/shared-runtime",
@@ -157,6 +158,7 @@
         "@dshfiles/references",
         "@dshfiles/policies",
         "@dshfiles/session-warming",
+        "@dshfiles/session-undo",
         "@dshfiles/hmr-gate"
       ]
     }

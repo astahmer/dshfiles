@@ -29,5 +29,5 @@ if (provider !== undefined) await provider.client.provision({ workspaceId, isola
 | [`@dshfiles/jj-integration`](../jj-integration/README.md) | jj  | 100      | `thread-xxxxxx` jj workspace beside the repo |
 | [`@dshfiles/git-worktrees`](../git-worktrees/README.md)   | git | 10       | git worktree, opt-in (`isolate`)             |
 
-Callers: `@dshfiles/backlog` (an item's thread starts isolated).
+Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).
 Bundle the port in the Host entry (`host.bundleDependencies`).

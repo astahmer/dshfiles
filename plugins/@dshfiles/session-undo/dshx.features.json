@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/host.ts",
+      "reason": "Snapshots and restores run in the VCS provider plugin through in-process vcs-provider API calls, each under that provider's automatic api-dispatch span; this plugin starts no process or request of its own."
+    }
+  ],
+  "features": [
+    {
+      "id": "turn-undo-redo",
+      "title": "Undo and redo a turn: conversation and files together",
+      "summary": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the original; redo restores the files the undo replaced and brings the original back.",
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["no-checkpoint", "undoable", "undone", "redone", "running"],
+      "failureModes": [
+        "Undo and redo are refused while the thread runs.",
+        "A fork that fails after the files were restored puts the files back before reporting the error.",
+        "A folder no VCS provider claims records turns without files; undo then rewinds only the conversation.",
+        "A new turn in the forked thread drops its redo."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Undo last turn\"",
+        "hover button \"Redo the undone turn and its files\"",
+        "expect text \"Redo the undone turn and its files\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-undo.undo-redo",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "undoes the last turn into a fork cut before it with its files restored, and redoes it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.refusals",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "refuses while the thread runs, and with nothing recorded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.redo-dropped",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "a new turn in the fork drops its redo"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.fork-failure",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "puts the files back when the conversation cannot be forked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.snapshot-gate",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "records a turn without files when no provider claims the folder, and holds tool calls until the snapshot is taken"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    }
+  ]
+}
