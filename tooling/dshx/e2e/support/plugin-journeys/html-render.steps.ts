@@ -92,5 +92,22 @@ Then('the preview card shows the file with its relative stylesheet and script in
     await expect(frame.getByRole('heading', { name: PREVIEW_TITLE })).toBeVisible()
     await expect(frame.locator('#status')).toHaveText('stylesheet and script inlined', { timeout: 10_000 })
   })
+})
+
+When('the fake model screenshots its latest page with html_render_screenshot', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(`[[call html_render_screenshot ${JSON.stringify({ colorScheme: 'dark' })}]]`)
+  await composer.press('Enter')
+  await expect(page.getByText(/^(Tool finished\.|Answered by \S+)$/)).toHaveCount(3, { timeout: 90_000 })
+})
+
+Then('the screenshot comes back as an image from the preview browser', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'html-render-screenshot-returns-image', async () => {
+    await expect(page.getByText(/could not be rendered|is not loaded|no html_render or html_preview page/i)).toHaveCount(0)
+    // The fake model answers "Tool finished." to a text-only (or failed) tool result; DSH hands a result image to the
+    // model as a following user message, which the fake answers with "Answered by <account>".
+    await expect(page.getByText('Tool finished.', { exact: true })).toHaveCount(2)
+    await expect(page.getByText(/^Answered by \S+$/)).toHaveCount(1)
+  })
   await finishJourneyAssertions(page)
 })

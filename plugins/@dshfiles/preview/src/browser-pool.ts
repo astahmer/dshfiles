@@ -92,6 +92,35 @@ const launchChromium = async (configuredPath: string): Promise<Browser> => {
   }
 }
 
+const escapeAttribute = (value: string): string => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+
+/** A script-free shell whose only child is the document in an opaque-origin frame, like the html-render card. */
+const sandboxShell = (document: string): string =>
+  [
+    '<!doctype html><html><head><meta charset="utf-8">',
+    '<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%;display:block}</style>',
+    `</head><body><iframe sandbox="allow-scripts" srcdoc="${escapeAttribute(document)}"></iframe></body></html>`,
+  ].join('')
+
+const SETTLE_TIMEOUT_MS = 3_000
+
+/** A page script that never yields would hold `evaluate` forever; the capture goes on without the measurement. */
+const settleWithin = <Value>(work: Promise<Value>): Promise<Value | undefined> =>
+  Promise.race([work.catch(() => undefined), new Promise<undefined>(resolve => setTimeout(resolve, SETTLE_TIMEOUT_MS))])
+
+/** JPEG qualities tried in order until the image fits the caller's byte budget. */
+const RENDER_QUALITIES = [75, 55, 35] as const
+
+export interface RenderHtmlInput {
+  readonly document: string
+  readonly width: number
+  readonly height: number
+  readonly fullPage: boolean
+  readonly colorScheme: 'light' | 'dark'
+  readonly maxImageBytes: number
+  readonly maxFullPageHeight: number
+}
+
 const pageSpan = <Result>(name: string, pageId: string | undefined, run: () => Promise<Result>): Promise<Result> =>
   withSpan(name, { kind: 'client', attributes: pageId === undefined ? {} : { 'dshx.preview.page': pageId } }, run)
 
@@ -290,6 +319,47 @@ export class PreviewBrowsers {
       const result = bounded(serialized, MAX_EVALUATE_CHARS)
       return { ...(await this.#summary(entry)), result: result.text, truncated: result.truncated }
     })
+  }
+
+  /**
+   * Screenshot of an untrusted document with no network: a fresh offline context, every routed request aborted, and the
+   * document in a sandboxed srcdoc frame. Nothing is kept after the call.
+   */
+  renderHtml(input: RenderHtmlInput) {
+    return withSpan(
+      'preview render-html',
+      { kind: 'client', attributes: { 'dshx.preview.document_chars': input.document.length, 'dshx.preview.full_page': input.fullPage } },
+      async () => {
+        const browser = await this.#launch()
+        const context = await browser.newContext({
+          viewport: { width: input.width, height: input.height },
+          colorScheme: input.colorScheme,
+          offline: true,
+          acceptDownloads: false,
+          serviceWorkers: 'block',
+        })
+        try {
+          context.setDefaultTimeout(ACTION_TIMEOUT_MS)
+          await context.route('**/*', route => route.abort('blockedbyclient'))
+          const page = await context.newPage()
+          await page.setContent(sandboxShell(input.document), { waitUntil: 'load', timeout: NAVIGATION_TIMEOUT_MS })
+          const frame = page.frames().find(candidate => candidate !== page.mainFrame())
+          const contentHeight = frame === undefined ? undefined : await settleWithin(frame.evaluate(() => document.documentElement.scrollHeight))
+          const height = input.fullPage ? Math.min(input.maxFullPageHeight, Math.max(input.height, contentHeight ?? input.height)) : input.height
+          if (height !== input.height) await page.setViewportSize({ width: input.width, height })
+          await settleWithin(page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
+          for (const quality of RENDER_QUALITIES) {
+            const image = await page.screenshot({ type: 'jpeg', quality, timeout: SNAPSHOT_TIMEOUT_MS })
+            if (image.byteLength <= input.maxImageBytes) return { image, width: input.width, height }
+          }
+          throw new PreviewError(
+            `The screenshot is larger than ${String(Math.round(input.maxImageBytes / 1024))} KB even at low quality. Capture the viewport instead of the full page, or use a smaller width.`,
+          )
+        } finally {
+          await context.close().catch(() => undefined)
+        }
+      },
+    )
   }
 
   async close(input: { readonly sessionId: string; readonly pageId?: string | undefined }): Promise<{ readonly closed: number }> {

@@ -151,6 +151,57 @@
           "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
         }
       ]
+    },
+    {
+      "id": "render-html",
+      "title": "Offline HTML screenshots for other Host plugins",
+      "summary": "The preview-render dshx contract (@dshfiles/preview/render-api) lets another Host plugin screenshot an untrusted HTML document in the preview Chromium: a fresh offline browser context per call with every request aborted, the document in an allow-scripts, opaque-origin srcdoc frame, an optional full-page capture up to 6000 pixels, and a JPEG returned as base64 within the API payload budget. Only plugin callers are served; html-render's html_render_screenshot is the agent tool over it.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["rendering", "captured", "refused"],
+      "failureModes": [
+        "A Client or Agent caller is refused: the contract serves other Host plugins only.",
+        "An image that stays above the budget at every JPEG quality is refused with how to shrink the capture.",
+        "A missing browser fails like every preview tool, naming the install command and the chromiumPath setting."
+      ],
+      "externalDependencies": [
+        {
+          "id": "playwright-core Chromium headless shell",
+          "boundary": "One Host Chromium launched over the pipe transport; each render gets its own offline context that is closed after the capture.",
+          "deterministicFake": "Unit tests render against the real headless shell with a loopback server that counts requests, proving none leave the context."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "preview.render-html-journey",
+          "featureFile": "tooling/dshx/e2e/features/html-render.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.render-html-offline",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.render-html-budget",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "refuses a render that stays over the image budget at every quality"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "preview render-html",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span"
+        }
+      ]
     }
   ]
 }

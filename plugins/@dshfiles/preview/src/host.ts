@@ -10,12 +10,15 @@ import { withSpan } from '@dshfiles/dshx/tracing'
 import { previewApi } from './api.js'
 import { PreviewBrowsers, PreviewError } from './browser-pool.js'
 import { DevServerProbes } from './dev-server-probe.js'
+import { previewRenderApi, RenderHtmlLimits } from './render-api.js'
 import { createScreenshotTool } from './screenshot-tool.js'
 import { previewSettings, type PreviewSettings } from './settings.js'
 
 const KILL_GRACE_MS = 3_000
 const STOP_REASON = 'stopped from the thread dev-server list'
 const DEFAULT_SNAPSHOT_CHARS = 20_000
+/** Base64 grows the JPEG by a third; this keeps the API output under dshx's 1 MB payload cap. */
+const MAX_RENDER_IMAGE_BYTES = 700 * 1024
 
 interface JobRegistry {
   readonly events: { subscribe(filter: { readonly owners: 'all' }, listener: (event: JobEvent) => void): () => void }
@@ -195,6 +198,24 @@ const api = previewApi.host({
     stopDevServer(requireRuntime(), { sessionId: ownThread(caller, input.sessionId), pid: input.pid, startedAt: input.startedAt }),
 })
 
+const renderApi = previewRenderApi.host({
+  screenshotHtml: ({ input, caller }) =>
+    userFacing(async () => {
+      if (caller.kind !== 'plugin')
+        throw new PluginApiError('preview-render serves other DSH Host plugins only; agents use html_render_screenshot.', { code: 'plugin-only' })
+      const shot = await requireRuntime().browsers.renderHtml({
+        document: input.document,
+        width: input.width ?? RenderHtmlLimits.defaultWidth,
+        height: input.height ?? RenderHtmlLimits.defaultHeight,
+        fullPage: input.fullPage ?? false,
+        colorScheme: input.colorScheme ?? 'light',
+        maxImageBytes: MAX_RENDER_IMAGE_BYTES,
+        maxFullPageHeight: RenderHtmlLimits.maxFullPageHeight,
+      })
+      return { image: Buffer.from(shot.image).toString('base64'), mediaType: 'image/jpeg' as const, width: shot.width, height: shot.height }
+    }),
+})
+
 const ownedSettings = previewSettings.host({
   setup: scope => {
     settingsScope = scope
@@ -258,7 +279,7 @@ const setupHost = (context: Context): Effect<void> => {
 export default defineHost({
   name: '@dshfiles/preview',
   inject: ['subprocess', 'tools', 'attachments'],
-  apis: [api],
+  apis: [api, renderApi],
   settings: [ownedSettings],
   tools: [
     ctx =>

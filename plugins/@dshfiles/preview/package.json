@@ -13,7 +13,11 @@
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./render-api": {
+      "types": "./src/render-api.ts",
+      "default": "./dist/render-api.js"
+    }
   },
   "scripts": {
     "build": "dshx build",

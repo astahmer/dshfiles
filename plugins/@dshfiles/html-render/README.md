@@ -58,6 +58,25 @@ An oversized or empty page is refused: the error names the size and how to shrin
 
 The file is read once when the tool runs; the card keeps that copy, so later edits need another `html_preview` call.
 
+## Checking a page
+
+`html_render_screenshot` lets the agent see what it published: it renders an `html_render` or `html_preview` page in
+the `@dshfiles/preview` Host Chromium and returns a JPEG.
+
+| Argument      | Required | Meaning                                                                          |
+| ------------- | -------- | -------------------------------------------------------------------------------- |
+| `callId`      | no       | The publishing call; defaults to the thread's latest page.                       |
+| `fullPage`    | no       | Capture the whole page height (up to 6000 px) instead of the card height.        |
+| `colorScheme` | no       | `light` (default) or `dark` for an `auto` page; a pinned page theme always wins. |
+| `width`       | no       | Viewport width, 320 to 1920; default 800, about the card's width.                |
+
+- **Same sandbox.** The page gets the card's CSP and the fixed light or dark theme tokens, then runs in an
+  `allow-scripts`, opaque-origin `srcdoc` frame inside an offline browser context whose every request is aborted.
+- **Which pages.** Each thread's last 16 pages published since DSH started (32 MB in total); after a restart, publish
+  the page again. Another thread's pages are never reachable.
+- **Dependency.** html-render calls preview's `preview-render` contract (`@dshfiles/preview/render-api`) with
+  `createHostApiClient`; without the preview plugin the tool says to enable it.
+
 ## Isolation
 
 The page is untrusted (the model wrote it, possibly from untrusted input), so it never runs as a DSH document:

@@ -119,6 +119,66 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "page-screenshot",
+      "title": "Agent screenshot of its own published page",
+      "summary": "The html_render_screenshot agent tool renders a page this thread published with html_render or html_preview (by call id, or the latest) in the @dshfiles/preview Host Chromium and returns a JPEG the model can see. The page gets the card's no-network CSP and fixed light or dark theme tokens and runs in an allow-scripts, opaque-origin srcdoc frame inside an offline browser context. Pages are remembered per thread for the current DSH run only (16 per thread, 32 MB in total).",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
+        "press Enter",
+        "expect region \"Screenshot target\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render_screenshot {}]]\"",
+        "press Enter",
+        "expect text \"Tool finished.\""
+      ],
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["running", "captured", "refused"],
+      "failureModes": [
+        "Without @dshfiles/preview loaded the tool refuses and asks the user to enable that plugin and install its browser.",
+        "A call id this thread did not publish during the current DSH run (or any page, after a restart) is refused with how to publish it again.",
+        "A screenshot above the preview API's image budget at every JPEG quality is refused; capture the viewport or a smaller width instead."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/preview",
+          "boundary": "The preview-render dshx contract (@dshfiles/preview/render-api) called in process with createHostApiClient; an absent owner is reported with isApiOwnerMissing.",
+          "deterministicFake": "Unit tests serve the same contract with a fixed JPEG and assert the sandboxed document sent; the browser journey uses the real preview Host and Chromium."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "html-render.screenshot",
+          "featureFile": "tooling/dshx/e2e/features/html-render.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.screenshot-sandboxed-document",
+          "file": "plugins/@dshfiles/html-render/src/html-screenshot-tool.test.ts",
+          "testName": "sends the thread’s latest page, or one by call id, to the preview renderer as a sandboxed document and stores the JPEG"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.screenshot-recovery",
+          "file": "plugins/@dshfiles/html-render/src/html-screenshot-tool.test.ts",
+          "testName": "says how to recover when the page is unknown or the preview plugin is absent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.page-store-bounds",
+          "file": "plugins/@dshfiles/html-render/src/html-screenshot-tool.test.ts",
+          "testName": "keeps each thread’s pages apart and bounds them per thread"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }

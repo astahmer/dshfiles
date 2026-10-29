@@ -27,6 +27,14 @@ Two things a thread needs while it builds a web app:
 
 An agent acts only on its own thread's pages and servers; it may read another thread's dev servers.
 
+## For other plugins: offline HTML screenshots
+
+`@dshfiles/preview/render-api` declares the `preview-render` dshx contract. Its one method, `screenshotHtml`, renders an
+untrusted HTML document (at most 700 000 characters) and returns a base64 JPEG: a fresh browser context per call with
+`offline: true` and every routed request aborted, the document in an `allow-scripts`, opaque-origin `srcdoc` frame,
+optional full-page capture up to 6000 px, and JPEG quality lowered until the image fits the 1 MB API payload. It
+serves Host plugin callers only (`createHostApiClient`); `@dshfiles/html-render` builds `html_render_screenshot` on it.
+
 ## Settings (`dshfiles-preview`)
 
 | Setting             | Default                                        |                                                                       |

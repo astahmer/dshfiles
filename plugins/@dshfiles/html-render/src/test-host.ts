@@ -4,16 +4,27 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import WorkingDirectoryService from '@deepseek-ai/dsh-working-directory'
+import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
+import { previewRenderApi } from '@dshfiles/preview/render-api'
+import type { ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import hostDefinition from './host.js'
 
-/** A real Host with the native filesystem, working-directory and agent services, one Agent whose workspace is a temp folder. */
-export const createHtmlRenderHost = async () => {
+/**
+ * A real Host with the native filesystem, working-directory, attachment and agent services, one Agent whose workspace is
+ * a temp folder. `renderer` serves @dshfiles/preview's `preview-render` contract in its place: the preview Host itself
+ * needs the native settings service, and its Chromium path is tested in that package.
+ */
+type ScreenshotMethod = (typeof previewRenderApi)['methods']['screenshotHtml']
+type ScreenshotHtml = (input: ApiHostInput<ScreenshotMethod>) => Promise<ApiHostOutput<ScreenshotMethod>>
+
+export const createHtmlRenderHost = async (options: { readonly renderer?: ScreenshotHtml } = {}) => {
   const cleanups: Array<() => Promise<void>> = []
   const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-html-render-')))
   cleanups.push(() => rm(root, { recursive: true, force: true }))
@@ -30,6 +41,12 @@ export const createHtmlRenderHost = async () => {
   await host.ctx.plugin(LlmRuntime)
   await host.ctx.plugin(AgentRegistry)
   await host.ctx.plugin(AgentLoop)
+  await host.ctx.plugin(LocalAttachmentStore, { dshHome: root })
+  const renderer = options.renderer
+  if (renderer !== undefined)
+    await host.mount(defineHost({ name: '@dshfiles/preview', apis: [previewRenderApi.host({ screenshotHtml: ({ input }) => renderer(input) })] }), {
+      packageId: '@dshfiles/preview',
+    })
   if (process.env.DSH_HTML_RENDER_BUILT === '1') {
     await host.mount(await import(new URL('../dist/index.js', import.meta.url).href), { packageId: '@dshfiles/html-render', native: true })
   } else {
@@ -37,9 +54,10 @@ export const createHtmlRenderHost = async () => {
   }
   const handle = await host.ctx.agents.create({ sessionId: SessionId(randomUUID()), meta: { cwd: workspace } })
   cleanups.push(() => handle.dispose())
-  const run = (name: string, args: unknown) =>
-    host.tools.execute({ callId: ToolCallId(randomUUID()), name, arguments: args, signal: AbortSignal.timeout(10_000), agent: handle.agent })
+  const run = (name: string, args: unknown, callId: string = randomUUID()) =>
+    host.tools.execute({ callId: ToolCallId(callId), name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent })
   return {
+    ctx: host.ctx,
     workspace,
     outside,
     run,

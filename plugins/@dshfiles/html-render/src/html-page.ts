@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const HTML_RENDER_TOOL = 'html_render'
 export const HTML_PREVIEW_TOOL = 'html_preview'
+export const HTML_SCREENSHOT_TOOL = 'html_render_screenshot'
 
 export const HtmlPageLimits = {
   maxHtmlBytes: 512 * 1024,

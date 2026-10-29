@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { HTML_PREVIEW_TOOL, HtmlPageLimits, HtmlPageModel, htmlPageThemes } from './html-page.js'
+import type { HtmlPageStore } from './html-page-store.js'
 import { RelativeAssets, type AssetReader } from './relative-assets.js'
 
 const argsSchema = z.object({
@@ -69,7 +70,7 @@ const summary = (value: {
  * Shows an HTML file of the calling thread's workspace in the same sandboxed card as html_render. Built from the
  * plugin's own context (like apply_patch) so the filesystem services it injects are readable during the call.
  */
-export const createHtmlPreviewTool = (ctx: Context) =>
+export const createHtmlPreviewTool = (input: { readonly ctx: Context; readonly pages: HtmlPageStore }) =>
   defineTool({
     name: HTML_PREVIEW_TOOL,
     description: [
@@ -93,6 +94,7 @@ export const createHtmlPreviewTool = (ctx: Context) =>
     },
     isConcurrencySafe: () => true,
     async execute(rawArgs, execution) {
+      const ctx = input.ctx
       const parsedArgs = argsSchema.safeParse(rawArgs)
       if (!parsedArgs.success) return fail(parsedArgs.error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; '))
       const args = parsedArgs.data
@@ -130,6 +132,7 @@ export const createHtmlPreviewTool = (ctx: Context) =>
       const displayPath = relative(ctx.fs.processPath(workspace), ctx.fs.processPath(target)) || basename(target.displayPath)
       const page = HtmlPageModel.parse({ title: args.title ?? basename(target.displayPath), html: inlined.html, height: args.height, theme: args.theme })
       if (!page.ok) return fail(page.error.replaceAll('html_render', 'html_preview'))
+      input.pages.remember({ sessionId: agent.id, callId: execution.callId, page: page.page, bytes: page.bytes })
       return { ...page.page, bytes: page.bytes, path: displayPath, inlined: [...inlined.inlined], skipped: [...inlined.skipped] }
     },
   })

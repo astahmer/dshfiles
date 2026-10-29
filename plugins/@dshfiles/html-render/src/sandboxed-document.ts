@@ -130,6 +130,22 @@ const buildDocument = (input: { readonly html: string; readonly scheme: ColorSch
 }
 
 const escapeAttribute = (value: string): string => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+
+const LEADING_DOCTYPE = /^\s*<!doctype[^>]*>/i
+
+/**
+ * The same policy, charset and theme for a Host renderer with no DOMParser (html_render_screenshot): prepended as text
+ * after one standards-mode doctype. A second CSP the markup carries can only narrow this one; the renderer adds its own
+ * network isolation.
+ */
+const buildStaticDocument = (input: { readonly html: string; readonly scheme: ColorScheme; readonly tokens: ThemeTokens }): string =>
+  [
+    '<!doctype html>',
+    `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(HTML_PAGE_CSP)}"><meta charset="utf-8">`,
+    `<style data-dsh-theme>${themeStylesheet(input.scheme, input.tokens)}</style>`,
+    input.html.replace(LEADING_DOCTYPE, ''),
+  ].join('\n')
+
 const escapeText = (value: string): string => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;')
 
 /**
@@ -149,5 +165,6 @@ export class SandboxedDocument {
   static readonly fallbackTokens = fallbackTokens
   static readonly resolveTheme = resolveThemeTokens
   static readonly build = buildDocument
+  static readonly buildStatic = buildStaticDocument
   static readonly standalone = buildStandalonePage
 }

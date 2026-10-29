@@ -14,11 +14,13 @@ const PAGE = `<!doctype html><title>Preview fixture</title>
 
 let server: Server
 let origin = ''
+let requestCount = 0
 let settings: PreviewSettings = previewSettings.schema({})
 const browsers = new PreviewBrowsers({ settings: () => settings })
 
 beforeAll(async () => {
   server = createServer((_request, response) => {
+    requestCount += 1
     response.writeHead(200, { 'content-type': 'text/html' })
     response.end(PAGE)
   })
@@ -79,6 +81,46 @@ describe('PreviewBrowsers', () => {
     expect(result.truncated).toBe(true)
     expect(result.result.length).toBeLessThan(8_100)
     settings = previewSettings.schema({})
+  })
+
+  it('renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span', { timeout: 60_000 }, async () => {
+    using recorder = recordSpans()
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: requestCount keeps counting while the page renders
+    const before = requestCount
+    const document = [
+      '<body style="margin:0"><div id="tall" style="height:1500px;background:#123456">probe</div>',
+      `<img src="${origin}/pixel.png"><script>fetch("${origin}/beacon").catch(() => undefined); document.getElementById("tall").textContent = String(parent === window)</script>`,
+    ].join('')
+    const viewport = await browsers.renderHtml({
+      document,
+      width: 400,
+      height: 300,
+      fullPage: false,
+      colorScheme: 'dark',
+      maxImageBytes: 700 * 1024,
+      maxFullPageHeight: 6000,
+    })
+    expect([...viewport.image.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff])
+    expect(viewport).toMatchObject({ width: 400, height: 300 })
+    const full = await browsers.renderHtml({
+      document,
+      width: 400,
+      height: 300,
+      fullPage: true,
+      colorScheme: 'light',
+      maxImageBytes: 700 * 1024,
+      maxFullPageHeight: 1000,
+    })
+    expect(full.height).toBe(1000)
+    expect(requestCount).toBe(before)
+    expect(recorder.spans.filter(span => span.name === 'preview render-html')).toHaveLength(2)
+    expect(recorder.span('preview render-html').attributes).toEqual({ 'dshx.preview.document_chars': document.length, 'dshx.preview.full_page': false })
+  })
+
+  it('refuses a render that stays over the image budget at every quality', { timeout: 30_000 }, async () => {
+    await expect(
+      browsers.renderHtml({ document: '<p>x</p>', width: 400, height: 300, fullPage: false, colorScheme: 'light', maxImageBytes: 10, maxFullPageHeight: 6000 }),
+    ).rejects.toThrow('even at low quality')
   })
 
   it('isolates threads and closes a thread’s pages when it ends', { timeout: 30_000 }, async () => {
