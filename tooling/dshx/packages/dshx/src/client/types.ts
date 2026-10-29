@@ -86,6 +86,10 @@ export interface ClientDefinition {
   readonly locales?: readonly LocaleDefinition[]
   readonly conversations?: readonly ClientConversationContribution[]
   readonly slots?: readonly SlotContribution[]
+  /** Operating systems this browser half runs on; elsewhere it registers nothing. Every OS when absent. */
+  readonly os?: readonly ClientOs[]
+  /** Prefix registry item ids with the package id (`open` → `@acme/plugin.open`); ids that already start with `@` stay as they are. */
+  readonly prefixIds?: boolean
   /** `metadata.plugin` is this plugin's context: `add`, `provide`, `use`, dialogs, toasts, commands and layout. */
   readonly setup?: (
     ctx: ClientContext,
@@ -93,6 +97,8 @@ export interface ClientDefinition {
     metadata?: { readonly packageId: string; readonly plugin?: PluginContext },
   ) => void | Effect<void>
 }
+
+export type ClientOs = 'macos' | 'windows' | 'linux'
 
 type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]
   ? unknown

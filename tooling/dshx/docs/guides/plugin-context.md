@@ -15,6 +15,19 @@ Where to get it:
 | `defineClient({ setup(ctx, decorate, metadata) })` | `metadata.plugin` |
 | A component registered through dshx | `usePlugin()` |
 
+## Definition options
+
+`defineClient` and `defineClientPlugin` take two opt-in fields; leaving them out changes nothing.
+
+- `os: ['macos', 'windows']` registers nothing in a browser on another OS (User-Agent Client Hints, else
+  `navigator.platform`). It restricts the browser half only.
+- `prefixIds: true` prefixes registry item ids with the package id: `api.add(Command, { id: 'open', … })` becomes
+  `@acme/plugin.open`. An id that already starts with `@` is kept, so a plugin can switch it on without renaming.
+
+The browser half gets no row options: the browser Loader creates each Client entry as `{ name }`
+(`@deepseek-ai/dsh-client-modules`), so a row's `config` never reaches it; pass options through `defineSettings` and
+`useSettings`. A GUI on/off switch already exists: the Plugins page toggles each bundle and component.
+
 ## Contribute: `add`
 
 ```ts

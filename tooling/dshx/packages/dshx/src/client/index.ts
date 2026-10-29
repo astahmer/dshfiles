@@ -66,6 +66,7 @@ export const defineRegistry = BrowserBroker.defineRegistry
 export const contributionFailures = BrowserBroker.failures
 export type { ContractToken, ContributionFailure, Live, RegistryToken, Subscribable } from './broker.js'
 export type { ItemSource, PluginContext, PluginServices, Track } from './plugin-context.js'
+export type { ClientOs } from './types.js'
 export const constantSource = PluginContextModel.constant
 export const createSource = PluginContextModel.signal
 

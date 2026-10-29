@@ -10,6 +10,7 @@ import type {
   ClientConversationContribution,
   ClientContext,
   ClientDefinition,
+  ClientOs,
   LocaleDefinition,
   LocaleDictionaries,
   SlotContribution,
@@ -26,7 +27,8 @@ import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
 import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
 
-const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup'])
+const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup', 'os', 'prefixIds'])
+const CLIENT_OS = new Set(['macos', 'windows', 'linux'])
 const LOCALE_ID_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u
 const SETTINGS_SECTION_SLOT = 'settings.section'
 
@@ -300,6 +302,12 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
   if (source.setup !== undefined && typeof source.setup !== 'function') {
     fail('DSHX2102', 'Client definition setup must be a function.', metadata, 'Use setup(ctx) { ... } or remove setup.')
   }
+  if (source.os !== undefined && (!Array.isArray(source.os) || source.os.some(os => !CLIENT_OS.has(os)))) {
+    fail('DSHX2102', 'Client definition os must list "macos", "windows" or "linux".', metadata, 'Use os: ["macos"] or remove os to run everywhere.')
+  }
+  if (source.prefixIds !== undefined && typeof source.prefixIds !== 'boolean') {
+    fail('DSHX2102', 'Client definition prefixIds must be a boolean.', metadata, 'Use prefixIds: true or remove it.')
+  }
   return value as ClientDefinition
 }
 
@@ -333,6 +341,22 @@ function registerLocales(client: ClientRuntimeContext, definition: ClientDefinit
     for (const { locale: localeId, dictionary } of registration.additional) {
       client.effect(() => client.locale.register(namespace, localeId, dictionary))
     }
+  }
+}
+
+/** The OS the browser reports, from User-Agent Client Hints where available. */
+class ClientOsModel {
+  static current = (): ClientOs | undefined => {
+    if (typeof navigator === 'undefined') return undefined
+    const hinted =
+      'userAgentData' in navigator && typeof navigator.userAgentData === 'object' && navigator.userAgentData !== null && 'platform' in navigator.userAgentData
+        ? navigator.userAgentData.platform
+        : undefined
+    const platform = (typeof hinted === 'string' && hinted !== '' ? hinted : navigator.platform).toLowerCase()
+    if (platform.startsWith('mac')) return 'macos'
+    if (platform.startsWith('win')) return 'windows'
+    if (platform.includes('linux')) return 'linux'
+    return undefined
   }
 }
 
@@ -417,13 +441,23 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
     inject,
     apply(ctx) {
       const client = ctx as ClientRuntimeContext
+      const os = ClientOsModel.current()
+      if (definition.os !== undefined && (os === undefined || !definition.os.includes(os))) {
+        console.info(`dshx: ${metadata.packageId} runs on ${definition.os.join(', ')} only; this browser reports ${os ?? 'an unknown OS'}.`)
+        return undefined
+      }
       registerPluginPage(ctx, metadata)
       registerLocales(client, definition)
       const settings = metadata.settingsCapability === true ? createSettingsClientRuntime(ctx) : undefined
       if (!hasApiCapability) {
         const baseDecorate = ((component: unknown): unknown =>
           settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
-        const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+        const runtime = PluginRuntimeModel.create({
+          ctx: client,
+          packageId: metadata.packageId,
+          decorate: baseDecorate,
+          prefixIds: definition.prefixIds === true,
+        })
         registerContributions(client, definition, runtime.decorate, metadata.packageId)
         return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
       }
@@ -437,7 +471,12 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         const apiComponent = ApiClientLifecycle.provide(component as any, apiClient)
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
       }) as ComponentDecorator
-      const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+      const runtime = PluginRuntimeModel.create({
+        ctx: client,
+        packageId: metadata.packageId,
+        decorate: baseDecorate,
+        prefixIds: definition.prefixIds === true,
+      })
       registerContributions(client, definition, runtime.decorate, metadata.packageId)
       return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
     },

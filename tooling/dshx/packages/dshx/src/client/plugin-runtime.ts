@@ -29,6 +29,7 @@ const createPluginRuntime = (input: {
   readonly ctx: RuntimeHostContext
   readonly packageId: string
   readonly decorate: ComponentDecorator
+  readonly prefixIds?: boolean
 }): { readonly plugin: PluginContext; readonly decorate: ComponentDecorator } => {
   const scope = PluginContextModel.createScope()
   if (typeof input.ctx.effect === 'function') input.ctx.effect(() => () => scope.dispose(), 'dshx plugin scope')
@@ -40,6 +41,7 @@ const createPluginRuntime = (input: {
   plugin = PluginContextModel.create({
     owner: input.packageId,
     scope,
+    prefixIds: input.prefixIds === true,
     slots: () => {
       const slots = input.ctx.get('slots')
       return isNativeSlots(slots) ? slots : undefined

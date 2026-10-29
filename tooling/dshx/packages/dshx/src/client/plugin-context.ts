@@ -34,6 +34,8 @@ export type NativeMount<T> = (input: NativeMountInput<T>) => () => void
 export interface PluginContextOptions {
   readonly owner: string
   readonly scope: PluginScope
+  /** Prefix item ids that do not start with `@` with `<owner>.`. */
+  readonly prefixIds?: boolean
   readonly slots: () => NativeSlots | undefined
   readonly decorate: <Component>(component: Component) => Component
   readonly services: PluginServices
@@ -189,6 +191,12 @@ const itemLabel = (item: unknown): string => {
   return 'item'
 }
 
+/** `open` → `@acme/plugin.open`; an id that already starts with `@` is a full id and stays. */
+const prefixedId = <T>(owner: string, item: T): T => {
+  if (typeof item !== 'object' || item === null || !('id' in item) || typeof item.id !== 'string' || item.id.startsWith('@')) return item
+  return { ...item, id: `${owner}.${item.id}` }
+}
+
 const createPluginContext = (options: PluginContextOptions): PluginContext => {
   const liveCache = new Map<string, Subscribable<Live<unknown>>>()
   const listCache = new Map<string, Subscribable<readonly unknown[]>>()
@@ -201,7 +209,8 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
     return mount({ item, owner: options.owner, slots, decorate: options.decorate })
   }
 
-  const addFixed = <T>(registry: RegistryToken<T>, item: T): (() => void) => {
+  const addFixed = <T>(registry: RegistryToken<T>, given: T): (() => void) => {
+    const item = options.prefixIds === true ? prefixedId(options.owner, given) : given
     const entry = BrowserBroker.add(registry, item, options.owner)
     let unmount: () => void = () => {}
     try {
