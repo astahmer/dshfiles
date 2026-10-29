@@ -6,10 +6,37 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ChatNode } from '../src/native/contract/chat-nodes.ts'
 import { ProcessState } from '../src/native/conversation-nodes/process-groups.ts'
 import { toolDefinition } from '../src/native/conversation-nodes/tool.ts'
-import { setPinnedToolNames } from '../src/pinned-tool-names.ts'
+import type { PinnedToolCall } from '../src/pinned-tool-calls.ts'
+import { PinnedToolNames } from '../src/pinned-tool-names.ts'
 
 type ToolContext = Parameters<NonNullable<typeof toolDefinition.buildViewNode>>[0]
 const noPredecessors = { previous: () => undefined }
+
+/**
+ * The part of uiConversation's event registry Chat relies on: a keyed `register` whose registration and disposal each
+ * notify subscribers once, which makes uiConversation rebuild every bound Conversation. The native registry needs the
+ * whole client UI module graph to load, so its contract is restated here.
+ */
+const eventRegistry = () => {
+  const definitions = new Map<string, unknown>()
+  let refreshes = 0
+  return {
+    get refreshes() {
+      return refreshes
+    },
+    kinds: () => [...definitions.keys()],
+    register: (definition: { readonly kind: string; readonly match: unknown; readonly target?: string }) => {
+      if (definitions.has(definition.kind)) throw new Error(`conversation Definition "${definition.kind}" is already registered`)
+      expect(definition.match).toEqual({})
+      expect(definition.target).toBeUndefined()
+      definitions.set(definition.kind, definition)
+      refreshes += 1
+      return () => {
+        if (definitions.delete(definition.kind)) refreshes += 1
+      }
+    },
+  }
+}
 
 const turn: TurnLocation = {
   turn: 1,
@@ -67,7 +94,7 @@ const rootEntries = (nodes: readonly ChatNode[]) => {
   return state.output()?.entries?.map(entry => entry.kind) ?? []
 }
 
-afterEach(() => setPinnedToolNames([]))
+afterEach(() => PinnedToolNames.set([]))
 
 describe('pinned tool calls', () => {
   it('keeps every call in one step group while nothing is pinned', () => {
@@ -76,8 +103,51 @@ describe('pinned tool calls', () => {
     expect(rootEntries(nodes)).toEqual(['group'])
   })
 
+  it('re-groups already built nodes when a provider pins a tool after they were built, and again when it unpins', () => {
+    const registry = eventRegistry()
+    let providers: readonly PinnedToolCall[] = []
+    const listeners = new Set<() => void>()
+    const publish = (next: readonly PinnedToolCall[]): void => {
+      providers = next
+      for (const listener of listeners) listener()
+    }
+    const stop = PinnedToolNames.follow({
+      providers: {
+        get: () => providers,
+        subscribe: listener => {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+      },
+      events: registry,
+    })
+    const built = () => [toolNode({ seq: 11, name: 'bash' }), toolNode({ seq: 12, name: 'html_render' })].map(node => node.groupTree)
+
+    expect(built()).toEqual([undefined, undefined])
+    expect(registry.refreshes).toBe(0)
+    publish([{ toolName: 'html_render' }])
+    expect(registry.refreshes).toBe(1)
+    expect(built()).toEqual([undefined, 'turn'])
+
+    publish([{ toolName: 'html_render' }])
+    expect(registry.refreshes).toBe(1)
+
+    publish([])
+    expect(registry.refreshes).toBe(2)
+    expect(built()).toEqual([undefined, undefined])
+    expect(registry.kinds()).toEqual([])
+
+    publish([{ toolName: 'html_preview' }])
+    expect(registry.kinds()).toEqual(['dshfiles-chat.pinned-tool-calls'])
+    stop()
+    expect(registry.refreshes).toBe(4)
+    expect(registry.kinds()).toEqual([])
+    publish([{ toolName: 'html_render' }])
+    expect(registry.refreshes).toBe(4)
+  })
+
   it('places a pinned call in the Turn outside the process fold and the step groups around it', () => {
-    setPinnedToolNames(['html_render'])
+    PinnedToolNames.set(['html_render'])
     const nodes = [toolNode({ seq: 11, name: 'bash' }), toolNode({ seq: 12, name: 'html_render' }), toolNode({ seq: 13, name: 'bash' })]
     expect(nodes.map(node => node.groupTree)).toEqual([undefined, 'turn', undefined])
     expect(rootEntries(nodes)).toEqual(['group', 'node', 'group'])

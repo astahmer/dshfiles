@@ -96,8 +96,9 @@ Resume sends a continuation prompt, never blindly replays unfinished tools.
 A tool whose call is the Turn's deliverable (an `html_render` page) registers its name with
 `api.add(PinnedToolCalls, { toolName })` from `@dshfiles/chat/pinned-tool-calls`. Chat builds that call's node at
 group-tree position `turn` (like a turn error): it never joins a step group and stays out of the "Completed in" fold in
-every work-details mode. Without providers nothing changes. A name registered after a thread's nodes were built applies
-from their next rebuild (a new event on the call or reopening the thread).
+every work-details mode. Without providers nothing changes. When the set of pinned names changes after a thread's nodes
+were built (a provider plugin enabled later), Chat registers or removes an inert `uiConversation` event Definition;
+the native registry change rebuilds every bound Conversation, so open threads re-group at once.
 
 ### Build
 

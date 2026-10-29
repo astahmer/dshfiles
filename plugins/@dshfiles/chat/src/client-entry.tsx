@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'
 import { Browser, defineClient, MenuItem, type BrowserService } from '@dshfiles/dshx/client'
 import { apply, inject } from './native/index.ts'
 import { PinnedToolCalls } from './pinned-tool-calls.ts'
-import { setPinnedToolNames } from './pinned-tool-names.ts'
+import { PinnedToolNames } from './pinned-tool-names.ts'
 
 const BROWSER_KIND = 'browser'
 const WEB_PROTOCOLS = new Set(['http:', 'https:'])
@@ -14,10 +14,7 @@ export default defineClient({
     apply(ctx, decorate)
     const plugin = metadata?.plugin
     if (plugin === undefined) return
-    const pinned = plugin.list(PinnedToolCalls)
-    const syncPinned = (): void => setPinnedToolNames(pinned.get().map(entry => entry.toolName))
-    syncPinned()
-    ctx.effect(() => pinned.subscribe(syncPinned))
+    ctx.effect(() => PinnedToolNames.follow({ providers: plugin.list(PinnedToolCalls), events: ctx.uiConversation.events }))
     // The browser page type comes from another Host package, so it can appear or vanish after this plugin starts.
     const browser: BrowserService = {
       available: {
