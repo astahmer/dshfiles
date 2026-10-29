@@ -162,7 +162,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
               registry={registry}
               visible={active && visible && surfaceVisible}
               onSelect={definition => selectView.current(definition, { group: panelProps.api.group, replacePanelId: id })}
-              onRun={() => panelProps.api.close()}
+              onRun={() => (definition?.tabId === undefined ? panelProps.api.close() : workbenchTabs().actions.close(definition.tabId))}
             />
           </div>
         )
