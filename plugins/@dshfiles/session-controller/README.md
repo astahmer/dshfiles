@@ -66,6 +66,37 @@ arrived after the interruption but never started a turn does not invalidate it:
 a restart can persist the message and leave no turn to run it, so the stopped
 task still offers Resume.
 
+### Driving threads: `sessions-api`
+
+The published `sessions-api` dshx module (`sessionsApi`, owner `@dshfiles/session-controller`) is the typed way for
+another plugin (`createHostApiClient`) or a browser (`useApi`) to drive a thread. Every method runs the same native
+path as the Chat UI; native refusals keep their message with a `session-*` code.
+
+```ts
+const sessions = createHostApiClient(ctx, sessionsApi, '@acme/plugin')
+const { sessionId } = await sessions.create({ projectId, title: 'Nightly triage', model: { provider, model }, prompt: 'Triage the new issues.' })
+await sessions.setInstruction({ sessionId, key: '@acme/plugin:tone', text: 'Answer in French.' }) // text: null removes it
+await sessions.message({ sessionId, text: 'CI finished: 2 failures.', wake: true })
+await sessions.wait({ sessionId, timeoutMs: 120_000 }) // { status: 'idle' | 'running' }
+await sessions.compact({ sessionId }) // or command({ sessionId, line: '/goal …' })
+const { value } = await sessions.generate({ prompt, jsonSchema: { type: 'object', properties: { title: { type: 'string' } } } })
+```
+
+| Method                           | What                                                                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create`                         | thread in a project or directory, with optional agent preset, title, model and first prompt                                                               |
+| `prompt`                         | user prompt, `queue` (default) or `steer`                                                                                                                 |
+| `command`                        | one slash command line, as typed in the composer                                                                                                          |
+| `message`                        | a message recorded with the calling plugin as its source (`dshfiles-plugin-message`); `next-turn` or `next-step`, `wake` to start an idle thread          |
+| `compact`, `interrupt`           | `/compact`; stop the running turn, keeping the queue                                                                                                      |
+| `wait`                           | until idle with nothing queued, or `timeoutMs`                                                                                                            |
+| `selectModel`, `selectAgent`     | the thread's model; its agent preset                                                                                                                      |
+| `instructions`, `setInstruction` | keyed instructions every later request carries in its system prompt (a section, so a removed one leaves no trace in history), kept in dshx plugin storage |
+| `generate`                       | dshx `generate` for Clients: one model call outside any thread, `jsonSchema` for JSON output                                                              |
+
+None of these is an agent tool: what the agent may do to other threads is thread-sidebar's thread tools, which now
+call this API for create, prompt, stop and model selection.
+
 ### Live model catalog
 
 The Host cache listens to the same inputs as the native model picker: `llm/adapters-updated`,

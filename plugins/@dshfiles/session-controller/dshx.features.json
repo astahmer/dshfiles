@@ -24,7 +24,12 @@
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         }
       ],
-      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     },
     {
       "id": "thread-local-model",
@@ -41,7 +46,11 @@
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "session-controller.thread-local-model", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "gherkin",
+          "id": "session-controller.thread-local-model",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
         {
           "kind": "unit-test",
           "id": "session-controller.thread-local-no-default",
@@ -74,8 +83,14 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -111,6 +126,46 @@
           "span": "session tail read",
           "file": "plugins/@dshfiles/session-controller/tests/host/tail-log-persistence.test.ts",
           "testName": "records a session tail read span with the thread, bytes and frames it read"
+        }
+      ]
+    },
+    {
+      "id": "drive-threads",
+      "title": "Drive threads from another plugin",
+      "summary": "The sessions API lets a plugin or a browser create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt, and make one-off model calls.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["created", "prompted", "message-queued", "running", "idle", "instructions-set"],
+      "failureModes": [
+        "A native refusal (unknown thread, busy agent) reaches the caller with its own message and a session-* code.",
+        "A command the thread does not offer fails with command-unavailable instead of running nothing.",
+        "Keyed instructions need the profile's storage-domain row; without it setInstruction fails with storage-unavailable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "session-controller.sessions-api-instructions",
+          "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
+          "testName": "prompts a thread, waits for its turn, and carries keyed instructions in every later request"
+        },
+        {
+          "kind": "host-test",
+          "id": "session-controller.sessions-api-message",
+          "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
+          "testName": "adds a plugin message that waits for the next turn unless asked to wake the thread"
+        },
+        {
+          "kind": "host-test",
+          "id": "session-controller.sessions-api-generate",
+          "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
+          "testName": "generates outside any thread, decoding a JSON Schema reply"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -8,6 +6,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineCommand, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { continuationApi } from '@dshfiles/session-controller/continuation-api'
+import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { setSessionSettled, settledSessionIdsFromHost } from './settings.js'
@@ -24,6 +23,8 @@ const requireContext = (): Context => {
   if (hostContext === undefined) throw new Error('Thread actions Host is not active.')
   return hostContext
 }
+
+const sessions = () => createHostApiClient(requireContext(), sessionsApi, '@dshfiles/thread-sidebar')
 
 const dependencies: ThreadActionDeps = {
   listSessions: async signal => {
@@ -96,18 +97,13 @@ const dependencies: ThreadActionDeps = {
     requireContext().sessionController.fork({ sessionId: SessionId(sessionId), ...(atSeq === undefined ? undefined : { atSeq }) }),
   continueIn: async input => createHostApiClient(requireContext(), continuationApi, '@dshfiles/thread-sidebar').continueIn(input),
   create: async input =>
-    requireContext().sessionController.create({
-      ...(input.projectId === undefined ? undefined : { workspaceId: WorkspaceId(input.projectId) }),
+    sessions().create({
+      ...(input.projectId === undefined ? undefined : { projectId: input.projectId }),
       ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
       ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
     }),
   prompt: async input => {
-    // SAFETY: SessionRequestId is a type-only brand over a client-minted unique id.
-    const requestId = randomUUID() as SessionRequestId
-    await requireContext().sessionController.prompt(
-      { requestId, sessionId: SessionId(input.sessionId), mode: input.mode, content: [{ type: 'text', text: input.text }] },
-      AbortSignal.timeout(15_000),
-    )
+    await sessions().prompt({ sessionId: input.sessionId, mode: input.mode, text: input.text }, { signal: AbortSignal.timeout(15_000) })
   },
   ownWorkspaceFor: async projectId => {
     const jj = createHostApiClient(requireContext(), jjIntegrationApi, '@dshfiles/thread-sidebar')
@@ -120,16 +116,20 @@ const dependencies: ThreadActionDeps = {
     }
   },
   stop: async sessionId => {
-    requireContext().sessionController.cancel({ sessionId: SessionId(sessionId) })
+    await sessions().interrupt({ sessionId })
   },
   selectModel: async input => {
-    const value = await requireContext().sessionController.selectModel({
-      sessionId: SessionId(input.sessionId),
+    const selected = await sessions().selectModel({
+      sessionId: input.sessionId,
       provider: input.provider,
       model: input.model,
       ...(input.reasoningEffort === undefined ? undefined : { reasoningEffort: input.reasoningEffort }),
     })
-    return value.selected
+    return {
+      provider: selected.provider,
+      model: selected.model,
+      ...(selected.reasoningEffort === undefined ? undefined : { reasoningEffort: selected.reasoningEffort }),
+    }
   },
   registerProject: async (path, title) => {
     const controller = requireContext().workspaceController

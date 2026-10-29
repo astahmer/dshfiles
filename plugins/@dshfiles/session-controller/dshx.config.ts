@@ -7,6 +7,7 @@ export default defineConfig({
     'interruption-api': 'src/interruption-api.ts',
     'continuation-api': 'src/continuation-api.ts',
     'thread-model-api': 'src/thread-model-api.ts',
+    'sessions-api': 'src/sessions-api.ts',
   },
   // tsc lowers the Host's TC39 `@Remote` decorators first, as the native build does; the bundler keeps them as is.
   host: { entry: 'build/host/host.js' },
