@@ -8,6 +8,7 @@ export { defineTool } from '@deepseek-ai/dsh-tools'
 import { HostApiClientModel } from '../api/host-client.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import { PluginStorageModel } from './plugin-storage.js'
+import { ReloadTransactionModel } from './outside-reload.js'
 
 export const createHostApiClient = HostApiClientModel.create
 export const isApiServed = HostApiClientModel.isServed
@@ -39,4 +40,6 @@ export type {} from '@deepseek-ai/dsh-tools'
 export type {} from '@deepseek-ai/dsh-system-prompt'
 
 export { waitForManagedExit, terminateManagedProcess } from './process.js'
+export const runOutsideReload = ReloadTransactionModel.runOutside
+export const scheduleOutsideReload = ReloadTransactionModel.schedule
 export { readWebStartupOverrides } from './web-startup.js'
