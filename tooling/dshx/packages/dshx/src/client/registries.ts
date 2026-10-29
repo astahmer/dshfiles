@@ -95,13 +95,16 @@ export interface FileViewerItem {
   readonly component: ComponentType<FileViewerProps>
 }
 
-/** A section in Settings. */
+/** A section in Settings, a tab inside the Plugins page, or a row in General. */
 export interface SettingsSectionItem {
   readonly id: string
+  /** The section's nav label or the Plugins tab's label; a General row renders its own. */
   readonly title: string
   readonly order?: number
   readonly component: ComponentType<never>
-  /** Search metadata; picking one opens the section with its id as `target`. */
+  /** `section` (the default) adds a Settings section, `plugins` a tab inside the Plugins page, `general` a row in General. */
+  readonly placement?: 'section' | 'plugins' | 'general'
+  /** Search metadata of a `section`; picking one opens the section with its id as `target`. */
   readonly entries?: readonly SettingsSearchEntry[]
 }
 
@@ -325,12 +328,13 @@ PluginContextModel.registerNativeMount(PluginDetailSection, ({ item, owner, slot
 PluginContextModel.registerNativeMount(SettingsSection, ({ item, owner, slots, decorate }) => {
   assertItemId('SettingsSection', item.id)
   if (item.title.trim() === '') throw new TypeError('SettingsSection title must be non-empty.')
-  const disposeSlot = registerSlot(
-    slots,
-    'settings.section',
-    { id: item.id, order: item.order ?? 100, label: () => item.title, registrant: owner },
-    contribution({ component: item.component, owner, id: `settings:${item.id}`, decorate }),
-  )
+  const placement = item.placement ?? 'section'
+  if (placement !== 'section' && item.entries !== undefined)
+    throw new TypeError(`SettingsSection entries need placement "section"; ${item.id} is placed in ${placement}.`)
+  const component = contribution({ component: item.component, owner, id: `settings:${item.id}`, decorate })
+  if (placement === 'general') return registerSlot(slots, 'settings.general.item', { id: item.id, order: item.order ?? 100 }, component)
+  if (placement === 'plugins') return registerSlot(slots, 'settings.plugins.tab', { id: item.id, order: item.order ?? 100, label: () => item.title }, component)
+  const disposeSlot = registerSlot(slots, 'settings.section', { id: item.id, order: item.order ?? 100, label: () => item.title, registrant: owner }, component)
   // The native slot ledger drops `metadata`, so search entries reach the Settings shell through the dshx seat.
   const unpublish = item.entries === undefined ? () => {} : SettingsSearchEntriesModel.publish({ sectionId: item.id, entries: item.entries })
   return () => {

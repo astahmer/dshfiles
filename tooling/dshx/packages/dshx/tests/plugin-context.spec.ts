@@ -229,6 +229,22 @@ describe('registries', () => {
     expect(SettingsSearchEntriesModel.current().has('acme')).toBe(false)
   })
 
+  it('places a settings contribution as a Plugins tab or a General row', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { plugin, host } = createPlugin('@test/settings-placement')
+    plugin.add(SettingsSection, { id: 'hub', title: 'Hub', order: 20, placement: 'plugins', component: () => null })
+    plugin.add(SettingsSection, { id: 'links', title: 'Links', placement: 'general', component: () => null })
+    expect(host.registered.map(entry => [entry.name, entry.options.id, entry.options.order])).toEqual([
+      ['settings.plugins.tab', 'hub', 20],
+      ['settings.general.item', 'links', 100],
+    ])
+    const label = host.registered[0]?.options.label
+    expect(typeof label === 'function' ? label() : label).toBe('Hub')
+    plugin.add(SettingsSection, { id: 'row', title: 'Row', placement: 'general', component: () => null, entries: [{ id: 'x', title: 'X' }] })
+    expect(host.registered).toHaveLength(2)
+    expect(BrowserBroker.failures.get()[0]).toMatchObject({ id: 'dshx.settings-section:row', message: expect.stringMatching(/placement "section"/u) })
+  })
+
   it('mounts Plugins page badges and sections into their detail slots', () => {
     const { plugin, host } = createPlugin('@test/plugins-page')
     plugin.add(PluginDetailBadge, { id: 'failures', component: () => null })

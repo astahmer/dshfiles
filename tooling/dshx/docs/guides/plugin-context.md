@@ -51,7 +51,7 @@ export default defineClientPlugin({
 | `HeaderAction` | session header actions |
 | `SessionRowAccessory` | leading content of each sidebar thread row |
 | `Overlay` | frame-wide floating layer (`shell.overlay`) |
-| `SettingsSection` | a Settings section, with search `entries` |
+| `SettingsSection` | a Settings section with search `entries`; `placement: 'plugins'` makes it a tab inside Settings › Plugins, `'general'` a row in General |
 | `PluginDetailBadge` | a tag beside a Settings › Plugins detail title |
 | `PluginDetailSection` | a section under a Settings › Plugins detail page |
 
@@ -113,7 +113,7 @@ api.commands.keys.get().get('@acme/plugin.open') // ['Mod+Shift+A'], or the user
 
 An editable command's Host row carries no default binding: the Host refuses overlapping defaults in whichever plugin
 registers second, so a default could stop a core plugin's setup. Until the user binds one, its own `keys` apply and the
-row reads "No shortcut". Its id must map to a Host shortcut id (`CommandChords.shortcutId`); the capture-phase listener
+row reads "No shortcut". Settings › General › Keyboard shortcuts (or Mod+/) lists it. Its id must map to a Host shortcut id (`CommandChords.shortcutId`); the capture-phase listener
 binds only Mod (+ Shift) chords. `CommandChords` converts `Mod+Shift+K` to and from Host bindings.
 
 ### Contracts owned plugins provide
