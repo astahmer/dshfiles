@@ -7,3 +7,5 @@ Monaco-based workspace file editor for DSH. Provides a workspace tree, editor ta
 Depends on `@dshfiles/workbench` for its dockable panel and `@dshfiles/plugin-ui` for shared UI. Build, test, and typecheck with `pnpm build`, `pnpm test`, and `pnpm typecheck` from this package.
 
 The Workbench chooser exposes the reusable **Editor: Files** view; its open-file tabs retain their filenames.
+
+The editor provides dshx's `SessionScreen` contract: the session on screen (`current`) and the one side panels follow (`mounted`), the walked and watched workspace file index the command palette's file search reads, one tree level at a time through `workspaceFiles.list`, and the Host's `@` mention file search.

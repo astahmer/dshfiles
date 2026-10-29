@@ -1,19 +1,6 @@
 import { assign, fromCallback, setup, useMachine } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useMemo } from 'react'
-import { z } from 'zod'
-import { PaletteRules } from './palette.js'
-
-const filesReplySchema = z.union([
-  z.object({ status: z.literal('no-session') }),
-  z.object({
-    status: z.enum(['indexing', 'ready']),
-    sessionId: z.string().min(1).max(256),
-    files: z.array(z.string().min(1).max(4096)).max(50_000),
-    truncated: z.boolean(),
-  }),
-])
-
-export type WorkspaceFilesReply = z.infer<typeof filesReplySchema>
+import { useEffect, useMemo, useRef } from 'react'
+import { SessionScreen, useContract, type WorkspaceFilesState } from '@dshfiles/dshx/client'
 
 export interface FilesState {
   readonly status: 'loading' | 'indexing' | 'ready' | 'no-session' | 'unavailable'
@@ -23,7 +10,7 @@ export interface FilesState {
 }
 
 interface WorkspaceFilesClient {
-  readonly requestFiles: (respond: (reply: WorkspaceFilesReply) => void, signal: AbortSignal) => boolean
+  readonly requestFiles: (respond: (reply: WorkspaceFilesState) => void, signal: AbortSignal) => boolean
 }
 
 interface WorkspaceFilesInput {
@@ -54,7 +41,7 @@ export const workspaceFilesMachine = setup({
   actors: {
     requestFiles: fromCallback<WorkspaceFilesEvent, { readonly client: WorkspaceFilesClient; readonly requestId: number }>(({ input, sendBack }) => {
       const controller = new AbortController()
-      const respond = (reply: WorkspaceFilesReply): void => {
+      const respond = (reply: WorkspaceFilesState): void => {
         if (controller.signal.aborted) return
         const files = reply.status === 'no-session' ? { ...NO_FILES, status: 'no-session' as const } : reply
         sendBack({ type: 'reply', requestId: input.requestId, files })
@@ -99,20 +86,24 @@ export const workspaceFilesMachine = setup({
 })
 
 export const useWorkspaceFiles = (enabled: boolean): FilesState => {
+  const screen = useContract(SessionScreen)
+  const latestScreen = useRef(screen)
+  latestScreen.current = screen
+  // The machine keeps the client it started with, so the client reads the provider at request time.
   const client = useMemo<WorkspaceFilesClient>(
     () => ({
       requestFiles: (respond, signal) => {
-        const receive = (value: unknown): void => {
-          const decoded = filesReplySchema.safeParse(value)
-          if (!decoded.success || signal.aborted) return
-          respond(decoded.data)
-        }
-        return !window.dispatchEvent(new CustomEvent(PaletteRules.WORKSPACE_FILES_EVENT, { detail: { respond: receive, signal }, cancelable: true }))
+        if (latestScreen.current.status !== 'active') return false
+        const index = latestScreen.current.value.files.index
+        const stop = index.subscribe(() => respond(index.get()))
+        signal.addEventListener('abort', stop, { once: true })
+        respond(index.get())
+        return true
       },
     }),
     [],
   )
   const [snapshot, send] = useMachine(workspaceFilesMachine, { input: { client } })
-  useEffect(() => send({ type: enabled ? 'enable' : 'disable' }), [enabled, send])
+  useEffect(() => send({ type: enabled ? 'enable' : 'disable' }), [enabled, screen.status, send])
   return snapshot.context.files
 }

@@ -1,9 +1,10 @@
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { expect, test } from 'vitest'
-import { workspaceFilesMachine, type WorkspaceFilesReply } from './workspace-files-machine.js'
+import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
+import { workspaceFilesMachine } from './workspace-files-machine.js'
 
 test('streams file-index progress and discards replies from cancelled requests', async () => {
-  const replies: ((value: WorkspaceFilesReply) => void)[] = []
+  const replies: ((value: WorkspaceFilesState) => void)[] = []
   const signals: AbortSignal[] = []
   const actor = createActor(workspaceFilesMachine, {
     input: {

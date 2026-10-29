@@ -1,23 +1,5 @@
-import { z } from 'zod'
+import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
 import { isIgnored, parseGitignore, type IgnoreRule } from './gitignore.js'
-
-/**
- * Cross-plugin file listing for fuzzy open (command-palette ⌘P): dispatch
- * `new CustomEvent('dshfiles:workspace-files', { detail: { respond, signal }, cancelable: true })`.
- * The editor calls `preventDefault()` when it took the request, then calls `respond` with the cached list first and
- * again as the walk of the session on screen progresses and as watched directories change. Paths are
- * workspace-relative, ready for `dshfiles:open-file`.
- */
-export const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
-
-export type WorkspaceFilesReply =
-  | { readonly status: 'no-session' }
-  | { readonly status: 'indexing' | 'ready'; readonly sessionId: string; readonly files: readonly string[]; readonly truncated: boolean }
-
-export const workspaceFilesRequestSchema = z.object({
-  respond: z.custom<(reply: WorkspaceFilesReply) => void>(value => typeof value === 'function'),
-  signal: z.instanceof(AbortSignal).optional(),
-})
 
 const IGNORED_DIRECTORIES = new Set(['.git', '.jj', 'node_modules'])
 const MAX_FILES = 20_000
@@ -164,7 +146,7 @@ interface SessionIndex {
   controller: AbortController
   /** Bumped per walk so a walk that finishes after a release cannot publish or re-watch. */
   generation: number
-  readonly listeners: Set<(reply: WorkspaceFilesReply) => void>
+  readonly listeners: Set<(reply: WorkspaceFilesState) => void>
   readonly watches: Map<string, AbortController>
   readonly relists: Map<string, ReturnType<typeof setTimeout>>
   idleTimer: ReturnType<typeof setTimeout> | null
@@ -187,7 +169,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
   const sessions = new Map<SessionId, SessionIndex>()
   const disposed = new AbortController()
 
-  const reply = (sessionId: SessionId, index: SessionIndex): WorkspaceFilesReply => ({
+  const reply = (sessionId: SessionId, index: SessionIndex): WorkspaceFilesState => ({
     status: index.walking ? 'indexing' : 'ready',
     sessionId,
     files: index.files,
@@ -351,7 +333,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
       })
   }
 
-  const request = (sessionId: SessionId, listener: (reply: WorkspaceFilesReply) => void): (() => void) => {
+  const request = (sessionId: SessionId, listener: (reply: WorkspaceFilesState) => void): (() => void) => {
     const existing = sessions.get(sessionId)
     const index: SessionIndex = existing ?? {
       directories: new Map(),

@@ -162,6 +162,33 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "session-screen-contract",
+      "title": "Session screen and workspace files for other plugins",
+      "summary": "Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file search reads its index through it.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["no-session", "indexing", "ready"],
+      "failureModes": [
+        "A directory the Host refuses lists as undefined and a failed search answers no hits, so a caller shows an empty result rather than an error.",
+        "The index reports no-session while no session has been shown yet."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "editor.session-screen-index",
+          "file": "plugins/@dshfiles/editor/src/session-screen.test.ts",
+          "testName": "indexes the mounted session while followed and moves with it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the contract reads the native workspaceFiles and fileReferences Remote methods, whose calls carry their own spans."
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -2,9 +2,10 @@ import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, FileViewer, Files, type FilesService } from '@dshfiles/dshx/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { defineClient, FileViewer, Files, type FilesService, SessionScreen } from '@dshfiles/dshx/client'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -21,7 +22,8 @@ import { OpenFileAddress, fileLinkParamsSchema, GO_TO_LINE_EVENT, goToLineReques
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
-import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
+import { createSessionScreen } from './session-screen.js'
+import { createWorkspaceFileIndex } from './workspace-files.js'
 
 const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
@@ -54,7 +56,7 @@ const clientSessionsSchema = z.object({
 export default defineClient({
   name: '@dshfiles/editor',
   locales: [editorSettingsLocale],
-  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles', 'configForms'],
+  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'uiSession', 'remote', 'remote.workspaceFiles', 'remote.fileReferences', 'configForms'],
   setup(ctx, decorate, metadata) {
     metadata?.plugin?.add(FileViewer, {
       id: 'dshfiles-editor.markdown-preview',
@@ -254,14 +256,6 @@ export default defineClient({
         options.signal?.addEventListener('abort', stop, { once: true })
         return stop
       }
-      const onFilesRequest = (event: Event): void => {
-        if (!(event instanceof CustomEvent)) return
-        const request = workspaceFilesRequestSchema.safeParse(event.detail)
-        if (!request.success) return
-        event.preventDefault()
-        watch(request.data.respond, request.data.signal === undefined ? {} : { signal: request.data.signal })
-      }
-      window.addEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
       const withdraw =
         metadata?.plugin?.provide(Files, {
           watch,
@@ -277,12 +271,26 @@ export default defineClient({
             return result.ok
           },
         }) ?? (() => {})
+      const provided = metadata?.plugin?.provide(
+        SessionScreen,
+        createSessionScreen({
+          current: {
+            get: () => ctx.uiSession.adapter.current.getSnapshot().key,
+            subscribe: listener => ctx.uiSession.adapter.current.subscribe(listener),
+          },
+          mounted: { get: currentSession, subscribe: subscribeSession },
+          fileIndex,
+          asSessionId: SessionId,
+          list: (sessionId, path, signal) => ctx.remote.workspaceFiles.list(sessionId, path, signal),
+          search: (sessionId, query, signal) => ctx.remote.fileReferences.list(sessionId, query, signal),
+        }),
+      )
       return () => {
         withdraw()
-        window.removeEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
+        provided?.()
         fileIndex.dispose()
       }
-    }, 'dshfiles-editor: workspace file listing and the Files contract')
+    }, 'dshfiles-editor: session screen, workspace files and the Files contract')
   },
 })
 

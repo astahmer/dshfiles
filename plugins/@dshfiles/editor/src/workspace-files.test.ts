@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles, type WorkspaceFilesReply } from './workspace-files.js'
+import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles } from './workspace-files.js'
+import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
 
 interface Tree {
   [name: string]: Tree | 'file'
@@ -54,7 +55,7 @@ describe('createWorkspaceFileIndex', () => {
     const { list, listed } = lister(workspace, new Set(['locked']))
     let clock = 0
     const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), now: () => clock })
-    const replies: WorkspaceFilesReply[] = []
+    const replies: WorkspaceFilesState[] = []
     const stop = index.request('ses_1', reply => replies.push(reply))
     expect(replies[0]).toMatchObject({ status: 'indexing', files: [] })
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -63,13 +64,13 @@ describe('createWorkspaceFileIndex', () => {
 
     const walksBefore = listed.length
     clock = 10_000
-    const again: WorkspaceFilesReply[] = []
+    const again: WorkspaceFilesState[] = []
     index.request('ses_1', reply => again.push(reply))
     expect(again).toEqual([{ status: 'ready', sessionId: 'ses_1', files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'], truncated: false }])
     expect(listed.length).toBe(walksBefore)
 
     clock = 60_000
-    const stale: WorkspaceFilesReply[] = []
+    const stale: WorkspaceFilesState[] = []
     index.request('ses_1', reply => stale.push(reply))
     expect(stale[0]).toMatchObject({ status: 'indexing', files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'] })
     index.dispose()
@@ -92,7 +93,7 @@ describe('createWorkspaceFileIndex retention', () => {
         },
         now: () => 0,
       })
-      const replies: WorkspaceFilesReply[] = []
+      const replies: WorkspaceFilesState[] = []
       const stop = index.request('ses_1', reply => replies.push(reply))
       expect(index.retainedSessions()).toBe(1)
 
@@ -174,7 +175,7 @@ describe('createWorkspaceFileIndex with Host changes', () => {
       const { list } = lister(tree)
       const { watch, watched, emit } = watcher()
       const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), watch, now: () => 0 })
-      const replies: WorkspaceFilesReply[] = []
+      const replies: WorkspaceFilesState[] = []
       const stop = index.request('ses_1', reply => replies.push(reply))
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready' }))
       expect(watched()).toEqual(['.', 'src'])

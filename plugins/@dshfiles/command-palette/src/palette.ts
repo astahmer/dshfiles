@@ -2,7 +2,6 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
-const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
 const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
 /** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
@@ -211,7 +210,6 @@ const rankActions = <Action extends RankableAction>({
 
 export class PaletteRules {
   static readonly OPEN_FILE_EVENT = OPEN_FILE_EVENT
-  static readonly WORKSPACE_FILES_EVENT = WORKSPACE_FILES_EVENT
   static readonly GO_TO_LINE_EVENT = GO_TO_LINE_EVENT
   static readonly PALETTE_PREFIXES = PALETTE_PREFIXES
   static readonly parsePaletteQuery = parsePaletteQuery
