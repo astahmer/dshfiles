@@ -21,6 +21,7 @@ import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupanc
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
 const VIRTUAL_CLIENT_PUBLIC = '\0virtual:dshx-client-public'
 const VIRTUAL_CLIENT_API_HOOKS = '\0virtual:dshx-client-api-hooks'
+const VIRTUAL_CLIENT_HOST_STORAGE = '\0virtual:dshx-client-host-storage'
 const VIRTUAL_CLIENT_SETTINGS_HOOK = '\0virtual:dshx-client-settings-hook'
 const DSHX_CLIENT_PUBLIC = '@dshfiles/dshx/client'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
@@ -50,7 +51,7 @@ const CLIENT_PLUGIN_CONTEXT_PATH = fileURLToPath(new URL('../../client/plugin-co
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js', import.meta.url))
-const API_STORAGE_PATH = fileURLToPath(new URL('../../api/storage.js', import.meta.url))
+const CLIENT_HOST_STORAGE_PATH = fileURLToPath(new URL('../../client/host-storage.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
@@ -135,13 +136,14 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       if (
         source === VIRTUAL_CLIENT_ENTRY ||
         source === VIRTUAL_CLIENT_API_HOOKS ||
+        source === VIRTUAL_CLIENT_HOST_STORAGE ||
         source === VIRTUAL_CLIENT_SETTINGS_HOOK ||
         source === DSHX_CLIENT_PUBLIC ||
         source === DSHX_API_PUBLIC ||
         source === DSHX_SETTINGS_PUBLIC ||
         source === DSHX_CONVERSATION_PUBLIC
       ) {
-        if (source === VIRTUAL_CLIENT_API_HOOKS || source === VIRTUAL_CLIENT_SETTINGS_HOOK) return source
+        if (source === VIRTUAL_CLIENT_API_HOOKS || source === VIRTUAL_CLIENT_HOST_STORAGE || source === VIRTUAL_CLIENT_SETTINGS_HOOK) return source
         if (source === DSHX_CLIENT_PUBLIC) return VIRTUAL_CLIENT_PUBLIC
         if (source === DSHX_API_PUBLIC) return `${VIRTUAL_CLIENT_PUBLIC}-api`
         if (source === DSHX_SETTINGS_PUBLIC) return `${VIRTUAL_CLIENT_PUBLIC}-settings`
@@ -165,6 +167,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
           `export { useApi, useApiEvent, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { hostStorage } from ${JSON.stringify(VIRTUAL_CLIENT_HOST_STORAGE)}`,
           `import { ApiClientEventsModel } from ${JSON.stringify(API_CLIENT_EVENTS_PATH)}`,
           'export const subscribeApiEvent = ApiClientEventsModel.subscribe',
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
@@ -210,6 +213,14 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           '',
         ].join('\n')
       }
+      // Its own module, not a plugin-context service, so only a bundle that calls it carries the storage client.
+      if (id === VIRTUAL_CLIENT_HOST_STORAGE) {
+        return [
+          `import { HostStorageModel } from ${JSON.stringify(CLIENT_HOST_STORAGE_PATH)}`,
+          'export function hostStorage(...args) { return HostStorageModel.forPlugin(...args) }',
+          '',
+        ].join('\n')
+      }
       if (id === VIRTUAL_CLIENT_SETTINGS_HOOK) {
         return [
           `import { useSettings as useSettingsImplementation } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
@@ -225,8 +236,6 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
           'export const event = ApiDefinitionModel.event',
-          `import { PluginStorageContract } from ${JSON.stringify(API_STORAGE_PATH)}`,
-          'export const dshxStorageApi = PluginStorageContract.api',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')
@@ -289,14 +298,14 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
       const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
       if (chunk === undefined || chunk.type !== 'chunk') return
       const settingsRetained = retainedHookExports(chunk.modules, VIRTUAL_CLIENT_SETTINGS_HOOK).length > 0
-      const apiRetained = retainedHookExports(chunk.modules, VIRTUAL_CLIENT_API_HOOKS).length > 0
+      const apiRetained = [VIRTUAL_CLIENT_API_HOOKS, VIRTUAL_CLIENT_HOST_STORAGE].some(module => retainedHookExports(chunk.modules, module).length > 0)
       if (settingsRetained && !(options.inject ?? []).includes(SETTINGS_PROVIDER_PACKAGE)) {
         throw new DshxError('DSHX1203', 'useSettings() requires the official Settings Scope provider package edge.', {
           hint: `Add ${JSON.stringify(SETTINGS_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
         })
       }
       if (apiRetained && !(options.inject ?? []).includes(API_PROVIDER_PACKAGE)) {
-        throw new DshxError('DSHX1203', 'useApi()/useApiQuery() requires the official Client Connection provider package edge.', {
+        throw new DshxError('DSHX1203', 'useApi()/useApiQuery()/hostStorage() requires the official Client Connection provider package edge.', {
           hint: `Add ${JSON.stringify(API_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
         })
       }

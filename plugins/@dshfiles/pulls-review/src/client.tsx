@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { Changes, defineClientPlugin } from '@dshfiles/dshx/client'
+import { Changes, defineClientPlugin, hostStorage } from '@dshfiles/dshx/client'
 import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PullsReviewPanel } from './panel.js'
@@ -22,7 +22,7 @@ export default defineClientPlugin({
     const ctx = api.raw.ctx
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
-    const reviewed = api.storage.store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
+    const reviewed = hostStorage(api).store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
     void reviewed.ready.then(
       () => {
         let stored: unknown = null

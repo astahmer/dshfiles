@@ -7,6 +7,7 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import { ApiProtocolModel } from '../api/common.js'
 import { ApiDefinitionModel } from '../api/define.js'
+import { PluginStorageContract } from '../api/storage.js'
 import { BROWSER_TRACES_API } from '../tracing/browser-protocol.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
@@ -101,9 +102,9 @@ export function provideTestConnection(ctx: Context): TestConnection {
       peer,
     )
   return {
-    /** Routes the mounted plugins registered, without the registry listing, browser-traces API and event stream dshx serves on the first one's behalf. */
+    /** Routes the mounted plugins registered, without the registry listing, browser-traces and plugin-storage APIs and event stream dshx serves on the first one's behalf. */
     get routeCount() {
-      const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id].map(
+      const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id, PluginStorageContract.api.id].map(
         apiId => `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
       )
       return [...routes.keys()].filter(path => path !== ApiProtocolModel.eventsPath && !dshxPrefixes.some(prefix => path.startsWith(prefix))).length

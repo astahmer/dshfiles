@@ -116,7 +116,7 @@ export interface PluginStorage {
 
 /**
  * Key-value storage for one namespace (a plugin package name), kept by the Host's storage domain and shared with
- * that plugin's browser half through `dshxStorageApi`. Needs the profile's `@deepseek-ai/dsh-storage-domain` row.
+ * that plugin's browser half through `hostStorage(api)`. Needs the profile's `@deepseek-ai/dsh-storage-domain` row.
  */
 const pluginStorage = (ctx: Context, namespace: string): PluginStorage => {
   const checkedNamespace = PluginStorageContract.namespace.parse(namespace)

@@ -22,7 +22,7 @@ The panel shows the range and totals, then every changed-file diff in one
 scrollable view. Each diff header carries its scope and summary, and a per-file
 action marks that file reviewed. The review-wide selector can batch-mark files
 across scopes. Review marks are kept on the Host through dshx plugin storage
-(`api.storage.store`), so every browser of that DSH shows the same marks; marks
+(`hostStorage(api).store`), so every browser of that DSH shows the same marks; marks
 an earlier version kept in this browser's localStorage move there once. They are keyed by
 workspace, base and working-copy revision, so a new revision — or a base that
 moved under the same `@` — starts fresh; the record keeps the 20 most recently

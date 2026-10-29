@@ -165,13 +165,14 @@ describe('API registry', () => {
     expect(listApis(first.ctx).map(api => `${api.owner}/${api.id}`)).toEqual([
       '@dshfiles/dshx/browser-traces',
       '@dshfiles/dshx/registry',
+      '@dshfiles/dshx/storage',
       '@test/caller/plain',
       '@test/threads/threads',
     ])
 
     await first.dispose()
     const afterHandover = await list()
-    expect(afterHandover.apis.map(api => api.owner)).toEqual(['@dshfiles/dshx', '@dshfiles/dshx', '@test/threads'])
+    expect(afterHandover.apis.map(api => api.owner)).toEqual(['@dshfiles/dshx', '@dshfiles/dshx', '@dshfiles/dshx', '@test/threads'])
     expect(host.tools.schemas().filter(schema => schema.name === 'dshx_capabilities')).toHaveLength(1)
     await host.dispose()
   })

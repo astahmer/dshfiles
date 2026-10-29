@@ -1,14 +1,11 @@
 import { ApiDefinitionModel } from './define.js'
 import { ApiRuntimeModel } from './runtime.js'
-import { PluginStorageContract } from './storage.js'
 
 export const defineApi = ApiDefinitionModel.define
 export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner
 export const dshxRegistryApi = ApiDefinitionModel.registryApi
 export const method = ApiDefinitionModel.method
 export const event = ApiDefinitionModel.event
-/** Host-backed plugin key-value storage; call it from a browser with `useApi(dshxStorageApi)` or `createApiClient`. */
-export const dshxStorageApi = PluginStorageContract.api
 export type { StorageListInput, StoragePage, StoredEntry } from './storage.js'
 /** Call a registered dshx API by identity; see {@link RegisteredApiSpec}. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient

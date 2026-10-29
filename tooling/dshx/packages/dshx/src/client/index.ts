@@ -33,6 +33,9 @@ export type {
   SlotOptions,
 } from './types.js'
 export { useApi, useApiEvent, useApiQuery } from '../api/client.js'
+import { HostStorageModel } from './host-storage.js'
+/** Host-backed key-value storage and stores for a plugin; see the plugin-context guide. */
+export const hostStorage = HostStorageModel.forPlugin
 import { ApiClientEventsModel } from '../api/client-events.js'
 /** Follow a Host-published API event outside React; see `useApiEvent`. */
 export const subscribeApiEvent = ApiClientEventsModel.subscribe

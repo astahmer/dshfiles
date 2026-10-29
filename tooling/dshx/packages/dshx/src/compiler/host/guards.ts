@@ -17,7 +17,6 @@ const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set([
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-cordis-host-runner',
   '@deepseek-ai/dsh-tool-cordis',
-  '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-mcp-client',
 ])
 

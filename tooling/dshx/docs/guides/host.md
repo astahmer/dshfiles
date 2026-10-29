@@ -209,7 +209,7 @@ export default defineHost({
 
 Durable key-value storage for one plugin, kept by the Host's storage domain (`@deepseek-ai/dsh-storage-domain`, in
 every web profile) in one `dshx_plugin_kv` domain per process. Use the plugin's package name as the namespace: the
-browser half reads the same entries through `api.storage` or `useApi(dshxStorageApi)`.
+browser half reads the same entries through `hostStorage(api)`.
 
 ```ts
 import { pluginStorage } from '@dshfiles/dshx/host'
@@ -226,8 +226,7 @@ while (page.cursor !== null) page = await storage.list({ prefix: 'runs/', cursor
   more match; pass it back to read the next page. Keys may contain `/`, so a prefix works as a folder.
 - Without the storage-domain row every call rejects with `PluginApiError` code `storage-unavailable`, whose message
   says which row to add.
-- The first loaded dshx Host with an API (the registry leader) serves `dshxStorageApi` (owner `@dshfiles/dshx`, id
-  `storage`) to browsers and publishes its `changed` event (`{ namespace, key, deleted }`) for every write, from the
+- The first loaded dshx Host with an API (the registry leader) serves the `storage` API (owner `@dshfiles/dshx`) to browsers and publishes its `changed` event (`{ namespace, key, deleted }`) for every write, from the
   Host half or a browser.
 - Prefer it to a plugin-owned domain for small, schemaless state. A plugin that needs typed tables, its own schema
   version or a global singleton still declares its own `defineDomain`.
@@ -257,8 +256,8 @@ const { value } = await generate(ctx, {
   `generate-aborted` and `generate-invalid-output`, so an API handler can return them to a browser as they are.
 - The call is marked `purpose: 'compaction'`, the side-call marker usage recorders and the request-messages polyfill
   read; a plugin that needs it in a thread's own request series runs it through that thread instead.
-- `generate` imports `@deepseek-ai/dsh-llm` on its first call, from the Host installation, so a Host that never calls
-  it carries no dsh-llm import.
+- `generate` imports `@deepseek-ai/dsh-llm` on its first call, so a Host that never calls it carries no dsh-llm import;
+  one that does declares it in `peerDependencies` (DSHX4005 says so at build).
 
 ## Related chapters
 

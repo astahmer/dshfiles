@@ -14,7 +14,7 @@ export const isApiServed = HostApiClientModel.isServed
 export const listApis = HostApiClientModel.list
 /** Send a declared API event to every connected browser; see `useApiEvent`. */
 export const publishApiEvent = HostApiEventsModel.publish
-/** Durable key-value storage for one plugin namespace, shared with its browser half through `dshxStorageApi`. */
+/** Durable key-value storage for one plugin namespace, shared with its browser half through `hostStorage(api)`. */
 export const pluginStorage = PluginStorageModel.open
 export type { PluginStorage } from './plugin-storage.js'
 /** One model call outside any thread, with optional schema-checked JSON output. */

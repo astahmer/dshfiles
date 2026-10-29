@@ -73,7 +73,8 @@ describe('Host API events', () => {
     expect(response.headers.get('content-type')).toBe('text/event-stream')
     const next = readFrames(response)
     const key = ApiProtocolModel.eventKey('@acme/jobs', 'jobs', 'changed')
-    expect(await next()).toEqual({ type: 'catalog', events: [key] })
+    // The registry leader also serves plugin storage, whose `changed` event joins the catalog.
+    expect(await next()).toEqual({ type: 'catalog', events: [key, ApiProtocolModel.eventKey('@dshfiles/dshx', 'storage', 'changed')] })
 
     await HostApiEventsModel.publish(fixture.context as never, jobsApi, 'changed', { running: 3 })
     expect(await next()).toEqual({ type: 'event', key, version: 2, data: { running: 3 } })

@@ -384,8 +384,8 @@ const registry = useApiQuery(dshxRegistryApi, 'list', { input: { schemas: false 
 
 `tools` lists every tool the agent of `input.sessionId` (else the first live one) sees, tagged `api` (with its owner), `mcp` (`mcp__*`), `plugin` (a dshx Host's `defineHost({ tools })`, with its owner) or `tool` (DSH's own and other plugins'). Each carries `readOnly` (the tool declares itself safe beside sibling calls, which dshx `readOnly: true` sets) and `enabled`: the global tools the agent's preset restricts away are listed with `enabled: false`. `skills` lists the skill registry for `input.cwd` with the Host-reported `source`, `provider`, `modelInvocable` and `userInvocable`. Modern Hosts omit absolute paths; consumers should discard the legacy `path` field if an older Host returns it. An older dshx may also omit source or invocation fields, so decode them with defaults. `@dshfiles/agent-toolkit` is the page that reads it.
 
-The same leader serves `dshxStorageApi` (id `storage`), the plugin key-value storage behind `pluginStorage` and
-`api.storage`; see [Plugin storage](./host.md#plugin-storage-pluginstoragectx-namespace).
+The same leader serves the `storage` API (owner `@dshfiles/dshx`), the plugin key-value storage behind `pluginStorage` and
+`hostStorage(api)`; see [Plugin storage](./host.md#plugin-storage-pluginstoragectx-namespace).
 
 Plugins built with an older dshx do not join the registry until they are rebuilt.
 

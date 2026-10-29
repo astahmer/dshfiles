@@ -1,5 +1,4 @@
 import type { CommandsService, DialogsService, EnvironmentService, LayoutService, NotificationsService, SystemService, ToastsService } from './app-services.js'
-import type { StorageService } from './host-storage.js'
 import { BrowserBroker, type ContractToken, type Live, type RegistryToken, type Subscribable } from './broker.js'
 
 /** Reads a source and recomputes the calling item whenever that source changes. */
@@ -55,8 +54,6 @@ export interface PluginServices {
   readonly notifications: NotificationsService
   /** Live locale with its text direction, and appearance (color scheme, fonts). */
   readonly environment: EnvironmentService
-  /** Key-value storage and stores kept on the Host under this plugin's id, shared by every browser and its Host half. */
-  readonly storage: StorageService
 }
 
 /** The per-plugin surface every contribution goes through. */

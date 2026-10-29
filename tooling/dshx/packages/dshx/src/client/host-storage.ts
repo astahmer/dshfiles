@@ -3,6 +3,8 @@ import { ApiClientEventsModel } from '../api/client-events.js'
 import { ApiRuntimeModel, type ContextLike } from '../api/runtime.js'
 import { PluginStorageContract, type StorageListInput, type StoragePage, type StoredEntry } from '../api/storage.js'
 import type { ApiEventStatus } from '../api/types.js'
+import type { PluginContext } from './plugin-context.js'
+import { PluginRuntimeModel } from './plugin-runtime.js'
 import type { PersistedStore, StoreScope } from './store.js'
 
 /** A Host store definition: the browser `defineStore` fields without `storage`, `from` (no browser values to import). */
@@ -191,6 +193,17 @@ const createStorageService = (input: { readonly ctx: ContextLike; readonly names
   }
 }
 
+/**
+ * Host-backed storage for one plugin, under its package id: the entries its Host half reads with `pluginStorage`, and
+ * stores every browser connected to that Host shares. Pass the context `setup` received.
+ */
+const hostStorage = (plugin: PluginContext): StorageService => {
+  const ctx = PluginRuntimeModel.hostOf(plugin)
+  if (ctx === undefined) throw new TypeError('hostStorage needs the plugin context setup(api) received.')
+  return createStorageService({ ctx, namespace: plugin.id, signal: plugin.signal })
+}
+
 export class HostStorageModel {
   static readonly create = createStorageService
+  static readonly forPlugin = hostStorage
 }

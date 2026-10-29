@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'v
 import { z } from 'zod'
 import { createElement, type ComponentType } from 'react'
 import { BrowserBroker, type Live } from '../src/client/broker.js'
-import { HostStorageModel } from '../src/client/host-storage.js'
 import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/client/app-services.js'
 import { PluginHooksModel } from '../src/client/hooks.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from '../src/client/plugin-context.js'
@@ -49,7 +48,6 @@ const services = {
   system: AppServicesModel.system,
   notifications: AppServicesModel.notifications,
   environment: AppServicesModel.createEnvironment({ service: () => undefined, on: () => () => {} }),
-  storage: HostStorageModel.create({ ctx: { get: () => undefined }, namespace: '@acme/plugin', signal: new AbortController().signal }),
 }
 
 const createPlugin = (

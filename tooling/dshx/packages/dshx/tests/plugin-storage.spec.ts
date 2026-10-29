@@ -163,3 +163,16 @@ describe('the storage API the registry leader serves', () => {
     expect(store.get()).toBe(0)
   })
 })
+
+describe('hostStorage', () => {
+  it('reaches the Host from the context defineClientPlugin hands setup', async () => {
+    const { createClientPluginApi } = await import('../src/sdk/client.js')
+    const { createTestClient } = await import('../src/testing/index.js')
+    const client = await createTestClient()
+    const api = createClientPluginApi(client.ctx, [], '@acme/plugin')
+    const store = HostStorageModel.forPlugin(api).store({ key: 'x', scope: 'global', schema: z.number(), initial: 0 })
+    // No Connection in this stub: the call is made, and reports it, instead of refusing the context.
+    await expect(store.ready).rejects.toMatchObject({ kind: 'unavailable' })
+    await client.dispose()
+  })
+})

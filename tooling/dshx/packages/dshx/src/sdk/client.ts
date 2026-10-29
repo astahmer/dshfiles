@@ -176,7 +176,9 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
   }
   // Property descriptors keep the plugin's lazy `signal` getter instead of reading it here.
   const api = Object.defineProperties(createBaseApi(ctx), Object.getOwnPropertyDescriptors(plugin))
-  return Object.assign(api, capabilities) as ClientPluginApi<Uses>
+  const full = Object.assign(api, capabilities) as ClientPluginApi<Uses>
+  PluginRuntimeModel.shareHost(full, plugin)
+  return full
 }
 
 /** Define the explicit browser half of a native DSH plugin. Ordinary React components receive native slot props. */

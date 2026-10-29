@@ -1,6 +1,5 @@
 import { AppServicesModel } from './app-services.js'
 import { PluginHooksModel } from './hooks.js'
-import { HostStorageModel } from './host-storage.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from './plugin-context.js'
 
 type ComponentDecorator = <Component>(component: Component) => Component
@@ -59,12 +58,21 @@ const createPluginRuntime = (input: {
         service: name => input.ctx.get(name),
         on: (event, listener) => input.ctx.on?.(event, listener) ?? (() => false),
       }),
-      storage: HostStorageModel.create({ ctx: input.ctx, namespace: input.packageId, signal: scope.signal }),
     },
   })
+  pluginHosts.set(plugin, input.ctx)
   return { plugin, decorate }
 }
 
+/** The Cordis context behind each plugin context, for helpers such as `hostStorage` that call the Host. */
+const pluginHosts = new WeakMap<PluginContext, RuntimeHostContext>()
+
 export class PluginRuntimeModel {
   static readonly create = createPluginRuntime
+  static readonly hostOf = (plugin: PluginContext): RuntimeHostContext | undefined => pluginHosts.get(plugin)
+  /** A view built from a plugin context (the `defineClientPlugin` api) reaches the same Host. */
+  static readonly shareHost = (view: PluginContext, plugin: PluginContext): void => {
+    const host = pluginHosts.get(plugin)
+    if (host !== undefined) pluginHosts.set(view, host)
+  }
 }
