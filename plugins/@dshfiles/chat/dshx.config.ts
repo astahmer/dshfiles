@@ -6,6 +6,7 @@ export default defineConfig({
     'turn-error-action': 'src/turn-error-action.ts',
     'chat-focus': 'src/chat-focus.ts',
     'turn-usage-cost': 'src/turn-usage-cost.ts',
+    'pinned-tool-calls': 'src/pinned-tool-calls.ts',
   },
   client: {
     entry: 'src/client-entry.tsx',

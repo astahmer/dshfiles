@@ -30,6 +30,10 @@
     "./turn-usage-cost": {
       "types": "./src/turn-usage-cost.ts",
       "default": "./dist/turn-usage-cost.js"
+    },
+    "./pinned-tool-calls": {
+      "types": "./src/pinned-tool-calls.ts",
+      "default": "./dist/pinned-tool-calls.js"
     }
   },
   "scripts": {

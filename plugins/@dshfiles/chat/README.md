@@ -64,6 +64,9 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/contract/slots.ts` (also) | `TurnTailOwnerProps` extends `ChatTurnTailExtras` |
 | `src/native/chat/AssistantMarkdown.tsx` | rewrites links whose scheme a dshx `LinkHandler` claims before `MarkdownText`, which keeps only http(s) and mailto hrefs, and routes clicks on them to the handler (`MarkdownLinks.openFromClick` on the root's click and aux-click capture) |
 | `src/native/chat/ChatView.module.css` | outlines (inside its box, so a folded group's scroll body does not clip it) and tints the row carrying `data-chat-focus` |
+| `src/native/conversation-nodes/tool.ts` | a call whose tool name a `PinnedToolCalls` provider registered gets group-tree position `turn`, so it stays visible outside the completed Turn's fold and splits the step group around it |
+| `src/pinned-tool-calls.ts` | new: the published `@dshfiles/chat/pinned-tool-calls` registry token |
+| `src/pinned-tool-names.ts` | new: the registered names, set from `client-entry.tsx` and read synchronously while tool nodes build |
 
 ### Focus a Turn, Step or tool call from another plugin
 
@@ -87,6 +90,14 @@ offers an inline **Resume**; a signed-out account does not while that turn remai
 notices remain historical. The action uses the owned session-controller's
 `interruption-api` contract; an older Host without that API hides the action.
 Resume sends a continuation prompt, never blindly replays unfinished tools.
+
+### Keep a tool call visible after its Turn completes
+
+A tool whose call is the Turn's deliverable (an `html_render` page) registers its name with
+`api.add(PinnedToolCalls, { toolName })` from `@dshfiles/chat/pinned-tool-calls`. Chat builds that call's node at
+group-tree position `turn` (like a turn error): it never joins a step group and stays out of the "Completed in" fold in
+every work-details mode. Without providers nothing changes. A name registered after a thread's nodes were built applies
+from their next rebuild (a new event on the call or reopening the thread).
 
 ### Build
 

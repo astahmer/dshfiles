@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-tools/types'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import type { ChatNode, ToolChatData } from '../contract/chat-nodes.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode, contextLocation } from './common.ts'
+import { isPinnedToolName } from '../../pinned-tool-names.ts'
 
 declare module '../contract/chat-nodes.ts' {
   interface ChatNodeDataMap {
@@ -288,6 +289,11 @@ function fallbackState(context: ConversationNodeContext<ToolState>): ToolState |
   return state
 }
 
+function rootToolName(root: ToolCallBlock): string {
+  if ('kind' in root) return root.name || (root.call?.name ?? '')
+  return root.name
+}
+
 /** Root Tool preparation, dispatch, result, and nested PTC calls. */
 export const toolDefinition: ConversationNodeDefinition<ToolState> = {
   kind: 'tool-call',
@@ -345,10 +351,12 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
     const preparing = !('kind' in projected) && projected.phase === 'preparing'
     const visibility = preparing && interruptedAt !== undefined ? 'hidden' : 'visible'
     const location = contextLocation(context)
+    // dshfiles: a pinned tool's call is the Turn's deliverable, so it stays in the Turn outside the process fold.
+    const groupTree = isPinnedToolName(rootToolName(projected)) ? 'turn' : undefined
     const data = current?.data.root === projected ? current.data : { root: projected } satisfies ToolChatData
     if (current?.data === data && current.anchorSeq === anchor
-      && current.visibility === visibility && current.location === location) return current
-    return chatNode(context, 'tool-call', anchor, data, { visibility, location })
+      && current.visibility === visibility && current.location === location && current.groupTree === groupTree) return current
+    return chatNode(context, 'tool-call', anchor, data, { visibility, location, groupTree })
   },
 }
 
