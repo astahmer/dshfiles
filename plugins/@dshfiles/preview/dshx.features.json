@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "preview-browser",
+      "title": "Agent preview browser",
+      "summary": "Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per thread: preview_open, preview_navigate, preview_snapshot (bounded accessibility text with element refs), preview_screenshot (image), preview_click, preview_type, preview_evaluate (off until the user enables it), preview_reveal, preview_close and preview_list. Top-level navigations are limited to allowed hosts, loopback by default. A thread's pages close after it idles or when it is disposed, and preview_open with reveal (or preview_reveal) shows the URL in the user's browser tab beside the thread.",
+      "surfaces": ["host", "tool"],
+      "configuration": [],
+      "states": ["no-pages", "page-open", "snapshot-truncated", "navigation-blocked", "evaluate-disabled", "page-limit", "launch-failed", "idle-closed"],
+      "failureModes": [
+        "A top-level navigation to a host outside allowedHosts is refused before loading, and a link or redirect to one is aborted in the browser.",
+        "Chromium missing or failing to launch reports how to install the headless shell or set chromiumPath instead of a stack trace.",
+        "A snapshot ref from an older snapshot that no longer resolves fails the action with a timeout that asks for a fresh preview_snapshot.",
+        "An agent cannot act on another thread's pages; a Client must name the thread.",
+        "preview_evaluate stays refused until the user turns on allowEvaluate."
+      ],
+      "externalDependencies": [
+        {
+          "id": "playwright-core + Chromium headless shell",
+          "boundary": "Launches one headless Chromium per Host over a pipe (no debugging port), creates one context per thread without downloads or service workers, and drives pages on loopback dev servers.",
+          "deterministicFake": "src/browser-pool.test.ts drives the real headless shell against a fixture page served on 127.0.0.1 by node:http."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "preview.browser-journey",
+          "reason": "The agent tools have no screen of their own; the preview.dev-server-chip scenario of thread-dev-servers drives preview_open and preview_snapshot through the fake model and checks the result in the thread header."
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.browser-actions",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.navigation-allowlist",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "refuses a remote host and blocks a link navigation to it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.evaluate-opt-in",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "keeps evaluate off until the setting allows it, then bounds its result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.thread-isolation",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "isolates threads and closes a thread’s pages when it ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.url-policy",
+          "file": "plugins/@dshfiles/preview/src/url-policy.test.ts",
+          "testName": "refuses remote hosts, look-alike hosts and non-web schemes by default"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "preview open",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
+        },
+        {
+          "kind": "custom",
+          "span": "preview launch",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
+        },
+        {
+          "kind": "custom",
+          "span": "preview click",
+          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
+        }
+      ]
+    },
+    {
+      "id": "thread-dev-servers",
+      "title": "Thread dev servers",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop.",
+      "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
+      "surfaces": ["host", "tool", "client"],
+      "configuration": [],
+      "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform"],
+      "failureModes": [
+        "The DSH Host and the processes that launched it are never listed, so their ports can never be stopped from here.",
+        "A pid recycled between the list and the stop is refused because the stop re-reads the process table and matches pid and start time.",
+        "Several threads sharing one checkout all list a server no job attributes; the job owner wins when a job matches.",
+        "Listening sockets no thread accounts for (other apps, system services) are not listed.",
+        "Open is disabled when no browser tab is available beside the thread on screen."
+      ],
+      "externalDependencies": [
+        {
+          "id": "lsof and ps (macOS), ss and /proc (Linux)",
+          "boundary": "Read-only current-user listening sockets, process table and working directories through the Host subprocess service; the only writes are the confirmed stop of one listed server.",
+          "deterministicFake": "src/dev-servers.test.ts parses canned lsof/ss/ps output; src/dev-server-probe.test.ts injects a fake command runner."
+        },
+        {
+          "id": "@deepseek-ai/dsh-jobs",
+          "boundary": "Read-only projection of live jobs to attribute a Host child to its thread, plus the registry kill for a job-owned server.",
+          "deterministicFake": "src/dev-servers.test.ts passes live jobs as plain records."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "preview.dev-server-chip",
+          "featureFile": "tooling/dshx/e2e/features/preview.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.dev-server-attribution",
+          "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
+          "testName": "attributes a Host job’s descendant to the job owner and an orphan to the thread whose workspace holds it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.dev-server-host-excluded",
+          "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
+          "testName": "never lists the Host or the supervisor that launched it, nor sockets outside every thread workspace"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "preview port-probe",
+          "file": "plugins/@dshfiles/preview/src/dev-server-probe.test.ts",
+          "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
+        }
+      ]
+    }
+  ]
+}
