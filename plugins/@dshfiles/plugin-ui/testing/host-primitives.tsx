@@ -118,3 +118,25 @@ export const rankByName = <T extends { readonly name: string; readonly label?: s
   const prefixHit = (item: T): number => (keys(item).some(key => key.startsWith(query)) ? 0 : 1)
   return items.filter(item => keys(item).some(containsInOrder)).sort((left, right) => prefixHit(left) - prefixHit(right))
 }
+
+const MARKDOWN_LINK = /\[([^\]]*)\]\(([^)\s]+)\)/gu
+
+/** Renders only `[label](href)` links, keeping http(s) and mailto hrefs as the Host renderer does. */
+export const MarkdownText = (props: { text: string; variant?: string; streaming?: boolean }): JSX.Element => {
+  const parts: ReactNode[] = []
+  let last = 0
+  for (const match of props.text.matchAll(MARKDOWN_LINK)) {
+    parts.push(props.text.slice(last, match.index))
+    const href = match[2] ?? ''
+    parts.push(/^(https?|mailto):/u.test(href) ? <a key={match.index} href={href}>{match[1]}</a> : match[1])
+    last = match.index + match[0].length
+  }
+  parts.push(props.text.slice(last))
+  return <div data-variant={props.variant}>{parts}</div>
+}
+
+export const CodeBlock = (props: { code: string; lang?: string | undefined; copyLabel: string; showHeader?: boolean }): JSX.Element => (
+  <pre data-lang={props.lang} aria-label={props.showHeader === false ? undefined : props.copyLabel}>
+    {props.code}
+  </pre>
+)

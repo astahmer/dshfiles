@@ -1,7 +1,5 @@
-import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
 /** Markdown and chips put real controls inside an item row; a gesture the reader meant for one of them is not the row's. */
 export const interactiveTargets = 'a, button, input, select, textarea, [role="button"]'
@@ -17,6 +15,6 @@ export const BacklogText = (props: { readonly text: string; readonly className?:
       props.onActivate?.()
     }}
   >
-    <MarkdownText text={props.text} labels={markdownLabels} variant="compact" />
+    <Markdown text={props.text} />
   </div>
 )

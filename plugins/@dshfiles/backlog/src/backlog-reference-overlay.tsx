@@ -1,4 +1,4 @@
-import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
@@ -16,8 +16,6 @@ import { backlogApi, BacklogViews } from './api.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia } from './item-files.js'
 import type { BacklogKind, BacklogStatus } from './item.js'
-
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
 const StatusLine = (props: { readonly kind: BacklogKind; readonly status: BacklogStatus; readonly project: string | null }): JSX.Element => (
   <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
@@ -130,7 +128,7 @@ export const BacklogReferenceOverlay = (props: {
               <StatusLine kind={detail.item.kind} status={detail.item.status} project={detail.item.project} />
               {detail.item.body.trim() === '' ? null : (
                 <div className="dshx:max-h-[40vh] dshx:overflow-auto">
-                  <MarkdownText text={detail.item.body} labels={markdownLabels} variant="compact" />
+                  <Markdown text={detail.item.body} />
                 </div>
               )}
               <AttachmentMedia itemId={detail.item.id} attachments={detail.item.attachments} />

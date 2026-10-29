@@ -1,4 +1,5 @@
-import { MarkdownText, writeClipboard, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -31,8 +32,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { memoryApi, type MemoryCitation, type PanelNote, type PanelThread } from './api.ts'
 import { PanelFormat } from './panel-format.ts'
-
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
 type ThreadStatusFilter = 'all' | 'digested' | 'undigested'
 type ThreadSourceFilter = '' | 'trail' | 'model'
@@ -214,7 +213,7 @@ const DigestedThreadDetail = (props: {
           </div>
           <p className="dshx:text-sm dshx:font-medium">{thread.decision}</p>
           <div className="dshx:text-xs">
-            <MarkdownText text={digestBody} labels={markdownLabels} variant="compact" />
+            <Markdown text={digestBody} />
           </div>
           <p className="dshx:text-[11px] dshx:text-muted-foreground">
             {thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}

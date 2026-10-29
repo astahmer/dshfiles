@@ -1,4 +1,5 @@
-import { MarkdownText, type MarkdownLabels, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -79,7 +80,6 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
 
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 const HOUR_MS = 3_600_000
 
 const linkIcons = {
@@ -577,7 +577,7 @@ const Conversation = (props: {
                     />
                   ) : (
                     <>
-                      <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
+                      <Markdown text={run.event.detail} />
                       <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
                       {canEdit ? (
                         <div className="dshx:flex dshx:justify-end dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-within:opacity-100">

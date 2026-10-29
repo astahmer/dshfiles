@@ -1,4 +1,4 @@
-import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -16,8 +16,6 @@ import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryApi, type MemoryPreview, type PanelNote, type PanelThread } from './api.ts'
 import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type MemoryReferencePreviewRequest } from './memory-reference.ts'
 import { PanelFormat, noteStatusBadge, noteStatusLabels, originLabels } from './panel-format.ts'
-
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
 /** A preview the card knows how to draw; `excerpt` is also the shape an older Host leaves it in. */
 type PreviewCard =
@@ -73,7 +71,7 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
         <h2 className="dshx:text-base dshx:font-semibold dshx:leading-snug" data-dshfiles-memory-title>
           {title}
         </h2>
-        {body.length === 0 ? null : <MarkdownText text={body} labels={markdownLabels} variant="compact" />}
+        {body.length === 0 ? null : <Markdown text={body} />}
       </div>
 
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
@@ -253,7 +251,7 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
         {props.thread.title.length === 0 ? '(untitled thread)' : props.thread.title}
       </h2>
       {props.thread.decision.length === 0 ? null : <p className="dshx:text-xs dshx:font-medium">{props.thread.decision}</p>}
-      <MarkdownText text={props.thread.digest} labels={markdownLabels} variant="compact" />
+      <Markdown text={props.thread.digest} />
     </div>
     <p className="dshx:text-[11px] dshx:text-muted-foreground">
       {props.thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}

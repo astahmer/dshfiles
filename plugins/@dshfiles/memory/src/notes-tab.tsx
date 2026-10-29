@@ -1,4 +1,5 @@
-import { MarkdownText, writeClipboard, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
@@ -49,8 +50,6 @@ import { memoryApi, type MemoryNoteType, type PanelNote } from './api.ts'
 import { noteStatusBadge, noteStatusLabels, originLabels, originShortLabels, PanelFormat } from './panel-format.ts'
 import { NoteSelectionModel } from './note-selection.js'
 import { useNoteEditor } from './use-note-editor.js'
-
-const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
 const noteTypeOptions: readonly { readonly value: MemoryNoteType | ''; readonly label: string }[] = [
   { value: '', label: 'All types' },
@@ -222,7 +221,7 @@ const NoteEditorForm = (props: { readonly note: PanelNote; readonly editor: Retu
         </Button>
       </div>
       {preview ? (
-        <MarkdownText text={draft.text} labels={markdownLabels} variant="compact" />
+        <Markdown text={draft.text} />
       ) : (
         <Textarea aria-label="Note text" value={draft.text} onChange={event => send({ type: 'text.change', value: event.currentTarget.value })} rows={4} />
       )}
@@ -372,7 +371,7 @@ const NoteDetail = (props: {
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:p-5">
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <h2 className="dshx:text-lg dshx:font-semibold dshx:leading-snug">{title}</h2>
-          {body.length === 0 ? null : <MarkdownText text={body} labels={markdownLabels} variant="compact" />}
+          {body.length === 0 ? null : <Markdown text={body} />}
           {note.status === 'valid' ? null : (
             <p className="dshx:text-xs dshx:text-muted-foreground">
               {noteStatusLabels[note.status]}
