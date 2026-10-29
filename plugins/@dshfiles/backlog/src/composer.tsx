@@ -35,7 +35,7 @@ import { CaptureProject } from './capture-project.js'
 import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { composerLinkLabel } from './composer-link-label.js'
-import { insertImageReferences, markdownImageReferences } from './image-attachment-reference.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { fileInput } from './composer-files.js'
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
@@ -333,7 +333,7 @@ export const Composer = (props: {
     const result = await attachments.add(files)
     if (result.added.length === 0) return
     const element = input.current
-    const insertion = insertImageReferences({
+    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
       text: element?.value ?? text,
       start: element?.selectionStart ?? text.length,
       end: element?.selectionEnd ?? text.length,
@@ -417,7 +417,10 @@ export const Composer = (props: {
     setStatus('inbox')
     setFailed(null)
     props.onClearStatus?.()
-    const serializedText = serializeProjectReferenceDraft(markdownImageReferences(submitted.text, submitted.files), props.projects)
+    const serializedText = serializeProjectReferenceDraft(
+      ImageAttachmentReferenceModel.markdownImageReferences(submitted.text, submitted.files),
+      props.projects,
+    )
     const payload: Parameters<typeof api.capture>[0] = {
       text: serializedText.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : serializedText,
     }

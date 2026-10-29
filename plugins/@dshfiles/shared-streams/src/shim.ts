@@ -88,7 +88,7 @@ self.onconnect = event => {
  * the script URL, so a per-tab Blob URL would give every tab its own worker and
  * its own connections.
  */
-export const SHARED_EVENT_SOURCE_PAGE = String.raw`
+const SHARED_EVENT_SOURCE_PAGE = String.raw`
 const WORKER_PATH = __WORKER_PATH__
 const READY_TIMEOUT_MS = 3000
 const KEY = '__dshSharedEventSource'

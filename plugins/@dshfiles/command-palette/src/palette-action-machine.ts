@@ -1,5 +1,5 @@
 import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
-import type { PaletteAction, PaletteActionContext } from './palette-api.js'
+import type { PaletteAction, PaletteActionContext } from './palette-contract.js'
 
 interface PaletteActionRequest {
   readonly action: PaletteAction

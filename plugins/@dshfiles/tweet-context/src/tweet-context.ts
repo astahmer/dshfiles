@@ -456,21 +456,20 @@ const frameDifference = (left: Uint8Array, right: Uint8Array): number => {
 }
 
 const frameSharpness = (pixels: Uint8Array): number => {
-  const width = VIDEO_SCAN_EDGE
   const height = 36
   let total = 0
   let samples = 0
   for (let y = 1; y < height - 1; y += 1) {
-    for (let x = 1; x < width - 1; x += 1) {
-      const index = (y * width + x) * 3
+    for (let x = 1; x < VIDEO_SCAN_EDGE - 1; x += 1) {
+      const index = (y * VIDEO_SCAN_EDGE + x) * 3
       for (let channel = 0; channel < 3; channel += 1) {
         const offset = index + channel
         const laplacian =
           4 * (pixels[offset] ?? 0) -
           (pixels[offset - 3] ?? 0) -
           (pixels[offset + 3] ?? 0) -
-          (pixels[offset - width * 3] ?? 0) -
-          (pixels[offset + width * 3] ?? 0)
+          (pixels[offset - VIDEO_SCAN_EDGE * 3] ?? 0) -
+          (pixels[offset + VIDEO_SCAN_EDGE * 3] ?? 0)
         total += Math.abs(laplacian)
         samples += 1
       }
@@ -766,8 +765,8 @@ const samplePostVideo = async (input: {
       frameDirectory,
       durationSeconds: input.video.duration,
       maxFrames: input.maxFrames,
-      ...(input.startSeconds === undefined ? {} : { startSeconds: input.startSeconds }),
-      ...(input.endSeconds === undefined ? {} : { endSeconds: input.endSeconds }),
+      ...(input.startSeconds !== undefined && { startSeconds: input.startSeconds }),
+      ...(input.endSeconds !== undefined && { endSeconds: input.endSeconds }),
       signal: input.signal,
     })
     const attachments = await input.attachments.saveImages(
@@ -863,7 +862,7 @@ const fetchTweetContext = async (input: {
           const saved = await input.attachments.saveImages([{ ...image, name: `tweet-${item.id}-photo-${String(output.photos.length + 1)}` }])
           const attachment = saved[0]
           if (attachment === undefined) throw new Error('The attachment store returned no photo.')
-          output.photos.push({ attachment, ...(media.photo.altText === undefined ? {} : { altText: limitedText(media.photo.altText) }) })
+          output.photos.push({ attachment, ...(media.photo.altText !== undefined && { altText: limitedText(media.photo.altText) }) })
           continue
         }
         const demand = videoDemands.shift() ?? 1
@@ -878,8 +877,8 @@ const fetchTweetContext = async (input: {
           video: media.video,
           id: item.id,
           maxFrames: frameBudget,
-          ...(input.startSeconds === undefined ? {} : { startSeconds: input.startSeconds }),
-          ...(input.endSeconds === undefined ? {} : { endSeconds: input.endSeconds }),
+          ...(input.startSeconds !== undefined && { startSeconds: input.startSeconds }),
+          ...(input.endSeconds !== undefined && { endSeconds: input.endSeconds }),
           attachments: input.attachments,
           fetcher: input.fetcher,
           signal: mediaSignal,
@@ -941,9 +940,9 @@ export class TweetContextService {
         attachments: this.#attachments,
         fetcher: this.#fetcher,
         signal: input.signal,
-        ...(input.maxFrames === undefined ? {} : { maxFrames: input.maxFrames }),
-        ...(input.startSeconds === undefined ? {} : { startSeconds: input.startSeconds }),
-        ...(input.endSeconds === undefined ? {} : { endSeconds: input.endSeconds }),
+        ...(input.maxFrames !== undefined && { maxFrames: input.maxFrames }),
+        ...(input.startSeconds !== undefined && { startSeconds: input.startSeconds }),
+        ...(input.endSeconds !== undefined && { endSeconds: input.endSeconds }),
       })
       span.setAttribute(
         'dshx.tweet-context.frames',
@@ -990,9 +989,9 @@ export const createTweetContextTool = (attachments: Pick<AttachmentStore, 'saveI
       }).fetch({
         url: args.url,
         signal: execution.signal,
-        ...(args.maxFrames === undefined ? {} : { maxFrames: args.maxFrames }),
-        ...(args.startSeconds === undefined ? {} : { startSeconds: args.startSeconds }),
-        ...(args.endSeconds === undefined ? {} : { endSeconds: args.endSeconds }),
+        ...(args.maxFrames !== undefined && { maxFrames: args.maxFrames }),
+        ...(args.startSeconds !== undefined && { startSeconds: args.startSeconds }),
+        ...(args.endSeconds !== undefined && { endSeconds: args.endSeconds }),
       })
     },
   })

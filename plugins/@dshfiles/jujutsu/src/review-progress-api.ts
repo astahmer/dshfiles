@@ -2,7 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { reviewFileSchema, reviewStoreSchema } from './review-progress.js'
 
-export const reviewProgressSnapshotSchema = z
+const reviewProgressSnapshotSchema = z
   .object({
     /** Monotone across Host restarts so a stale read never replaces a newer write. */
     revision: z.number().int().positive(),
@@ -10,7 +10,7 @@ export const reviewProgressSnapshotSchema = z
   })
   .strict()
 
-export const reviewProgressToggleSchema = z
+const reviewProgressToggleSchema = z
   .object({
     repositoryRoot: z.string().min(1).max(2048),
     commitId: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),

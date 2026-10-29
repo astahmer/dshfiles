@@ -14,7 +14,7 @@ import { withSpan } from '@dshfiles/dshx/tracing'
 const PAGE_SIZE = 24
 const HUB_TIMEOUT_MS = 15_000
 const MAX_LEGACY_SCAN_PAGES = 100
-export const INSTALL_TIMEOUT_MS = 5 * 60_000
+const INSTALL_TIMEOUT_MS = 5 * 60_000
 const HOST_LOG_PREFIX = '[dshx-plugin-marketplace]'
 
 class HubHttpError extends Error {
@@ -72,7 +72,7 @@ const installTargetSchema = z.object({
   status: z.string().min(1).max(40),
 })
 
-export const hubDetailResponseSchema = z.object({
+const hubDetailResponseSchema = z.object({
   plugin: hubCardSchema,
   installTargets: z.array(installTargetSchema).max(20),
   repositoryUrl: z.string().url().max(2_048).nullable().optional(),

@@ -3653,6 +3653,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [
       preferences.attentionColors,
       preferences.maxChildren,
+      preferences.projectColorPalette,
       preferences.threadRowDensity,
       preferences.threadRowMachine,
       preferences.threadRowPath,

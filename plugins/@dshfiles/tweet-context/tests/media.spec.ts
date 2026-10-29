@@ -13,15 +13,29 @@ const attachmentStore = (): Pick<AttachmentStore, 'saveImages'> => ({
     })),
 })
 
-const post = (id: string, media: object, quote?: unknown) => ({
+interface FixtureMediaItem {
+  readonly type?: string
+  readonly url: string
+  readonly altText?: string
+}
+
+interface FixtureMedia {
+  readonly all?: readonly FixtureMediaItem[]
+  readonly photos?: readonly FixtureMediaItem[]
+  readonly videos?: readonly FixtureMediaItem[]
+}
+
+const post = (id: string, media: FixtureMedia, quote?: unknown) => ({
   id,
   text: `Post ${id}`,
   author: { name: `Author ${id}`, screen_name: `user${id}` },
   media,
-  ...(quote === undefined ? {} : { quote }),
+  ...(quote !== undefined && { quote }),
 })
 
-const fixture = (status: object, thread: readonly object[] = []) => {
+type FixturePost = ReturnType<typeof post>
+
+const fixture = (status: FixturePost, thread: readonly FixturePost[] = []) => {
   const requests: string[] = []
   const fetcher: typeof fetch = async input => {
     const url = new URL(input instanceof Request ? input.url : String(input))

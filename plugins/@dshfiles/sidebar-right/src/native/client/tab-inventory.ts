@@ -2,7 +2,7 @@
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
-import { readSidebarLayout, sidebarPersistence } from './persistence.ts'
+import { SidebarLayoutStorage } from './persistence.ts'
 
 /** One open occurrence; resource recovery belongs to its kind's provider. */
 export interface SidebarRightOpenTab {
@@ -25,9 +25,9 @@ export class SidebarTabInventory {
       if (typeof localStorage === 'undefined') return
       const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       for (const key of keys) {
-        if (key === null || !key.startsWith(`${sidebarPersistence}.`)) continue
-        const sessionId = key.slice(sidebarPersistence.length + 1) as SessionId
-        const saved = readSidebarLayout(sessionId)
+        if (key === null || !key.startsWith(`${SidebarLayoutStorage.prefix}.`)) continue
+        const sessionId = key.slice(SidebarLayoutStorage.prefix.length + 1) as SessionId
+        const saved = SidebarLayoutStorage.read(sessionId)
         if (saved !== undefined)
           this.sessions.set(
             sessionId,
@@ -40,7 +40,7 @@ export class SidebarTabInventory {
           )
       }
       this.publish()
-    } catch (_storageUnavailable) {
+    } catch {
       /* Adopted in-memory layouts still publish their open tabs. */
     }
   }

@@ -9,14 +9,14 @@ import { z } from 'zod'
  * truth about which rebuilds wait for a Host restart.
  */
 
-export const gateReasonSchema = z.literal('host-artifact-changed')
+const gateReasonSchema = z.literal('host-artifact-changed')
 
-export const deferredPackageSchema = z.object({
+const deferredPackageSchema = z.object({
   id: z.string().min(1).max(256),
   reason: gateReasonSchema,
 })
 
-export const hmrGateStatusSchema = z.object({
+const hmrGateStatusSchema = z.object({
   deferred: z.array(deferredPackageSchema).max(64),
   watched: z.number().int().min(0).max(4096),
 })

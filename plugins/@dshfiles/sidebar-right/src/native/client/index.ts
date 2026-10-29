@@ -21,7 +21,7 @@
  * from another package does — `ui-sidebar-documentpreview` is the live proof.
  */
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
-import { observeSidebarFocus } from './focus.ts'
+import { SidebarFocus } from './focus.ts'
 import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { ClientContext } from '@dshfiles/dshx/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -51,45 +51,6 @@ import { GUIDE_ID, guideDefinition } from './tabs/guide/definition.ts'
 import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
-
-export type { SidebarRightTarget } from './focus.ts'
-export type { RightbarSeatProps, SidebarRightInjected, SidebarRightPresentation } from './shell/SidebarRight.tsx'
-export type { GuideBodyProps, GuideInjected } from './tabs/guide/GuideBody.tsx'
-export type { ExpandButtonProps } from './shell/ExpandButton.tsx'
-export type { SidebarRightState, SurfaceState } from './stores.ts'
-export type {
-  ISidebarRight,
-  SidebarRightOpenResourceOptions,
-  SidebarRightOpenTabOptions,
-  SidebarRightPlacement,
-  SidebarRightCloseHandler,
-  SurfaceActions,
-} from './service.ts'
-export type { SidebarRightGuideBox, SidebarRightGuideEntry, SidebarRightTabClaim, SidebarRightTabDefinition, SidebarRightTabPriority } from './tab-registry.ts'
-export type {
-  SidebarRightTabInfo,
-  SidebarRightTabInjected,
-  UseSidebarRightTabInfo,
-  SidebarRightTabActions,
-  SidebarRightTabMenuOwnerProps,
-  SidebarRightTabNavigation,
-  SidebarRightTabPlacement,
-  SidebarRightGuideEntryOwnerProps,
-} from './contract/slots.ts'
-export type {
-  SidebarRightNavigationParams,
-  SidebarRightResourceParams,
-  SidebarRightResourceParamsMap,
-  SidebarRightTabParams,
-  SidebarRightTabParamsFor,
-  SidebarRightTabParamsMap,
-} from './contract/params.ts'
-// The layout ids and rectangle the navigation face takes, so a caller needs no import from the kit.
-export type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
-export type { PinResource, SidebarRightNavigator, TabOccurrence, SidebarRightOccurrenceId } from './tab-domain.ts'
-export type { SidebarRightKey } from './locales.ts'
-export type { OpenContentIntent } from './stores.ts'
-export type { SidebarRightOpenTab } from './tab-inventory.ts'
 
 /** This package's copy namespace. */
 const NS = 'sidebarRight'
@@ -240,20 +201,19 @@ export function apply(ctx: ClientContext): void {
       }),
     'ui-sidebar-right: shortcuts',
   )
-  if (typeof document !== 'undefined') ctx.effect(() => observeSidebarFocus(document), 'ui-sidebar-right: focus')
+  if (typeof document !== 'undefined') ctx.effect(() => SidebarFocus.observe(document), 'ui-sidebar-right: focus')
 
   ctx.effect(() => {
     const handle = createSidebarRightStore(() => defaultSeed(tabs))
     // Each Session Context generation owns one Store. Background tab actions
     // use the latest adoption for that Session.
-    const adoptions = sessionReleases
     const store: typeof handle = {
       ...handle,
       create: scopeKey => {
         const instance = handle.create(scopeKey)
         if (scopeKey !== undefined) {
           const sessionId = scopeKey as SessionId
-          adoptions.get(sessionId)?.()
+          sessionReleases.get(sessionId)?.()
           const releaseAdoption = adopt(sessionId, instance)
           let releaseProjection: (() => void) | undefined
           const navigationSubscriptions = new Map<TabId, () => void>()
@@ -271,6 +231,7 @@ export function apply(ctx: ClientContext): void {
               if (!navigationSubscriptions.has(tab.id))
                 navigationSubscriptions.set(tab.id, controller.tabDomain.occurrence(sessionId, tab).navigation.subscribe(sync))
             }
+            // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `releaseProjection` is reassigned before the old projection is released.
             const previous = releaseProjection
             releaseProjection = resourcePanels.publish(
               sessionId,
@@ -291,7 +252,7 @@ export function apply(ctx: ClientContext): void {
           const unsubscribe = instance.subscribe(sync)
           const unsubscribeMode = workbenchMode.subscribe(sync)
           sync()
-          adoptions.set(sessionId, () => {
+          sessionReleases.set(sessionId, () => {
             unsubscribe()
             unsubscribeMode()
             releaseProjection?.()
@@ -432,8 +393,8 @@ export function apply(ctx: ClientContext): void {
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()
-      for (const release of adoptions.values()) release()
-      adoptions.clear()
+      for (const release of sessionReleases.values()) release()
+      sessionReleases.clear()
     }
   }, 'ui-sidebar-right: seats and shipped tab type')
 }

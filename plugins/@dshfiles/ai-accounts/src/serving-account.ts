@@ -11,7 +11,7 @@ import {
 
 export const SERVING_ACCOUNT_RETENTION_MS = 90 * 86_400_000
 export const MAX_SERVING_ACCOUNT_SESSIONS = 2000
-export const servingAccountDomain = defineDomain({
+const servingAccountDomain = defineDomain({
   name: 'ai_accounts_serving',
   version: 1,
   layout: 'per-record',

@@ -1,5 +1,6 @@
 import type { CommandItem } from '@dshfiles/dshx/client'
-import { PaletteApi, type PaletteAction } from './palette-api.js'
+import { PaletteApi } from './palette-api.js'
+import type { PaletteAction } from './palette-contract.js'
 
 const PALETTE_ACTION_ID = /^@[^/]+\/.+/u
 

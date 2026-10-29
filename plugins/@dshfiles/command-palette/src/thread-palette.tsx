@@ -14,7 +14,8 @@ import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
 import { ProjectTone } from './project-tone.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
-import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
+import { PaletteApi } from './palette-api.js'
+import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {

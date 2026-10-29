@@ -12,7 +12,7 @@ const agentIdSchema = z.string().min(1).max(256)
 const messageIdSchema = z.string().uuid()
 const topicSchema = z.string().min(1).max(128)
 
-export const subscriptionInputSchema = z
+const subscriptionInputSchema = z
   .object({
     agentId: agentIdSchema,
     topic: topicSchema,

@@ -4,7 +4,7 @@ import { WORKBENCH_COMPONENT } from './layout-store.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
 
-export const TERMINAL_SOURCE_ID = 'dshfiles-workbench.terminal'
+const TERMINAL_SOURCE_ID = 'dshfiles-workbench.terminal'
 
 /**
  * Explicit launch intents only. Native SidebarRight owns records, Session scope,

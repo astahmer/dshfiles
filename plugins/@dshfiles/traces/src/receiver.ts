@@ -6,7 +6,7 @@ import { pluginAttributes, withSpan, type Span } from '@dshfiles/dshx/tracing'
 import type { ReceiverState, ReceiverStatus } from './types.js'
 
 export const MAX_BODY_BYTES = 8 * 1024 * 1024
-export const MAX_DECODED_BYTES = 32 * 1024 * 1024
+const MAX_DECODED_BYTES = 32 * 1024 * 1024
 const PORT_RETRY_MS = 30_000
 const FORWARD_TIMEOUT_MS = 5_000
 const MAX_FORWARDS_IN_FLIGHT = 8

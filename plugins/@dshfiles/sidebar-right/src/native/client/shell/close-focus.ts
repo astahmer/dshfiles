@@ -2,7 +2,7 @@
 import { flushSync } from 'react-dom'
 import type { PaneId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { visibleSidebarPane } from '../focus.ts'
+import { SidebarFocus } from '../focus.ts'
 
 /**
  * Focus the page selected by an open or split after its DOM has committed.
@@ -15,7 +15,7 @@ export function openWithPaneFocus(document: Document, sessionId: SessionId, open
   flushSync(() => {
     paneId = open()
   })
-  if (paneId !== undefined) visibleSidebarPane(document, sessionId, paneId)?.focus({ preventScroll: true })
+  if (paneId !== undefined) SidebarFocus.visiblePane(document, sessionId, paneId)?.focus({ preventScroll: true })
 }
 
 /**
@@ -32,5 +32,5 @@ export function closeWithPaneFocus(document: Document, sessionId: SessionId, pan
   const retain = owner?.dataset.sidebarRightSession === sessionId && (source?.dataset.dockkitPane ?? source?.dataset.dockkitFloat) === paneId
   flushSync(close)
   if (!retain || (document.activeElement !== document.body && document.activeElement !== before)) return
-  visibleSidebarPane(document, sessionId, paneId)?.focus({ preventScroll: true })
+  SidebarFocus.visiblePane(document, sessionId, paneId)?.focus({ preventScroll: true })
 }

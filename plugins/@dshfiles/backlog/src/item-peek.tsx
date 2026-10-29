@@ -65,7 +65,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
-import { markdownImageReferences } from './image-attachment-reference.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
@@ -269,7 +269,7 @@ const BodyField = (props: {
     setFailed(null)
     const pending = [...attachments.files]
     attachments.clear()
-    const submittedBody = markdownImageReferences(body, pending)
+    const submittedBody = ImageAttachmentReferenceModel.markdownImageReferences(body, pending)
     if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
     for (const file of pending) {
       try {
@@ -473,7 +473,7 @@ const ReplyComposer = (props: {
     setPending(true)
     setFailed(null)
     try {
-      await props.onSave(markdownImageReferences(submittedText, attachments.files), attachments.files)
+      await props.onSave(ImageAttachmentReferenceModel.markdownImageReferences(submittedText, attachments.files), attachments.files)
     } catch (error) {
       setFailed(errorMessage(error, 'The reply could not be saved.'))
     } finally {
@@ -740,7 +740,7 @@ const CommentBox = (props: {
     setPending(true)
     setFailed(null)
     try {
-      const text = markdownImageReferences(submittedText, files)
+      const text = ImageAttachmentReferenceModel.markdownImageReferences(submittedText, files)
       await submitReply({
         text,
         files,
@@ -860,9 +860,10 @@ const LinkRow = (props: {
   return (
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-      {link.type === 'item' ? (
+      {link.type === 'item' && (
         <BacklogReferenceChip id={Number(link.target)} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
-      ) : link.type === 'url' ? (
+      )}
+      {link.type === 'url' && (
         <Popover open={urlOpen} onOpenChange={setUrlOpen}>
           <PopoverTrigger asChild>
             <button type="button" className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
@@ -894,9 +895,11 @@ const LinkRow = (props: {
             </button>
           </PopoverContent>
         </Popover>
-      ) : open === undefined ? (
+      )}
+      {link.type !== 'item' && link.type !== 'url' && open === undefined && (
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
-      ) : (
+      )}
+      {link.type !== 'item' && link.type !== 'url' && open !== undefined && (
         <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
           {link.type === 'thread' ? props.threadLabel : linkLabel(link)}
         </button>

@@ -5,7 +5,7 @@
 export type ThreadSidebarSurface = 'sidebar' | 'board'
 
 /** The DOM attribute each surface marks its root with, so a global drag listener can tell whose row it is. */
-export const THREAD_SURFACE_ATTRIBUTE = 'data-thread-surface'
+const THREAD_SURFACE_ATTRIBUTE = 'data-thread-surface'
 
 const isThreadSidebarSurface = (value: string | undefined): value is ThreadSidebarSurface => value === 'sidebar' || value === 'board'
 

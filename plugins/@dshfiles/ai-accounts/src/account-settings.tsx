@@ -63,7 +63,7 @@ const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Eleme
     </span>
   </label>
 )
-export const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
+const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
   <section aria-label="Routing and priority" className={cardClass}>
     <header className="dshx:flex dshx:items-start dshx:gap-3">
       <BarChart3Icon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
@@ -83,7 +83,7 @@ export const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
   </section>
 )
 
-export const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
+const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
   const profile = props.state.selected
   const status = profile === null ? null : accountConnectionStatus(profile, props.state.usage)
   return (

@@ -27,7 +27,7 @@
  * The kit plans none of this; it is decided here before its planners run.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout } from './persistence.ts'
+import { SidebarLayoutStorage } from './persistence.ts'
 import type { DockMode, DockZone, FloatRect, History, LayoutOp, LayoutState, Mint, PaneId, SplitId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import {
   activeDockPaneId,
@@ -132,7 +132,7 @@ function counting(from: number): { mint: Mint; used: () => number } {
  * for, and an open into a fresh surface shows only what it opened.
  * @returns the initial surface.
  */
-export function createSurface(): SurfaceState {
+function createSurface(): SurfaceState {
   const counter = counting(0)
   return {
     layout: createInitialState({ next: counter.mint }),
@@ -163,7 +163,7 @@ function pageKind(state: LayoutState, tabId: TabId): string | undefined {
  * @param tabId - the tab asked about.
  * @returns `true` for the docked surface's only tab.
  */
-export function soleDockedTab(state: LayoutState, tabId: TabId): boolean {
+function soleDockedTab(state: LayoutState, tabId: TabId): boolean {
   const pane = findTabPane(state, tabId)
   return pane.host === 'dock' && pane.tabs.length === 1 && dockPaneIds(state).length === 1
 }
@@ -357,9 +357,9 @@ export function createSidebarRightStore(seed: () => SidebarRightSeed): EngineSto
                         kind,
                         contentId,
                         title,
-                        ...(paneId === undefined ? {} : { paneId }),
-                        ...(index === undefined ? {} : { index }),
-                        ...(page ? { revealIfOpened: false } : intent.revealIfOpened === undefined ? {} : { revealIfOpened: intent.revealIfOpened }),
+                        ...(paneId !== undefined && { paneId }),
+                        ...(index !== undefined && { index }),
+                        ...(page ? { revealIfOpened: false } : intent.revealIfOpened !== undefined && { revealIfOpened: intent.revealIfOpened }),
                       })
               ops.push(...planned.ops)
               if (replace !== undefined && replace !== planned.tabId) ops.push({ type: 'closeTab', tabId: replace })
@@ -465,16 +465,16 @@ export function createSidebarRightStore(seed: () => SidebarRightSeed): EngineSto
     create(scopeKey) {
       const instance = handle.create(scopeKey)
       if (scopeKey === undefined) return instance
-      const saved = readSidebarLayout(scopeKey)
+      const saved = SidebarLayoutStorage.read(scopeKey)
       if (saved !== undefined) instance.store.set({ bySession: { [scopeKey]: saved } })
       instance.subscribe(() => {
         const surface = instance.getSnapshot().bySession[scopeKey]
-        if (surface !== undefined) writeSidebarLayout(scopeKey, surface)
+        if (surface !== undefined) SidebarLayoutStorage.write(scopeKey, surface)
       })
       return {
         ...instance,
         clearPersisted: () => {
-          clearSidebarLayout(scopeKey)
+          SidebarLayoutStorage.clear(scopeKey)
         },
       }
     },

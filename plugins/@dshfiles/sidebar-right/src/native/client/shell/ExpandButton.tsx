@@ -51,7 +51,7 @@ export function ExpandButton({
   // surface on its own mount, and until then there is nothing expanded.
   const shortcut = useShortcuts(entries => entries.find(entry => entry.id === 'sidebar.right.toggle'))
   const expanded = useStore(state => state.bySession[sessionId]?.layout.expanded ?? false)
-  const workbench = useWorkbenchMode(value => value)
+  const workbench = useWorkbenchMode(value => value, Object.is)
   const dockActions = workbench ? dock() : undefined
   const dockOpen = useSyncExternalStore(dockActions?.subscribe ?? subscribeNothing, dockActions?.isOpen ?? closed, closed)
   if (workbench ? dockOpen : expanded) return null

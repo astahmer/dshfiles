@@ -5,10 +5,10 @@ import { ReviewWorkspaceModel } from './review.js'
 type OkReview = Extract<ReviewResult, { readonly status: 'ok' }>
 
 /** How much of the patch one summary call may carry; the scopes' file lists are always complete. */
-export const MAX_SUMMARY_PATCH_CHARS = 20_000
-export const MAX_SUMMARY_CHARS = 600
+const MAX_SUMMARY_PATCH_CHARS = 20_000
+const MAX_SUMMARY_CHARS = 600
 
-export const SUMMARY_SYSTEM_PROMPT = [
+const SUMMARY_SYSTEM_PROMPT = [
   'You help a reviewer understand a change before reading it.',
   'You receive a git patch and the review scopes its files were grouped into.',
   'Answer with one line per scope and nothing else: the scope key, a colon, then one or two plain sentences.',

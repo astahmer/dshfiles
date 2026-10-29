@@ -77,16 +77,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
-import {
-  BOOKMARK_MIME,
-  BOOKMARK_SOURCE_MIME,
-  resolveBookmarkDrop,
-  resolveDragOriginDrop,
-  resolveRevisionDrop,
-  resolveWorkspaceDrop,
-  REVISION_MIME,
-  WORKSPACE_MIME,
-} from './revision-drop.js'
+import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
 import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
 import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
@@ -155,7 +146,6 @@ const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.a
 const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: z.string(), fallback: '' })
 
 const REPOSITORY_ID_LIMIT = 32
-const INITIAL_GRAPH_PAGE_SIZE = REVISION_PAGE_SIZE
 const EMPTY_REVISIONS: readonly Revision[] = []
 const REPOSITORY_QUERY_CACHE = { staleTime: JUJUTSU_QUERY_STALE_TIME, gcTime: JUJUTSU_QUERY_GC_TIME }
 
@@ -452,8 +442,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
 
   const stateQuery = useQuery({
-    queryKey: jujutsuQueryKeys.state(path, INITIAL_GRAPH_PAGE_SIZE),
-    queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: INITIAL_GRAPH_PAGE_SIZE }, { signal })),
+    queryKey: jujutsuQueryKeys.state(path, REVISION_PAGE_SIZE),
+    queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: REVISION_PAGE_SIZE }, { signal })),
     ...REPOSITORY_QUERY_CACHE,
     enabled: repoId !== null,
     ...autoRefresh.queryOptions,
@@ -904,7 +894,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const chooseMoveDestination = (destination: Revision): void => {
     if (moveSource === null) return
     setMoveSource(null)
-    const resolution = resolveRevisionDrop({ sourceRevisionId: moveSource.commitId, target: destination, revisions: state?.revisions ?? [] })
+    const resolution = RevisionDropModel.resolveRevision({ sourceRevisionId: moveSource.commitId, target: destination, revisions: state?.revisions ?? [] })
     if (resolution.kind === 'invalid') {
       sendAction({ type: 'reject', error: resolution.message })
       return
@@ -1079,10 +1069,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const dropResolution = (event: DragEvent, target: Revision) => {
     const revisions = state?.revisions ?? []
     const workspace = event.dataTransfer.getData(WORKSPACE_MIME)
-    if (workspace.length > 0) return resolveWorkspaceDrop({ workspace, target, revisions })
+    if (workspace.length > 0) return RevisionDropModel.resolveWorkspace({ workspace, target, revisions })
     const bookmark = event.dataTransfer.getData(BOOKMARK_MIME)
     if (bookmark.length > 0) {
-      return resolveBookmarkDrop({
+      return RevisionDropModel.resolveBookmark({
         bookmark,
         sourceRevisionId: event.dataTransfer.getData(BOOKMARK_SOURCE_MIME),
         target,
@@ -1090,9 +1080,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       })
     }
     const sourceRevisionId = event.dataTransfer.getData(REVISION_MIME)
-    if (sourceRevisionId.length > 0) return resolveRevisionDrop({ sourceRevisionId, target, revisions })
+    if (sourceRevisionId.length > 0) return RevisionDropModel.resolveRevision({ sourceRevisionId, target, revisions })
     const origin = actionActor.getSnapshot().context.dragOrigin
-    return origin === null ? { kind: 'noop' as const } : resolveDragOriginDrop({ origin, target, revisions })
+    return origin === null ? { kind: 'noop' as const } : RevisionDropModel.resolveDragOrigin({ origin, target, revisions })
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {

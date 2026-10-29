@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { PaletteApi, type PaletteAction, type PaletteActionContext } from './palette-api.js'
+import { PaletteApi } from './palette-api.js'
+import type { PaletteAction, PaletteActionContext } from './palette-contract.js'
 
 const context: PaletteActionContext = {
   thread: {

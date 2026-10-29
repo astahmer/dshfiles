@@ -17,7 +17,8 @@ import {
   type QuotaRecoveryModelCatalog,
   type QuotaRecoveryModelSelection,
 } from './api.js'
-import { AccountStoreModel, accountStoreService } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
+import { accountStoreService } from './account-store.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
@@ -101,7 +102,7 @@ export const accountsHostApi = aiAccountsApi.host({
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
-  filePath: () => AccountStoreModel.filePath(),
+  filePath: () => AccountHomePolicy.filePath(),
   secretCatalogKeys: async ({ input, ctx }) => {
     const bridge = secretCatalogBridgeFor(ctx)
     if (bridge === undefined) return { available: false, items: [] }
@@ -272,7 +273,7 @@ export const accountsHostApi = aiAccountsApi.host({
       name: baseModelName(input.instanceId, model.name),
       efforts: (model.reasoning?.efforts ?? []).map(effort => ({ id: effort.id, name: effort.name })),
       defaultEffort: model.reasoning?.defaultEffort ?? null,
-      ...('accountAdditional' in model && typeof model.accountAdditional === 'boolean' ? { accountAdditional: model.accountAdditional } : {}),
+      ...('accountAdditional' in model && typeof model.accountAdditional === 'boolean' && { accountAdditional: model.accountAdditional }),
     }))
     const catalog = { instanceId: input.instanceId, models: resolved }
     if (warning === undefined) return catalog

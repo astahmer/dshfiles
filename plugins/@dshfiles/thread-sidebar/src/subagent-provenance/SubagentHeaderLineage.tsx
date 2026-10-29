@@ -10,7 +10,7 @@ import {
   StateDot,
   Tooltip as NativeTooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'

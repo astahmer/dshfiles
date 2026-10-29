@@ -35,7 +35,7 @@ export interface HostSession {
   forgetLaunchUrl: () => void
 }
 
-export class HostStartError extends Error {}
+class HostStartError extends Error {}
 
 /**
  * Resolve once the Host prints its tokenized launch URL.

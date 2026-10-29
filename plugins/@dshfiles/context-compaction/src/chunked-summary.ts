@@ -130,7 +130,7 @@ const withoutOneCallProvenance = (result: SummaryProjection): SummaryProjection 
   summary: result.summary,
   provider: result.provider,
   model: result.model,
-  ...(result.maxTokens === undefined ? {} : { maxTokens: result.maxTokens }),
+  ...(result.maxTokens !== undefined && { maxTokens: result.maxTokens }),
 })
 
 export const summarizeInChunks = ({ input, maxInputBytes, messageBytes, summarize, signal }: ChunkedSummaryOptions): Promise<SummaryProjection> =>

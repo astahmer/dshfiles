@@ -272,5 +272,3 @@ export const defaultTargetFor = (items: readonly StartThreadItem[], projects: re
   const option = StartThreadForm.targets(items, projects).find(candidate => candidate.value === value)
   return option?.target ?? { kind: 'default' }
 }
-
-export const startThreadLimits = { titleMax: TITLE_MAX, messageMax: MESSAGE_MAX } as const

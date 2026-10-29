@@ -6,7 +6,7 @@ export const MAX_VIEWED_MARKS = 2000
 
 const sessionIdSchema = z.string().min(1).max(128)
 
-export const viewedFileSchema = z
+const viewedFileSchema = z
   .object({
     sessionId: sessionIdSchema,
     seq: z.number().int().nonnegative(),
@@ -35,7 +35,7 @@ export const viewedFileFromKey = (key: string): ViewedFile | null => {
   return parts.success ? { sessionId: parts.data[0], seq: parts.data[1], path: parts.data[2] } : null
 }
 
-export const viewedMarksSnapshotSchema = z
+const viewedMarksSnapshotSchema = z
   .object({
     /** Monotone across Host restarts so a stale read never replaces a newer write. */
     revision: z.number().int().positive(),

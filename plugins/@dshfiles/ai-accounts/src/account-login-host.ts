@@ -1,7 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
-import { AccountStoreModel, accountStoreService, type AccountStoreFile } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
+import { accountStoreService, type AccountStoreFile } from './account-store.js'
 import { accountLoginMetadata, aiAccountsLoginApi, type AccountLoginState } from './account-login-api.js'
 import { createAccountLoginService, type AccountLoginAccount } from './account-login-service.js'
 import { createCodexLoginFiles } from './codex-login-files.js'
@@ -12,7 +13,7 @@ export class AccountLoginHostModel {
     file.accounts.map(account => {
       if (account.kind !== 'codex') return { instanceId: account.instanceId, kind: account.kind }
       try {
-        return { instanceId: account.instanceId, kind: account.kind, layout: AccountStoreModel.codexLayoutFor(account, file.shadowRoot) }
+        return { instanceId: account.instanceId, kind: account.kind, layout: AccountHomePolicy.codexLayoutFor(account, file.shadowRoot) }
       } catch {
         return { instanceId: account.instanceId, kind: account.kind }
       }
@@ -27,7 +28,7 @@ export const installAccountLogin = (ctx: Context): void => {
   const runtime = accountRuntime(ctx)
   if (runtime === undefined) throw new Error('AI Accounts runtime is unavailable.')
   runtime.accountLogin = createAccountLoginService({
-    files: createCodexLoginFiles(path => AccountStoreModel.isManagedSetupHome(path, 'codex')),
+    files: createCodexLoginFiles(path => AccountHomePolicy.isManagedSetupHome(path, 'codex')),
     account: async id => {
       const file = await accountStoreService.readAccountFile()
       const pending = runtime.accountSetup?.candidates() ?? []

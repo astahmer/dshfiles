@@ -1,10 +1,5 @@
 import { and, assign, raise, setup } from '@dshfiles/plugin-ui/machine'
 
-/**
- * What the Host's main view can show. A panel target may also name a scope: the same panel key showing a different
- * subject (Jujutsu on two repositories) in two tabs; the Host only ever sees the panel id.
- */
-export type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
 import type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
 
 export interface Tab {

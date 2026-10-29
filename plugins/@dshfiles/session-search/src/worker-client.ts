@@ -60,7 +60,7 @@ const DEFAULT_TIMEOUT_MS = 30_000
  * falls back to the worker built next to the package. Node cannot resolve `.js` specifiers inside a `.ts` module, so the
  * built file is the supported path — build the plugin before testing.
  */
-export const resolveWorkerEntry = (base: string | URL): WorkerEntry => {
+const resolveWorkerEntry = (base: string | URL): WorkerEntry => {
   const root = base instanceof URL ? base : new URL(base)
   for (const candidate of [new URL('./search-worker.js', root), new URL('../dist/search-worker.js', root)]) {
     if (existsSync(fileURLToPath(candidate))) return { url: candidate, execArgv: [] }

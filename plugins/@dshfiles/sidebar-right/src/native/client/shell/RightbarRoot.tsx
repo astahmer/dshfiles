@@ -45,9 +45,9 @@ function SessionView({
  */
 export function RightbarRoot({ usePanelInfo, useViews, useWorkbenchMode, ...props }: RootProps) {
   const native = usePanelInfo(info => info.activePanelId === null)
-  const workbench = useWorkbenchMode(value => value)
+  const workbench = useWorkbenchMode(value => value, Object.is)
   const visible = native || workbench
-  const views = useViews(value => value)
+  const views = useViews(value => value, Object.is)
   return (
     <>
       {views.map(view => (

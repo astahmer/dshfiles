@@ -40,7 +40,3 @@ export const declaredResetWaitMs = (message: string, now: number): number | unde
   if (wait === undefined || !Number.isFinite(wait) || wait <= 0) return undefined
   return Math.min(wait, MAX_RESET_WAIT_MS)
 }
-
-export class ResetHintModel {
-  static readonly declaredResetWaitMs = declaredResetWaitMs
-}

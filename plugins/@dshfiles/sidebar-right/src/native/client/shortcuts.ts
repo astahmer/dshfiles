@@ -103,7 +103,7 @@ export function registerSidebarShortcuts(
           'desktop:windows': desktop,
           'desktop:linux': desktop,
           'web:windows': web,
-          ...(kind === 'close' ? { 'web:macos': web } : {}),
+          ...(kind === 'close' && { 'web:macos': web }),
         },
         regions: ['page', 'editable', 'terminal'],
         modals: kind === 'close' ? ['settings', 'shortcuts', 'other'] : [],

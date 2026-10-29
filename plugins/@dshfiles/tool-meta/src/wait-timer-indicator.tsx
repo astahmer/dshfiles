@@ -13,16 +13,14 @@ export const WaitTimerIndicator = ({ timer, t }: WaitTimerIndicatorProps) => {
   const remaining = timer.remainingMs === undefined ? undefined : ToolTimingModel.formatDuration({ ms: timer.remainingMs, live: true, t })
   const timeout = timer.timeoutMs === undefined ? undefined : ToolTimingModel.formatDuration({ ms: timer.timeoutMs, live: true, t })
   const label = remaining === undefined || timeout === undefined ? t('waitElapsed', { duration: elapsed }) : t('waitProgress', { remaining, timeout })
-  const waitingFor =
-    timer.waitingFor === 'job-output'
-      ? t('waitingForJobOutput')
-      : timer.waitingFor === 'all-jobs'
-        ? t('waitingForAllJobs')
-        : timer.waitingFor.count === 1
-          ? t('waitingForJob')
-          : timer.waitingFor.until === 'any-settled'
-            ? t('waitingForAnyJobs', { count: String(timer.waitingFor.count) })
-            : t('waitingForJobs', { count: String(timer.waitingFor.count) })
+  const waitingForLabel = () => {
+    if (timer.waitingFor === 'job-output') return t('waitingForJobOutput')
+    if (timer.waitingFor === 'all-jobs') return t('waitingForAllJobs')
+    if (timer.waitingFor.count === 1) return t('waitingForJob')
+    if (timer.waitingFor.until === 'any-settled') return t('waitingForAnyJobs', { count: String(timer.waitingFor.count) })
+    return t('waitingForJobs', { count: String(timer.waitingFor.count) })
+  }
+  const waitingFor = waitingForLabel()
   const progress = timer.timeoutMs === undefined ? undefined : Math.min(timer.elapsedMs, timer.timeoutMs)
 
   return (

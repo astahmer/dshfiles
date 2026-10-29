@@ -19,7 +19,7 @@ export const GenAiNames = {
 } as const
 
 /** Attributes whose values are message content; present only when content capture is on. */
-export const CONTENT_ATTRIBUTES = {
+const CONTENT_ATTRIBUTES = {
   inputMessages: 'gen_ai.input.messages',
   outputMessages: 'gen_ai.output.messages',
   systemInstructions: 'gen_ai.system_instructions',

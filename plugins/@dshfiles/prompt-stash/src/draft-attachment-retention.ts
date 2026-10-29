@@ -17,7 +17,7 @@ interface RetentionInput {
 type RetentionEvent = { readonly type: 'attachments'; readonly count: number }
 
 // SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
-export const draftAttachmentRetentionMachine = setup({
+const draftAttachmentRetentionMachine = setup({
   types: { input: {} as RetentionInput, context: {} as RetentionInput, events: {} as RetentionEvent },
   actors: { retention: fromCallback<RetentionEvent, RetentionInput>(({ input }) => input.retain()) },
 }).createMachine({

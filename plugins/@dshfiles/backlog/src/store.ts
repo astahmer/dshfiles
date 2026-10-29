@@ -681,7 +681,7 @@ const createBacklogStore = ({
       }
       const events = item.events.map((event, index) =>
         index === commentIndex
-          ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars), ...(attachments === undefined ? {} : { attachments }) }
+          ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars), ...(attachments !== undefined && { attachments }) }
           : event,
       )
       const edited: BacklogItem = { ...item, events }

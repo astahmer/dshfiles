@@ -3,8 +3,6 @@ import { z } from 'zod'
 
 import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
 
-export type { PaletteAction, PaletteActionContext, PaletteMode, PaletteThemePreference, PaletteThread, PaletteWorkspace } from './palette-contract.js'
-
 interface PaletteApiSnapshot {
   readonly actions: readonly PaletteAction[]
   readonly mode: PaletteMode | null

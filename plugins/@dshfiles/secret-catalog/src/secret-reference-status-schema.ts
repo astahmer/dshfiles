@@ -1,7 +1,7 @@
 import { secretScopeSchema } from '@dshfiles/credential-port'
 import { z } from 'zod'
 
-export const secretReferenceStateSchema = z.enum([
+const secretReferenceStateSchema = z.enum([
   'resolved',
   'empty',
   'invalid-reference',
@@ -17,7 +17,7 @@ export const secretReferenceStateSchema = z.enum([
 export type SecretReferenceState = z.infer<typeof secretReferenceStateSchema>
 
 /** A same-named alias in a project or machine-local config, which a global-only resolver cannot reach. */
-export const secretReferenceElsewhereSchema = z.object({
+const secretReferenceElsewhereSchema = z.object({
   scope: secretScopeSchema,
   folder: z.string().max(4096),
   environment: z.string().max(256),
@@ -25,7 +25,7 @@ export const secretReferenceElsewhereSchema = z.object({
 export type SecretReferenceElsewhere = z.infer<typeof secretReferenceElsewhereSchema>
 
 /** Where `secret --global` writes, and the file it really lands in when that path is a symlink (e.g. Nix-managed). */
-export const secretGlobalConfigSchema = z.object({
+const secretGlobalConfigSchema = z.object({
   path: z.string().max(4096).nullable(),
   linkedTo: z.string().max(4096).nullable(),
 })

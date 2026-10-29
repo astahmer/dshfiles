@@ -5,7 +5,6 @@ import {
   attachInputSchema,
   createInputSchema,
   dismissInputSchema,
-  idInputSchema,
   intakeInputSchema,
   intakeOutputSchema,
   listInputSchema,
@@ -24,24 +23,22 @@ import {
   sourceOutputSchema,
   staleInputSchema,
   annotationSchema,
-  unassignedSchema,
 } from './schema.js'
 
-export const storeErrorSchema = z.enum(['missing', 'revision', 'limit', 'status'])
+const storeErrorSchema = z.enum(['missing', 'revision', 'limit', 'status'])
 
-export const annotationResultSchema = z.union([
+const annotationResultSchema = z.union([
   z.object({ ok: z.literal(true), annotation: annotationSchema }).strict(),
   z.object({ ok: z.literal(false), error: storeErrorSchema }).strict(),
 ])
 
-export const annotationsResultSchema = z.union([
+const annotationsResultSchema = z.union([
   z.object({ ok: z.literal(true), annotations: z.array(annotationSchema).max(50) }).strict(),
   z.object({ ok: z.literal(false), error: storeErrorSchema }).strict(),
 ])
 
-export const createdOutputSchema = z.object({ annotations: z.array(annotationSchema).max(8) }).strict()
-export const intakeResultSchema = z.object({ items: z.array(unassignedSchema).max(100) }).strict()
-export const tokenOutputSchema = z.object({ token: z.string().min(20).max(200), createdAt: z.number().int().nonnegative() }).strict()
+const createdOutputSchema = z.object({ annotations: z.array(annotationSchema).max(8) }).strict()
+const tokenOutputSchema = z.object({ token: z.string().min(20).max(200), createdAt: z.number().int().nonnegative() }).strict()
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -163,5 +160,3 @@ function attachmentsResultSchema() {
 }
 
 export type AnnotationsApi = typeof annotationsApi
-export const annotationsApiIdInput = idInputSchema
-export const intakeResult = intakeResultSchema

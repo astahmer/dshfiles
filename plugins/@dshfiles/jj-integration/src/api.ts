@@ -3,23 +3,20 @@ import { jjRepositoriesSchema, jjRepositorySchema, jjRevisionSchema, jjThreadSch
 import { z } from 'zod'
 import { CleanupJobModel } from './cleanup-jobs.js'
 
-const revisionSchema = jjRevisionSchema
-export type ThreadRevisionView = z.infer<typeof revisionSchema>
-const threadSchema = jjThreadSchema
-export type ThreadView = z.infer<typeof threadSchema>
-const repositorySchema = jjRepositorySchema
-export type RepositoryView = z.infer<typeof repositorySchema>
+export type ThreadRevisionView = z.infer<typeof jjRevisionSchema>
+export type ThreadView = z.infer<typeof jjThreadSchema>
+export type RepositoryView = z.infer<typeof jjRepositorySchema>
 
 const integrationProgressSchema = z.object({ phase: z.enum(['queued', 'validating', 'rebasing']), updatedAt: z.number().int().nonnegative() }).strict()
 
 const landResultSchema = z
   .object({
     status: z.enum(['landed', 'nothing-to-land', 'needs-description', 'conflicted']),
-    revisions: z.array(revisionSchema),
+    revisions: z.array(jjRevisionSchema),
     files: z.array(z.string()),
     bookmark: z.string(),
     /** Where the bookmark points after rebasing; absent from a Host older than this field. */
-    head: revisionSchema.optional(),
+    head: jjRevisionSchema.optional(),
     agentAsked: z.boolean(),
   })
   .strict()
@@ -111,7 +108,7 @@ const cleanupResultSchema = z
     /** Threads-directory folders and files no jj workspace owns, such as forgotten workspaces and stray logs. */
     untracked: z.array(cleanupUntrackedSchema),
     /** Empty, undescribed revisions nothing builds on, found (and abandoned when applied) after the workspaces went. */
-    emptyRevisions: z.array(revisionSchema),
+    emptyRevisions: z.array(jjRevisionSchema),
   })
   .strict()
 export type CleanupResult = z.infer<typeof cleanupResultSchema>
@@ -315,7 +312,7 @@ export const jjIntegrationApi = defineApi({
           sessionId: z.string().min(1).max(128).optional(),
         })
         .strict(),
-      output: z.object({ thread: threadSchema.nullable() }).strict(),
+      output: z.object({ thread: jjThreadSchema.nullable() }).strict(),
       description:
         'The thread workspace at a path (revisions not yet on the bookmark, conflicts, whether main moved, and whether it is safe to rebase), or null when the path is not a thread.',
     }),
@@ -359,7 +356,7 @@ export const jjIntegrationApi = defineApi({
     }),
     threadStatus: method({
       input: threadPathInput,
-      output: z.object({ bookmark: z.string(), thread: threadSchema.nullable() }).strict(),
+      output: z.object({ bookmark: z.string(), thread: jjThreadSchema.nullable() }).strict(),
       description:
         'Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
       tool: {
@@ -403,7 +400,7 @@ export const jjIntegrationApi = defineApi({
     }),
     discard: method({
       input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
-      output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(revisionSchema) }).strict(),
+      output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(jjRevisionSchema) }).strict(),
       description:
         'Remove one thread workspace: forget its jj workspace and its DSH project registration. Unlanded revisions are kept unless force is true, which abandons them. Call only when the user asked to remove that thread workspace.',
       tool: {
@@ -425,7 +422,7 @@ export const jjIntegrationApi = defineApi({
               .object({
                 path: z.string(),
                 status: z.enum(['discarded', 'has-work', 'error']),
-                revisions: z.array(revisionSchema),
+                revisions: z.array(jjRevisionSchema),
                 error: z.string().nullable(),
               })
               .strict(),

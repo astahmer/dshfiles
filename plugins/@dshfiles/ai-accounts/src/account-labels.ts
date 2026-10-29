@@ -21,16 +21,6 @@ export const KIND_ACCENT = {
 /** Rail group headings, in the order the groups are listed. */
 export const KIND_GROUPS: readonly AccountProfile['kind'][] = ['codex', 'claude', 'github-copilot', 'opencode-go', 'commandcode', 'cursor']
 
-/** The subscription each kind bills against, for the detail header's kicker. */
-export const KIND_SUBSCRIPTION = {
-  codex: 'CHATGPT SUBSCRIPTION',
-  claude: 'ANTHROPIC SUBSCRIPTION',
-  'opencode-go': 'OPENCODE SUBSCRIPTION',
-  commandcode: 'COMMAND CODE SUBSCRIPTION',
-  'github-copilot': 'GITHUB COPILOT SUBSCRIPTION',
-  cursor: 'CURSOR SUBSCRIPTION',
-} satisfies Record<AccountProfile['kind'], string>
-
 /** Kinds that publish a model route; the rest only track identity and quota. */
 export const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
 

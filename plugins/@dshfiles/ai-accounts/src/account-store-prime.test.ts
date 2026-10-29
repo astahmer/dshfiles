@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type * as store from './account-store.js'
 
 const accountDraft = {
   instanceId: 'codex-test',
@@ -36,7 +35,7 @@ afterEach(() => {
  * The store resolves DSH_HOME at import time, so each case stubs the variable
  * and re-imports the module to get a fresh, independently cached instance.
  */
-const loadStoreWith = async (accounts: unknown[]): Promise<typeof store> => {
+const loadStoreWith = async (accounts: unknown[]) => {
   const home = mkdtempSync(join(tmpdir(), 'dsh-accounts-store-'))
   const dir = join(home, 'plugins', 'ai-accounts')
   mkdirSync(dir, { recursive: true })
@@ -51,7 +50,9 @@ const loadStoreWith = async (accounts: unknown[]): Promise<typeof store> => {
   )
   vi.stubEnv('DSH_HOME', home)
   vi.resetModules()
-  return import('./account-store.js')
+  const storeModule = await import('./account-store.js')
+  const { AccountHomePolicy } = await import('./account-home-policy.js')
+  return { ...storeModule, AccountHomePolicy }
 }
 
 describe('account store priming', () => {
@@ -62,7 +63,7 @@ describe('account store priming', () => {
 
     expect(primed.accounts).toHaveLength(1)
     expect(primed.accounts[0]?.instanceId).toBe('codex-test')
-    expect(store.AccountStoreModel.filePath()).toMatch(/\/plugins\/ai-accounts\/accounts\.json$/u)
+    expect(store.AccountHomePolicy.filePath()).toMatch(/\/plugins\/ai-accounts\/accounts\.json$/u)
   })
 
   it('keeps the sync read stable across repeats without an async re-read', async () => {
@@ -200,7 +201,7 @@ describe('atomic setup account creation', () => {
       store.accountStoreService.createSetupAccount({ kind: 'codex', requestId: requestTwo }),
       store.accountStoreService.createSetupAccount({ kind: 'claude', requestId: requestThree }),
     ])
-    const root = join(store.AccountStoreModel.filePath(), '..', 'homes')
+    const root = join(store.AccountHomePolicy.filePath(), '..', 'homes')
     const final = await store.accountStoreService.readAccountFile()
     expect(final.accounts).toEqual([])
     const first = codex.draft
@@ -213,10 +214,10 @@ describe('atomic setup account creation', () => {
     expect(second.shadowHomePath).toBe(second.homePath)
     expect(third.homePath).toBe(join(root, third.instanceId))
     expect(third.shadowHomePath).toBe('')
-    expect(store.AccountStoreModel.isManagedSetupHome(first.homePath, 'codex')).toBe(true)
-    expect(store.AccountStoreModel.isManagedSetupHome(third.homePath, 'claude')).toBe(true)
-    expect(store.AccountStoreModel.isManagedSetupHome(first.homePath, 'claude')).toBe(false)
-    expect(store.AccountStoreModel.codexLayoutFor(first, final.shadowRoot)).toEqual({
+    expect(store.AccountHomePolicy.isManagedSetupHome(first.homePath, 'codex')).toBe(true)
+    expect(store.AccountHomePolicy.isManagedSetupHome(third.homePath, 'claude')).toBe(true)
+    expect(store.AccountHomePolicy.isManagedSetupHome(first.homePath, 'claude')).toBe(false)
+    expect(store.AccountHomePolicy.codexLayoutFor(first, final.shadowRoot)).toEqual({
       mode: 'direct',
       sharedHomePath: first.homePath,
       effectiveHomePath: first.homePath,
@@ -260,10 +261,10 @@ describe('atomic setup account creation', () => {
 
   it('only recognizes canonical generated setup homes in the trusted active store root', async () => {
     const store = await loadStoreWith([])
-    const root = join(store.AccountStoreModel.filePath(), '..', 'homes')
+    const root = join(store.AccountHomePolicy.filePath(), '..', 'homes')
     const instanceId = `codex_work_${requestOne.replaceAll('-', '')}`
     const valid = join(root, instanceId)
-    expect(store.AccountStoreModel.isManagedSetupHome(valid, 'codex')).toBe(true)
+    expect(store.AccountHomePolicy.isManagedSetupHome(valid, 'codex')).toBe(true)
     for (const path of [
       '',
       root,
@@ -277,19 +278,19 @@ describe('atomic setup account creation', () => {
       `/tmp/${instanceId}`,
       instanceId,
     ]) {
-      expect(store.AccountStoreModel.isManagedSetupHome(path, 'codex')).toBe(false)
+      expect(store.AccountHomePolicy.isManagedSetupHome(path, 'codex')).toBe(false)
     }
   })
 
   it('does not let traversal ids or near-match manual paths bypass Codex home containment', async () => {
     const store = await loadStoreWith([])
-    const root = join(store.AccountStoreModel.filePath(), '..', 'homes')
+    const root = join(store.AccountHomePolicy.filePath(), '..', 'homes')
     for (const instanceId of ['', '..', '../escape', '../../escape', '/tmp/escape']) {
       const path = join(root, instanceId)
-      expect(() => store.AccountStoreModel.codexLayoutFor({ instanceId, homePath: path, shadowHomePath: path }, '/tmp/unused')).toThrow()
+      expect(() => store.AccountHomePolicy.codexLayoutFor({ instanceId, homePath: path, shadowHomePath: path }, '/tmp/unused')).toThrow()
     }
     const instanceId = `codex_work_${requestOne.replaceAll('-', '')}`
     const path = join(root, instanceId, 'near-match')
-    expect(() => store.AccountStoreModel.codexLayoutFor({ instanceId, homePath: path, shadowHomePath: path }, '/tmp/unused')).toThrow()
+    expect(() => store.AccountHomePolicy.codexLayoutFor({ instanceId, homePath: path, shadowHomePath: path }, '/tmp/unused')).toThrow()
   })
 })

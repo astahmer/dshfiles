@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBookmarkDrop, resolveDragOriginDrop, resolveRevisionDrop, resolveWorkspaceDrop } from './revision-drop.js'
+import { RevisionDropModel } from './revision-drop.js'
 
 const revision = (
   commitId: string,
@@ -17,7 +17,7 @@ const revisions = [trunk, feature, featureChild, other]
 
 describe('revision drop resolution', () => {
   it('prepares a rebase and records its source and destination for the preview', () => {
-    expect(resolveRevisionDrop({ sourceRevisionId: 'feature', target: other, revisions })).toEqual({
+    expect(RevisionDropModel.resolveRevision({ sourceRevisionId: 'feature', target: other, revisions })).toEqual({
       kind: 'action',
       action: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
       presentation: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
@@ -25,20 +25,20 @@ describe('revision drop resolution', () => {
   })
 
   it('explains a branch drop onto its own descendant', () => {
-    expect(resolveRevisionDrop({ sourceRevisionId: 'feature', target: featureChild, revisions })).toEqual({
+    expect(RevisionDropModel.resolveRevision({ sourceRevisionId: 'feature', target: featureChild, revisions })).toEqual({
       kind: 'invalid',
       message: 'A branch cannot be rebased onto one of its own revisions.',
     })
   })
 
   it('treats dropping a revision onto itself as a no-op', () => {
-    expect(resolveRevisionDrop({ sourceRevisionId: 'feature', target: feature, revisions })).toEqual({ kind: 'noop' })
+    expect(RevisionDropModel.resolveRevision({ sourceRevisionId: 'feature', target: feature, revisions })).toEqual({ kind: 'noop' })
   })
 
   it('moves one named workspace even when several share its current revision', () => {
     const sharedRevision = revision('shared', [], [], ['default', 'review-a', 'review-b'], true)
     const destination = revision('destination', ['shared'])
-    expect(resolveWorkspaceDrop({ workspace: 'review-b', target: destination, revisions: [sharedRevision, destination] })).toEqual({
+    expect(RevisionDropModel.resolveWorkspace({ workspace: 'review-b', target: destination, revisions: [sharedRevision, destination] })).toEqual({
       kind: 'action',
       action: { kind: 'workspace-edit', name: 'review-b', commitId: 'destination' },
       presentation: { kind: 'workspace-move', sourceId: 'shared', destinationId: 'destination', workspace: 'review-b' },
@@ -47,12 +47,12 @@ describe('revision drop resolution', () => {
 
   it('resolves the default workspace and ignores a drop onto its current revision', () => {
     const current = revision('current', [], [], [], true)
-    expect(resolveWorkspaceDrop({ workspace: 'default', target: current, revisions: [current, other] }).kind).toBe('noop')
-    expect(resolveWorkspaceDrop({ workspace: 'unknown', target: other, revisions: [current, other] })).toEqual({ kind: 'noop' })
+    expect(RevisionDropModel.resolveWorkspace({ workspace: 'default', target: current, revisions: [current, other] }).kind).toBe('noop')
+    expect(RevisionDropModel.resolveWorkspace({ workspace: 'unknown', target: other, revisions: [current, other] })).toEqual({ kind: 'noop' })
   })
 
   it('resolves a locally started revision drag when the drop event has no transfer data', () => {
-    expect(resolveDragOriginDrop({ origin: { kind: 'revision', sourceId: 'feature' }, target: other, revisions })).toEqual({
+    expect(RevisionDropModel.resolveDragOrigin({ origin: { kind: 'revision', sourceId: 'feature' }, target: other, revisions })).toEqual({
       kind: 'action',
       action: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
       presentation: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
@@ -60,7 +60,9 @@ describe('revision drop resolution', () => {
   })
 
   it('resolves local bookmark drags from their origin', () => {
-    expect(resolveDragOriginDrop({ origin: { kind: 'bookmark', sourceId: 'feature', bookmark: 'feature/bookmark' }, target: other, revisions })).toEqual({
+    expect(
+      RevisionDropModel.resolveDragOrigin({ origin: { kind: 'bookmark', sourceId: 'feature', bookmark: 'feature/bookmark' }, target: other, revisions }),
+    ).toEqual({
       kind: 'action',
       action: { kind: 'bookmark-move', bookmark: 'feature/bookmark', destinationId: 'other' },
       presentation: { kind: 'bookmark-move', bookmark: 'feature/bookmark', sourceId: 'feature', destinationId: 'other' },
@@ -71,7 +73,7 @@ describe('revision drop resolution', () => {
     const current = revision('current', [], [], ['review'], true)
     const destination = revision('destination')
     expect(
-      resolveDragOriginDrop({
+      RevisionDropModel.resolveDragOrigin({
         origin: { kind: 'workspace', sourceId: 'current', workspace: 'review' },
         target: destination,
         revisions: [current, destination],
@@ -85,7 +87,7 @@ describe('revision drop resolution', () => {
 
   it('prepares local bookmark moves with the bookmark source revision', () => {
     expect(
-      resolveBookmarkDrop({
+      RevisionDropModel.resolveBookmark({
         bookmark: 'feature/bookmark',
         sourceRevisionId: 'feature',
         target: revisions[3]!,
@@ -104,8 +106,10 @@ describe('revision drop resolution', () => {
   })
 
   it('ignores missing, remote, and already-present bookmarks', () => {
-    expect(resolveBookmarkDrop({ bookmark: 'stale', sourceRevisionId: 'feature', target: other, revisions })).toEqual({ kind: 'noop' })
-    expect(resolveBookmarkDrop({ bookmark: 'feature/bookmark', sourceRevisionId: 'missing', target: other, revisions })).toEqual({ kind: 'noop' })
-    expect(resolveBookmarkDrop({ bookmark: 'feature/bookmark', sourceRevisionId: 'feature', target: feature, revisions })).toEqual({ kind: 'noop' })
+    expect(RevisionDropModel.resolveBookmark({ bookmark: 'stale', sourceRevisionId: 'feature', target: other, revisions })).toEqual({ kind: 'noop' })
+    expect(RevisionDropModel.resolveBookmark({ bookmark: 'feature/bookmark', sourceRevisionId: 'missing', target: other, revisions })).toEqual({ kind: 'noop' })
+    expect(RevisionDropModel.resolveBookmark({ bookmark: 'feature/bookmark', sourceRevisionId: 'feature', target: feature, revisions })).toEqual({
+      kind: 'noop',
+    })
   })
 })

@@ -15,10 +15,12 @@ export const name = 'dshfiles-network-terminal-output'
 // this entry pending while the Loader is waiting for this same entry to settle.
 export const inject = ['connection', 'webServer', 'webApp']
 
+const ADDRESS_LABELS: Record<LaunchAddress['kind'], string> = { local: '  Local', lan: '  LAN', advertised: '  Advertised' }
+
 /** Authenticate only at the terminal boundary; never add tokens to status data. */
 export function launchAddressLines(addresses: readonly LaunchAddress[], authenticatedUrl: HostConnectionHandle['authenticatedUrl']): string[] {
   const lines = addresses.map((address, index) => {
-    const label = index === 0 ? 'dsh web' : address.kind === 'lan' ? '  LAN' : address.kind === 'advertised' ? '  Advertised' : '  Local'
+    const label = index === 0 ? 'dsh web' : ADDRESS_LABELS[address.kind]
     return `${label}: ${authenticatedUrl(address.url)}`
   })
   if (addresses.some(address => address.kind === 'local' && address.url.startsWith('https:') && new URL(address.url).hostname === 'localhost')) {

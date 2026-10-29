@@ -25,7 +25,7 @@ import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { knownSessionRuntime } from './session-runtime.js'
 import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
-import { createResourceProbeLimiter, readResourceSnapshot, selectAutoHost } from './resource-snapshot.js'
+import { ResourceSnapshotModel } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -193,7 +193,7 @@ const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
   maxEntries: 128,
   spanName: 'multi-host resource snapshot refresh',
 })
-const resourceProbeLimiter = createResourceProbeLimiter(4)
+const resourceProbeLimiter = ResourceSnapshotModel.createResourceProbeLimiter(4)
 
 const connectRuntime = async ({
   host,
@@ -545,12 +545,12 @@ const readResourcePool = async (): Promise<ResourcePool> => {
     }
   })
 
-  return { hosts: entries, selected: selectAutoHost(entries) }
+  return { hosts: entries, selected: ResourceSnapshotModel.selectAutoHost(entries) }
 }
 
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
-  resourceSnapshot: async () => readResourceSnapshot(),
+  resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
   resourcePool: async () => readResourcePool(),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])

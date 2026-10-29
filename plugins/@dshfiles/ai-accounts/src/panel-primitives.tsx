@@ -69,20 +69,6 @@ export const NumberedSection = (props: {
   </section>
 )
 
-/** The coloured square a profile wears in the rail, the detail header and the model picker. */
-export const ProviderMark = (props: { readonly badge: string; readonly color: string; readonly size?: 'default' | 'lg' }): JSX.Element => (
-  <span
-    aria-hidden
-    className={cn(
-      'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:bg-muted-foreground dshx:font-bold dshx:text-white dshx:ring-1 dshx:ring-white/15 dshx:ring-inset',
-      props.size === 'lg' ? 'dshx:size-9 dshx:text-sm' : 'dshx:size-6 dshx:text-[10px]',
-    )}
-    style={{ background: props.color === '' ? undefined : props.color }}
-  >
-    {props.badge}
-  </span>
-)
-
 /** One quota window: label, percent left in its tone, and the bar. */
 export const QuotaMeter = (props: {
   readonly label: string

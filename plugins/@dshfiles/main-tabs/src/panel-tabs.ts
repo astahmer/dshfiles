@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { HostTarget, TabTarget } from './tabs-machine.js'
+import type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
 
 /**
  * A panel tab may name a scope: one panel plugin showing a different subject per tab (Jujutsu on two repositories).

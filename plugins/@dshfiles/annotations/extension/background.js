@@ -133,9 +133,9 @@ function startPicker() {
       selector: selectorOf(element),
       tag: element.tagName.toLowerCase(),
       rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
-      ...(text.length === 0 ? {} : { text }),
-      ...(Object.keys(attributes).length === 0 ? {} : { attributes }),
-      ...(Object.keys(styles).length === 0 ? {} : { styles }),
+      ...(text.length !== 0 && { text }),
+      ...(Object.keys(attributes).length !== 0 && { attributes }),
+      ...(Object.keys(styles).length !== 0 && { styles }),
     }
   }
 

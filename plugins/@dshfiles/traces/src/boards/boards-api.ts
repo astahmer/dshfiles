@@ -34,7 +34,7 @@ export const breakdownInputSchema = z
   .strict()
 export type BreakdownInput = z.infer<typeof breakdownInputSchema>
 
-export const breakdownRowSchema = z
+const breakdownRowSchema = z
   .object({
     key: z.string().nullable(),
     count: z.number().int().nonnegative(),
@@ -50,7 +50,7 @@ export const breakdownRowSchema = z
   .strict()
 export type BreakdownRow = z.infer<typeof breakdownRowSchema>
 
-export const breakdownSchema = z
+const breakdownSchema = z
   .object({
     windowMinutes: z.number().int().positive(),
     spans: z.number().int().nonnegative(),

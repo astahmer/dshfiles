@@ -18,7 +18,7 @@ import type { QuotaSnapshot } from './usage-history-model.js'
  */
 
 // The domain name is a lower-case identifier, so the package's hyphen cannot appear.
-export const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
+const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
 
 const LEGACY_BUCKET_MS = 15 * 60_000
 const MINUTE_MS = 60_000

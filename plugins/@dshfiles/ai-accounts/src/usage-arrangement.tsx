@@ -35,17 +35,17 @@ export const useUsageLayout = () => {
     },
   })
   const saveHidden = (ids: string[]): void => preference.mutate({ hidden: ids })
+  const arrangementError = (): string | null => {
+    if (reorder.isError) return `Could not change account priority: ${errorMessage(reorder.error, 'The Host may need updating. Retry after it is updated.')}`
+    if (preference.isError) return errorMessage(preference.error, 'Could not save display preference.')
+    if (fileQuery.isError) return 'Account priority is unavailable. Retry when the account Host is available.'
+    return null
+  }
   return {
     layout,
     pending,
     ready: fileQuery.data !== undefined && !fileQuery.isError,
-    error: reorder.isError
-      ? `Could not change account priority: ${errorMessage(reorder.error, 'The Host may need updating. Retry after it is updated.')}`
-      : preference.isError
-        ? errorMessage(preference.error, 'Could not save display preference.')
-        : fileQuery.isError
-          ? 'Account priority is unavailable. Retry when the account Host is available.'
-          : null,
+    error: arrangementError(),
     movingId: reorder.variables?.instanceId ?? null,
     neighborIndex: (shownIds: readonly string[], id: string, direction: -1 | 1): number => AccountOrderModel.neighborIndex(accounts, shownIds, id, direction),
     hide: (id: string): void => saveHidden([...hiddenUsageAccounts.filter(hidden => hidden !== id), id]),

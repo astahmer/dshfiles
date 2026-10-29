@@ -9,14 +9,14 @@ const githubReleaseSchema = z.object({
   body: z.string().max(50_000).nullable(),
 })
 
-export const releaseHighlightSchema = z
+const releaseHighlightSchema = z
   .object({
     section: z.string().min(1).max(80),
     text: z.string().min(1).max(300),
   })
   .strict()
 
-export const releaseInfoSchema = z
+const releaseInfoSchema = z
   .object({
     version: z.string().min(1).max(100),
     title: z.string().min(1).max(255),

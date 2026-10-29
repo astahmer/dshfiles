@@ -29,7 +29,8 @@ import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
-import { AccountStoreModel, accountStoreService, type AccountStoreFile } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
+import { accountStoreService, type AccountStoreFile } from './account-store.js'
 import { createAccountSetupService } from './account-setup-service.js'
 import { verifyAccountConnection } from './account-connection-verification.js'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -138,12 +139,10 @@ export default definePlugin({
         return verifyAccountConnection({
           ...request,
           readCopilotCredential: async id => runtime.copilotLogin?.readPending(id) ?? copilotCredentialReader(id),
-          ...(pendingHome === undefined
-            ? {}
-            : {
-                readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
-                  probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
-              }),
+          ...(pendingHome !== undefined && {
+            readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
+              probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
+          }),
         })
       },
       saveKey: async (reference, _owner, value, accepted) => {
@@ -171,14 +170,14 @@ export default definePlugin({
         if (
           file.accounts.some(
             account =>
-              AccountStoreModel.containsConfiguredHome(draft.homePath, account.homePath) ||
-              AccountStoreModel.containsConfiguredHome(draft.homePath, account.shadowHomePath),
+              AccountHomePolicy.containsConfiguredHome(draft.homePath, account.homePath) ||
+              AccountHomePolicy.containsConfiguredHome(draft.homePath, account.shadowHomePath),
           )
         )
           return
         if (draft.kind !== 'codex' && draft.kind !== 'claude') return
         const path = draft.homePath
-        if (!AccountStoreModel.isManagedSetupHome(path, draft.kind)) return
+        if (!AccountHomePolicy.isManagedSetupHome(path, draft.kind)) return
         try {
           // Check exact trusted absolute target and all resolved ancestors before recursive removal.
           if (realpathSync(path) !== path || !lstatSync(path).isDirectory()) throw new Error('Unsafe pending account home')

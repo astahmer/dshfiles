@@ -160,13 +160,11 @@ const SummaryItem = (props: {
               className={cn(
                 'dshx:tabular-nums',
                 lines.percent === null ? 'dshx:text-[11px] dshx:font-semibold' : 'dshx:text-[10px]',
-                props.item.disabled
-                  ? 'dshx:text-muted-foreground'
-                  : props.item.exhausted
-                    ? 'dshx:text-destructive'
-                    : lines.percent === null
-                      ? QUOTA_TONE_TEXT[tone]
-                      : 'dshx:text-muted-foreground',
+                !props.item.disabled && props.item.exhausted
+                  ? 'dshx:text-destructive'
+                  : !props.item.disabled && lines.percent === null
+                    ? QUOTA_TONE_TEXT[tone]
+                    : 'dshx:text-muted-foreground',
               )}
             >
               {lines.reset}

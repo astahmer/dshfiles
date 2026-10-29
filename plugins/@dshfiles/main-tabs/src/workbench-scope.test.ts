@@ -1,7 +1,8 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
-import { tabsMachine, type HostTarget, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import { tabsMachine, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
+import type { HostTarget } from '@dshfiles/workbench/tabs'
 
 const thread = (sessionId: string): HostTarget => ({ kind: 'thread', sessionId })
 const preferences: TabPreferences = { enabled: true, maxTabs: 12, openMode: 'preview', persistence: 'project' }

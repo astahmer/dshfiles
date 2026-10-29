@@ -23,7 +23,7 @@ const INGEST_BATCH_DELAY_MS = 25
 /** A burst this large flushes immediately instead of growing the buffer. */
 const INGEST_BATCH_LIMIT = 200
 
-export class ActivityError extends Error {
+class ActivityError extends Error {
   constructor(
     readonly code: string,
     message: string,

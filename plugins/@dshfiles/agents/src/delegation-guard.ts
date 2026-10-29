@@ -5,7 +5,7 @@ import { Agents, type Agent } from './agent.js'
  * each `@deepseek-ai/dsh-tool-subagent` row plus the workflow tool), because no Host metadata marks a tool as a
  * delegation tool; a profile that renames one of them has to extend this list.
  */
-export const DELEGATION_TOOL_NAMES: readonly string[] = ['subagent', 'subagent_fork', 'workflow']
+const DELEGATION_TOOL_NAMES: readonly string[] = ['subagent', 'subagent_fork', 'workflow']
 
 /** Refuses a delegation call when the agent that started the calling thread may not spawn subagents. */
 export class DelegationGuard {

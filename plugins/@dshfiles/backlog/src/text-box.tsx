@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 're
 
 import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { InlineCompletion } from './inline-completion.js'
-import { insertImageReferences } from './image-attachment-reference.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { replyTextAtSubmit } from './reply-input.js'
@@ -56,7 +56,7 @@ export const BacklogTextBox = (props: {
     const result = await props.attachments.add(files)
     if (result.added.length === 0) return
     const element = input.current
-    const insertion = insertImageReferences({
+    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
       text: element?.value ?? props.value,
       start: element?.selectionStart ?? props.value.length,
       end: element?.selectionEnd ?? props.value.length,

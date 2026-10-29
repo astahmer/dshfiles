@@ -26,7 +26,7 @@ export type DayPoint = {
 }
 
 /** A compact bar sparkline; empty days keep their slot so the shape matches the range. */
-export const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: string | undefined }): JSX.Element => {
+const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: string | undefined }): JSX.Element => {
   const max = Math.max(...props.values, 1)
   return (
     <span aria-hidden className="dshx:flex dshx:h-8 dshx:items-end dshx:gap-[2px]">

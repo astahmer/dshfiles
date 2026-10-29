@@ -1,6 +1,6 @@
 import { assign, setup } from '@dshfiles/plugin-ui/machine'
 import { PaletteRules } from './palette.js'
-import type { PaletteMode } from './palette-api.js'
+import type { PaletteMode } from './palette-contract.js'
 
 interface PaletteLocation {
   readonly mode: PaletteMode

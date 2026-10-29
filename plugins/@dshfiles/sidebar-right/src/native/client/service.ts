@@ -33,7 +33,7 @@
  * The registration adopts Session stores, names the on-screen Session, and
  * forwards the seats' reports; callers use the service's navigation methods.
  */
-import { sidebarTargetFromElement, type SidebarRightTarget } from './focus.ts'
+import { SidebarFocus, type SidebarRightTarget } from './focus.ts'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
@@ -465,10 +465,10 @@ export class SidebarRightController implements ISidebarRight {
           kind: claim.kind,
           contentId: claim.contentId,
           title: claim.title,
-          ...(placement.paneId === undefined ? {} : { paneId: placement.paneId }),
-          ...(preferNewPane ? { preferNewPane: true } : {}),
-          ...(placement.replaceTab === undefined ? {} : { replaceTab: placement.replaceTab }),
-          ...(placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened }),
+          ...(placement.paneId !== undefined && { paneId: placement.paneId }),
+          ...(preferNewPane && { preferNewPane: true }),
+          ...(placement.replaceTab !== undefined && { replaceTab: placement.replaceTab }),
+          ...(placement.revealIfOpened !== undefined && { revealIfOpened: placement.revealIfOpened }),
         },
         tabId => {
           workbenchAdmission?.(tabId)
@@ -482,19 +482,16 @@ export class SidebarRightController implements ISidebarRight {
     const layout = surface?.layout
     const replaced = placement.replaceTab === undefined ? undefined : layout?.tabs[placement.replaceTab]
     const replacementPane = replaced === undefined || layout === undefined ? undefined : findTabPane(layout, replaced.id)
-    const revealed =
-      layout === undefined
-        ? undefined
-        : claim.contentId === pageAddress(claim.kind)
-          ? findPaneContentTab(
-              layout,
-              replacementPane?.host === 'dock' ? replacementPane.id : (placement.paneId ?? activeDockPaneId(layout)),
-              claim.contentId,
-              claim.kind,
-            )
-          : placement.revealIfOpened === false
-            ? undefined
-            : findContentTab(layout, claim.contentId, claim.kind)
+    const revealedTab = (): TabId | undefined => {
+      if (layout === undefined) return undefined
+      if (claim.contentId === pageAddress(claim.kind)) {
+        const paneId = replacementPane?.host === 'dock' ? replacementPane.id : (placement.paneId ?? activeDockPaneId(layout))
+        return findPaneContentTab(layout, paneId, claim.contentId, claim.kind)
+      }
+      if (placement.revealIfOpened === false) return undefined
+      return findContentTab(layout, claim.contentId, claim.kind)
+    }
+    const revealed = revealedTab()
     if (replaced === undefined || replaced.id === revealed) {
       commit()
       return
@@ -577,12 +574,12 @@ export class SidebarRightController implements ISidebarRight {
       const surface = this.adopted.get(resourceSessionId)?.store.getSnapshot().bySession[resourceSessionId]
       return surface === undefined
         ? undefined
-        : sidebarTargetFromElement(element, resourceSessionId, surface.layout, tabId => this.tabDomain.occurrence(resourceSessionId, { id: tabId }))
+        : SidebarFocus.targetFromElement(element, resourceSessionId, surface.layout, tabId => this.tabDomain.occurrence(resourceSessionId, { id: tabId }))
     }
     const screen = this.screen()
     return screen === undefined
       ? undefined
-      : sidebarTargetFromElement(element, screen.sessionId, screen.surface.layout, tabId => this.tabDomain.occurrence(screen.sessionId, { id: tabId }))
+      : SidebarFocus.targetFromElement(element, screen.sessionId, screen.surface.layout, tabId => this.tabDomain.occurrence(screen.sessionId, { id: tabId }))
   }
 
   /**
@@ -624,8 +621,8 @@ export class SidebarRightController implements ISidebarRight {
         this.focus(tab.id)
       } else {
         this.openTab(kind, {
-          ...(target.host === 'dock' ? { paneId: target.paneId } : {}),
-          ...(tab?.kind === 'guide' ? { replaceTab: tab.id } : {}),
+          ...(target.host === 'dock' && { paneId: target.paneId }),
+          ...(tab?.kind === 'guide' && { replaceTab: tab.id }),
         })
       }
       return this.mountedSurface()?.layout.activePaneId

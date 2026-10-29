@@ -1,7 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { threadModelApi } from './thread-model-api.ts'
-import type {} from './native/index.ts'
 
 /** Agents have self-only authority; other authenticated callers name their target explicitly. */
 export function threadModelSessionForCaller(input: { sessionId?: string }, caller: ApiCaller): string {

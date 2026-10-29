@@ -1,6 +1,6 @@
 import type { AccountProfile, UsageCard } from './api.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
-import { AccountStoreModel } from './account-store.js'
+import { AccountHomePolicy } from './account-home-policy.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
 import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { readCopilotUsage } from './copilot-quota.js'
@@ -29,7 +29,7 @@ export const readAccountUsage = async (input: {
     case 'codex': {
       let home: string
       try {
-        home = AccountStoreModel.codexLayoutFor(account, input.shadowRoot).effectiveHomePath
+        home = AccountHomePolicy.codexLayoutFor(account, input.shadowRoot).effectiveHomePath
       } catch (cause) {
         return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'The Codex home is invalid.')
       }

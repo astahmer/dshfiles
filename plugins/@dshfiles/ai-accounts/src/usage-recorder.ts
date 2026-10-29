@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
-import { USAGE_HISTORY_DOMAIN, UsageHistoryModel, usageHistoryDomain } from './usage-history.js'
+import { UsageHistoryModel, usageHistoryDomain } from './usage-history.js'
 import { mapRollingUntilAborted } from './rolling-concurrency.js'
 import { usageMetaSchema, type QuotaSnapshot, type UsageHistorySettings, type UsageMeta } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
@@ -287,5 +287,3 @@ export const createUsageHistoryService = (ctx: Context) => ({
   readMany: readUsageHistories.bind(null, ctx),
   createScheduler: createUsageHistoryScheduler.bind(null, ctx),
 })
-
-export { USAGE_HISTORY_DOMAIN }

@@ -7,7 +7,7 @@ import { dshReleaseStatusSchema } from './release-status.js'
 export const settingsPatchSchema = z.record(z.string(), z.json())
 
 /** One control a live settings section publishes to search, with the section that opens at it. */
-export const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
+const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
 
 const MAX_LISTED_ENTRIES = 50
 

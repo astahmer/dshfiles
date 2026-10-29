@@ -49,7 +49,7 @@ export const workspaceNameSchema = z
 
 const pathListSchema = z.array(z.string().min(1).max(1024)).min(1).max(100)
 
-export const mutationSchema = z.discriminatedUnion('kind', [
+const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
   z.object({ kind: z.literal('split'), commitId: commitIdSchema, paths: pathListSchema, message: z.string().min(1).max(4000) }),
   z.object({
@@ -108,7 +108,7 @@ export const previewSchema = z.object({
 
 export const fileStatusSchema = z.enum(['M', 'A', 'D', 'R', 'C'])
 
-export const fileStatSchema = z.object({
+const fileStatSchema = z.object({
   path: z.string().max(2048),
   status: fileStatusSchema,
   additions: z.number().int().min(0),
@@ -117,14 +117,14 @@ export const fileStatSchema = z.object({
   conflict: z.boolean().optional(),
 })
 
-export const fileChangeSchema = fileStatSchema.extend({
+const fileChangeSchema = fileStatSchema.extend({
   contentDigest: z
     .string()
     .regex(/^[a-f0-9]{64}$/)
     .nullable(),
 })
 
-export const stateSchema = z.object({
+const stateSchema = z.object({
   root: z.string().max(2048),
   revisions: z.array(revisionSchema).max(500),
   graphHasMore: z.boolean().default(false),
@@ -155,7 +155,7 @@ const graphSliceSchema = z.object({
   truncated: z.boolean(),
 })
 
-export const graphNavigationSchema = z.object({
+const graphNavigationSchema = z.object({
   operationId: z.string().regex(/^[a-f0-9]{128}$/),
   landmarks: z
     .array(
@@ -169,7 +169,7 @@ export const graphNavigationSchema = z.object({
     .max(4),
 })
 
-export const revisionRelationshipSchema = graphSliceSchema.extend({
+const revisionRelationshipSchema = graphSliceSchema.extend({
   commitId: commitIdSchema,
   targetCommitId: commitIdSchema,
   relation: z.enum(['same', 'ancestor', 'descendant', 'diverged', 'no-common-ancestor']),
@@ -183,7 +183,7 @@ export const revisionRelationshipSchema = graphSliceSchema.extend({
 
 export const graphPageOutputSchema = z.object({ revisions: z.array(revisionSchema).max(REVISION_PAGE_SIZE), hasMore: z.boolean() })
 
-export const referenceGraphSchema = z.object({
+const referenceGraphSchema = z.object({
   label: z.string().min(1).max(255),
   commitId: commitIdSchema.nullable(),
   changeId: z.string().min(1).max(64).nullable(),

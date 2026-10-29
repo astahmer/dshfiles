@@ -41,7 +41,7 @@ export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   failed: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
 } satisfies ThreadNotificationCategories
 
-export const threadNotificationCategoryPreferencesSchema = z
+const threadNotificationCategoryPreferencesSchema = z
   .object({
     delivery: z.enum(['off', 'in-app', 'system', 'both']),
     sound: z.boolean(),
@@ -174,7 +174,7 @@ const legacyNotificationPreferencesSchema = z.object({
 
 export type LegacyNotificationPreferences = z.infer<typeof legacyNotificationPreferencesSchema>
 
-export const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
+const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
 
 export const legacyNotificationPreferences = createStoredValue({
   key: LEGACY_NOTIFICATION_STORAGE_KEY,

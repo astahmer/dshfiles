@@ -1,17 +1,17 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
-export const marketplaceLocaleSchema = z.enum(['en', 'zh'])
-export const marketplaceBadgeSchema = z.enum(['official', 'community'])
-export const marketplaceCompatibilitySchema = z.enum(['compatible', 'incompatible', 'unknown'])
-export const marketplaceSortSchema = z.enum(['latest', 'stars'])
+const marketplaceLocaleSchema = z.enum(['en', 'zh'])
+const marketplaceBadgeSchema = z.enum(['official', 'community'])
+const marketplaceCompatibilitySchema = z.enum(['compatible', 'incompatible', 'unknown'])
+const marketplaceSortSchema = z.enum(['latest', 'stars'])
 
-export const marketplaceCategorySchema = z.object({
+const marketplaceCategorySchema = z.object({
   slug: z.string().min(1).max(80),
   name: z.string().min(1).max(100),
 })
 
-export const marketplaceCardSchema = z.object({
+const marketplaceCardSchema = z.object({
   slug: z.string().min(1).max(160),
   name: z.string().min(1).max(160),
   packageName: z.string().min(1).max(240),
@@ -30,7 +30,7 @@ export const marketplaceCardSchema = z.object({
   installed: z.boolean(),
 })
 
-export const marketplaceListInputSchema = z.object({
+const marketplaceListInputSchema = z.object({
   locale: marketplaceLocaleSchema,
   category: z.string().min(1).max(80).optional(),
   cursor: z.string().min(1).max(1000).optional(),
@@ -38,14 +38,14 @@ export const marketplaceListInputSchema = z.object({
   sort: marketplaceSortSchema.optional(),
 })
 
-export const marketplaceListOutputSchema = z.object({
+const marketplaceListOutputSchema = z.object({
   categories: z.array(marketplaceCategorySchema).max(100),
   items: z.array(marketplaceCardSchema).max(24),
   nextCursor: z.string().max(1000).nullable(),
   total: z.number().int().nonnegative().nullable(),
 })
 
-export const installFailureCodeSchema = z.enum([
+const installFailureCodeSchema = z.enum([
   'busy',
   'catalog-unavailable',
   'target-unavailable',
@@ -71,7 +71,7 @@ const installFailureSchema = z.object({
   retryable: z.boolean(),
 })
 
-export const marketplaceInstallOutputSchema = z.union([installSuccessSchema, installFailureSchema])
+const marketplaceInstallOutputSchema = z.union([installSuccessSchema, installFailureSchema])
 
 export type MarketplaceLocale = z.infer<typeof marketplaceLocaleSchema>
 export type MarketplaceBadge = z.infer<typeof marketplaceBadgeSchema>

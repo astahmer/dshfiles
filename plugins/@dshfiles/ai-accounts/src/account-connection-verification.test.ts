@@ -62,7 +62,7 @@ const accountFor = (kind: AccountKind, keyedClaude = false): AccountProfile => (
 
 const requestFor = (kind: AccountKind, keyedClaude = false): VerificationInput => ({
   account: accountFor(kind, keyedClaude),
-  ...(kind === 'claude' && !keyedClaude ? { readAccountUsage } : {}),
+  ...(kind === 'claude' && !keyedClaude && { readAccountUsage }),
   shadowRoot: '/synthetic/shadows',
   resolveCredential: vi.fn(async () => (kind === 'cursor' ? cursorToken : 'synthetic-key')),
   readCopilotCredential: vi.fn<VerificationInput['readCopilotCredential']>(async () => ({

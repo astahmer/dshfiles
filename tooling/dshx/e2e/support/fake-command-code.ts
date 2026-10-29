@@ -3,7 +3,6 @@ import { createServer } from 'node:http'
 import { z } from 'zod'
 import { startFakeCommandCode as startFakeServer, type FakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.js'
 
-export { FAKE_COMMAND_CODE_MODEL_ID } from '../../packages/dshx/src/scratch/fake-command-code.js'
 export type { FakeChatRequest, FakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.js'
 
 const fakes = new WeakMap<Page, FakeCommandCode>()

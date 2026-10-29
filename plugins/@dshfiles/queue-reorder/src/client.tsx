@@ -11,7 +11,7 @@ import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type CSSProperties } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
-import { attachmentPreviews, messagePreview, messageText } from './message-preview.js'
+import { MessagePreviewModel } from './message-preview.js'
 import { QueuedAttachments, type ReadQueuedImage } from './queued-attachments.js'
 import { QueueEditModel, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
 import { useQueueClientForEditing } from './session-queue-editor.js'
@@ -226,7 +226,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const placeholderPreview =
     record === null
       ? ''
-      : messagePreview(
+      : MessagePreviewModel.messagePreview(
           record.blocks.map(block => (block.type === 'text' ? block : { type: block.type })),
           previewLength,
         )
@@ -250,9 +250,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     const files = attachmentsOf(row.content)
     const rowId = MessageId(row.id)
     const isBusy = busy === rowId
-    const preview = messagePreview(row.content, previewLength)
-    const text = messageText(row.content)
-    const previews = attachmentPreviews(row.blocks)
+    const preview = MessagePreviewModel.messagePreview(row.content, previewLength)
+    const text = MessagePreviewModel.messageText(row.content)
+    const previews = MessagePreviewModel.attachmentPreviews(row.blocks)
     return (
       <li
         className={cn(

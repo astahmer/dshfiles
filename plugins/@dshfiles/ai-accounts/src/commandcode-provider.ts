@@ -32,7 +32,7 @@ import { providerFetch } from './provider-request.js'
 
 export const COMMANDCODE_KIND = 'commandcode'
 
-export const DEFAULT_COMMANDCODE_BASE_URL = 'https://api.commandcode.ai'
+const DEFAULT_COMMANDCODE_BASE_URL = 'https://api.commandcode.ai'
 
 export const DEFAULT_COMMANDCODE_KEY_ENV = 'COMMANDCODE_API_KEY'
 

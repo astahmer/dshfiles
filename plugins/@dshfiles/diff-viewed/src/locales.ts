@@ -1,6 +1,6 @@
 import { defineLocale } from '@dshfiles/dshx/client'
 
-export const DIFF_VIEWED_LOCALE_NAMESPACE = 'dshfiles.diffViewed'
+const DIFF_VIEWED_LOCALE_NAMESPACE = 'dshfiles.diffViewed'
 
 const en = {
   viewed: 'Viewed',

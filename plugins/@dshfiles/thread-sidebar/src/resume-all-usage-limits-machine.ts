@@ -1,7 +1,6 @@
 import type { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import type { ApiClientInput, ApiClientOutput } from '@dshfiles/dshx/api'
-import { assign, emit, fromPromise, setup, useMachine } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useRef } from 'react'
+import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 
 const MAX_CONCURRENT_RESUMES = 3
 
@@ -146,21 +145,3 @@ const resumeAllUsageLimitsMachineDefinition = setup({
 })
 
 export const resumeAllUsageLimitsMachine = resumeAllUsageLimitsMachineDefinition
-
-export const useResumeAllUsageLimits = (input: {
-  readonly client: ResumeAllUsageLimitClient
-  readonly onSettled: (event: ResumeAllUsageLimitSettled) => void
-}) => {
-  const [snapshot, send, actor] = useMachine(resumeAllUsageLimitsMachine, { input: { client: input.client } })
-  const onSettled = useRef(input.onSettled)
-  onSettled.current = input.onSettled
-  useEffect(() => {
-    const subscription = actor.on('settled', event => onSettled.current(event))
-    return () => subscription.unsubscribe()
-  }, [actor])
-  return {
-    busy: snapshot.hasTag('busy'),
-    busyIds: snapshot.context.busyIds,
-    start: (continuationIds: readonly string[]): void => send({ type: 'start', continuationIds }),
-  }
-}

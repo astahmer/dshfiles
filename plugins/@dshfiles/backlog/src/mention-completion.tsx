@@ -8,7 +8,7 @@ import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi } from './api.js'
 import { InlineCompletion, type InlineToken } from './inline-completion.js'
 import { ItemGlyphs } from './item-glyphs.js'
-import { imageReferenceLabels } from './image-attachment-reference.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import type { ComposerFile } from './composer-files.js'
 
 /** The thread fields an `@` row needs; the composer's `ComposerThread` satisfies it. */
@@ -130,7 +130,7 @@ export const useMentionCompletion = (props: {
       ),
       hint: 'project reference',
     }))
-    const imageRows = imageReferenceLabels(props.files ?? [])
+    const imageRows = ImageAttachmentReferenceModel.imageReferenceLabels(props.files ?? [])
       .filter(label => label.toLowerCase().includes(query))
       .map(label => ({
         key: `image:${label}`,

@@ -150,7 +150,7 @@ export const listLocalProjectFiles = async (input: {
           bytes: entry.size,
           ignored: ignored.has(path),
           copyable: copyReason === undefined,
-          ...(copyReason === undefined ? {} : { copyReason }),
+          ...(copyReason !== undefined && { copyReason }),
         })
       } catch {
         continue

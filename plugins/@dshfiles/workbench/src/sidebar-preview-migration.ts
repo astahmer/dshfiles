@@ -9,7 +9,7 @@ export class SidebarPreviewMigration {
   static readonly storageKey = 'dshfiles.workbench.sidebar-preview-docked.v1'
 
   static create(storage?: StorageSource) {
-    const completed = createStoredValue({ key: this.storageKey, schema: z.boolean(), fallback: false, ...(storage === undefined ? {} : { storage }) })
+    const completed = createStoredValue({ key: this.storageKey, schema: z.boolean(), fallback: false, ...(storage !== undefined && { storage }) })
     return {
       reset(): void {
         completed.remove()

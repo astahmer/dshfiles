@@ -31,6 +31,14 @@ import { CodexSignIn } from './codex-sign-in.js'
 const isUnknownConnectionResult = (error: unknown): boolean =>
   isApiError(error) && (error.kind === 'contract' || error.kind === 'transport' || error.kind === 'unavailable')
 
+const CONNECTION_NOTES: Partial<Record<AccountProfile['kind'], string>> = {
+  claude:
+    'Claude Code checks local sign-in configuration using the selected directory and Host environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation; quota may be unavailable. API keys have separate billing; setup-token verification requires access to the free token-count endpoint.',
+  codex:
+    'Browser sign-in stages credentials privately before confirmation. Existing CLI homes are read in place, never copied or deleted. Custom shared homes need a distinct auth overlay.',
+  cursor: 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.',
+}
+
 interface SetupPorts {
   readonly controller: AccountSetupController
   readonly credentialSetup: CredentialSetupPort | undefined
@@ -87,7 +95,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
           {
             kind: provider,
             requestId: request.operationId,
-            ...(request.accountId === undefined ? {} : { existingInstanceId: request.accountId }),
+            ...(request.accountId !== undefined && { existingInstanceId: request.accountId }),
           },
           { signal },
         )
@@ -160,8 +168,8 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
   const startAgain = (): void => {
     if (!controller.isCurrent(request.id)) return
     controller.open({
-      ...(request.accountId === undefined ? {} : { accountId: request.accountId }),
-      ...(request.onCreated === undefined ? {} : { onCreated: request.onCreated }),
+      ...(request.accountId !== undefined && { accountId: request.accountId }),
+      ...(request.onCreated !== undefined && { onCreated: request.onCreated }),
     })
   }
   const complete = (): void => {
@@ -230,6 +238,15 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
       />
     )
   }
+  const signInStep = () => {
+    if (method === 'subscription' || method === 'cli') return 'cli'
+    if (method === 'reference') return 'reference'
+    if (method === 'device' && account?.signedIn === true && !connectAnother && !(account.kind === 'codex' && !newAccount)) return 'signed-in'
+    if (account?.kind === 'github-copilot') return 'copilot'
+    if (account?.kind === 'codex') return 'codex'
+    return 'unavailable'
+  }
+  const step = signInStep()
   return (
     <Dialog
       open
@@ -316,7 +333,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
               <AccountConnectionOptions account={account} method={method} busy={busy} configure={input => configure.mutate(input)} />
             )}
             <fieldset disabled={busy} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
-              {method === 'subscription' || method === 'cli' ? (
+              {step === 'cli' && (
                 <>
                   <p className="dshx:text-sm dshx:text-muted-foreground">
                     {account.kind === 'claude' ? 'Use your Claude subscription. No API key needed.' : 'Use an existing CLI login on this Host.'}
@@ -333,21 +350,16 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                   <Button onClick={complete}>
                     {finish.isPending
                       ? 'Checking sign-in…'
-                      : method === 'subscription'
-                        ? newAccount
-                          ? 'Verify subscription and add account'
-                          : 'Verify subscription and reconnect'
-                        : newAccount
-                          ? 'Verify CLI login and add account'
-                          : 'Verify CLI login and reconnect'}
+                      : `Verify ${method === 'subscription' ? 'subscription' : 'CLI login'} and ${newAccount ? 'add account' : 'reconnect'}`}
                   </Button>
                 </>
-              ) : method === 'reference' ? (
+              )}
+              {step === 'reference' && (
                 <>
                   <ExistingConnectionReference
                     key={`${account.instanceId}:${ref}`}
                     account={account}
-                    method={method}
+                    method="reference"
                     busy={busy}
                     configure={input => configure.mutate(input)}
                   />
@@ -358,7 +370,8 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     {finish.isPending ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}
                   </Button>
                 </>
-              ) : method === 'device' && account.signedIn && !connectAnother && !(account.kind === 'codex' && !newAccount) ? (
+              )}
+              {step === 'signed-in' && (
                 <>
                   <p className="dshx:text-sm">A credential is available. The Host will check the selected login before saving.</p>
                   <Button onClick={complete}>{finish.isPending ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}</Button>
@@ -366,9 +379,11 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     Sign in to another account
                   </Button>
                 </>
-              ) : account.kind === 'github-copilot' ? (
+              )}
+              {step === 'copilot' && (
                 <CopilotSignIn instanceId={account.instanceId} operationId={request.operationId} signedIn={false} onConnected={complete} onCancelled={close} />
-              ) : account.kind === 'codex' ? (
+              )}
+              {step === 'codex' && (
                 <CodexSignIn
                   replaceExisting={!newAccount || (account.signedIn && connectAnother)}
                   instanceId={account.instanceId}
@@ -376,20 +391,16 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                   onConnected={complete}
                   onCancelled={close}
                 />
-              ) : (
+              )}
+              {step === 'unavailable' && (
                 <p className="dshx:text-sm dshx:text-muted-foreground">Credential management is unavailable on this Host. Setup cannot be completed here.</p>
               )}
             </fieldset>
             <details className="dshx:text-xs dshx:text-muted-foreground">
               <summary className="dshx:cursor-pointer">How this works</summary>
               <p className="dshx:mt-2">
-                {account.kind === 'claude'
-                  ? 'Claude Code checks local sign-in configuration using the selected directory and Host environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation; quota may be unavailable. API keys have separate billing; setup-token verification requires access to the free token-count endpoint.'
-                  : account.kind === 'codex'
-                    ? 'Browser sign-in stages credentials privately before confirmation. Existing CLI homes are read in place, never copied or deleted. Custom shared homes need a distinct auth overlay.'
-                    : account.kind === 'cursor'
-                      ? 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.'
-                      : 'Your selected sign-in method is checked before saving. Existing credentials are not replaced unless you explicitly choose to replace them.'}
+                {CONNECTION_NOTES[account.kind] ??
+                  'Your selected sign-in method is checked before saving. Existing credentials are not replaced unless you explicitly choose to replace them.'}
               </p>
             </details>
           </>

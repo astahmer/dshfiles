@@ -5,7 +5,7 @@ const remoteIdPattern = /^[a-z0-9][a-z0-9-]{0,31}$/
 const sshTargetPattern = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/
 const shellWord = z.string().min(1).max(512)
 
-export const executionPolicySchema = z
+const executionPolicySchema = z
   .object({
     target: z.enum(['local', 'remote', 'auto']).default('local'),
     remote: z.string().regex(remoteIdPattern).optional(),
@@ -14,7 +14,7 @@ export const executionPolicySchema = z
   .strict()
   .default({ target: 'local', onRemoteFailure: 'local' })
 
-export const loadPolicySchema = z
+const loadPolicySchema = z
   .object({
     localMemoryFloorMb: z.number().int().min(0).max(1_048_576).default(4_096),
     remoteCooldownMs: z.number().int().min(1_000).max(600_000).default(60_000),
@@ -22,7 +22,7 @@ export const loadPolicySchema = z
   .strict()
   .default({ localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 })
 
-export const projectActionSchema = z
+const projectActionSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
     label: z.string().trim().min(1).max(80),

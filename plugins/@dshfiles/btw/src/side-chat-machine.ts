@@ -31,7 +31,7 @@ interface SideChatContext extends SideChatInput {
 type SideChatEvent = { readonly type: 'close' } | { readonly type: 'dismiss' }
 
 /** Shown in the thread list filter and the panel tab; the sidebar hides threads whose title starts with it. */
-export const SIDE_CHAT_TITLE_PREFIX = 'btw · '
+const SIDE_CHAT_TITLE_PREFIX = 'btw · '
 
 const TITLE_LENGTH = 80
 

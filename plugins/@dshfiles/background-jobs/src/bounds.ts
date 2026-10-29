@@ -6,7 +6,7 @@
  * disk; the live path applies the same ones so both faces agree.
  */
 
-export const MAX_LABEL_LENGTH = 2_000
+const MAX_LABEL_LENGTH = 2_000
 export const MAX_KIND_LENGTH = 64
 export const MAX_PROGRESS_LENGTH = 300
 export const MAX_DETAIL_LENGTH = 500

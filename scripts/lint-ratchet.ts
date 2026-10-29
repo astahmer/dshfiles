@@ -22,6 +22,8 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/project-folder-picker/src/index.ts',
   'plugins/@dshfiles/usage/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
+  'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',
+  'plugins/@dshfiles/rich-composer/src/conversation-contract.ts',
   'tooling/dshx/packages/create-dshx/src/capabilities.ts',
   'tooling/dshx/packages/create-dshx/src/index.ts',
   'tooling/dshx/packages/dshx/client/index.d.ts',

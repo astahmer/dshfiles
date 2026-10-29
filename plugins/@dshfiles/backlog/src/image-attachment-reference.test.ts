@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { imageReferenceLabels, insertImageReferences, markdownImageReferences } from './image-attachment-reference.js'
+import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import type { ComposerFile } from './composer-files.js'
 
 const image = (id: string): ComposerFile => ({
@@ -23,12 +23,12 @@ const file: ComposerFile = {
 
 describe('backlog image references', () => {
   it('numbers image attachments and excludes files', () => {
-    expect(imageReferenceLabels([file, image('one'), image('two')])).toEqual(['Image 1', 'Image 2'])
+    expect(ImageAttachmentReferenceModel.imageReferenceLabels([file, image('one'), image('two')])).toEqual(['Image 1', 'Image 2'])
   })
 
   it('inserts image mentions at the caret with separators', () => {
     expect(
-      insertImageReferences({
+      ImageAttachmentReferenceModel.insertImageReferences({
         text: 'lookhere next',
         start: 4,
         end: 8,
@@ -39,20 +39,20 @@ describe('backlog image references', () => {
   })
 
   it('leaves text unchanged when the added files contain no images', () => {
-    expect(insertImageReferences({ text: 'notes', start: 5, end: 5, files: [file], firstImageNumber: 0 })).toEqual({
+    expect(ImageAttachmentReferenceModel.insertImageReferences({ text: 'notes', start: 5, end: 5, files: [file], firstImageNumber: 0 })).toEqual({
       text: 'notes',
       caret: 5,
     })
   })
 
   it('turns image mentions into rendered Markdown context references on submit', () => {
-    expect(markdownImageReferences('Compare @Image 1 with @Image 2.', [image('one'), file, image('two')])).toBe(
+    expect(ImageAttachmentReferenceModel.markdownImageReferences('Compare @Image 1 with @Image 2.', [image('one'), file, image('two')])).toBe(
       'Compare ![one.png](t3-context://v1/image/image_one) with ![two.png](t3-context://v1/image/image_two).',
     )
   })
 
   it('leaves unresolved image mentions unchanged and escapes Markdown labels', () => {
-    expect(markdownImageReferences('@Image 1 @Image 2', [{ ...image('abc123'), name: 'a]b.png' }])).toBe(
+    expect(ImageAttachmentReferenceModel.markdownImageReferences('@Image 1 @Image 2', [{ ...image('abc123'), name: 'a]b.png' }])).toBe(
       '![a\\]b.png](t3-context://v1/image/image_abc123) @Image 2',
     )
   })

@@ -29,7 +29,7 @@ const unansweredResultIds = (options: GenerateOptions): readonly string[] => {
 }
 
 /** The request part a silent 400 most likely refers to, or the request's shape when no known cause is present. */
-export const describeSilentRejection = (options: GenerateOptions): string => {
+const describeSilentRejection = (options: GenerateOptions): string => {
   const duplicates = duplicateToolNames(options)
   if (duplicates.length > 0) return `the request declares these tools more than once: ${duplicates.join(', ')}`
   const orphans = unansweredResultIds(options)

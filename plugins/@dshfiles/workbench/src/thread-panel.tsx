@@ -22,7 +22,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Native MainPanel layout policy, without a second Session/editor state owner. */
-export class HeroPolicy {
+class HeroPolicy {
   static content(session: SessionSnapshot, conversation: ConversationSnapshot, summaryBlank: boolean | undefined): ConversationContentInputProps {
     // Native ui-conversation's value module is disabled by RichComposer. Use
     // its exact phase facts through public snapshot selectors, not a runtime

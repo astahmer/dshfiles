@@ -14,7 +14,7 @@ export const CodexSignIn = (props: {
   readonly onConnected: () => void
   readonly onCancelled?: () => void
 }): JSX.Element => {
-  const { instanceId, onConnected } = props
+  const { instanceId, onConnected, operationId } = props
   const api = useApi(aiAccountsLoginApi)
   const client = useQueryClient()
   const operation = props.operationId === undefined ? {} : { operationId: props.operationId }
@@ -29,12 +29,13 @@ export const CodexSignIn = (props: {
     alive.current = true
     return () => {
       alive.current = false
-      if (ownsAttempt.current) void api.cancel({ instanceId: instanceId, confirm: true, ...operation }).catch(() => undefined)
+      if (ownsAttempt.current)
+        void api.cancel({ instanceId: instanceId, confirm: true, ...(operationId !== undefined && { operationId }) }).catch(() => undefined)
     }
-  }, [api, instanceId, props.operationId])
+  }, [api, instanceId, operationId])
   const begin = useMutation({
     mutationFn: () =>
-      beginLoginQuery(client, key, () => api.begin({ instanceId, ...operation, ...(props.replaceExisting === true ? { replaceExisting: true } : {}) })),
+      beginLoginQuery(client, key, () => api.begin({ instanceId, ...operation, ...(props.replaceExisting === true && { replaceExisting: true }) })),
     onSuccess: next => {
       ownsAttempt.current = next.status === 'starting' || next.status === 'waiting'
       if (!alive.current) {

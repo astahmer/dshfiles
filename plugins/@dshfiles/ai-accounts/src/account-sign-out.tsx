@@ -60,15 +60,14 @@ const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typ
       onSignedOut?.()
     },
   })
-  const reason = disabled
-    ? 'Finish the current account edit before signing out.'
-    : !account.signedIn
-      ? 'This account is already signed out.'
-      : capability.isPending
-        ? 'Checking sign-out availability…'
-        : capability.isError
-          ? 'Sign out needs the updated Host. Restart when idle, then retry.'
-          : capability.data?.reason
+  const blockedReason = () => {
+    if (disabled) return 'Finish the current account edit before signing out.'
+    if (!account.signedIn) return 'This account is already signed out.'
+    if (capability.isPending) return 'Checking sign-out availability…'
+    if (capability.isError) return 'Sign out needs the updated Host. Restart when idle, then retry.'
+    return capability.data?.reason
+  }
+  const reason = blockedReason()
   const blocked = disabled === true || !account.signedIn || capability.isError || capability.data?.available !== true || signOut.isPending
   return (
     <AlertDialog

@@ -10,7 +10,7 @@ export interface NavigationHistory<Location extends NavigationLocation> {
   readonly index: number
 }
 
-export const NAVIGATION_HISTORY_LIMIT = 100
+const NAVIGATION_HISTORY_LIMIT = 100
 
 export class ThreadNavigationHistoryModel {
   static readonly emptyNavigationHistory = <Location extends NavigationLocation>(): NavigationHistory<Location> => ({ entries: [], index: -1 })

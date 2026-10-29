@@ -26,7 +26,7 @@ const traceIdSchema = z
   .regex(/^[0-9a-fA-F]{32}$/)
   .describe('32-character hex trace id.')
 
-export const listInputSchema = z
+const listInputSchema = z
   .object({
     service: z.string().min(1).max(256).optional().describe('Only traces with a span from this service.name.'),
     operation: z.string().min(1).max(256).optional().describe('Only traces with a span of exactly this name.'),
@@ -54,7 +54,7 @@ const hexId = (bytes: 8 | 16) =>
     .regex(new RegExp(`^[0-9a-fA-F]{${String(bytes * 2)}}$`))
     .describe(`${String(bytes * 2)}-character hex ${bytes === 16 ? 'trace' : 'span'} id.`)
 
-export const logsInputSchema = z
+const logsInputSchema = z
   .object({
     service: z.string().min(1).max(256).optional().describe('Only records from this service.name.'),
     minSeverity: z

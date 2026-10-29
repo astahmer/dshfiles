@@ -2,7 +2,7 @@ import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { MAX_VIEWED_MARKS, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
-export const viewedMarkSchema = z
+const viewedMarkSchema = z
   .object({
     key: z.string().min(1),
     version: z.number().int().positive(),

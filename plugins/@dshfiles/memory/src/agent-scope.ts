@@ -7,7 +7,7 @@ export interface AgentScopeLookup {
 }
 
 /** How far up a subagent's lineage memory looks; a deeper chain falls back to the project block. */
-export const MAX_AGENT_SCOPE_HOPS = 4
+const MAX_AGENT_SCOPE_HOPS = 4
 
 /**
  * The memory scope a thread reads: its own agent's scope, or — for a subagent — the scope of the agent whose thread

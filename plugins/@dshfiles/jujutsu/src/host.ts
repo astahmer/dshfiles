@@ -27,7 +27,6 @@ const COMMAND_TIMEOUT = 30_000
 const NETWORK_TIMEOUT = 120_000
 const PREVIEW_TTL = 5 * 60_000
 const MAX_REVISIONS = 500
-const INITIAL_GRAPH_PAGE_SIZE = REVISION_PAGE_SIZE
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 
 /** One `jj evolog` row from EVOLUTION_TEMPLATE. */
@@ -263,7 +262,7 @@ const readGraphPage = async (
   excludeCommitIds: readonly string[],
   signal: AbortSignal | undefined,
 ): Promise<{ readonly revisions: Revision[]; readonly hasMore: boolean }> => {
-  const candidateCount = INITIAL_GRAPH_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1
+  const candidateCount = REVISION_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1
   const scanLimit = excludeCommitIds.length + candidateCount
   const listing = await runAt(
     ctx,
@@ -302,11 +301,11 @@ const readGraphPage = async (
   const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision =>
     matchesRevisionSearch(revision, query),
   )
-  const page = revisions.slice(0, INITIAL_GRAPH_PAGE_SIZE)
+  const page = revisions.slice(0, REVISION_PAGE_SIZE)
   const evolution = await readEvolvedCommitIds(ctx, repo, page, signal)
   return {
     revisions: page.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) })),
-    hasMore: page.length > 0 && (revisions.length > INITIAL_GRAPH_PAGE_SIZE || candidates.listingTruncated),
+    hasMore: page.length > 0 && (revisions.length > REVISION_PAGE_SIZE || candidates.listingTruncated),
   }
 }
 

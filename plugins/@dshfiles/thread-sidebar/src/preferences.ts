@@ -27,7 +27,7 @@ const sidebarSectionSchema = z.enum(SIDEBAR_SECTIONS)
 const sidebarOrderSectionSchema = z.enum(SIDEBAR_ORDER_SECTIONS)
 const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
-export const projectColorPaletteSchema = z.enum(PROJECT_COLOR_PALETTES)
+const projectColorPaletteSchema = z.enum(PROJECT_COLOR_PALETTES)
 
 /**
  * Auto-archive became auto-settle: the same idle scan now writes our own soft status instead of the

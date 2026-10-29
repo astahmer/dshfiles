@@ -8,7 +8,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 
-export const ASK_DSH_TITLE_PREFIX = 'Ask DSH · '
+const ASK_DSH_TITLE_PREFIX = 'Ask DSH · '
 const ASK_DSH_TITLE_QUESTION_LIMIT = 60
 
 /** Sidebar title for one ask: the prefix marks the group, the question's first line names it. */

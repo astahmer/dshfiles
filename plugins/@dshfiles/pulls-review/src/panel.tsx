@@ -98,8 +98,8 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
           api.summarize(
             {
               path: reviewPath,
-              ...(baseRef === '' ? {} : { base: baseRef }),
-              ...(reviewSessionId === undefined ? {} : { sessionId: String(reviewSessionId) }),
+              ...(baseRef !== '' && { base: baseRef }),
+              ...(reviewSessionId !== undefined && { sessionId: String(reviewSessionId) }),
             },
             { signal },
           ),

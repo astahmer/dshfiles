@@ -1,4 +1,4 @@
-import type { HostTarget } from './tabs-machine.js'
+import type { HostTarget } from '@dshfiles/workbench/tabs'
 
 interface SessionRow {
   readonly id: string

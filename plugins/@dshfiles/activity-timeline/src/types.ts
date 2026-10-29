@@ -5,7 +5,7 @@ const revisionEvidenceSchema = z
   .regex(/^[a-f0-9]{40,64}$/)
   .nullable()
 
-export const verificationReceiptSummarySchema = z
+const verificationReceiptSummarySchema = z
   .object({
     receiptId: z.string().uuid(),
     sessionId: z.string().min(1).max(128),
@@ -66,7 +66,7 @@ export type ActivitySource = z.infer<typeof activitySourceSchema>
 export const activityLevelSchema = z.enum(['routine', 'notable', 'attention'])
 export type ActivityLevel = z.infer<typeof activityLevelSchema>
 
-export const activityReferenceSchema = z
+const activityReferenceSchema = z
   .object({
     kind: z.enum(['session', 'workspace', 'integration-candidate', 'message', 'revision']),
     id: z.string().min(1).max(256),
@@ -118,7 +118,7 @@ export const activityIngestSchema = activityEventSchema
   })
 export type ActivityIngest = z.infer<typeof activityIngestSchema>
 
-export const condensedItemSchema = z
+const condensedItemSchema = z
   .object({
     kind: z.enum(['event', 'group']),
     id: z.string().min(1).max(256),
@@ -148,7 +148,7 @@ export const activityPageSchema = z
   .strict()
 export type ActivityPage = z.infer<typeof activityPageSchema>
 
-export const activityFilterSchema = z
+const activityFilterSchema = z
   .object({
     sources: z.array(activitySourceSchema).max(4).optional(),
     levels: z.array(activityLevelSchema).max(3).optional(),

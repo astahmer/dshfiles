@@ -27,6 +27,19 @@ const statusVariant = (annotation: Annotation): 'default' | 'secondary' | 'outli
   return 'outline'
 }
 
+const pickFailureMessage = ({
+  reason,
+  noPage,
+}: {
+  readonly reason: 'cancelled' | 'timeout' | 'unavailable' | 'no-page'
+  readonly noPage: string
+}): string | null => {
+  if (reason === 'no-page') return noPage
+  if (reason === 'timeout') return 'The pick timed out; click Pick again.'
+  if (reason === 'cancelled') return null
+  return 'Could not reach that tab.'
+}
+
 export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const api = useApi(annotationsApi)
   const queryClient = useQueryClient()
@@ -54,9 +67,10 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     refetchOnWindowFocus: !open,
     retry: 1,
   })
+  const refetchList = list.refetch
   useEffect(() => {
-    if (open) void list.refetch()
-  }, [list.refetch, open])
+    if (open) void refetchList()
+  }, [refetchList, open])
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
@@ -116,15 +130,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     mutationFn: async () => runHostRequest({ request: signal => api.chromePick({}, { signal }) }),
     onSuccess: result => {
       if (!result.ok) {
-        setActionError(
-          result.reason === 'no-page'
-            ? 'No annotatable tab yet; open a page in that window.'
-            : result.reason === 'timeout'
-              ? 'The pick timed out; click Pick again.'
-              : result.reason === 'cancelled'
-                ? null
-                : 'Could not reach that tab.',
-        )
+        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'No annotatable tab yet; open a page in that window.' }))
         return
       }
       setActionError(null)
@@ -136,15 +142,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     mutationFn: async (pageId: string) => runHostRequest({ request: signal => api.chromePick({ pageId }, { signal }) }),
     onSuccess: result => {
       if (!result.ok) {
-        setActionError(
-          result.reason === 'no-page'
-            ? 'That tab is gone; refresh the list.'
-            : result.reason === 'timeout'
-              ? 'The pick timed out; click Pick again.'
-              : result.reason === 'cancelled'
-                ? null
-                : 'Could not reach that tab.',
-        )
+        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'That tab is gone; refresh the list.' }))
         return
       }
       setActionError(null)

@@ -21,81 +21,83 @@ type DragRevision = {
   readonly workingCopy: boolean
 }
 
-export const resolveRevisionDrop = (input: {
-  readonly sourceRevisionId: string
-  readonly target: DragRevision
-  readonly revisions: readonly DragRevision[]
-}): RevisionDropResolution => {
-  const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
-  if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
-  if (source.immutable) return { kind: 'invalid', message: 'Immutable revisions cannot be rebased.' }
-  if (SourceControlModel.descendantCommitIds(input.revisions, source.commitId).has(input.target.commitId)) {
-    return { kind: 'invalid', message: 'A branch cannot be rebased onto one of its own revisions.' }
+export class RevisionDropModel {
+  static readonly resolveRevision = (input: {
+    readonly sourceRevisionId: string
+    readonly target: DragRevision
+    readonly revisions: readonly DragRevision[]
+  }): RevisionDropResolution => {
+    const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
+    if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
+    if (source.immutable) return { kind: 'invalid', message: 'Immutable revisions cannot be rebased.' }
+    if (SourceControlModel.descendantCommitIds(input.revisions, source.commitId).has(input.target.commitId)) {
+      return { kind: 'invalid', message: 'A branch cannot be rebased onto one of its own revisions.' }
+    }
+    return {
+      kind: 'action',
+      action: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
+      presentation: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
+    }
   }
-  return {
-    kind: 'action',
-    action: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
-    presentation: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
-  }
-}
 
-export const resolveWorkspaceDrop = (input: {
-  readonly workspace: string
-  readonly target: DragRevision
-  readonly revisions: readonly DragRevision[]
-}): RevisionDropResolution => {
-  const source =
-    input.revisions.find(revision => revision.workspaces.includes(input.workspace)) ??
-    (input.workspace === 'default' ? input.revisions.find(revision => revision.workingCopy) : undefined)
-  if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
-  return {
-    kind: 'action',
-    action: { kind: 'workspace-edit', name: input.workspace, commitId: input.target.commitId },
-    presentation: {
-      kind: 'workspace-move',
-      sourceId: source.commitId,
-      destinationId: input.target.commitId,
-      workspace: input.workspace,
-    },
+  static readonly resolveWorkspace = (input: {
+    readonly workspace: string
+    readonly target: DragRevision
+    readonly revisions: readonly DragRevision[]
+  }): RevisionDropResolution => {
+    const source =
+      input.revisions.find(revision => revision.workspaces.includes(input.workspace)) ??
+      (input.workspace === 'default' ? input.revisions.find(revision => revision.workingCopy) : undefined)
+    if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
+    return {
+      kind: 'action',
+      action: { kind: 'workspace-edit', name: input.workspace, commitId: input.target.commitId },
+      presentation: {
+        kind: 'workspace-move',
+        sourceId: source.commitId,
+        destinationId: input.target.commitId,
+        workspace: input.workspace,
+      },
+    }
   }
-}
 
-export const resolveBookmarkDrop = (input: {
-  readonly bookmark: string
-  readonly sourceRevisionId: string
-  readonly target: DragRevision
-  readonly revisions: readonly DragRevision[]
-}): RevisionDropResolution => {
-  const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
-  if (source === undefined || !source.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
-  if (input.target.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
-  return {
-    kind: 'action',
-    action: { kind: 'bookmark-move', bookmark: input.bookmark, destinationId: input.target.commitId },
-    presentation: {
-      kind: 'bookmark-move',
-      sourceId: source.commitId,
-      destinationId: input.target.commitId,
-      bookmark: input.bookmark,
-    },
+  static readonly resolveBookmark = (input: {
+    readonly bookmark: string
+    readonly sourceRevisionId: string
+    readonly target: DragRevision
+    readonly revisions: readonly DragRevision[]
+  }): RevisionDropResolution => {
+    const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
+    if (source === undefined || !source.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
+    if (input.target.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
+    return {
+      kind: 'action',
+      action: { kind: 'bookmark-move', bookmark: input.bookmark, destinationId: input.target.commitId },
+      presentation: {
+        kind: 'bookmark-move',
+        sourceId: source.commitId,
+        destinationId: input.target.commitId,
+        bookmark: input.bookmark,
+      },
+    }
   }
-}
 
-export const resolveDragOriginDrop = (input: {
-  readonly origin: DragOrigin
-  readonly target: DragRevision
-  readonly revisions: readonly DragRevision[]
-}): RevisionDropResolution => {
-  if (input.origin.kind === 'revision') {
-    return resolveRevisionDrop({ sourceRevisionId: input.origin.sourceId, target: input.target, revisions: input.revisions })
+  static readonly resolveDragOrigin = (input: {
+    readonly origin: DragOrigin
+    readonly target: DragRevision
+    readonly revisions: readonly DragRevision[]
+  }): RevisionDropResolution => {
+    if (input.origin.kind === 'revision') {
+      return RevisionDropModel.resolveRevision({ sourceRevisionId: input.origin.sourceId, target: input.target, revisions: input.revisions })
+    }
+    if (input.origin.kind === 'bookmark') {
+      return RevisionDropModel.resolveBookmark({
+        bookmark: input.origin.bookmark,
+        sourceRevisionId: input.origin.sourceId,
+        target: input.target,
+        revisions: input.revisions,
+      })
+    }
+    return RevisionDropModel.resolveWorkspace({ workspace: input.origin.workspace, target: input.target, revisions: input.revisions })
   }
-  if (input.origin.kind === 'bookmark') {
-    return resolveBookmarkDrop({
-      bookmark: input.origin.bookmark,
-      sourceRevisionId: input.origin.sourceId,
-      target: input.target,
-      revisions: input.revisions,
-    })
-  }
-  return resolveWorkspaceDrop({ workspace: input.origin.workspace, target: input.target, revisions: input.revisions })
 }

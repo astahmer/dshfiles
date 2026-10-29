@@ -18,7 +18,7 @@ export type FastModeUsageObservation = z.infer<typeof fastModeUsageObservationSc
 export const fastModeUsageEventSchema = fastModeUsageObservationSchema.extend({ at: z.number().int().min(0) })
 export type FastModeUsageEvent = z.infer<typeof fastModeUsageEventSchema>
 
-export const fastModeUsagePointSchema = z.object({
+const fastModeUsagePointSchema = z.object({
   at: z.number().int().min(0),
   requests: z.number().int().min(0),
   confirmedFast: z.number().int().min(0),

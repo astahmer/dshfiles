@@ -9,15 +9,15 @@ import { z } from 'zod'
  * different behaviour.
  */
 
-export const moveDirectionSchema = z.enum(['up', 'down'])
+const moveDirectionSchema = z.enum(['up', 'down'])
 
-export const queueMoveInputSchema = z.object({
+const queueMoveInputSchema = z.object({
   sessionId: z.string().min(1).max(128),
   itemId: z.string().min(1).max(128),
   direction: moveDirectionSchema,
 })
 
-export const queuePositionSchema = z.object({
+const queuePositionSchema = z.object({
   sessionId: z.string().min(1).max(128),
   itemId: z.string().min(1).max(128),
   index: z.number().int().min(0),
@@ -27,7 +27,7 @@ export const queuePositionSchema = z.object({
   last: z.boolean(),
 })
 
-export const queueEntrySchema = z.object({
+const queueEntrySchema = z.object({
   target: z.enum(['next-turn', 'next-step']),
   items: z.array(z.string()).max(256),
 })
@@ -35,7 +35,7 @@ export const queueEntrySchema = z.object({
 /** Largest queued file the dock copies back into the composer; base64 crosses the wire as one JSON string. */
 export const MAX_QUEUE_FILE_BYTES = 25 * 1024 * 1024
 
-export const queueFileAttachmentSchema = z.object({
+const queueFileAttachmentSchema = z.object({
   attachmentId: z.string().min(1).max(256),
   name: z.string().min(1).max(512),
   bytes: z.number().int().min(0).max(MAX_QUEUE_FILE_BYTES),

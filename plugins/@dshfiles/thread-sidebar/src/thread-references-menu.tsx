@@ -46,7 +46,7 @@ export interface ThreadReferencesItemsProps {
 }
 
 /** The threads that reference one thread, fetched when its reference submenu opens. */
-export const useThreadReferences = (sessionId: SessionId, limit?: number): ThreadReferencesState => {
+const useThreadReferences = (sessionId: SessionId, limit?: number): ThreadReferencesState => {
   const query = useApiQuery(threadActionsApi, 'references', {
     input: { sessionId, ...(limit === undefined ? undefined : { limit }) },
   })

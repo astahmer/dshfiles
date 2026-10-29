@@ -211,7 +211,7 @@ function matcherFor(pattern: string): (address: string) => boolean {
   // `basename: true` is what makes `*.md` match at any depth; it applies only to
   // patterns without a separator, which is exactly the path case.
   const whole = pattern.includes(':')
-  const match = picomatch(pattern, { nocase: true, dot: true, ...(whole ? {} : { basename: true }) })
+  const match = picomatch(pattern, { nocase: true, dot: true, ...(!whole && { basename: true }) })
   return address => {
     if (whole) return match(address)
     const path = pathOf(address)

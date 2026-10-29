@@ -11,7 +11,7 @@ import { useObservable } from './use-observable.js'
 import { DshReleaseIndicator } from '../release-notice.js'
 
 /** The control a search entry names: the row tagged with its id, focused on its first control. */
-export const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly entryId: string }): boolean => {
+const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly entryId: string }): boolean => {
   const row = input.container.querySelector<HTMLElement>(`[data-settings-entry="${CSS.escape(input.entryId)}"]`)
   if (row === null) return false
   row.scrollIntoView({ block: 'center' })

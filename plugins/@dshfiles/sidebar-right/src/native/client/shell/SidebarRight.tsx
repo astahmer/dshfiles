@@ -453,7 +453,7 @@ export function RightbarSeat({
   toggleFullscreen,
 }: RightbarSeatProps): ReactNode {
   // One store instance per session, so this map holds this session's surface.
-  const shortcuts = useShortcuts(entries => entries)
+  const shortcuts = useShortcuts(entries => entries, Object.is)
   const surface = useStore(state => state.bySession[sessionId])
   const shown = active && surface !== undefined && surface.layout.expanded
   const autoFullscreen = viewportWidth < 768

@@ -94,9 +94,9 @@ function ShippedGuide({ children }: { children: ReactNode }): ReactNode {
 
 /** The guide tab's body, replaceable through its chain child. */
 export function GuideBody({ useTabInfo, useGuideEntries, renderSlot, renderSlotChain, useShortcuts }: GuideBodyProps): ReactNode {
-  const shortcuts = useShortcuts(entries => entries)
+  const shortcuts = useShortcuts(entries => entries, Object.is)
   const { tab } = useTabInfo()
-  const entries = useGuideEntries(entries => entries)
+  const entries = useGuideEntries(entries => entries, Object.is)
   const options = {
     hookContext: useTabInfo,
     fallback: (
@@ -112,7 +112,7 @@ export function GuideBody({ useTabInfo, useGuideEntries, renderSlot, renderSlotC
                   entryId: entry.id,
                   kind: entry.kind,
                   title: entry.title(),
-                  ...(description === undefined ? {} : { description }),
+                  ...(description !== undefined && { description }),
                 },
                 {
                   entryKey: entry.providerId,

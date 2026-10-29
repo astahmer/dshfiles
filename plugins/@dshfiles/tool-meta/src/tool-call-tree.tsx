@@ -17,7 +17,7 @@ const wrappers = new Set<unknown>()
  * ('tool.call.toolview', owner). Handing it a `renderSlot` that frames each dispatch with a meta line decorates every
  * tool card, whichever plugin owns it, while the tree keeps its own slot authorization, keys and memoization.
  */
-export const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeProps>; readonly Meta: ToolMetaComponent }): ComponentType<ToolTreeProps> => {
+const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeProps>; readonly Meta: ToolMetaComponent }): ComponentType<ToolTreeProps> => {
   const { tree: Tree, Meta } = input
   const ToolCallTreeWithMeta = (props: ToolTreeProps): ReactElement => {
     const nativeRenderSlot: RenderToolView | undefined = props.renderSlot

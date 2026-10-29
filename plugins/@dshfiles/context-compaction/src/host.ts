@@ -51,7 +51,7 @@ class ContextCompactionEngine extends BasicCompactionEngine {
       input,
       maxInputBytes,
       messageBytes,
-      ...(signal === undefined ? {} : { signal }),
+      ...(signal !== undefined && { signal }),
       summarize: (candidate, candidateSignal) => super.summarize(candidate, agent, candidateSignal),
     })
   }

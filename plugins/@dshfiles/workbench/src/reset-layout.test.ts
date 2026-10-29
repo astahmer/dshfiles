@@ -168,7 +168,7 @@ describe('coordinated presentation reset', () => {
     add(side, 'legacy')
     const old = capture()
     for (const [name, store] of Object.entries(p.rootStores)) {
-      const api = name === 'main' ? main : name === 'dock' ? right : name === 'left' ? left : bottom
+      const api = { main, dock: right, left }[name] ?? bottom
       store.set(api.toJSON())
     }
     p.sideStore.set(side.toJSON())

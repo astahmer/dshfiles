@@ -152,7 +152,7 @@ const SERIES_KEYS = 6
 const OTHER_KEY = 'Other'
 
 /** `~/dev/dshfiles-threads/dshfiles-221d06c1` is a thread workspace of `dshfiles`. */
-export const projectOf = (cwd: string | null): string | null => {
+const projectOf = (cwd: string | null): string | null => {
   if (cwd === null || cwd.length === 0) return null
   const parent = basename(dirname(cwd))
   if (parent.endsWith('-threads') && parent.length > '-threads'.length) return parent.slice(0, -'-threads'.length)
@@ -705,7 +705,7 @@ export const openUsageStore = (path: string) => {
     )
     const total = statusCounts.reduce((sum, row) => sum + row.count, 0)
     return {
-      ...(query.provider === undefined ? {} : { appliedProvider: query.provider }),
+      ...(query.provider !== undefined && { appliedProvider: query.provider }),
       rows: rows.map((row): RequestView => ({
         id: row.id,
         sessionId: row.session_id,
@@ -855,7 +855,7 @@ export const openUsageStore = (path: string) => {
     const span = query.to - query.from
     const previous = summaryOf(rangeFilter({ from: query.from - span, to: query.from, purposes: query.purposes, provider: query.provider }))
     return {
-      ...(query.provider === undefined ? {} : { appliedProvider: query.provider }),
+      ...(query.provider !== undefined && { appliedProvider: query.provider }),
       summary: {
         cost: current.cost,
         requests: current.requests,

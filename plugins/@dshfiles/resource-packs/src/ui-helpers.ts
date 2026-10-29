@@ -36,7 +36,6 @@ export class ResourceUiModel {
 
   static displayValue(property: PropertyDefinition, value: PropertyValue | undefined, resources: readonly ResourceRecord[]): string {
     if (value === null || value === undefined) return '—'
-    // oxlint-disable-next-line antislop/no-runtime-typeof -- PropertyValue is the schema-validated domain union; rendering selects its string variant.
     if (property.type === 'select' && typeof value === 'string')
       return property.options.find(option => option.id === value)?.label ?? `Unknown option: ${value}`
     if (property.type === 'multiselect' && Array.isArray(value))
@@ -47,10 +46,8 @@ export class ResourceUiModel {
           )
           .join(', ') || '—'
       )
-    // oxlint-disable-next-line antislop/no-runtime-typeof -- Render the boolean variant of the validated PropertyValue union, not an untrusted payload.
     if (typeof value === 'boolean') return value ? 'Yes' : 'No'
     if (Array.isArray(value)) return value.map(item => (typeof item === 'string' ? item : ResourceUiModel.referenceLabel(item, resources))).join(', ') || '—'
-    // oxlint-disable-next-line antislop/no-runtime-typeof -- After null/array narrowing, the union object variant is exactly ResourceRef.
     if (typeof value === 'object') return ResourceUiModel.referenceLabel(value, resources)
     return String(value)
   }
@@ -78,12 +75,10 @@ export class ResourceUiModel {
       }
       switch (property.type) {
         case 'text':
-          // oxlint-disable-next-line antislop/no-runtime-typeof -- Validate a Form draft union member against the current text definition before mutation.
           if (typeof value !== 'string' || value.length > 20_000) fail()
           values[property.id] = value
           break
         case 'number': {
-          // oxlint-disable-next-line antislop/no-runtime-typeof -- A number control's draft may be numeric or a temporary string; other domain variants are invalid.
           if (typeof value !== 'number' && typeof value !== 'string') fail()
           const number = Number(value)
           if (!Number.isFinite(number)) fail()
@@ -91,13 +86,11 @@ export class ResourceUiModel {
           break
         }
         case 'checkbox':
-          // oxlint-disable-next-line antislop/no-runtime-typeof -- Confirm the draft union is the definition's boolean variant before writing it.
           if (typeof value !== 'boolean') fail()
           values[property.id] = value
           break
         case 'date': {
           if (
-            // oxlint-disable-next-line antislop/no-runtime-typeof -- Draft union validation also checks date syntax and calendar validity, not just representation.
             typeof value !== 'string' ||
             !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
             !Number.isFinite(Date.parse(value)) ||
@@ -108,13 +101,11 @@ export class ResourceUiModel {
           break
         }
         case 'datetime': {
-          // oxlint-disable-next-line antislop/no-runtime-typeof -- Validate the draft's string variant and timestamp before canonical ISO conversion.
           if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) fail()
           values[property.id] = new Date(String(value)).toISOString()
           break
         }
         case 'select':
-          // oxlint-disable-next-line antislop/no-runtime-typeof -- Definition validation checks the draft string against stable option IDs.
           if (typeof value !== 'string' || !property.options.some(option => option.id === value)) fail()
           values[property.id] = value
           break
@@ -141,7 +132,6 @@ export class ResourceUiModel {
   }
 
   static datetimeInput(value: PropertyValue | undefined): string {
-    // oxlint-disable-next-line antislop/no-runtime-typeof -- A datetime editor renders only the union's valid timestamp-string variant.
     if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return ''
     const date = new Date(value)
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)

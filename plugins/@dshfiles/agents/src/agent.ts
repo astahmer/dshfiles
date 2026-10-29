@@ -3,19 +3,19 @@ import { z } from 'zod'
 export const AGENT_HANDLE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u
 export const DEFAULT_AGENT_HANDLE = 'dsh'
 export const MAX_AGENTS = 100
-export const MAX_HANDLE_CHARS = 32
-export const MAX_NAME_CHARS = 60
-export const MAX_GLYPH_CHARS = 8
-export const MAX_DESCRIPTION_CHARS = 200
-export const MAX_INSTRUCTIONS_CHARS = 8_000
-export const MAX_PRESET_CHARS = 64
-export const MAX_PROVIDER_CHARS = 128
-export const MAX_MODEL_CHARS = 256
-export const MAX_EFFORT_CHARS = 64
+const MAX_HANDLE_CHARS = 32
+const MAX_NAME_CHARS = 60
+const MAX_GLYPH_CHARS = 8
+const MAX_DESCRIPTION_CHARS = 200
+const MAX_INSTRUCTIONS_CHARS = 8_000
+const MAX_PRESET_CHARS = 64
+const MAX_PROVIDER_CHARS = 128
+const MAX_MODEL_CHARS = 256
+const MAX_EFFORT_CHARS = 64
 export const MAX_SESSION_CHARS = 256
-export const MAX_MEMORY_SCOPE_CHARS = 80
-export const MAX_ROUTINE_CHARS = 400
-export const MAX_PEER_HANDLES = 50
+const MAX_MEMORY_SCOPE_CHARS = 80
+const MAX_ROUTINE_CHARS = 400
+const MAX_PEER_HANDLES = 50
 /** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
 export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
@@ -28,7 +28,7 @@ export const AGENTS_QUERY_ROOT = 'dshfiles-agents'
 const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
 const timestampSchema = z.number().int().nonnegative()
 /** A memory note scope an agent owns; the notes table already stores free-form scopes, so no new table. */
-export const agentMemoryScopeSchema = z
+const agentMemoryScopeSchema = z
   .string()
   .trim()
   .min(1)

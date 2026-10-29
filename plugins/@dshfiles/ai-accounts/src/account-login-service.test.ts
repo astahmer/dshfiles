@@ -66,7 +66,7 @@ const harness = (
     run,
     onComplete,
     deferAdoption: () => options.deferAdoption === true,
-    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
   })
   cleanups.push(async () => {
     service.dispose()

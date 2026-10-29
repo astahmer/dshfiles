@@ -100,12 +100,7 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
 }
 
 /** Rows in the order they render, for keyboard movement in the panel. */
-export const itemsOrder = (
-  items: readonly BacklogSummaryView[],
-  by: GroupBy,
-  collapsed: ReadonlySet<string>,
-  sort: BacklogSort = 'updated',
-): BacklogSummaryView[] =>
+const itemsOrder = (items: readonly BacklogSummaryView[], by: GroupBy, collapsed: ReadonlySet<string>, sort: BacklogSort = 'updated'): BacklogSummaryView[] =>
   groupsOf(items, by)
     .filter(group => !collapsed.has(group.key))
     .flatMap(group => sortBacklogItems(group.items, sort).sort((left, right) => Number(right.pinned) - Number(left.pinned)))

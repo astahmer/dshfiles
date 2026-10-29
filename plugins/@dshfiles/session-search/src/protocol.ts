@@ -3,7 +3,7 @@ import { z } from 'zod'
 /** A JSON value as it crosses the worker boundary. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
-export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
 )
 
@@ -17,16 +17,16 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
  * The host maps core's own filter clauses onto these, so the two callers that matter (`@dshfiles/memory` and the
  * session controller) filter exactly as they do against the stock backend.
  */
-export const eventFilterClauseSchema = z.discriminatedUnion('kind', [
+const eventFilterClauseSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('type'), values: z.array(z.string().min(1)).readonly() }),
   z.object({ kind: z.literal('surface'), values: z.array(z.string().min(1)).readonly() }),
   z.object({ kind: z.literal('seq'), from: z.number().int().optional(), to: z.number().int().optional() }).readonly(),
   z.object({ kind: z.literal('time'), from: z.number().optional(), to: z.number().optional() }).readonly(),
 ])
-export const eventFiltersSchema = z.array(eventFilterClauseSchema).readonly()
+const eventFiltersSchema = z.array(eventFilterClauseSchema).readonly()
 export type EventFilters = z.infer<typeof eventFiltersSchema>
 
-export const sessionSearchRequestSchema = z.object({
+const sessionSearchRequestSchema = z.object({
   query: z.string().min(1),
   limit: z.number().int().min(1).max(100),
   /** Offset into the ranked result set; the host keeps cursors opaque. */
@@ -37,7 +37,7 @@ export const sessionSearchRequestSchema = z.object({
 })
 export type SessionSearchRequest = z.infer<typeof sessionSearchRequestSchema>
 
-export const sessionEventSearchRequestSchema = z.object({
+const sessionEventSearchRequestSchema = z.object({
   sessionId: z.string().min(1),
   query: z.string().min(1),
   limit: z.number().int().min(1).max(100),
@@ -74,7 +74,7 @@ export const sessionHeaderSchema = z.object({
 })
 export type SessionHeaderRow = z.infer<typeof sessionHeaderSchema>
 
-export const searchMatchSchema = z.object({
+const searchMatchSchema = z.object({
   sessionId: z.string(),
   seq: z.number().int(),
   type: z.string(),

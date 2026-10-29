@@ -15,7 +15,7 @@ const unprovidedRestartActor = fromPromise<void, RestartClient>(async () => {
 })
 
 // SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
-export const restartMachine = setup({
+const restartMachine = setup({
   types: {
     context: {} as RestartContext,
     events: {} as RestartEvent,

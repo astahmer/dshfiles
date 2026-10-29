@@ -21,7 +21,7 @@ const STATUS_TONE = {
 
 const STATUS_LABEL = { M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', C: 'Copied' } satisfies Record<FileStatus, string>
 
-export const FileStatusLetter = (props: { readonly status: FileStatus; readonly className?: string }): JSX.Element => (
+const FileStatusLetter = (props: { readonly status: FileStatus; readonly className?: string }): JSX.Element => (
   <span
     aria-label={STATUS_LABEL[props.status]}
     className={cn('dshx:w-3 dshx:flex-none dshx:text-center dshx:font-mono dshx:text-[11px] dshx:font-semibold', STATUS_TONE[props.status], props.className)}

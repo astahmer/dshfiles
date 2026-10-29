@@ -39,7 +39,8 @@ describe('managed setup Codex routes', () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-managed-route-'))
     vi.stubEnv('DSH_HOME', home)
     vi.resetModules()
-    const { accountStoreService, AccountStoreModel } = await import('./account-store.js')
+    const { accountStoreService } = await import('./account-store.js')
+    const { AccountHomePolicy } = await import('./account-home-policy.js')
     const { configFromAccountsFile } = await import('./account-config.js')
     const { ProviderRoutes } = await import('./provider-routes.js')
     const { CodexHomeModel } = await import('./codex-home.js')
@@ -60,7 +61,7 @@ describe('managed setup Codex routes', () => {
       enabled: true,
       layout: { mode: 'direct', sharedHomePath: expectedHome, effectiveHomePath: expectedHome },
     })
-    expect(built.routes.get(created.instanceId)).toMatchObject({ layout: AccountStoreModel.codexLayoutFor(account, config.codexShadowRoot) })
+    expect(built.routes.get(created.instanceId)).toMatchObject({ layout: AccountHomePolicy.codexLayoutFor(account, config.codexShadowRoot) })
     // The exception belongs to the managed policy, not a relaxation of the raw/global Codex guard.
     expect(() => CodexHomeModel.resolveLayout({ homePath: expectedHome, shadowHomePath: expectedHome })).toThrow()
   })

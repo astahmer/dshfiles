@@ -29,7 +29,7 @@ import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 
 export type BrowserNotificationPermission = NotificationPermission | 'unsupported'
 
-export const readBrowserNotificationPermission = (): BrowserNotificationPermission =>
+const readBrowserNotificationPermission = (): BrowserNotificationPermission =>
   typeof window === 'undefined' || !('Notification' in window) ? 'unsupported' : window.Notification.permission
 
 const categoryLabelKeys = {

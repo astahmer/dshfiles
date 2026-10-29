@@ -167,9 +167,9 @@ export const createAccountSetupService = (input: {
   const draftForMethod = (draft: AccountDraft, method: AccountConnectionMethod, id: string): AccountDraft => ({
     ...draft,
     apiKeyEnv: method === 'key' ? privateReference(id) : method === 'reference' ? draft.apiKeyEnv : '',
-    ...(draft.kind === 'commandcode' || draft.kind === 'cursor' || draft.kind === 'opencode-go'
-      ? { authSource: method === 'cli' ? ('cli' as const) : ('reference' as const) }
-      : {}),
+    ...((draft.kind === 'commandcode' || draft.kind === 'cursor' || draft.kind === 'opencode-go') && {
+      authSource: method === 'cli' ? ('cli' as const) : ('reference' as const),
+    }),
   })
   const prepare = (raw: PrepareAccountConnectionInput): Promise<AccountConnectionSnapshot> => {
     const request = prepareAccountConnectionInputSchema.parse(raw)
@@ -355,11 +355,11 @@ export const createAccountSetupService = (input: {
       if (methodChanged && method === 'reference') base.apiKeyEnv = operation.existing?.apiKeyEnv ?? ''
       const next = accountDraftSchema.parse({
         ...base,
-        ...(configuration.displayName === undefined ? {} : { displayName: configuration.displayName }),
-        ...(configuration.homePath === undefined ? {} : { homePath: configuration.homePath }),
-        ...(configuration.shadowHomePath === undefined ? {} : { shadowHomePath: configuration.shadowHomePath }),
-        ...(configuration.apiKeyEnv === undefined ? {} : { apiKeyEnv: configuration.apiKeyEnv }),
-        ...(configuration.apiBaseUrl === undefined ? {} : { apiBaseUrl: configuration.apiBaseUrl }),
+        ...(configuration.displayName !== undefined && { displayName: configuration.displayName }),
+        ...(configuration.homePath !== undefined && { homePath: configuration.homePath }),
+        ...(configuration.shadowHomePath !== undefined && { shadowHomePath: configuration.shadowHomePath }),
+        ...(configuration.apiKeyEnv !== undefined && { apiKeyEnv: configuration.apiKeyEnv }),
+        ...(configuration.apiBaseUrl !== undefined && { apiBaseUrl: configuration.apiBaseUrl }),
       })
       const authChanged =
         methodChanged ||

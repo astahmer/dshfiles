@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { ResourcePoolEntry, ResourceSnapshot } from './api.js'
-import { createResourceProbeLimiter, resourcePressureScore, selectAutoHost } from './resource-snapshot.js'
+import { ResourceSnapshotModel } from './resource-snapshot.js'
 
 const snapshot = ({
   loadAverage1m,
@@ -50,10 +50,10 @@ it('ranks hosts by their highest normalized CPU or memory pressure', () => {
   const cpuPressured = snapshot({ loadAverage1m: 4, cpuCount: 8, memoryFreeBytes: 80 })
   const memoryPressured = snapshot({ loadAverage1m: 1, cpuCount: 8, memoryFreeBytes: 20 })
 
-  expect(resourcePressureScore(cpuPressured)).toBe(0.5)
-  expect(resourcePressureScore(memoryPressured)).toBe(0.8)
+  expect(ResourceSnapshotModel.resourcePressureScore(cpuPressured)).toBe(0.5)
+  expect(ResourceSnapshotModel.resourcePressureScore(memoryPressured)).toBe(0.8)
   expect(
-    selectAutoHost([
+    ResourceSnapshotModel.selectAutoHost([
       entry({ hostId: 'cpu', hostName: 'CPU host', runtimeId: 'runtime-cpu', snapshot: cpuPressured }),
       entry({ hostId: 'memory', hostName: 'Memory host', runtimeId: 'runtime-memory', snapshot: memoryPressured }),
     ]),
@@ -64,7 +64,7 @@ it('keeps directory order as the deterministic tie-break and skips hidden or sta
   const equal = snapshot({ loadAverage1m: 1, cpuCount: 4, memoryFreeBytes: 75 })
 
   expect(
-    selectAutoHost([
+    ResourceSnapshotModel.selectAutoHost([
       entry({ hostId: 'hidden', hostName: 'Hidden', runtimeId: 'runtime-hidden', snapshot: equal, hidden: true }),
       entry({ hostId: 'stale', hostName: 'Stale', runtimeId: 'runtime-stale', snapshot: equal, stale: true }),
       entry({ hostId: 'first', hostName: 'First', runtimeId: 'runtime-first', snapshot: equal }),
@@ -74,7 +74,7 @@ it('keeps directory order as the deterministic tie-break and skips hidden or sta
 })
 
 it('limits concurrent remote resource probes', async () => {
-  const limiter = createResourceProbeLimiter(2)
+  const limiter = ResourceSnapshotModel.createResourceProbeLimiter(2)
   let active = 0
   let maximum = 0
 
@@ -105,8 +105,11 @@ it('returns no candidate when snapshots are unavailable or unsupported', () => {
     refreshing: false,
   }
 
-  expect(resourcePressureScore(noLoad)).toBeUndefined()
+  expect(ResourceSnapshotModel.resourcePressureScore(noLoad)).toBeUndefined()
   expect(
-    selectAutoHost([entry({ hostId: 'unsupported', hostName: 'Unsupported', runtimeId: 'runtime-unsupported', snapshot: noLoad }), unavailable]),
+    ResourceSnapshotModel.selectAutoHost([
+      entry({ hostId: 'unsupported', hostName: 'Unsupported', runtimeId: 'runtime-unsupported', snapshot: noLoad }),
+      unavailable,
+    ]),
   ).toBeNull()
 })

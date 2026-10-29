@@ -1,6 +1,5 @@
-import z from '@deepseek-ai/schemastery'
 import type { AccountStoreFile } from './account-store.js'
-import { DEFAULT_DISTRIBUTION, type Distribution } from './account-pool.js'
+import type { Distribution } from './account-pool.js'
 import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel } from './credentials.js'
 export interface CodexAccountConfig {
@@ -52,34 +51,6 @@ export interface AiAccountsConfig {
   readonly cooldownMs: number
   readonly codexShadowRoot: string
 }
-
-const CodexAccount = z.object({
-  instanceId: z.string().default('codex'),
-  displayName: z.string().default(''),
-  homePath: z.string().default(''),
-  shadowHomePath: z.string().default(''),
-  additionalModelIds: z.array(z.string()).default([]),
-  enabled: z.boolean().default(true),
-})
-const KeyedAccount = z.object({
-  instanceId: z.string().default('opencode-go'),
-  displayName: z.string().default(''),
-  kind: z.union(['opencode-go', 'commandcode']).default('opencode-go'),
-  apiKeyEnv: z.string().default(''),
-  apiBaseUrl: z.string().default(''),
-  enabled: z.boolean().default(true),
-})
-export const Config = z.object({
-  codexAccounts: z
-    .array(CodexAccount)
-    .default([CodexAccount({})])
-    .volatile(),
-  opencodeAccounts: z.array(KeyedAccount).default([]).volatile(),
-  opencodeApiKey: z.string().default('').volatile(),
-  distribution: z.string().default(DEFAULT_DISTRIBUTION).volatile(),
-  cooldownMs: z.number().default(300_000).volatile(),
-  codexShadowRoot: z.string().default('').volatile(),
-})
 
 export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig => {
   const codexAccounts = file.accounts

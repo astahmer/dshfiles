@@ -166,10 +166,10 @@ export class TabDomain {
     // have been dragged since: `replaceTab: true` names this tab; otherwise the
     // pane holding it, unless the caller named another.
     const place = (placement: SidebarRightTabPlacement): SidebarRightPlacement => ({
-      ...(placement.replaceTab === true ? { replaceTab: tabId } : held.paneId === undefined ? {} : { paneId: held.paneId }),
-      ...(placement.paneId === undefined ? {} : { paneId: placement.paneId }),
-      ...(placement.preferNewPane === undefined ? {} : { preferNewPane: placement.preferNewPane }),
-      ...(placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened }),
+      ...(placement.replaceTab === true ? { replaceTab: tabId } : held.paneId !== undefined && { paneId: held.paneId }),
+      ...(placement.paneId !== undefined && { paneId: placement.paneId }),
+      ...(placement.preferNewPane !== undefined && { preferNewPane: placement.preferNewPane }),
+      ...(placement.revealIfOpened !== undefined && { revealIfOpened: placement.revealIfOpened }),
     })
     const held: Held = {
       id: randomUUID() as SidebarRightOccurrenceId,

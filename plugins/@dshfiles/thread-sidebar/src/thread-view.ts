@@ -24,7 +24,7 @@ export type ThreadStatusFilter = Exclude<(typeof THREAD_STATUS_FILTER_OPTIONS)[n
 export type ThreadStatusFilters = readonly ThreadStatusFilter[]
 
 /** The status filters that name one attention label the user already sees on a thread row. */
-export const THREAD_ATTENTION_FILTER_LABELS = {
+const THREAD_ATTENTION_FILTER_LABELS = {
   'approval-needed': 'threadSidebarApprovalNeeded',
   'input-needed': 'threadSidebarInputNeeded',
   'turn-finished': 'threadSidebarTurnFinished',

@@ -29,10 +29,10 @@ export const INITIAL_SIDEBAR_NOTICE_QUEUE_STATE: SidebarNoticeQueueState = {
   pending: [],
 }
 
-export const enqueueSidebarNotice = (pending: readonly SidebarNotice[], notice: SidebarNotice): readonly SidebarNotice[] =>
+const enqueueSidebarNotice = (pending: readonly SidebarNotice[], notice: SidebarNotice): readonly SidebarNotice[] =>
   [...pending, notice].slice(-MAX_PENDING_SIDEBAR_NOTICES)
 
-export const takeNextSidebarNotice = (pending: readonly SidebarNotice[]) => ({
+const takeNextSidebarNotice = (pending: readonly SidebarNotice[]) => ({
   notice: pending[0] ?? null,
   pending: pending.slice(1),
 })

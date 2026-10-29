@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { SecretGlobalConfig } from './secret-reference-status-schema.js'
 
-export const globalSecretConfigPath = (): string => join(homedir(), '.config', 'secret', 'config.json')
+const globalSecretConfigPath = (): string => join(homedir(), '.config', 'secret', 'config.json')
 
 /**
  * Where a global alias really lands. When the config path is a symlink (a Nix or dotfiles manager links it into a

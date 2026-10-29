@@ -60,7 +60,7 @@ const harness = async (
     saveKey,
     cleanupCandidate,
     cancelLogin,
-    ...(settleLogin === undefined ? {} : { settleLogin }),
+    ...(settleLogin !== undefined && { settleLogin }),
     onCommit,
   })
   services.push(service)

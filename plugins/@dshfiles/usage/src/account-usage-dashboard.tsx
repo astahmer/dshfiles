@@ -337,12 +337,13 @@ export const AccountUsageDashboardContent = (props: {
   )
 }
 
-export const AccountUsageDashboard = (props: AccountUsageViewProps): JSX.Element => {
+/** Keyed per account and period so each selection anchors its range once, when it is chosen. */
+const AccountUsagePeriodPanel = (props: AccountUsageViewProps & { readonly period: UsagePeriod }): JSX.Element => {
   const api = useApi(usageApi)
-  const [period, setPeriod] = useState<UsagePeriod>(7)
-  const query = useMemo(() => AccountUsageDashboardModel.accountUsageQuery(props.accountId, period, Date.now()), [props.accountId, period])
+  const [now] = useState(Date.now)
+  const query = useMemo(() => AccountUsageDashboardModel.accountUsageQuery(props.accountId, props.period, now), [props.accountId, props.period, now])
   const usage = useQuery({
-    queryKey: ['ai-accounts', 'account-usage-dashboard', props.accountId, period, query],
+    queryKey: ['ai-accounts', 'account-usage-dashboard', props.accountId, props.period, query],
     queryFn: ({ signal }) =>
       runHostRequest({
         signal,
@@ -359,6 +360,46 @@ export const AccountUsageDashboard = (props: AccountUsageViewProps): JSX.Element
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
+  if (usage.isError)
+    return (
+      <div role="status" className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/30 dshx:p-5 dshx:text-sm">
+        <p>Account usage unavailable.</p>
+        <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">
+          {isApiOwnerMissing(usage.error)
+            ? 'The Usage plugin is not active on this Host. Enable it to view recorded account usage.'
+            : errorMessage(usage.error, 'Could not load recorded account usage.')}
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="dshx:mt-3"
+          onClick={() => {
+            void usage.refetch()
+          }}
+        >
+          Retry
+        </Button>
+      </div>
+    )
+  if (usage.data === undefined)
+    return (
+      <p role="status" className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">
+        Loading account usage…
+      </p>
+    )
+  return (
+    <AccountUsageDashboardContent
+      query={query}
+      days={props.period}
+      view={usage.data.view}
+      requests={usage.data.requests}
+      onOpenUsageHistory={props.onOpenUsageHistory}
+    />
+  )
+}
+
+export const AccountUsageDashboard = (props: AccountUsageViewProps): JSX.Element => {
+  const [period, setPeriod] = useState<UsagePeriod>(7)
   return (
     <section
       aria-label={`Usage for ${props.displayName}`}
@@ -382,38 +423,7 @@ export const AccountUsageDashboard = (props: AccountUsageViewProps): JSX.Element
           triggerClassName="dshx:w-40 dshx:text-xs"
         />
       </div>
-      {usage.isError ? (
-        <div role="status" className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/30 dshx:p-5 dshx:text-sm">
-          <p>Account usage unavailable.</p>
-          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">
-            {isApiOwnerMissing(usage.error)
-              ? 'The Usage plugin is not active on this Host. Enable it to view recorded account usage.'
-              : errorMessage(usage.error, 'Could not load recorded account usage.')}
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="dshx:mt-3"
-            onClick={() => {
-              void usage.refetch()
-            }}
-          >
-            Retry
-          </Button>
-        </div>
-      ) : usage.data === undefined ? (
-        <p role="status" className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">
-          Loading account usage…
-        </p>
-      ) : (
-        <AccountUsageDashboardContent
-          query={query}
-          days={period}
-          view={usage.data.view}
-          requests={usage.data.requests}
-          onOpenUsageHistory={props.onOpenUsageHistory}
-        />
-      )}
+      <AccountUsagePeriodPanel key={`${props.accountId}:${period}`} {...props} period={period} />
     </section>
   )
 }

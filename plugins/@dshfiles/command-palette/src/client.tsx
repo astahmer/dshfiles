@@ -21,8 +21,16 @@ import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
 import { ContributedCommandsModel } from './contributed-commands.js'
-import { CommandPalette, PaletteActions, type CommandPaletteState } from './palette-contract.js'
-import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
+import {
+  CommandPalette,
+  PaletteActions,
+  type CommandPaletteState,
+  type PaletteAction,
+  type PaletteActionContext,
+  type PaletteMode,
+  type PaletteWorkspace,
+} from './palette-contract.js'
+import { PaletteApi } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})

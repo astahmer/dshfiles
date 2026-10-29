@@ -191,7 +191,7 @@ export type SpanSample = {
 /** Spans longer than this are not looked for: it bounds the start-time index scan of an end-time window. */
 const SAMPLE_LOOKBACK_US = 6 * 3_600_000_000
 
-export class TraceStoreError extends Error {
+class TraceStoreError extends Error {
   constructor(
     readonly code: 'invalid-cursor' | 'not-found',
     message: string,

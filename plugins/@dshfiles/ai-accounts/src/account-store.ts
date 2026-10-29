@@ -51,13 +51,6 @@ const storeFileSchema = accountsFileSchema.extend({
   accounts: z.array(accountDraftSchema).max(64),
 })
 
-export class AccountStoreModel {
-  static readonly filePath = AccountHomePolicy.filePath
-  static readonly isManagedSetupHome = AccountHomePolicy.isManagedSetupHome
-  static readonly codexLayoutFor = AccountHomePolicy.codexLayoutFor
-  static readonly containsConfiguredHome = AccountHomePolicy.containsConfiguredHome
-}
-
 const parseJson = (raw: string): unknown => {
   try {
     return JSON.parse(raw)
@@ -88,7 +81,7 @@ const nodeAccountStoreFileSystem: AccountStoreFileSystem = {
   chmod,
 }
 
-const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountStoreModel.codexLayoutFor(profile, file.shadowRoot)
+const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountHomePolicy.codexLayoutFor(profile, file.shadowRoot)
 
 const defaultName = (draft: AccountDraft): string =>
   draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${KIND_LABEL[draft.kind]} (${draft.instanceId})`
@@ -321,7 +314,7 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
   /** Reuse the established home rules without materializing, copying or reading authentication. */
   const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<AccountProfile, 'mode' | 'loginHint'> => {
     if (draft.kind === 'codex') {
-      const layout = AccountStoreModel.codexLayoutFor(draft, shadowRoot)
+      const layout = AccountHomePolicy.codexLayoutFor(draft, shadowRoot)
       return { mode: layout.mode, loginHint: CodexHomeModel.loginHint(layout) }
     }
     if (draft.kind === 'claude')
