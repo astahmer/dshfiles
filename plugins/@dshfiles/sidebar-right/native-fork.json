@@ -7,16 +7,32 @@
     "ref": "dsh-v0.2.1-rc.2",
     "path": "packages/client/ui-sidebar-right"
   },
-  "files": [{ "upstream": "src", "local": "src/native" }],
+  "files": [
+    {
+      "upstream": "src",
+      "local": "src/native"
+    }
+  ],
   "delta": [
+    "src/native/client/contract/params.ts",
+    "src/native/client/focus.ts",
     "src/native/client/index.ts",
+    "src/native/client/persistence.ts",
     "src/native/client/service.ts",
-    "src/native/client/shortcuts.ts",
     "src/native/client/session-view.ts",
     "src/native/client/session-views.ts",
-    "src/native/client/tab-info.ts",
-    "src/native/client/shell/SidebarRight.tsx",
+    "src/native/client/shell/ExpandButton.tsx",
     "src/native/client/shell/RightbarRoot.tsx",
-    "src/native/client/shell/ExpandButton.tsx"
+    "src/native/client/shell/SidebarRight.tsx",
+    "src/native/client/shell/close-focus.ts",
+    "src/native/client/shortcuts.ts",
+    "src/native/client/stores.ts",
+    "src/native/client/tab-domain.ts",
+    "src/native/client/tab-info.ts",
+    "src/native/client/tab-inventory.ts",
+    "src/native/client/tab-registry.ts",
+    "src/native/client/tabs/guide/GuideBody.module.css",
+    "src/native/client/tabs/guide/GuideBody.tsx",
+    "src/native/client/tabs/guide/GuideTitle.tsx"
   ]
 }
