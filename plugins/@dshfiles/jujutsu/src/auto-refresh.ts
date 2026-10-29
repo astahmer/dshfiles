@@ -19,12 +19,22 @@ export const refreshesOnReturn = (input: { readonly preferences: RefreshPreferen
 
 const documentVisible = (): boolean => typeof document === 'undefined' || document.visibilityState === 'visible'
 
-/** Tracks whether the panel is on screen (tab visible, element intersecting and laid out) and catches up when it returns. */
-export const useAutoRefresh = (input: { readonly preferences: RefreshPreferences; readonly paused: boolean; readonly onBecameVisible: () => void }) => {
+/**
+ * Tracks whether the panel is on screen (tab visible, its surface showing it, element intersecting and laid out) and
+ * catches up when it returns.
+ */
+export const useAutoRefresh = (input: {
+  readonly preferences: RefreshPreferences
+  readonly paused: boolean
+  readonly surfaceVisible: boolean
+  readonly onBecameVisible: () => void
+}) => {
   const [element, setElement] = useState<HTMLElement | null>(null)
   const [initialPageVisible] = useState(documentVisible)
-  const [snapshot, send, actor] = useMachine(autoRefreshVisibilityMachine, { input: { pageVisible: initialPageVisible } })
-  const visible = snapshot.context.pageVisible && snapshot.context.intersecting && snapshot.context.laidOut
+  const [snapshot, send, actor] = useMachine(autoRefreshVisibilityMachine, {
+    input: { pageVisible: initialPageVisible, surfaceVisible: input.surfaceVisible },
+  })
+  const visible = snapshot.context.pageVisible && snapshot.context.surfaceVisible && snapshot.context.intersecting && snapshot.context.laidOut
   const latest = useRef(input)
   latest.current = input
 
@@ -34,6 +44,10 @@ export const useAutoRefresh = (input: { readonly preferences: RefreshPreferences
     })
     return () => subscription.unsubscribe()
   }, [actor])
+
+  useEffect(() => {
+    send({ type: 'surface.visibility', visible: input.surfaceVisible })
+  }, [input.surfaceVisible, send])
 
   useEffect(() => {
     const update = (): void => send({ type: 'document.visibility', visible: documentVisible() })
@@ -66,5 +80,5 @@ export const useAutoRefresh = (input: { readonly preferences: RefreshPreferences
     return () => observer.disconnect()
   }, [element, send])
 
-  return { ref: setElement, queryOptions: refreshQueryOptions({ preferences: input.preferences, visible, paused: input.paused }) }
+  return { ref: setElement, visible, queryOptions: refreshQueryOptions({ preferences: input.preferences, visible, paused: input.paused }) }
 }

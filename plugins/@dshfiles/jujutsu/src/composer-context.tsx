@@ -105,7 +105,7 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   // shared context query stays on for them even when this surface's own toggle is off.
   const loaded = (preferences[surface] || preferences.chatReferenceLinks) && cwd !== null
   const refetch = useRef<() => void>(() => undefined)
-  const refresh = useAutoRefresh({ preferences, paused: false, onBecameVisible: () => refetch.current() })
+  const refresh = useAutoRefresh({ preferences, paused: false, surfaceVisible: true, onBecameVisible: () => refetch.current() })
   const query = useQuery({
     queryKey: composerKeys.context(cwd ?? '', baseKey),
     queryFn: ({ signal }) => api.context({ cwd: cwd ?? '', base }, { signal }),

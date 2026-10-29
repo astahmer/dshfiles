@@ -20,6 +20,7 @@ interface GraphNavigationInput {
   readonly repoId: string | null
   readonly root: string
   readonly refreshedAt: number
+  readonly onScreen: boolean
   readonly selected: Pick<Revision, 'commitId' | 'changeId'> | undefined
   readonly comparison: Pick<Revision, 'commitId' | 'changeId'> | undefined
   readonly revisions: readonly Revision[]
@@ -60,7 +61,7 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const landmarksQuery = useQuery({
     queryKey: ['jujutsu', input.root, 'graph-navigation', input.repoId, input.refreshedAt],
     queryFn: async ({ signal }) => readResult(await api.graphNavigation({ repoId: input.repoId ?? '' }, { signal })),
-    enabled: input.repoId !== null,
+    enabled: input.repoId !== null && input.onScreen,
     retry: false,
     staleTime: JUJUTSU_QUERY_STALE_TIME,
     gcTime: JUJUTSU_QUERY_GC_TIME,
