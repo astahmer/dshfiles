@@ -7,7 +7,7 @@ import { onTestFinished, test } from 'vitest'
 import { ensureJujutsuRepository, RepositoryInitializationError, type RepositoryInitRunner } from './repository-init.ts'
 
 const fixture = async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-init-'))
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'dshfiles-jj-init-')))
   const repo = join(home, 'repo')
   await mkdir(repo)
   onTestFinished(() => rm(home, { recursive: true, force: true }))
