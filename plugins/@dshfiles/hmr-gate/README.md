@@ -11,7 +11,7 @@ transport (`@deepseek-ai/dsh-client-hmr`) stat-polls every client bundle and
 announces each rebuild, so the browser runs the new client immediately. In the
 `web` profile the Host `hmr` row is **disabled on purpose**: a 2026-10-19
 recomposition dropped `sessionQuery` and took `session-controller` down twice
-(see [recovery](../../docs/recovery.md)). The documented cost is that a rebuild
+(see [recovery](../../../docs/recovery.md)). The documented cost is that a rebuild
 reaches the browser but not the running Host, so a rebuilt plugin can ask the old
 Host for a service or a field it does not have — which is how the composer died
 on 2026-10-22.
@@ -79,4 +79,5 @@ fnm exec --using=22.23.3 node -e "import('./dist/index.js')"
 
 Then, in a scratch DSH, touch one plugin's `dist/client.js` (HMR applies) and then
 `dist/index.js` + `dist/client.js` (no reload, the Plugins row names the package).
-See [`../../plans/hmr-compat-gate`](../../plans/hmr-compat-gate/README.md).
+
+The incident, the two failure classes and the options rejected are in [the design](docs/design.md).

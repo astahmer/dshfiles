@@ -27,23 +27,32 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Backlog](backlog/README.md)                                         | Agent triage, lifecycle signals from threads/revisions/PRs, `@b:` mentions and backlinks, rich bodies, Discord import.                                                                   |
 | [Secret input binding](secret-input/README.md)                       | Bind a form input to a Secret Catalog alias (`secret:ALIAS`) instead of storing a value; backlog triage key first.                                                                       |
 | [Desktop shell](desktop-shell/README.md)                             | Relaunch on Host exit, lifecycle test, signing, updates.                                                                                                                                 |
-| [Workbench as the main view](workbench-main/README.md)               | Landed locally with green journeys; open: a Host restart and live confirmation on the `web` profile.                                                                                     |
 | [DOM hook refactor](dom-hook-refactor.md)                            | Replace transcript/stat/frame/thread DOM mutations with typed owner-rendered extension points.                                                                                           |
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                       |
 | [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                     |
 
 ## Testing, research and housekeeping
 
-| Plan                                                          | Open work                                                                                                                                                                                                                   |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Plugin E2E coverage](plugin-e2e-coverage.md)                 | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding.                                                                                                                                                     |
-| [E2E speed and work-skipping](e2e-speed/README.md)            | Phase trace and composition cache landed; next a per-scenario result cache, boot reuse, the network-boundary measurement.                                                                                                   |
-| [HMR compatibility gate](hmr-compat-gate/README.md)           | The `hmr-gate` transport and slot-inject containment shipped; open: the scratch loaded-vs-disk run, retry/reload actions on the notice, and a live client-only rebuild.                                                     |
-| [Host loop freezes](host-loop-freezes/README.md)              | The replay harness (`bench:freezes`) and the L4 off-loop backend (`@dshfiles/session-search`, loaded in `web`) shipped, though the plan's status line still says proposed; confirm L1–L3 against the gates, then retire it. |
-| [Host gaps](dsh-host-gaps.md)                                 | Behaviors our plugins cannot build until DSH exposes a capability. A decision register (own / upstream / drop), not a task plan.                                                                                            |
-| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption backlog from reference products.                                                                                                                                                        |
-| [Self-improvement](self-improve/README.md)                    | Open improvements mined from DSH Session history (jj hardening, fetch provider, checkout-sync fan-out, store folds, context diet); the ledger dedups and reopens them. A standing backlog, not a task plan.                 |
-| [~/dev cleanup](dev-cleanup-audit.md)                         | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                                                                     |
+| Plan                                                          | Open work                                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Plugin E2E coverage](plugin-e2e-coverage.md)                 | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding.                                                                                                                                     |
+| [E2E speed and work-skipping](e2e-speed/README.md)            | Phase trace and composition cache landed; next a per-scenario result cache, boot reuse, the network-boundary measurement.                                                                                   |
+| [Host gaps](dsh-host-gaps.md)                                 | Behaviors our plugins cannot build until DSH exposes a capability. A decision register (own / upstream / drop), not a task plan.                                                                            |
+| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption backlog from reference products.                                                                                                                                        |
+| [Self-improvement](self-improve/README.md)                    | Open improvements mined from DSH Session history (jj hardening, fetch provider, checkout-sync fan-out, store folds, context diet); the ledger dedups and reopens them. A standing backlog, not a task plan. |
+| [~/dev cleanup](dev-cleanup-audit.md)                         | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                                                     |
+
+## Open follow-ups
+
+Leftovers of finished plans. The plan files were deleted; each line links to the doc that now owns the topic.
+
+- **HMR gate** ([design](../plugins/@dshfiles/hmr-gate/docs/design.md)): confirm in a scratch DSH with Host HMR enabled
+  that `hmr/reload` releases a deferral, watch a client-only rebuild apply live, and decide whether the Plugins row
+  gains retry and page-reload actions.
+- **Host loop freezes** ([Host loop freezes](../plugins/@dshfiles/session-search/docs/host-loop-freezes.md)): measure
+  the idle background tax of the activity timeline and usage store writes against the 5 ms/s gate; never measured.
+- **Workbench main view** ([docking decisions](../plugins/@dshfiles/workbench/docs/docking-decisions.md#the-main-view)):
+  the user restarts the `web` Host and confirms the Workbench centre live.
 
 ## Proposed, not started
 

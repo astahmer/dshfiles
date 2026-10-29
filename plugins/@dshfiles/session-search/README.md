@@ -7,6 +7,8 @@ them). Measured on this machine: one content search blocked the Host event loop 
 still **43.5 s** on a fully warm index, while a plain FTS5 `MATCH` answers in 27-70 ms. That is a design property, not
 a tunable, so this plugin replaces the backend and inverts the split.
 
+The freeze, the baseline and the decisions behind this backend are in [Host loop freezes](docs/host-loop-freezes.md).
+
 ## How it works
 
 - **Search is a pure read.** `SessionSearchEngine` extends core's exported `SessionQueryEngine` and implements only
@@ -76,7 +78,7 @@ Two gotchas worth knowing before editing:
 - Refused filters are `text` event predicates and the session filters other than `id`; they raise
   `SESSION_QUERY_INVALID_FILTER` rather than silently returning results that do not match the request. `type`,
   `surface`, `seq` and `time` are served.
-- **Live sessions are indexed from their appended log frames.** A live session's newest events become searchable once
-  they reach the log; a dedicated live-event feed is not wired yet.
+- **Live sessions are indexed from their appended log frames.** A committed `session/event` nudges the worker
+  (coalesced to 500 ms), so a live session's newest events become searchable once they reach the log, not before.
 - No embeddings, no ranking changes: the ranking mirrors the stock shape (strongest match per session, shorter
   documents first, newest first) over `bm25`.

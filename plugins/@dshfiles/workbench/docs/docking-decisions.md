@@ -32,6 +32,35 @@ Why the Workbench is DSH's docking surface, and what the choice rules out. The b
 - **Dockview's chrome does not match dockkit's.** Dockview is MIT and in the workspace; the visual mismatch with the
   stock right sidebar is accepted unless it becomes a product problem.
 
+## The main view
+
+The Workbench is also DSH's centre column: the conversation and every global main panel are Dockview panels in one
+layout, arranged by the user instead of replacing each other.
+
+- **The frame owns the centre seat.** `frame-layout` declares `shell.main` and provides `ctx.mainSurface`, like
+  `ctx.rightPanel`. The frame already declares the keyed `main` slot, so it holds the only legal render function for
+  registered main entries and hands it to the seat's occupant. A `workspace-nav` fork would have had to re-declare
+  `main`. Details are in the [frame-layout README](../../frame-layout/README.md#the-main-surface-seat).
+- **Dockview tabs are the main view's tabs.** There is no separate strip above the centre in the owned stack.
+  `main-tabs` keeps the semantics (preview, pin, indicators, close, thread open and move) and renders its native strip
+  only where Workbench is absent.
+- **No native-layout opt-out.** The `mainSurface` setting was first planned as a default with an explicit native
+  opt-out. In the owned stack the centre always uses Workbench, and a saved `mainSurface: native` is decoded but cannot
+  switch the renderer ([layout recovery](layout-recovery.md)).
+- **Slot contributions keep working through their declarer.** Declaring a slot claims it, so only the declarer may
+  render it. Where the declarer is ours (frame, `sidebar-right`, `chat`, `rich-composer`, `settings-shell`,
+  `workspace-nav`, `thread-sidebar`), its content can become a panel; native resources (file preview, diff, terminal)
+  reach panels through the owned `sidebar-right` declarer. A plugin with no slot of its own uses the panel registry.
+  For a foreign declarer the route is the documented panel contract or a Host-gap row, never a client-side mirror of
+  another package's state.
+- **No new nested surfaces.** Nested Dockview containers were built and their saved layouts still restore under
+  per-path keys, but new side-by-side or stacked layouts use Dockview groups (**Split right**, **Split down**).
+- **The conversation is not a naive panel.** It owns scroll anchoring, virtualization, keyboard and focus, so moving or
+  re-laying out its panel must not remount it.
+
+Switching between already-open threads measured 32.8 ms p50 in Workbench against 111.9 ms in the native centre
+([performance](../../../../docs/performance.md#workbench-main-seat-baseline-2026-10-26)).
+
 ## Things that bit
 
 - Dockview reports layout changes only for later gestures, so a freshly applied default layout was never saved and a
