@@ -131,10 +131,23 @@ test('all relationship reads stay pinned when another operation moves the bookma
 })
 
 test('old landmarks outside 500 revisions resolve and bounded histories never truncate counts', async () => {
-  const { jj, id, run } = await fixture()
+  const { repo, jj, id, run } = await fixture()
   const base = id()
   jj(['bookmark', 'create', 'main'])
-  for (let index = 0; index < 501; index += 1) jj(['new', '-m', `step ${index}`])
+  // One fast-import instead of 501 `jj new` spawns, which took longer than the timeout on a busy machine.
+  const steps = Array.from({ length: 501 }, (_, index) => {
+    const message = `step ${String(index)}\n`
+    return `commit refs/heads/chain\ncommitter Graph Test <graph@example.invalid> ${String(1_700_000_000 + index)} +0000\ndata ${String(Buffer.byteLength(message))}\n${message}${index === 0 ? `from ${base}\n` : ''}\n`
+  })
+  const imported = spawnSync('git', ['fast-import', '--quiet'], {
+    env: { PATH: process.env.PATH ?? '', GIT_DIR: join(repo, '.jj', 'repo', 'store', 'git') },
+    input: steps.join(''),
+    encoding: 'utf8',
+  })
+  assert.equal(imported.status, 0, imported.stderr)
+  jj(['git', 'import'])
+  jj(['edit', 'chain'])
+  jj(['bookmark', 'delete', 'chain'])
   const tip = id()
   const navigation = await GraphNavigationReads.readGraphNavigation(run)
   assert.equal(navigation.landmarks.find(item => item.kind === 'main')?.revisions[0]?.commitId, base)
