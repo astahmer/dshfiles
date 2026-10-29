@@ -25,7 +25,7 @@ if (
   outputPath !== undefined &&
   (!isWithin(planDirectory, outputPath) || dirname(outputPath) !== planDirectory || basename(outputPath) !== 'transcript-prototype-results.json')
 ) {
-  throw new Error('The output path must be plans/ade-performance/transcript-prototype-results.json.')
+  throw new Error('The output path must be docs/ade-performance/transcript-prototype-results.json.')
 }
 const html = await readFile(htmlPath, 'utf8')
 const percentile = (values, fraction) => {

@@ -11,7 +11,7 @@ This is an implementation plan, not implemented work. Extend the existing owned 
 - Existing dshx client output is exactly one JS chunk. Distinguish lazy activation, evaluation and transfer; `import()` alone is not a supported code-splitting solution.
 - Counters must contain bounded counts, generations and synthetic/redacted identities—not prompts, tokens, drafts, secrets, launch URLs or message bodies.
 
-The [earlier ADE baseline](../ade-performance/README.md#measurement-rules-and-caveats) measured short, non-streaming held turns and five selected bundles. Its warm navigation numbers do not measure these full-profile, long-history, streaming, large-corpus or multi-tab workloads. Current JJ caches supersede the earlier uncached-inventory hypothesis.
+The [earlier ADE baseline](../../docs/ade-performance/README.md#measurement-rules-and-caveats) measured short, non-streaming held turns and five selected bundles. Its warm navigation numbers do not measure these full-profile, long-history, streaming, large-corpus or multi-tab workloads. Current JJ caches supersede the earlier uncached-inventory hypothesis.
 
 ## Work packages
 
