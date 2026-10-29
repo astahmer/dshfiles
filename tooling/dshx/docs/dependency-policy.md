@@ -20,7 +20,5 @@ DSH compatibility adapters, compiler/loader boundaries, Profile orchestration, R
 
 ## Automation
 
-- Knip checks unused files, exports, and dependencies with explicit entries for public package exports, bins, generated routes, and fixtures.
-- `pnpm audit --prod --audit-level high` blocks critical/high production advisories.
-- Renovate groups safe updates, isolates DSH/beta/major upgrades, maintains the lockfile, and updates pinned GitHub Actions digests.
-- Every dependency change must pass `pnpm check:all` and the relevant package/real-runtime smoke tests.
+- Knip checks unused files, exports, and dependencies with explicit entries for public package exports, bins, generated routes, and fixtures (`pnpm --dir tooling/dshx run deps:check`, part of the root `pnpm run check:dshx`).
+- Every dependency change must pass the root `pnpm run check` and the relevant package/real-runtime smoke tests.

@@ -29,6 +29,7 @@ Additional references:
 - [Compatibility and verification](./compatibility.md)
 - [Installed verification binaries](./verification-binaries.md) — optional stock DSH and Chromium selection for isolated checks.
 - [Architecture](./architecture.md)
+- [Dependency policy](./dependency-policy.md) — when to adopt a package instead of writing a generic helper.
 
 ## Public entry points
 
