@@ -87,6 +87,17 @@ it('reads and toggles the global Workbench dock without any selected Session', (
   expect(owner.openWithFocus).not.toHaveBeenCalled()
 })
 
+it('publishes isExpanded as a snapshot that follows the dock and the on-screen Session', () => {
+  const dock = dockPane()
+  const owner = sidebar({ workbench: () => true, dock: () => dock })
+  const seen: boolean[] = []
+  releases.push(owner.controller.expanded.subscribe(() => seen.push(owner.controller.expanded.getSnapshot())))
+  owner.controller.toggleExpanded()
+  dock.close()
+  owner.show('s1' as SessionId)
+  expect(seen).toEqual([true, false, false])
+})
+
 it('preserves genuine resource occurrences, pins and native floating layout while toggling Workbench', () => {
   const dock = dockPane()
   let workbench = true

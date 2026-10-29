@@ -78,6 +78,8 @@ interface SidebarRightSessions {
   readonly onScreen: ObservableSnapshot<SessionId | undefined>
   /** Open tab metadata across saved and adopted Sessions. */
   readonly openTabs: SidebarTabInventory['source']
+  /** Fires on every adopted store commit and on-screen change; `expanded` follows it. */
+  readonly layoutChanges: { subscribe(listener: () => void): () => void }
 }
 
 /**
@@ -103,7 +105,17 @@ export function createSidebarRightController(
   const rooms = new Map<SessionId, RoomRule>()
   const onScreen = createSnapshotStore<SessionId | undefined>(undefined)
   const inventory = new SidebarTabInventory()
-  const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source })
+  const layoutListeners = new Set<() => void>()
+  const layoutChanged = (): void => {
+    for (const listener of [...layoutListeners]) listener()
+  }
+  const layoutChanges = {
+    subscribe: (listener: () => void): (() => void) => {
+      layoutListeners.add(listener)
+      return () => layoutListeners.delete(listener)
+    },
+  }
+  const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges })
   return {
     controller,
     forget: sessionId => {
@@ -111,7 +123,9 @@ export function createSidebarRightController(
       rooms.delete(sessionId)
     },
     show: sessionId => {
-      if (onScreen.getSnapshot() !== sessionId) onScreen.set(sessionId)
+      if (onScreen.getSnapshot() === sessionId) return
+      onScreen.set(sessionId)
+      layoutChanged()
     },
     measure: (sessionId, canSplitPane) => {
       rooms.set(sessionId, canSplitPane)
@@ -122,6 +136,7 @@ export function createSidebarRightController(
         const surface = store.getSnapshot().bySession[sessionId]
         inventory.update(sessionId, Object.values(surface?.layout.tabs ?? {}))
         if (surface !== undefined) controller.tabDomain.sync(sessionId, surface.layout)
+        layoutChanged()
       }
       const adoption: Adoption = { store, unsubscribe: store.subscribe(sync) }
       adopted.set(sessionId, adoption)
@@ -277,6 +292,19 @@ export class SidebarRightController implements ISidebarRight {
   readonly openTabs: SidebarTabInventory['source']
   /** The on-screen Session; see {@link ISidebarRight.mounted}. */
   readonly mounted: ObservableSnapshot<SessionId | undefined>
+  /** dshfiles delta: `isExpanded()` that follows the on-screen Session's column and the Workbench dock, for dshx `layout.side`. */
+  readonly expanded: ObservableSnapshot<boolean> = {
+    getSnapshot: () => this.isExpanded(),
+    subscribe: listener => {
+      const stopLayout = this.layoutChanges.subscribe(listener)
+      const stopDock = this.host.dock?.()?.subscribe(listener) ?? (() => {})
+      return () => {
+        stopLayout()
+        stopDock()
+      }
+    },
+  }
+  private readonly layoutChanges: SidebarRightSessions['layoutChanges']
   private readonly adopted: ReadonlyMap<SessionId, Adoption>
   private readonly rooms: ReadonlyMap<SessionId, RoomRule>
   private readonly closeHandlers = new Map<string, SidebarRightCloseHandler>()
@@ -317,6 +345,7 @@ export class SidebarRightController implements ISidebarRight {
     this.rooms = sessions.rooms
     this.mounted = sessions.onScreen
     this.openTabs = sessions.openTabs
+    this.layoutChanges = sessions.layoutChanges
     this.tabDomain = new TabDomain(this, pin)
   }
 
