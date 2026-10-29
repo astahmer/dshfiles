@@ -45,6 +45,7 @@
     "@dshfiles/thread-sidebar": "workspace:*",
     "@dshfiles/tweet-context": "workspace:*",
     "@dshfiles/usage": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"
   },

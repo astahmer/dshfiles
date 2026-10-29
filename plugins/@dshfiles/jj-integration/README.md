@@ -405,6 +405,14 @@ Sessions), while the cleanup has to skip busy threads and drop the DSH
 registration. `jjc`'s revset is the model for the empty-revision pass, minus the
 revisions a live workspace still builds on.
 
+## VCS provider
+
+This plugin serves [`@dshfiles/vcs-provider-port`](../vcs-provider-port/README.md) for jj repositories (priority 100,
+so a jj repository colocated with git is jj's): `provision` is the same verb as `jj-threads.provision`, and
+`snapshot`/`restore` record a workspace's files as the jj operation that snapshotted them and put them back with
+`jj restore --from 'at_operation(<op>, @)' --into @`. A restore touches only that workspace's working-copy files:
+history, bookmarks and other workspaces stay where they are.
+
 ## Agent tools
 
 - `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the current working-copy revision. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
@@ -432,7 +440,9 @@ use **Rebase**.
 
 ## Limits
 
-- jj repositories only; git worktrees are not handled yet.
+- jj repositories only. Plain git repositories get thread worktrees and file snapshots from
+  [`@dshfiles/git-worktrees`](../git-worktrees/README.md), the other provider of the same
+  [VCS provider port](../vcs-provider-port/README.md); the Thread integration page and Rebase stay jj-only.
 - A thread workspace starts without `node_modules`; run project-specific
   preparation only after the thread starts and only when its memory-note
   conditions match.

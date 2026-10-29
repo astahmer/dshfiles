@@ -3,7 +3,7 @@ import { AttachmentId, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachme
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import type { PromptContentPart, SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
-import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { BlockAssembler, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -17,6 +17,7 @@ import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dsh
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { usageApi, type JevUsageRecord } from '@dshfiles/usage/api'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
+import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { randomUUID } from 'node:crypto'
@@ -611,18 +612,17 @@ const transcribeSpeech = async (
 const PREVIEW_CHARS = 280
 
 /**
- * The workspace a started thread runs in: jj-integration cuts a thread workspace from the project, and answers the
- * workspace unchanged outside a jj repository. Only a missing plugin is no error, because then the project checkout is
- * all the Host has to offer.
+ * The workspace a started thread runs in: the version-control provider that claims the project (jj-integration for a
+ * jj repository, git-worktrees for a plain git one when its isolation is on) cuts a thread workspace from it, and a
+ * project no provider claims, or a Host without any provider, starts in the project checkout itself.
  */
 const isolatedWorkspaceOf = async (ctx: Context, workspaceId: string): Promise<WorkspaceId> => {
-  const jj = createHostApiClient(ctx, jjIntegrationApi, '@dshfiles/backlog')
-  const provisioned = await jj.safe.provision({ workspaceId, isolate: true })
-  if (!provisioned.ok && !isApiOwnerMissing(provisioned.error)) {
-    throw new PluginApiError(`The thread workspace could not be created: ${provisioned.error.message}`, { code: 'workspace-failed' })
-  }
-  // SAFETY: both ids come from the Host workspace registry, the same identity the Session controller takes branded.
-  return (provisioned.ok ? provisioned.value.workspaceId : workspaceId) as WorkspaceId
+  const path = ctx.get('workspaceRegistry')?.get(WorkspaceId(workspaceId))?.path
+  const provider = path === undefined ? undefined : await VcsProviders.resolve(ctx, { path, callerPackageId: '@dshfiles/backlog' })
+  if (provider === undefined) return WorkspaceId(workspaceId)
+  const provisioned = await provider.client.safe.provision({ workspaceId, isolate: true })
+  if (!provisioned.ok) throw new PluginApiError(`The thread workspace could not be created: ${provisioned.error.message}`, { code: 'workspace-failed' })
+  return WorkspaceId(provisioned.value.workspaceId)
 }
 
 /** The agent a start names, refused when it is unknown or disabled so the thread is not started as the wrong one. */

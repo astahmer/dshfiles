@@ -164,11 +164,13 @@ project workspace or bare folder, an agent handle, an account/model, and the fir
 one Host verb, so a thread an agent starts is the thread the dialog starts. The tool itself does not
 navigate the calling thread.
 
-A thread started from an item always runs in its own jj workspace of the chosen project, whatever the
+A thread started from an item always runs in its own workspace of the chosen project, whatever the
 isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout
-another thread is editing. `@dshfiles/jj-integration` creates that workspace (one `thread-xxxxxx` beside the
-project) and the thread starts in it; outside a jj repository, or with the plugin not installed, the thread
-starts in the project workspace as before. A thread with no project joins the first registered workspace, the
+another thread is editing. The version-control provider that claims the project
+([`@dshfiles/vcs-provider-port`](../vcs-provider-port/README.md)) creates that workspace: `@dshfiles/jj-integration`
+for a jj repository (one `thread-xxxxxx` beside the project), `@dshfiles/git-worktrees` for a plain git repository
+when its `isolate` setting is on. A project no provider claims, or one whose provider keeps isolation off, starts the
+thread in the project workspace as before. A thread with no project joins the first registered workspace, the
 way the composer's New thread does, and is isolated there too. A workspace that cannot be created reports its reason
 in the toast and nothing is started, so a jj failure never falls back to a shared checkout.
 

@@ -1,0 +1,31 @@
+{
+  "name": "@dshfiles/vcs-provider-port",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Host port through which version-control plugins (jj, git worktrees) provide workspace isolation and file snapshots, shared so callers never depend on one provider.",
+  "license": "MIT",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

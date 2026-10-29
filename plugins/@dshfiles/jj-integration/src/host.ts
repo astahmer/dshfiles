@@ -35,6 +35,7 @@ import {
   type ThreadView,
   type WorkspaceSyncView,
 } from './api.js'
+import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
@@ -1380,6 +1381,47 @@ const destinationAt = async (workspaceRoot: string, isolated: boolean, projectWo
   }
 }
 
+const provisionWorkspace = async (input: {
+  readonly workspaceId: string
+  readonly isolate?: boolean | undefined
+  readonly base?: string | undefined
+  readonly name?: string | undefined
+}): Promise<{ workspaceId: string; isolated: boolean; destination: DestinationView }> => {
+  const registry = registryOf()
+  const source = registry.get(WorkspaceId(input.workspaceId))
+  if (source === undefined) throw new Error(`Unknown workspace ${input.workspaceId}.`)
+  const settings = readSettings()
+  const location = await cachedLocation(requireThreads(), source.path)
+  if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(isolatesNewThreadsByDefault(settings)) }
+  const project = await registry.resolveByPath(location.repoRoot)
+  if (!(input.isolate ?? isolatesNewThreadsByDefault(settings))) {
+    const projectId = project?.id ?? source.id
+    return { workspaceId: projectId, isolated: false, destination: await destinationAt(location.repoRoot, false, project?.id ?? null) }
+  }
+  const thread = await requireThreads().provision(location.repoRoot, input.base, input.name)
+  const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
+  emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
+  invalidateRepositories()
+  return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
+}
+
+/** jj-integration as a `@dshfiles/vcs-provider-port` provider: the port's callers isolate and snapshot without naming jj. */
+const vcsProvider = VcsProviders.contract('@dshfiles/jj-integration').host({
+  detect: async ({ input }) => {
+    const location = await cachedBestEffortLocation(requireThreads(), input.path)
+    if (location === undefined) return { match: null }
+    return {
+      match: { vcs: 'jj', priority: 100, repoRoot: location.repoRoot, workspaceRoot: location.workspaceRoot, isolated: location.threadName !== undefined },
+    }
+  },
+  provision: async ({ input }) => {
+    const provisioned = await provisionWorkspace(input)
+    return { workspaceId: provisioned.workspaceId, isolated: provisioned.isolated }
+  },
+  snapshot: async ({ input, signal }) => ({ snapshot: await requireThreads().snapshotFiles(input.path, signal) }),
+  restore: async ({ input, signal }) => ({ previous: await requireThreads().restoreFiles(input.path, input.snapshot, signal) }),
+})
+
 const api = jjIntegrationApi.host({
   ownWorkspaceFor: async ({ input }) => {
     const registry = registryOf()
@@ -1396,24 +1438,7 @@ const api = jjIntegrationApi.host({
     invalidateRepositories()
     return { workspaceId: workspace.id, branched: true }
   },
-  provision: async ({ input }) => {
-    const registry = registryOf()
-    const source = registry.get(WorkspaceId(input.workspaceId))
-    if (source === undefined) throw new Error(`Unknown workspace ${input.workspaceId}.`)
-    const settings = readSettings()
-    const location = await cachedLocation(requireThreads(), source.path)
-    if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(isolatesNewThreadsByDefault(settings)) }
-    const project = await registry.resolveByPath(location.repoRoot)
-    if (!(input.isolate ?? isolatesNewThreadsByDefault(settings))) {
-      const projectId = project?.id ?? source.id
-      return { workspaceId: projectId, isolated: false, destination: await destinationAt(location.repoRoot, false, project?.id ?? null) }
-    }
-    const thread = await requireThreads().provision(location.repoRoot, input.base, input.name)
-    const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
-    emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
-    invalidateRepositories()
-    return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
-  },
+  provision: ({ input }) => provisionWorkspace(input),
   isolate: ({ caller }) => isolateSession(caller),
   destination: async ({ input }) => {
     const registry = registryOf()
@@ -1877,6 +1902,6 @@ export default defineHost({
   inject: ['subprocess', 'sessionController'],
   commands: [rebaseCommand],
   settings: [ownedSettings],
-  apis: [api],
+  apis: [api, vcsProvider],
   setup: setupHost,
 })

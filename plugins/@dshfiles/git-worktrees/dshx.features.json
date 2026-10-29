@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "git-thread-worktrees",
+      "title": "Isolate threads in git worktrees",
+      "summary": "As a VCS provider for plain git repositories, create a thread worktree on its own dsh/thread-… branch beside the repository when isolation is switched on, register it as a DSH project, list and remove it.",
+      "surfaces": ["host", "integration"],
+      "configuration": [
+        {
+          "key": "isolate",
+          "defaultValue": "false",
+          "constraints": "Off answers every provision with the project checkout unchanged.",
+          "coveredBy": ["git-worktrees.provision"]
+        },
+        {
+          "key": "threadsDirectory",
+          "defaultValue": "",
+          "constraints": "Empty uses <repository>-threads; ~/ expands to the home directory.",
+          "coveredBy": ["git-worktrees.provision"]
+        }
+      ],
+      "states": ["not-a-repository", "project-checkout", "thread-worktree", "removed"],
+      "failureModes": [
+        "git worktree remove refuses a worktree with uncommitted changes unless force is passed.",
+        "Removing anything but a thread worktree this plugin created is refused."
+      ],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "Fixed-argv git CLI run with execFile; snapshots use a throwaway GIT_INDEX_FILE so the real index and HEAD never move.",
+          "deterministicFake": "Real temporary git repositories in src/git-worktrees.integration.test.ts; no git mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "git-worktrees.provision",
+          "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
+          "testName": "provisions a thread worktree on its own branch and recognises it"
+        },
+        {
+          "kind": "host-test",
+          "id": "git-worktrees.outside-git",
+          "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
+          "testName": "is not a repository outside git and refuses to remove the project checkout"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "git <subcommand>",
+          "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
+          "testName": "is not a repository outside git and refuses to remove the project checkout"
+        }
+      ]
+    },
+    {
+      "id": "git-file-snapshots",
+      "title": "Snapshot and restore a git workspace's files",
+      "summary": "Record every tracked and untracked, non-ignored file as a commit kept under refs/dsh/snapshots/ without moving HEAD or the index, and put the files back to it, returning a snapshot of what they were.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["snapshot", "restored"],
+      "failureModes": ["A snapshot that is not a commit id is refused before any file changes.", "Ignored files are never recorded or touched."],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "Fixed-argv git CLI run with execFile; snapshots use a throwaway GIT_INDEX_FILE so the real index and HEAD never move.",
+          "deterministicFake": "Real temporary git repositories in src/git-worktrees.integration.test.ts; no git mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "git-worktrees.snapshot-restore",
+          "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
+          "testName": "restores files to a snapshot and back, leaving the index, HEAD and ignored files alone"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "git <subcommand>",
+          "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
+          "testName": "is not a repository outside git and refuses to remove the project checkout"
+        }
+      ]
+    }
+  ]
+}

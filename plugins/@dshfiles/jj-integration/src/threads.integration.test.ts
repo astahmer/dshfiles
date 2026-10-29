@@ -59,6 +59,25 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
   })
 
+  it("restores a workspace's files to a snapshot and back without touching another workspace", async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(repo, 'shared.txt'), 'project edit\n')
+    const before = await threads.snapshotFiles(thread.path)
+    writeFileSync(join(thread.path, 'shared.txt'), 'two\n')
+    writeFileSync(join(thread.path, 'added.txt'), 'new\n')
+
+    const redo = await threads.restoreFiles(thread.path, before)
+
+    expect(readFileSync(join(thread.path, 'shared.txt'), 'utf8')).toBe('one\n')
+    expect(existsSync(join(thread.path, 'added.txt'))).toBe(false)
+    expect(readFileSync(join(repo, 'shared.txt'), 'utf8')).toBe('project edit\n')
+
+    await threads.restoreFiles(thread.path, redo)
+    expect(readFileSync(join(thread.path, 'shared.txt'), 'utf8')).toBe('two\n')
+    expect(readFileSync(join(thread.path, 'added.txt'), 'utf8')).toBe('new\n')
+    await expect(threads.restoreFiles(thread.path, 'not-an-operation')).rejects.toThrow('not a jj operation id')
+  })
+
   it('identifies non-thread secondary workspaces by their owning JJ checkout', async () => {
     const secondaryPath = join(root, 'secondary')
     jj(repo, 'workspace', 'add', secondaryPath, '--name', 'secondary')

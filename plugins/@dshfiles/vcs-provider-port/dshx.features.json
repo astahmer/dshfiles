@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "vcs-provider-resolution",
+      "title": "One port for version-control providers",
+      "summary": "Providers serve the same dshx API id under their own owner; a caller asks every served provider which claims a path and uses the highest priority one to isolate a thread or snapshot and restore files.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["claimed", "unclaimed", "no-provider"],
+      "failureModes": [
+        "A provider whose detect fails is skipped instead of failing the caller.",
+        "A path no provider claims resolves to nothing, so the caller keeps the project checkout."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.priority",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/index.test.ts",
+          "testName": "picks the highest-priority provider that claims the path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.unclaimed",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/index.test.ts",
+          "testName": "answers nothing when no provider claims the path or none is loaded"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    }
+  ]
+}

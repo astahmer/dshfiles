@@ -24,6 +24,7 @@
     "@dshfiles/editor": "link:../../plugins/@dshfiles/editor",
     "@dshfiles/fff-search": "link:../../plugins/@dshfiles/fff-search",
     "@dshfiles/frame-layout": "link:../../plugins/@dshfiles/frame-layout",
+    "@dshfiles/git-worktrees": "link:../../plugins/@dshfiles/git-worktrees",
     "@dshfiles/goal-stall-guard": "link:../../plugins/@dshfiles/goal-stall-guard",
     "@dshfiles/goal-tool": "link:../../plugins/@dshfiles/goal-tool",
     "@dshfiles/hmr-gate": "link:../../plugins/@dshfiles/hmr-gate",
@@ -149,6 +150,7 @@
         "@dshfiles/memory",
         "@dshfiles/agent-toolkit",
         "@dshfiles/home",
+        "@dshfiles/git-worktrees",
         "@dshfiles/hmr-gate"
       ]
     }

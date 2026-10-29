@@ -159,6 +159,7 @@ const pathIsWithin = (parent: string, candidate: string): boolean => {
 }
 const pathsOverlap = (left: string, right: string): boolean => pathIsWithin(left, right) || pathIsWithin(right, left)
 const HEX_ID = /^[0-9a-f]+$/u
+const OPERATION_ID = /^[0-9a-f]{12,128}$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
 const commitIdRevset = (commitId: string): string => {
   if (!isCommitId(commitId)) throw new ThreadError('jj-failed', 'JJ returned an invalid commit ID; refusing revision selection.')
@@ -631,6 +632,26 @@ export const createThreads = (options: {
       throw new ThreadError('not-a-thread', `${path} is not a managed thread workspace.`)
     }
     return { ...location, threadName: location.threadName }
+  }
+
+  /** Snapshots the working copy and names the operation holding it; `restoreFiles` reads `@` back at that operation. */
+  const snapshotFiles = async (path: string, signal?: AbortSignal): Promise<string> => {
+    const { workspaceRoot } = await locate(path, signal)
+    await jj(['util', 'snapshot'], workspaceRoot, signal)
+    const operationId = (await jj(['--ignore-working-copy', 'op', 'log', '--no-graph', '-n', '1', '-T', 'id'], workspaceRoot, signal)).trim()
+    if (!OPERATION_ID.test(operationId)) throw new ThreadError('jj-failed', 'Could not read the operation that recorded the working copy.')
+    return operationId
+  }
+
+  /** Puts this workspace's files back to `@` as it was at an operation; history, bookmarks and other workspaces stay. */
+  const restoreFiles = async (path: string, operationId: string, signal?: AbortSignal): Promise<string> => {
+    if (!OPERATION_ID.test(operationId)) throw new ThreadError('jj-failed', 'That snapshot is not a jj operation id.')
+    const { repoRoot, workspaceRoot } = await locate(path, signal)
+    return serialized(repoRoot, async () => {
+      const previous = await snapshotFiles(workspaceRoot, signal)
+      await jj(['restore', '--from', `at_operation(${operationId}, @)`, '--into', '@'], workspaceRoot, signal)
+      return previous
+    })
   }
 
   const workingCopyCommitId = async (path: string, signal?: AbortSignal): Promise<string> => {
@@ -1704,6 +1725,8 @@ export const createThreads = (options: {
     removeUntrackedEntry,
     bookmarks,
     workingCopyCommitId,
+    snapshotFiles,
+    restoreFiles,
     revisionGraph,
   }
 }
