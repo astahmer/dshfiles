@@ -11,5 +11,5 @@
     { "upstream": "src", "local": "src/native" },
     { "upstream": "locale", "local": "locale" }
   ],
-  "delta": ["src/native/spawn.ts"]
+  "delta": ["src/native/runner-launch.ts", "src/native/spawn.ts"]
 }

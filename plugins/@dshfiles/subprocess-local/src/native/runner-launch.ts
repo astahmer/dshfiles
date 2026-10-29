@@ -19,7 +19,7 @@ export const WINDOWS_RUNNER_SELECTION = 'windows' as const
 /** Non-empty command tuple used to launch the private runner entry. */
 export type RunnerInvocation = [string, ...string[]]
 
-const SOURCE_TSCONFIG_PATH = fileURLToPath(new URL('../../../../tsconfig.base.json', import.meta.url))
+const SOURCE_TSCONFIG_PATH = fileURLToPath(new URL('../../../../../tsconfig.base.json', import.meta.url))
 const RUNNER_CONTROL_ENV_PREFIXES = ['NODE_', 'TSX_'] as const
 
 /**
