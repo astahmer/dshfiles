@@ -23,7 +23,7 @@
     "lint": "oxlint src tests dshx.config.ts",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check .",
-    "test": "dshx test",
+    "test": "vitest run",
     "build": "dshx build",
     "dev": "dshx dev --open",
     "prepack": "npm run check && npm run build",
