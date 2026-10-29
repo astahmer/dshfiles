@@ -29,6 +29,8 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [DOM hook refactor](dom-hook-refactor.md)                            | Replace transcript/stat/frame/thread DOM mutations with typed owner-rendered extension points.                                                                                           |
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                       |
 | [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                     |
+| [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                    |
+| [opencode v2 parity](opencode-parity.md)                             | Browser plugin context gaps against opencode v2 (composer, session screen, panel/tab model, registries); A14 unblocks the workbench and chat-focus migrations.                            |
 
 ## Testing, research and housekeeping
 
@@ -40,6 +42,8 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption backlog from reference products.                                                                                                                                        |
 | [Self-improvement](self-improve/README.md)                    | Open improvements mined from DSH Session history (jj hardening, fetch provider, checkout-sync fan-out, store folds, context diet); the ledger dedups and reopens them. A standing backlog, not a task plan. |
 | [~/dev cleanup](dev-cleanup-audit.md)                         | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                                                     |
+| [Performance optimization](performance-optimization/README.md) | Remaining client, Host and tooling work packages from the repository-wide audit, then full representative before/after acceptance.                                                                         |
+| [Lint cleanup](lint-cleanup/README.md)                        | Remove the ratcheted lint baseline with real fixes and lower each cap as a rule empties.                                                                                                                    |
 
 ## Open follow-ups
 
@@ -54,6 +58,14 @@ Leftovers of finished plans. The plan files were deleted; each line links to the
   the user restarts the `web` Host and confirms the Workbench centre live.
 
 ## Proposed, not started
+
+Written plans for ideas that were scoped but not started:
+
+- [Agent Calendar](agent-calendar.md): a turn-time Calendar tab inside Usage.
+- [Capabilities hub](capabilities-hub.md): one launchpad for Skills, MCP and DSH plugin managers.
+- [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
+- [Plugin Guide](plugin-guide.md): a developer panel over a versioned catalog of public extension surfaces.
+- [Session reminders](session-reminders.md): same-Session reminders through the official Schedule bundle.
 
 Ideas that were investigated but never built. Their plan files were deleted; this line is what survives. Reopen one by
 writing a new plan.
