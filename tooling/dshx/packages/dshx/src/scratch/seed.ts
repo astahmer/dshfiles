@@ -120,7 +120,10 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   // name and shows only the model id.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
+  // Each option holds its display name and model id in adjacent spans whose text runs together, so match one span.
+  const routeOption = input.page
+    .getByRole('menuitemradio', { name: modelId, exact: true })
+    .or(modelList.getByRole('button').filter({ has: input.page.locator('span').filter({ hasText: bareModelWord }) }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 
