@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
-import { createElement } from 'react'
+import { createElement, type ComponentType } from 'react'
 import { BrowserBroker, type Live } from '../src/client/broker.js'
 import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/client/app-services.js'
 import { PluginHooksModel } from '../src/client/hooks.js'
@@ -44,7 +44,7 @@ const services = {
   dialogs: AppServicesModel.dialogs,
   toast: AppServicesModel.toast,
   commands: AppServicesModel.createCommands(() => undefined),
-  layout: AppServicesModel.createLayout(() => undefined),
+  layout: AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => undefined }),
   system: AppServicesModel.system,
   notifications: AppServicesModel.notifications,
   environment: AppServicesModel.createEnvironment({ service: () => undefined, on: () => () => {} }),
@@ -250,7 +250,7 @@ describe('registries', () => {
     expect(entry?.name).toBe('conversation.input.dock')
     const inject = entry?.options.inject
     expect(typeof inject === 'function' ? inject('s1') : undefined).toEqual({ sessionId: 's1' })
-    const Frame = entry?.component as (props: { readonly sessionId: string }) => unknown
+    const Frame = entry?.component as ComponentType<{ readonly sessionId: string }>
     expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toContain('<button type="button" aria-haspopup="menu" aria-expanded="false">Sending after upload s1</button>')
     label = undefined
     expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toBe('')
@@ -307,6 +307,46 @@ describe('services', () => {
     const provider = createPlugin('@test/dialogs')
     provider.plugin.provide(Dialogs, provided)
     expect(await createPlugin('@test/owner').plugin.dialogs.confirm({ title: 'Sure?' })).toBe(true)
+  })
+})
+
+describe('layout.side', () => {
+  it('opens, hides and toggles the on-screen side region and follows its state', () => {
+    let expanded = false
+    const listeners = new Set<() => void>()
+    const sidebarRight = {
+      isExpanded: () => expanded,
+      toggleExpanded: () => {
+        expanded = !expanded
+        for (const listener of listeners) listener()
+      },
+      expanded: {
+        getSnapshot: () => expanded,
+        subscribe: (listener: () => void) => {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+      },
+    }
+    const side = AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => sidebarRight }).side
+    const seen: boolean[] = []
+    const stop = side.expanded.subscribe(() => seen.push(side.expanded.get()))
+    expect(side.open()).toBe(true)
+    expect(side.open()).toBe(true)
+    expect(side.hide()).toBe(true)
+    expect(side.toggle()).toBe(true)
+    expect(seen).toEqual([true, false, true])
+    stop()
+  })
+
+  it('refuses without a side region or while no session is on screen', () => {
+    expect(AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => undefined }).side.open()).toBe(false)
+    const throwing = { isExpanded: () => false, toggleExpanded: () => {
+      throw new Error('no session on screen')
+    } }
+    const side = AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => throwing }).side
+    expect(side.toggle()).toBe(false)
+    expect(side.expanded.get()).toBe(false)
   })
 })
 

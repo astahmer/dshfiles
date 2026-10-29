@@ -49,7 +49,7 @@ const createPluginRuntime = (input: {
       dialogs: AppServicesModel.dialogs,
       toast: AppServicesModel.toast,
       commands: AppServicesModel.createCommands(() => input.ctx.get('shortcuts')),
-      layout: AppServicesModel.createLayout(() => input.ctx.get('layout')),
+      layout: AppServicesModel.createLayout({ layout: () => input.ctx.get('layout'), sidebarRight: () => input.ctx.get('sidebarRight') }),
       system: AppServicesModel.system,
       notifications: AppServicesModel.notifications,
       environment: AppServicesModel.createEnvironment({

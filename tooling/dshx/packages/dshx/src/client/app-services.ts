@@ -159,12 +159,66 @@ interface NativeLayout {
   toggleSidebar(): void
 }
 
+/** The right side region of the session on screen: its native right pane, or the Workbench dock. */
+export interface SideRegionService {
+  /** Whether it shows its panel; false while no session is on screen or the Host has no side region. */
+  readonly expanded: Subscribable<boolean>
+  /** Each returns false when the Host has no side region or no session is on screen. */
+  open(): boolean
+  hide(): boolean
+  toggle(): boolean
+}
+
 export interface LayoutService {
   /** The selected main panel id, or null while a conversation shows. */
   readonly panel: Subscribable<string | null>
   /** Show a registered main panel, or the conversation with null. Returns false when this Host has no layout. */
   openPanel(panelId: string | null): boolean
   toggleSidebar(): boolean
+  readonly side: SideRegionService
+}
+
+interface NativeSideRegion {
+  isExpanded(): boolean
+  toggleExpanded(): void
+  readonly expanded?: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
+}
+
+const isNativeSideRegion = (value: unknown): value is NativeSideRegion =>
+  typeof value === 'object' &&
+  value !== null &&
+  'isExpanded' in value &&
+  typeof value.isExpanded === 'function' &&
+  'toggleExpanded' in value &&
+  typeof value.toggleExpanded === 'function'
+
+// The Host's toggle throws while no session is on screen; that is a refusal here, not an error.
+const createSideRegion = (sidebarRight: () => unknown): SideRegionService => {
+  const toggleWhen = (wanted: (expanded: boolean) => boolean): boolean => {
+    const native = sidebarRight()
+    if (!isNativeSideRegion(native)) return false
+    try {
+      if (wanted(native.isExpanded())) native.toggleExpanded()
+      return true
+    } catch {
+      return false
+    }
+  }
+  return {
+    expanded: {
+      get: () => {
+        const native = sidebarRight()
+        return isNativeSideRegion(native) && native.isExpanded()
+      },
+      subscribe: listener => {
+        const native = sidebarRight()
+        return isNativeSideRegion(native) && native.expanded !== undefined ? native.expanded.subscribe(listener) : () => {}
+      },
+    },
+    open: () => toggleWhen(expanded => !expanded),
+    hide: () => toggleWhen(expanded => expanded),
+    toggle: () => toggleWhen(() => true),
+  }
 }
 
 const isNativeLayout = (value: unknown): value is NativeLayout =>
@@ -176,26 +230,27 @@ const isNativeLayout = (value: unknown): value is NativeLayout =>
   typeof value.panelInfo === 'object' &&
   value.panelInfo !== null
 
-const createLayout = (layout: () => unknown): LayoutService => ({
+const createLayout = (input: { readonly layout: () => unknown; readonly sidebarRight: () => unknown }): LayoutService => ({
+  side: createSideRegion(input.sidebarRight),
   panel: {
     get: () => {
-      const native = layout()
+      const native = input.layout()
       return isNativeLayout(native) ? native.panelInfo.getSnapshot().activePanelId : null
     },
     subscribe: listener => {
-      const native = layout()
+      const native = input.layout()
       return isNativeLayout(native) ? native.panelInfo.subscribe(listener) : () => {}
     },
   },
   openPanel: panelId => {
-    const native = layout()
+    const native = input.layout()
     if (!isNativeLayout(native)) return false
     // MainPanelId is a branded string; the Host validates the key and throws when it is unregistered.
     native.selectPanel(panelId as never)
     return true
   },
   toggleSidebar: () => {
-    const native = layout()
+    const native = input.layout()
     if (!isNativeLayout(native)) return false
     native.toggleSidebar()
     return true

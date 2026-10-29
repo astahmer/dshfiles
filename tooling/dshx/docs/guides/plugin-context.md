@@ -180,7 +180,7 @@ is no longer current.
 | `api.dialogs` | `confirm`, `alert`, `prompt`, `select` in the app's dialogs (`Dialogs` contract); plain browser dialogs while no provider runs |
 | `api.toast.show(input)` | a toast through the `Toasts` contract; logged while no provider runs |
 | `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run |
-| `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()` |
+| `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()`; `side` is the right region of the session on screen (its native right pane, or the Workbench dock): live `expanded`, `open()`, `hide()`, `toggle()`, each false without a side region or a session on screen |
 | `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab, `openLink(href)` through a `LinkHandler` and else as `openExternal`; each resolves or returns false when the browser cannot |
 | `api.notifications` | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported` |
 | `api.environment` | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service |

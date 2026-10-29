@@ -81,6 +81,7 @@ export type {
   DialogsService,
   EnvironmentService,
   LayoutService,
+  SideRegionService,
   LocaleState,
   NotificationPermissionState,
   NotificationsService,
