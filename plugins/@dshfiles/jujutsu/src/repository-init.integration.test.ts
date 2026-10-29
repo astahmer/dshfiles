@@ -223,7 +223,7 @@ test('a malformed nested Git marker blocks initialization of its valid outer Git
   assert.equal(await readFile(join(nested, '.git'), 'utf8'), 'not a gitdir pointer\n')
 })
 
-test('a real linked Git worktree initializes on installed JJ and preserves both Git checkouts', async () => {
+test('a real linked Git worktree initializes on installed JJ and preserves both Git checkouts', async context => {
   const f = await fixture()
   await f.createGit()
   const worktree = join(f.home, 'worktree')
@@ -233,7 +233,15 @@ test('a real linked Git worktree initializes on installed JJ and preserves both 
   const before = gitState(worktreeGit)
   const primaryBefore = gitState(f.git)
   const pointer = await readFile(join(worktree, '.git'))
-  assert.deepEqual(await f.open(worktree), { root: worktree, initialized: true })
+  const opened = await f.open(worktree).catch((error: unknown) => {
+    if (error instanceof RepositoryInitializationError && error.message.includes('may not support Git worktrees')) return undefined
+    throw error
+  })
+  if (opened === undefined) {
+    context.skip('The installed JJ cannot initialize a linked Git worktree.')
+    return
+  }
+  assert.deepEqual(opened, { root: worktree, initialized: true })
   assert.deepEqual(gitState(worktreeGit), before)
   assert.deepEqual(gitState(f.git), primaryBefore)
   assert.deepEqual(await readFile(join(worktree, '.git')), pointer)
