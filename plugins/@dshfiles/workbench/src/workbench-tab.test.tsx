@@ -260,6 +260,27 @@ describe('workbench semantic tab chrome', () => {
     fireEvent.keyDown(editor, { key: 'Escape' })
   })
 
+  it('closes the other native tabs of its group, or only those to its right', () => {
+    const tab = fixture({ semantic: false })
+    act(() => {
+      tab.api.addPanel({ id: 'second', component: 'body', position: { referenceGroup: tab.panel.group } })
+      tab.api.addPanel({ id: 'third', component: 'body', position: { referenceGroup: tab.panel.group } })
+    })
+    act(() => tab.panel.api.setActive())
+    tab.menu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close tabs to the right' }))
+    expect(tab.panel.group.panels.map(panel => panel.id)).toEqual(['panel-a'])
+
+    act(() => tab.api.addPanel({ id: 'fourth', component: 'body', position: { referenceGroup: tab.panel.group } }))
+    tab.menu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close other tabs' }))
+    expect(tab.panel.group.panels.map(panel => panel.id)).toEqual(['panel-a'])
+    tab.menu()
+    expect(screen.getByRole('menuitem', { name: 'Close other tabs' }).getAttribute('data-disabled')).toBe('')
+    expect(screen.getByRole('menuitem', { name: 'Close tabs to the right' }).getAttribute('data-disabled')).toBe('')
+    expect(tab.actions.close).not.toHaveBeenCalled()
+  })
+
   it('hides only a single native tab row without closing or navigating its panel', () => {
     const tab = fixture({ semantic: false })
     tab.menu()
