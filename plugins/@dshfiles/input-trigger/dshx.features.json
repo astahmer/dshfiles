@@ -87,6 +87,30 @@
           "reason": "Client-only: Restore a persisted command chip renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "command-slash-entries",
+      "title": "Slash entries for dshx commands",
+      "summary": "Lists every dshx Command that names a slash entry in the composer's / menu at the start of the draft. Picking one runs it and clears its token; sending a line that is exactly the entry runs it as a command claim.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["offered", "picked", "claimed"],
+      "failureModes": ["A disabled or failing command reports its error as the composer's command notice instead of sending the line."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.command-slash-entries",
+          "file": "plugins/@dshfiles/input-trigger/src/command-slash-source.test.ts",
+          "testName": "runs a picked command and clears its token"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the slash entry runs a browser command and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }
