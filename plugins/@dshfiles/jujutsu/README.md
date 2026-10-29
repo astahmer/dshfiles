@@ -1,5 +1,7 @@
 # @dshfiles/jujutsu
 
+![Describe and review the working copy in Source Control](docs/screenshots/source-control.png)
+
 ![Show exact revision counts against the selected base](docs/screenshots/composer-context.png)
 
 ![Remove a workspace from the graph](docs/screenshots/workspace-removal.png)
@@ -16,7 +18,7 @@ A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
 
-The reusable graph view is **Jujutsu: Revision graph** in navigation and the Workbench chooser. Repository-scoped tabs keep their repository titles.
+Two panels in navigation, the main view and the Workbench chooser: **Jujutsu: Revision graph** and **Jujutsu: Source Control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
 
 ## What it provides
 
@@ -64,7 +66,7 @@ The reusable graph view is **Jujutsu: Revision graph** in navigation and the Wor
   and Escape or Cancel collapses it; only the shared folder picker for a new
   workspace parent is still a dialog. A panel whose row the current filter
   hides stays reachable above the list.
-- A Source Control view modelled on jj-view: a message box that describes or
+- A Source Control panel modelled on jj-view: a message box that describes or
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal
   filesets), split by selected files, and group describe/new/edit/squash.
@@ -75,7 +77,7 @@ The reusable graph view is **Jujutsu: Revision graph** in navigation and the Wor
   command, unbound by default under Settings › Shortcuts. It opens the page on
   that repository, or collapses the panel when it already shows it.
 - One Jujutsu tab per repository in the main view, through the copy-plus button
-  in the page header (_Open this repository in a new tab_): `@dshfiles/main-tabs`
+  in the graph toolbar (_Open this repository in a new tab_): `@dshfiles/main-tabs`
   opens a tab scoped to that repository, named _Jujutsu · <repo>_ and renamed
   after whichever repository the tab shows later. A scoped tab keeps its own
   repository, view, filters, selection and expanded rows; closing it leaves the
@@ -99,7 +101,7 @@ The reusable graph view is **Jujutsu: Revision graph** in navigation and the Wor
 - Dragging a local bookmark or revision onto a revision (main page and side
   panel) prepares a move/rebase preview while the moving branch is dimmed.
   Every mutation, fetch, and push needs a second explicit confirmation.
-- View settings (default tab, ancestor groups, file layout, raw patch expanded,
+- View settings (the side panel's default tab, ancestor groups, file layout, raw patch expanded,
   day grouping, graph density, hide immutable, mine only, revisions loaded) are saved in this
   browser and shared live by every Jujutsu surface; the repository, view and
   filters a given tab, thread or the dock was left on are kept per scope

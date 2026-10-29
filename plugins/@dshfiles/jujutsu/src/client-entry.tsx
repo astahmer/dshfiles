@@ -27,10 +27,12 @@ import { sidePanelRepository } from './side-panel-repository.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
+const SOURCE_CONTROL_PANEL_ID = 'dshfiles-jujutsu-source-control'
 const RIGHT_PANE_ID = '@dshfiles/jujutsu/revision-graph'
 const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 /** The workbench panel id the global dock opens by default. */
 const DOCK_PANEL_ID = 'dshfiles-jujutsu.dock'
+const SOURCE_CONTROL_DOCK_PANEL_ID = 'dshfiles-jujutsu.source-control'
 /** `@dshfiles/main-tabs` asks this for the graph's right-pane view when its main tab is dropped there. */
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
 const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
@@ -51,16 +53,17 @@ export default defineClient({
       const workspace = await ctx.workspaces.create({ path: canonicalPath })
       return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
     }
-    const panel = (surface: 'main' | 'side-panel' | 'dock', scope: string, defaultPath: string | null, visible = true): JSX.Element => (
+    const panel = (options: SurfacePanelOptions): JSX.Element => (
       <PluginQueryProvider>
         <ProjectsBoundPanel
           workspaces={ctx.workspaces}
           // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
-          key={scope}
-          scope={scope}
-          defaultPath={defaultPath}
-          surface={surface}
-          visible={visible}
+          key={options.scope}
+          scope={options.scope}
+          defaultPath={options.defaultPath ?? null}
+          surface={options.surface}
+          visible={options.visible ?? true}
+          {...(options.view === undefined ? {} : { view: options.view })}
           directoryPicker={directoryPicker}
           registerWorkspace={registerWorkspace}
           // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
@@ -101,17 +104,28 @@ export default defineClient({
     }
     const MainSurfacePanel = decorate(() => {
       const scope = useActiveJujutsuScope()
-      return panel('main', scope, null)
+      return panel({ surface: 'main', scope, view: 'graph' })
     })
+    const MainSourceControlPanel = decorate(() => panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, view: 'source' }))
     const SideSurfacePanel = decorate(() => {
       const target = useMountedSession()
-      return panel('side-panel', target.scope, target.defaultPath)
+      return panel({ surface: 'side-panel', scope: target.scope, defaultPath: target.defaultPath })
     })
-    const DockSurfacePanel = decorate((props: WorkbenchPanelProps) => panel('dock', DOCK_PANEL_SCOPE, null, props.visible))
-    const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) => panel('main', props.scope, null, props.visible))
+    const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
+      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'graph' }),
+    )
+    const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
+      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'source' }),
+    )
+    const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
+      panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
+    )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu: Revision graph' }, PanelGlyph),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: 'Jujutsu: Source Control' }, SourceControlGlyph),
     )
     ctx.effect(
       () =>
@@ -233,6 +247,7 @@ export default defineClient({
       ),
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, MainSurfacePanel))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: SOURCE_CONTROL_PANEL_ID }, MainSourceControlPanel))
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, SideSurfacePanel))
     // The graph is one panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's
     // business, so it answers the strip's request and offers the reverse row on its own right-pane tab.
@@ -295,8 +310,27 @@ export default defineClient({
         }),
       'dshfiles-jujutsu: dock panel',
     )
+    ctx.effect(
+      () =>
+        workbenchPanels().register({
+          id: SOURCE_CONTROL_DOCK_PANEL_ID,
+          title: 'Jujutsu: Source Control',
+          mainPanelId: SOURCE_CONTROL_PANEL_ID,
+          component: DockSourceControlPanel,
+        }),
+      'dshfiles-jujutsu: source control dock panel',
+    )
   },
 })
+
+interface SurfacePanelOptions {
+  readonly surface: 'main' | 'side-panel' | 'dock'
+  readonly scope: string
+  readonly defaultPath?: string | null
+  readonly visible?: boolean | undefined
+  /** Omitted only on the narrow side panel, which switches between both views with tabs. */
+  readonly view?: 'graph' | 'source'
+}
 
 interface MountedPanelScope {
   readonly scope: string
@@ -341,6 +375,23 @@ const ProjectsBoundPanel = (props: Omit<Parameters<typeof JujutsuPanel>[0], 'pro
   const { workspaces, ...panelProps } = props
   return <JujutsuPanel {...panelProps} projects={useRegisteredProjects(workspaces)} />
 }
+
+const SourceControlGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5M12 11v6M9 14h6" />
+  </svg>
+)
 
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg

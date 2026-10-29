@@ -129,6 +129,8 @@ interface JujutsuPanelProps {
   readonly launchSession: (cwd: string) => Promise<void>
   /** False while the workbench keeps this panel mounted behind another tab or in a hidden dock. */
   readonly visible?: boolean
+  /** A panel dedicated to one view; without it the panel switches between both with tabs (the narrow side panel). */
+  readonly view?: View
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -286,7 +288,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
   const [diffTabOpen, setDiffTabOpen] = useState(false)
-  const view = chosenView ?? preferences.defaultView
+  const view = props.view ?? chosenView ?? preferences.defaultView
   const [authorFilter, setAuthorFilter] = usePanelScopeState(scope, 'authorFilter', () => '')
   const [textFilter, setTextFilter] = usePanelScopeState(scope, 'textFilter', () => '')
   const [fromDate, setFromDate] = usePanelScopeState(scope, 'fromDate', () => '')
@@ -374,6 +376,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
   const [workspaceRemoval, setWorkspaceRemoval] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
+  const showViewTabs = props.view === undefined || fullDiff !== null
   const [patchDisclosure, setPatchDisclosure] = useState<{ readonly commitId: string; readonly open: boolean } | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string } | null>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
@@ -1867,27 +1870,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               return
             }
             setDiffTabOpen(false)
-            setView(value === 'source' ? 'source' : 'graph')
+            if (props.view === undefined) setView(value === 'source' ? 'source' : 'graph')
           }}
           value={diffTabOpen ? 'diff' : view}
         >
           <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
-            {!sidePanel && (
-              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:pt-1">
-                <h1 className="dshx:text-xl dshx:font-semibold">Jujutsu</h1>
-                <p className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-                  {state?.root ?? 'Select a repository to inspect its revision graph.'}
-                </p>
-              </div>
-            )}
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
+            {showViewTabs && (
               <TabsList aria-label="Jujutsu views" className="dshx:h-9 dshx:gap-4 dshx:rounded-none dshx:border-b dshx:p-0" variant="line">
-                <TabsTrigger
-                  className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
-                  value="graph"
-                >
-                  Revision graph
-                </TabsTrigger>
+                {props.view !== 'source' && (
+                  <TabsTrigger
+                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
+                    value="graph"
+                  >
+                    Revision graph
+                  </TabsTrigger>
+                )}
                 {fullDiff !== null && (
                   <TabsTrigger
                     className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
@@ -1896,14 +1893,87 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                     Diff
                   </TabsTrigger>
                 )}
-                <TabsTrigger
-                  className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
-                  value="source"
-                >
-                  Source Control
-                </TabsTrigger>
+                {props.view !== 'graph' && (
+                  <TabsTrigger
+                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
+                    value="source"
+                  >
+                    Source Control
+                  </TabsTrigger>
+                )}
               </TabsList>
-              <span aria-live="polite" className="dshx:flex dshx:size-6 dshx:items-center dshx:justify-center" role="status">
+            )}
+            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Choose repository"
+                    className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
+                    onClick={() => setPickerOpen(true)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <FolderGit2Icon className="dshx:text-muted-foreground" />
+                    {state !== undefined || path.length > 0 ? (
+                      <>
+                        <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
+                        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
+                      </>
+                    ) : (
+                      <span className="dshx:text-muted-foreground">Choose repository…</span>
+                    )}
+                    <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{state?.root ?? (path || 'Choose repository')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={repoId === null || selectedRemote === '' || busy}
+                    onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Fetch
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
+                    onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Push
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-busy={busy}
+                    aria-label="Refresh"
+                    disabled={busy || repoId === null}
+                    onClick={refreshRepository}
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {busy ? <Spinner /> : <RefreshCwIcon />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Refresh</TooltipContent>
+              </Tooltip>
+              <span aria-live="polite" className="dshx:flex dshx:items-center" role="status">
                 {loadingRepository && (
                   <>
                     <Spinner aria-hidden="true" className="dshx:size-3" />
@@ -1911,8 +1981,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   </>
                 )}
               </span>
-              <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
-                {props.surface === 'main' ? (
+              <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
+                {props.surface === 'main' && props.view !== 'source' ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -1990,77 +2060,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </div>
-            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Choose repository"
-                    className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
-                    onClick={() => setPickerOpen(true)}
-                    type="button"
-                    variant="outline"
-                  >
-                    <FolderGit2Icon className="dshx:text-muted-foreground" />
-                    {state !== undefined || path.length > 0 ? (
-                      <>
-                        <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
-                        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
-                      </>
-                    ) : (
-                      <span className="dshx:text-muted-foreground">Choose repository…</span>
-                    )}
-                    <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{state?.root ?? (path || 'Choose repository')}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    disabled={repoId === null || selectedRemote === '' || busy}
-                    onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Fetch
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
-                    onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Push
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-busy={busy}
-                    aria-label="Refresh"
-                    disabled={busy || repoId === null}
-                    onClick={refreshRepository}
-                    size="icon-sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {busy ? <Spinner /> : <RefreshCwIcon />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Refresh</TooltipContent>
-              </Tooltip>
               {busy && !loadingRepository && (
                 <span className="dshx:sr-only" role="status">
                   Working…

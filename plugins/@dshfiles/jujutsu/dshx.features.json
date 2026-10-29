@@ -663,9 +663,57 @@
       ]
     },
     {
+      "id": "source-control",
+      "title": "Describe and review the working copy in Source Control",
+      "summary": "Jujutsu: Source Control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
+      "reach": [
+        "click button \"Jujutsu: Source Control\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect textbox \"Working copy description\"",
+        "expect button \"Jujutsu view settings\"",
+        "expect button \"Repository actions\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["working-copy", "ancestors", "no-repository"],
+      "failureModes": [
+        "Without a selected repository the panel offers the repository picker instead of empty groups.",
+        "An invalid repository shows the registration error with a control to choose another repository."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-repository",
+          "boundary": "Local jj executable and repository state.",
+          "deterministicFake": "Real disposable local JJ repositories."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "jujutsu.source-control-no-gherkin-journey",
+          "reason": "No Gherkin scenario walks the Source Control panel yet; its reach steps open the panel on a scratch DSH with dshx dev open, and the describe and file reads it calls are the same jujutsu API methods the revision graph journeys exercise."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
+        }
+      ]
+    },
+    {
       "id": "panel-scopes",
       "title": "Keep one repository per Jujutsu tab, thread and dock",
-      "summary": "Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The page header's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
+      "summary": "Jujutsu: Revision graph and Jujutsu: Source Control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
@@ -675,13 +723,10 @@
         "expect button \"Sample project*\"",
         "click button \"Open this repository in a new tab\"",
         "expect tab \"Jujutsu \u00b7 sample*\"",
-        "click tab \"Source Control\"",
-        "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu: Revision graph\"",
         "expect button \"Locate Current\"",
-        "click tab \"Jujutsu \u00b7 sample*\"",
+        "click button \"Jujutsu: Source Control\"",
         "expect textbox \"Working copy description\"",
-        "click tab \"Revision graph\"",
+        "click tab \"Jujutsu \u00b7 sample*\"",
         "expect button \"Locate Current\""
       ],
       "surfaces": ["client", "storage", "integration"],
