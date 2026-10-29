@@ -11,6 +11,7 @@ import hostDefinition from './host.js'
 import { NetworkController } from './network-controller.js'
 import { NETWORK_SETTINGS_NAMESPACE } from './network-preferences.js'
 import * as startup from './startup.js'
+import { socketClosed } from './socket-closed.test-support.js'
 
 const lanHost = Object.values(networkInterfaces())
   .flat()
@@ -151,7 +152,7 @@ describe('required localhost native Host lifecycle', () => {
       const connected = once(client, 'connect', { signal: AbortSignal.timeout(2_000) })
       client.connect({ host: '127.0.0.1', port })
       await connected
-      const closed = once(client, 'close', { signal: AbortSignal.timeout(2_000) })
+      const closed = socketClosed(client)
       await runtime.plugin.dispose()
       await closed
       expect(runtime.host.ctx.webServer.port).toBe(port)

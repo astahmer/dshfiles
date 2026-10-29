@@ -13,6 +13,7 @@ import hostDefinition from './host.js'
 import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { LoopbackAccess } from './access.js'
+import { socketClosed } from './socket-closed.test-support.js'
 
 const lanHost = Object.values(networkInterfaces())
   .flat()
@@ -85,7 +86,7 @@ describe('LoopbackAccess real-socket lifetime', () => {
       const connected = once(client, 'connect', { signal: AbortSignal.timeout(2_000) })
       client.connect({ host: '127.0.0.1', port })
       await connected
-      const closed = once(client, 'close', { signal: AbortSignal.timeout(2_000) })
+      const closed = socketClosed(client)
       await plugin.dispose()
       await closed
       await expectPortsReleased(port)
@@ -124,7 +125,7 @@ describe('LoopbackAccess real-socket lifetime', () => {
       const bytes = once(client, 'data', { signal: AbortSignal.timeout(2_000) })
       client.write('lifecycle')
       expect((await bytes)[0]).toEqual(Buffer.from('lifecycle'))
-      const closed = once(client, 'close', { signal: AbortSignal.timeout(2_000) })
+      const closed = socketClosed(client)
       await access.close()
       await closed
       expect(access.status()).toMatchObject({ state: 'stopped', localhostOrigin: null, listeners: [] })

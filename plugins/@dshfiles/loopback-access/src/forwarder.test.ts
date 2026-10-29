@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { LoopbackForwarder } from './forwarder.js'
+import { socketClosed } from './socket-closed.test-support.js'
 
 const servers: Server[] = []
 const sockets = new Set<Socket>()
@@ -91,7 +92,7 @@ async function connect(listener: { host: string; port: number }): Promise<Socket
 }
 
 async function closed(socket: Socket): Promise<void> {
-  await once(socket, 'close', { signal: AbortSignal.timeout(2_000) })
+  await socketClosed(socket)
 }
 
 function readBytes(socket: Socket, length: number): Promise<Buffer> {
