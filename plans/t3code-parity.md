@@ -1,0 +1,93 @@
+# What we lack compared to t3code
+
+We compared [pingdotgg/t3code](https://github.com/pingdotgg/t3code) at the latest nightly
+tag, `v0.1.6-nightly.20261029.3892`. The repo has no `nightly` branch; nightlies are
+tags. That tag points at commit `08a463e29976617134de01e9341f898bc881d0eb`
+(2026-10-29T18:34:43Z). We read its user docs (`docs/user/*`), internals
+(`docs/internals/overview.md`, `docs/orchestration-v2/*`) and source. All t3code paths
+below are relative to that tag. On our side we read DSH 0.2.1-rc.2 plus the
+`plugins/@dshfiles/*` READMEs and sources.
+
+t3code is a control surface for vendor agent CLIs: Codex app-server, Claude, Cursor,
+Grok, OpenCode, Pi and ACP agents. It ships an Effect server, a web app, an Electron
+desktop app and Expo mobile apps. DSH runs its own agent loop, which plugins extend.
+Rows list only real gaps or meaningful differences. "(unverified)" means we did not
+confirm it in source.
+
+Resume here: pick an item from "Suggested order".
+
+## A. UX / GUI
+
+| ID  | t3code has | What we have today / gap |
+| --- | ---------- | ------------------------ |
+| A1  | iOS and Android apps (`apps/mobile`, Expo). They push alerts when a thread finishes, fails or needs approval, and show Live Activities through the T3 Connect relay (`docs/user/mobile-notifications.md`). Drafts and the queue work offline | Web GUI only. `api.notifications` covers browser notifications, and thread-sidebar adds per-category in-app and system alerts. **Gap:** we have no phone client and no push when every browser is closed |
+| A2  | **Visual replies**: the `html_render` / `html_preview` tools publish a sandboxed, themed HTML page (chart, mockup, collage) above the reply. It is checked with screenshots from a managed headless Chrome (`apps/server/src/htmlRender/headlessChrome.ts`, `mcp/toolkits/html`). MCP Apps render inline in place of the tool call (`apps/server/src/mcpApps`) | Chat renders Markdown, and the editor previews Markdown. **Gap:** we have no agent-published HTML or MCP App surface in the transcript |
+| A3  | A preview browser panel with agent tools: `preview_open/navigate/act/snapshot/evaluate/wait_for/resize/recording_start/stop`, plus `t3_preview_list/close` (`mcp/toolkits/preview`, `apps/desktop/src/preview`). It can import cookies from another browser (`docs/user/browser-import.md`). The thread details card lists the dev servers the thread started, with their ports and a Stop button (`apps/web/src/portDiscoveryState.ts`) | Chat's `Browser` contract opens the Host browser page. The agent drives a browser only through an external chrome-devtools MCP (`docs/computer-use.md`). **Gap:** we have no first-party agent browser tools, no detection of dev-server ports per thread, and no "open in preview" |
+| A4  | Composer: a Tiptap Markdown editor. A paste of 32 KiB or more becomes a file attachment. ArrowUp recalls earlier prompts. Inline chips cover a terminal excerpt, a review comment, a PR `#123` with a `#` picker, and a thread `@` or a thread dragged from the sidebar. **Prompt links** open a draft from a URL (`/new?prompt=&repo=&model=&pr=`, `apps/web/src/components/promptLinks`) (`docs/user/composer.md`) | rich-composer has file, quote, note, comment and session-reference chips. mentions provides `@thread:`/`@file:`, and prompt-stash saves prompts. **Gaps:** prompt recall (rich-composer has no ArrowUp history), large-paste-to-file (unverified), a `#` PR picker, terminal-excerpt chips and prompt links |
+| A5  | The queue is saved on the server. You can **edit a queued message in place**, **Send now** to steer, and steer the oldest queued message with `Cmd+Shift+Enter`. After Stop or a restart the queue is **held** until you resume it (`docs/user/composer.md` "Queued messages") | queue-reorder handles drag reorder. `queue_describe`, `thread_queue_steer` and `thread_queue_remove` cover the rest. **Gap:** we cannot edit a queued message in place. Whether the queue holds after a restart is unverified |
+| A6  | **Multi-model fan-out**: Shift-click several models to send one prompt as one thread and worktree per model. `Cmd+Enter` starts a thread in the background and opens a fresh draft (`docs/user/thread-sidebar.md` "Start in the background", `apps/web/src/components/chat/ComposerFooterControls.tsx`) | We have nothing like it. Today you start each thread by hand, or an agent runs the `workflow` tool |
+| A7  | Threads without a project run in a `~/.t3/scratch/<date>-<words>-<id>` folder. **Turn into project** later promotes that folder in place (`docs/user/thread-sidebar.md` "Start without a project", `mcp/toolkits/project/handlers.ts`) | A thread can take a bare `cwd`, but nothing creates a scratch folder or promotes it to a project. Small gap |
+| A8  | Sidebar: drag a thread between sections to pin, unpin, settle or wake it, with the order saved on the server. Settle, snooze and archive show an Undo toast (`mod+z`). A folded **Working** section. A drag across rows bulk-settles them (`docs/user/thread-sidebar.md`) | thread-sidebar has pin, settle, auto-settle, mute with a timer, project groups and attention. The Undo toasts, Working fold, cross-section drag and drag-sweep bulk settle are unverified in our code |
+| A9  | Devices panel for the iOS Simulator and Android Emulator, with `device_*` agent tools (`apps/web/src/components/device`, `mcp/toolkits/device`). Desktop **SnapShots** capture an OS window together with its accessibility tree (`apps/desktop/src/snapShot`) | annotations only picks elements inside DSH. Low relevance without mobile or desktop targets |
+| A10 | Themes imported from Open VSX (`apps/web/src/openVsxThemes.ts`) and voice dictation on iPhone (`docs/user/composer.md`) | We have only the native theme. Voice exists only in backlog capture. Low priority |
+
+## B. Agent / provider runtime
+
+| ID  | t3code has | What we have today / gap |
+| --- | ---------- | ------------------------ |
+| B1  | Each provider's own runtime does the work, with that provider's native tools, skills and MCP. Sources: Codex app-server (`packages/effect-codex-app-server`), Claude (`apps/server/src/provider/ClaudeProvider.ts`), Cursor, Grok, OpenCode, Pi, Muse and fx, plus any ACP registry agent (`packages/provider-acp`, `provider-acp-registry`). t3code normalizes their events into one execution graph (`docs/orchestration-v2/README.md`) | One DSH agent loop. ai-accounts turns the subscriptions into model routes, and its README says "DSH has no Cursor agent runtime". **Difference, not a must-have:** we have no ACP client to drive an external agent as a thread. An ACP-client plugin would close it if we want Claude Code or Cursor native harnesses |
+| B2  | Per-thread **permission modes**: Supervised, Auto-accept edits, Auto (the provider's automatic review) and Full access. Projects can set their own default. A delegated child never runs broader than its parent (`docs/user/permission-modes.md`, `apps/server/src/mcp/delegatedTaskModes.ts`) | DSH has approvals and file-sandbox modes, and `policies` adds hard deny rules. **Gap (unverified):** a per-thread mode picker in the composer, an "auto-review" mode, and a rule that keeps a subagent within its parent's mode |
+| B3  | **Edit from here**: rewind to any earlier message, optionally restoring files from that message's checkpoint. Checkpoints are hidden git refs. Restore is refused when another thread shares the directory (`orchestration-v2/CheckpointRollbackService.ts`, `CheckpointRestoreSafety.ts`, `checkpointing/CheckpointStore.ts`) | session-undo snapshots and restores only the **last** turn. Chat's **Branch** forks at any turn without restoring files (`plugins/@dshfiles/chat/src/native/apply.ts` `forkAt`). **Gap:** rewinding N turns with file restore, and the shared-directory guard |
+| B4  | **PR watch**: `watch_pull_request` checks every 2 min and wakes the agent when CI fails, required checks pass, someone reviews or comments, or the branch starts to conflict. Threads share one check, and its budget is aware of rate limits (`orchestration-v2/PullRequestWatchReactor.ts`, `pullRequestWatch.ts`, `docs/user/source-control.md`) | Missing. `schedule_create` reminders can only poll blindly. Depends on C1 |
+| B5  | **Scheduled tasks and webhooks**: a schedule or a webhook URL starts a templated prompt (`{{body.x}}`, `{{headers.y}}`) in a project, either as a new thread per run or posting to an existing thread. You can pause a task or run it now. Agent tools: `schedule_task`, `list_scheduled_tasks`, `run_scheduled_task_now`, `delete_scheduled_task` (`apps/server/src/scheduledTasks/*`, `webhookTemplate.ts`, `webhookVerification.ts`) | DSH `schedule_*` reminders live inside one existing Session. **Gap:** a project-level task that starts a new thread per run, webhook triggers with signature checks, and a global list with pause and run-now |
+| B6  | Outside agents use an **MCP server** at `/mcp` with OAuth sign-in. Claude Code in a terminal, or ChatGPT, can list, start, message and wait on threads (`apps/server/src/mcp/McpHttpServer.ts`, `OrchestratorMcpService.ts`, `docs/user/outside-agents.md`) | `dshx sessions prompt` (CLI) and `connectDshxApiClient` exist, but with cookie auth only. **Gap:** we expose no MCP endpoint for external agents to drive DSH threads |
+| B7  | `request_secret`: the agent asks the user to type a secret into the server's store (`mcp/toolkits/orchestrator/tools.ts`) | `secret_list` and `secret_get` only read, and the user adds secrets in secret-catalog. Small gap |
+| B8  | Idle auto-compaction (`orchestration-v2/IdleCompactionService.ts`). Handing context to another provider uses a fixed token budget (`ContextHandoffService.ts`, `docs/user/portable-handoffs.md`) | context-compaction is a chunked backend, and session-warming keeps the cache warm. Handoff is moot for us: switching model or account keeps the one DSH transcript. Idle auto-compaction is missing; low priority |
+
+## C. Git / VCS & review
+
+| ID  | t3code has | What we have today / gap |
+| --- | ---------- | ------------------------ |
+| C1  | Forge integration with GitHub, GitLab, Forgejo/Gitea, Bitbucket, Azure DevOps and GitCafe (`packages/source-control-*`, `apps/server/src/pullRequest/PullRequestService.ts`). It commits, pushes and **creates the PR with a generated title and body**. It also handles review, line comments, requesting reviewers, merge, auto-merge, revert PRs, closing PRs in bulk and GitHub stacks (merge or rebase a stack) | jujutsu does fetch, push and bookmarks. pulls-review reviews the local jj diff. **Gap:** we call no forge API at all and have no PR list or PR page |
+| C2  | Thread↔PR links: one thread can link several PRs. A link is made automatically when the agent runs `gh pr create` or `glab mr create`. There are `link_pull_request`, `unlink_pull_request` and `list_thread_pull_requests` tools, PR badges on threads, and a reverse lookup from a PR to its threads (`orchestration-v2/ThreadPullRequestService.ts`, `pullRequest/linkedThreads.ts`) | backlog links URLs only. **Gap:** we have no PR entity on a thread |
+| C3  | The **server owns settlement**: threads settle after inactivity, on PR merge, or on PR close, even with no client connected. The PR sync reactor notices a merge done outside the app (`orchestration-v2/ThreadSettlementService.ts`, `PullRequestSyncReactor.ts`) | thread-sidebar's auto-settle checks idleness only, and the check runs in the browser (`plugins/@dshfiles/thread-sidebar/src/auto-settle-machine.ts`, used from `client.tsx`). **Gap:** settlement owned by the Host and aware of PRs |
+| C4  | **Review guides**: an AI-written tour of a PR in stops, with "Look closely" calls and mechanical changes grouped last. Guides are stored per server, can be asked about per stop, and agents can write them through `write_pull_request_guides` (`pullRequest/PullRequestReviewGuideService.ts`, `persistence/PullRequestReviewGuides.ts`) | pulls-review offers review scopes and a one-off summarize (`generate`). **Partial:** no stored guided tour |
+| C5  | Viewed marks sync with GitHub's own "viewed" state (`pullRequest/pullRequestViewedFiles.ts`) | diff-viewed keeps marks locally per turn. Syncing needs C1 |
+| C6  | Project lifecycle: **New project** (git init, README, first commit, optional private GitHub repo), **Add project** by cloning in the background with progress and cancel, and **Publish repository** (`docs/user/source-control.md`) | `project_register` handles a local folder. `multi_host_clone_project` clones onto a remote host only. **Gap:** local clone, new project and publish |
+| C7  | Worktree policies: automatic cleanup by inactivity, settle or merge, run hourly on the server. `runOnSettle` scripts in `t3.json`. **Auto-pull** fast-forwards the default branch. A configurable worktree folder (`apps/server/src/storageCleanup.ts`, `serverRuntimeStartup.autoPull.test.ts`, `docs/user/project-settings.md`) | `jj_thread_cleanup` previews and applies on demand. project-checks runs trusted actions. `dshx checkout sync` is manual. **Gap:** a scheduled cleanup policy, actions that run on settle, and auto-fetch of `main@origin` |
+
+## D. Platform / architecture
+
+| ID  | t3code has | What we have today / gap |
+| --- | ---------- | ------------------------ |
+| D1  | **Event-sourced orchestration**: `EventSink` writes the events, the projections, the command receipt and the outbox in one SQLite transaction. `EffectWorker` performs side effects only after that commit, so a retried command stays idempotent. 91 migrations (`docs/internals/overview.md`, `orchestration-v2/EventSink.ts`, `EffectWorker.ts`, `persistence/Migrations`) | DSH keeps one event log per Session. Plugin state such as settled threads and attention lives in separate storage domains that are not written in the same transaction. **Pattern to borrow:** an outbox and command receipts for plugin Host APIs that trigger side effects (settle, PR watch, scheduled runs) |
+| D2  | Remote access: the **T3 Connect** relay (`apps/server/src/relay`, `cloud`), Tailscale HTTPS (`packages/tailscale`), and desktop-managed SSH that installs the server on the remote host (`apps/desktop/src/ssh`). Also pairing with revocable sessions, linked environments, and load balancing new threads across machines (`docs/user/remote-access.md`) | We have multi-host SSH (provision, runtime control, `multi_host_resource_pool` picks the least loaded machine), loopback-access and LAN binding. **Gap:** an internet relay, phone pairing and revocable device sessions |
+| D3  | Guest links let one browser follow a thread live and propose messages, valid for 24 h (`apps/server/src/guest`, `orchestration-v2/GuestShareDecider.ts`) | Missing. Needs D2 |
+| D4  | Electron desktop app, `t3 service install` background service, self-update, built-in **Triage an issue** playbook (`apps/desktop`, `apps/server/src/triage`) | We removed `apps/desktop` (see opencode-parity A16). The supervisor launcher is optional. The self-improve skill and traces partly cover triage. Low priority |
+| D5  | Contracts are Effect `Schema` RPC types (`packages/contracts/src/rpc.ts`). The server and its providers are written in Effect | dshx uses a Promise API, with an opt-in `@dshfiles/dshx/effect` layer (opencode-parity C25). No action |
+
+## E. What we have that t3code lacks (short)
+
+- A plugin platform: dshx, Cordis bundles, ~85 owned plugins, marketplace and native forks. t3code has no plugin or extension system; its only extension point is adding a provider adapter.
+- Cross-thread memory (digests and notes), the backlog and named references.
+- jj-first thread workspaces, an integration dashboard, and rebase onto `main` with conflict checks.
+- An in-app OTLP receiver, trace viewer and alerts (`traces`), plus `activity-timeline`. t3code writes NDJSON and exports OTLP to an external backend (`docs/operations/observability.md`).
+- Persistent, mentionable `agents`, an agent communication inbox, and parent-scoped `agent-questions`.
+- `policies` deny rules, `tool-search`, `session-warming`, `goal-stall-guard`, `project-checks` receipts, the Monaco `editor` and the docking `workbench`.
+- A single agent loop: switching model, account or fallback keeps one transcript, with no handoff budget.
+- Already at parity: the usage and cost page (`usage`, `ai-accounts` quota), resuming after a usage limit (`ai_accounts_continuations`), the prompt stash, marking files viewed, the command palette with message search, goals, subagents and workflows.
+
+## Suggested order
+
+Ordered by leverage: how much daily loop it closes against how much it costs. Most items fit owned Host plugins.
+
+1. **C1 + C2 + B4: forge plugin with GitHub first.** Create a PR from a thread, link it to the thread, and watch it to wake the agent. This closes the "agent ships, CI fails, agent fixes" loop that today needs a human watching. Reuse the `gh` login and secret references. Keep PR links in plugin storage, and wake the agent through the sessions API `message({ wake })`.
+2. **C3: Host-owned auto-settle with PR awareness.** Move the auto-settle scan from the thread-sidebar client into its Host half, and add "PR merged or closed" as a trigger once C2 exists. Small, and fixes settling when no browser is open.
+3. **B5: project-scheduled tasks and webhooks.** Each run starts a new thread through the sessions API `create`. Use a Host route with an HMAC check, plus tools that mirror t3code's. Unlocks CI-failure and new-PR automation.
+4. **B3: rewind N turns with file restore.** Extend session-undo to any turn, using jj-operation snapshots for each turn, and add a guard for shared directories. Users already expect "edit from here".
+5. **A2 + A3: visual replies and preview tools.** An `html_render` tool shown as a sandboxed iframe card in chat. First-party agent browser tools over the Host browser page. Dev-server port detection in a thread card.
+6. **A4 + A5: composer quick wins.** Prompt recall with ArrowUp, large-paste-to-file, editing a queued message, prompt links (`?prompt=`).
+7. **B6: MCP endpoint for outside agents.** Expose the sessions API as MCP tools, so Claude Code or Codex in a terminal can drive DSH threads.
+8. **A6: multi-model fan-out.** One prompt, N threads, each isolated with jj. Cheap on top of the sessions API `create`.
+9. **C7 + C6: worktree policies, auto-fetch, local clone and new project.** Housekeeping.
+10. Defer: A1/D2/D3 (mobile, relay, guests), B1 (ACP client), A9/A10/D4. Each costs a lot or depends on a new client or a relay.
