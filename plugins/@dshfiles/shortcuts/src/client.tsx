@@ -33,6 +33,7 @@ export default defineClient({
   name: '@dshfiles/shortcuts',
   // Read through the dshx runtime too: api.commands.keys follows this service's catalog for user rebindings.
   inject: ['shortcuts'],
+  prefixIds: true,
   setup(ctx, _decorate, metadata) {
     // Resolved per key press rather than once at setup. The layout service is
     // registered by another client entry, so reading it during setup can observe
@@ -70,7 +71,7 @@ export default defineClient({
     const plugin = metadata?.plugin
     if (plugin === undefined) return
     plugin.add(Command, {
-      id: '@dshfiles/shortcuts.toggle-sidebar',
+      id: 'toggle-sidebar',
       title: 'Toggle sidebar',
       keywords: ['sidebar', 'hide', 'show'],
       keys: ['Mod+B'],
