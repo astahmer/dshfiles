@@ -208,6 +208,7 @@ import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
+import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import {
   effectiveActivityAt,
   isMuteActive,
@@ -2742,9 +2743,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     sessionPhase: sessionState.phase,
     workspacePhase: workspaceState.phase,
   })
+  // The Host scans on its own (`auto-settle-host.ts`). Only a Host from before that scan, which does not serve this
+  // API, leaves the browser to settle threads; while the answer is pending nothing scans, so the two never race.
+  const hostAutoSettle = useApiQuery(threadSidebarAutoSettleApi, 'status', { input: {}, enabled: isPrimarySurface })
+  const browserOwnsAutoSettle = isApiOwnerMissing(hostAutoSettle.error)
   useAutoSettle({
     client: autoSettleClient,
-    enabled: isPrimarySurface && autoSettleEnabled,
+    enabled: isPrimarySurface && browserOwnsAutoSettle && autoSettleEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
     refreshKey: autoSettleRefreshKey,
   })

@@ -233,11 +233,25 @@ export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt
 const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
   includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
+/** The settings the idle settle policy reads; the browser and the Host scan pass the same values. */
+export type AutoSettlePolicy = Pick<
+  SidebarPreferences,
+  | 'autoSettleEnabled'
+  | 'autoSettleSessionIds'
+  | 'autoSettleDisabledSessionIds'
+  | 'parkedSessionIds'
+  | 'excludedSessionIds'
+  | 'excludedWorkspaceIds'
+  | 'idleMinutes'
+  | 'rebasedThreadSettleDelay'
+  | 'scanIntervalMinutes'
+>
+
 export interface AutoSettleContext {
-  session: SessionActivity
+  session: Pick<SessionActivity, 'running' | 'updatedAt' | 'blank'> & { readonly id: string }
   workspaceId: string | undefined
   now: number
-  preferences: SidebarPreferences
+  preferences: AutoSettlePolicy
   archivedSessionIds: ReadonlySet<string>
   pinnedSessionIds: ReadonlySet<string>
   settledSessionIds: ReadonlySet<string>
@@ -245,7 +259,10 @@ export interface AutoSettleContext {
 
 export type AutoSettleOverride = 'inherit' | 'enabled' | 'disabled'
 
-const autoSettleOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoSettleOverride => {
+const autoSettleOverrideForSession = (
+  preferences: Pick<AutoSettlePolicy, 'autoSettleSessionIds' | 'autoSettleDisabledSessionIds'>,
+  sessionId: string,
+): AutoSettleOverride => {
   if (preferences.autoSettleDisabledSessionIds.includes(sessionId)) return 'disabled'
   if (preferences.autoSettleSessionIds.includes(sessionId)) return 'enabled'
   return 'inherit'
@@ -261,7 +278,8 @@ const setAutoSettleOverride = (preferences: SidebarPreferences, sessionId: strin
       : preferences.autoSettleDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-const shouldScanForAutoSettle = (preferences: SidebarPreferences): boolean => preferences.autoSettleEnabled || preferences.autoSettleSessionIds.length > 0
+const shouldScanForAutoSettle = (preferences: Pick<AutoSettlePolicy, 'autoSettleEnabled' | 'autoSettleSessionIds'>): boolean =>
+  preferences.autoSettleEnabled || preferences.autoSettleSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -297,7 +315,13 @@ const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: 
   }
 }
 
-const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<string, WorkspaceView>): WorkspaceView | undefined => {
+/** The workspace fields session attribution reads; the Host registry and the client stream both carry them. */
+export type AttributedWorkspace = Pick<WorkspaceView, 'workspaceId' | 'path' | 'sessionIds'>
+
+const projectOfThreadWorkspace = <Workspace extends AttributedWorkspace>(
+  workspace: Workspace,
+  byPath: ReadonlyMap<string, Workspace>,
+): Workspace | undefined => {
   const projectPath = WorkspacePaths.projectPathOf(workspace.path)
   return projectPath === workspace.path ? undefined : byPath.get(projectPath)
 }
@@ -307,7 +331,7 @@ const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<
  * path under a `<repository>-threads` directory resolves even without a registration, which is all a session keeps
  * after its thread workspace is forgotten.
  */
-const projectIdForPath = (path: string, byPath: ReadonlyMap<string, WorkspaceView>): string | undefined => {
+const projectIdForPath = (path: string, byPath: ReadonlyMap<string, AttributedWorkspace>): string | undefined => {
   const registered = byPath.get(path)
   if (registered !== undefined) return (projectOfThreadWorkspace(registered, byPath) ?? registered).workspaceId
   const projectPath = WorkspacePaths.projectPathOf(path)
@@ -318,8 +342,8 @@ const projectIdForPath = (path: string, byPath: ReadonlyMap<string, WorkspaceVie
 
 /** jj-integration's thread workspaces are attributed to their owning project workspace; unaccounted sessions fall back to their recorded cwd. */
 const workspaceForSessions = (input: {
-  readonly workspaces: readonly WorkspaceView[]
-  readonly sessions: readonly Pick<SessionSummary, 'id' | 'cwd'>[]
+  readonly workspaces: readonly AttributedWorkspace[]
+  readonly sessions: readonly { readonly id: string; readonly cwd?: string | undefined }[]
 }): Map<string, string> => {
   const byPath = new Map(input.workspaces.map(workspace => [workspace.path, workspace]))
   const map = new Map<string, string>()

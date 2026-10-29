@@ -744,7 +744,7 @@
     {
       "id": "idle-archive-policy",
       "title": "Automatically settle eligible idle threads",
-      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
+      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. The Host scans on the configured interval, so threads settle with no browser open; other plugins ask it to settle a thread for their own trigger through the auto-settle-api contract, and thread_auto_settle_status reads the last and next scan and the newest automatic settles. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -811,13 +811,26 @@
           "coveredBy": ["thread-sidebar.idle-archive"]
         }
       ],
-      "states": ["disabled", "eligible", "per-thread-enabled", "per-thread-disabled", "excluded", "settled", "settle-failed"],
+      "states": [
+        "disabled",
+        "eligible",
+        "per-thread-enabled",
+        "per-thread-disabled",
+        "excluded",
+        "settled",
+        "settle-failed",
+        "trigger-settled",
+        "trigger-skipped"
+      ],
       "failureModes": [
         "Running, blank, pinned, parked, settled, or excluded sessions are never automatically settled.",
         "A thread with a still-running descendant is never automatically settled, so a child turn cannot be rejected mid-step.",
         "Per-thread enable still respects session and workspace safety exclusions.",
         "Per-thread disable does not alter global session exclusions.",
-        "A refused settings write leaves the session visible and reports the failure."
+        "A refused settings write leaves the session visible and reports the failure.",
+        "A failed Host scan is recorded as the last scan's error and the next interval scans again.",
+        "A thread waiting for an answer to a question is never automatically settled.",
+        "A browser on a Host without the auto-settle API keeps scanning on its own; a browser on a Host with it never scans."
       ],
       "externalDependencies": [],
       "verification": [
@@ -872,12 +885,34 @@
           "id": "thread-sidebar.idle-archive-policy-unit-auto-settle-machine",
           "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-machine.test.ts",
           "testName": "scans immediately when enabled and on its actor-owned interval"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-host-scan",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "waits for the boot delay, then scans on the configured interval with no browser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-settle-trigger",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "settles a trigger request with its reason and reports what it skipped"
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "auto-settle scan",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "records one auto-settle scan span with the settled counts"
         }
       ]
     },

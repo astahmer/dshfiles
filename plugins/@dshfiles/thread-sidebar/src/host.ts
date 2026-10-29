@@ -2,7 +2,9 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-user-questions'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineHost } from '@dshfiles/dshx/host'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { createHostApiClient, defineHost, scheduleOutsideReload } from '@dshfiles/dshx/host'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { execFile } from 'node:child_process'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
@@ -11,6 +13,9 @@ import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { attentionFor, closeAttention, threadAttentionApiHost } from './attention-host.js'
+import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
+import { createAutoSettleScanner, type AutoSettleScanner, type AutoSettleSources } from './auto-settle-host.js'
+import { SidebarOrganization } from './organization.js'
 import { ThreadAttentionStoreModel } from './attention-store.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
@@ -22,7 +27,7 @@ import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { InflightTurns } from './inflight-turns.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
-import { RestartResumeSetting, settledSessionIdsFromHost, threadSidebarHostSettings } from './settings.js'
+import { AutoSettleSettings, RestartResumeSetting, settledSessionIdsFromHost, threadSidebarHostSettings } from './settings.js'
 import { underSettledSession } from './settled-gate.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { setThreadActionsContext, threadActionsHost, threadActionCommands } from './thread-actions-host.js'
@@ -230,6 +235,52 @@ const pendingQuestionsApi = threadSidebarPendingQuestionsApi.host({
   },
 })
 
+const autoSettleSources = (ctx: Context): AutoSettleSources => ({
+  readPolicy: AutoSettleSettings.policy,
+  readSnapshot: async () => {
+    const { items } = await ctx.sessionController.list({}, AbortSignal.timeout(30_000))
+    const sessions = items.map(item => ({
+      id: String(item.sessionId),
+      running: item.running,
+      blank: item.blank,
+      updatedAt: item.updatedAt,
+      parentId: item.parentSessionId === undefined ? undefined : String(item.parentSessionId),
+      pendingInteraction: (item.projections?.values.userQuestions?.active.length ?? 0) > 0,
+      cwd: item.cwd,
+    }))
+    const workspaces = ctx.workspaceRegistry.list().map(workspace => ({ workspaceId: workspace.id, path: workspace.path, sessionIds: workspace.sessionIds }))
+    return {
+      sessions,
+      workspaceBySession: SidebarOrganization.workspaceForSessions({ workspaces, sessions }),
+      archivedSessionIds: new Set(ctx.workspaceRegistry.archivedSessionIds),
+      pinnedSessionIds: new Set(ctx.workspaceRegistry.pinnedSessionIds),
+      settledSessionIds: new Set(settledSessionIdsFromHost()),
+    }
+  },
+  readRebasedThreads: async () => {
+    try {
+      const view = await createHostApiClient(ctx, jjIntegrationApi, '@dshfiles/thread-sidebar').repositories({})
+      return view.repositories.flatMap(repository => repository.threads)
+    } catch (error) {
+      if (error instanceof Error && isApiOwnerMissing(error)) return undefined
+      throw error
+    }
+  },
+  settle: AutoSettleSettings.settle,
+})
+
+let autoSettleScanner: AutoSettleScanner | undefined
+
+const requireAutoSettleScanner = (): AutoSettleScanner => {
+  if (autoSettleScanner === undefined) throw new Error('The thread-sidebar auto-settle scan is not running on this Host yet; retry in a few seconds.')
+  return autoSettleScanner
+}
+
+const autoSettleApi = threadSidebarAutoSettleApi.host({
+  status: () => requireAutoSettleScanner().status(),
+  requestSettle: ({ input }) => requireAutoSettleScanner().requestSettle(input),
+})
+
 // The slice of `@deepseek-ai/dsh-client-modules`' ClientModuleRegistry this plugin reads; older Hosts lack members.
 interface ClientModuleRegistrySurface {
   readonly graph?: () => { readonly entries: ReadonlyArray<{ readonly id: string; readonly rev?: string | undefined }> }
@@ -263,6 +314,7 @@ export default defineHost({
     threadActionsHost,
     threadQueueHost,
     threadViewsHost,
+    autoSettleApi,
   ],
   // A settled Session runs no model step until it is unsettled: a late wake (subagent settlement, queued
   // follow-up, reminder) proposes a step this rejects, which the loop ends as `blocked` without a request.
@@ -298,6 +350,22 @@ export default defineHost({
         await closeAttention()
       }
     }, 'thread-sidebar: thread attention store')
+    // Auto-settle runs here, not in a browser tab, so idle and rebased threads settle with no page open.
+    ctx.effect(() => {
+      const scanner = createAutoSettleScanner({
+        // Armed during activation, so each tick leaves the reload transaction before it writes the settled status.
+        clock: { now: Date.now, schedule: (run, delayMs) => scheduleOutsideReload(ctx, run, delayMs) },
+        sources: autoSettleSources(ctx),
+      })
+      autoSettleScanner = scanner
+      const stopListening = AutoSettleSettings.onChanged(scanner.settingsChanged)
+      scanner.start()
+      return () => {
+        stopListening()
+        scanner.stop()
+        if (autoSettleScanner === scanner) autoSettleScanner = undefined
+      }
+    }, 'thread-sidebar: auto-settle scan')
     // A turn that was still open when the previous Host process stopped never wrote its own recovery
     // record: the crash leaves the marker behind instead, and this process turns it into a visible row.
     ctx.effect(() => {

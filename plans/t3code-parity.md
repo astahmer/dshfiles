@@ -82,7 +82,7 @@ Resume here: pick an item from "Suggested order".
 Ordered by leverage: how much daily loop it closes against how much it costs. Most items fit owned Host plugins.
 
 1. **C1 + C2 + B4: forge plugin with GitHub first.** Create a PR from a thread, link it to the thread, and watch it to wake the agent. This closes the "agent ships, CI fails, agent fixes" loop that today needs a human watching. Reuse the `gh` login and secret references. Keep PR links in plugin storage, and wake the agent through the sessions API `message({ wake })`.
-2. **C3: Host-owned auto-settle with PR awareness.** Move the auto-settle scan from the thread-sidebar client into its Host half, and add "PR merged or closed" as a trigger once C2 exists. Small, and fixes settling when no browser is open.
+2. **C3: PR-aware auto-settle.** The Host-owned scan and the `requestSettle` trigger API have shipped; once C2 exists, its PR watcher calls `requestSettle` with "PR merged" or "PR closed" as the reason.
 3. **B5: project-scheduled tasks and webhooks.** Each run starts a new thread through the sessions API `create`. Use a Host route with an HMAC check, plus tools that mirror t3code's. Unlocks CI-failure and new-PR automation.
 4. **B3: rewind N turns with file restore.** Extend session-undo to any turn, using jj-operation snapshots for each turn, and add a guard for shared directories. Users already expect "edit from here".
 5. ~~**A2 + A3: visual replies and preview tools.**~~ Done: `@dshfiles/html-render` and `@dshfiles/preview`. An `html_render` tool shown as a sandboxed iframe card in chat. First-party agent browser tools over the Host browser page. Dev-server port detection in a thread card.

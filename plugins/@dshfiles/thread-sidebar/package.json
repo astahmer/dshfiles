@@ -21,6 +21,10 @@
       "types": "./src/attention-api.ts",
       "default": "./dist/attention-api.js"
     },
+    "./auto-settle-api": {
+      "types": "./src/auto-settle-api.ts",
+      "default": "./dist/auto-settle-api.js"
+    },
     "./attention-client": {
       "types": "./src/attention-client.ts",
       "default": "./dist/attention-client.js"

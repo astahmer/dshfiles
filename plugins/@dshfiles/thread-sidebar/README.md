@@ -165,17 +165,35 @@ names, blocks every later wake-up, and hides the thread from native navigation
 until it is restored. Settled is this plugin's own status: the thread stays
 listed and openable, the archive verb is never called, and the Host refuses the
 model steps it proposes until it is unsettled. Auto-settle is off by default;
-when enabled, the configured scan interval checks the same idle threshold and
-writes `settledSessionIds`. It skips running, blank, archived, pinned, parked,
-already-settled, excluded-session, excluded-project, and still-running-descendant
-entries. A thread menu can inherit the global setting, explicitly settle that
-thread, or exclude it; explicit per-thread enables still honor excluded projects
-and other safety checks. Settling records the instant in `settledAt`, which is
-what the composer banner dates and what the separate settled auto-archive delay
-counts from. It also answers jj-integration's **Settle** action in its post-rebase
+when enabled, the Host checks the same idle threshold on the configured scan
+interval (`src/auto-settle-host.ts`, first scan 30 s after boot, again at once
+when the policy settings change) and writes `settledSessionIds`, so threads
+settle with no browser open. It skips running, blank, archived, pinned, parked,
+already-settled, excluded-session, excluded-project, waiting-for-an-answer and
+still-running-descendant entries. The same scan settles rebased threads once
+`rebasedThreadSettleDelay` passes, reading jj-integration's thread workspaces
+through its Host API. A browser runs its own scan only against a Host from before
+this one (the `thread-sidebar-auto-settle` API answers owner-missing); otherwise
+it never scans, so a thread is never settled twice. `thread_auto_settle_status`
+(read-only) shows the last and next scan and the newest automatic settles. A
+thread menu can inherit the global setting, explicitly settle that thread, or
+exclude it; explicit per-thread enables still honor excluded projects and other
+safety checks. Settling records the instant in `settledAt`, which is what the
+composer banner dates and what the separate settled auto-archive delay counts
+from. It also answers jj-integration's **Settle** action in its post-rebase
 notice (`src/settle-request.ts`): the sidebar owns this status, so the notice asks
 through the cancelable `dshfiles:thread-settle` window event instead of writing a
 second copy.
+
+**Settle triggers from other plugins.** A plugin with its own reason to settle a
+thread (a pull request merged or closed, say) imports the
+`@dshfiles/thread-sidebar/auto-settle-api` contract and calls
+`createHostApiClient(ctx, threadSidebarAutoSettleApi, '<its package>').requestSettle({ sessionIds, reason, source })`
+from its Host. The sidebar applies the scan's safety rules (running, waiting,
+blank, archived, pinned, opted-out and running-subagent threads are skipped and
+reported per id), writes the settled status once, and lists the settle with its
+source and reason in `thread_auto_settle_status`. Callers that run without the
+sidebar treat `isApiOwnerMissing(error)` as "nothing settles".
 
 Settled exists because auto-archive used to push idle threads into the native
 archived state, and native navigation drops an archived Session from the main

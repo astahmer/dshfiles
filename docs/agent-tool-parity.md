@@ -105,6 +105,8 @@ Each row is a tool worth building today: the backing verb already exists.
 Already tool-served (this change): the 23 `thread_*` / `project_*` tools below, including
 `thread_settle` / `thread_unsettle` (move one thread into or out of the plugin's own
 settled status, which the Host `agent/pre-step` gate enforces) and
+`thread_auto_settle_status` (read the Host auto-settle scan: on/off, last and next
+scan, and the newest automatic settles with their trigger), and
 `thread_recoveries` (list the threads whose turn a restart or a crash interrupted) and
 `thread_recovery_resume` (queue the continuation prompt for one of them) — the same
 `thread-sidebar-recovery` verbs the Interrupted and Needs resume groups drive.
