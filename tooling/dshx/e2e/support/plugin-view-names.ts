@@ -30,3 +30,5 @@ export const globalPanelLink = (page: Page, fixtureName: string): Locator =>
     .getByRole('navigation', { name: 'Navigation', exact: true })
     .getByRole('button', { name: reusableViewName(fixtureName), exact: true })
     .or(page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: globalPanelName(fixtureName), exact: true }))
+    .or(page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: reusableViewName(fixtureName), exact: true }))
+    .first()

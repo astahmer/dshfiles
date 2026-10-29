@@ -22,7 +22,16 @@ const ProfilePackage = z
 const WorkspacePackage = z.object({ packageManager: z.string() }).passthrough()
 const ProjectPackage = z.object({ dsh: z.unknown() }).passthrough()
 const ClientExternals = z
-  .object({ dsh: z.object({ client: z.object({ external: z.array(z.string()).default([]) }).passthrough().optional() }).passthrough() })
+  .object({
+    dsh: z
+      .object({
+        client: z
+          .object({ external: z.array(z.string()).default([]) })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough(),
+  })
   .passthrough()
 const PnpmModules = z.object({ packageManager: z.string(), storeDir: z.string().min(1) }).passthrough()
 const SHARED_CORDIS_PACKAGES = Object.keys(CORDIS_IDENTITY_DEPENDENCIES)
