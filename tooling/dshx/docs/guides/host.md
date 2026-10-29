@@ -15,6 +15,12 @@ interface HostDefinition {
   readonly prompts?: readonly PromptContribution[]
   readonly settings?: readonly SettingsContribution[]
   readonly apis?: readonly ApiHostRegistration[]
+  readonly toolEdits?: readonly ToolEdit[]
+  readonly agentPresets?: readonly PresetDefinition[]
+  readonly providers?: readonly ProviderContribution[]
+  readonly models?: readonly ModelDiscoveryContribution[]
+  readonly skills?: readonly SkillRegistration[]
+  readonly mcpServers?: readonly McpServerConfig[]
   readonly setup?: (ctx: Context) => void | Promise<void>
 }
 ```
@@ -95,6 +101,40 @@ DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effe
 ## Runtime validation
 
 The built adapter reports a Host-definition diagnostic when the default export is not a `defineHost()` object, contains an unknown field, uses a malformed contribution, or supplies a non-function `setup`. Native DSH Host modules remain supported when they export named `name`, `inject`, `Config`, and `apply` instead of a default definition.
+
+## Registering agents, providers, models, skills and MCP servers
+
+Each field registers into DSH's own registry for the plugin's lifetime; the registry validates and refuses duplicates.
+
+```ts
+export default defineHost({
+  agentPresets: [{ id: 'acme-reviewer', name: 'Reviewer', plugins: [{ name: '@deepseek-ai/dsh-tool-fs' }] }],
+  providers: [
+    {
+      providers: ['acme'],
+      adapter: new AcmeAdapter(), // an LlmAdapter from @deepseek-ai/dsh-llm
+      configurable: [{ provider: 'acme', displayName: 'Acme', settingsNs: 'acme-llm', settingsPath: ['apiKey'] }],
+    },
+  ],
+  models: [{ settingsNs: 'acme-llm', discover: async (request, signal) => listAcmeModels(request, signal) }],
+  skills: [{ name: 'acme-release', description: 'How Acme ships a release.', source: 'runtime', content: '…' }],
+  mcpServers: [{ transport: 'stdio', serverName: 'acme-docs', command: 'acme-docs-mcp' }],
+})
+```
+
+| Field | DSH registry | Inject added |
+| --- | --- | --- |
+| `agentPresets` | `agentPresets.register` (a preset is a list of Loader rows) | `agentPresets` |
+| `providers` | `llm.registerAdapter`, `llm.registerConfigurableProviders` (Settings › Models) | `llm` |
+| `models` | `llm.registerModelDiscovery` | `llm` |
+| `skills` | `skills.register` | `skills` |
+| `mcpServers` | one `@deepseek-ai/dsh-mcp-client` plugin per server, loaded on first use from the Host installation | none |
+
+Commands already have `commands`. Not covered, because DSH 0.2.1 has no registry for them: references (the Session
+reference resolver and file references are fixed services), integrations (no DSH concept), and credentials (one
+`CredentialProvider` service that stores values by reference; owned plugins keep `secret:` references resolved through
+the Secret Catalog instead). Registrations that change at runtime (ai-accounts' per-account providers) keep calling the
+services, whose handles can `replace` entries.
 
 ## Editing other plugins' tools: `toolEdits`
 

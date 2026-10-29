@@ -6,6 +6,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { AnyApiMethodDefinition, ApiHostRegistration } from '../api/types.js'
 import type { SettingsContribution } from '../settings/types.js'
 import type { ToolEdit } from './tool-edits.js'
+import type { HostRegistrations } from './registrations.js'
 
 /** A system-prompt section wrapped only to preserve its registration kind. */
 declare const promptContributionBrand: unique symbol
@@ -32,7 +33,7 @@ export type PromptContribution = PromptSectionContribution | PromptContextContri
 export type HostToolContribution = ToolDefinition | ((ctx: Context) => ToolDefinition)
 
 /** Author-facing Host definition backed by the official Cordis context and Tool model. */
-export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = StandardSchemaV1> {
+export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = StandardSchemaV1> extends HostRegistrations {
   readonly name?: string
   readonly inject?: readonly string[]
   readonly tools?: readonly HostToolContribution[]
