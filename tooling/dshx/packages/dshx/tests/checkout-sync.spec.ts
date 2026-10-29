@@ -201,6 +201,16 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(describeRevision(checkout, '@-')).toBe('feat: landed elsewhere')
   })
 
+  it('syncs right after dry runs that rebuilt the same commit', async () => {
+    writeFile(join(checkout, 'local.txt'), 'local\n')
+    jj(checkout, 'status')
+    land('feature.txt', 'feature\n', 'feat: landed elsewhere')
+
+    for (let attempt = 0; attempt < 3; attempt++) expect(await sync(true)).toMatchObject({ status: 'would-sync' })
+    expect(await sync()).toMatchObject({ status: 'synced', kept: [{ description: '' }] })
+    expect(readFileSync(join(checkout, 'local.txt'), 'utf8')).toBe('local\n')
+  })
+
   it('reports a dry run without touching the repository or the files', async () => {
     writeFile(join(checkout, 'local.txt'), 'local\n')
     jj(checkout, 'status')

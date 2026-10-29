@@ -269,7 +269,14 @@ export const syncCheckout = async (options: {
   const preWorkingCopy = (await jj.revisions('@'))[0]?.commitId
   const quiet = dryRun ? ['--ignore-working-copy'] : []
   options.onProgress?.(`rebase ${workspace} onto ${targetLabel}${dryRun ? ' (simulated)' : ''}`)
-  await jj.read([...quiet, 'rebase', lone ? '-r' : '-b', '@', '-d', targetRevset, '--skip-emptied'])
+  const rebase = [...quiet, 'rebase', lone ? '-r' : '-b', '@', '-d', targetRevset, '--skip-emptied']
+  await jj.read(rebase).catch(async (error: unknown) => {
+    // Git commit ids hold whole-second timestamps, so redoing a rebase an earlier (dry) run undid within the same second
+    // recreates its exact commit, which jj refuses. The next second gives a new id.
+    if (!(error instanceof CheckoutSyncError) || !error.message.includes('already exists')) throw error
+    await new Promise(resolve => setTimeout(resolve, 1_050 - (Date.now() % 1_000)))
+    await jj.read(rebase)
+  })
   const rebaseOperation = await jj.operation()
   const after = await jj.revisions(`::@ ~ ::${targetRevset}`)
 
