@@ -1,6 +1,12 @@
 {
   "schemaVersion": 1,
   "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/host.ts",
+      "reason": "The subprocess runner runs only inside createCloneJobs and createProject (src/project-lifecycle.ts), whose project clone and project create spans cover every git, jj and gh process; executable lookups run inside the automatic api-dispatch span."
+    }
+  ],
   "features": [
     {
       "id": "workspace-folder-add-flow",
@@ -37,6 +43,69 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "project-clone",
+      "title": "Add a project by cloning a repository",
+      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git progress and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. The project_clone, project_clone_jobs and project_clone_cancel agent tools drive the same jobs.",
+      "reach": [
+        "click button \"New session\"",
+        "click button \"Choose workspace\"",
+        "click menuitem \"Add workspace*\"",
+        "click button \"New\"",
+        "click menuitem \"Clone repository…\"",
+        "expect textbox \"Repository URL\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled"],
+      "failureModes": [
+        "An existing destination folder is refused before anything runs; a second start for the same folder returns the running job.",
+        "A failed or cancelled clone deletes the folder it created and registers nothing; a failed jj colocation keeps the clone and names the command to finish it.",
+        "Clone jobs live in Host memory: a Host restart drops the trail, and a clone it interrupted leaves its partial folder."
+      ],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "git clone --progress through the Host subprocess service; jj git init --colocate afterwards when jj resolves.",
+          "deterministicFake": "src/project-lifecycle.test.ts clones a local file:// repository with the real git and jj binaries; cancellation uses a runner that waits for the abort signal."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-file-url",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "clones a file:// repository in the background, colocates jj and registers it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-cancel",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "cancels a running clone, deletes its partial folder and never registers it"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.clone-repository",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "project clone",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "clones a file:// repository in the background, colocates jj and registers it"
         }
       ]
     }

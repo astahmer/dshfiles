@@ -16,3 +16,9 @@ Feature: Workspace folder picker
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
     When the sidebar Add workspace action is opened
     Then the picker starts in folder browsing mode without project actions
+
+  @scenario:workspace-folder-picker.clone-repository
+  Scenario: Clone a local repository as a project
+    Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
+    When the header workspace Add workspace action is opened
+    Then a local repository can be cloned and registered as a workspace

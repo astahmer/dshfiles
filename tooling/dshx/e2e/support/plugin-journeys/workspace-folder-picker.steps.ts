@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
@@ -101,6 +102,35 @@ Then('a typed absolute folder path can be registered without browsing', async ({
     await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
     await page.getByRole('menuitem', { name: /Add workspace/ }).click()
     await recordAssertion(page, 'add-workspace-flow-can-reopen', () => expect(dialog).toBeVisible())
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
+})
+
+Then('a local repository can be cloned and registered as a workspace', async ({ page }: { page: Page }) => {
+  const scratchRoot = await realpath(await mkdtemp(join(tmpdir(), 'dsh-folder-picker-clone-')))
+  const origin = join(scratchRoot, 'origin')
+  const dialog = folderPickerDialog(page)
+  try {
+    await mkdir(origin)
+    execFileSync('git', ['init', '--quiet', '--initial-branch=main', origin])
+    await writeFile(join(origin, 'README.md'), '# origin\n')
+    execFileSync('git', ['-C', origin, 'add', 'README.md'])
+    execFileSync('git', ['-C', origin, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--quiet', '-m', 'first'])
+    await dialog.getByRole('button', { name: 'New', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Clone repository…' }).click()
+    const cloneDialog = page.getByRole('dialog', { name: 'Clone repository' })
+    await recordAssertion(page, 'clone-dialog-opens', () => expect(cloneDialog).toBeVisible())
+    await cloneDialog.getByRole('textbox', { name: 'Repository URL' }).fill(`file://${origin}`)
+    await recordAssertion(page, 'folder-name-follows-the-url', () => expect(cloneDialog.getByRole('textbox', { name: 'Folder name' })).toHaveValue('origin'))
+    await cloneDialog.getByRole('textbox', { name: 'Parent folder' }).fill(scratchRoot)
+    await cloneDialog.getByRole('textbox', { name: 'Folder name' }).fill('cloned-project')
+    await cloneDialog.getByRole('button', { name: 'Clone', exact: true }).click()
+    await recordAssertion(page, 'clone-closes-after-registration', () => expect(cloneDialog).toBeHidden({ timeout: 30_000 }))
+    await recordAssertion(page, 'cloned-folder-is-registered-as-workspace', () =>
+      expect(page.getByRole('treeitem').filter({ hasText: 'cloned-project' })).toBeVisible(),
+    )
     await finishJourneyAssertions(page)
   } finally {
     await rm(scratchRoot, { recursive: true, force: true })

@@ -14,7 +14,7 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ProjectFolderPickerModel, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -69,6 +69,8 @@ export interface ProjectFolderPickerProps {
   readonly pinnedWorkspaceIds?: readonly string[]
   /** Accessible list label and placeholder override for callers whose list is not only projects. */
   readonly placeholder?: string
+  /** Caller-owned controls after the search field, such as other ways to add a project. */
+  readonly headerActions?: ReactNode
 }
 
 const projectGlyphTones = [
@@ -384,6 +386,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               Browse…
             </Button>
           )}
+          {props.headerActions}
         </div>
         {pathMode ? (
           <>

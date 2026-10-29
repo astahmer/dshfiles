@@ -17,6 +17,27 @@ The chooser intentionally does not show registered projects or the
 choosing one that already exists. The existing workspace-selection UI remains
 unchanged.
 
+## Clone a repository
+
+![Clone a repository as a project](docs/screenshots/project-clone.png)
+
+**New → Clone repository…** in the same dialog clones a Git repository
+(`https://`, `ssh://`, `git@host:path` or a local `file:///` URL) into a new
+folder `<parent>/<name>` on this machine. The clone runs as a background Host
+job: `git clone --progress` feeds the progress bar, **Cancel clone** stops it
+and deletes the partial folder, then `jj git init --colocate` runs when jj is
+installed and the clone is registered as a project and selected. Closing the
+dialog leaves the job running; it still registers the project when it ends.
+
+The same jobs are agent tools: `project_clone` (URL, parent folder, folder
+name), `project_clone_jobs` (read-only trail, newest first) and
+`project_clone_cancel` (requires `confirm: true`). An existing destination is
+refused, a second start for the same folder returns the running job, and each
+clone leaves one `project clone` span with its final state and phase. Jobs live
+in Host memory, so a Host restart drops the trail. `multi_host_clone_project`
+stays the remote counterpart; it runs `git clone` over SSH and shares no code
+with this local job beyond the idea.
+
 ## Runtime support
 
 The plugin builds against the published
