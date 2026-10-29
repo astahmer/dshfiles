@@ -53,6 +53,8 @@ test('present config and explicit environment precedence never rewrite the local
   assert.equal(env.DSH_SESSION_ID, undefined)
   assert.equal(env.DSH_RESTART_RUN_ID, undefined)
   assert.equal(env.DSHFILES_PROFILE, 'chosen')
+  assert.equal(env.NODE_COMPILE_CACHE, join(f.env.XDG_CACHE_HOME ?? join(f.home, '.cache'), 'dshfiles', 'node-compile-cache'))
+  assert.equal(LauncherConfig.environment(config, { ...f.env, NODE_COMPILE_CACHE: '/chosen/cache' }).NODE_COMPILE_CACHE, '/chosen/cache')
   assert.match(LauncherConfig.runningProfilePattern(config), /core\\\[1\\\]/)
   assert.equal(readFileSync(f.file, 'utf8'), original)
 })
