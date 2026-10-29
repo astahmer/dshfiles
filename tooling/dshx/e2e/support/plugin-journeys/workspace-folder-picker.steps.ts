@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
@@ -131,6 +131,31 @@ Then('a local repository can be cloned and registered as a workspace', async ({ 
     await recordAssertion(page, 'cloned-folder-is-registered-as-workspace', () =>
       expect(page.getByRole('treeitem').filter({ hasText: 'cloned-project' })).toBeVisible(),
     )
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
+})
+
+Then('a new project can be created and registered as a workspace', async ({ page }: { page: Page }) => {
+  const scratchRoot = await realpath(await mkdtemp(join(tmpdir(), 'dsh-folder-picker-new-')))
+  const dialog = folderPickerDialog(page)
+  try {
+    await dialog.getByRole('button', { name: 'New', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'New project…' }).click()
+    const createDialog = page.getByRole('dialog', { name: 'New project' })
+    await recordAssertion(page, 'new-project-dialog-opens', () => expect(createDialog).toBeVisible())
+    await createDialog.getByRole('textbox', { name: 'Parent folder' }).fill(scratchRoot)
+    await createDialog.getByRole('textbox', { name: 'Project name' }).fill('fresh-project')
+    await createDialog.getByRole('button', { name: 'Create', exact: true }).click()
+    await recordAssertion(page, 'new-project-closes-after-registration', () => expect(createDialog).toBeHidden({ timeout: 30_000 }))
+    await recordAssertion(page, 'new-project-is-registered-as-workspace', () =>
+      expect(page.getByRole('treeitem').filter({ hasText: 'fresh-project' })).toBeVisible(),
+    )
+    await recordAssertion(page, 'new-project-has-readme-and-jj', async () => {
+      expect(await readFile(join(scratchRoot, 'fresh-project', 'README.md'), 'utf8')).toBe('# fresh-project\n')
+      await access(join(scratchRoot, 'fresh-project', '.jj'))
+    })
     await finishJourneyAssertions(page)
   } finally {
     await rm(scratchRoot, { recursive: true, force: true })

@@ -7,19 +7,20 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { ChevronDownIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, ProjectFolderPicker, type DirectoryPickerPort, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useState } from 'react'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { ProjectCloneDialog } from './project-clone-dialog.js'
+import { ProjectCreateDialog } from './project-create-dialog.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
 const directoryFlowLabels = { heading: 'Add workspace' } satisfies { readonly heading: string }
 
-type DirectoryFlowView = 'browse' | 'clone'
+type DirectoryFlowView = 'browse' | 'clone' | 'create'
 
 const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
@@ -34,6 +35,17 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   if (view === 'clone') {
     return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={path => props.onPicked(path)} />
   }
+  if (view === 'create') {
+    return (
+      <ProjectCreateDialog
+        api={lifecycleApi}
+        gitHubAvailable={tools.data?.gh === true}
+        home={tools.data?.home}
+        onClose={() => setView('browse')}
+        onCreated={path => props.onPicked(path)}
+      />
+    )
+  }
   const addActions = tools.isSuccess ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -46,6 +58,10 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
         <DropdownMenuItem disabled={!tools.data.git} onSelect={() => setView('clone')}>
           <GitBranchIcon aria-hidden />
           Clone repository…
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!tools.data.jj} onSelect={() => setView('create')}>
+          <FolderPlusIcon aria-hidden />
+          New project…
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

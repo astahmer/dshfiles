@@ -108,6 +108,74 @@
           "testName": "clones a file:// repository in the background, colocates jj and registers it"
         }
       ]
+    },
+    {
+      "id": "project-create",
+      "title": "Create a new project",
+      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs.",
+      "reach": [
+        "click button \"New session\"",
+        "click button \"Choose workspace\"",
+        "click menuitem \"Add workspace*\"",
+        "click button \"New\"",
+        "click menuitem \"New project…\"",
+        "expect textbox \"Project name\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["form", "creating", "created", "created-with-warning", "failed"],
+      "failureModes": [
+        "An existing folder, a missing parent or a missing jj is refused before anything is written.",
+        "A failure before registration removes the folder it created, so the same request can be retried.",
+        "A GitHub failure after registration keeps the project and shows the gh command to finish it; the GitHub option is hidden while gh is not installed."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "jj git init --colocate, jj commit and jj bookmark create through the Host subprocess service.",
+          "deterministicFake": "src/project-lifecycle.test.ts creates the project with the real jj binary in a temporary folder."
+        },
+        {
+          "id": "gh",
+          "boundary": "gh repo create --private --source . --remote origin, then git push of main; only when createGitHubRepository is true.",
+          "deterministicFake": "src/project-lifecycle.test.ts replaces only the gh process with one that adds a local bare remote, then pushes with the real git."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.new-project-jj",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "creates a colocated jj project with a README, a described first commit on main, and registers it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.new-project-github",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "creates a private GitHub repository through gh and pushes main when opted in"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.new-project",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "project create",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "creates a colocated jj project with a README, a described first commit on main, and registers it"
+        }
+      ]
     }
   ]
 }

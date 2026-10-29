@@ -7,7 +7,7 @@ import BrowseDirectoryPicker from '@deepseek-ai/dsh-host-directory-picker-browse
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
-import { createCloneJobs, type CommandRunner, type ProjectCommand, type ProjectLifecycleDeps } from './project-lifecycle.js'
+import { createCloneJobs, createProject, type CommandRunner, type ProjectCommand, type ProjectLifecycleDeps } from './project-lifecycle.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 
 type BrowseCapability = Extract<ReturnType<BrowseDirectoryPicker['capability']>, { kind: 'browse' }>
@@ -87,6 +87,7 @@ const createHost = () => {
     startClone: request => cloneJobs.start(request.input),
     cloneJobs: async () => ({ jobs: cloneJobs.list() }),
     cancelClone: async request => cloneJobs.cancel(request.input.jobId),
+    createProject: request => createProject(deps, request.input),
   })
 
   return defineHost({

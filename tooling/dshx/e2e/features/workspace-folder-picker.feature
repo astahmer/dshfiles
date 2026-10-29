@@ -22,3 +22,9 @@ Feature: Workspace folder picker
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
     When the header workspace Add workspace action is opened
     Then a local repository can be cloned and registered as a workspace
+
+  @scenario:workspace-folder-picker.new-project
+  Scenario: Create a new jj project
+    Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
+    When the header workspace Add workspace action is opened
+    Then a new project can be created and registered as a workspace

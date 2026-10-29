@@ -233,6 +233,12 @@ from the `agent/turn-stopping` hook, not from a user action.
 (`WorkspaceController.create`). Both packages are client-only today, so these
 need a Host half somewhere that owns them.
 
+The workspace-folder-picker Host half serves the project lifecycle with full
+parity: **Clone repository…** → `project_clone`, `project_clone_jobs`
+(read-only) and `project_clone_cancel` (`confirm: true`); **New project…** →
+`project_create` (`createGitHubRepository` required, no default);
+`project_tools_status` (read-only) reports git, jj and gh.
+
 ### workbench
 
 Workbench docking, Add panel, nested containers, tab preview/pin/reorder, named layouts and resource presentation targets

@@ -38,6 +38,24 @@ in Host memory, so a Host restart drops the trail. `multi_host_clone_project`
 stays the remote counterpart; it runs `git clone` over SSH and shares no code
 with this local job beyond the idea.
 
+## Create a new project
+
+![Create a new project](docs/screenshots/project-create.png)
+
+**New → New project…** creates `<parent>/<name>`, runs `jj git init
+--colocate`, writes a `README.md`, commits it as `chore: initialize <name>`,
+creates the `main` bookmark on that commit and registers the folder as a
+project. When the GitHub CLI is installed, **Create a private GitHub
+repository** also runs `gh repo create <name> --private --source . --remote
+origin` and pushes `main`; the option is hidden without `gh`. An existing
+folder, a missing parent or a missing jj is refused before anything is
+written; a failure before registration removes the folder again, and a GitHub
+failure after it keeps the project and shows the command that finishes the
+job. The `project_create` agent tool takes the same inputs, with
+`createGitHubRepository` required so an agent never creates a GitHub repository
+by default, and `project_tools_status` reports which of git, jj and gh are
+installed. Each run leaves one `project create` span.
+
 ## Runtime support
 
 The plugin builds against the published

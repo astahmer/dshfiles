@@ -50,6 +50,18 @@ export const cloneJobSchema = z
 
 export type CloneJob = z.infer<typeof cloneJobSchema>
 
+const createdProjectSchema = z
+  .object({
+    path: z.string(),
+    workspaceId: z.string(),
+    title: z.string(),
+    gitHubRepository: z.string().nullable(),
+    warning: z.string().max(1_000).nullable(),
+  })
+  .strict()
+
+export type CreatedProject = z.infer<typeof createdProjectSchema>
+
 export const projectToolsSchema = z
   .object({
     home: z.string(),
@@ -93,6 +105,22 @@ export const projectLifecycleApi = defineApi({
       description:
         'Cancel one running clone job and delete the partly cloned folder it created; a finished job is returned unchanged. confirm: true is required. Call only when the user asked to cancel that clone.',
       tool: { name: 'project_clone_cancel', render: compact },
+    }),
+    createProject: method({
+      input: z
+        .object({
+          parentPath: parentPathSchema,
+          name: projectFolderNameSchema,
+          createGitHubRepository: z.boolean(),
+        })
+        .strict(),
+      output: createdProjectSchema,
+      description:
+        'Create a new project folder <parentPath>/<name>: jj git init (colocated), a README.md, a first described commit and a main bookmark, then register it as a project. createGitHubRepository: true also creates a PRIVATE GitHub repository with the GitHub CLI and pushes main; pass it only when the user asked for a GitHub repository. Refuses an existing folder. Call only when the user asked to create a project.',
+      tool: {
+        name: 'project_create',
+        render: created => `Created ${created.path}${created.gitHubRepository === null ? '' : ` · ${created.gitHubRepository}`}`,
+      },
     }),
   },
 })

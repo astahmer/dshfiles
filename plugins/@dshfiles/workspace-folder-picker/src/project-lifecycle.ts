@@ -1,8 +1,8 @@
-import { existsSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { withSpan } from '@dshfiles/dshx/tracing'
-import type { CloneJob } from './project-lifecycle-api.js'
+import type { CloneJob, CreatedProject } from './project-lifecycle-api.js'
 
 export type ProjectCommand = 'git' | 'jj' | 'gh'
 
@@ -36,6 +36,7 @@ export interface ProjectLifecycleDeps {
 }
 
 const CLONE_TIMEOUT_MS = 30 * 60_000
+const STEP_TIMEOUT_MS = 2 * 60_000
 const MAX_JOBS = 20
 
 const excerpt = (text: string, limit = 1_000): string => text.trim().split('\n').slice(-6).join('\n').slice(-limit)
@@ -197,6 +198,76 @@ export const createCloneJobs = (deps: ProjectLifecycleDeps) => {
     },
   }
 }
+
+const failStep = (step: string, result: CommandResult): never => {
+  throw new PluginApiError(`${step} failed: ${excerpt(result.stderr) || `exit ${String(result.exitCode)}`}`, { code: 'project-create-failed' })
+}
+
+/**
+ * Creates a jj project: folder, colocated repository, README, a described first commit on `main`, registration, and
+ * optionally a private GitHub repository. A failure before registration removes the folder it created, so the same
+ * request can simply be retried; GitHub problems after registration only add a warning.
+ */
+export const createProject = (
+  deps: ProjectLifecycleDeps,
+  input: { readonly parentPath: string; readonly name: string; readonly createGitHubRepository: boolean },
+): Promise<CreatedProject> =>
+  withSpan('project create', { attributes: { 'dshx.project.github': input.createGitHubRepository } }, async span => {
+    const path = destination({ ...input, home: deps.home() })
+    const jj = await requireCommand(deps, 'jj', 'Install jj (https://jj-vcs.github.io), or create the folder and add it as a project instead.')
+    const gh = input.createGitHubRepository
+      ? await requireCommand(
+          deps,
+          'gh',
+          'Install the GitHub CLI (https://cli.github.com) and run `gh auth login`, or create the project without a GitHub repository.',
+        )
+      : undefined
+    const signal = AbortSignal.timeout(STEP_TIMEOUT_MS)
+    const run = async (step: string, argv: readonly string[]): Promise<CommandResult> => {
+      const result = await deps.run({ argv, cwd: path, signal })
+      return result.exitCode === 0 ? result : failStep(step, result)
+    }
+    mkdirSync(path)
+    let registered: RegisteredFolder
+    try {
+      await run('jj git init', [jj, 'git', 'init', '--colocate', '.'])
+      writeFileSync(join(path, 'README.md'), `# ${input.name}\n`)
+      await run('jj commit', [jj, 'commit', '-m', `chore: initialize ${input.name}`])
+      await run('jj bookmark create', [jj, 'bookmark', 'create', 'main', '-r', '@-'])
+      registered = await deps.register(path)
+    } catch (error) {
+      rmSync(path, { recursive: true, force: true })
+      span.setStatus('error', 'create failed')
+      throw error
+    }
+    if (gh === undefined) return { path, workspaceId: registered.workspaceId, title: registered.title, gitHubRepository: null, warning: null }
+    const created = await deps.run({ argv: [gh, 'repo', 'create', input.name, '--private', '--source', '.', '--remote', 'origin'], cwd: path, signal })
+    if (created.exitCode !== 0) {
+      span.setAttributes({ 'dshx.project.github_failed': 'create' })
+      return {
+        path,
+        workspaceId: registered.workspaceId,
+        title: registered.title,
+        gitHubRepository: null,
+        warning: `The project was created, but the GitHub repository was not: ${excerpt(created.stderr, 400)} Run \`gh auth status\`, then \`gh repo create ${input.name} --private --source . --remote origin\` in ${path}.`,
+      }
+    }
+    const repository = excerpt(created.stdout, 400).split('\n').at(-1) ?? input.name
+    const git = await deps.resolve('git')
+    const pushed = git === undefined ? undefined : await deps.run({ argv: [git, 'push', '--set-upstream', 'origin', 'main'], cwd: path, signal })
+    if (pushed === undefined || pushed.exitCode !== 0) {
+      span.setAttributes({ 'dshx.project.github_failed': 'push' })
+      return {
+        path,
+        workspaceId: registered.workspaceId,
+        title: registered.title,
+        gitHubRepository: repository,
+        warning: `The GitHub repository exists but main was not pushed. Run \`jj git push --bookmark main --remote origin\` in ${path}.`,
+      }
+    }
+    await deps.run({ argv: [jj, 'git', 'import'], cwd: path, signal })
+    return { path, workspaceId: registered.workspaceId, title: registered.title, gitHubRepository: repository, warning: null }
+  })
 
 export class ProjectLifecycleModel {
   static readonly readProgress = readProgress

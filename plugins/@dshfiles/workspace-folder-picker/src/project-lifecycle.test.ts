@@ -6,7 +6,7 @@ import { PluginApiError } from '@dshfiles/dshx/api'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { localCloneUrlSchema, projectFolderNameSchema } from './project-lifecycle-api.js'
-import { createCloneJobs, ProjectLifecycleModel, type CommandRunner, type ProjectLifecycleDeps } from './project-lifecycle.js'
+import { createCloneJobs, createProject, ProjectLifecycleModel, type CommandRunner, type ProjectLifecycleDeps } from './project-lifecycle.js'
 
 const toolsAvailable = spawnSync('jj', ['--version']).status === 0 && spawnSync('git', ['--version']).status === 0
 const env = { ...process.env, JJ_CONFIG: '', JJ_USER: 'Test', JJ_EMAIL: 'test@example.com', GIT_TERMINAL_PROMPT: '0' }
@@ -134,5 +134,49 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
     expect(existsSync(join(root, 'clone'))).toBe(false)
     expect(registered).toEqual([])
     expect(() => jobs.cancel('clone-unknown')).toThrow(PluginApiError)
+  })
+
+  it('creates a colocated jj project with a README, a described first commit on main, and registers it', async () => {
+    using recorder = recordSpans()
+    const created = await createProject(deps(), { parentPath: '~/', name: 'fresh', createGitHubRepository: false })
+    const path = join(root, 'fresh')
+    expect(created).toEqual({ path, workspaceId: 'ws-1', title: 'fresh', gitHubRepository: null, warning: null })
+    expect(readFileSync(join(path, 'README.md'), 'utf8')).toBe('# fresh\n')
+    expect(existsSync(join(path, '.git'))).toBe(true)
+    const log = execFileSync('jj', ['log', '--no-graph', '-r', 'main', '-T', 'description'], { cwd: path, encoding: 'utf8', env })
+    expect(log.trim()).toBe('chore: initialize fresh')
+    expect(recorder.span('project create').attributes['dshx.project.github']).toBe(false)
+  })
+
+  it('refuses GitHub creation without gh before touching the disk', async () => {
+    await expect(createProject(deps(), { parentPath: root, name: 'fresh', createGitHubRepository: true })).rejects.toMatchObject({ code: 'gh-missing' })
+    expect(existsSync(join(root, 'fresh'))).toBe(false)
+  })
+
+  it('creates a private GitHub repository through gh and pushes main when opted in', async () => {
+    installed.add('gh')
+    const bare = join(root, 'remote.git')
+    execFileSync('git', ['init', '--bare', bare], { stdio: 'ignore', env })
+    const ghCalls: (readonly string[])[] = []
+    const withFakeGh: CommandRunner = input => {
+      if (input.argv[0] !== 'gh') return nodeRunner(input)
+      ghCalls.push(input.argv)
+      execFileSync('git', ['remote', 'add', 'origin', bare], { cwd: input.cwd, env })
+      return Promise.resolve({ exitCode: 0, stdout: 'https://github.com/test/fresh\n', stderr: '' })
+    }
+    const created = await createProject(deps(withFakeGh), { parentPath: root, name: 'fresh', createGitHubRepository: true })
+    expect(ghCalls).toEqual([['gh', 'repo', 'create', 'fresh', '--private', '--source', '.', '--remote', 'origin']])
+    expect(created).toMatchObject({ gitHubRepository: 'https://github.com/test/fresh', warning: null })
+    expect(execFileSync('git', ['--git-dir', bare, 'log', '--format=%s', 'main'], { encoding: 'utf8', env }).trim()).toBe('chore: initialize fresh')
+  })
+
+  it('keeps the project and warns with the next command when gh fails', async () => {
+    installed.add('gh')
+    const failingGh: CommandRunner = input =>
+      input.argv[0] === 'gh' ? Promise.resolve({ exitCode: 1, stdout: '', stderr: 'not logged in' }) : nodeRunner(input)
+    const created = await createProject(deps(failingGh), { parentPath: root, name: 'fresh', createGitHubRepository: true })
+    expect(created.gitHubRepository).toBeNull()
+    expect(created.warning).toContain('gh auth status')
+    expect(registered).toEqual([join(root, 'fresh')])
   })
 })
