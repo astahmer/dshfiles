@@ -47,7 +47,10 @@ replacement leaves the plugin broken in that page — Settings → Plugins → P
 list retries it — and a failed Host replacement stops the plugin and reports its
 entry `failed`. Revisions are bundle metadata (mtime, ctime, size), so a rewrite
 that preserves all three never reloads, while a metadata-only touch reloads the
-plugin with fresh component state. A page also applies graphs only from the
+plugin with fresh component state. `dshx build` stages a plugin's whole `dist/` and
+swaps it in with two renames, so a poll sees one complete rebuild per plugin
+instead of a burst of partial files. A turbo cache restore still writes file by
+file. A page also applies graphs only from the
 release it booted, and it closes `/plugins/events` for good when a restarting
 Host answers that route non-200 before registering it: the page then updates
 nothing and learns of no release change until it is reloaded. Reload a tab you

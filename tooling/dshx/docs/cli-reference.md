@@ -56,6 +56,8 @@ dshx build [--cwd <project>] [--verbose]
 
 Build runs the offline manifest, migration, compatibility, and TypeScript checks before compiling. It builds enabled Host and Client faces through the bounded Vite kernel, emits declarations by default, and verifies the artifact shape. Its only writes are build outputs.
 
+Every face writes into a hidden sibling staging directory (`.dist.dshx-<pid>-<id>/`). Only when all faces succeed does the build replace `dist/` with it, by renaming the old directory away and the staged one in. A running Host that polls bundles therefore sees one complete change per plugin. A failed build keeps the last good `dist/`. Anything else written into `dist/` is replaced too, so keep other generators' output elsewhere. `dshx dev` watchers still write in place.
+
 ## `dshx dev`
 
 ```bash

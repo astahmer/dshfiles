@@ -7,6 +7,7 @@ import { isCancel, select, text } from '@clack/prompts'
 import { buildClient } from '../compiler/client/build.js'
 import { buildHost } from '../compiler/host/build.js'
 import { buildModule } from '../compiler/module/build.js'
+import { StagedOutput } from '../compiler/staged-output.js'
 import { resolveDshxConfig } from '../config/resolve.js'
 import { startDevSession } from '../dev/orchestrator.js'
 import type { DevEvent, DevSession } from '../dev/types.js'
@@ -339,6 +340,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   ]
   for (const item of diagnostics) printDiagnostic(io, item)
   if (hasErrors(diagnostics)) return 1
+  const staged = await StagedOutput.create(project.outDir)
   const jobs: Array<{
     readonly fallback: string
     readonly task: Promise<unknown>
@@ -354,7 +356,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       logicalName: project.name,
       root: project.root,
       ...(project.hostEntry !== undefined && { entry: project.hostEntry }),
-      outDir: project.outDir,
+      outDir: staged.directory,
       sourcemap: project.build.sourcemap,
       declarations: project.build.declarations ?? true,
       bundleDependencies: project.hostBundleDependencies ?? [],
@@ -377,7 +379,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         logicalName: project.name,
         root: project.root,
         entry: project.clientEntry,
-        outDir: project.outDir,
+        outDir: staged.directory,
         sourcemap: project.build.sourcemap,
         declarations: project.build.declarations ?? true,
         minify: project.build.minify ?? false,
@@ -399,7 +401,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         root: project.root,
         name: shared.name,
         entry: shared.entry,
-        outDir: project.outDir,
+        outDir: staged.directory,
         sourcemap: project.build.sourcemap,
       }),
     })
@@ -421,7 +423,11 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
     for (const name of names) artifacts.push(resolvePath(project.outDir, name))
     if (names.length === 0 && fallback !== undefined) artifacts.push(fallback)
   })
-  if (failed) return 1
+  if (failed) {
+    await staged.discard()
+    return 1
+  }
+  await staged.publish()
   const targetDiagnostics = await (runtime.checkPackageTargets ?? checkPackageTargets)(project)
   for (const item of targetDiagnostics) printDiagnostic(io, item)
   if (hasErrors(targetDiagnostics)) return 1
