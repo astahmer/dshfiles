@@ -430,7 +430,7 @@ export default defineClient({
         try {
           return register(true)
         } catch (error) {
-          console.warn(`command-palette: ${newThreadShortcutId} keeps no default binding`, error)
+          console.debug(`command-palette: ${newThreadShortcutId} keeps no default binding (${error instanceof Error ? error.message : String(error)})`)
           try {
             return register(false)
           } catch {

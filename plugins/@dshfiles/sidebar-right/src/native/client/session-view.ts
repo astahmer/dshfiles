@@ -34,7 +34,8 @@ export class SidebarSessionView {
   ) {
     this.reference = sessions.retain(sessionId, { source })
     void this.reference.ready.catch((error: unknown) => {
-      console.error('Sidebar Session opening failed:', error)
+      // A view disposed while its Session was still opening (plugin reload, thread switch) rejects as released.
+      if (!this.disposed) console.error('Sidebar Session opening failed:', error)
     })
   }
 
