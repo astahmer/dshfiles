@@ -271,6 +271,64 @@
           "reason": "Client-only: the Composer contract edits browser draft state; setModel uses the model picker's existing Host call."
         }
       ]
+    },
+    {
+      "id": "prompt-recall",
+      "title": "Recall earlier prompts with ArrowUp",
+      "summary": "ArrowUp in an empty composer shows this thread's previous prompts from its loaded history, newest first; repeated ArrowUp goes older, ArrowDown goes newer and back to the empty draft, Escape restores the draft, and editing the recalled text ends recall.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["idle", "recalling", "edited"],
+      "failureModes": [
+        "A thread without prompts in its loaded window leaves ArrowUp as ordinary caret movement.",
+        "Prompts older than the loaded event window are not recalled until the transcript loads them."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-history",
+          "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
+          "testName": "reads human prompts newest first, once each, skipping injected and empty messages"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-older",
+          "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
+          "testName": "ArrowUp in an empty composer recalls the newest prompt, then older ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-newer",
+          "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
+          "testName": "ArrowDown walks forward and past the newest restores the empty draft"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-escape",
+          "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
+          "testName": "Escape restores the draft recall started from"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-edit-ends",
+          "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
+          "testName": "editing a recalled prompt ends recall, so the arrows and Escape keep their ordinary behaviour"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.prompt-recall-unit-keys",
+          "file": "plugins/@dshfiles/rich-composer/src/native/input/editor/keymap.test.ts",
+          "testName": "a bare ArrowUp or ArrowDown asks for recall and is consumed only when a prompt was shown"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: prompt recall reads the Session event window already in the browser and starts no Host work."
+        }
+      ]
     }
   ]
 }

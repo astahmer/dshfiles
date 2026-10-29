@@ -54,6 +54,7 @@ import { liveViewBindings } from './conversation/live-bindings.ts'
 import { TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
+import { PromptRecallModel } from '../prompt-recall.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -553,6 +554,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           removeAttachment: undefined,
           resolveDraftAttachments: undefined,
           retryFileUpload: undefined,
+          promptHistory: undefined,
           toggleCommandMenu: undefined,
           stop: undefined,
           hooks: {
@@ -629,6 +631,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         retryFileUpload: (id) => {
           if (sessions.binding(sessionId) !== undefined) liveConversation(ctx)?.retryFileUpload(sessionId, id)
         },
+        promptHistory: () => PromptRecallModel.promptsOf(sessions.binding(sessionId)?.eventSource.getSnapshot().entries ?? []),
         toggleCommandMenu: inputTriggers === undefined
           ? undefined
           : (selection) => {

@@ -22,6 +22,7 @@ import {
 import { mergeRegister } from '@lexical/utils'
 import { clipboardText } from '../../../clipboard-text.ts'
 import type { ArbitrateKey, ArbitrateOutcome } from '../../contract/draft-editor.ts'
+import type { RecallDirection } from '../../../prompt-recall.ts'
 
 /** The bar-supplied behavior behind each intercepted gesture. */
 export interface ComposerKeymapHandlers {
@@ -43,6 +44,10 @@ export interface ComposerKeymapHandlers {
   intakeFiles(files: readonly File[], directories?: ReadonlySet<File>): void
   /** Pasted plain text (sanitized insertion through the shell). */
   pasteText(text: string): void
+  /** Prompt recall on a bare ArrowUp/ArrowDown; true = a prompt was shown — the keystroke is consumed. */
+  recall?(direction: RecallDirection): boolean
+  /** Escape while a recalled prompt is unedited; true = the earlier draft came back. */
+  endRecall?(): boolean
 }
 
 /** Composition state a keydown can trust (see the module doc's Safari note). */
@@ -87,6 +92,11 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       event?.preventDefault()
       return true
     }
+    const bare = event !== null && !inComposition && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey
+    if (bare && (key === 'up' || key === 'down') && handlers.recall?.(key === 'up' ? 'older' : 'newer') === true) {
+      event.preventDefault()
+      return true
+    }
     return false
   }
 
@@ -118,7 +128,12 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       // Escape layering: an open overlay closes; claimed without an overlay
       // does NOT release (deleting the command chip is the only exit gesture).
       handlers.dismissPopup()
-      if (handlers.arbitrate('escape', isComposingEvent(event, recentlyComposing)) === 'consumed') {
+      const composingEscape = isComposingEvent(event, recentlyComposing)
+      if (handlers.arbitrate('escape', composingEscape) === 'consumed') {
+        event.preventDefault()
+        return true
+      }
+      if (!composingEscape && handlers.endRecall?.() === true) {
         event.preventDefault()
         return true
       }

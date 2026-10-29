@@ -142,6 +142,7 @@ const fixture = (id: string, initialView = 'chat') => {
     removeAttachment: vi.fn(),
     resolveDraftAttachments: () => [],
     retryFileUpload: vi.fn(),
+    promptHistory: () => [],
     toggleCommandMenu: vi.fn(),
     stop: vi.fn(),
     insertReference: vi.fn(),

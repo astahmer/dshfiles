@@ -6,6 +6,7 @@ import type { ComposerBarProps } from '../../contract/slots.ts'
 import type { BusyEnterBehavior } from '../../contract/composer-submission.ts'
 import { resolveSubmitMode } from '../submission-policy.ts'
 import { registerComposerKeymap } from './keymap.ts'
+import { PromptRecallModel } from '../../../prompt-recall.ts'
 
 interface DraftViewGate {
   locked: boolean
@@ -20,6 +21,10 @@ interface DraftViewGate {
   showToast: (text: string) => void
   t: ComposerBarProps['t']
   canAcceptDrop: boolean
+  /** This thread's prompts, newest first; absent without a Session. */
+  promptHistory: (() => readonly string[]) | undefined
+  /** Replace the whole draft with a recalled prompt or the draft recall started from. */
+  replaceDraft: (text: string) => void
 }
 
 /**
@@ -109,6 +114,12 @@ export function installDraftKeymap(
   keyboard: ComposerKeyboard,
   gate: MutableRefObject<DraftViewGate>,
 ): () => void {
+  const recall = PromptRecallModel.create()
+  const showRecalled = (text: string | null): boolean => {
+    if (text === null) return false
+    gate.current.replaceDraft(text)
+    return true
+  }
   return registerComposerKeymap(editor, {
     arbitrate: (key, composing) => keyboard.arbitrate(key, composing),
     space: () => {
@@ -141,6 +152,15 @@ export function installDraftKeymap(
     pasteText: (text) => {
       if (gate.current.machineBusy || gate.current.locked) return
       gate.current.pasteText(text)
+    },
+    recall: (direction) => {
+      const history = gate.current.promptHistory
+      if (gate.current.machineBusy || gate.current.locked || history === undefined) return false
+      return showRecalled(recall.step({ direction, draft: keyboard.snapshot.draft, caret: keyboard.caretSpan(), prompts: history }))
+    },
+    endRecall: () => {
+      if (gate.current.machineBusy || gate.current.locked) return false
+      return showRecalled(recall.escape(keyboard.snapshot.draft))
     },
   })
 }

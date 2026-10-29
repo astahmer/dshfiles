@@ -46,7 +46,7 @@ export type InputBarProps = ComposerBarProps
 
 export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addFiles, removeAttachment, resolveDraftAttachments,
-  retryFileUpload,
+  retryFileUpload, promptHistory,
   toggleCommandMenu, stop, t,
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut,
   useProjection, sessionId, variant, disabled: inert = false, blocked, insertReference,
@@ -255,6 +255,18 @@ export const InputBar = memo(function InputBar({
     }
   }, [inputActions, insertReference, keyboard])
 
+  // A plain prompt replaces the draft in one write. A prompt holding thread references is rebuilt as chips, but only
+  // after the clearing write commits: inserting inside the same key handler lands in the document that write replaces.
+  const replaceDraft = useCallback((text: string): void => {
+    if (inputActions === undefined) return
+    if (parsePastedComposerText(text).every(part => part.kind === 'text')) {
+      inputActions.setDraft(text)
+      return
+    }
+    inputActions.setDraft('')
+    queueMicrotask(() => { pasteText(text) })
+  }, [inputActions, pasteText])
+
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const onPickFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const picked = e.target.files === null ? [] : [...e.target.files]
@@ -267,11 +279,11 @@ export const InputBar = memo(function InputBar({
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop,
+    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft,
   })
   gate.current = {
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop,
+    intakeFiles, pasteText, uploadsPending, showToast, t, canAcceptDrop, promptHistory, replaceDraft,
   }
 
   useEffect(() => {
