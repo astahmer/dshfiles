@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -531,20 +532,14 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   return (
     <TooltipProvider>
       <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:sm:p-5">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-          <div>
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('noTurnGuarantee')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Badge variant={diagnostics !== undefined && diagnosticsQuery.error === null ? 'secondary' : 'destructive'}>
-              {diagnostics !== undefined && diagnosticsQuery.error === null ? t('connected') : t('unavailable')}
-            </Badge>
-            <Button variant="outline" size="sm" disabled={diagnosticsQuery.isFetching} onClick={() => void diagnosticsQuery.refetch()}>
-              <RefreshCwIcon aria-hidden /> {t('refresh')}
-            </Button>
-          </div>
-        </header>
+        <PageHeader heading={t('title')} description={t('noTurnGuarantee')}>
+          <Badge variant={diagnostics !== undefined && diagnosticsQuery.error === null ? 'secondary' : 'destructive'}>
+            {diagnostics !== undefined && diagnosticsQuery.error === null ? t('connected') : t('unavailable')}
+          </Badge>
+          <Button variant="outline" size="sm" disabled={diagnosticsQuery.isFetching} onClick={() => void diagnosticsQuery.refetch()}>
+            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          </Button>
+        </PageHeader>
 
         {diagnosticsQuery.isPending ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
         {diagnosticsQuery.error !== null ? (

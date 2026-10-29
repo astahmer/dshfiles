@@ -1,5 +1,6 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
@@ -263,26 +264,20 @@ export const ActivityTimelinePanel = (props: {
   return (
     <div className="dshx-root dshx:@container">
       <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-          <div>
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Badge variant="secondary">
-              {statsQuery.data?.retained ?? 0} {t('retained')}
-            </Badge>
-            <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
-              {statsQuery.data?.attention ?? 0} {t('attention')}
-            </Badge>
-            <Badge variant="outline">
-              {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
-            </Badge>
-            <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
-              <RefreshCwIcon aria-hidden /> {t('refresh')}
-            </Button>
-          </div>
-        </header>
+        <PageHeader heading={t('title')} description={t('subtitle')}>
+          <Badge variant="secondary">
+            {statsQuery.data?.retained ?? 0} {t('retained')}
+          </Badge>
+          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
+            {statsQuery.data?.attention ?? 0} {t('attention')}
+          </Badge>
+          <Badge variant="outline">
+            {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
+          </Badge>
+          <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
+            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          </Button>
+        </PageHeader>
         {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
           <SearchInput

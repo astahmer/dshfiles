@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
@@ -364,26 +365,20 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
   return (
     <div className="dshx-root dshx:@container">
       <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-          <div>
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Badge variant="secondary">
-              {value?.runningCount ?? 0} {t('running')}
-            </Badge>
-            <Badge variant="outline">
-              {value?.finishedCount ?? 0} {t('finished')}
-            </Badge>
-            <Badge variant="outline">
-              {value?.indexing.historyRows ?? 0} {t('historyRows')}
-            </Badge>
-            <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-              <RefreshCwIcon aria-hidden /> {t('refresh')}
-            </Button>
-          </div>
-        </header>
+        <PageHeader heading={t('title')} description={t('subtitle')}>
+          <Badge variant="secondary">
+            {value?.runningCount ?? 0} {t('running')}
+          </Badge>
+          <Badge variant="outline">
+            {value?.finishedCount ?? 0} {t('finished')}
+          </Badge>
+          <Badge variant="outline">
+            {value?.indexing.historyRows ?? 0} {t('historyRows')}
+          </Badge>
+          <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          </Button>
+        </PageHeader>
 
         {value !== undefined && !value.liveAvailable ? (
           <Alert>
