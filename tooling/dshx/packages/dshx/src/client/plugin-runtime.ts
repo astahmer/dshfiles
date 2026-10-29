@@ -1,5 +1,6 @@
 import { AppServicesModel } from './app-services.js'
 import { PluginHooksModel } from './hooks.js'
+import { HostStorageModel } from './host-storage.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from './plugin-context.js'
 
 type ComponentDecorator = <Component>(component: Component) => Component
@@ -58,6 +59,7 @@ const createPluginRuntime = (input: {
         service: name => input.ctx.get(name),
         on: (event, listener) => input.ctx.on?.(event, listener) ?? (() => false),
       }),
+      storage: HostStorageModel.create({ ctx: input.ctx, namespace: input.packageId, signal: scope.signal }),
     },
   })
   return { plugin, decorate }

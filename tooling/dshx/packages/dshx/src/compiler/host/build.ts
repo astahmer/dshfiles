@@ -38,6 +38,8 @@ const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
+const API_STORAGE_PATH = fileURLToPath(new URL('../../api/storage.js', import.meta.url))
+const HOST_PLUGIN_STORAGE_PATH = fileURLToPath(new URL('../../host/plugin-storage.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
@@ -127,6 +129,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const listApis = HostApiClientModel.list',
           `import { HostApiEventsModel } from ${JSON.stringify(API_HOST_EVENTS_PATH)}`,
           'export const publishApiEvent = HostApiEventsModel.publish',
+          `import { PluginStorageModel } from ${JSON.stringify(HOST_PLUGIN_STORAGE_PATH)}`,
+          'export const pluginStorage = PluginStorageModel.open',
           '',
         ].join('\n')
       }
@@ -138,6 +142,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
           'export const event = ApiDefinitionModel.event',
+          `import { PluginStorageContract } from ${JSON.stringify(API_STORAGE_PATH)}`,
+          'export const dshxStorageApi = PluginStorageContract.api',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')

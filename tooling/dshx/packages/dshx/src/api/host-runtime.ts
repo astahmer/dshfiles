@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 import type { ToolDefinition, ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {
   AnyApiMethodDefinition,
   ApiCaller,
@@ -23,6 +24,8 @@ import { HostApiEventsModel } from './host-events.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
 import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
+import { PluginStorageModel } from '../host/plugin-storage.js'
+import { PluginStorageContract } from './storage.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -435,6 +438,32 @@ async function mountEvents(ctx: Context, registry: ApiRegistry): Promise<() => P
   }
 }
 
+/** Plugin storage rides with the registry: one API per process, and every write of the domain becomes a `changed` event. */
+async function mountStorage(ctx: Context): Promise<() => Promise<void>> {
+  let mounted: Awaited<ReturnType<typeof mountApi>>
+  try {
+    mounted = await mountApi(ctx, ApiDefinitionModel.registryOwner, PluginStorageModel.registration(ctx))
+  } catch (cause) {
+    warn(ctx, `dshx registry: plugin storage is not served: ${describeFailure(cause)}`)
+    return async () => undefined
+  }
+  // A stub Context without the event bus, or whose `on` returns no disposer, serves the API without change events.
+  const listening: unknown =
+    typeof ctx.on === 'function'
+      ? ctx.on('domain/changed', change => {
+          const payload = PluginStorageModel.changeOf(change)
+          if (payload === undefined) return
+          void HostApiEventsModel.publish(ctx, PluginStorageContract.api, 'changed', payload).catch((cause: unknown) =>
+            warn(ctx, `dshx registry: a plugin storage change was not published: ${describeFailure(cause)}`),
+          )
+        })
+      : undefined
+  return async () => {
+    if (typeof listening === 'function') listening()
+    await mounted.dispose()
+  }
+}
+
 async function lead(registry: ApiRegistry): Promise<void> {
   const member = registry.members[0]
   if (member === undefined || registry.leader !== undefined) return
@@ -444,6 +473,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
     const unmount = (await mountApi(member.ctx, ApiDefinitionModel.registryOwner, registration)).dispose
     const unmountBrowserTraces = await mountBrowserTraces(member.ctx)
     const unmountEvents = await mountEvents(member.ctx, registry)
+    const unmountStorage = await mountStorage(member.ctx)
     const tools = toolsOf(member.ctx)
     const unregister = tools?.register(capabilitiesTool(registry))
     member.stop = async () => {
@@ -452,6 +482,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
       } catch {
         // The tools layer may already have released it with the Host fiber.
       }
+      await unmountStorage()
       await unmountEvents()
       await unmountBrowserTraces()
       await unmount()

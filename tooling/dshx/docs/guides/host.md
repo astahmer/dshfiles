@@ -96,6 +96,33 @@ DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effe
 
 The built adapter reports a Host-definition diagnostic when the default export is not a `defineHost()` object, contains an unknown field, uses a malformed contribution, or supplies a non-function `setup`. Native DSH Host modules remain supported when they export named `name`, `inject`, `Config`, and `apply` instead of a default definition.
 
+## Plugin storage: `pluginStorage(ctx, namespace)`
+
+Durable key-value storage for one plugin, kept by the Host's storage domain (`@deepseek-ai/dsh-storage-domain`, in
+every web profile) in one `dshx_plugin_kv` domain per process. Use the plugin's package name as the namespace: the
+browser half reads the same entries through `api.storage` or `useApi(dshxStorageApi)`.
+
+```ts
+import { pluginStorage } from '@dshfiles/dshx/host'
+
+const storage = pluginStorage(ctx, '@acme/plugin')
+await storage.set('runs/2026-10-29', { ok: true }) // JSON, at most 256 KiB; resolves once durable
+const entry = await storage.get('runs/2026-10-29') // { key, value, updatedAt } | undefined
+await storage.delete('runs/2026-10-29') // true when it existed
+let page = await storage.list({ prefix: 'runs/', limit: 100 })
+while (page.cursor !== null) page = await storage.list({ prefix: 'runs/', cursor: page.cursor })
+```
+
+- `list` returns keys in code-unit order, at most `limit` (default 100, max 500), and a `cursor` (the last key) while
+  more match; pass it back to read the next page. Keys may contain `/`, so a prefix works as a folder.
+- Without the storage-domain row every call rejects with `PluginApiError` code `storage-unavailable`, whose message
+  says which row to add.
+- The first loaded dshx Host with an API (the registry leader) serves `dshxStorageApi` (owner `@dshfiles/dshx`, id
+  `storage`) to browsers and publishes its `changed` event (`{ namespace, key, deleted }`) for every write, from the
+  Host half or a browser.
+- Prefer it to a plugin-owned domain for small, schemaless state. A plugin that needs typed tables, its own schema
+  version or a global singleton still declares its own `defineDomain`.
+
 ## Related chapters
 
 - [Prompt](./prompt.md)

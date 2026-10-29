@@ -7,12 +7,16 @@ export const definePromptSection = HostDefinitionModel.definePromptSection
 export { defineTool } from '@deepseek-ai/dsh-tools'
 import { HostApiClientModel } from '../api/host-client.js'
 import { HostApiEventsModel } from '../api/host-events.js'
+import { PluginStorageModel } from './plugin-storage.js'
 
 export const createHostApiClient = HostApiClientModel.create
 export const isApiServed = HostApiClientModel.isServed
 export const listApis = HostApiClientModel.list
 /** Send a declared API event to every connected browser; see `useApiEvent`. */
 export const publishApiEvent = HostApiEventsModel.publish
+/** Durable key-value storage for one plugin namespace, shared with its browser half through `dshxStorageApi`. */
+export const pluginStorage = PluginStorageModel.open
+export type { PluginStorage } from './plugin-storage.js'
 export type { HostDefinition, HostToolContribution, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'
 export type { CommandDefinition, CommandInvocation } from '@deepseek-ai/dsh-commands'
 export type { CommandResult } from '@deepseek-ai/dsh-commands/types'

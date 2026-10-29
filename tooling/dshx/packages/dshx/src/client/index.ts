@@ -142,6 +142,7 @@ export type {
 
 export const defineStore = StoreModel.define
 export type { DefinedStore, PersistedStore, StoreDefinition, StoreScope } from './store.js'
+export type { DefinedHostStore, HostStore, HostStoreDefinition, StorageService } from './host-storage.js'
 
 export const usePlugin = PluginHooksModel.usePlugin
 export const useSubscribable = PluginHooksModel.useSubscribable

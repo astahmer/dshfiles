@@ -232,6 +232,7 @@ is no longer current.
 | `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()`; `side` is the right region of the session on screen (its native right pane, or the Workbench dock): live `expanded`, `open()`, `hide()`, `toggle()`, each false without a side region or a session on screen |
 | `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab, `openLink(href)` through a `LinkHandler` and else as `openExternal`; each resolves or returns false when the browser cannot |
 | `api.notifications` | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported` |
+| `api.storage` | key-value storage and stores kept on the Host under this plugin's package id (see [Host-backed state](#host-backed-state-apistorage)) |
 | `api.environment` | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service |
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.
@@ -296,6 +297,32 @@ drafts(sessionId).set('…')
 - Values live in browser storage, are ready before setup and follow other tabs.
 - `storage: 'memory'` keeps the value on the page instead: it survives a plugin reload or HMR but not a page
   reload, and other tabs do not see it (an expanded tree, a scroll position).
+
+## Host-backed state: `api.storage`
+
+`defineStore` keeps a value in this browser. `api.storage` keeps it on the Host, under the plugin's package id, so
+every browser connected to that Host and the plugin's Host half (`pluginStorage(ctx, '@acme/plugin')`) see one value.
+Values are JSON, at most 256 KiB each.
+
+```ts
+const layout = api.storage.store({ key: 'layout', scope: 'global', schema: z.object({ columns: z.number() }), initial: { columns: 1 } })
+await layout.ready // reads `initial` until the Host answered
+layout.set({ columns: 3 }) // optimistic; reverts with a console warning if the Host refuses
+const draft = api.storage.store({ key: 'draft', scope: 'session', schema: z.string(), initial: '' })
+draft(sessionId).get()
+
+await api.storage.set('exports/2026-10', rows)
+const page = await api.storage.list({ prefix: 'exports/', limit: 50 }) // { entries: [{ key, value, updatedAt }], cursor }
+await api.storage.list({ prefix: 'exports/', cursor: page.cursor ?? undefined })
+```
+
+- A store is a `PersistedStore` plus `ready`; it follows writes from other browsers and the Host half through the
+  storage API's `changed` event, and reads every loaded key again when that event stream comes back.
+- Scopes: `global`, `session` and `project` like `defineStore`. A store is per server by construction: it lives on
+  the Host the page is connected to. A directory fits the `project` scope id.
+- `ready` rejects when the Host serves no plugin storage (the profile lacks the `@deepseek-ai/dsh-storage-domain` row,
+  or no dshx Host with an API is loaded); the store keeps reading `initial`.
+- Host keys of a store are `store/<key>` (global) or `store/<key>/<scope>/<id>`, so the Host half can read them.
 
 ## Failures
 
