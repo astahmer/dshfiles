@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { agentsApi } from '@dshfiles/agents/contract'
-import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -18,6 +18,7 @@ import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { ReplyRouting } from './reply-routing.js'
 import { BacklogFocusModel } from './backlog-focus.js'
+import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogMentionChip } from './backlog-mention-chip.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
@@ -245,15 +246,22 @@ export default defineClient({
         </AgentDispatchProvider>
       </PluginQueryProvider>
     )
+    const openInBacklog = (id: number): void => {
+      BacklogFocusModel.request(id)
+      // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
+      ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+    }
+    metadata?.plugin?.add(LinkHandler, {
+      id: 'dshfiles-backlog.item',
+      scheme: 'b',
+      open: link => {
+        const id = BacklogReference.id(link.target)
+        if (id !== undefined) openInBacklog(id)
+      },
+    })
     const ReferenceOverlay = (): JSX.Element => (
       <PluginQueryProvider>
-        <BacklogReferenceOverlay
-          openInBacklog={id => {
-            BacklogFocusModel.request(id)
-            // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
-            ctx.layout.selectPanel(PANEL_ID as MainPanelId)
-          }}
-        />
+        <BacklogReferenceOverlay openInBacklog={openInBacklog} />
         <BacklogNoticeToast openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)} />
       </PluginQueryProvider>
     )
