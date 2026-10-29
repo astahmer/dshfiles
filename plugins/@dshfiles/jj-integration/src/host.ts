@@ -40,6 +40,7 @@ import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { AutoCleanupModel, createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
+import { AutoFetchModel, createAutoFetchScheduler, type FetchOutcome } from './auto-fetch.js'
 import { SETTLED_THREADS_NAMESPACE, SettleCleanupModel, settledStatusSchema } from './settle-cleanup.js'
 import { JsonText } from './json-text.js'
 import { workspaceSyncActivity } from './workspace-sync-outcome.js'
@@ -1223,6 +1224,14 @@ const knownRepositoryRoots = async (): Promise<readonly string[]> => {
   return [...new Set(workspaces.map((workspace, index) => locations[index]?.repoRoot ?? workspace.path))]
 }
 
+/** Registered folders that resolve to a jj repository, once per repository; plain folders are left out. */
+const jjRepositoryRoots = async (): Promise<readonly string[]> => {
+  const active = requireThreads()
+  const workspaces = presentWorkspaces(registryOf().list())
+  const locations = await mapBounded(workspaces, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
+  return [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
+}
+
 const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   if (outcome.status === 'busy') {
     hostContext?.logger.debug('jj-integration: automatic cleanup skipped while %s runs', outcome.jobId)
@@ -1255,6 +1264,27 @@ const cleanupSettledWorkspaces = (input: { readonly justSettled: readonly string
     repositories: listRepositories,
     archived: () => new Set(registryOf().archivedSessionIds),
     remove: targets => cleanupRunner.start({ ...request, olderThanHours: 0, targets }).done,
+  })
+}
+
+const reportAutoFetch = (outcome: FetchOutcome): void => {
+  if (outcome.status === 'failed') {
+    emitActivity({
+      type: 'repository.fetch-failed',
+      summary: `Automatic fetch failed in ${basename(outcome.repoRoot)}`,
+      detail: AutoFetchModel.failureDetail(outcome, readSettings().autoFetch.remote),
+      path: outcome.repoRoot,
+      level: 'attention',
+    })
+    return
+  }
+  if (outcome.status !== 'fast-forwarded' && !(outcome.status === 'fetched' && outcome.bookmarkMoved)) return
+  invalidateRepositories()
+  emitActivity({
+    type: 'repository.fetched',
+    summary: `Automatic fetch moved ${readSettings().bookmark} in ${basename(outcome.repoRoot)}`,
+    path: outcome.repoRoot,
+    level: 'routine',
   })
 }
 
@@ -1908,6 +1938,14 @@ const setupHost = (context: Context): Effect<void> => {
     if (next === undefined || justSettled.length === 0 || !readSettings().autoCleanup.onSettle) return
     void cleanupSettledWorkspaces({ justSettled, settled: next }).catch(error => context.logger.warn('jj-integration: settle cleanup failed: %o', error))
   })
+  const autoFetch = createAutoFetchScheduler({
+    settings: () => readSettings().autoFetch,
+    bookmark: () => readSettings().bookmark,
+    repositories: jjRepositoryRoots,
+    execute: createExecutor(context),
+    report: reportAutoFetch,
+    onError: error => context.logger.warn('jj-integration: automatic fetch run failed: %o', error),
+  })
   const firstSweep = setTimeout(sweep, 30_000)
   const timer = setInterval(sweep, SWEEP_INTERVAL_MS)
   firstSweep.unref()
@@ -1916,6 +1954,7 @@ const setupHost = (context: Context): Effect<void> => {
     async *[Symbol.asyncIterator]() {
       yield async () => {
         autoCleanup.dispose()
+        autoFetch.dispose()
         statusWarmup.dispose()
         clearTimeout(firstSweep)
         clearInterval(timer)

@@ -91,6 +91,20 @@ export const jjIntegrationSettings = defineSettings({
     }).description(
       'Remove idle thread workspaces automatically, through the same cleanup job as the manual button. A workspace with unlanded revisions, a working or waiting thread, a thread whose activity cannot be read, or a queued integration is always kept.',
     ),
+    autoFetch: Schema.object({
+      enabled: Schema.boolean().default(false).description('Run `jj git fetch` in every registered jj repository on the interval below.'),
+      intervalMinutes: Schema.natural()
+        .min(5)
+        .max(24 * 60)
+        .default(30)
+        .description('Minutes between fetches. The first one waits a couple of minutes after DSH starts.'),
+      remote: Schema.string().default('origin').description('Git remote to fetch. Repositories without it are skipped.'),
+      fastForwardBookmark: Schema.boolean()
+        .default(false)
+        .description(
+          'After fetching, move the local bookmark (see Bookmark) to its remote copy when it is a strict ancestor of it. Local commits are never moved or dropped.',
+        ),
+    }).description('Keep remote bookmarks such as main@origin fresh. Failures appear in the activity timeline.'),
   }),
 })
 

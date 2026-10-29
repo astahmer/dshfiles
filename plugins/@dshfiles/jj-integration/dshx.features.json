@@ -629,6 +629,12 @@
           "span": "jj <subcommand>",
           "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
           "testName": "records a jj workspace span with the exit code and marks a failed run"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration auto fetch",
+          "file": "plugins/@dshfiles/jj-integration/src/auto-fetch.test.ts",
+          "testName": "reports a failed fetch with a recovery hint and an error span"
         }
       ]
     },

@@ -394,6 +394,21 @@ directory mtimes plus the workspace registry timestamps — never the Session
 list — so it stays cheap on a store with a thousand Sessions. `activeWithinHours:
 0` restores the old behaviour of one job over every registered repository.
 
+### Automatic fetch
+
+`autoFetch` (off by default) runs `jj git fetch --remote <remote>` (`origin`) in
+every registered jj repository every `intervalMinutes` (30), one repository at a
+time, so `main@origin` stays fresh for Rebase and the graph. Repositories
+without that remote are skipped. A tracked local bookmark follows the fetch the
+way jj always does; `fastForwardBookmark` additionally moves an untracked local
+bookmark to its remote copy, only when it is a strict ancestor of it, so local
+commits are never moved. A failed fetch lands in the activity timeline as
+`repository.fetch-failed` (attention) with the command to reproduce it; a moved
+bookmark is a routine `repository.fetched`. Each repository leaves a
+`jj-integration auto fetch` span with its status.
+
+### Settle cleanup
+
 `autoCleanup.onSettle` (off by default) also removes a thread workspace the
 moment its last thread is settled or archived: the Host watches the settled ids
 thread-sidebar keeps in its `thread-sidebar` settings document, and when a
