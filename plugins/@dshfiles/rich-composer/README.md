@@ -66,7 +66,7 @@ The upstream editor handles clipboard `text/plain` as editable text. This fork p
 
 ## Composer contract
 
-The fork provides dshx's `Composer` contract (`src/composer-service.ts`) over its per-session input shells, so other plugins read and edit the draft, add chips, pick the model and move focus without a slot of their own. Quote and note chips are reference chips of the `composer-snippet` input-trigger source (`src/composer-snippets.ts`): the chip carries its text in `ref`, so a restored draft still sends it, and the model reads a quote as a Markdown block quote and a note inside `<note>` tags. File chips use the native `reference` source the composer's file drop already uses. `setModel` goes through the `modelDirectories` service, the same path as the model picker.
+The fork provides dshx's `Composer` contract (`src/composer-service.ts`) over its per-session input shells, so other plugins read and edit the draft, add chips, pick the model and move focus without a slot of their own. Quote, note and line-comment chips are reference chips of the `composer-snippet` input-trigger source (`src/composer-snippets.ts`): the chip carries its content in `ref`, so a restored draft still sends it, and the model reads a quote as a Markdown block quote, a note inside `<note>` tags and a comment inside `<comment path lines>`. File chips use the native `reference` source the composer's file drop already uses. `setModel` goes through the `modelDirectories` service, the same path as the model picker.
 
 ## Composer settings
 

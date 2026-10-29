@@ -19,3 +19,16 @@ describe('composer quote and note chips', () => {
     expect(() => ComposerSnippets.serialize('{"kind":"quote"}')).toThrow()
   })
 })
+
+describe('composer line-comment chips', () => {
+  it('labels a comment with its file and lines and sends where it points', () => {
+    const chip = ComposerSnippets.reference({ kind: 'comment', path: 'src/retry.ts', line: 12, endLine: 14, text: 'this loop never backs off' })
+    expect(chip.label).toBe('retry.ts:12-14')
+    expect(ComposerSnippets.serialize(chip.ref)).toBe('<comment path="src/retry.ts" lines="12-14">\nthis loop never backs off\n</comment>')
+  })
+
+  it('names a single line once', () => {
+    const chip = ComposerSnippets.reference({ kind: 'comment', path: 'a.ts', line: 3, endLine: 3, text: 'typo' })
+    expect(chip.clipboardText).toBe('a.ts:3 typo')
+  })
+})

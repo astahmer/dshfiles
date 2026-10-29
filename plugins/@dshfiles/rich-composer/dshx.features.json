@@ -280,7 +280,7 @@
     {
       "id": "composer-contract",
       "title": "Composer contract for other plugins",
-      "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote and note chips, the next message's model and variant, and focus. Quote and note chips keep their text in the chip, so a restored draft still sends them.",
+      "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote, note and line-comment chips, the next message's model and variant, and focus. Those chips keep their content in the chip, so a restored draft still sends them.",
       "surfaces": [
         "client"
       ],

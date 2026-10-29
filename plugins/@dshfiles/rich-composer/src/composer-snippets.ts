@@ -4,7 +4,12 @@ import { z } from 'zod/mini'
 
 const SNIPPET_SOURCE = 'composer-snippet'
 
-const Snippet = z.object({ kind: z.enum(['quote', 'note']), text: z.string() })
+const Snippet = z.discriminatedUnion('kind', [
+  z.object({ kind: z.enum(['quote', 'note']), text: z.string() }),
+  z.object({ kind: z.literal('comment'), path: z.string(), line: z.number(), endLine: z.optional(z.number()), text: z.string() }),
+])
+
+type SnippetAttachment = Exclude<ComposerAttachment, { kind: 'file' }>
 
 /** The slice of `@dshfiles/input-trigger`'s source contract this chip needs; its client types re-declare the upstream conversation package this fork replaces. */
 interface SnippetSource {
@@ -19,22 +24,24 @@ interface SnippetSource {
 const isSourceRegistry = (value: unknown): value is { registerSource(source: SnippetSource): () => void } =>
   typeof value === 'object' && value !== null && 'registerSource' in value && typeof value.registerSource === 'function'
 
-/** The composer's quote and note chips: the chip keeps its text in `ref`, so a restored draft still sends it. */
+/** The composer's quote, note and line-comment chips: the chip keeps its content in `ref`, so a restored draft still sends it. */
 export class ComposerSnippets {
-  static reference = (attachment: Extract<ComposerAttachment, { kind: 'quote' | 'note' }>): ReferenceInsert => {
+  static reference = (attachment: SnippetAttachment): ReferenceInsert => {
+    const snippet = Snippet.parse(attachment)
     const firstLine = attachment.text.trim().split('\n')[0] ?? ''
-    return {
-      source: SNIPPET_SOURCE,
-      ref: JSON.stringify({ kind: attachment.kind, text: attachment.text }),
-      label: attachment.label ?? (firstLine.length > 40 ? `${firstLine.slice(0, 40)}…` : firstLine),
-      clipboardText: ComposerSnippets.clipboardText(attachment),
-    }
+    const label =
+      attachment.kind === 'comment'
+        ? `${attachment.path.split('/').at(-1) ?? attachment.path}:${ComposerSnippets.lines(attachment)}`
+        : (attachment.label ?? (firstLine.length > 40 ? `${firstLine.slice(0, 40)}…` : firstLine))
+    return { source: SNIPPET_SOURCE, ref: JSON.stringify(snippet), label, clipboardText: ComposerSnippets.clipboardText(snippet) }
   }
 
   /** What the model reads in place of the chip. */
   static serialize = (ref: string): string => {
     const snippet = Snippet.parse(JSON.parse(ref))
-    return snippet.kind === 'quote' ? ComposerSnippets.clipboardText(snippet) : `<note>\n${snippet.text}\n</note>`
+    if (snippet.kind === 'note') return `<note>\n${snippet.text}\n</note>`
+    if (snippet.kind === 'comment') return `<comment path="${snippet.path}" lines="${ComposerSnippets.lines(snippet)}">\n${snippet.text}\n</comment>`
+    return ComposerSnippets.clipboardText(snippet)
   }
 
   /** Registers the chips' serializer with the input-trigger pipeline; a draft holding one cannot send without it. */
@@ -53,11 +60,15 @@ export class ComposerSnippets {
     })
   }
 
-  private static clipboardText = (snippet: { readonly kind: 'quote' | 'note'; readonly text: string }): string =>
-    snippet.kind === 'note'
-      ? snippet.text
-      : snippet.text
-          .split('\n')
-          .map(line => `> ${line}`)
-          .join('\n')
+  private static lines = (comment: { readonly line: number; readonly endLine?: number | undefined }): string =>
+    comment.endLine === undefined || comment.endLine === comment.line ? String(comment.line) : `${String(comment.line)}-${String(comment.endLine)}`
+
+  private static clipboardText = (snippet: z.infer<typeof Snippet>): string => {
+    if (snippet.kind === 'note') return snippet.text
+    if (snippet.kind === 'comment') return `${snippet.path}:${ComposerSnippets.lines(snippet)} ${snippet.text}`
+    return snippet.text
+      .split('\n')
+      .map(line => `> ${line}`)
+      .join('\n')
+  }
 }
