@@ -22,6 +22,8 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
+// The dshx source, not its dist: this runs on checkouts where dshx is not built yet.
+import { BundleFreshness } from '../tooling/dshx/packages/dshx/src/repository/bundle-freshness.ts'
 import { decodeJson } from './json.ts'
 
 /**
@@ -367,43 +369,14 @@ const syncOwnedBundles = async (): Promise<void> => {
   })
 }
 
-const bundleSourcesSchema = z.object({ sources: z.array(z.string()), hashes: z.record(z.string(), z.string().nullable()).optional() })
-const pluginScriptsSchema = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
-
-/**
- * Linked plugins whose bundle is missing or was built from a workspace source that has since changed. DSH loads a dist
- * as it is, so after a base change or a failed build an old bundle boots against newer neighbours and fails on imports.
- * A source newer than its bundle counts only when its content differs from the hash the build recorded, since a jj
- * checkout rewrites files it leaves unchanged.
- */
+/** Linked plugins whose bundle is missing or was built from a workspace source that has since changed. */
 const staleLinkedBundles = (): readonly string[] => {
   if (!existsSync(manifestPath)) return []
   const manifest = readJson(profileManifestSchema, manifestPath)
   return Object.entries(manifest.dependencies).flatMap(([name, spec]) => {
     if (!isOwned(name) || !spec.startsWith('link:')) return []
-    const directory = resolve(profileDirectory, spec.slice('link:'.length))
-    const packagePath = join(directory, 'package.json')
-    if (!existsSync(packagePath) || readJson(pluginScriptsSchema, packagePath).scripts.build === undefined) return []
-    const distDirectory = join(directory, 'dist')
-    if (!existsSync(join(distDirectory, 'index.js'))) return [name]
-    const stale = readdirSync(distDirectory)
-      .filter(file => file.endsWith('.js.deps.json'))
-      .some(file => {
-        const bundlePath = join(distDirectory, file.slice(0, -'.deps.json'.length))
-        if (!existsSync(bundlePath)) return true
-        const builtAt = statSync(bundlePath).mtimeMs
-        const dependencies = readJson(bundleSourcesSchema, join(distDirectory, file))
-        return dependencies.sources
-          .filter(source => !source.includes('node_modules/'))
-          .some(source => {
-            const sourcePath = resolve(directory, source)
-            if (!existsSync(sourcePath)) return true
-            if (statSync(sourcePath).mtimeMs <= builtAt) return false
-            const recorded = dependencies.hashes?.[source]
-            return recorded === undefined || recorded !== sha256(readFileSync(sourcePath))
-          })
-      })
-    return stale ? [name] : []
+    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)), decodeJson })
+    return report.status === 'stale' || report.status === 'unbuilt' ? [name] : []
   })
 }
 
