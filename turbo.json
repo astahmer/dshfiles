@@ -24,10 +24,11 @@
         "!.cache/**",
         "!.turbo/**",
         "!dist/**",
+        "!build/**",
         "!node_modules/**",
         "!.vite/**"
       ],
-      "outputs": ["dist/**", ".cache/*.tsbuildinfo"]
+      "outputs": ["dist/**", "build/**", ".cache/*.tsbuildinfo"]
     },
     "@dshfiles/ui-styles#build": {
       "dependsOn": ["^build"],
