@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "deny-policies",
+      "title": "Deny tool calls outright, after permissions",
+      "summary": "A global tool guard refuses any call whose tool name matches a rule's glob and whose JSON arguments match its pattern, whatever the approval policy or sandbox mode allowed; the agent can list and dry-run the rules but never change them.",
+      "surfaces": ["host", "integration"],
+      "configuration": [
+        {
+          "key": "rules",
+          "defaultValue": "[]",
+          "constraints": "Each rule: name, tool glob (`*` wildcard), match regular expression over the JSON arguments (empty matches every call), reason, enabled.",
+          "coveredBy": ["policies.matching", "policies.runtime-guard"]
+        }
+      ],
+      "states": ["no-policy", "allowed", "denied"],
+      "failureModes": [
+        "A rule whose pattern does not compile denies every call of its tool, so a broken policy fails closed.",
+        "Settings that cannot be read leave no rule active and log nothing to the model."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "policies.matching",
+          "file": "plugins/@dshfiles/policies/src/policies.test.ts",
+          "testName": "matches the tool glob and the argument pattern, and skips disabled rules"
+        },
+        {
+          "kind": "unit-test",
+          "id": "policies.fail-closed",
+          "file": "plugins/@dshfiles/policies/src/policies.test.ts",
+          "testName": "fails closed on a pattern that does not compile"
+        },
+        {
+          "kind": "host-test",
+          "id": "policies.runtime-guard",
+          "file": "plugins/@dshfiles/policies/src/policies.test.ts",
+          "testName": "denies a matching call before its tool runs and lets other calls through"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A synchronous in-memory check inside the native tool guard; the denied call is already recorded by the agent-tool span and the session log."
+        }
+      ]
+    }
+  ]
+}

@@ -41,6 +41,7 @@
     "@dshfiles/model-selection": "link:../../plugins/@dshfiles/model-selection",
     "@dshfiles/multi-host": "link:../../plugins/@dshfiles/multi-host",
     "@dshfiles/plugin-marketplace": "link:../../plugins/@dshfiles/plugin-marketplace",
+    "@dshfiles/policies": "link:../../plugins/@dshfiles/policies",
     "@dshfiles/privacy-controls": "link:../../plugins/@dshfiles/privacy-controls",
     "@dshfiles/project-checks": "link:../../plugins/@dshfiles/project-checks",
     "@dshfiles/prompt-stash": "link:../../plugins/@dshfiles/prompt-stash",
@@ -153,6 +154,7 @@
         "@dshfiles/home",
         "@dshfiles/git-worktrees",
         "@dshfiles/references",
+        "@dshfiles/policies",
         "@dshfiles/hmr-gate"
       ]
     }
