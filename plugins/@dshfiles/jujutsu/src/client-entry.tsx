@@ -9,14 +9,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { Changes, defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels, NativeAsideOwners, type WorkbenchPanelProps } from '@dshfiles/workbench/registry'
-import { requestWorkspaceReview } from '@dshfiles/pulls-review/review-page-context'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
@@ -160,9 +159,8 @@ export default defineClient({
       workspaces: ctx.workspaces,
       toggleJujutsu,
       openWorkspaceReview: (workspacePath, sessionId) => {
-        requestWorkspaceReview({ workspacePath, sessionId })
-        // SAFETY: the pulls-review plugin registers this main panel id in every profile that loads jujutsu.
-        ctx.layout.selectPanel('pulls-review' as MainPanelId)
+        const changes = metadata?.plugin?.use(Changes).get()
+        if (changes?.status === 'active') changes.value.review({ workspacePath, sessionId })
       },
       openJujutsuReference: (path, reference) => {
         sidePanelRepository.request({ path, reference })

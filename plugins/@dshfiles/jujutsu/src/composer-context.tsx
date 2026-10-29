@@ -22,7 +22,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { z } from 'zod'
 import { useAutoRefresh } from './auto-refresh.js'
-import { openInEditor } from './open-in-editor.js'
+import { useOpenInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import type { FileStatus } from './api.js'
 import { ComposerContextModel, composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
@@ -201,6 +201,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   const [expanded, setExpanded] = useState(false)
   const [fullDiffPath, setFullDiffPath] = useState<string | null | undefined>(undefined)
   const api = useApi(composerContextApi)
+  const openInEditor = useOpenInEditor()
   const repository = context.repository
   const diffQuery = useQuery({
     queryKey: composerKeys.diff(context.cwd ?? '', context.baseKey),

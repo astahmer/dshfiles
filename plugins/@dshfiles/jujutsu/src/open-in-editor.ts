@@ -1,7 +1,10 @@
+import { Files, useContract } from '@dshfiles/dshx/client'
+
 /**
- * Asks @dshfiles/editor to open a workspace file through its `dshfiles:open-file` window event (see the editor's
- * open-file.ts contract). Returns true when an editor took the request; false when none is installed or no session is
- * on screen.
+ * Opens a repository file in the editor through the dshx `Files` contract. The returned function reports false while no
+ * editor provides it or no session is on screen.
  */
-export const openInEditor = (request: { readonly path: string; readonly cwd: string; readonly line?: number }): boolean =>
-  !window.dispatchEvent(new CustomEvent('dshfiles:open-file', { detail: request, cancelable: true }))
+export const useOpenInEditor = (): ((request: { readonly path: string; readonly cwd: string; readonly line?: number }) => boolean) => {
+  const files = useContract(Files)
+  return request => files.status === 'active' && files.value.open(request)
+}

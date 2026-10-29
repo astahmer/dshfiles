@@ -74,7 +74,7 @@ import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from '.
 import { GraphPagingModel } from './graph-paging.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
-import { openInEditor } from './open-in-editor.js'
+import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
@@ -253,6 +253,7 @@ const hasDragType = (event: DragEvent, type: string): boolean => [...event.dataT
 export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const sidePanel = props.surface === 'side-panel'
   const api = useApi(jujutsuApi)
+  const openInEditor = useOpenInEditor()
   const queryClient = useQueryClient()
   const [preferences, setPreference] = usePreferences()
   const diffLayout: PatchLayout =

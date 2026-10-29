@@ -31,7 +31,7 @@ import { RevisionGraphModel } from './graph.js'
 import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { SourceControlModel } from './source-control.js'
-import { openInEditor } from './open-in-editor.js'
+import { useOpenInEditor } from './open-in-editor.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 
 interface SourceControlViewProps {
@@ -81,6 +81,7 @@ const IconAction = (props: {
 /** jj-view style Source Control: a describe box for @, then the working copy and @-1 … @-N groups. */
 export const SourceControlView = (props: SourceControlViewProps): JSX.Element => {
   const api = useApi(jujutsuApi)
+  const openInEditor = useOpenInEditor()
   const groups = useMemo(() => SourceControlModel.sourceControlGroups(props.revisions, props.ancestorCount), [props.revisions, props.ancestorCount])
   const commitIds = groups.map(group => group.revision.commitId)
   const filesQuery = useQuery({
