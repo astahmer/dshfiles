@@ -69,6 +69,7 @@ export type { ItemSource, PluginContext, PluginServices, Track } from './plugin-
 export const constantSource = PluginContextModel.constant
 export const createSource = PluginContextModel.signal
 
+export { CommandChords } from './command-chords.js'
 export { Command, Composer, Dialogs, SessionScreen, Toasts } from './app-services.js'
 export { LinkHandler, MarkdownLinks } from './links.js'
 export { Browser, Changes, Files } from './app-contracts.js'

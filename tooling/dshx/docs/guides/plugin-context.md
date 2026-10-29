@@ -73,7 +73,7 @@ api.add(ComposerPill, {
 
 | Registry | Owner |
 | --- | --- |
-| `Command` | `@dshfiles/command-palette` lists it and binds its `keys` |
+| `Command` | `@dshfiles/command-palette` lists it; `@dshfiles/shortcuts` binds its keys and lists `editable` ones in Keyboard shortcuts; `@dshfiles/input-trigger` adds its `slash` entry |
 | `MenuItem` | `@dshfiles/workbench` lists rows with `menu: 'workbench.new-view'` as Actions in its New tab chooser; a row runs and the chooser closes |
 | `FileViewer` | `@dshfiles/editor` offers a matching viewer as a toggle beside Save and renders it over the text with `{ sessionId, path, text }` (unsaved edits included); the editor's own Markdown preview is one |
 | `LinkHandler` | Markdown renderers: the chat fork's assistant messages and plugin-ui `Markdown` open `[label](scheme:target)` and `<scheme:target>` links through it |
@@ -92,6 +92,29 @@ api.system.openLink('ticket:42') // true: the handler ran
   puts `MarkdownLinks.openFromClick` on its root's `onClickCapture` and `onAuxClickCapture`, so plain, modified and
   middle clicks all reach the handler instead of the placeholder URL. Code spans and fenced blocks stay as written.
 - A scheme without a handler renders as it always did: its text, not a link.
+
+### Commands
+
+A `Command` takes optional fields past `id`, `title`, `keys` and `run`; leaving them out keeps today's behaviour.
+
+```ts
+api.add(Command, {
+  id: '@acme/plugin.open',
+  title: 'Open Acme',
+  keys: ['Mod+Shift+A'],
+  editable: true, // listed in Keyboard shortcuts (Mod+/), where the user can rebind it
+  scope: 'page', // its keys stay off while a text field has focus
+  slash: 'acme', // `/acme` in the composer runs it
+  suggested: true, // shown in the palette before anything is typed
+  run: openAcme,
+})
+api.commands.keys.get().get('@acme/plugin.open') // ['Mod+Shift+A'], or the user's binding
+```
+
+An editable command's Host row carries no default binding: the Host refuses overlapping defaults in whichever plugin
+registers second, so a default could stop a core plugin's setup. Until the user binds one, its own `keys` apply and the
+row reads "No shortcut". Its id must map to a Host shortcut id (`CommandChords.shortcutId`); the capture-phase listener
+binds only Mod (+ Shift) chords. `CommandChords` converts `Mod+Shift+K` to and from Host bindings.
 
 ### Contracts owned plugins provide
 
@@ -192,7 +215,7 @@ is no longer current.
 | --- | --- |
 | `api.dialogs` | `confirm`, `alert`, `prompt`, `select` in the app's dialogs (`Dialogs` contract); plain browser dialogs while no provider runs |
 | `api.toast.show(input)` | a toast through the `Toasts` contract; logged while no provider runs |
-| `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run |
+| `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run; `api.commands.keys` is the live map of each command's effective keys |
 | `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()`; `side` is the right region of the session on screen (its native right pane, or the Workbench dock): live `expanded`, `open()`, `hide()`, `toggle()`, each false without a side region or a session on screen |
 | `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab, `openLink(href)` through a `LinkHandler` and else as `openExternal`; each resolves or returns false when the browser cannot |
 | `api.notifications` | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported` |

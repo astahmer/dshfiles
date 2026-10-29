@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 import { BrowserBroker, type Live, type Subscribable } from './broker.js'
+import { CommandChords } from './command-chords.js'
 import { HostCommandsModel } from './host-commands.js'
 import { MarkdownLinks } from './links.js'
 import { LocaleNamespaceModel } from './locale.js'
@@ -79,6 +80,14 @@ export interface CommandItem {
   readonly enabled?: boolean
   /** Keeps it out of the palette; its keys still work. */
   readonly hidden?: boolean
+  /** Lists it in Settings › Shortcuts so the user can rebind its keys; its id must map to a Host shortcut id (`CommandChords.shortcutId`). */
+  readonly editable?: boolean
+  /** `page` turns its keys off while a text field has focus; `global` (the default) keeps them on. */
+  readonly scope?: 'global' | 'page'
+  /** Name of a `/` menu entry in the composer that runs it, without the slash. */
+  readonly slash?: string
+  /** Shown in the palette before anything is typed. */
+  readonly suggested?: boolean
   /** From a key press, false declines the key so it reaches its target. */
   run(): void | false | Promise<void>
 }
@@ -207,10 +216,64 @@ export interface CommandsService {
   run(id: string): boolean
   /** Every contributed command, in contribution order. */
   readonly list: Subscribable<readonly CommandItem[]>
+  /** The keys each command answers to now: the user's binding for an editable command, else its default `keys`. */
+  readonly keys: Subscribable<ReadonlyMap<string, readonly string[]>>
+}
+
+interface NativeShortcutCatalog {
+  readonly platform: string
+  readonly catalog: { getSnapshot(): unknown; subscribe(listener: () => void): () => void }
+}
+
+const isNativeShortcutCatalog = (value: unknown): value is NativeShortcutCatalog =>
+  typeof value === 'object' &&
+  value !== null &&
+  'platform' in value &&
+  typeof value.platform === 'string' &&
+  'catalog' in value &&
+  typeof value.catalog === 'object' &&
+  value.catalog !== null &&
+  'getSnapshot' in value.catalog &&
+  typeof value.catalog.getSnapshot === 'function'
+
+const ShortcutCatalog = z.array(z.object({ id: z.string(), binding: z.unknown(), modified: z.boolean() }))
+
+const createCommandKeys = (shortcuts: () => unknown): Subscribable<ReadonlyMap<string, readonly string[]>> => {
+  const commands = BrowserBroker.items(Command)
+  let cached: { readonly commands: unknown; readonly catalog: unknown; readonly keys: ReadonlyMap<string, readonly string[]> } | undefined
+  return {
+    get: () => {
+      const native = shortcuts()
+      const list = commands.get()
+      const snapshot = isNativeShortcutCatalog(native) ? native.catalog.getSnapshot() : undefined
+      if (cached !== undefined && cached.commands === list && cached.catalog === snapshot) return cached.keys
+      const userBindings = new Map((ShortcutCatalog.safeParse(snapshot).data ?? []).filter(entry => entry.modified).map(entry => [entry.id, entry.binding]))
+      const keys = new Map(
+        list.map(command => {
+          const shortcutId = command.editable === true ? CommandChords.shortcutId(command.id) : undefined
+          if (shortcutId === undefined || !userBindings.has(shortcutId) || !isNativeShortcutCatalog(native)) return [command.id, command.keys ?? []]
+          const chord = CommandChords.fromBinding({ binding: userBindings.get(shortcutId), platform: native.platform })
+          return [command.id, chord === undefined ? [] : [chord]]
+        }),
+      )
+      cached = { commands: list, catalog: snapshot, keys }
+      return keys
+    },
+    subscribe: listener => {
+      const native = shortcuts()
+      const offCatalog = isNativeShortcutCatalog(native) ? native.catalog.subscribe(listener) : () => {}
+      const offCommands = commands.subscribe(listener)
+      return () => {
+        offCatalog()
+        offCommands()
+      }
+    },
+  }
 }
 
 const createCommands = (shortcuts: () => unknown): CommandsService => ({
   list: BrowserBroker.items(Command),
+  keys: createCommandKeys(shortcuts),
   run: id => {
     const command = BrowserBroker.items(Command)
       .get()
