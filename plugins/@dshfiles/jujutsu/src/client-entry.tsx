@@ -42,7 +42,7 @@ export default defineClient({
   inject: ['slots', 'layout', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'uiWorkspace', 'workspaces', 'shortcuts'],
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const directoryPicker: DirectoryPickerPort = {
       pick: () => ctx.uiWorkspace.pickDirectory(),
       list: (path, signal) => ctx.uiWorkspace.listDirectory(path, signal),
@@ -138,7 +138,7 @@ export default defineClient({
       window.addEventListener('dshfiles:jj-changed', refresh)
       return () => window.removeEventListener('dshfiles:jj-changed', refresh)
     }, 'dshfiles-jujutsu: refresh after another plugin changes the repository')
-    // Older Hosts lack active()/isExpanded(); without them the toggle only ever opens.
+    // Older Hosts lack active(); without it the toggle only ever opens.
     const toggleJujutsu = (path: string | null): void => {
       // While the global dock owns the right column, the panel to reveal is the
       // dock's own — the per-thread surface is not drawn, so driving it would
@@ -149,16 +149,9 @@ export default defineClient({
         return
       }
       const sidebar = ctx.sidebarRight
-      const showingJujutsu =
-        typeof sidebar.isExpanded === 'function' &&
-        typeof sidebar.active === 'function' &&
-        typeof sidebar.toggleExpanded === 'function' &&
-        sidebar.isExpanded() &&
-        sidebar.active()?.kind === RIGHT_PANE_KIND
-      if (showingJujutsu && (path === null || sidePanelRepository.isShowing(path))) {
-        sidebar.toggleExpanded()
-        return
-      }
+      const side = metadata?.plugin?.layout.side
+      const showingJujutsu = side?.expanded.get() === true && typeof sidebar.active === 'function' && sidebar.active()?.kind === RIGHT_PANE_KIND
+      if (showingJujutsu && (path === null || sidePanelRepository.isShowing(path)) && side.hide()) return
       if (path !== null) sidePanelRepository.request({ path })
       sidebar.openTab(RIGHT_PANE_KIND)
     }
