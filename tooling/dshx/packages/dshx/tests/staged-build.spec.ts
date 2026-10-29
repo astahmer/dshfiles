@@ -7,6 +7,7 @@ import { runCli } from '../src/cli/run.js'
 import type { CliRunOptions } from '../src/cli/run.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
+import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
@@ -135,5 +136,27 @@ describe('staged dshx build output', () => {
     })
     expect(code).toBe(0)
     expect(await readdir(root)).toEqual(['dist'])
+  })
+
+  it('drops declarations, sourcemaps and dependency manifests a rebuild no longer produces', async () => {
+    const root = await temporaryRoot()
+    await writePluginFixture(root)
+    expect((await runBuild(offlineRuntime(project(root)))).code).toBe(0)
+    expect(await listing(resolve(root, 'dist'))).toEqual([
+      'client.d.ts',
+      'client.js',
+      'client.js.deps.json',
+      'client.js.map',
+      'index.d.ts',
+      'index.js',
+      'index.js.deps.json',
+      'index.js.map',
+    ])
+    const sourcemap = JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')) as { readonly sources: readonly string[] }
+    expect(sourcemap.sources).toContain('../src/client.tsx')
+
+    const { clientEntry: _clientEntry, ...hostOnly } = project(root, { sourcemap: false, declarations: false })
+    expect((await runBuild(offlineRuntime(hostOnly))).code).toBe(0)
+    expect(await listing(resolve(root, 'dist'))).toEqual(['index.js', 'index.js.deps.json'])
   })
 })

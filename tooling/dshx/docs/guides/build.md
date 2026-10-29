@@ -155,6 +155,8 @@ dist/client.js.map      # when enabled
 dist/client.d.ts
 ```
 
+`dshx build` owns the whole output directory: it stages every face beside `dist/` and swaps the finished directory in, so files from an earlier build that this one no longer produces, including declarations and sourcemaps you turned off, do not survive. See [`dshx build`](../cli-reference.md#dshx-build).
+
 The declaration files describe the actual DSH/Cordis module shape—`name`, `inject`, `Config`, and `apply(ctx, config)`—not the authoring `HostDefinition`/`ClientDefinition`. Shared contracts appear in public source declarations only when the plugin author explicitly exports them. Build and pack validation require every `package.json` `exports`, `types`, and `bin` path to exist.
 
 ## Commands
