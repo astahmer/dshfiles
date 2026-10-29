@@ -15,7 +15,7 @@ import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
-import { workbenchPanels, NativeAsideOwners } from '@dshfiles/workbench/registry'
+import { workbenchPanels, NativeAsideOwners, type WorkbenchPanelProps } from '@dshfiles/workbench/registry'
 import { requestWorkspaceReview } from '@dshfiles/pulls-review/review-page-context'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
@@ -52,7 +52,7 @@ export default defineClient({
       const workspace = await ctx.workspaces.create({ path: canonicalPath })
       return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
     }
-    const panel = (surface: 'main' | 'side-panel' | 'dock', scope: string, defaultPath: string | null): JSX.Element => (
+    const panel = (surface: 'main' | 'side-panel' | 'dock', scope: string, defaultPath: string | null, visible = true): JSX.Element => (
       <PluginQueryProvider>
         <ProjectsBoundPanel
           workspaces={ctx.workspaces}
@@ -61,6 +61,7 @@ export default defineClient({
           scope={scope}
           defaultPath={defaultPath}
           surface={surface}
+          visible={visible}
           directoryPicker={directoryPicker}
           registerWorkspace={registerWorkspace}
           // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
@@ -107,8 +108,8 @@ export default defineClient({
       const target = useMountedSession()
       return panel('side-panel', target.scope, target.defaultPath)
     })
-    const DockSurfacePanel = decorate(() => panel('dock', DOCK_PANEL_SCOPE, null))
-    const ScopedWorkbenchPanel = decorate((props: { readonly scope: string }) => panel('main', props.scope, null))
+    const DockSurfacePanel = decorate((props: WorkbenchPanelProps) => panel('dock', DOCK_PANEL_SCOPE, null, props.visible))
+    const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) => panel('main', props.scope, null, props.visible))
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu: Revision graph' }, PanelGlyph),

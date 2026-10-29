@@ -127,6 +127,8 @@ interface JujutsuPanelProps {
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
   readonly launchSession: (cwd: string) => Promise<void>
+  /** False while the workbench keeps this panel mounted behind another tab or in a hidden dock. */
+  readonly visible?: boolean
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -436,6 +438,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const autoRefresh = useAutoRefresh({
     preferences,
     paused: registerMutation.isPending || actionBusy || preview !== undefined,
+    surfaceVisible: props.visible ?? true,
     onBecameVisible: () => {
       if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
     },
@@ -445,10 +448,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     queryKey: jujutsuQueryKeys.state(path, REVISION_PAGE_SIZE),
     queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: REVISION_PAGE_SIZE }, { signal })),
     ...REPOSITORY_QUERY_CACHE,
-    enabled: repoId !== null,
+    enabled: repoId !== null && autoRefresh.visible,
     ...autoRefresh.queryOptions,
   })
   const state = stateQuery.data
+  const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {
     if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
     recoveredRepositoryPath.current = path
@@ -525,6 +529,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     repoId,
     root: path,
     refreshedAt: stateQuery.dataUpdatedAt,
+    onScreen: graphOnScreen,
     selected: selection ?? undefined,
     comparison: comparisonSelection ?? undefined,
     revisions: graphRowsInput,
@@ -543,7 +548,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       return {
         queryKey: jujutsuQueryKeys.editTimes(path, commitIds),
         queryFn: ({ signal }: { readonly signal: AbortSignal }) => api.editTimes({ repoId: repoId ?? '', commitIds }, { signal }),
-        enabled: repoId !== null,
+        enabled: repoId !== null && graphOnScreen,
         // A commit id names one immutable version, so its edit time never goes stale.
         staleTime: Number.POSITIVE_INFINITY,
         placeholderData: keepPreviousData,
@@ -763,7 +768,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
   const graphPageFailedCursor = graphPageIsCurrent ? graphPageState.failedCursor : null
   const loadMoreGraphRevisions = useCallback((): void => {
-    if (repoId === null) return
+    if (repoId === null || !graphOnScreen) return
     const excludeCommitIds = [
       ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
       ...graphPageRevisions.map(revision => revision.commitId),
@@ -771,7 +776,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const cursor = GraphPagingModel.cursor(excludeCommitIds)
     if (!GraphPagingModel.canRequestPage({ hasMore: graphHasMore, pending: graphPagePending, cursor, failedCursor: graphPageFailedCursor })) return
     requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds })
-  }, [repoId, graphHasMore, graphPagePending, graphPageFailedCursor, debouncedSearch, state?.revisions, graphPageRevisions, requestGraphPage])
+  }, [repoId, graphOnScreen, graphHasMore, graphPagePending, graphPageFailedCursor, debouncedSearch, state?.revisions, graphPageRevisions, requestGraphPage])
   // Each page lands below the viewport, so the list tops itself up instead of waiting for a scroll event at the very end of the loaded history.
   useEffect(() => {
     const element = listScrollRef.current
