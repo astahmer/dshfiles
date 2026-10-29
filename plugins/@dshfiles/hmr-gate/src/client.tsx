@@ -17,6 +17,10 @@ import { z } from 'zod'
 
 const EVENTS_ROUTE = 'plugins/events'
 const ROW_ID = 'dshfiles-hmr-gate'
+const RECOVERY_KEY = 'dshfiles.hmr-gate.slot-recovery-at'
+const RECOVERY_INTERVAL_MS = 30_000
+// Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
+const RECOVERY_DELAY_MS = 1_500
 
 const deferredPackageSchema = z.object({ id: z.string().min(1), reason: z.string().min(1) })
 
@@ -112,6 +116,32 @@ export default defineClient({
       }
       publish(frame.data.packages)
     }
+
+    // A recomposition can leave a slot with no adapter or registration for one render; the stock renderer then throws
+    // SlotAssemblyError past every error boundary and the shell has none, so React unmounts the page. Reload once the
+    // swap settles instead of leaving it blank; the timestamp keeps a deterministic failure from looping.
+    ctx.effect(() => {
+      let pending: ReturnType<typeof setTimeout> | undefined
+      const onError = (event: ErrorEvent): void => {
+        if (!(event.error instanceof Error) || event.error.name !== 'SlotAssemblyError' || pending !== undefined) return
+        let last = 0
+        try {
+          last = Number(sessionStorage.getItem(RECOVERY_KEY) ?? 0)
+        } catch {}
+        if (Date.now() - last < RECOVERY_INTERVAL_MS) return
+        pending = setTimeout(() => {
+          try {
+            sessionStorage.setItem(RECOVERY_KEY, String(Date.now()))
+          } catch {}
+          window.location.reload()
+        }, RECOVERY_DELAY_MS)
+      }
+      window.addEventListener('error', onError)
+      return () => {
+        window.removeEventListener('error', onError)
+        if (pending !== undefined) clearTimeout(pending)
+      }
+    }, 'hmr-gate: recover from a slot assembly crash')
 
     ctx.effect(() => {
       const source = new EventSource(EVENTS_ROUTE)
