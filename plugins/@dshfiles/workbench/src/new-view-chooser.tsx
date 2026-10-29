@@ -1,3 +1,4 @@
+import { MenuItem, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
@@ -5,11 +6,17 @@ import { useEffect, useRef, useState } from 'react'
 import { NewThreadSource } from './new-thread-source.js'
 import type { WorkbenchPanelDefinition } from './registry.js'
 
+/** The `MenuItem` menu id this chooser lists below the views. */
+const NEW_VIEW_MENU = 'workbench.new-view'
+
 export const NewViewChooser = (props: {
   readonly definitions: readonly WorkbenchPanelDefinition[]
   readonly onSelect: (definition: WorkbenchPanelDefinition) => void
+  /** Called after a contributed `workbench.new-view` row ran, to close the chooser. */
+  readonly onRun?: () => void
   readonly autoFocus?: boolean
 }): JSX.Element => {
+  const menuRows = useRegistry(MenuItem)
   const [search, setSearch] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -32,6 +39,9 @@ export const NewViewChooser = (props: {
     }
     return priority(left) - priority(right) || left.title.localeCompare(right.title)
   })
+  const actions = menuRows
+    .filter(row => row.menu === NEW_VIEW_MENU && [row.title, ...(row.keywords ?? [])].some(text => text.toLocaleLowerCase().includes(query)))
+    .toSorted((left, right) => (left.order ?? 100) - (right.order ?? 100) || left.title.localeCompare(right.title))
   return (
     <section aria-label="Choose a view" className="dshx-root dshx:@container dshx:h-full dshx:overflow-y-auto dshx:bg-background dshx:text-sm">
       <div className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-xl dshx:flex-col dshx:gap-5 dshx:p-6 dshx:@max-pane-narrow:p-4">
@@ -62,7 +72,25 @@ export const NewViewChooser = (props: {
             ))}
           </div>
         )}
-        {views.length === 0 && <p className="dshx:text-muted-foreground">No matching views.</p>}
+        {actions.length > 0 && (
+          <div className="dshx:flex dshx:flex-col dshx:gap-1">
+            <p className="dshx:mb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Actions</p>
+            {actions.map(row => (
+              <Button
+                key={row.id}
+                variant="ghost"
+                className="dshx:h-auto dshx:min-h-10 dshx:w-full dshx:justify-start dshx:gap-2 dshx:py-2"
+                onClick={() => {
+                  row.run()
+                  props.onRun?.()
+                }}
+              >
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{row.title}</span>
+              </Button>
+            ))}
+          </div>
+        )}
+        {views.length === 0 && actions.length === 0 && <p className="dshx:text-muted-foreground">No matching views.</p>}
       </div>
     </section>
   )

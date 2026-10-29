@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { defineClientPlugin, MenuItem } from '@dshfiles/dshx/client'
+import { createTestClient } from '@dshfiles/dshx/testing'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NewThreadSource } from './new-thread-source.js'
 import { NewViewChooser } from './new-view-chooser.js'
@@ -77,5 +79,34 @@ describe('NewViewChooser', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: 'New thread' }))
     expect(select).toHaveBeenCalledWith(newThread)
+  })
+
+  it('lists contributed workbench.new-view rows as actions that run and close the chooser', async () => {
+    const client = await createTestClient()
+    const run = vi.fn()
+    const close = vi.fn()
+    try {
+      await act(async () => {
+        await client.mount(
+          defineClientPlugin({
+            id: 'actions',
+            uses: ['ui'],
+            setup: api => {
+              api.add(MenuItem, { id: 'web', menu: 'workbench.new-view', title: 'Open web page', keywords: ['browser'], run })
+              api.add(MenuItem, { id: 'other', menu: 'elsewhere', title: 'Not here', run })
+            },
+          }),
+          { packageId: '@test/actions' },
+        )
+      })
+      render(<NewViewChooser definitions={[source('backlog', 'Backlog')]} onSelect={() => undefined} onRun={close} />)
+      expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Backlog', 'Open web page'])
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'browser' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Open web page' }))
+      expect(run).toHaveBeenCalledOnce()
+      expect(close).toHaveBeenCalledOnce()
+    } finally {
+      await client.dispose()
+    }
   })
 })
