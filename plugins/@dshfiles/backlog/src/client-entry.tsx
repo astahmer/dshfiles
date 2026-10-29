@@ -35,7 +35,7 @@ const backlogCaptureEventSchema = z.object({ text: z.string().max(20_000) })
 export default defineClient({
   name: '@dshfiles/backlog',
   inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers', 'uiConversation'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
@@ -200,19 +200,13 @@ export default defineClient({
           }),
         )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
-        if (systemNotification && 'Notification' in window && window.Notification.permission === 'granted') {
-          try {
-            const notification = new Notification('Backlog thread started', { body: `b:${item.id} · ${item.title}` })
-            notification.onclick = () => {
-              window.focus()
-              // SAFETY: startThread returns a Host-minted Session id, type-only branded by the session controller.
-              ctx.uiWorkspace.openSession(started.sessionId as SessionId)
-              notification.close()
-            }
-          } catch {
-            // Browser notification support can disappear between permission checks and delivery.
-          }
-        }
+        if (systemNotification)
+          metadata?.plugin?.notifications.notify({
+            title: 'Backlog thread started',
+            body: `b:${item.id} · ${item.title}`,
+            // SAFETY: startThread returns a Host-minted Session id, type-only branded by the session controller.
+            onClick: () => ctx.uiWorkspace.openSession(started.sessionId as SessionId),
+          })
         return { kind: 'dispatched' }
       },
     }
