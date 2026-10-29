@@ -106,3 +106,15 @@ export const IconDataOutlineMedium = icon
 export const IconPersonalizationOutlineMedium = icon
 export const IconSettingsOutlineMedium = icon
 export const IconUserOutlineMedium = icon
+export const IconSettingsOutlineRegular = icon
+
+/** Host ranking contract without its alignment score: a case-insensitive ordered subsequence of the name or label, prefix hits first, then source order. */
+export const rankByName = <T extends { readonly name: string; readonly label?: string }>(items: readonly T[], rawQuery: string): readonly T[] => {
+  const query = rawQuery.trim().toLowerCase()
+  if (query === '') return items
+  const keys = (item: T): string[] => [item.name, item.label ?? ''].map(key => key.toLowerCase())
+  const containsInOrder = (key: string): boolean =>
+    [...key].reduce((matched, character) => (character === query[matched] ? matched + 1 : matched), 0) === query.length
+  const prefixHit = (item: T): number => (keys(item).some(key => key.startsWith(query)) ? 0 : 1)
+  return items.filter(item => keys(item).some(containsInOrder)).sort((left, right) => prefixHit(left) - prefixHit(right))
+}

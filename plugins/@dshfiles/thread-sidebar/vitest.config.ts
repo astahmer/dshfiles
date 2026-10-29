@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     alias: {
+      '@deepseek-ai/dsh-client-ui-primitives': fileURLToPath(new URL('../plugin-ui/testing/host-primitives.tsx', import.meta.url)),
       'react-dom/server': fileURLToPath(new URL('../plugin-ui/node_modules/react-dom/server.node.js', import.meta.url)),
     },
   },
