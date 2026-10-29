@@ -1,6 +1,22 @@
 # Agent Session History plan
 
-> Implementation in progress from this plan. No live profile changes or restarts are included.
+> Not started on stock DSH. The first attempt extended upstream `@deepseek-ai/dsh-tool-session-query` and added a
+> latest-page read to `sessionController.page` in a DSH core fork; this repository carries no core patches, so that
+> route is closed until upstream exposes the read. Discovery already ships in `@dshfiles/memory` (see Context), and
+> `dshx_comm_history` covers live descendants only.
+
+## Status
+
+| Step                                                                              | Status  | Notes                                                                                                                                                                        |
+| --------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Define Agent search/read goals, workspace scopes, LoD behavior, and write meaning | done    | Old and active Session search; read-only current workspace by default; write grants cover every supported operation.                                                         |
+| Inspect DSH Host Agent Tool, Session, Workspace, and Approval contracts           | partial | Native Host services and source contracts are verified; search cursor/filter semantics and canonical workspace/group signals still need a final audit.                       |
+| Cold-safe latest-page read on `sessionController.page`                            | blocked | Built and tested only in a core fork (optional latest cursor without activation, returns `throughSeq`); needs an upstream Host API before it can ship here.                  |
+| Extend Session tools and Host-enforced presets                                    | open    | Reuse `@deepseek-ai/dsh-tool-session-query` (read-only, tested) rather than duplicate it in DSHX; its package Config and workspace-authority layer are the extension points. |
+| Validate in an isolated profile and report promotion gates                        | open    | Never modify or restart the active `web` profile.                                                                                                                            |
+
+Next: finish the Host API audit for cursor-based search and exact workspace/status signals, then decide whether the
+tool extension can land without the core latest-page read.
 
 ## Context
 
@@ -12,7 +28,7 @@
 - Host `sessionController.search` returns bounded results but does not expose provider cursors or metadata filters; lower-level `sessionQuery.searchSessions` supports cursor/filter requests. Verify public typing and safe use before choosing the search boundary.
 - The Host `tools` service registers callable Agent tools and passes the acting Agent in `ToolRunContext`. The Host `approval` service supports a human-mediated, audited `allowed-once` result during a live turn. The current runtime does not load Session-history tools.
 - DSH core's `@deepseek-ai/dsh-tool-session-query` is the intended upstream home for the trajectory tools. **Verified 2026-10-17:** it is not published and installed in no profile; the only copy is source in the DSH core checkouts, it registers **nine** read-only tools (`session_search`, `session_list`, `session_read`, `session_events`, `session_event`, `session_titles`, `session_title`, `session_children`, `session_observe`), and it authorizes cross-session reads by **workspace-id equality** (`session.header.workspaceId`), not by exact `cwd`. Nothing in this repository loads it, so the statements in earlier drafts ("ships", "five tools", "cwd equality") were wrong and must not be used to justify building a second tool here.
-- The shipped discovery layer for this repository is `@dshfiles/memory`'s composed finder (`find_threads` / `related_threads`), which searches titles, Session ids, cwd/workspace paths, message text through `sessionQuery.searchSessions`, and memory digests/notes in one ranked, project-scoped page. It is discovery only: no trajectory reads, no writes, no new index. See [`session-search.md`](session-search.md) and the [memory README](../plugins/@dshfiles/memory/README.md#finding-threads-one-finder-over-titles-content-and-memory).
+- The shipped discovery layer for this repository is `@dshfiles/memory`'s composed finder (`find_threads` / `related_threads`), which searches titles, Session ids, cwd/workspace paths, message text through `sessionQuery.searchSessions`, and memory digests/notes in one ranked, project-scoped page. It is discovery only: no trajectory reads, no writes, no new index. See the [memory README](../plugins/@dshfiles/memory/README.md#finding-threads-one-finder-over-titles-content-and-memory).
 - Relevant sources: [`agent-communication`](../plugins/@dshfiles/agent-communication/README.md), [`thread-sidebar`](../plugins/@dshfiles/thread-sidebar/README.md), [DSH Agent communication](../tooling/dshx/docs/agent-communication.md), and [native Session Query tools](../../dsh-core-agent-session-history/packages/session-query/tool-session-query/README.md).
 
 ## Goal

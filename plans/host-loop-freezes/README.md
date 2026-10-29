@@ -24,7 +24,7 @@
   3. All writes go into **one** `BEGIN IMMEDIATE … COMMIT` through `node:sqlite` `DatabaseSync` on the Host event loop: no chunking, no yielding, `Array.from(text).length` per document.
   4. `assertNotAborted` runs _between_ cold reads, so an abort before the transaction discards all the work already done.
 - **Trigger chain today.** Command palette `#` (`content-search-machine.ts`, 200 ms debounce, aborts the previous request on every keystroke) → `@dshfiles/memory` finder (`thread-finder.ts`, 1.5 s content deadline) → core `searchSessions`. While the user types, nothing ever commits. About 1.5 s after typing stops, the deadline fires and the finder starts its **un-abortable** warm search (`warmSessionContent`, no signal, no deadline), which runs the whole backlog at full speed and starves Host timers — the observed freeze window.
-- **Related work.** `plans/dsh-host-gaps.md` row 14 (fast thread-content search) and row 57 (observation instability); `plans/session-search.md` (delivered finder); `plans/ade-performance/README.md` (ADE interaction-speed audit; precedent for a plan-local benchmark harness).
+- **Related work.** `plans/dsh-host-gaps.md` row 14 (fast thread-content search) and row 57 (observation instability); the delivered finder ([memory README](../../plugins/@dshfiles/memory/README.md#finding-threads-one-finder-over-titles-content-and-memory)); `plans/ade-performance/README.md` (ADE interaction-speed audit; precedent for a plan-local benchmark harness).
 - **Boundary.** Stock DSH 0.2.1-rc.2 and this repo's supported dshx/plugin surfaces only. Never patch DSH core, never restart or reload the live `web` profile, never run a search against the live index or the live corpus in place, never push.
 
 ## Measured baseline (M0, 2026-10-18)

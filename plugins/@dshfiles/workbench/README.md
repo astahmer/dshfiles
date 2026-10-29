@@ -27,7 +27,7 @@ The synthetic split/narrow fixture intentionally has no provider credentials; th
 
 The fixed-chat fixture has no external model credentials; it verifies preserved history and editable drafts.
 
-[View contract and layout recovery](docs/layout-recovery.md) · [Native terminal ownership and verification](docs/terminal-pages.md)
+[View contract and layout recovery](docs/layout-recovery.md) · [Native terminal ownership and verification](docs/terminal-pages.md) · [Docking decisions](docs/docking-decisions.md)
 
 ![The custom Threads view moved into the bottom pane](docs/screenshots/every-pane-views.png)
 

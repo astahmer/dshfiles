@@ -1,6 +1,6 @@
 # Workbench as the main view — dockable panels for anything, slot-compatible
 
-> **Status: landed locally; awaiting live confirmation (2026-10-26).** Successor to [`plans/global-dock`](../global-dock/README.md).
+> **Status: landed locally; awaiting live confirmation (2026-10-26).** Builds on the global dock, whose decisions are in [the Workbench docking decisions](../../plugins/@dshfiles/workbench/docs/docking-decisions.md).
 > **Resume here:** All 31 current acceptance cases have green proof: 27 in `/tmp/workbench-main-final-accepted-results`,
 > the stronger Session-bound semantic check in `/tmp/workbench-main-semantic-bound-subject-results`, and all three
 > native/resource/nested reruns in `/tmp/workbench-main-final-three-results`. The original run's failures were two startup

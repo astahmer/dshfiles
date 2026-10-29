@@ -28,5 +28,6 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                                            |
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: the weekly evidence review, mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger. |
 | [Observability](observability.md)                            | Which source answers which question; OpenTelemetry spans for turns, model calls, tools and plugin code, one trace.                                      |
+| [Reference repositories](reference-repos.md)                 | Upstream and peer projects checked out locally for comparison, and why each is kept.                                                                    |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).
