@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-html-render
+      name: '@dshfiles/html-render'

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "html-page-card",
+      "title": "Agent-published HTML page as a sandboxed card",
+      "summary": "The html_render agent tool publishes a self-contained HTML page (chart, mockup, table) that the chat transcript shows as a card: a sandboxed iframe themed with the DSH light/dark tokens, resizable, with Copy HTML, Open in new tab and Expand to full screen. The card stays visible after the Turn completes (Chat's PinnedToolCalls keeps it outside the \"Completed in\" fold). The page is persisted in the tool result's presentation metadata, so a reload shows it again; the model gets only a one-line summary.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
+        "press Enter",
+        "expect region \"Sales dashboard\""
+      ],
+      "surfaces": ["host", "client"],
+      "configuration": [],
+      "states": ["preparing", "running", "published", "refused"],
+      "failureModes": [
+        "HTML above 512 KB (UTF-8) is refused with an error that names the size and how to shrink or split the page.",
+        "The page has no network: external scripts, stylesheets, images, fonts, fetch and form posts are blocked by its Content-Security-Policy; only inline code and data:/blob: media load.",
+        "The frame runs scripts without same-origin, so the page cannot read DSH cookies, storage or the Host API; it can still navigate its own frame when the user clicks a link.",
+        "Open in new tab is blocked by a browser that refuses pop-ups; Copy HTML and Expand still work."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "html-render.card",
+          "featureFile": "tooling/dshx/e2e/features/html-render.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.persisted-meta",
+          "file": "plugins/@dshfiles/html-render/src/html-render-tool.test.ts",
+          "testName": "persists the page as presentation metadata and tells the model only a summary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.size-cap",
+          "file": "plugins/@dshfiles/html-render/src/html-render-tool.test.ts",
+          "testName": "refuses a page over the size cap with a recovery path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.csp-first",
+          "file": "plugins/@dshfiles/html-render/src/sandboxed-document.test.ts",
+          "testName": "puts the no-network policy first in the head and drops base and http-equiv elements"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.theme-tokens",
+          "file": "plugins/@dshfiles/html-render/src/sandboxed-document.test.ts",
+          "testName": "reads live Host tokens in auto mode and refuses values that could escape the stylesheet"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.standalone-shell",
+          "file": "plugins/@dshfiles/html-render/src/sandboxed-document.test.ts",
+          "testName": "keeps the page inside a sandboxed srcdoc frame whatever its markup contains"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    }
+  ]
+}
