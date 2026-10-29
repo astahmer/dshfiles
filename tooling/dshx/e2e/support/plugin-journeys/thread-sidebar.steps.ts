@@ -2140,3 +2140,36 @@ Then('Working selects only running threads and Done also selects threads that ne
   })
   await finishJourneyAssertions(page)
 })
+
+const promptLinkProject = 'Prompt link project'
+const promptLinkText = 'Draft from a prompt link'
+
+When('the GUI is opened with a prompt link for a registered project', async ({ page }: { page: Page }) => {
+  const profile = profileFor(page)
+  const call = await connectDshxApi({ url: profile.url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
+  const path = join(profile.homeRoot, 'prompt-link-project')
+  await mkdir(path)
+  const registered = z.object({ path: z.string() }).parse(await call('projectRegister', { path, title: promptLinkProject }))
+  // The tokenized launch URL redirects and drops other parameters; a signed-in browser opens the plain link.
+  const link = new URL(new URL(profile.url).origin)
+  link.searchParams.set('prompt', promptLinkText)
+  link.searchParams.set('project', registered.path)
+  await page.goto(link.href)
+})
+
+Then('a new thread in that project holds the prompt unsent and the address no longer carries the link', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await recordAssertion(page, 'thread-sidebar-prompt-link-prefills-new-thread', async () => {
+    await expect(composer).toContainText(promptLinkText, { timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(promptLinkProject)
+  })
+  await recordAssertion(page, 'thread-sidebar-prompt-link-strips-address', async () => {
+    const params = new URL(page.url()).searchParams
+    expect(['prompt', 'project', 'model'].filter(name => params.has(name))).toEqual([])
+    expect(params.get('thread')).toMatch(/^session-/u)
+  })
+  await recordAssertion(page, 'thread-sidebar-prompt-link-never-sends', async () => {
+    await expect(page.locator('[data-conversation-content]')).toHaveAttribute('data-content-phase', 'hero')
+  })
+  await finishJourneyAssertions(page)
+})

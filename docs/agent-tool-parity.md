@@ -458,7 +458,7 @@ the guarded save as an agent tool`) — the sha256-guarded save, with `sessionId
 - `diff-viewed`: `changes_summary` (`api/changes.summary` fetch) — its per-file
   marks have no Host verb at all.
 - `queue-reorder`: bound (not installed, so latent): `queue_describe` for the queued
-  rows, plus the existing `queue_move`. Its two queue edits are bound where the
+  rows, plus the existing `queue_move`. Its queue edits are bound where the
   Session controller lives — `thread_queue_remove`, `thread_queue_steer` and `thread_queue_edit` in
   `thread-sidebar` (sibling revision `feat(thread-sidebar): let an Agent remove and
 steer a queued message`). Still missing: `queue_move_to_thread` (the prompt half is

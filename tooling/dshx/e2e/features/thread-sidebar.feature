@@ -258,3 +258,9 @@ Feature: Thread sidebar journeys
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When the shipped Working and Done views are opened in the view manager
     Then Working selects only running threads and Done also selects threads that need a resume
+
+  @scenario:thread-sidebar.prompt-links
+  Scenario: A prompt link opens a prefilled new thread without sending it
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When the GUI is opened with a prompt link for a registered project
+    Then a new thread in that project holds the prompt unsent and the address no longer carries the link

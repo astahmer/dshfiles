@@ -25,3 +25,15 @@ Feature: Rich composer references
     Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/input-trigger, @dshfiles/session-controller" is booted
     When a plugin sets the draft and attaches a quote, a note and a file through the Composer contract
     Then the composer shows the draft with the quote, note and file chips
+
+  @scenario:rich-composer.prompt-recall
+  Scenario: Recall this thread's earlier prompts with ArrowUp
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When a thread with two sent prompts is opened
+    Then ArrowUp recalls them newest first, ArrowDown walks back and Escape restores the empty draft
+
+  @scenario:rich-composer.large-paste
+  Scenario: A large paste becomes a text file that can go back to text
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When 40 KiB of text is pasted into a thread composer
+    Then the paste is a text file attachment that Paste as text turns back into text

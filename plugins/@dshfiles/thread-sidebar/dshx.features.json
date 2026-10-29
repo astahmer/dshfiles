@@ -2567,6 +2567,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "thread-sidebar.prompt-links",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "thread-sidebar.prompt-links-unit-read",
           "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",

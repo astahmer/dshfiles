@@ -287,6 +287,11 @@
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "rich-composer.prompt-recall",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "rich-composer.prompt-recall-unit-history",
           "file": "plugins/@dshfiles/rich-composer/src/prompt-recall.test.ts",
@@ -344,6 +349,11 @@
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.large-paste",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
         {
           "kind": "unit-test",
           "id": "rich-composer.large-paste-unit-threshold",
