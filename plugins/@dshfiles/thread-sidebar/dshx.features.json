@@ -27,7 +27,11 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-content-seat.test.tsx",
           "testName": "keeps the genuine preview and its actions only for a standalone sidebar, including override teardown"
         },
-        { "kind": "gherkin", "id": "thread-sidebar.preview-as-regular-tab", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.preview-as-regular-tab",
+          "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature"
+        },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.authoritative-current-session",
@@ -64,7 +68,11 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
           "testName": "retains footer contributions as the actual declared slots with their real owner shares"
         },
-        { "kind": "gherkin", "id": "thread-sidebar.workbench-assemblies", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.workbench-assemblies",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.explicit-reopen-intent",
@@ -73,7 +81,10 @@
         }
       ],
       "telemetry": [
-        { "kind": "not-applicable", "reason": "Client-only presentation adapters reuse existing sidebar slots and Host actions; they start no new Host work." }
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation adapters reuse existing sidebar slots and Host actions; they start no new Host work."
+        }
       ]
     },
     {
@@ -2492,6 +2503,49 @@
         }
       ],
       "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "queued-message-tools",
+      "title": "Remove, steer or edit a queued message as an Agent",
+      "summary": "thread_queue_remove, thread_queue_steer and thread_queue_edit act on one queued message through the Session controller updateQueue verb the queue dock uses; an edit replaces the text in place, keeping the message id and position, and the Host refuses messages with images or files.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["queued", "removed", "steering", "edited"],
+      "failureModes": [
+        "A message that already left the queue is refused with session/queue-item-not-found and nothing changes.",
+        "An edit of a message with images or files is refused with QUEUE_EDIT_NON_TEXT; the message stays queued unchanged.",
+        "A Host started before thread_queue_edit existed answers with an unknown-endpoint error until it is restarted."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.queued-message-tools-unit-exposure",
+          "file": "plugins/@dshfiles/thread-sidebar/src/queue-api.test.ts",
+          "testName": "removing, steering and editing a queued message are named, gated tools"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.queued-message-tools-unit-edit-input",
+          "file": "plugins/@dshfiles/thread-sidebar/src/queue-api.test.ts",
+          "testName": "an edit carries the replacement text and refuses an empty one"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.queued-message-tools-agent-only",
+          "reason": "Agent tools with no browser surface; the queue dock's own Edit/Remove/Steer buttons are covered by the queue-reorder journeys."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "automatic",
           "source": "api-dispatch"

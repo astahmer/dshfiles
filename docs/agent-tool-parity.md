@@ -459,13 +459,14 @@ the guarded save as an agent tool`) — the sha256-guarded save, with `sessionId
   marks have no Host verb at all.
 - `queue-reorder`: bound (not installed, so latent): `queue_describe` for the queued
   rows, plus the existing `queue_move`. Its two queue edits are bound where the
-  Session controller lives — `thread_queue_remove` and `thread_queue_steer` in
+  Session controller lives — `thread_queue_remove`, `thread_queue_steer` and `thread_queue_edit` in
   `thread-sidebar` (sibling revision `feat(thread-sidebar): let an Agent remove and
 steer a queued message`). Still missing: `queue_move_to_thread` (the prompt half is
   `thread_prompt`; `session/updateQueue` still cannot retarget a queued item to
   another Session) and `queue_list_attachments`;
-  `queue_reorder_set_preferences` is a settings write. `queue_edit` cannot preserve
-  attachments because `QueueAction.edit` is text-only (a recorded Host gap).
+  `queue_reorder_set_preferences` is a settings write. `thread_queue_edit` (thread-sidebar)
+  replaces a queued message's text in place; it cannot preserve attachments because
+  `QueueAction.edit` is text-only (a recorded Host gap).
 - `attachment-gallery`: `session_attach_file` (session attachment + upload),
   `session_read_attachment` (`session/attachment`).
 - `send-after-upload`: `session_queue_message` (queue-mode prompt, reachable as

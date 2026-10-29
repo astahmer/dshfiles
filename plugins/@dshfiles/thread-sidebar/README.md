@@ -746,6 +746,13 @@ references this thread" when it could not look. The same rows drive the
 header's `...` menu, which is why the client tolerates a Host that predates the
 method (it shows one muted line instead of the rows).
 
+`thread_queue_remove`, `thread_queue_steer` and `thread_queue_edit` act on one
+queued message through the Session controller's `updateQueue`, the verb the queue
+dock uses. `thread_queue_edit` is the native in-place edit: the message keeps its
+id and its place in the queue and gets the new `text`; the Host refuses a message
+that carries images or files (queue-reorder's **Edit** button handles those by
+moving the message through the composer). `queue_describe` lists the ids.
+
 Every write tool's description says it may run only when the user asked for that
 change. `thread_archive` never stops running work on its own: without
 `stopActivity` the Host refuses with `workspace/session-active` and the tool
