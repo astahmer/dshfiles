@@ -6,5 +6,5 @@ Feature: One shared plugin stylesheet
 
   @scenario:ui-styles.isolated-boot-sheet
   Scenario: An isolated plugin boot injects the shared stylesheet
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     Then exactly one shared plugin stylesheet is injected

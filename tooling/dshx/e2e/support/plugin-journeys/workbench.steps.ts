@@ -491,6 +491,9 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
       .getByRole('tab')
       .filter({ has: page.locator(`[data-workbench-tab-id=${JSON.stringify(initialPanelId)}]`) })
     await expect(initialTab).toHaveCount(1)
+    if ((await initialTab.getAttribute('aria-selected')) !== 'true') {
+      await initialTab.click()
+    }
     await expect(initialTab).toHaveAttribute('aria-selected', 'true')
     const initialBody = await panelBodyForTab(initialTab)
     await expect(initialBody.locator('[data-conversation-session]')).toHaveAttribute('data-conversation-session', initialSessionId)
@@ -2100,9 +2103,10 @@ Then('the view chooser exposes qualified plugin names and AI Accounts search sel
     const chooser = await clickNewTab(mainPane(page))
     const cards = chooser.getByRole('button')
     const names = await cards.evaluateAll(elements => elements.map(element => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
-    expect(names.length).toBeGreaterThan(0)
-    // No alias helper here: every actual reusable card must be qualified, including core presentation adapters.
-    expect(names.every(name => /^[^:]+: \S/u.test(name))).toBe(true)
+    expect(names).toContain('New thread')
+    const reusableNames = names.filter(name => name !== 'New thread')
+    expect(reusableNames.length).toBeGreaterThan(0)
+    expect(reusableNames.every(name => /^[^:]+: \S/u.test(name))).toBe(true)
     await expect(chooser.getByRole('button', { name: 'Rich Composer: Current conversation', exact: true })).toHaveCount(0)
     for (const name of [
       'Thread Sidebar: Threads',

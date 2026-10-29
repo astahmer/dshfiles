@@ -1475,7 +1475,12 @@
       "id": "footer-more-menu",
       "title": "Reach Settings, sidebar pages, and hidden footer actions from both More menus",
       "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu, and the Workbench Navigation view's, offers the same Settings action beside Customize sidebar in both the scroll-and-menu and menu-only overflow modes, even when every destination fits the row. A seat whose card yielded to another surface takes no room and can never leave the footer menu empty.",
-      "reach": ["expect button \"More\"", "click button \"More\"", "expect button \"Settings\""],
+      "reach": [
+        "click button \"New tab\"",
+        "click button \"Thread Sidebar: Navigation\"",
+        "click button \"More sidebar destinations\"",
+        "expect option \"Settings\""
+      ],
       "surfaces": ["client", "settings"],
       "configuration": [],
       "states": ["wide", "narrow", "collapsed", "hidden-entry", "entry-yielded-to-another-seat"],
@@ -1502,6 +1507,11 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-menu-overflow",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.workbench-navigation-settings",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {

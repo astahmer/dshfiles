@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
-import { openGlobalPanel } from '../plugin-view-names.js'
+import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -11,6 +11,8 @@ import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFol
 import { materializeNonblankThread } from '../thread-composer.js'
 
 const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
+const workbenchNavigation = (page: Page): Locator =>
+  page.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation"]').getByRole('navigation', { name: 'Navigation', exact: true })
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -111,13 +113,14 @@ const dragRowToSectionHeader = async (page: Page, row: Locator, header: Locator)
 const sectionOfSidebar = (page: Page, section: string): Locator => threadSidebar(page).locator(`section[data-thread-section="${section}"]`)
 
 /**
- * Right after boot the client restores its first selection, creating a blank session of its own when it has none to
- * reopen. A New thread click that lands before that restore settles is overridden by it: the page opens the click's
- * session, then the restore selects its own. So wait for the restored selection first, then for the URL to name a
- * session the Host created after the click, rather than trusting the first `session/create` answer.
+ * DSH may restore a blank composer at boot, and New thread reuses it while it is selected. Otherwise wait for the
+ * Host-created session opened by the click, rather than trusting the first `session/create` response after boot.
  */
 const startBlankThread = async (page: Page): Promise<string> => {
   await expect.poll(() => currentThreadId(page), { message: 'The page never restored its first thread selection after boot.', timeout: 15_000 }).not.toBeNull()
+  const existingThreadId = currentThreadId(page)
+  const blankComposer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  if (existingThreadId !== null && (await blankComposer.isVisible())) return existingThreadId
   const createdThreadIds = new Set<string>()
   const recordCreatedThread = async (response: Response): Promise<void> => {
     const request = response.request()
@@ -144,6 +147,25 @@ const startBlankThread = async (page: Page): Promise<string> => {
   if (createdThreadId === null) throw new Error('The page left the new thread before its composer rendered.')
   await expect(page.getByRole('textbox').first()).toBeVisible()
   return createdThreadId
+}
+
+const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): Promise<string> => {
+  const blankComposer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  const existingThreadId = currentThreadId(page)
+  if (existingThreadId !== null && existingThreadId !== excludedThreadId && (await blankComposer.isVisible())) return existingThreadId
+  await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
+  await expect
+    .poll(
+      async () => {
+        const threadId = currentThreadId(page)
+        return threadId !== null && threadId !== excludedThreadId && (await blankComposer.isVisible())
+      },
+      { message: 'New thread did not leave the archived session for a blank composer.', timeout: 15_000 },
+    )
+    .toBe(true)
+  const selectedThreadId = currentThreadId(page)
+  if (selectedThreadId === null || selectedThreadId === excludedThreadId) throw new Error('The page did not leave the archived session.')
+  return selectedThreadId
 }
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
@@ -939,7 +961,7 @@ Then('unmuting it from the session header clears the marker', async ({ page }: {
 
 When('the Active section is folded and reopened', async ({ page }: { page: Page }) => {
   await showThreadsByStatus(page)
-  const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })
+  const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (1)', exact: true })
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')
   await activeSection.click()
   await expect(activeSection).toHaveAttribute('aria-expanded', 'false')
@@ -947,12 +969,13 @@ When('the Active section is folded and reopened', async ({ page }: { page: Page 
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')
 })
 
-Then('the sidebar keeps the blank session out of classified thread rows', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'thread-sidebar-classification-excludes-blank-host-session', async () => {
-    await expect.poll(() => currentThreadId(page)).not.toBeNull()
-    await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toHaveAttribute('aria-expanded', 'true')
-    await expect(threadSidebar(page).locator('article')).toHaveCount(0)
-    await expect(threadSidebar(page).getByText('No threads in this section.', { exact: true })).toBeVisible()
+Then('the selected blank session stays available in the Active thread rows', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-blank-active-row', async () => {
+    const sessionId = currentThreadId(page)
+    if (sessionId === null) throw new Error('The selected blank thread is not open.')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Active (1)', exact: true })).toHaveAttribute('aria-expanded', 'true')
+    await expect(threadRow(page, sessionId)).toBeVisible()
+    await expect(threadSidebar(page).locator('article')).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })
@@ -978,12 +1001,13 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
   await expect(archiveItem).toBeEnabled()
+  const archivedThreadId = await targetRow.getAttribute('data-thread-id')
+  if (archivedThreadId === null) throw new Error('The target thread has no session id before archiving.')
   await archiveItem.click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
-  // Opening an archived thread restores it, so the reload below must not reopen the one just archived: leave the
-  // archived thread (its id is in the URL) for a fresh blank thread first, or the refresh unarchives it and the
-  // Archived filter would find nothing.
-  await startBlankThread(page)
+  // Opening an archived thread restores it, so the reload below must not reopen the one just archived: leave it for
+  // any other blank composer before the refresh, or the Archived filter would find nothing.
+  await selectBlankThreadAwayFrom(page, archivedThreadId)
 
   await selectThreadViewValue(page, 'Group: Status', 'Date')
   await selectThreadViewValue(page, 'Filter: None', 'Archived')
@@ -1435,6 +1459,41 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
   await finishJourneyAssertions(page)
 })
 
+When('the Workbench Navigation panel is opened in menu-only overflow', async ({ page }: { page: Page }) => {
+  const main = page.locator('[data-workbench-region="main"]').first()
+  const newTab = main.getByRole('button', { name: 'New tab', exact: true }).filter({ visible: true }).first()
+  await newTab.click()
+  const chooser = main.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
+  await expect(chooser).toBeVisible()
+  await chooser.getByRole('button', { name: reusableViewName('Navigation'), exact: true }).click()
+  await expect(workbenchNavigation(page)).toBeVisible()
+  await page.evaluate(
+    ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
+    [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, navigationOverflow: 'menu' })],
+  )
+  await page.reload()
+  const navigationTab = main.getByRole('tab', { name: reusableViewName('Navigation'), exact: true })
+  if ((await navigationTab.getAttribute('aria-selected')) !== 'true') await navigationTab.click()
+  const navigation = workbenchNavigation(page)
+  await expect(navigation).toBeVisible()
+  await expect(navigation.getByRole('toolbar', { name: 'Sidebar navigation', exact: true })).toHaveCSS('overflow-x', 'hidden')
+})
+
+Then('the Workbench Navigation More menu offers Settings', async ({ page }: { page: Page }) => {
+  const navigation = workbenchNavigation(page)
+  const menu = page.getByRole('dialog').filter({ has: page.getByPlaceholder('Filter destinations…') })
+  await recordAssertion(page, 'thread-sidebar-workbench-navigation-more-offers-settings', async () => {
+    await navigation.getByRole('button', { name: 'More sidebar destinations', exact: true }).click()
+    await expect(menu.getByRole('option', { name: 'Settings', exact: true })).toBeVisible()
+    await expect(menu.getByRole('option', { name: 'Customize sidebar', exact: true })).toBeVisible()
+  })
+  await menu.getByRole('option', { name: 'Settings', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-workbench-navigation-more-opens-settings', async () => {
+    await expect(page.getByRole('dialog').filter({ hasText: 'Built-in plugins' })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 // The overflow mode has no Customize control; a browser copy is what the sidebar hands to Host settings on load.
 When('the sidebar header moves overflowing destinations into its More menu only', async ({ page }: { page: Page }) => {
   await expect(sidebarNavigation(page).getByRole('button', { name: 'More sidebar destinations', exact: true })).toBeVisible()
@@ -1490,6 +1549,9 @@ When('two Host threads are opened one after the other', async ({ page }: { page:
   await expect(threadRow(page, firstThreadId)).toHaveCount(1)
   const secondThreadId = await startBlankThread(page)
   expect(secondThreadId).not.toBe(firstThreadId)
+  await page.getByRole('textbox').first().fill('thread sidebar history e2e second')
+  await page.getByRole('textbox').first().press('Enter')
+  await expect(threadRow(page, secondThreadId)).toHaveCount(1)
   threadHistoryJourneys.set(page, { firstThreadId, secondThreadId })
 })
 
@@ -1639,9 +1701,12 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
 
 Then('no child rows or thread-link actions are offered for the blank session', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-blank-session-has-no-child-or-link-actions', async () => {
-    await expect.poll(() => currentThreadId(page)).not.toBeNull()
-    await expect(threadSidebar(page).locator('article')).toHaveCount(0)
-    await expect(threadSidebar(page).getByRole('list', { name: 'Child threads', exact: true })).toHaveCount(0)
+    const sessionId = currentThreadId(page)
+    if (sessionId === null) throw new Error('The blank thread is not open.')
+    const row = threadRow(page, sessionId)
+    await expect(row).toBeVisible()
+    await expect(row.getByRole('list', { name: 'Child threads', exact: true })).toHaveCount(0)
+    await openThreadRowMenu(row)
     await expect(page.getByRole('menuitem', { name: 'Copy thread link', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -1754,10 +1819,12 @@ Then('the skill {string} appears as an @ suggestion', async ({ page }: { page: P
 let asideThreadId: string | null = null
 
 When('a nonblank Host thread is opened in the side panel from its context menu', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
   await composer.fill('aside e2e target')
   await composer.press('Enter')
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
   const threadId = currentThreadId(page)
   if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   asideThreadId = threadId
@@ -1778,9 +1845,13 @@ Then("the side panel hosts that thread's scrollable conversation and composer", 
     // The embedded Conversation must be sized by the pane, not by its content: the body never grows past the pane, it
     // owns a real scroll container, and its composer stays inside both the pane and the viewport.
     const geometry = await aside.evaluate(element => {
-      const body = element.querySelector('.wSkVaW_body')
-      const scrollBody = element.querySelector('.wSkVaW_scrollBody')
-      const composer = element.querySelector('.wSkVaW_composerSeat')
+      const byLocalClass = (localName: string): HTMLElement | null =>
+        Array.from(element.querySelectorAll<HTMLElement>('*')).find(candidate =>
+          Array.from(candidate.classList).some(className => className.includes(`_${localName}_`)),
+        ) ?? null
+      const body = byLocalClass('body')
+      const scrollBody = byLocalClass('scrollBody')
+      const composer = byLocalClass('composerSeat')
       if (body === null || scrollBody === null || composer === null) throw new Error('the aside holds no conversation body or composer')
       const pane = element.getBoundingClientRect()
       return {
@@ -1789,11 +1860,14 @@ Then("the side panel hosts that thread's scrollable conversation and composer", 
         bodyHeight: Math.round(body.getBoundingClientRect().height),
         scrollHeight: scrollBody.scrollHeight,
         clientHeight: scrollBody.clientHeight,
+        scrollOverflowY: window.getComputedStyle(scrollBody).overflowY,
         composerBottom: Math.round(composer.getBoundingClientRect().bottom),
         viewportHeight: window.innerHeight,
       }
     })
     expect(geometry.bodyHeight).toBeLessThanOrEqual(geometry.paneHeight)
+    expect(geometry.clientHeight).toBeGreaterThan(0)
+    expect(['auto', 'scroll']).toContain(geometry.scrollOverflowY)
     expect(geometry.scrollHeight).toBeGreaterThanOrEqual(geometry.clientHeight)
     expect(geometry.composerBottom).toBeLessThanOrEqual(Math.min(geometry.paneBottom, geometry.viewportHeight))
   })
@@ -2018,6 +2092,7 @@ Then('the JJ inventory is read again after the sidebar expands', async ({ page }
 
 Then('the blocked session appears in the Usage limit group', async ({ page }: { Page }) => {
   await recordAssertion(page, 'thread-sidebar-usage-limit-group', async () => {
+    await showThreadsByStatus(page)
     await expect.poll(() => currentThreadId(page), { timeout: 30_000 }).not.toBeNull()
     const sessionId = currentThreadId(page)
     if (sessionId === null) throw new Error('The blocked thread is not selected.')

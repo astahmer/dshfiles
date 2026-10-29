@@ -105,7 +105,7 @@ const PRICING_CHECK_MS = 30 * 60_000
 
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials', 'agents', 'sessionProjections'],
+  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
   apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi, accountSessionHostApi, threadAccountHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],

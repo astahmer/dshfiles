@@ -63,7 +63,7 @@ Feature: MCP servers
 
   @scenario:mcp-servers.autocomplete
   Scenario: Find MCP server names and tools through @ autocomplete
-    Given the isolated plugin composition of "@dshfiles/mcp-servers, @dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/mcp-servers, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When the MCP servers page is opened
     And the local echo MCP server is added as a stdio command
     Then the Echo server reads "Native client loaded · 1 Host tools registered"

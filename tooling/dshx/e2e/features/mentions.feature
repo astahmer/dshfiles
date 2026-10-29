@@ -1,13 +1,14 @@
 Feature: Ranked @ mentions and thread links
 
   The @ menu is @dshfiles/mentions' own source over the native file and
-  thread lookups. Turns fail for lack of a provider; the threads exist only
-  to be mentioned.
+  thread lookups. A loopback Command Code provider materializes the titled
+  threads; no external provider is used.
 
   @scenario:mentions.ranked-mentions
   Scenario: An exact thread title leads the menu, and scopes narrow it
-    Given the isolated plugin profile "@dshfiles/mentions" is booted
-    When threads named "deploy" and "fix the deploy script" are started
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And threads named "deploy" and "fix the deploy script" are started
     And a new thread composer types "@deploy"
     Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @skill: · @mcp: · @b: backlog"
     When a new thread composer types "@\"fix the"
@@ -21,8 +22,9 @@ Feature: Ranked @ mentions and thread links
 
   @scenario:mentions.session-mention-links
   Scenario: Referenced threads open from the sent message, in a new tab on Cmd-click
-    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/main-tabs" is booted
-    When threads named "Mention target" and "Second thread" are started
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/main-tabs, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And threads named "Mention target" and "Second thread" are started
     And a new thread mentions "Mention target" and is sent
     Then the sent message links to "Mention target"
     When the "Referenced session" link is clicked
@@ -32,8 +34,9 @@ Feature: Ranked @ mentions and thread links
 
   @scenario:mentions.skill-and-mcp-scopes
   Scenario: Skills share the @ menu with threads and files, and each scope keeps its own rows
-    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/thread-sidebar" is booted with the autocomplete skill fixture
-    When threads named "e2e skill notes" and "unrelated work" are started
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts" is booted with the autocomplete skill fixture
+    When a Command Code account backed by a local fake provider is added
+    And threads named "e2e skill notes" and "unrelated work" are started
     And a new thread composer types "@e2e"
     Then the skill "e2e-skill-mentions" and the thread "e2e skill notes" are both offered
     When a new thread composer types "@skill:e2e"

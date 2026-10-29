@@ -16,12 +16,17 @@ const newThreadComposer = (page: Page) =>
     exact: true,
   })
 
-When('a canonical thread mention is pasted into a new thread composer', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  const composer = newThreadComposer(page)
+When('a canonical thread mention is pasted into an active thread composer', async ({ page }: { page: Page }) => {
+  const { sessionId } = await openNewProjectThread(page, {
+    title: 'Pasted mention journey',
+    folder: 'pasted-mention-project',
+    text: 'seed prompt for pasted mention',
+  })
+  await expect(failedTurns(page)).toHaveCount(1, { timeout: 20_000 })
+  const composer = threadComposer(page)
   await expect(composer).toBeVisible()
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(page.url()).origin })
-  const mention = `@[Pasted thread](dsh-session:${Buffer.from(JSON.stringify('session-e2e')).toString('base64url')})`
+  const mention = `@[Pasted thread](dsh-session:${Buffer.from(JSON.stringify(sessionId)).toString('base64url')})`
   await page.evaluate(async value => navigator.clipboard.writeText(value), mention)
   await composer.click()
   await page.keyboard.press('Meta+V')

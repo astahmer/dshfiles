@@ -5,49 +5,49 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.archive-undo
   Scenario: Undo a manual archive from its temporary notice
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a nonblank Host thread is archived and immediately undone
     Then the thread is restored from the archive notice
 
   @scenario:thread-sidebar.archive-undo-preferences
   Scenario: Configure the manual archive undo notice
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When archive undo settings are changed and threads are archived
     Then archive undo settings control the temporary notice
 
   @scenario:thread-sidebar.archived-open-notice
   Scenario: Opening an archived thread restores it in one click
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When an archived thread is opened from the Archived section
     Then the thread is restored and open with no archived banner
 
   @scenario:thread-sidebar.settle
   Scenario: Settle a thread from its context menu and unsettle it to reply
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a nonblank Host thread is settled from its context menu
     Then the thread is settled, opens read-only and unsettles to reply
 
   @scenario:thread-sidebar.board-view
   Scenario: Open the thread board as a page of columns with its own grouping and filters
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When separate remote threads are enabled and the thread board page is opened
     Then the board shows only columns, grouped and filtered independently from the sidebar list
 
   @scenario:thread-sidebar.continue-in-project
   Scenario: Continue a thread in another project and settle the original
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/workspace-folder-picker" is booted
     When a nonblank Host thread is continued in another registered project from its context menu
     Then the continuation opens in that project with the conversation and the original thread is settled
 
   @scenario:thread-sidebar.section-order
   Scenario: Keep remote threads with view groups by default or separate them
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host" is booted
     When an archived thread and a settled thread fill the bottom sections
     Then separate remote grouping is opt-in, reorderable and persists across reloads
 
   @scenario:thread-sidebar.settled-auto-archive
   Scenario: A settled thread archives itself once its archive delay has passed
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a thread is settled with a one-week settled-archive delay
     Then the settled banner shows the archive time it is waiting for
     When the settled-archive delay is shortened to immediately
@@ -62,20 +62,20 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.section-drop
   Scenario: Drag a thread row into another section
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a nonblank Host thread is parked from its context menu
     Then dragging its row onto the Active header unparks it and survives a reload
 
   @scenario:thread-sidebar.classification
-  Scenario: Blank Host sessions stay out of classified thread rows
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+  Scenario: A selected blank Host session remains available in the Active section
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a blank Host thread is started
     And the Active section is folded and reopened
-    Then the sidebar keeps the blank session out of classified thread rows
+    Then the selected blank session stays available in the Active thread rows
 
   @scenario:thread-sidebar.session-header-actions
   Scenario: Pin a thread from the session header
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a nonblank Host thread is pinned from its session header
     Then the thread stays pinned after reload
 
@@ -88,7 +88,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.multi-select
   Scenario: Extend a keyboard selection across threads and archive the batch
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When three nonblank Host threads fill the Active section
     And the first thread row is focused and Shift+ArrowDown selects the next two rows
     Then the sidebar shows three selected rows and their menu archives all of them
@@ -102,51 +102,51 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.idle-archive
   Scenario: Auto-settle stays opt-in and saves its schedule
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When auto-settle is enabled with a new idle threshold and scan interval
     Then the policy settings survive a browser reload
 
   @scenario:thread-sidebar.thread-mute
   Scenario: Snooze a thread until tomorrow morning, find it under Muted, and unmute it
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a thread is snoozed until tomorrow morning from its sidebar row
     Then it stays snoozed after reload and the Muted filter lists it
     And unmuting it from the session header clears the marker
 
   @scenario:thread-sidebar.manual-unread
   Scenario: Manual unread stays per-thread and clears on reopen
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When one thread is marked unread and another thread is opened
     Then its unread marker clears on open
 
   @scenario:thread-sidebar.turn-finished-attention
   Scenario: A finished turn keeps asking every tab for attention until it is opened
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a thread finishes its turn and the browser hands its unfinished marker to the Host
     Then every open tab shows the finished turn until one tab opens it
 
   @scenario:thread-sidebar.auto-archive-overrides
   Scenario: Per-thread auto-settle overrides the global opt-in
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When auto-settle is enabled for one thread while global auto-settle stays off
     Then the per-thread override survives reload without changing the global setting
 
   @scenario:thread-sidebar.attention-colors
   Scenario: Attention status colors are configurable and saved
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When an attention status color is changed in Thread list settings
     Then the selected attention color survives a browser reload
 
   @scenario:thread-sidebar.notifications-settings
   Scenario: Configure notification delivery, placement, dismissal timeout, and sounds
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When notification routes and sounds are configured in Settings
     Then previewing a notification sound plays a tone through the browser audio context
     And the notification settings survive a browser reload
 
   @scenario:thread-sidebar.notification-sound-palette
   Scenario: Notification sound mute toggles from the command palette
-    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted
     When the command palette is opened
     When the palette query is "Mute notification sounds"
     Then the notification sound mute palette action toggles both ways
@@ -171,51 +171,57 @@ Feature: Thread sidebar journeys
     When the sidebar header moves overflowing destinations into its More menu only
     Then the header More menu still offers Settings and opens a destination the row left out
 
+  @scenario:thread-sidebar.workbench-navigation-settings
+  Scenario: Workbench Navigation More keeps Settings in menu-only overflow
+    Given an isolated Workbench header profile with all original view providers is booted
+    When the Workbench Navigation panel is opened in menu-only overflow
+    Then the Workbench Navigation More menu offers Settings
+
   @scenario:thread-sidebar.palette-search
   Scenario: Thread search reports an empty result from a fresh Host profile
-    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted
     When the sidebar thread-search destination is opened with a nonmatching query
     Then the thread-sidebar palette shows no matching sessions
 
   @scenario:thread-sidebar.navigation-history
   Scenario: Back and Forward follow Host-created threads
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When two Host threads are opened one after the other
     Then Back and Forward return to the corresponding Host sessions
 
   @scenario:thread-sidebar.keyboard-selection
   Scenario: Arrow keys move focus and Shift selects a range of threads
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When two nonblank Host threads are listed in the sidebar
     Then arrow keys move focus and Shift+ArrowDown selects a range of threads
 
   @scenario:thread-sidebar.children-links
   Scenario: Blank Host sessions do not expose child or link actions
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a blank Host thread is started
     Then no child rows or thread-link actions are offered for the blank session
 
   @scenario:thread-sidebar.mention-insertion
   Scenario: Mentioning a visible Host thread inserts a native chip at the captured cursor
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a visible Host thread is mentioned from its context menu at the captured cursor
     Then the composer contains the native mention chip at the captured cursor
 
   @scenario:thread-sidebar.restart-confirmation
   Scenario: No restart action is offered without pending Host changes
-    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted
     When the thread-sidebar command palette is searched for restart
     Then no restart action or confirmation appears without pending Host changes
 
   @scenario:thread-sidebar.skill-mentions
   Scenario: Find a user-invocable skill through @ autocomplete
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with the autocomplete skill fixture
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted with the autocomplete skill fixture
     When the composer searches @ autocomplete for skill "e2e-skill-mentions"
     Then the skill "e2e-skill-mentions" appears as an @ suggestion
 
   @scenario:thread-sidebar.open-in-side-panel
   Scenario: Open a thread in the right side panel from its row menu, its hover action and the palette
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/sidebar-right, @dshfiles/command-palette" is booted
     When a nonblank Host thread is opened in the side panel from its context menu
     Then the side panel hosts that thread's scrollable conversation and composer
     And the thread row offers the side-panel hover action
@@ -228,19 +234,19 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.referenced-by
   Scenario: See which thread references a thread from its row and header menus
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with session content search
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted with session content search
     When another thread references a visible Host thread from its composer
     Then both menus list the referencing thread under Referenced by
 
   @scenario:thread-sidebar.rename-thread-title
   Scenario: Rename a thread from its row menu and cancel an edit
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When a thread title is renamed from its row menu and a second edit is cancelled
     Then the renamed thread title survives reload and the cancelled draft is discarded
 
   @scenario:thread-sidebar.jj-inventory-pauses-while-collapsed
   Scenario: A collapsed sidebar stops reading the JJ inventory
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     And the provider onboarding prompt is dismissed
     And the browser counts JJ inventory requests
     When the sidebar inventory pane is collapsed
@@ -249,19 +255,19 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.compact-view-tabs
   Scenario: View tabs switch to icons in a narrow sidebar and keep their names
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When the thread sidebar is narrowed to its minimum width
     Then every view tab fits without scrolling and keeps its full name as tooltip and accessible name
 
   @scenario:thread-sidebar.full-view-tabs
   Scenario: View tabs keep their names when the sidebar is wide enough for them
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When the view tab row is 480 pixels wide
     Then every view tab shows its full name
 
   @scenario:thread-sidebar.shipped-view-filters
   Scenario: The shipped Working view lists running threads and Done includes usage-limited threads
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     When the shipped Working and Done views are opened in the view manager
     Then Working selects only running threads and Done also selects threads that need a resume
 

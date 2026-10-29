@@ -4,8 +4,8 @@ Feature: Rich composer references
 
   @scenario:rich-composer.paste-session-mention
   Scenario: Paste a thread mention into the composer
-    Given the isolated plugin profile "@dshfiles/rich-composer" is booted
-    When a canonical thread mention is pasted into a new thread composer
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When a canonical thread mention is pasted into an active thread composer
     Then the pasted mention is displayed as a reference chip
 
   @scenario:rich-composer.image-attachment-reference

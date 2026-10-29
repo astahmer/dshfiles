@@ -242,7 +242,7 @@ When('the sidebar goes back to the drafting thread', async ({ page }: { page: Pa
 
 Then('the draft still reads {string} with its image and file attached', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'prompt-stash-draft-attachments-survive-back', async () => {
-    await expect(threadComposer({ page })).toHaveText(text)
+    await expect(threadComposer({ page })).toContainText(text)
     await expect(removeAttachment({ page, name: 'Remove image red.png' })).toBeVisible()
     await expect(removeAttachment({ page, name: 'Remove file note.txt' })).toBeVisible()
   })

@@ -51,7 +51,7 @@ Feature: Prompt stash
 
   @scenario:prompt-stash.draft-attachments-survive-back
   Scenario: Draft attachments survive leaving the thread and coming back
-    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread drafts "Draft with attachments" with an image and a file attached
     And another thread is opened

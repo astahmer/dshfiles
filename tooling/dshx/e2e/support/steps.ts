@@ -278,15 +278,15 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
 
 Given('the isolated rich-composer, input-trigger and attachment-gallery plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/rich-composer', '@dshfiles/input-trigger', '@dshfiles/attachment-gallery'],
-    profileLabel: 'rich-composer-input-trigger-attachment-gallery',
+    packageIds: ['@dshfiles/rich-composer', '@dshfiles/session-controller', '@dshfiles/input-trigger', '@dshfiles/attachment-gallery'],
+    profileLabel: 'rich-composer-session-controller-input-trigger-attachment-gallery',
   })
   await visitIsolatedPluginProfile(page, profile)
 })
 
 Given('the isolated ThreadSidebar and AI Accounts plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/thread-sidebar', '@dshfiles/ai-accounts'],
+    packageIds: ['@dshfiles/thread-sidebar', '@dshfiles/session-controller', '@dshfiles/rich-composer', '@dshfiles/chat', '@dshfiles/ai-accounts'],
     profileLabel: 'thread-sidebar-usage-limit',
   })
   await visitIsolatedPluginProfile(page, profile)
@@ -332,8 +332,14 @@ const sessionContentSearchPatch = `- id: session-query-sqlite
     persistedReadConcurrency: 4
 `
 
-Given('the isolated plugin profile {string} is booted with session content search', async ({ page }: { page: Page }, packageId: string) => {
-  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, cordisPatch: sessionContentSearchPatch })
+Given('the isolated plugin composition of {string} is booted with session content search', async ({ page }: { page: Page }, packageList: string) => {
+  const [packageId, ...companionPackageIds] = packageList.split(',').map(listed => listed.trim())
+  if (packageId === undefined || packageId === '') throw new Error('The plugin composition names no package.')
+  const profile = await bootComposedPluginProfile({
+    packageIds: [packageId, ...companionPackageIds],
+    profileLabel: `${packageList}-session-content-search`,
+    cordisPatch: sessionContentSearchPatch,
+  })
   await visitIsolatedPluginProfile(page, profile)
 })
 

@@ -20,7 +20,7 @@ Then(
       const tools = section(page, /^Tools \(\d+\)$/)
       const capabilities = tools.getByRole('row').filter({ hasText: 'dshx_capabilities' })
       await expect(capabilities).toContainText('read-only')
-      await expect(tools.getByRole('row').filter({ hasText: 'memory_note' })).toContainText('memory')
+      await expect(tools.getByRole('row', { name: /^memory_note\b/ })).toBeVisible()
     })
     await recordAssertion(page, 'agent-toolkit-lists-plugin-apis', async () => {
       await expect(
