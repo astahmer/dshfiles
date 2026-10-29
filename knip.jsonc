@@ -112,15 +112,10 @@
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-client-ui-workspace"],
     },
-    "plugins/@dshfiles/secret-catalog": {
-      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
-      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
-    },
     "plugins/@dshfiles/settings-shell": {
-      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes", "@deepseek-ai/dsh-client-ui-plugin-manager"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-client-ui-plugin-manager"],
     },
     "plugins/@dshfiles/shared-runtime": {
       "entry": ["dshx.config.ts", "src/client.ts!"],
