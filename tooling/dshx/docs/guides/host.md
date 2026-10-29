@@ -123,6 +123,34 @@ while (page.cursor !== null) page = await storage.list({ prefix: 'runs/', cursor
 - Prefer it to a plugin-owned domain for small, schemaless state. A plugin that needs typed tables, its own schema
   version or a global singleton still declares its own `defineDomain`.
 
+## One-off model calls: `generate(ctx, input)`
+
+One model call outside any thread: no tools, nothing written to a Session log. It replaces the hand-rolled
+`llm.stream` + `BlockAssembler` loop.
+
+```ts
+import { generate } from '@dshfiles/dshx/host'
+
+const { text } = await generate(ctx, { prompt: diff, system: 'Summarize this change in one line.', signal })
+const { value } = await generate(ctx, {
+  prompt: 'Name this thread.',
+  schema: z.object({ title: z.string().max(60) }), // value: { title: string }
+  model: { provider: 'anthropic', model: 'claude-haiku-4-5' },
+  sessionId, // providers keyed per session need the thread id
+})
+```
+
+- `model` defaults to the Host's default model (`agentDefaultModel`). A reasoning effort the model refuses is dropped
+  and the call retried once.
+- With `schema` (any Standard Schema; zod also publishes its JSON Schema to the model) the reply must be one JSON value;
+  a code fence is tolerated. One invalid reply is answered with the validation issues; a second fails.
+- Failures are `PluginApiError`s with codes `llm-unavailable`, `model-unavailable`, `generate-failed`,
+  `generate-aborted` and `generate-invalid-output`, so an API handler can return them to a browser as they are.
+- The call is marked `purpose: 'compaction'`, the side-call marker usage recorders and the request-messages polyfill
+  read; a plugin that needs it in a thread's own request series runs it through that thread instead.
+- `generate` imports `@deepseek-ai/dsh-llm` on its first call, from the Host installation, so a Host that never calls
+  it carries no dsh-llm import.
+
 ## Related chapters
 
 - [Prompt](./prompt.md)

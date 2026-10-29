@@ -39,6 +39,10 @@ describe('host compiler', () => {
   it('bundles every runtime export of @dshfiles/dshx/host', async () => {
     const publicExports = Object.keys(await import('../src/host/index.js'))
     const root = await temporaryProject()
+    // `generate` loads dsh-llm on its first call, so a Host that uses it declares the peer.
+    const manifestFile = resolve(root, 'package.json')
+    const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
+    await writeFile(manifestFile, JSON.stringify({ ...manifest, peerDependencies: { ...manifest.peerDependencies, '@deepseek-ai/dsh-llm': '*' } }))
     await writeFile(
       resolve(root, 'src/host.ts'),
       [

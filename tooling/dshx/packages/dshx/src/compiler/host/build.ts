@@ -40,6 +40,7 @@ const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', i
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const API_STORAGE_PATH = fileURLToPath(new URL('../../api/storage.js', import.meta.url))
 const HOST_PLUGIN_STORAGE_PATH = fileURLToPath(new URL('../../host/plugin-storage.js', import.meta.url))
+const HOST_GENERATE_PATH = fileURLToPath(new URL('../../host/generate.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
@@ -131,6 +132,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const publishApiEvent = HostApiEventsModel.publish',
           `import { PluginStorageModel } from ${JSON.stringify(HOST_PLUGIN_STORAGE_PATH)}`,
           'export const pluginStorage = PluginStorageModel.open',
+          // A named function export, not a static class member, so a Host that never calls it drops its dsh-llm import.
+          `export { generate } from ${JSON.stringify(HOST_GENERATE_PATH)}`,
           '',
         ].join('\n')
       }

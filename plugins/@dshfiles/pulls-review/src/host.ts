@@ -3,9 +3,8 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
-import { BlockAssembler, createUserMessage, type GenerateOptions } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { definePlugin, defineTool } from '@dshfiles/dshx/host'
+import { definePlugin, defineTool, generate } from '@dshfiles/dshx/host'
 import { pullsReviewApi, type SummarizeResult } from './api.js'
 import { createJjRun } from './jj.js'
 import { renderScopeReport } from './report.js'
@@ -32,31 +31,18 @@ const modelCall = async (
     readonly input: string
     readonly signal: AbortSignal
   },
-): Promise<string> => {
-  const llm = ctx.get('llm')
-  if (llm === undefined) throw new Error('the DSH llm service is unavailable')
-  const base: Omit<GenerateOptions, 'sessionId'> = {
-    provider: request.provider,
-    model: request.model,
-    system: request.system,
-    messages: [createUserMessage({ content: [{ type: 'text', text: request.input }], source: { kind: 'user' } })],
-    maxTokens: 1_024,
-    purpose: 'compaction',
-    signal: request.signal,
-  }
-  // Providers keyed per session (OpenCode Go) reject the call without the thread's session id.
-  const options: GenerateOptions = request.sessionId === undefined ? base : { ...base, sessionId: SessionId(request.sessionId) }
-  const assembler = new BlockAssembler()
-  for await (const chunk of llm.stream(options)) assembler.push(chunk)
-  const finish = assembler.finish
-  if (finish.kind === 'error') throw new Error(finish.failure.message)
-  if (finish.kind === 'aborted') throw new Error('the model call was aborted')
-  return assembler
-    .blocks()
-    .flatMap(block => (block.type === 'text' ? [block.text] : []))
-    .join('')
-    .trim()
-}
+): Promise<string> =>
+  (
+    await generate(ctx, {
+      model: { provider: request.provider, model: request.model },
+      system: request.system,
+      prompt: request.input,
+      maxTokens: 1_024,
+      signal: request.signal,
+      // Providers keyed per session (OpenCode Go) reject the call without the thread's session id.
+      ...(request.sessionId === undefined ? undefined : { sessionId: request.sessionId }),
+    })
+  ).text
 
 export default definePlugin({
   id: 'dshfiles-pulls-review',

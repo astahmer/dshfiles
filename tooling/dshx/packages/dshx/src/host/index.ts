@@ -17,6 +17,9 @@ export const publishApiEvent = HostApiEventsModel.publish
 /** Durable key-value storage for one plugin namespace, shared with its browser half through `dshxStorageApi`. */
 export const pluginStorage = PluginStorageModel.open
 export type { PluginStorage } from './plugin-storage.js'
+/** One model call outside any thread, with optional schema-checked JSON output. */
+export { generate } from './generate.js'
+export type { GenerateInput, GenerateModel, GenerateResult } from './generate.js'
 export type { HostDefinition, HostToolContribution, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'
 export type { CommandDefinition, CommandInvocation } from '@deepseek-ai/dsh-commands'
 export type { CommandResult } from '@deepseek-ai/dsh-commands/types'

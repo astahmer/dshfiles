@@ -13,7 +13,12 @@ const dshPackageName = (specifier: string): string | undefined => {
 }
 
 /** Lazy DSHX runtime integrations load only when the composition opts into them. */
-const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set(['@deepseek-ai/dsh-client-connection', '@deepseek-ai/dsh-cordis-host-runner', '@deepseek-ai/dsh-tool-cordis'])
+const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set([
+  '@deepseek-ai/dsh-client-connection',
+  '@deepseek-ai/dsh-cordis-host-runner',
+  '@deepseek-ai/dsh-tool-cordis',
+  '@deepseek-ai/dsh-llm',
+])
 
 /** Keep external DSH Host imports on the Host installation's module identity. */
 function hostPeerDependencyPlugin(root: string): Plugin {
