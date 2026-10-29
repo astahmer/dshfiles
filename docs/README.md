@@ -31,5 +31,6 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: the weekly evidence review, mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger. |
 | [Observability](observability.md)                            | Which source answers which question; OpenTelemetry spans for turns, model calls, tools and plugin code, one trace.                                      |
 | [Reference repositories](reference-repos.md)                 | Upstream and peer projects checked out locally for comparison, and why each is kept.                                                                    |
+| [Harness landscape](research/harness-landscape/README.md)    | Dated comparison of DSH against ten coding harnesses, one report per product.                                                                           |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).
