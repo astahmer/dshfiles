@@ -10,6 +10,9 @@ const packages = [
   { name: 'unrelated', directory: 'plugins/@dshfiles/unrelated', test: 'vitest run', dependencies: [] },
 ]
 
+// A cold checkout (CI) has no workspace dist yet, so a source-only run still needs its dependencies built.
+const sourceOnlyBuild = build => build.required === false || /^unbuilt workspace dependency /.test(build.reason)
+
 const summarize = selection => selection.map(({ name, mode }) => ({ name, mode }))
 const selectionScript = fileURLToPath(new URL('./test-selection.mjs', import.meta.url))
 
@@ -18,11 +21,11 @@ const dryRunAutoBuild = path =>
   JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run', '--build=auto'], { encoding: 'utf8' }))
 
 test('auto build is the default and skips source-only related runs', () => {
-  assert.equal(dryRun('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+  assert.ok(sourceOnlyBuild(dryRun('plugins/@dshfiles/shared-streams/src/shim.ts').build))
 })
 
 test('auto build skips source-only related runs and builds dist loaders and full dependents', () => {
-  assert.equal(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+  assert.ok(sourceOnlyBuild(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build))
   const distLoader = dryRunAutoBuild('plugins/@dshfiles/prompt-stash/src/host.ts')
   assert.equal(distLoader.build.required, true)
   assert.match(distLoader.build.reason, /loads dist/)

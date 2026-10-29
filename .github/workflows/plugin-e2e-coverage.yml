@@ -42,6 +42,9 @@ jobs:
         run: pnpm run test:inventory
         working-directory: tooling/dshx
 
+      - name: Build create-dshx for the scaffold catalog test
+        run: pnpm --dir tooling/dshx/packages/create-dshx run build
+
       - name: Test feature catalog invariants
         run: pnpm run test:feature-coverage
         working-directory: tooling/dshx
