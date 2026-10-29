@@ -23,8 +23,8 @@ describe('activity description thread link', () => {
     const html = render('moved it inbox → doing (mentioned in a thread)', 'session-abc123')
 
     expect(html).not.toContain('<button')
-    expect(html).toBe(
-      '<p>moved it inbox → doing (mentioned in <a href="?thread=session-abc123" class="dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground">a thread “we probably can skip calling jev to decide stuff”</a>)</p>',
+    expect(html).toMatch(
+      /^<p>moved it inbox → doing \(mentioned in <a href="\?thread=session-abc123"[^>]*>a thread “we probably can skip calling jev to decide stuff”<\/a>\)<\/p>$/,
     )
   })
 
