@@ -30,6 +30,7 @@ import { EMPTY_CHAT_SNAPSHOT } from './contract/snapshot.ts'
 import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
 import { ChatView } from './chat/ChatView.tsx'
 import { openChatExternalLink } from './chat/external-link-opening.ts'
+import { sessionSidebar } from './chat/session-sidebar.ts'
 import { ChatFlow } from './chat/ChatFlow.tsx'
 import { detachedFlow, detachedView } from '../detached-injected.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
@@ -274,8 +275,9 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           openFile: async (path, options) => {
             const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
             const url = fileAddressFor(sessionId, cwd, path)
-            if (options?.line === undefined) ctx.sidebarRight.openResource(url)
-            else ctx.sidebarRight.openResource(url, { params: { line: options.line } })
+            const sidebar = sessionSidebar(ctx.sidebarRight, sessionId)
+            if (options?.line === undefined) sidebar.openResource(url)
+            else sidebar.openResource(url, { params: { line: options.line } })
             await Promise.resolve()
           },
           openExternalLink: (href) => {
@@ -285,7 +287,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
               currentOrigin: window.location.origin,
               linkOpening: linkOpening.getSnapshot(),
               browserAvailable: ctx.get('sidebarRightTabs')?.get('browser') !== undefined,
-              openInSidebar: sidebarUrl => ctx.sidebarRight.openTab('browser', { params: { url: sidebarUrl } }),
+              openInSidebar: sidebarUrl => sessionSidebar(ctx.sidebarRight, sessionId).openTab('browser', { params: { url: sidebarUrl } }),
               openInNewTab: newTabUrl => { window.open(newTabUrl, '_blank', 'noopener,noreferrer') },
             })
           },
