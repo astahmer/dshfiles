@@ -20,7 +20,7 @@
   ],
   // Foreign binaries the hand-run scripts call: ffmpeg is installed on the Host, and bddgen/vitest come
   // from the tooling/dshx workspace the scripts are executed from.
-  "ignoreBinaries": ["dsh", "jj", "knip", "playwright", "ffmpeg", "bddgen", "vitest"],
+  "ignoreBinaries": ["dsh", "jj", "knip", "playwright", "ffmpeg", "bddgen", "vitest", "pgrep", "openssl"],
   "workspaces": {
     ".": {
       // Measurement scripts under .agents, docs and plans run by hand with the arguments in their headers.
