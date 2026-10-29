@@ -466,7 +466,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     readonly query: string
     readonly revisions: readonly Revision[]
     readonly hasMore: boolean
-  }>({ repoId: null, query: '', revisions: [], hasMore: false })
+    readonly failedCursor: string | null
+  }>({ repoId: null, query: '', revisions: [], hasMore: false, failedCursor: null })
   const graphPageMutation = useMutation({
     mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly excludeCommitIds: readonly string[] }) =>
       throwReadFailure(await api.graphPage({ ...input, excludeCommitIds: [...input.excludeCommitIds] }, {})),
@@ -476,19 +477,39 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         const samePageSet = current.repoId === input.repoId && current.query === input.query
         const loaded = samePageSet ? current.revisions : []
         const seen = new Set(loaded.map(revision => revision.commitId))
+        // Two triggers can overlap on one page; a revision already loaded is appended only once.
+        const added = page.revisions.filter(revision => !seen.has(revision.commitId))
         return {
           repoId: input.repoId,
           query: input.query,
-          // Two triggers can overlap on one page; a revision already loaded is appended only once.
-          revisions: [...loaded, ...page.revisions.filter(revision => !seen.has(revision.commitId))],
-          hasMore: page.hasMore,
+          revisions: [...loaded, ...added],
+          hasMore: GraphPagingModel.hasMoreAfterPage({ hasMore: page.hasMore, addedRevisions: added.length }),
+          failedCursor: null,
         }
       })
     },
+    onError: (_error, input) => {
+      if (input.repoId !== repoId || input.query !== debouncedSearchRef.current) return
+      setGraphPageState(current =>
+        current.repoId === input.repoId && current.query === input.query
+          ? { ...current, failedCursor: GraphPagingModel.cursor(input.excludeCommitIds) }
+          : current,
+      )
+    },
   })
   const { isPending: graphPagePending, mutate: requestGraphPage } = graphPageMutation
+  // A fresh repository read is the retry for a failed page: at most one attempt per refresh, never a loop.
   useEffect(() => {
-    setGraphPageState({ repoId, query: debouncedSearch, revisions: [], hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false) })
+    setGraphPageState(current => (current.failedCursor === null ? current : { ...current, failedCursor: null }))
+  }, [stateQuery.dataUpdatedAt])
+  useEffect(() => {
+    setGraphPageState({
+      repoId,
+      query: debouncedSearch,
+      revisions: [],
+      hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false),
+      failedCursor: null,
+    })
     if (repoId !== null && debouncedSearch.length > 0) requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds: [] })
   }, [repoId, debouncedSearch, state?.graphHasMore, requestGraphPage])
 
@@ -740,17 +761,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
   const graphHasMore = graphPageIsCurrent ? graphPageState.hasMore : debouncedSearch.length > 0 || (state?.graphHasMore ?? false)
   const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
+  const graphPageFailedCursor = graphPageIsCurrent ? graphPageState.failedCursor : null
   const loadMoreGraphRevisions = useCallback((): void => {
-    if (repoId === null || !graphHasMore || graphPagePending) return
-    requestGraphPage({
-      repoId,
-      query: debouncedSearch,
-      excludeCommitIds: [
-        ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
-        ...graphPageRevisions.map(revision => revision.commitId),
-      ],
-    })
-  }, [repoId, graphHasMore, graphPagePending, debouncedSearch, state?.revisions, graphPageRevisions, requestGraphPage])
+    if (repoId === null) return
+    const excludeCommitIds = [
+      ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
+      ...graphPageRevisions.map(revision => revision.commitId),
+    ]
+    const cursor = GraphPagingModel.cursor(excludeCommitIds)
+    if (!GraphPagingModel.canRequestPage({ hasMore: graphHasMore, pending: graphPagePending, cursor, failedCursor: graphPageFailedCursor })) return
+    requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds })
+  }, [repoId, graphHasMore, graphPagePending, graphPageFailedCursor, debouncedSearch, state?.revisions, graphPageRevisions, requestGraphPage])
   // Each page lands below the viewport, so the list tops itself up instead of waiting for a scroll event at the very end of the loaded history.
   useEffect(() => {
     const element = listScrollRef.current

@@ -32,3 +32,18 @@ test('keeps loading while the loaded history leaves less than the lookahead belo
   // Scrolling past the limit still loads: the chain limit only bounds the automatic top-up.
   assert.equal(GraphPagingModel.needsAnotherPage(viewport), true)
 })
+
+test('a page that failed is not requested again at the same cursor, only once the loaded history moves', () => {
+  const failedCursor = GraphPagingModel.cursor(['a', 'b'])
+  assert.equal(GraphPagingModel.canRequestPage({ hasMore: true, pending: false, cursor: GraphPagingModel.cursor(['a', 'b']), failedCursor }), false)
+  assert.equal(GraphPagingModel.canRequestPage({ hasMore: true, pending: false, cursor: GraphPagingModel.cursor(['a', 'b', 'c']), failedCursor }), true)
+  assert.equal(GraphPagingModel.canRequestPage({ hasMore: true, pending: false, cursor: GraphPagingModel.cursor(['a', 'c']), failedCursor }), true)
+  assert.equal(GraphPagingModel.canRequestPage({ hasMore: true, pending: true, cursor: GraphPagingModel.cursor([]), failedCursor: null }), false)
+  assert.equal(GraphPagingModel.canRequestPage({ hasMore: false, pending: false, cursor: GraphPagingModel.cursor([]), failedCursor: null }), false)
+})
+
+test('paging ends when a page adds nothing new, even if the Host still reports more', () => {
+  assert.equal(GraphPagingModel.hasMoreAfterPage({ hasMore: true, addedRevisions: 0 }), false)
+  assert.equal(GraphPagingModel.hasMoreAfterPage({ hasMore: true, addedRevisions: 3 }), true)
+  assert.equal(GraphPagingModel.hasMoreAfterPage({ hasMore: false, addedRevisions: 3 }), false)
+})
