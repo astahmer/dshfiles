@@ -6,7 +6,7 @@ context (`tooling/dshx/docs/guides/plugin-context.md`): registries, contracts wi
 `Live<T>`, dialogs/toasts, stores, `keyed`, English-fallback locales, settings search
 entries, `dshx add`, failure isolation, and the command palette on dshx contracts.
 
-Resume here: pick the next item; A14 unblocks the workbench and chat-focus migrations.
+Resume here: pick the next item.
 
 ## A. Browser plugin context
 
@@ -25,7 +25,7 @@ Resume here: pick the next item; A14 unblocks the workbench and chat-focus migra
 | A11 | Environment accessors: locale + text direction, appearance (font, light/dark), router path, workspace-removed events                                                                                      | None                                                                        |
 | A12 | Store scopes: per server or directory, in-memory store surviving plugin reload, Host-backed stores shared across browsers                                                                                 | localStorage, global/session/project                                        |
 | A13 | Plugin metadata: options passed to the browser half, `os` restriction, GUI-only on/off switch, automatic id prefixing (`<plugin>.<cmd>`, `plugin.<id>.<key>`)                                             | Convention only                                                             |
-| A14 | Requests that wait for their receiver: calls made before a contract's provider is active queue and run once it starts                                                                                     | Dialogs fall back; workbench open-requests and chat-focus keep page globals |
+| A14 | Requests that wait for their receiver: calls made before a contract's provider is active queue and run once it starts                                                                                     | Done: `api.whenActive(contract, { signal, timeoutMs })`. Workbench open-requests and chat-focus keep page globals: they wait for a view to mount, not a provider |
 | A15 | Settings placement: a section inside a host page, or rows in General                                                                                                                                      | Own section only                                                            |
 | A16 | Desktop main process: typed Ipc, native menu bar items, embedded web views                                                                                                                                | Not applicable while web-first                                              |
 

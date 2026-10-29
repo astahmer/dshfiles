@@ -175,6 +175,39 @@ const liveOf = <T>(token: ContractToken<T>): Subscribable<Live<T>> => {
   }
 }
 
+/**
+ * The provider's value once it is active: at once when it already is, else when one starts. Waiting callers resolve
+ * in the order they asked. Rejects with `signal.reason` when the signal aborts first.
+ */
+const whenActive = <T>(token: ContractToken<T>, signal: AbortSignal): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const live = liveOf(token)
+    const current = live.get()
+    if (current.status === 'active') {
+      resolve(current.value)
+      return
+    }
+    if (signal.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const stop = (): void => {
+      unsubscribe()
+      signal.removeEventListener('abort', abort)
+    }
+    const abort = (): void => {
+      stop()
+      reject(signal.reason)
+    }
+    const unsubscribe = live.subscribe(() => {
+      const next = live.get()
+      if (next.status !== 'active') return
+      stop()
+      resolve(next.value)
+    })
+    signal.addEventListener('abort', abort, { once: true })
+  })
+
 const refreshRegistry = (state: RegistryState): void => {
   state.snapshot = Object.freeze([...state.entries.values()].map(entry => entry.item))
   notifyAll(state.listeners)
@@ -257,6 +290,7 @@ export class BrowserBroker {
   static readonly provide = provide
   static readonly failContract = failContract
   static readonly live = liveOf
+  static readonly whenActive = whenActive
   static readonly add = addEntry
   static readonly items = itemsOf
   static readonly reportFailure = reportFailure

@@ -114,6 +114,51 @@ describe('contracts', () => {
   })
 })
 
+describe('whenActive', () => {
+  it('resolves at once with an active provider', async () => {
+    createPlugin('@test/provider').plugin.provide(CounterContract, { count: () => 7 })
+    expect((await createPlugin('@test/consumer').plugin.whenActive(CounterContract)).count()).toBe(7)
+  })
+
+  it('queues calls made before the provider starts and runs them in order once it does', async () => {
+    const consumer = createPlugin('@test/consumer')
+    const order: string[] = []
+    const first = consumer.plugin.whenActive(CounterContract).then(counter => order.push(`first:${counter.count()}`))
+    const second = consumer.plugin.whenActive(CounterContract).then(counter => order.push(`second:${counter.count()}`))
+    await flush()
+    expect(order).toEqual([])
+    BrowserBroker.failContract(CounterContract, new Error('restarting'))
+    await flush()
+    expect(order).toEqual([])
+    createPlugin('@test/provider').plugin.provide(CounterContract, { count: () => 3 })
+    await Promise.all([first, second])
+    expect(order).toEqual(['first:3', 'second:3'])
+  })
+
+  it('rejects when the caller aborts, the timeout passes or the consumer scope ends', async () => {
+    const consumer = createPlugin('@test/consumer')
+    const controller = new AbortController()
+    const aborted = consumer.plugin.whenActive(CounterContract, { signal: controller.signal })
+    controller.abort(new Error('closed'))
+    await expect(aborted).rejects.toThrow('closed')
+
+    vi.useFakeTimers()
+    try {
+      const timedOut = consumer.plugin.whenActive(CounterContract, { timeoutMs: 1_000 })
+      const rejection = expect(timedOut).rejects.toMatchObject({ name: 'TimeoutError' })
+      await vi.advanceTimersByTimeAsync(1_000)
+      await rejection
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const pending = consumer.plugin.whenActive(CounterContract)
+    consumer.dispose()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    createPlugin('@test/provider').plugin.provide(CounterContract, { count: () => 1 })
+  })
+})
+
 describe('registries', () => {
   it('lists items from every plugin and withdraws them with their scope', () => {
     const owner = createPlugin('@test/owner')

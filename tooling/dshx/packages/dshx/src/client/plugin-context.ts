@@ -62,6 +62,12 @@ export interface PluginContext extends PluginServices {
   provide<T>(contract: ContractToken<T>, value: T): () => void
   /** Follow a contract another plugin provides; the same object for every call. */
   use<T>(contract: ContractToken<T>): Subscribable<Live<T>>
+  /**
+   * The contract's value once a provider is active, so a call made before its plugin starts runs when it does
+   * (`(await api.whenActive(Contract)).open(id)`). Waits through `pending` and `inactive`; rejects with the abort reason
+   * when `signal` aborts, with a `TimeoutError` after `timeoutMs`, or when this scope ends.
+   */
+  whenActive<T>(contract: ContractToken<T>, options?: { readonly signal?: AbortSignal; readonly timeoutMs?: number }): Promise<T>
   /** Run fn in a fresh scope for each value of source; its registrations end when the value changes. */
   keyed<K>(
     source: Subscribable<K>,
@@ -272,6 +278,15 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
       liveCache.set(contract.id, created)
       return created
     },
+    whenActive: (contract, waitOptions = {}) =>
+      BrowserBroker.whenActive(
+        contract,
+        AbortSignal.any([
+          options.scope.signal,
+          ...(waitOptions.signal === undefined ? [] : [waitOptions.signal]),
+          ...(waitOptions.timeoutMs === undefined ? [] : [AbortSignal.timeout(waitOptions.timeoutMs)]),
+        ]),
+      ),
     keyed: (source, fn, keyedOptions = {}) => {
       const equals = keyedOptions.equals ?? Object.is
       let run: { readonly key: unknown; readonly scope: PluginScope } | undefined

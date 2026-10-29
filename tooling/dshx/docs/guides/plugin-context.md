@@ -93,6 +93,19 @@ if (live.status === 'active') live.value.count()
 - `active`: `value`, `generation` (a restart comes back with a new one) and `owner`.
 - `inactive` with `reason: 'disabled'` (withdrawn) or `'failed'`.
 
+To call a provider that may not have started yet, wait for it instead of reading `get()`:
+
+```ts
+const badge = await api.whenActive(AcmeBadge, { timeoutMs: 10_000 })
+badge.count()
+```
+
+`whenActive(contract, { signal?, timeoutMs? })` resolves at once with an active provider's value, else when one
+starts; callers waiting together resolve in the order they asked. It waits through `pending` and `inactive` (a
+failed or withdrawn provider may come back), and rejects with the signal's reason, a `TimeoutError` after
+`timeoutMs`, or an `AbortError` when the calling scope ends. Nothing waits by default: `use` and `get()` still
+report `pending` right away.
+
 One provider at a time; a second one throws. `owner` on the token restricts who
 may provide it. `bind(component)` makes `usePlugin()` inside a shared component
 return the provider's context, not the consumer's.
@@ -160,4 +173,6 @@ kind and id. Read them with `contributionFailures` or
 - Contribution failures are browser-only; an agent tool would need a Host relay.
 - The command palette publishes `PaletteActions` and `CommandPalette` this way
   (`@dshfiles/command-palette/palette-contract`). Workbench panels and regions
-  and the chat-focus mailbox still keep their own page globals.
+  and the chat-focus mailbox still keep their own page globals: their requests
+  wait for a view to mount (a workbench region, one thread's Chat view, with a
+  TTL), not for a provider to start, so `whenActive` does not replace them.
