@@ -28,6 +28,13 @@ const canonicalHome = async (home: string): Promise<string> => {
     return join(await canonicalHome(parent), basename(absolute))
   }
 }
+// realpath calls can settle out of order; queued access resolves its home in call order so the queue stays FIFO.
+let accessKeyOrder: Promise<unknown> = Promise.resolve()
+const canonicalHomeInCallOrder = (home: string): Promise<string> => {
+  const key = accessKeyOrder.then(() => canonicalHome(home))
+  accessKeyOrder = key.catch(() => undefined)
+  return key
+}
 
 export class AccountCredentialHomeWork {
   /** Token refresh holds one ordinary resource owner across read/decide/persist; other normal callers wait their turn. */
@@ -78,7 +85,7 @@ export class AccountCredentialHomeWork {
     options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
   ): Promise<Result> => {
     if (options.signal?.aborted) throw new Error('Credential access was cancelled before it started.')
-    const key = await canonicalHome(home)
+    const key = await canonicalHomeInCallOrder(home)
     if (options.signal?.aborted) throw new Error('Credential access was cancelled before it started.')
     const state = homes.get(key) ?? { queue: [] }
     const current = state.owner
