@@ -28,8 +28,9 @@ import { ApiDefinitionModel } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import { SettingsDefinitionModel } from '../settings/define.js'
 import { HostDefinitionModel } from './define.js'
+import { ToolEditsModel } from './tool-edits.js'
 
-const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'Config', 'settings', 'apis', 'setup'])
+const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'Config', 'settings', 'apis', 'toolEdits', 'setup'])
 
 /** Project identity embedded by the Host compiler. */
 export interface HostPluginMetadata {
@@ -362,6 +363,18 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
   if (source.apis !== undefined && (!Array.isArray(source.apis) || source.apis.some(item => !ApiDefinitionModel.isHostRegistration(item)))) {
     fail('DSHX2002', 'Host apis must be an array of values returned by api.host().', metadata, 'Use apis: [contract.host({ ... })] or remove apis.')
   }
+  if (
+    source.toolEdits !== undefined &&
+    (!Array.isArray(source.toolEdits) ||
+      source.toolEdits.some(edit => typeof edit !== 'object' || edit === null || (edit.tools === undefined && edit.codeMode !== true)))
+  ) {
+    fail(
+      'DSHX2002',
+      'Host definition toolEdits must be an array of edits that name tools or set codeMode.',
+      metadata,
+      'Use toolEdits: [{ tools: "bash", update: tool => ({ ...tool, description: "…" }) }] or remove toolEdits.',
+    )
+  }
   if (source.setup !== undefined && typeof source.setup !== 'function') {
     fail('DSHX2002', 'Host definition setup must be a function.', metadata, 'Use setup(ctx) { ... } or remove setup.')
   }
@@ -376,6 +389,7 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   if ((definition.commands?.length ?? 0) > 0 && !inject.includes('commands')) inject.push('commands')
   if ((definition.prompts?.length ?? 0) > 0 && !inject.includes('systemPrompt')) inject.push('systemPrompt')
   if ((definition.settings?.length ?? 0) > 0 && !inject.includes('settings')) inject.push('settings')
+  if ((definition.toolEdits?.length ?? 0) > 0) for (const service of ['tools', 'agents']) if (!inject.includes(service)) inject.push(service)
   const apis = definition.apis ?? []
   if (apis.length > 0 && !inject.includes('connection')) inject.push('connection')
   const exposesTools = apis.some(api => Object.values(ApiDefinitionModel.hostRegistrationParts(api).contract.methods).some(method => method.tool !== undefined))
@@ -403,6 +417,7 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
         else ctx.systemPrompt.context(contribution.value)
       }
       for (const setting of definition.settings ?? []) registerSettings(ctx, setting)
+      if ((definition.toolEdits?.length ?? 0) > 0) ToolEditsModel.install(ctx, metadata.packageId, definition.toolEdits ?? [])
       if (apis.length === 0) return withRuntime(ctx, SdkSetupRuntime.invokeHost(definition.setup, ctx, config, metadata), metadata)
       const apiSetup = Promise.all(apis.map(api => registerApi(ctx, metadata.packageId, api)))
       return withRuntime(

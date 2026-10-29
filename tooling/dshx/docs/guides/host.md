@@ -96,6 +96,31 @@ DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effe
 
 The built adapter reports a Host-definition diagnostic when the default export is not a `defineHost()` object, contains an unknown field, uses a malformed contribution, or supplies a non-function `setup`. Native DSH Host modules remain supported when they export named `name`, `inject`, `Config`, and `apply` instead of a default definition.
 
+## Editing other plugins' tools: `toolEdits`
+
+`tools` adds tools. `toolEdits` changes the tools an agent sees, whoever registered them:
+
+```ts
+export default defineHost({
+  toolEdits: [
+    { tools: 'bash', update: tool => ({ ...tool, description: `${tool.description} Prefer rg over grep.` }) },
+    { tools: 'web_fetch', remove: true, agents: agent => agent.session.header.cwd?.startsWith('/secure') === true },
+    { tools: /^jj_/, rename: name => `vcs_${name}` }, // a namespace: the old names disappear
+    { codeMode: true, agents: agent => agent.id === reviewerSessionId }, // DSH's `ptc` presentation: one run_code tool
+  ],
+})
+```
+
+- Each edit applies per agent, in that agent's own tool scope (DSH's `tools.register`, `tools.restrict` and
+  `tools.presentAs` on `agent.ctx`), to every live agent and each one created later. The global registry and other
+  agents are untouched, and every edit is lifted when the plugin unloads or the agent ends.
+- `update` returns the definition the agent sees and runs, so it may also wrap `execute`. `rename` keeps the original
+  definition (or the updated one) under the new name.
+- Only global tools can be edited (`defineHost({ tools })`, API tools, MCP tools): a tool an agent preset registers in
+  the agent's own scope is not restrictable or shadowable there. An edit that matches nothing, or that DSH refuses
+  (`codeMode` on a preset that already chose a presentation), is logged under `dshx:tool-edits` and skipped.
+- Tools registered after an agent was created are not edited for that agent.
+
 ## Plugin storage: `pluginStorage(ctx, namespace)`
 
 Durable key-value storage for one plugin, kept by the Host's storage domain (`@deepseek-ai/dsh-storage-domain`, in

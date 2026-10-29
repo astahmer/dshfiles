@@ -5,6 +5,7 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { AnyApiMethodDefinition, ApiHostRegistration } from '../api/types.js'
 import type { SettingsContribution } from '../settings/types.js'
+import type { ToolEdit } from './tool-edits.js'
 
 /** A system-prompt section wrapped only to preserve its registration kind. */
 declare const promptContributionBrand: unique symbol
@@ -41,5 +42,7 @@ export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = Standard
   readonly Config?: ConfigSchema
   readonly settings?: readonly SettingsContribution[]
   readonly apis?: readonly ApiHostRegistration<Record<string, AnyApiMethodDefinition>, any>[]
+  /** Hide, rename, update other plugins' tools per agent, or present an agent's tools as code; see the Host guide. */
+  readonly toolEdits?: readonly ToolEdit[]
   readonly setup?: (ctx: Context, config: StandardSchemaV1.InferOutput<ConfigSchema>) => void | Effect<void>
 }

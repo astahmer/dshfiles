@@ -141,6 +141,7 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/cordis-plugin-include": "catalog:",
     "@deepseek-ai/cordis-plugin-loader": "catalog:",
+    "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
@@ -163,6 +164,7 @@
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
+    "@deepseek-ai/dsh-user-approval": "catalog:",
     "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "catalog:",
     "@types/node": "catalog:",
@@ -177,6 +179,7 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-agent": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.1-rc.2 <0.3.0-0",
@@ -197,6 +200,7 @@
     "@deepseek-ai/dsh-system-prompt": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "effect": ">=4.0.4 <5",
     "playwright": ">=1.56.0 <2",
@@ -247,6 +251,12 @@
       "optional": true
     },
     "effect": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-agent": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-user-approval": {
       "optional": true
     }
   },

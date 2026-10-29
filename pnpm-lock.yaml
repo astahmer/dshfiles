@@ -329,6 +329,9 @@ catalogs:
     '@deepseek-ai/dsh-tools':
       specifier: 0.2.1-rc.2
       version: 0.2.1-rc.2
+    '@deepseek-ai/dsh-user-approval':
+      specifier: 0.2.1-rc.2
+      version: 0.2.1-rc.2
     '@deepseek-ai/dsh-working-directory':
       specifier: 0.2.1-rc.2
       version: 0.2.1-rc.2
@@ -7034,6 +7037,9 @@ importers:
       '@deepseek-ai/cordis-plugin-loader':
         specifier: 1.0.5
         version: 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.9)
+      '@deepseek-ai/dsh-agent':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(3bb27a3380dabe8aa6c4edfe696d286a)
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(779272f85162780555fdbdc3b0895783)
@@ -7100,6 +7106,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)
+      '@deepseek-ai/dsh-user-approval':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2(3bb27a3380dabe8aa6c4edfe696d286a))(@deepseek-ai/dsh-brand@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-system-prompt@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))
       '@deepseek-ai/dsh-web-app':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(0c63bde8ead443703fc82236b6c5f72e)
