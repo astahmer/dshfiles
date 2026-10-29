@@ -3,7 +3,6 @@ import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
 import { z } from 'zod'
-import { decodeJson } from '../json.js'
 
 /**
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
@@ -175,7 +174,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
       input.state.oneShotCalls.add(directive)
     }
     const rawArguments = match[3] ?? '{}'
-    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? decodeJson(z.string(), `"${rawArguments}"`) : rawArguments
+    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
     return [{ name: match[2] ?? '', argumentsJson }]
   })
   if (calls.length > 0) return streamAnswer(toolCalls(calls))
