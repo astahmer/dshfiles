@@ -134,6 +134,7 @@ is no longer current.
 | `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run |
 | `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()` |
 | `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab; each resolves or returns false when the browser cannot |
+| `api.notifications` | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported` |
 | `api.environment` | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service |
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.

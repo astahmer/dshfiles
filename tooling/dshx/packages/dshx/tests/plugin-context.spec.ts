@@ -46,6 +46,7 @@ const services = {
   commands: AppServicesModel.createCommands(() => undefined),
   layout: AppServicesModel.createLayout(() => undefined),
   system: AppServicesModel.system,
+  notifications: AppServicesModel.notifications,
   environment: AppServicesModel.createEnvironment({ service: () => undefined, on: () => () => {} }),
 }
 
@@ -332,6 +333,68 @@ describe('system', () => {
       ['https://example.test/docs', '_blank', 'noopener,noreferrer'],
       ['mailto:team@example.test', '_blank', 'noopener,noreferrer'],
     ])
+  })
+})
+
+describe('notifications', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const stubNotification = (permission: string, requested: unknown = permission) => {
+    const shown: { readonly title: string; readonly options: NotificationOptions; onclick: (() => void) | null; readonly close: () => void }[] = []
+    class FakeNotification {
+      static permission = permission
+      static requestPermission = vi.fn(async () => requested)
+      onclick: (() => void) | null = null
+      readonly close = vi.fn()
+      constructor(title: string, options: NotificationOptions) {
+        shown.push(Object.assign(this, { title, options }))
+      }
+    }
+    const focus = vi.fn()
+    vi.stubGlobal('window', { Notification: FakeNotification, focus })
+    return { shown, focus, FakeNotification }
+  }
+
+  it('reports unsupported and shows nothing without the Notification API', async () => {
+    vi.stubGlobal('window', {})
+    expect(AppServicesModel.notifications.permission()).toBe('unsupported')
+    expect(await AppServicesModel.notifications.requestPermission()).toBe('unsupported')
+    expect(AppServicesModel.notifications.notify({ title: 'Done' })).toBe(false)
+  })
+
+  it('never prompts from notify and shows nothing until permission is granted', () => {
+    const { shown, FakeNotification } = stubNotification('default')
+    expect(AppServicesModel.notifications.notify({ title: 'Done' })).toBe(false)
+    expect(FakeNotification.requestPermission).not.toHaveBeenCalled()
+    expect(shown).toEqual([])
+  })
+
+  it('shows a granted notification and focuses the page before running onClick', () => {
+    const { shown, focus } = stubNotification('granted')
+    const onClick = vi.fn(() => expect(focus).toHaveBeenCalled())
+    expect(AppServicesModel.notifications.notify({ title: 'Turn finished', body: 'Fix the build', tag: 'thread-1', onClick })).toBe(true)
+    expect(shown[0]).toMatchObject({ title: 'Turn finished', options: { body: 'Fix the build', tag: 'thread-1' } })
+    shown[0]?.onclick?.()
+    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(shown[0]?.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns false when the browser refuses to construct a notification', () => {
+    class ThrowingNotification {
+      static permission = 'granted'
+      constructor() {
+        throw new TypeError('Illegal constructor')
+      }
+    }
+    vi.stubGlobal('window', { Notification: ThrowingNotification })
+    expect(AppServicesModel.notifications.notify({ title: 'Done' })).toBe(false)
+  })
+
+  it('resolves the answered permission, or reads it again when the browser resolves nothing', async () => {
+    stubNotification('default', 'granted')
+    expect(await AppServicesModel.notifications.requestPermission()).toBe('granted')
+    stubNotification('denied', undefined)
+    expect(await AppServicesModel.notifications.requestPermission()).toBe('denied')
   })
 })
 

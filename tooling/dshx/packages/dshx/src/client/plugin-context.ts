@@ -1,4 +1,4 @@
-import type { CommandsService, DialogsService, EnvironmentService, LayoutService, SystemService, ToastsService } from './app-services.js'
+import type { CommandsService, DialogsService, EnvironmentService, LayoutService, NotificationsService, SystemService, ToastsService } from './app-services.js'
 import { BrowserBroker, type ContractToken, type Live, type RegistryToken, type Subscribable } from './broker.js'
 
 /** Reads a source and recomputes the calling item whenever that source changes. */
@@ -48,6 +48,8 @@ export interface PluginServices {
   readonly layout: LayoutService
   /** Copy, save a file, open an external URL. */
   readonly system: SystemService
+  /** OS-level notifications through the browser Notification API. */
+  readonly notifications: NotificationsService
   /** Live locale with its text direction, and appearance (color scheme, fonts). */
   readonly environment: EnvironmentService
 }

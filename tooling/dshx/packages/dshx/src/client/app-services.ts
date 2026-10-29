@@ -264,6 +264,68 @@ const system: SystemService = {
   },
 }
 
+export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
+
+export interface NotifyInput {
+  readonly title: string
+  readonly body?: string
+  /** A later notification with the same tag replaces this one. */
+  readonly tag?: string
+  /** Runs once the page has focus, when the user clicks the notification. */
+  readonly onClick?: () => void
+}
+
+export interface NotificationsService {
+  /** `unsupported` where the browser has no Notification API. */
+  permission(): NotificationPermissionState
+  /** Ask the user to allow notifications; browsers only show the prompt from a user gesture. */
+  requestPermission(): Promise<NotificationPermissionState>
+  /** Show an OS notification without ever prompting; false without permission or when the browser refuses. */
+  notify(input: NotifyInput): boolean
+}
+
+const BrowserNotificationPermission = z.enum(['default', 'granted', 'denied'])
+
+const browserNotification = (): typeof Notification | undefined => (typeof window !== 'undefined' && 'Notification' in window ? window.Notification : undefined)
+
+const readNotificationPermission = (): NotificationPermissionState => {
+  const api = browserNotification()
+  return api === undefined ? 'unsupported' : (BrowserNotificationPermission.safeParse(api.permission).data ?? 'unsupported')
+}
+
+const notifications: NotificationsService = {
+  permission: readNotificationPermission,
+  // Older Safari answers through a callback and resolves undefined, so the permission is read again.
+  requestPermission: async () => {
+    const api = browserNotification()
+    if (api === undefined) return 'unsupported'
+    try {
+      return BrowserNotificationPermission.safeParse(await api.requestPermission()).data ?? readNotificationPermission()
+    } catch {
+      return readNotificationPermission()
+    }
+  },
+  // Some browsers only allow notifications from a service worker and throw here.
+  notify: input => {
+    const api = browserNotification()
+    if (api?.permission !== 'granted') return false
+    try {
+      const notification = new api(input.title, {
+        ...(input.body !== undefined && { body: input.body }),
+        ...(input.tag !== undefined && { tag: input.tag }),
+      })
+      notification.onclick = () => {
+        window.focus()
+        input.onClick?.()
+        notification.close()
+      }
+      return true
+    } catch {
+      return false
+    }
+  },
+}
+
 export type TextDirection = 'ltr' | 'rtl'
 
 export interface LocaleState {
@@ -372,5 +434,6 @@ export class AppServicesModel {
   static readonly createCommands = createCommands
   static readonly createLayout = createLayout
   static readonly system = system
+  static readonly notifications = notifications
   static readonly createEnvironment = createEnvironment
 }

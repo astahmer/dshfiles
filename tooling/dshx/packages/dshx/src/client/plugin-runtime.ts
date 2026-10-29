@@ -51,6 +51,7 @@ const createPluginRuntime = (input: {
       commands: AppServicesModel.createCommands(() => input.ctx.get('shortcuts')),
       layout: AppServicesModel.createLayout(() => input.ctx.get('layout')),
       system: AppServicesModel.system,
+      notifications: AppServicesModel.notifications,
       environment: AppServicesModel.createEnvironment({
         service: name => input.ctx.get(name),
         on: (event, listener) => input.ctx.on?.(event, listener) ?? (() => false),
