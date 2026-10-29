@@ -62,6 +62,7 @@ const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 /** The Editor plugin's right-pane tab and its cross-plugin open request (`@dshfiles/editor` README). */
 const EDITOR_PANE_ID = '@dshfiles/editor/files'
+const PUBLISH_SETTLE_MS = 250
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 /** The right-sidebar tab type Settings opens as; the panel's guide offers it beside the other panel cards. */
@@ -867,11 +868,17 @@ export default defineClient({
     // `settings_list` searches the same section entries for an Agent; a Host without the method just refuses it.
     ctx.effect(() => {
       let published: readonly SectionEntryRow[] | undefined
+      let pending: ReturnType<typeof setTimeout> | undefined
+      // Every section that registers changes the list, so boot would send one request per section; send the settled set.
       const publish = (): void => {
-        const entries = sectionEntries.getSnapshot()
-        if (entries === published) return
-        published = entries
-        void api.safe.publishSearchEntries({ entries: [...entries] })
+        if (pending !== undefined) clearTimeout(pending)
+        pending = setTimeout(() => {
+          pending = undefined
+          const entries = sectionEntries.getSnapshot()
+          if (entries === published) return
+          published = entries
+          void api.safe.publishSearchEntries({ entries: [...entries] })
+        }, PUBLISH_SETTLE_MS)
       }
       // A reconnect may reach a restarted Host that lost the last set.
       const republish = (): void => {
@@ -882,6 +889,7 @@ export default defineClient({
       const offEntries = sectionEntries.subscribe(publish)
       const offConnection = connection.state.subscribe(republish)
       return () => {
+        if (pending !== undefined) clearTimeout(pending)
         offEntries()
         offConnection()
       }
