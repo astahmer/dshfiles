@@ -95,6 +95,33 @@
           "reason": "Client-only: Select native panels with keyboard shortcuts renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "editable-command-keys",
+      "title": "Rebindable command keys",
+      "summary": "Binds every dshx Command on the keys it answers to now: its default keys, or the binding the user chose in the Host's Keyboard shortcuts dialog for an editable command. Editable commands are listed there without a default binding, and page-scoped commands keep their keys off inside text fields.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["default-keys", "user-binding", "unbound"],
+      "failureModes": [
+        "A command whose id has no Host shortcut form stays unlisted with a console warning and keeps its default keys.",
+        "A binding with modifiers other than Mod and Shift stays unbound with a console warning."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.editable-command-listing",
+          "file": "plugins/@dshfiles/shortcuts/src/editable-commands.test.ts",
+          "testName": "lists only editable commands, unbound, under their Host id, and passes key presses back to the capture listener"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: key bindings and the Host shortcut registry live in the browser and start no Host work."
+        }
+      ]
     }
   ],
   "kind": "bundle"

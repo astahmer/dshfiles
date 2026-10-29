@@ -1,6 +1,7 @@
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { Command, defineClient, type CommandItem } from '@dshfiles/dshx/client'
+import { EditableCommands } from './editable-commands.js'
 import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
 
 /**
@@ -30,6 +31,8 @@ type Layout = ILayout
  */
 export default defineClient({
   name: '@dshfiles/shortcuts',
+  // Read through the dshx runtime too: api.commands.keys follows this service's catalog for user rebindings.
+  inject: ['shortcuts'],
   setup(ctx, _decorate, metadata) {
     // Resolved per key press rather than once at setup. The layout service is
     // registered by another client entry, so reading it during setup can observe
@@ -71,23 +74,26 @@ export default defineClient({
       title: 'Toggle sidebar',
       keywords: ['sidebar', 'hide', 'show'],
       keys: ['Mod+B'],
+      slash: 'sidebar',
+      suggested: true,
       run: () => {
         requireLayout(layout).toggleSidebar()
       },
     })
-    plugin.keyed(plugin.list(Command), commands => installShortcuts(window, commandShortcuts(commands)))
+    plugin.keyed(plugin.commands.keys, keys => installShortcuts(window, commandShortcuts(plugin.list(Command).get(), keys)))
+    plugin.keyed(plugin.list(Command), commands => EditableCommands.register({ shortcuts: ctx.get('shortcuts'), commands }))
   },
 })
 
 /**
- * Bind the default keys of every contributed command.
+ * Bind the keys every contributed command answers to now: its defaults, or the user's binding when it is editable.
  *
  * A command's keys stay unbound when they need a modifier other than primary
  * and shift, because only those chords can be claimed safely.
  */
-const commandShortcuts = (commands: readonly CommandItem[]): Shortcut[] =>
+const commandShortcuts = (commands: readonly CommandItem[], keys: ReadonlyMap<string, readonly string[]>): Shortcut[] =>
   commands.flatMap(command =>
-    (command.keys ?? []).flatMap(chord => {
+    (keys.get(command.id) ?? command.keys ?? []).flatMap(chord => {
       const parsed = ShortcutKeyboardModel.parseChord(chord)
       if (parsed === undefined) {
         console.warn(`shortcuts: ${command.id} keeps ${chord} unbound; only primary (+ shift) chords can be claimed.`)
@@ -99,7 +105,7 @@ const commandShortcuts = (commands: readonly CommandItem[]): Shortcut[] =>
           key: parsed.key,
           modifier: 'primary' as const,
           alsoShift: parsed.alsoShift,
-          allowInEditable: true,
+          allowInEditable: command.scope !== 'page',
           label: command.title,
           run: () => {
             if (command.enabled === false) return false
