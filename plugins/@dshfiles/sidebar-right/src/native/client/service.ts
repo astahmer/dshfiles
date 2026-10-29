@@ -10,10 +10,10 @@
  * The plugin also names the Session on screen — the selected Session while the
  * Conversation fills the main column — from the selection and the main panel,
  * before React renders either change, and publishes it as `mounted`. Every
- * command on the public face acts on that Session through its adopted store; a
- * command with no Session on screen, or with one whose store the runtime has not
- * minted, has nothing to act on and fails loudly rather than writing into a
- * surface nobody is drawing. The seats never publish which Session they draw:
+ * command on the public face acts on that Session through its adopted store,
+ * minting that store when its seat has not rendered yet. A command with no
+ * Session on screen fails with a recoverable error, unless its caller names its
+ * own Session (`openResourceFor`), which then becomes the one on screen. The seats never publish which Session they draw:
  * they report only what they render with, the room their docking kit measured
  * and the automatic fullscreen rule of their frame width.
  *
@@ -80,6 +80,16 @@ interface SidebarRightSessions {
   readonly openTabs: SidebarTabInventory['source']
   /** Fires on every adopted store commit and on-screen change; `expanded` follows it. */
   readonly layoutChanges: { subscribe(listener: () => void): () => void }
+  /** Name a Session on screen; the plugin's own selection sync replaces it on its next change. */
+  readonly show: (sessionId: SessionId) => void
+}
+
+/** No Session can receive a navigation: none is on screen and the caller named none. */
+export class SidebarRightUnavailableError extends Error {
+  constructor() {
+    super('No conversation is open to show this in. Open a thread, then try again.')
+    this.name = 'SidebarRightUnavailableError'
+  }
 }
 
 /**
@@ -115,18 +125,19 @@ export function createSidebarRightController(
       return () => layoutListeners.delete(listener)
     },
   }
-  const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges })
+  const show = (sessionId: SessionId | undefined): void => {
+    if (onScreen.getSnapshot() === sessionId) return
+    onScreen.set(sessionId)
+    layoutChanged()
+  }
+  const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges, show })
   return {
     controller,
     forget: sessionId => {
       inventory.remove(sessionId)
       rooms.delete(sessionId)
     },
-    show: sessionId => {
-      if (onScreen.getSnapshot() === sessionId) return
-      onScreen.set(sessionId)
-      layoutChanged()
-    },
+    show,
     measure: (sessionId, canSplitPane) => {
       rooms.set(sessionId, canSplitPane)
     },
@@ -155,6 +166,11 @@ export interface SidebarRightHost {
   readonly workbench?: () => boolean
   /** Resolve the currently registered global right dock, independently of Session stores. */
   readonly dock?: () => DockPaneActions | undefined
+  /**
+   * Mint and adopt a Session's store before its seat renders, through the same
+   * persisted store the seat later reads; absent before the seats register.
+   */
+  readonly mint?: (sessionId: SessionId) => void
   /**
    * Whether the viewport is narrow enough that an expanded panel is presented fullscreen.
    * @returns the rule's verdict for the frame width the seats last rendered at.
@@ -305,6 +321,7 @@ export class SidebarRightController implements ISidebarRight {
     },
   }
   private readonly layoutChanges: SidebarRightSessions['layoutChanges']
+  private readonly show: SidebarRightSessions['show']
   private readonly adopted: ReadonlyMap<SessionId, Adoption>
   private readonly rooms: ReadonlyMap<SessionId, RoomRule>
   private readonly closeHandlers = new Map<string, SidebarRightCloseHandler>()
@@ -346,6 +363,7 @@ export class SidebarRightController implements ISidebarRight {
     this.mounted = sessions.onScreen
     this.openTabs = sessions.openTabs
     this.layoutChanges = sessions.layoutChanges
+    this.show = sessions.show
     this.tabDomain = new TabDomain(this, pin)
   }
 
@@ -376,6 +394,30 @@ export class SidebarRightController implements ISidebarRight {
   openTab<K extends string>(kind: K, options: SidebarRightOpenTabOptions<K> = {}): void {
     const { sessionId, actions } = this.require()
     this.placeTab(sessionId, actions, kind, options)
+  }
+
+  /**
+   * Open a resource on behalf of a Session's own content, such as a link in its
+   * conversation: on the on-screen surface like `openResource`, or in the
+   * caller's Session when none is on screen, which then becomes the one shown.
+   * @param sessionId - the Session whose content asked for the resource.
+   * @param address - a `dsh-resource://<type>/…` address.
+   * @param options - placement, the opening type, and navigation parameters.
+   */
+  openResourceFor(sessionId: SessionId, address: string, options: SidebarRightOpenResourceOptions = {}): void {
+    const target = this.require(sessionId)
+    this.placeResource(target.sessionId, target.actions, address, options)
+  }
+
+  /**
+   * Open a page type on behalf of a Session's own content; see {@link SidebarRightController.openResourceFor}.
+   * @param sessionId - the Session whose content asked for the page.
+   * @param kind - the page type's kind.
+   * @param options - placement and that kind's navigation parameters.
+   */
+  openTabFor<K extends string>(sessionId: SessionId, kind: K, options: SidebarRightOpenTabOptions<K> = {}): void {
+    const target = this.require(sessionId)
+    this.placeTab(target.sessionId, target.actions, kind, options)
   }
 
   /**
@@ -841,15 +883,18 @@ export class SidebarRightController implements ISidebarRight {
     return this.adopted.get(sessionId)?.store.actions
   }
 
-  private require(): { readonly sessionId: SessionId; readonly actions: SurfaceActions } {
+  private require(caller?: SessionId): { readonly sessionId: SessionId; readonly actions: SurfaceActions } {
     // Reads answer for the no-session case (there is nothing expanded), but a
-    // write has no session to write to. Callers are UI gestures and tool
-    // results, both of which belong to a session that is on screen.
-    const sessionId = this.mounted.getSnapshot()
-    const actions = sessionId === undefined ? undefined : this.actionsFor(sessionId)
-    if (sessionId === undefined || actions === undefined) {
-      throw new Error('sidebarRight: no session surface is mounted')
-    }
+    // write needs a Session. A Workbench thread panel shows its conversation
+    // whether or not the native selection names a Session, so its own Session
+    // stands in; a seat that has not rendered yet has its store minted now.
+    const onScreen = this.mounted.getSnapshot()
+    const sessionId = onScreen ?? caller
+    if (sessionId === undefined) throw new SidebarRightUnavailableError()
+    if (this.actionsFor(sessionId) === undefined) this.host.mint?.(sessionId)
+    const actions = this.actionsFor(sessionId)
+    if (actions === undefined) throw new SidebarRightUnavailableError()
+    if (onScreen === undefined) this.show(sessionId)
     return { sessionId, actions }
   }
 }

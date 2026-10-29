@@ -106,6 +106,7 @@ export function apply(ctx: ClientContext): void {
   // The automatic fullscreen rule as the seats last rendered it: the frame
   // hands them its width as owner props, and every seat reports the same rule.
   let autoFullscreen = false
+  let mintStore: ((sessionId: SessionId) => void) | undefined
   const { controller, adopt, forget, show, measure } = createSidebarRightController(
     tabs,
     (address, signal) => {
@@ -114,6 +115,7 @@ export function apply(ctx: ClientContext): void {
     {
       workbench: workbenchMode.getSnapshot,
       dock: () => ctx.get('rightPanel')?.dock?.(),
+      mint: sessionId => mintStore?.(sessionId),
       autoFullscreen: () => autoFullscreen,
       openWithFocus: (sessionId, open) => {
         openWithPaneFocus(document, sessionId, open)
@@ -277,6 +279,12 @@ export function apply(ctx: ClientContext): void {
         }
       },
     }
+    // A link can be followed before its Session's seat renders (a Workbench thread
+    // panel, a Session the native selection does not name). The persisted store
+    // the seat reads later already holds the opened tab.
+    mintStore = sessionId => {
+      store.create(sessionId)
+    }
     const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
       syncPresentation({ shown, track, fullscreen }) {
         // The native seat's unmount cleanup can run after Workbench takes over.
@@ -395,6 +403,7 @@ export function apply(ctx: ClientContext): void {
       ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: GUIDE_ID }, GuideTitle),
     )
     return () => {
+      mintStore = undefined
       disposeGuideTitle()
       disposeGuide()
       disposeExpand()

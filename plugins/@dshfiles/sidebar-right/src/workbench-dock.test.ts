@@ -4,7 +4,7 @@ import type { ShortcutCommand, Shortcuts } from '@deepseek-ai/dsh-client-shortcu
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createSidebarRightController, type SidebarRightHost } from './native/client/service.ts'
+import { createSidebarRightController, SidebarRightUnavailableError, type SidebarRightHost } from './native/client/service.ts'
 import { registerSidebarShortcuts } from './native/client/shortcuts.ts'
 import { createSidebarRightStore } from './native/client/stores.ts'
 import { SidebarRightTabRegistry } from './native/client/tab-registry.ts'
@@ -280,7 +280,7 @@ it('retains the original native service and keyboard behavior when no Workbench 
   const command = toggleCommand(owner.controller)
   expect(owner.controller.isExpanded()).toBe(false)
   expect(command.resolve(keyContext).status).toBe('blocked')
-  expect(() => owner.controller.toggleExpanded()).toThrow('no session surface is mounted')
+  expect(() => owner.controller.toggleExpanded()).toThrow(SidebarRightUnavailableError)
   // SAFETY: this stable fixture identity names the real native store adopted below.
   const sessionId = 'native-fallback-session' as SessionId
   const store = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' })).create()
