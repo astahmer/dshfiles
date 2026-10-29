@@ -34,6 +34,14 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+      - name: Start a systemd user manager for subprocess scopes
+        run: |
+          sudo loginctl enable-linger "$USER"
+          runtime="/run/user/$(id -u)"
+          for attempt in $(seq 1 50); do [ -S "$runtime/bus" ] && break; sleep 0.2; done
+          echo "XDG_RUNTIME_DIR=$runtime" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus" >> "$GITHUB_ENV"
+          XDG_RUNTIME_DIR="$runtime" systemd-run --user --scope --quiet true
       - run: pnpm install:all
       - name: Install Playwright Chromium
         run: pnpm --dir tooling/dshx exec playwright install --with-deps --only-shell chromium
