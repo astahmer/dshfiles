@@ -21,6 +21,7 @@ DSHX exposes a small authoring surface and keeps compiler/runtime internals out 
 8. [Creator](./guides/creator.md) — template/style matrix, generated dependencies, and automation.
 9. [Tooling](./guides/tooling.md) — experimental Node-side build/watch, config, compatibility, diagnostics, CLI, and repair APIs.
 10. [Tracing](./guides/tracing.md) — metadata-only Host spans, OTLP/HTTP JSON export behind `OTEL_EXPORTER_OTLP_*`, and what is never recorded.
+11. [Effect](./guides/effect.md) — opt-in `DshxEffect`: Effect API handlers, the plugin lifetime as a Scope, Effect clients, and events as Streams.
 
 Additional references:
 
@@ -42,6 +43,7 @@ Additional references:
 | `@dshfiles/dshx/api`                       | API Candidate          | Yes          | Shared typed API contracts and error guards                                   |
 | `@dshfiles/dshx/settings`                  | API Candidate          | Yes          | Shared Settings contracts                                                     |
 | `@dshfiles/dshx/tracing`                   | API Candidate          | No           | Host spans and OTLP trace export (off unless an endpoint is configured)       |
+| `@dshfiles/dshx/effect`                    | API Candidate          | Yes          | Opt-in Effect layer over handlers, setup, clients and events (`effect` 4 peer) |
 | `@dshfiles/dshx/experimental/conversation` | Experimental           | Yes          | Conversation lifecycle and renderer contributions                             |
 | `@dshfiles/dshx/tooling`                   | Tooling / Experimental | No           | Compiler, config resolution, compatibility, diagnostics, CLI, and repair APIs |
 

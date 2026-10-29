@@ -389,6 +389,9 @@ catalogs:
     cmdk:
       specifier: 1.1.1
       version: 1.1.1
+    effect:
+      specifier: 4.0.4
+      version: 4.0.4
     execa:
       specifier: 10.0.1
       version: 10.0.1
@@ -6864,6 +6867,9 @@ importers:
       '@types/write-file-atomic':
         specifier: 4.0.3
         version: 4.0.3
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.4
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
@@ -13032,6 +13038,9 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
+
+  effect@4.0.4:
+    resolution: {integrity: sha512-Sr50OeVSC3M5UkoUYUhFf3EULryhGaZZUf6OzDHTvaznOw7HRlxOKdF3/4nvQXHL22StOyMG3Cvo8Bt7xUp+Ng==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -28589,6 +28598,8 @@ snapshots:
       safe-buffer: 5.2.1
 
   ee-first@1.1.1: {}
+
+  effect@4.0.4: {}
 
   emoji-regex@8.0.0: {}
 
