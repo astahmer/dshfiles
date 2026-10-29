@@ -546,6 +546,17 @@ thread; selection changes update the URL. Copied links drop existing query
 parameters and fragments, including process launch credentials, and resolve
 only on the same DSH Host/origin where the session exists.
 
+Prompt links open a new thread with its composer already filled in:
+`http://127.0.0.1:3080/?prompt=<text>`, optionally with `&project=<project id or folder path>`
+and `&model=<provider>/<model>`. The sidebar reads them once at load, removes the
+three parameters from the address so a reload or a copied URL never reopens the
+draft, creates the thread in that project (else the current or first project),
+selects the model when one is given, and opens it. Nothing is sent: the text waits
+in the composer. An unknown project or a refused model leaves a console warning
+and still opens the draft in the default project with the default model. The link
+needs a browser already signed in to that DSH; a tokenized launch URL redirects
+and drops the extra parameters.
+
 The web app composes DSH's native subagent tools and runtime, while this plugin
 owns the subagent catalog action, child-thread lineage, and `Create subagent`
 tool-row presentation. A plugin-owned Host projection records the latest safe

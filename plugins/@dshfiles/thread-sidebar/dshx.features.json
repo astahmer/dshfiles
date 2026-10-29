@@ -2551,6 +2551,58 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "prompt-links",
+      "title": "Open a prefilled new thread from a prompt link",
+      "summary": "Opening the GUI with ?prompt=<text>, optionally &project=<id or path> and &model=<provider>/<model>, creates a new thread in that project, selects the model, fills its composer without sending, and removes the three parameters from the address.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["no-link", "opening", "draft-ready"],
+      "failureModes": [
+        "An unknown project opens the draft in the current or first project and logs a warning.",
+        "A refused or unreadable model keeps the default model; the draft still opens.",
+        "A tokenized launch URL redirects and drops the parameters, so the link only works in a browser already signed in to that DSH."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.prompt-links-unit-read",
+          "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",
+          "testName": "reads the prompt with its optional project and model"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.prompt-links-unit-not-a-link",
+          "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",
+          "testName": "a URL without a usable prompt is not a prompt link"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.prompt-links-unit-bad-model",
+          "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",
+          "testName": "an unreadable model is dropped while the prompt still opens"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.prompt-links-unit-strip",
+          "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",
+          "testName": "stripping removes only the prompt-link params"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.prompt-links-unit-project",
+          "file": "plugins/@dshfiles/thread-sidebar/src/prompt-link.test.ts",
+          "testName": "a project is found by its id, then by its folder path with or without a trailing slash"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the link reuses the existing Session create, model selection and draft initialization calls; it adds no Host work of its own."
+        }
+      ]
     }
   ],
   "kind": "bundle"

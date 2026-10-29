@@ -47,6 +47,7 @@ import { HoverPrefetch } from './hover-prefetch.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
+import { PromptLinkModel, type PromptLink } from './prompt-link.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
@@ -73,6 +74,7 @@ const BOARD_PANEL_ID = 'dshfiles-thread-board'
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarFollowUp: unknown
+    threadSidebarPromptLink: unknown
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
     threadSidebarNavigation: unknown
@@ -855,6 +857,55 @@ export default defineClient({
           console.warn(`thread-sidebar: could not start a follow-up thread: ${String(cause)}`)
         }
       })()
+    }
+
+    const workspacesReady = (): Promise<void> =>
+      new Promise(resolve => {
+        if (ctx.workspaces.list.getSnapshot().phase === 'ready') {
+          resolve()
+          return
+        }
+        const unsubscribe = ctx.workspaces.list.subscribe(() => {
+          if (ctx.workspaces.list.getSnapshot().phase !== 'ready') return
+          unsubscribe()
+          resolve()
+        })
+      })
+
+    /** A fresh thread whose composer holds the link's prompt; it is never sent from here. */
+    const openPromptLink = async (link: PromptLink): Promise<void> => {
+      await workspacesReady()
+      const projects = SidebarOrganization.projectWorkspaces(ctx.workspaces.list.getSnapshot().items)
+      const named = link.project === undefined ? undefined : PromptLinkModel.projectFor({ projects, reference: link.project })
+      if (link.project !== undefined && named === undefined) {
+        console.warn(`thread-sidebar: prompt link project ${link.project} is not a registered project; the draft opens in the current one`)
+      }
+      const workspaceId = named?.workspaceId ?? currentWorkspaceId() ?? projects[0]?.workspaceId
+      if (workspaceId === undefined) {
+        ctx.uiWorkspace.startSession(undefined, { prompt: link.prompt })
+        return
+      }
+      const sessionId = await ctx.sessions.create({ workspaceId })
+      if (link.model !== undefined) {
+        const selected = await ctx.remote.session.selectModel({ sessionId, ...link.model })
+        if (!selected.ok) console.warn(`thread-sidebar: prompt link model ${link.model.provider}/${link.model.model} was refused: ${selected.error.message}`)
+      }
+      const reference = ctx.sessions.retain(sessionId, { source: 'threadSidebarPromptLink' })
+      try {
+        await reference.ready
+        ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: link.prompt })
+        ctx.uiWorkspace.openSession(sessionId)
+      } finally {
+        reference.release()
+      }
+    }
+
+    const promptLink = typeof window === 'undefined' ? undefined : PromptLinkModel.read(window.location.href)
+    if (promptLink !== undefined) {
+      window.history.replaceState(window.history.state, '', PromptLinkModel.strip(window.location.href))
+      openPromptLink(promptLink).catch((cause: unknown) => {
+        console.warn(`thread-sidebar: the prompt link could not open a new thread: ${String(cause)}`)
+      })
     }
 
     // A live projection of the public root source, not another stored selection.
