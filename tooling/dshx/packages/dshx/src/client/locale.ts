@@ -143,4 +143,5 @@ export class LocaleNamespaceModel {
   static readonly parts = localeDefinitionParts
   static readonly registration = localeRegistration
   static readonly plural = plural
+  static readonly active = activeLocale
 }

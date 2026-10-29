@@ -46,6 +46,7 @@ const services = {
   commands: AppServicesModel.createCommands(() => undefined),
   layout: AppServicesModel.createLayout(() => undefined),
   system: AppServicesModel.system,
+  environment: AppServicesModel.createEnvironment({ service: () => undefined, on: () => () => {} }),
 }
 
 const createPlugin = (
@@ -334,6 +335,64 @@ describe('system', () => {
   })
 })
 
+describe('environment', () => {
+  const hostLocale = (active: string) => {
+    let snapshot = { active, locales: [], revision: 0 }
+    const listeners = new Set<() => void>()
+    return {
+      getSnapshot: () => snapshot,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      switchTo: (id: string) => {
+        snapshot = { ...snapshot, active: id, revision: snapshot.revision + 1 }
+        for (const listener of listeners) listener()
+      },
+    }
+  }
+
+  it('follows the Host locale with its text direction and keeps one value per locale', () => {
+    const locale = hostLocale('en')
+    const environment = AppServicesModel.createEnvironment({ service: name => (name === 'locale' ? locale : undefined), on: () => () => {} })
+    const seen: string[] = []
+    environment.locale.subscribe(() => seen.push(environment.locale.get().id))
+    const first = environment.locale.get()
+    expect(first).toEqual({ id: 'en', direction: 'ltr' })
+    expect(environment.locale.get()).toBe(first)
+    locale.switchTo('ar')
+    expect(environment.locale.get()).toEqual({ id: 'ar', direction: 'rtl' })
+    expect(seen).toEqual(['ar'])
+  })
+
+  it('reads appearance from the Host theme and refreshes on theme/change', () => {
+    let theme = { active: { colorScheme: 'light' }, fontFamilies: { text: 'Inter', code: 'JetBrains Mono', terminal: 'Menlo' } }
+    const listeners = new Set<() => void>()
+    const environment = AppServicesModel.createEnvironment({
+      service: name => (name === 'theme' ? { getTheme: () => theme } : undefined),
+      on: (_event, listener) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    })
+    const changed = vi.fn()
+    environment.appearance.subscribe(changed)
+    const first = environment.appearance.get()
+    expect(first).toEqual({ colorScheme: 'light', fonts: { text: 'Inter', code: 'JetBrains Mono', terminal: 'Menlo' } })
+    expect(environment.appearance.get()).toBe(first)
+    theme = { ...theme, active: { colorScheme: 'dark' } }
+    for (const listener of listeners) listener()
+    expect(changed).toHaveBeenCalledTimes(1)
+    expect(environment.appearance.get().colorScheme).toBe('dark')
+  })
+
+  it('falls back to the page language and a light scheme without Host services', () => {
+    const environment = AppServicesModel.createEnvironment({ service: () => undefined, on: () => () => {} })
+    expect(environment.locale.get()).toEqual({ id: 'en', direction: 'ltr' })
+    expect(environment.appearance.get()).toEqual({ colorScheme: 'light' })
+  })
+})
+
 describe('stores', () => {
   const memory = new Map<string, string>()
   beforeEach(() => {
@@ -411,6 +470,20 @@ describe('plugin entry points', () => {
     const api = setup.mock.calls[0]?.[0] as { readonly id: string; readonly add: unknown }
     expect(api.id).toBe('@test/acme')
     expect(api.add).toBeTypeOf('function')
+  })
+
+  it("reads the environment from the plugin's Cordis services", () => {
+    const theme = { getTheme: () => ({ active: { colorScheme: 'dark' }, fontFamilies: { text: 'a', code: 'b', terminal: 'c' } }) }
+    const on = vi.fn(() => () => true)
+    const runtime = PluginRuntimeModel.create({
+      ctx: { get: name => (name === 'theme' ? theme : undefined), on },
+      packageId: '@test/acme',
+      decorate: component => component,
+    })
+    const stop = runtime.plugin.environment.appearance.subscribe(() => {})
+    expect(runtime.plugin.environment.appearance.get().colorScheme).toBe('dark')
+    expect(on).toHaveBeenCalledWith('theme/change', expect.any(Function))
+    stop()
   })
 
   it('builds a scope-bound runtime whose decorator provides the plugin context', () => {

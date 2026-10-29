@@ -35,7 +35,7 @@ export default defineClientPlugin({
 ```
 
 - Pass a fixed item, or a function of `track`. `track(source)` reads a
-  `Subscribable` (a store, `api.use(...)`, `api.list(...)`, `api.layout.panel`)
+  `Subscribable` (a store, `api.use(...)`, `api.list(...)`, `api.layout.panel`, `api.environment.locale`)
   and recomputes the item when it changes. Return `undefined` to withdraw the
   item until the function returns one again.
 - `add` returns a function that withdraws the item early.
@@ -134,6 +134,7 @@ is no longer current.
 | `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run |
 | `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()` |
 | `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab; each resolves or returns false when the browser cannot |
+| `api.environment` | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service |
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.
 

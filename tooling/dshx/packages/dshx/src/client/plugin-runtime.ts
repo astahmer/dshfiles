@@ -8,6 +8,7 @@ type ComponentDecorator = <Component>(component: Component) => Component
 interface RuntimeHostContext {
   effect?(execute: () => () => void, label?: string): unknown
   get(name: string): unknown
+  on?(name: string, listener: () => void): () => boolean
 }
 
 const isNativeSlots = (value: unknown): value is NativeSlots =>
@@ -50,6 +51,10 @@ const createPluginRuntime = (input: {
       commands: AppServicesModel.createCommands(() => input.ctx.get('shortcuts')),
       layout: AppServicesModel.createLayout(() => input.ctx.get('layout')),
       system: AppServicesModel.system,
+      environment: AppServicesModel.createEnvironment({
+        service: name => input.ctx.get(name),
+        on: (event, listener) => input.ctx.on?.(event, listener) ?? (() => false),
+      }),
     },
   })
   return { plugin, decorate }

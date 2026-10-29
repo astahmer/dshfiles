@@ -1,5 +1,6 @@
 import { BrowserBroker, type Live, type Subscribable } from './broker.js'
 import { HostCommandsModel } from './host-commands.js'
+import { LocaleNamespaceModel } from './locale.js'
 
 export interface ConfirmInput {
   readonly title: string
@@ -225,7 +226,8 @@ const hostClipboard = (text: string): Promise<boolean> | undefined => {
   try {
     const load = typeof require === 'function' ? require : undefined
     const primitives: unknown = load?.(PRIMITIVES_MODULE)
-    if (typeof primitives !== 'object' || primitives === null || !('writeClipboard' in primitives) || typeof primitives.writeClipboard !== 'function') return undefined
+    if (typeof primitives !== 'object' || primitives === null || !('writeClipboard' in primitives) || typeof primitives.writeClipboard !== 'function')
+      return undefined
     return Promise.resolve(primitives.writeClipboard(text)).then(written => written === true)
   } catch {
     return undefined
@@ -261,6 +263,110 @@ const system: SystemService = {
   },
 }
 
+export type TextDirection = 'ltr' | 'rtl'
+
+export interface LocaleState {
+  /** Active UI locale id, e.g. `en` or `zh`. */
+  readonly id: string
+  readonly direction: TextDirection
+}
+
+export interface AppearanceState {
+  readonly colorScheme: 'light' | 'dark'
+  /** CSS font-family list per role; absent while this Host has no theme service. */
+  readonly fonts?: { readonly text: string; readonly code: string; readonly terminal: string }
+}
+
+export interface EnvironmentService {
+  readonly locale: Subscribable<LocaleState>
+  readonly appearance: Subscribable<AppearanceState>
+}
+
+interface NativeLocale {
+  getSnapshot(): unknown
+  subscribe(listener: () => void): () => void
+}
+
+interface NativeTheme {
+  getTheme(): unknown
+}
+
+const isNativeLocale = (value: unknown): value is NativeLocale =>
+  typeof value === 'object' &&
+  value !== null &&
+  'getSnapshot' in value &&
+  typeof value.getSnapshot === 'function' &&
+  'subscribe' in value &&
+  typeof value.subscribe === 'function'
+
+const isNativeTheme = (value: unknown): value is NativeTheme =>
+  typeof value === 'object' && value !== null && 'getTheme' in value && typeof value.getTheme === 'function'
+
+const activeLocaleOf = (snapshot: unknown): string | undefined =>
+  typeof snapshot === 'object' && snapshot !== null && 'active' in snapshot && typeof snapshot.active === 'string' && snapshot.active !== ''
+    ? snapshot.active
+    : undefined
+
+const appearanceOf = (snapshot: unknown): AppearanceState | undefined => {
+  if (typeof snapshot !== 'object' || snapshot === null || !('active' in snapshot) || !('fontFamilies' in snapshot)) return undefined
+  const { active, fontFamilies } = snapshot
+  if (typeof active !== 'object' || active === null || !('colorScheme' in active)) return undefined
+  if (active.colorScheme !== 'light' && active.colorScheme !== 'dark') return undefined
+  if (typeof fontFamilies !== 'object' || fontFamilies === null || !('text' in fontFamilies) || !('code' in fontFamilies) || !('terminal' in fontFamilies))
+    return undefined
+  const { text, code, terminal } = fontFamilies
+  if (typeof text !== 'string' || typeof code !== 'string' || typeof terminal !== 'string') return undefined
+  return { colorScheme: active.colorScheme, fonts: { text, code, terminal } }
+}
+
+// Chromium and Firefox ship `getTextInfo()`; older engines and Node expose the `textInfo` getter instead.
+const directionOf = (localeId: string): TextDirection => {
+  try {
+    const locale = new Intl.Locale(localeId)
+    const info: unknown =
+      'getTextInfo' in locale && typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : 'textInfo' in locale ? locale.textInfo : undefined
+    return typeof info === 'object' && info !== null && 'direction' in info && info.direction === 'rtl' ? 'rtl' : 'ltr'
+  } catch {
+    return 'ltr'
+  }
+}
+
+const createEnvironment = (input: {
+  readonly service: (name: 'locale' | 'theme') => unknown
+  readonly on: (event: 'theme/change', listener: () => void) => () => void
+}): EnvironmentService => {
+  let locale: LocaleState | undefined
+  const readLocale = (): LocaleState => {
+    const native = input.service('locale')
+    const id = (isNativeLocale(native) ? activeLocaleOf(native.getSnapshot()) : undefined) ?? LocaleNamespaceModel.active()
+    if (locale?.id !== id) locale = { id, direction: directionOf(id) }
+    return locale
+  }
+  const fallbackAppearance: AppearanceState = {
+    colorScheme: typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+  }
+  let appearance: { readonly source: unknown; readonly state: AppearanceState } | undefined
+  const readAppearance = (): AppearanceState => {
+    const native = input.service('theme')
+    if (!isNativeTheme(native)) return fallbackAppearance
+    const source = native.getTheme()
+    if (appearance !== undefined && appearance.source === source) return appearance.state
+    const state = appearanceOf(source) ?? fallbackAppearance
+    appearance = { source, state }
+    return state
+  }
+  return {
+    locale: {
+      get: readLocale,
+      subscribe: listener => {
+        const native = input.service('locale')
+        return isNativeLocale(native) ? native.subscribe(listener) : () => {}
+      },
+    },
+    appearance: { get: readAppearance, subscribe: listener => input.on('theme/change', listener) },
+  }
+}
+
 export class AppServicesModel {
   static readonly dialogs = dialogs
   static readonly toast = toast
@@ -268,4 +374,5 @@ export class AppServicesModel {
   static readonly createCommands = createCommands
   static readonly createLayout = createLayout
   static readonly system = system
+  static readonly createEnvironment = createEnvironment
 }
