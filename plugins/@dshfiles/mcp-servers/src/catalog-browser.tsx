@@ -1,9 +1,9 @@
-import { GlobeIcon, PlusIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { GlobeIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
@@ -164,19 +164,15 @@ export const CatalogBrowser = (props: {
             <DialogTitle className="dshx:shrink-0 dshx:text-base">{t('browseTitle')}</DialogTitle>
             <DialogDescription className="dshx:truncate">{t('browseSubtitle')}</DialogDescription>
           </div>
-          <InputGroup className="dshx:h-9 dshx:w-64 dshx:shrink-0 dshx:bg-muted/50">
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('search')}
-              autoFocus
-              maxLength={80}
-              onChange={event => setSearch(event.currentTarget.value)}
-              placeholder={t('search')}
-              value={search}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:h-9 dshx:w-64 dshx:shrink-0 dshx:bg-muted/50"
+            aria-label={t('search')}
+            autoFocus
+            maxLength={80}
+            onChange={event => setSearch(event.currentTarget.value)}
+            placeholder={t('search')}
+            value={search}
+          />
           <Button aria-label={t('close')} onClick={props.onClose} size="icon-sm" variant="ghost">
             <XIcon />
           </Button>

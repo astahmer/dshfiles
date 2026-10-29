@@ -13,12 +13,13 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { HashIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
+import { HashIcon, MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -675,16 +676,13 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
                         <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
                       </div>
-                      <div className="dshx:relative dshx:w-full dshx:sm:max-w-xs">
-                        <SearchIcon className="dshx:absolute dshx:left-2.5 dshx:top-2.5 dshx:size-4 dshx:text-muted-foreground" aria-hidden />
-                        <Input
-                          aria-label={t('search')}
-                          placeholder={t('searchPlaceholder')}
-                          value={search}
-                          onChange={event => setSearch(event.currentTarget.value)}
-                          className="dshx:pl-8"
-                        />
-                      </div>
+                      <SearchInput
+                        className="dshx:w-full dshx:sm:max-w-xs"
+                        aria-label={t('search')}
+                        placeholder={t('searchPlaceholder')}
+                        value={search}
+                        onChange={event => setSearch(event.currentTarget.value)}
+                      />
                     </CardHeader>
                     <CardContent className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3 dshx:pt-0">
                       {messagesQuery.isPending ? <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}

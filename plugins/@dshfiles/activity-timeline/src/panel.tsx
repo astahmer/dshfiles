@@ -2,9 +2,9 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
-import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -285,17 +285,13 @@ export const ActivityTimelinePanel = (props: {
         </header>
         {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
-          <InputGroup className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('search')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={event => setSearch(event.currentTarget.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+            aria-label={t('search')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={event => setSearch(event.currentTarget.value)}
+          />
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
             {(['session', 'communication', 'integration'] as const).map(source => (
               <Button

@@ -5,13 +5,13 @@ import { memoryApi } from '@dshfiles/memory/api'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { RefreshCwIcon, SearchIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
+import { RefreshCwIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
@@ -186,19 +186,15 @@ export const AgentToolkitPanel = (props: {
                 </SelectContent>
               </Select>
             )}
-            <InputGroup className="dshx:h-8 dshx:min-w-48 dshx:flex-1">
-              <InputGroupAddon>
-                <SearchIcon />
-              </InputGroupAddon>
-              <InputGroupInput
-                aria-label={t('searchLabel')}
-                autoComplete="off"
-                placeholder={t('searchPlaceholder')}
-                type="search"
-                value={query}
-                onChange={event => setQuery(event.currentTarget.value)}
-              />
-            </InputGroup>
+            <SearchInput
+              className="dshx:h-8 dshx:min-w-48 dshx:flex-1"
+              aria-label={t('searchLabel')}
+              autoComplete="off"
+              placeholder={t('searchPlaceholder')}
+              type="search"
+              value={query}
+              onChange={event => setQuery(event.currentTarget.value)}
+            />
           </div>
           <ToggleGroup
             aria-label={t('filterLabel')}

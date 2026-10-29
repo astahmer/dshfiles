@@ -11,7 +11,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -20,7 +20,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
-import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -411,17 +411,13 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
             <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
             <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
           </ToggleGroup>
-          <InputGroup className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('search')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={event => setSearch(event.currentTarget.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+            aria-label={t('search')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={event => setSearch(event.currentTarget.value)}
+          />
           <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
             <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
               <SelectValue />

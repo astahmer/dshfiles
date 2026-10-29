@@ -1,8 +1,8 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { ArrowDownIcon, ArrowUpIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowDownIcon, ArrowUpIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
@@ -118,11 +118,13 @@ export const RequestLog = (props: {
             {data === undefined ? 'Loading…' : `${shown.toLocaleString()} of the latest ${matching.toLocaleString()} requests`}
           </p>
         </div>
-        <label className="dshx:relative dshx:w-full dshx:sm:w-72">
-          <span className="dshx:sr-only">Search requests</span>
-          <SearchIcon className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2 dshx:size-3.5 dshx:-translate-y-1/2 dshx:text-muted-foreground" />
-          <Input value={props.search} onChange={event => props.onSearch(event.target.value)} placeholder="Model, provider or project" className="dshx:pl-7" />
-        </label>
+        <SearchInput
+          className="dshx:w-full dshx:sm:w-72"
+          aria-label="Search requests"
+          value={props.search}
+          onChange={event => props.onSearch(event.target.value)}
+          placeholder="Model, provider or project"
+        />
       </div>
       <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5" role="group" aria-label="Status">
         {STATUS_CHIPS.map(chip => (

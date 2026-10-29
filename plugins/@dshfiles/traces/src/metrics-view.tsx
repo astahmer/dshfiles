@@ -1,11 +1,10 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Chart, ChartFrame, colorLegend, defineChart, lineY, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
@@ -94,17 +93,13 @@ export const MetricsView = (props: { readonly client: TracesClient; readonly win
   })
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <InputGroup className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full">
-        <InputGroupAddon>
-          <SearchIcon />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label={t('searchMetrics')}
-          placeholder={t('searchMetricsPlaceholder')}
-          value={search}
-          onChange={event => setSearch(event.target.value)}
-        />
-      </InputGroup>
+      <SearchInput
+        className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full"
+        aria-label={t('searchMetrics')}
+        placeholder={t('searchMetricsPlaceholder')}
+        value={search}
+        onChange={event => setSearch(event.target.value)}
+      />
       {listQuery.isError ? (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>

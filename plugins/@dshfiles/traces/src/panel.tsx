@@ -16,13 +16,13 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, SearchIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { FiringAlertsBanner, FiringAlertsCount } from './alerts/alert-badges.js'
@@ -202,17 +202,13 @@ export const TracesPanel = (props: {
             {traceId === null ? (
               <>
                 <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-                  <InputGroup className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full">
-                    <InputGroupAddon>
-                      <SearchIcon />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      aria-label={t('search')}
-                      placeholder={t('searchPlaceholder')}
-                      value={view.search}
-                      onChange={event => update({ search: event.target.value })}
-                    />
-                  </InputGroup>
+                  <SearchInput
+                    className="dshx:w-72 dshx:max-w-full dshx:@max-pane-narrow:w-full"
+                    aria-label={t('search')}
+                    placeholder={t('searchPlaceholder')}
+                    value={view.search}
+                    onChange={event => update({ search: event.target.value })}
+                  />
                   <Select value={view.service ?? ALL} onValueChange={value => update({ service: value === ALL ? null : value })}>
                     <SelectTrigger size="sm" aria-label={t('service')} className="dshx:w-44 dshx:@max-pane-narrow:w-full">
                       <SelectValue />

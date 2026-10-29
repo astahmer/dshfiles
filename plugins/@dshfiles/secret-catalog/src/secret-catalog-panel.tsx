@@ -3,11 +3,11 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, FolderOpenIcon, PlusIcon, RefreshCwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FolderOpenIcon, PlusIcon, RefreshCwIcon, SlidersHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { KeyboardEvent } from 'react'
@@ -381,20 +381,16 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
             </Alert>
           )}
-          <InputGroup className="dshx:h-9 dshx:bg-muted/50">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('filterAliases')}
-              onChange={event => {
-                clearRevealed()
-                setSearch(event.currentTarget.value)
-              }}
-              placeholder={t('filterPlaceholder')}
-              value={search}
-            />
-          </InputGroup>
+          <SearchInput
+            className="dshx:h-9 dshx:bg-muted/50"
+            aria-label={t('filterAliases')}
+            onChange={event => {
+              clearRevealed()
+              setSearch(event.currentTarget.value)
+            }}
+            placeholder={t('filterPlaceholder')}
+            value={search}
+          />
           {error !== null && (
             <Alert className="dshx:pr-24" variant="destructive">
               <AlertDescription>{error}</AlertDescription>
