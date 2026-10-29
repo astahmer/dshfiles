@@ -11,7 +11,7 @@ interface ClientModule {
 export function createClientModuleLoader(): (id: string) => unknown {
   const modules = new Map<string, unknown>()
   const fallback = createRequire(import.meta.url)
-  const load = (id: string, importer: string = import.meta.url): unknown => {
+  const load: (id: string, importer?: string) => unknown = (id, importer = import.meta.url) => {
     if (id === '@deepseek-ai/cordis') return cordis
     // The browser shares these platform modules. Resolve one matching pair from
     // the test project rather than a provider's unrelated hoisted dependencies.

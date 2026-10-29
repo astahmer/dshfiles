@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { createServer, type Server, type Socket } from 'node:net'
 import { z } from 'zod'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
@@ -101,14 +103,14 @@ const homeDirectory = (stateHome?: string): string => {
   return join(home, 'runtime', 'dshx', 'communication')
 }
 
-const bridgePaths = (stateHome?: string): { readonly directory: string; readonly socketPath: string; readonly metadataPath: string } => {
+const bridgePaths = (stateHome?: string) => {
   const directory = homeDirectory(stateHome)
   const longSocket = join(directory, 'host.sock')
   const socketPath = longSocket.length > 90 ? join(tmpdir(), `dshx-comm-${createHash('sha256').update(directory).digest('hex').slice(0, 20)}.sock`) : longSocket
   return { directory, socketPath, metadataPath: join(directory, 'host.json') }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+const isRecord = (value: unknown): value is JsonObject => value !== null && typeof value === 'object' && !Array.isArray(value)
 
 const communicationTransportError = (error: JsonLineTransportError): CommunicationError => {
   if (error.code === 'request-too-large') return new CommunicationError('request-too-large', 'Communication request exceeds the size limit.')
@@ -118,7 +120,7 @@ const communicationTransportError = (error: JsonLineTransportError): Communicati
   return new CommunicationError('invalid-response', 'Communication bridge returned invalid JSON.')
 }
 
-const responseError = (requestId: string, code: string, message: string): Record<string, unknown> => ({
+const responseError = (requestId: string, code: string, message: string) => ({
   version: PROTOCOL_VERSION,
   requestId,
   ok: false,
@@ -141,15 +143,26 @@ const readMetadata = async (stateHome?: string): Promise<z.infer<typeof bridgeMe
   if (typeof process.getuid === 'function' && directoryStat.uid !== process.getuid()) {
     throw new CommunicationError('host-unavailable', 'DSHX Communication Host bridge directory belongs to a different user.')
   }
-  const value: unknown = JSON.parse(await readFile(location.metadataPath, 'utf8'))
-  return bridgeMetadataSchema.parse(value)
+  return bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, await readFile(location.metadataPath, 'utf8')))
 }
+
+/** One communication operation's result, as the JSON response envelope carries it. */
+type CommunicationOperationResult =
+  | readonly CommunicationAgent[]
+  | readonly CommunicationTopic[]
+  | CommunicationDiagnostics
+  | CommunicationSubscription
+  | { readonly removed: boolean }
+  | CommunicationMessage
+  | readonly CommunicationMessage[]
+  | { readonly acknowledged: boolean }
+  | { readonly items: readonly CommunicationMessage[] }
 
 const dispatch = async (
   service: CommunicationService,
   listAgents: () => readonly CommunicationAgent[] | Promise<readonly CommunicationAgent[]>,
   request: z.infer<typeof bridgeRequestSchema>,
-): Promise<unknown> => {
+): Promise<CommunicationOperationResult> => {
   if (request.operation === 'agents') {
     if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
     return (await listAgents()).map(item => communicationAgentSchema.parse(item))
@@ -177,8 +190,8 @@ const dispatch = async (
       .parse(request.input)
     return service.subscribe(request.principal, {
       topic: input.topic,
-      ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
-      ...(input.allowSteerFrom === undefined ? {} : { allowSteerFrom: input.allowSteerFrom }),
+      ...(input.delivery !== undefined && { delivery: input.delivery }),
+      ...(input.allowSteerFrom !== undefined && { allowSteerFrom: input.allowSteerFrom }),
     })
   }
   if (request.operation === 'unsubscribe') {
@@ -204,10 +217,10 @@ const dispatch = async (
       sender: request.principal,
       topic: input.topic,
       text: input.text,
-      ...(input.intent === undefined ? {} : { intent: input.intent }),
-      ...(input.priority === undefined ? {} : { priority: input.priority }),
-      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
-      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
+      ...(input.intent !== undefined && { intent: input.intent }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.correlationId !== undefined && { correlationId: input.correlationId }),
+      ...(input.dedupeKey !== undefined && { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'send') {
@@ -226,10 +239,10 @@ const dispatch = async (
       sender: request.principal,
       toAgentId: input.toAgentId,
       text: input.text,
-      ...(input.intent === undefined ? {} : { intent: input.intent }),
-      ...(input.priority === undefined ? {} : { priority: input.priority }),
-      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
-      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
+      ...(input.intent !== undefined && { intent: input.intent }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.correlationId !== undefined && { correlationId: input.correlationId }),
+      ...(input.dedupeKey !== undefined && { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'inbox') {
@@ -240,8 +253,8 @@ const dispatch = async (
     return {
       items: await service.inbox({
         principal: request.principal,
-        ...(input.topic === undefined ? {} : { topic: input.topic }),
-        ...(input.limit === undefined ? {} : { limit: input.limit }),
+        ...(input.topic !== undefined && { topic: input.topic }),
+        ...(input.limit !== undefined && { limit: input.limit }),
       }),
     }
   }
@@ -249,7 +262,7 @@ const dispatch = async (
   return service.acknowledge(request.principal, input.messageId)
 }
 
-const writeResponse = (socket: Socket, requestId: string, value: unknown): void => {
+const writeResponse = (socket: Socket, requestId: string, value: CommunicationOperationResult): void => {
   JsonLineTransport.write(
     socket,
     { version: PROTOCOL_VERSION, requestId, ok: true, result: value },
@@ -264,7 +277,7 @@ const removeStaleEndpoint = async (location: ReturnType<typeof bridgePaths>): Pr
   const metadata = await readFile(location.metadataPath, 'utf8').catch(() => undefined)
   if (metadata !== undefined) {
     try {
-      const parsed = bridgeMetadataSchema.parse(JSON.parse(metadata))
+      const parsed = bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, metadata))
       try {
         process.kill(parsed.pid, 0)
         throw new CommunicationError('host-already-active', `A DSHX Communication bridge is already active with pid ${parsed.pid}.`)
@@ -309,7 +322,7 @@ export const startHostCommunicationBridge = async (
       onLine: text => {
         let requestId = 'unknown'
         try {
-          const parsedValue: unknown = JSON.parse(text)
+          const parsedValue = decodeJson(jsonValueSchema, text)
           if (isRecord(parsedValue) && typeof parsedValue.requestId === 'string') requestId = parsedValue.requestId
           const request = bridgeRequestSchema.parse(parsedValue)
           if (request.token !== token) throw new CommunicationError('unauthorized', 'Communication bridge authentication failed.')
@@ -363,7 +376,7 @@ export const startHostCommunicationBridge = async (
     let stillOwned = false
     if (current !== undefined) {
       try {
-        stillOwned = bridgeMetadataSchema.parse(JSON.parse(current)).token === token
+        stillOwned = bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, current)).token === token
       } catch {
         stillOwned = false
       }
@@ -379,9 +392,9 @@ export const startHostCommunicationBridge = async (
 export const connectCommunicationClient = async (options: ConnectCommunicationClientOptions = {}): Promise<CommunicationClient> => {
   const principal = communicationPrincipalSchema.parse({ kind: 'external', id: options.principalId ?? 'cli' })
   const metadata = await readMetadata(options.stateHome)
-  const request = async (operation: z.infer<typeof operationSchema>, input?: unknown): Promise<unknown> => {
+  const request = async (operation: z.infer<typeof operationSchema>, input?: JsonValue): Promise<JsonValue | undefined> => {
     const requestId = randomUUID()
-    const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input === undefined ? {} : { input }) })}\n`
+    const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input !== undefined && { input }) })}\n`
     const value = await JsonLineTransport.request(metadata.socketPath, body, {
       maxRequestBytes: MAX_REQUEST_BYTES,
       maxResponseBytes: MAX_RESPONSE_BYTES,

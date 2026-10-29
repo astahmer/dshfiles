@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { readOrCreateRuntimeIdentity } from '../src/identity.js'
 
 const directories: string[] = []
@@ -38,7 +39,7 @@ describe('multi-host runtime identity', () => {
     expect(second).toEqual(first)
     expect((await stat(identityPath)).mode & 0o777).toBe(0o600)
     expect((await stat(dirname(identityPath))).mode & 0o777).toBe(0o700)
-    expect(JSON.parse(await readFile(identityPath, 'utf8'))).toMatchObject({ profile: 'identity-test', runtimeId: first.runtimeId })
+    expect(decodeJson(jsonObjectSchema, await readFile(identityPath, 'utf8'))).toMatchObject({ profile: 'identity-test', runtimeId: first.runtimeId })
   })
 
   test('refuses an identity file redirected through a symlink', async () => {

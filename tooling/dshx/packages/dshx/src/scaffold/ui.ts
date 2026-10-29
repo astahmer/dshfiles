@@ -4,13 +4,14 @@ import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
 import { z } from 'zod'
 import { SourceSyntax } from '../project/syntax.js'
+import { jsonObjectSchema } from '../json.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { inspectProjectComposition } from '../inspect/index.js'
-import type { InspectOptions, InspectResult, SlotSummary } from '../inspect/index.js'
-import { checkProjectManifest } from '../project/index.js'
+import { inspectProjectComposition } from '../inspect/provider.js'
+import type { InspectOptions, InspectResult, SlotSummary } from '../inspect/types.js'
+import { checkProjectManifest } from '../project/manifest.js'
 import { CLIENT_AUTHORING_TOOLCHAIN, CLIENT_CAPABILITIES, CLIENT_SERVICES, DSH_PACKAGES } from 'create-dshx/capabilities'
 import { ScaffoldFilePlan } from './common.js'
 
@@ -131,6 +132,11 @@ interface SlotScaffoldContract {
   readonly registration: readonly string[]
 }
 
+interface SlotContractResult {
+  readonly contract?: SlotScaffoldContract
+  readonly diagnostic?: DshxDiagnostic
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -143,7 +149,7 @@ const registrationFieldSchema = z.object({
   type: z.string().optional(),
 })
 
-function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions) {
+function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions): SlotContractResult {
   if (slot.type === 'factory') {
     return {
       diagnostic: diagnostic(
@@ -286,7 +292,12 @@ const hasSlotRegistration = (program: Program, slotName: string): boolean => {
   return found
 }
 
-function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string) {
+interface ClientSlotEdit {
+  readonly source: string | undefined
+  readonly duplicate: boolean
+}
+
+function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string): ClientSlotEdit {
   const sourceFile = SourceSyntax.parse({ file, source })
   if (hasSlotRegistration(sourceFile, slotName)) return { source: undefined, duplicate: true }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineClient' })
@@ -337,12 +348,7 @@ function newClientSource(clientFile: string, contributionFile: string, slotName:
   ].join('\n')
 }
 
-function updateManifest(
-  source: string,
-  provider: string,
-  slotName: string,
-  compatibility: DshCompatibility,
-): { source: string; manifest: Record<string, unknown> } {
+function updateManifest(source: string, provider: string, slotName: string, compatibility: DshCompatibility) {
   const value = JSON.parse(source) as Record<string, unknown>
   const exports = value.exports
   if (exports !== undefined && (typeof exports !== 'object' || exports === null || Array.isArray(exports)))
@@ -429,7 +435,7 @@ function result(
     generatedFiles: plan.filter(item => item.before === undefined).map(item => item.file),
     manifestChanged,
     diagnostics,
-    ...(diff === undefined ? {} : { diff }),
+    ...(diff !== undefined && { diff }),
   }
 }
 
@@ -530,7 +536,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   const slot: SlotSummary = {
     ...treeSlot,
     ...exactSlot,
-    ...(exactSlot.metadata === undefined ? {} : { metadata: exactSlot.metadata }),
+    ...(exactSlot.metadata !== undefined && { metadata: exactSlot.metadata }),
   }
   const provider = options.provider ?? slot.provider
   if (provider === undefined || provider.trim() === '') {
@@ -693,8 +699,8 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   }
   const postProject: ResolvedDshxConfig = {
     ...project,
-    ...(clientBefore === undefined ? { clientEntry: clientFile } : {}),
-    manifest,
+    ...(clientBefore === undefined && { clientEntry: clientFile }),
+    manifest: jsonObjectSchema.parse(manifest),
   }
   const compatibility = dependencies.compatibility ?? inspect.dsh?.compatibility ?? DEFAULT_COMPATIBILITY
   let postDiagnostics: readonly DshxDiagnostic[]

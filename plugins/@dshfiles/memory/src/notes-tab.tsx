@@ -23,6 +23,7 @@ import {
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -138,7 +139,12 @@ const NoteRow = (props: {
       </span>
       <span className="dshx:flex dshx:w-24 dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
         <span className={cn('dshx:font-medium', tone.accent)}>{tone.label}</span>
-        <span title={props.note.project}>{PanelFormat.projectName(props.note.project)}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>{PanelFormat.projectName(props.note.project)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{props.note.project}</TooltipContent>
+        </Tooltip>
         <span className="dshx:tabular-nums">{PanelFormat.formatDay(props.note.updatedAt)}</span>
         <span className="dshx:flex dshx:items-center dshx:gap-0.5">
           <QuoteIcon className="dshx:size-2.5" />
@@ -423,9 +429,12 @@ const NoteDetail = (props: {
           <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
             <div className="dshx:flex dshx:flex-col">
               <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
-              <dd className="dshx:truncate" title={note.project}>
-                {PanelFormat.projectName(note.project)}
-              </dd>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <dd className="dshx:truncate">{PanelFormat.projectName(note.project)}</dd>
+                </TooltipTrigger>
+                <TooltipContent>{note.project}</TooltipContent>
+              </Tooltip>
             </div>
             <div className="dshx:flex dshx:flex-col">
               <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
@@ -643,6 +652,7 @@ export const NotesTab = (props: {
   }
   const filtered = search.trim().length > 0 || type !== '' || status !== 'valid' || origin !== ''
   return (
+    <TooltipProvider delayDuration={500}>
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:px-5 dshx:pb-5 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
       <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/40 dshx:@max-[64rem]:h-[28rem] dshx:@max-[64rem]:flex-none">
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
@@ -745,19 +755,23 @@ export const NotesTab = (props: {
             <Button size="xs" variant="outline" disabled={review.isPending} onClick={() => review.mutate(undefined)}>
               <SparklesIcon /> {review.isPending ? 'Reviewing…' : 'Review with Jev'}
             </Button>
-            <Button
-              variant={selectMode ? 'secondary' : 'ghost'}
-              size="icon-sm"
-              aria-label="Select notes"
-              aria-pressed={selectMode}
-              title="Select notes"
-              onClick={() => {
-                setSelectMode(!selectMode)
-                if (selectMode) setSelection(ListSelectionModel.empty())
-              }}
-            >
-              <SquareCheckBigIcon />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={selectMode ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  aria-label="Select notes"
+                  aria-pressed={selectMode}
+                  onClick={() => {
+                    setSelectMode(!selectMode)
+                    if (selectMode) setSelection(ListSelectionModel.empty())
+                  }}
+                >
+                  <SquareCheckBigIcon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Select notes</TooltipContent>
+            </Tooltip>
           </div>
           <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
             <span className="dshx:text-[13px] dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
@@ -933,5 +947,6 @@ export const NotesTab = (props: {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </TooltipProvider>
   )
 }

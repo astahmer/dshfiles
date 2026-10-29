@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
-import { PromptDrafts, type SentPrompt } from './draft-store.js'
 import { MAX_RECENT_SCAN_NODES, projectRecentPrompts, type RecentPrompt } from './recent-prompts.js'
 
 export type PromptActionProps = Omit<ComposerActionProps, 'useChat'> & {
@@ -38,18 +37,6 @@ const newestFirstNodes = (chat: ChatNodes): Iterable<ChatNodePayload | undefined
 })
 
 export const selectRecentPrompts = (chat: ChatNodes): readonly RecentPrompt[] => projectRecentPrompts(newestFirstNodes(chat))
-
-export const selectSentPrompts = (chat: ChatNodes): readonly SentPrompt[] => {
-  const prompts: SentPrompt[] = []
-  for (const node of newestFirstNodes(chat)) {
-    const prompt = PromptDrafts.sentPromptFromNode(node?.data)
-    if (prompt !== null) prompts.push(prompt)
-  }
-  return prompts
-}
-
-export const areSentPromptsEqual = (left: readonly SentPrompt[], right: readonly SentPrompt[]): boolean =>
-  left.length === right.length && left.every((prompt, index) => prompt.id === right[index]?.id && prompt.text === right[index]?.text)
 
 /**
  * Subscribes to the Chat hook only while a Chat provider exists. The composer

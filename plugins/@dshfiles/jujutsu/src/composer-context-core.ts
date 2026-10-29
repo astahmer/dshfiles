@@ -1,3 +1,4 @@
+import { decodeJsonSafe, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import { composerBaseSchema, type ComposerBase } from './composer-context-api.js'
 
@@ -11,6 +12,10 @@ export const COMPOSER_HEAD_TEMPLATE =
 
 export const COMPOSER_BOOKMARKS_TEMPLATE = '"[" ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ "]\\n"'
 
+export const COMPOSER_BASE_TEMPLATE =
+  '"{\\"commitId\\":" ++ self.commit_id().short(64).escape_json() ++ ' +
+  '",\\"bookmarks\\":[" ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ "]}" ++ "\\n"'
+
 export const COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE = 'if(!self.remote(), self.name().escape_json() ++ "\\n")'
 export const COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE = 'self.remote_bookmarks().map(|b| b.name() ++ "@" ++ b.remote()).join("\\n") ++ "\\n"'
 
@@ -23,14 +28,14 @@ export const COMPOSER_FILE_TEMPLATE = '"{\\"path\\":" ++ path.display().escape_j
 const defaultComposerBase: ComposerBase = { kind: 'bookmark', name: 'main' }
 const REMOTE_BASE_PREFIX = 'remote-base='
 
-export const composerBaseFromSetting = (value: unknown): ComposerBase => {
+export const composerBaseFromSetting = (value: JsonValue | undefined): ComposerBase => {
   const parsed = z.string().max(512).safeParse(value)
   if (!parsed.success || parsed.data.length === 0) return defaultComposerBase
   if (parsed.data === 'trunk') return { kind: 'trunk' }
   if (parsed.data === 'parent') return { kind: 'parent' }
   if (parsed.data.startsWith(REMOTE_BASE_PREFIX)) {
     try {
-      const remoteBase = composerBaseSchema.safeParse(JSON.parse(decodeURIComponent(parsed.data.slice(REMOTE_BASE_PREFIX.length))))
+      const remoteBase = decodeJsonSafe(composerBaseSchema, decodeURIComponent(parsed.data.slice(REMOTE_BASE_PREFIX.length)))
       return remoteBase.success && remoteBase.data.kind === 'remoteBookmark' ? remoteBase.data : defaultComposerBase
     } catch {
       return defaultComposerBase
@@ -66,7 +71,7 @@ const parseRevisionCount = (stdout: string, truncated: boolean): number | null =
   return stdout.length
 }
 
-const revisionCountRevsets = (targetCommitId: string): { readonly ahead: string; readonly behind: string } => ({
+const revisionCountRevsets = (targetCommitId: string) => ({
   ahead: '::@ ~ ::' + targetCommitId,
   behind: '::' + targetCommitId + ' ~ ::@',
 })
@@ -92,11 +97,14 @@ const parseStatTotals = (stdout: string): { files: number; additions: number; de
   return { files: Number(match[1]), additions: Number(match[2] ?? 0), deletions: Number(match[3] ?? 0) }
 }
 
+/** A quoted path in a git patch is one JSON string literal. */
+const quotedGitPathSchema = z.string()
+
 const unquoteGitPath = (value: string): string => {
   if (!value.startsWith('"')) return value
   try {
-    const decoded: unknown = JSON.parse(value)
-    return typeof decoded === 'string' ? decoded : value
+    const decoded = decodeJsonSafe(quotedGitPathSchema, value)
+    return decoded.success ? decoded.data : value
   } catch {
     return value
   }

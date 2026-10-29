@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -436,7 +437,7 @@ export default defineClient({
       })
       if (markers.length === 0 && !offered) return noticeToast.element
       return (
-        <>
+        <TooltipProvider>
           {markers.map((marker, index) => (
             <div
               key={`${marker.kind}-${marker.at}-${index}`}
@@ -475,32 +476,40 @@ export default defineClient({
               {archived || marker.kind !== 'integrated' || marker.at !== thread.rebasedAt ? null : (
                 <>
                   {noticeActions.includes('settle') && !settledHere ? (
-                    <Button
-                      aria-label={translate('settleRebasedThread')}
-                      disabled={sessionRunning}
-                      onClick={settle}
-                      size="sm"
-                      title={translate('settleRebasedThread')}
-                      type="button"
-                      variant="ghost"
-                    >
-                      <CircleCheckIcon aria-hidden="true" size={16} />
-                      {translate('settleThread')}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          aria-label={translate('settleRebasedThread')}
+                          disabled={sessionRunning}
+                          onClick={settle}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <CircleCheckIcon aria-hidden="true" size={16} />
+                          {translate('settleThread')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{translate('settleRebasedThread')}</TooltipContent>
+                    </Tooltip>
                   ) : null}
                   {noticeActions.includes('archive') ? (
-                    <Button
-                      aria-label={translate('archiveRebasedThread')}
-                      disabled={sessionRunning || archive.isPending}
-                      onClick={() => archive.mutate()}
-                      size="sm"
-                      title={translate('archiveRebasedThread')}
-                      type="button"
-                      variant="ghost"
-                    >
-                      {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
-                      {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          aria-label={translate('archiveRebasedThread')}
+                          disabled={sessionRunning || archive.isPending}
+                          onClick={() => archive.mutate()}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
+                          {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{translate('archiveRebasedThread')}</TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </>
               )}
@@ -517,22 +526,26 @@ export default defineClient({
               <p className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:text-muted-foreground">
                 {translate('inlineIntegrateHint', { count: thread.unlanded.length, bookmark })}
               </p>
-              <Button
-                aria-label={translate('rebaseOnto', { bookmark })}
-                className="dshx-root dshx:shrink"
-                disabled={landing}
-                onClick={() => land.mutate(thread.path)}
-                size="sm"
-                title={translate('rebaseThread', { bookmark })}
-                type="button"
-              >
-                {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
-                {land.isPending ? translate('rebasing') : translate('rebaseOnto', { bookmark })}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={translate('rebaseOnto', { bookmark })}
+                    className="dshx-root dshx:shrink"
+                    disabled={landing}
+                    onClick={() => land.mutate(thread.path)}
+                    size="sm"
+                    type="button"
+                  >
+                    {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
+                    {land.isPending ? translate('rebasing') : translate('rebaseOnto', { bookmark })}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{translate('rebaseThread', { bookmark })}</TooltipContent>
+              </Tooltip>
             </div>
           ) : null}
           {noticeToast.element}
-        </>
+        </TooltipProvider>
       )
     }
     // A thread can land, keep working and land again, so each land reads inline after the Turn it followed, like the

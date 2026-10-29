@@ -40,7 +40,7 @@ export const SessionSection = (props: { readonly state: AccountsPanelState; read
         )
       }
       index="05"
-      title="Session"
+      heading="Session"
     >
       <dl className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-3">
         {facts.map(fact => (

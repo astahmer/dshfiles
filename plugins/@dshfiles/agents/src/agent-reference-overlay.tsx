@@ -2,6 +2,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -32,9 +33,12 @@ const delegationLabel = (agent: Agent): string => {
 const Detail = (props: { readonly label: string; readonly children: string }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
     <dt className={labelClass}>{props.label}</dt>
-    <dd className="dshx:truncate dshx:text-xs" title={props.children}>
-      {props.children}
-    </dd>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <dd className="dshx:truncate dshx:text-xs">{props.children}</dd>
+      </TooltipTrigger>
+      <TooltipContent className="dshx-root">{props.children}</TooltipContent>
+    </Tooltip>
   </div>
 )
 
@@ -46,7 +50,7 @@ const AgentCard = (props: {
   const { agent } = props
   const instructions = agent.instructions.trim()
   return (
-    <>
+    <TooltipProvider>
       <header className="dshx:flex dshx:items-start dshx:gap-2.5">
         <span
           aria-hidden
@@ -105,7 +109,7 @@ const AgentCard = (props: {
           ))
         )}
       </section>
-    </>
+    </TooltipProvider>
   )
 }
 

@@ -148,7 +148,7 @@ describe('Agent communication API operations', () => {
 
     const olderPage = await operations.browseMessages({
       agentId: 'agent-reader',
-      ...(newerPage.nextCursor === null ? {} : { beforeId: newerPage.nextCursor }),
+      ...(newerPage.nextCursor !== null && { beforeId: newerPage.nextCursor }),
       limit: 2,
     })
     expect(olderPage.items.map(item => item.text)).toEqual(['direct 1', 'direct 2'])

@@ -67,7 +67,7 @@ const CardFace = (props: {
         {props.renaming === true && props.onRenameDone !== undefined ? (
           <BacklogInlineTitle
             id={item.id}
-            title={item.title}
+            value={item.title}
             cancel={props.onRenameDone}
             className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
           />

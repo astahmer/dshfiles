@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-goal'
-import type {} from '@deepseek-ai/dsh-session'
+import type { SessionEventMap, UserMessage } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { z } from 'zod'
@@ -24,20 +24,15 @@ const rowConfig = z.object({
  */
 export const Config = z.union([rowConfig, z.undefined()]).transform(config => rowConfig.parse(config ?? {}))
 
-interface ContentBlock {
-  readonly type: string
-  readonly text?: string
-}
-
 const runtimeContextSource = z.object({ source: z.object({ kind: z.literal('runtime-context') }) })
 
-const promptText = (data: unknown): string => {
-  const content = (data as { readonly content?: readonly ContentBlock[] } | undefined)?.content
-  if (content === undefined || !Array.isArray(content)) return ''
-  return content
-    .filter(block => block.type === 'text')
-    .map(block => block.text ?? '')
-    .join('\n')
+/** The prompt a `user/message` event carried, as its text blocks read. */
+const promptText = (data: UserMessage): string => {
+  const texts: string[] = []
+  for (const block of data.content) {
+    if (block.type === 'text') texts.push(block.text)
+  }
+  return texts.join('\n')
 }
 
 /**
@@ -47,14 +42,12 @@ const promptText = (data: unknown): string => {
  * only when it also carries text, because the recorded failure was a completion
  * whose reasoning never reached the surface as an answer.
  */
-const assistantSaidAnything = (data: unknown): boolean => {
-  const content = (data as { readonly message?: { readonly content?: readonly ContentBlock[] } } | undefined)?.message?.content
-  if (content === undefined || !Array.isArray(content)) return false
-  return content.some(block => {
+const assistantSaidAnything = (data: SessionEventMap['assistant/message']): boolean =>
+  data.message.content.some(block => {
     if (block.type === 'tool-call') return true
-    return block.type !== 'text' && block.type !== 'reasoning' ? false : (block.text ?? '').trim().length > 0
+    if (block.type !== 'text' && block.type !== 'reasoning') return false
+    return block.text.trim().length > 0
   })
-}
 
 export default definePlugin({
   id: 'goal-stall-guard',

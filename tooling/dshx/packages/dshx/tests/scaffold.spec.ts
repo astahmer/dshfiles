@@ -2,10 +2,30 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { createUiScaffold } from '../src/scaffold/ui.js'
+import { decodeJson, jsonObjectSchema, type JsonObject } from '../src/json.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import type { InspectResult, SlotSummary } from '../src/inspect/types.js'
 import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
+
+const packageManifestSchema = z.looseObject({
+  exports: z.record(z.string(), z.string()).optional(),
+  dsh: z
+    .looseObject({
+      client: z
+        .looseObject({
+          platform: z.string(),
+          inject: z.array(z.string()),
+          external: z.array(z.string()),
+          immediately: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+  peerDependencies: z.record(z.string(), z.string()).optional(),
+})
 
 const compatibility = {
   id: 'protocol-2',
@@ -25,14 +45,14 @@ const compatibility = {
   },
 }
 
-function project(root: string, clientEntry: string | undefined, manifest: Record<string, unknown>): ResolvedDshxConfig {
+function project(root: string, clientEntry: string | undefined, manifest: JsonObject): ResolvedDshxConfig {
   return {
     root,
     packageFile: resolve(root, 'package.json'),
     configDependencies: [],
     packageId: '@demo/plugin',
     name: '@demo/plugin',
-    ...(clientEntry === undefined ? {} : { clientEntry }),
+    ...(clientEntry !== undefined && { clientEntry }),
     hostEntry: resolve(root, 'src/host.ts'),
     outDir: resolve(root, 'dist'),
     profile: 'web',
@@ -94,7 +114,7 @@ async function setup(full: boolean): Promise<{ root: string; project: ResolvedDs
   if (full) {
     await writeFile(resolve(root, 'src/client.tsx'), 'import { defineClient } from "@dshfiles/dshx/client"\n\nexport default defineClient({ setup() {} })\n')
   }
-  const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as Record<string, unknown>
+  const manifest = decodeJson(jsonObjectSchema, await readFile(resolve(root, 'package.json'), 'utf8'))
   return {
     root,
     project: project(root, full ? resolve(root, 'src/client.tsx') : undefined, manifest),
@@ -121,8 +141,8 @@ describe('add ui scaffold', () => {
       const client = await readFile(resolve(value.root, 'src/client.tsx'), 'utf8')
       expect(client).toContain('from "./slots/sidebar.footer.action.js"')
       expect(client).toContain('slots: [sidebar_footer_actionContribution]')
-      const manifest = JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8'))
-      expect(manifest.dsh.client.inject).toEqual([
+      const manifest = decodeJson(packageManifestSchema, await readFile(resolve(value.root, 'package.json'), 'utf8'))
+      expect(manifest.dsh?.client?.inject).toEqual([
         '@deepseek-ai/dsh-client-ui-renderer',
         '@deepseek-ai/dsh-client-ui-layout',
         '@deepseek-ai/dsh-client-ui-sidebar',
@@ -159,7 +179,7 @@ describe('add ui scaffold', () => {
         },
       )
       expect(result.manifestChanged).toBe(true)
-      const manifest = JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')) as Record<string, unknown>
+      const manifest = decodeJson(packageManifestSchema, await readFile(resolve(value.root, 'package.json'), 'utf8'))
       expect(manifest.exports).toMatchObject({ './client': './dist/client.js' })
       expect(manifest.dsh).toMatchObject({
         client: {
@@ -301,7 +321,7 @@ describe('add ui scaffold', () => {
               provider: '@demo/sidebar',
               kind: 'single',
               scope: 'root',
-              ...(options?.slotRoot === undefined ? {} : { metadata: { catalog: { registration: [], replaceRisk: 'none' }, occupants: [] } }),
+              ...(options?.slotRoot !== undefined && { metadata: { catalog: { registration: [], replaceRisk: 'none' }, occupants: [] } }),
             },
           ],
         }
@@ -342,9 +362,9 @@ describe('add ui scaffold', () => {
                 provider: '@demo/sidebar',
                 kind: options?.slotRoot === undefined ? 'list' : 'keyed',
                 scope: 'root',
-                ...(options?.slotRoot === undefined
-                  ? {}
-                  : { metadata: { catalog: { registration: [{ name: 'key', required: true, type: 'string' }], replaceRisk: 'none' } } }),
+                ...(options?.slotRoot !== undefined && {
+                  metadata: { catalog: { registration: [{ name: 'key', required: true, type: 'string' }], replaceRisk: 'none' } },
+                }),
               },
             ],
           }),

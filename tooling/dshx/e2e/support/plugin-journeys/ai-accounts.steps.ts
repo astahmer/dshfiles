@@ -135,6 +135,8 @@ const prepareCommandCodeKey = async (page: Page, name: string): Promise<void> =>
   await expect(dialog.getByRole('button', { name: 'API key', exact: true })).toHaveAttribute('aria-pressed', 'true')
 }
 
+const CUSTOM_MODEL_ID = 'e2e-custom-model'
+
 const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly routeSlug?: string; readonly key: string }): Promise<void> => {
   await prepareCommandCodeKey(page, input.name)
   const keyDialog = page.getByRole('dialog', { name: 'Connect Command Code', exact: true })
@@ -866,6 +868,29 @@ Then('the AI Accounts list on the Models page can be hidden and restored', async
     await expect(restoredAccountList).toBeChecked()
     await settings.getByRole('button', { name: 'Models', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a Codex account with a manually added model is configured', async ({ page }: { page: Page }) => {
+  await startFakeCommandCode(page)
+  await openAccountsPanel(page)
+  await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-ALPHA1' })
+  await selectedAccount(page).getByRole('tab', { name: 'Models', exact: true }).click()
+  await selectedAccount(page).getByRole('button', { name: 'Add custom model', exact: true }).click()
+  await selectedAccount(page).getByRole('textbox', { name: 'Additional model ID', exact: true }).fill(CUSTOM_MODEL_ID)
+  await selectedAccount(page).getByRole('button', { name: 'Add model', exact: true }).click()
+  await expect.poll(async () => (await readSavedAccounts(page))[0]?.additionalModelIds).toContain(CUSTOM_MODEL_ID)
+})
+
+Then('the custom model can be removed from its picker list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-custom-model-removal', async () => {
+    const customRow = selectedAccount(page).getByRole('row').filter({ hasText: 'Custom' })
+    await expect(customRow).toHaveCount(1)
+    await customRow.getByRole('button', { name: /^Actions for /u }).click()
+    await page.getByRole('menuitem', { name: 'Remove additional model', exact: true }).click()
+    await expect(customRow).toHaveCount(0)
+    await expect.poll(async () => (await readSavedAccounts(page))[0]?.additionalModelIds).not.toContain(CUSTOM_MODEL_ID)
   })
   await finishJourneyAssertions(page)
 })

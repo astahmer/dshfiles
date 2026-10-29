@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inspectRuntimePlugins } from '../src/runtime-status.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import type { DshCompatibility } from '../src/compat/index.js'
+import type { DshCompatibility } from '../src/compat/types.js'
 
 const project: ResolvedDshxConfig = {
   root: process.cwd(),

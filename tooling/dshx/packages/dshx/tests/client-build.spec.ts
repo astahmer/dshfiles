@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { Plugin } from 'vite'
-import { buildClient, watchClient } from '../src/compiler/index.js'
+import { buildClient, watchClient } from '../src/compiler/client/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
@@ -34,6 +34,10 @@ function evaluateClientRegistration(code: string) {
   return clientRegistrationShape.parse(registration)
 }
 const isClientPlugin = (value: unknown): value is z.infer<typeof clientPluginShape> => clientPluginShape.safeParse(value).success
+
+interface ApplyContext {
+  received?: unknown
+}
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-fixture-'))
@@ -140,7 +144,7 @@ describe('client compiler', () => {
     expect(registration?.id).toBe('@dshx/fixture-plugin')
     expect(styles).toHaveLength(0)
 
-    const requireModule = (id: string): unknown => {
+    const requireModule = (id: string) => {
       if (id === 'react') {
         const context = { Provider: 'provider' }
         return {
@@ -759,7 +763,7 @@ describe('client compiler', () => {
     const registration = evaluateClientRegistration(code)
     const plugin = clientPluginShape.parse(registration.factory(() => ({})))
     const config = { enabled: true }
-    const context = { received: undefined }
+    const context: ApplyContext = {}
     plugin.apply(context, config)
     expect(plugin.name).toBe('native-client')
     expect(plugin.inject).toEqual(['slots'])
@@ -1222,7 +1226,7 @@ describe('client compiler', () => {
 
     const factories = new Map<string, (requireModule: (id: string) => unknown) => unknown>()
     const materialized = new Map<string, unknown>()
-    const requireModule = (id: string): unknown => {
+    const requireModule = (id: string) => {
       if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
       return materialized.get(id)
     }

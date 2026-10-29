@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
@@ -73,17 +74,23 @@ const AccountUsageCard = (props: {
               Limit reached
             </Badge>
           ) : onReserve ? (
-            <Badge
-              className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info"
-              title="The weekly limit is spent; Codex requests draw on Luna Reserve."
-              variant="secondary"
-            >
-              On Luna Reserve
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="dshx:inline-flex">
+                  <Badge className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info" variant="secondary">
+                    On Luna Reserve
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>The weekly limit is spent; Codex requests draw on Luna Reserve.</TooltipContent>
+            </Tooltip>
           ) : null}
-          <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground" title={props.hostName}>
-            {props.hostName}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{props.hostName}</span>
+            </TooltipTrigger>
+            <TooltipContent>{props.hostName}</TooltipContent>
+          </Tooltip>
         </header>
         {UsageOverviewModel.bindingWindow(props.card) === undefined ? (
           <div className="dshx:text-xs dshx:text-muted-foreground">
@@ -119,15 +126,22 @@ const AccountUsageCard = (props: {
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
               <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
-                <span
-                  className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}
-                  title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}
-                >
-                  {resetLabel === null
-                    ? UsageOverviewModel.formatResetIn(window.resetsAt, props.now)
-                    : `${resetLabel} · ${UsageOverviewModel.formatResetIn(window.resetsAt, props.now)}`}
-                </span>
-                <span title="Age of this usage snapshot">Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}>
+                      {resetLabel === null
+                        ? UsageOverviewModel.formatResetIn(window.resetsAt, props.now)
+                        : `${resetLabel} · ${UsageOverviewModel.formatResetIn(window.resetsAt, props.now)}`}
+                    </span>
+                  </TooltipTrigger>
+                  {window.resetsAt === null ? null : <TooltipContent>{new Date(window.resetsAt).toLocaleString()}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>Age of this usage snapshot</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )
@@ -228,6 +242,8 @@ const ResizeGrip = (props: {
   }
 
   return (
+    <Tooltip>
+      <TooltipTrigger asChild>
     <div
       aria-label="Resize usage popover"
       className={cn(
@@ -256,12 +272,14 @@ const ResizeGrip = (props: {
         props.onResize(size)
       }}
       role="separator"
-      title="Drag to resize · double-click to fit content"
     >
       <svg aria-hidden className={cn('dshx:size-3', direction.x < 0 && 'dshx:-scale-x-100', direction.y < 0 && 'dshx:-scale-y-100')} viewBox="0 0 12 12">
         <path d="M11 4 4 11M11 8 8 11" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.2" />
       </svg>
     </div>
+      </TooltipTrigger>
+      <TooltipContent>Drag to resize · double-click to fit content</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -292,6 +310,7 @@ export const UsageOverview = (props: {
   const size = draggedSize ?? usagePopoverSize
   const sectionRef = useRef<HTMLElement>(null)
   return (
+    <TooltipProvider delayDuration={500}>
     <section
       aria-label="AI account usage"
       className={cn('dshx-root dshx:relative dshx:flex dshx:min-h-0 dshx:flex-col', size.height === 0 && 'dshx:max-h-[min(640px,75vh)]')}
@@ -330,26 +349,37 @@ export const UsageOverview = (props: {
             All
           </ToggleGroupItem>
           {providers.map(kind => (
-            <ToggleGroupItem aria-label={KIND_LABEL[kind]} className="dshx:px-1.5" key={kind} title={KIND_LABEL[kind]} value={kind}>
-              <ProviderGlyph kind={kind} />
+            <ToggleGroupItem aria-label={KIND_LABEL[kind]} className="dshx:px-1.5" key={kind} value={kind}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:inline-flex">
+                    <ProviderGlyph kind={kind} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{KIND_LABEL[kind]}</TooltipContent>
+              </Tooltip>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
         <Button className="dshx:ml-auto dshx:shrink-0 dshx:text-xs" onClick={props.onOpenHistory} size="xs" type="button" variant="ghost">
           Open usage history
         </Button>
-        <Button
-          aria-label={props.refreshing ? 'Refreshing usage' : 'Refresh usage'}
-          className="dshx:shrink-0"
-          disabled={props.refreshing}
-          onClick={props.onRefresh}
-          size="icon-xs"
-          title="Refresh usage"
-          type="button"
-          variant="ghost"
-        >
-          <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              aria-label={props.refreshing ? 'Refreshing usage' : 'Refresh usage'}
+              className="dshx:shrink-0"
+              disabled={props.refreshing}
+              onClick={props.onRefresh}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh usage</TooltipContent>
+        </Tooltip>
       </header>
       <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
         {props.usage === null ? (
@@ -385,5 +415,6 @@ export const UsageOverview = (props: {
       </div>
       {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} />}
     </section>
+    </TooltipProvider>
   )
 }

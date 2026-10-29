@@ -178,6 +178,8 @@ export type ApiQueryState<T> = ApiQueryResult<T>
 export type ApiQueryBaseOptions = {
   readonly enabled?: boolean
   readonly signal?: AbortSignal
+  /** Reuse a completed read for this many ms on mount; manual refetch and reconnect always fetch. Defaults to 5000. */
+  readonly staleTime?: number
 }
 export type ApiQueryOptions<M> = ApiClientInput<M> extends void ? ApiQueryBaseOptions : ApiQueryBaseOptions & { readonly input: ApiClientInput<M> }
 

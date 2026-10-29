@@ -1,0 +1,5 @@
+# Client-only: provides the dshx Dialogs and Toasts contracts and renders them in the shell overlay. No Host entry,
+# but the row lets the loader mount the package and hand its Client contribution to the shell.
+- insert:
+    - id: dshfiles-dialogs
+      name: '@dshfiles/dialogs'

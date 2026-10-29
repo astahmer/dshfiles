@@ -6,7 +6,6 @@ import { threadAccountHostApi } from './thread-account-host.js'
 import { threadModelApi, threadModelPolicySchema, type ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
 import { ThreadRequestPolicy } from './thread-request-policy.js'
 import { configFromAccountsFile } from './account-config.js'
-export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
@@ -80,7 +79,6 @@ import { createQuotaContinuationService } from './quota-continuation.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
 import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
-export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -951,7 +949,7 @@ export default definePlugin({
                   step,
                   provider,
                   requestProvider,
-                  ...(routedAccountId === undefined ? {} : { routedAccountId }),
+                  ...(routedAccountId !== undefined && { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
                   canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,

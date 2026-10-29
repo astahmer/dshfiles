@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionHeader } from '@deepseek-ai/dsh-session/types'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import {
   materializeSessionEventResultFilters,
   SessionQueryEngine,
@@ -256,7 +257,7 @@ export class SessionSearchEngine extends SessionQueryEngine {
 
   _parseCursor(cursor: string): z.infer<typeof cursorPayloadSchema> | undefined {
     try {
-      const parsed = cursorPayloadSchema.safeParse(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')))
+      const parsed = decodeJsonSafe(cursorPayloadSchema, Buffer.from(cursor, 'base64url').toString('utf8'))
       return parsed.success ? parsed.data : undefined
     } catch {
       return undefined

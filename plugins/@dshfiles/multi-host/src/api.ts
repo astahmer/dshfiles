@@ -13,6 +13,7 @@ const sessionIdSchema = z.string().min(1).max(256)
 const brandedSessionIdSchema = z.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+export type LocalProjectFileCandidate = { readonly path: string; readonly bytes: number; readonly ignored: boolean; readonly copyable: boolean }
 
 export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
@@ -214,6 +215,42 @@ const remotePathSchema = z
   .min(2)
   .max(4096)
   .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)
+const cloneDestinationSchema = z.union([
+  remotePathSchema,
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(4096)
+    .regex(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u),
+])
+const localProjectPathSchema = z.string().trim().min(1).max(4096)
+const localProjectFilePathSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(path => !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..'))
+const repositoryUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .regex(
+    /^(?:https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?|git@[A-Za-z0-9.-]+:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?)$/u,
+  )
+const cloneProjectInputSchema = z
+  .object({
+    runtimeId: idSchema,
+    repositoryUrl: repositoryUrlSchema,
+    destinationPath: cloneDestinationSchema,
+    copyFromPath: localProjectPathSchema.optional(),
+    copyPaths: z.array(localProjectFilePathSchema).max(128).optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if ((input.copyFromPath === undefined) !== (input.copyPaths === undefined)) {
+      context.addIssue({ code: 'custom', message: 'Local source folder and selected file list must be supplied together.' })
+    }
+  })
 
 const profileNameSchema = z
   .string()
@@ -444,6 +481,36 @@ export const multiHostApi = defineApi({
       description:
         'Register a folder on a remote runtime as a workspace, so the remote jj-integration can describe and isolate it. Call only when the user asked to open that folder there.',
       tool: { name: 'multi_host_open_folder', render: compactJson },
+    }),
+    localProjectFiles: method({
+      input: z.object({ path: localProjectPathSchema }).strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          root: z.string(),
+          files: z.array(z.object({ path: z.string(), bytes: z.number().int().nonnegative(), ignored: z.boolean(), copyable: z.boolean() }).strict()),
+          truncated: z.boolean(),
+        }),
+        failedSchema,
+      ]),
+      description: 'List untracked and ignored files under one local Git project, without reading file contents. Read-only.',
+      tool: { name: 'multi_host_local_project_files', readOnly: true, render: compactJson },
+    }),
+    runtimeCloneProject: method({
+      input: cloneProjectInputSchema,
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          workspaceId: z.string(),
+          path: z.string(),
+          copiedFileCount: z.number().int().nonnegative().optional(),
+          copyWarning: z.string().max(2048).optional(),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'Clone a Git repository to one remote host and register the clone as a project workspace. Optionally copy user-selected local untracked or ignored files from a Git project. Call only when the user asked to clone there.',
+      tool: { name: 'multi_host_clone_project', render: compactJson },
     }),
     runtimeBrowse: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),

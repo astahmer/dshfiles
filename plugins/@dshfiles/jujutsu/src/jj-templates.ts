@@ -10,6 +10,7 @@ export const REVISION_TEMPLATE =
   '\',"parents":[\' ++ self.parents().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']\' ++ ' +
   '\',"bookmarks":[\' ++ self.bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ ' +
   '\',"localBookmarks":[\' ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ ' +
+  '\',"remoteBookmarksText":\' ++ stringify(self.remote_bookmarks().map(|b| b.name() ++ "@" ++ b.remote()).join("\\n")).escape_json() ++ ' +
   '\',"tags":[\' ++ self.tags().map(|t| t.name().escape_json()).join(",") ++ \']\' ++ ' +
   '\',"workspaces":[\' ++ self.working_copies().map(|w| w.name().escape_json()).join(",") ++ \']\' ++ ' +
   '\',"workingCopy":\' ++ self.current_working_copy() ++ ' +

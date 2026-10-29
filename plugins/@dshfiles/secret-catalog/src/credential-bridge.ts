@@ -1,7 +1,6 @@
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from '@dshfiles/credential-port'
-import { secretScopeSchema, type SecretScope } from './secret-metadata.js'
+import { secretScopeSchema, type SecretCatalogCredentialBridge, type SecretCatalogKeyOption, type SecretScope } from '@dshfiles/credential-port'
 import type { SecretCatalogOperations } from './secret-operations.js'
 
 export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption }

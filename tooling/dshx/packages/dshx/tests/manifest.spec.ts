@@ -3,13 +3,15 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveDshxConfig } from '../src/config/resolve.js'
-import { checkPackageTargets, checkProjectManifest } from '../src/project/index.js'
+import { checkPackageTargets } from '../src/project/package-targets.js'
+import { checkProjectManifest } from '../src/project/manifest.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
-function fullManifest(): Record<string, unknown> {
-  return {
+function fullManifest() {
+  const manifest: Record<string, unknown> = {}
+  Object.assign(manifest, {
     name: '@test/plugin',
     type: 'module',
     main: './dist/index.js',
@@ -24,7 +26,8 @@ function fullManifest(): Record<string, unknown> {
       bundle: { patch: './cordis.patch.yml' },
       client: { platform: 'web', inject: [], external: [], immediately: false },
     },
-  }
+  })
+  return manifest
 }
 
 async function temporaryProject(options: { host?: boolean; client?: boolean } = {}): Promise<string> {

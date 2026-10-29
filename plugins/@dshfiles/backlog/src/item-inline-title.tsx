@@ -53,14 +53,14 @@ export const useBacklogInlineRename = (open: () => void): BacklogInlineRename =>
 /** The title input a renaming row swaps in for its rendered markdown title. */
 export const BacklogInlineTitle = (props: {
   readonly id: number
-  readonly title: string
+  readonly value: string
   readonly className: string
   readonly cancel: () => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   return (
     <InlineTitleEditor
-      value={props.title}
+      value={props.value}
       label="Item title"
       maxLength={BacklogItems.maxTitleChars}
       className={props.className}

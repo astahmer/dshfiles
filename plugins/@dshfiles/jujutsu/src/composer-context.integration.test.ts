@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { composerReads } from './composer-context-host.ts'
+import { ComposerContextHost } from './composer-context-host.ts'
 import {
+  COMPOSER_BASE_TEMPLATE,
   COMPOSER_BOOKMARKS_TEMPLATE,
   COMPOSER_FILE_TEMPLATE,
   COMPOSER_HEAD_TEMPLATE,
@@ -99,6 +100,21 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     '-T',
     'commit_id ++ "\\n"',
   ]).trim()
+  const baseRows = JujutsuOutputModel.parseJsonLines(
+    runJj(repo, home, [
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '-r',
+      ComposerContextModel.composerBaseTarget({ kind: 'bookmark', name: 'main' }),
+      '--limit',
+      '2',
+      '-T',
+      COMPOSER_BASE_TEMPLATE,
+    ]),
+    value => value,
+  )
+  expect(baseRows).toEqual([{ commitId: baseCommitId, bookmarks: ['main'] }])
   const revisionCountRevsets = ComposerContextModel.revisionCountRevsets(baseCommitId)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.ahead, '-T', '"x"']).length).toBe(2)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.behind, '-T', '"x"']).length).toBe(0)
@@ -148,7 +164,9 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   const divergedRevsets = ComposerContextModel.revisionCountRevsets(siblingCommitId)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.ahead, '-T', '"x"']).length).toBe(1)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.behind, '-T', '"x"']).length).toBe(1)
-}, 15_000)
+  // This builds a real repository through dozens of jj and git subprocesses; the suite runs files in parallel,
+  // where the 15s bound was a coin flip.
+}, 60_000)
 
 test('composer reads spawn jj again for view reads only after an operation lands', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-reads-'))
@@ -156,7 +174,7 @@ test('composer reads spawn jj again for view reads only after an operation lands
   onTestFinished(() => rm(home, { recursive: true, force: true }))
   runJj(home, home, ['git', 'init', '--no-colocate', repo])
   const spawned: string[] = []
-  const read = composerReads(async (_ctx, cwd, args) => {
+  const read = ComposerContextHost.reads(async (_ctx, cwd, args) => {
     spawned.push(args.join(' '))
     return { stdout: runJj(cwd, home, args), truncated: false }
   })

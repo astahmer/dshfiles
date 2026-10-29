@@ -1,3 +1,4 @@
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { describe, expect, it } from 'vitest'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { McpServerStateModel } from './server-state.js'
@@ -78,8 +79,8 @@ describe('server editor form', () => {
     })
     const values = McpServerFormModel.serverFormFromView(view)
     expect(values).toMatchObject({ id: 'one', enabled: false, localStart: true, startCwd: '/srv' })
-    expect(JSON.parse(values.headerRefs)).toEqual({ Authorization: 'REMOTE_TOKEN' })
-    expect(JSON.parse(values.startEnvRefs)).toEqual({ ACCESS_TOKEN: 'PROXY_TOKEN' })
+    expect(decodeJson(jsonObjectSchema, values.headerRefs)).toEqual({ Authorization: 'REMOTE_TOKEN' })
+    expect(decodeJson(jsonObjectSchema, values.startEnvRefs)).toEqual({ ACCESS_TOKEN: 'PROXY_TOKEN' })
     expect(JSON.stringify(values)).not.toContain(secret)
   })
 

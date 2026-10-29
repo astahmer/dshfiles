@@ -2,7 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { PropsLocale, PropsRuntime, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
-import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
+import type { ClientContext, LocaleDefinition, LocaleKeyOf, PluralKeyOf, PropsLocaleOf } from '../src/client/index.js'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStore } from '@deepseek-ai/dsh-session'
 import { ClientContributionModel } from '../src/client/define.js'
@@ -109,17 +109,32 @@ describe('defineClient', () => {
     expectTypeOf<LocaleKeyOf<typeof copy>>().toEqualTypeOf<'title' | 'body'>()
     expectTypeOf<PropsLocaleOf<typeof copy>['t']>().parameter(0).toEqualTypeOf<'title' | 'body' | import('@deepseek-ai/dsh-client-ui-slots').CommonKeyOf>()
 
-    defineLocale('test.missing-key', {
+    defineLocale('test.extra-key', {
+      // @ts-expect-error A key English lacks is refused in every other locale.
       zh: { title: '标题', body: '正文' },
-      // @ts-expect-error Every shipped locale must expose exactly the same keys.
       en: { title: 'Title' },
     })
-    defineLocale('test.extra-locale', {
+    defineLocale('test.extra-key-other-locale', {
+      en: { title: 'Title' },
+      // @ts-expect-error A key English lacks is refused in every other locale.
+      fr: { title: 'Titre', body: 'Corps' },
+    })
+    // @ts-expect-error English is required.
+    defineLocale('test.missing-en', { zh: { title: '标题' } })
+    const partial = defineLocale('test.partial', {
+      en: { title: 'Title', body: 'Body' },
       zh: { title: '标题' },
-      en: { title: 'Title' },
-      // @ts-expect-error Only LocaleId keys are accepted.
-      fr: { title: 'Titre' },
+      fr: { body: 'Corps' },
     })
+    expectTypeOf<LocaleKeyOf<typeof partial>>().toEqualTypeOf<'title' | 'body'>()
+    const englishOnly = defineLocale('test.english-only', { en: { title: 'Title' } })
+    expectTypeOf<LocaleKeyOf<typeof englishOnly>>().toEqualTypeOf<'title'>()
+    const counted = defineLocale('test.counted', {
+      en: { title: 'Title', items_one: '{count} item', items_other: '{count} items', files_zero: 'No files', files_other: '{count} files' },
+      zh: { items_other: '{count} 项' },
+    })
+    expectTypeOf<PluralKeyOf<typeof counted>>().toEqualTypeOf<'items' | 'files'>()
+    expectTypeOf<PluralKeyOf<typeof copy>>().toEqualTypeOf<never>()
     defineLocale('test.invalid-value', {
       zh: { title: '标题' },
       // @ts-expect-error Locale values must be strings.
@@ -149,6 +164,7 @@ describe('Client runtime adapter', () => {
       packageId: '@test/plugin',
       logicalName: 'logical-client',
       sourceFile: '/project/src/client.tsx',
+      plugin: expect.objectContaining({ id: '@test/plugin', add: expect.any(Function), provide: expect.any(Function) }),
     })
   })
 
@@ -244,7 +260,8 @@ describe('Client runtime adapter', () => {
     expect(effect.mock.invocationCallOrder[0]).toBeLessThan(registerLocale.mock.invocationCallOrder[0] ?? 0)
     expect(calls).toEqual(['locale:test.copy', 'inject:test.slot', 'slot:test.copy', 'setup'])
     expect(registered[0]).toEqual({ namespace: 'test.copy', dictionaries: LocaleNamespaceModel.parts(copy).dictionaries })
-    expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component })
+    expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component: expect.any(Function) })
+    expect(registered[1]).toHaveProperty('component.displayName', 'WithPlugin(Isolated(component))')
     expect(dispose).not.toHaveBeenCalled()
   })
 
@@ -257,7 +274,8 @@ describe('Client runtime adapter', () => {
     const ctx = testContext()
     ctx.provide('slots', { inject: <Result>(_name: string, apply: () => Result) => apply(), register })
     plugin.apply(ctx)
-    expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, component)
+    expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, expect.any(Function))
+    expect(register.mock.calls[0]?.[1]).toHaveProperty('displayName', 'WithPlugin(Isolated(component))')
   })
 
   it('does not inject or register an empty Slot list', () => {
@@ -396,8 +414,10 @@ describe('Client runtime adapter', () => {
     ['empty namespace', '', { zh: { title: '标题' }, en: { title: 'Title' } }],
     ['whitespace namespace', ' test.copy ', { zh: { title: '标题' }, en: { title: 'Title' } }],
     ['non-object dictionaries', 'test.copy', null],
-    ['missing locale', 'test.copy', { zh: { title: '标题' } }],
-    ['extra locale', 'test.copy', { zh: { title: '标题' }, en: { title: 'Title' }, fr: { title: 'Titre' } }],
+    ['missing en', 'test.copy', { zh: { title: '标题' } }],
+    ['non-object en', 'test.copy', { en: null, zh: { title: '标题' } }],
+    ['invalid locale id', 'test.copy', { en: { title: 'Title' }, 'not a locale': { title: 'Titre' } }],
+    ['extra key in an additional locale', 'test.copy', { en: { title: 'Title' }, fr: { title: 'Titre', body: 'Corps' } }],
     ['non-object dictionary', 'test.copy', { zh: { title: '标题' }, en: [] }],
     ['non-string value', 'test.copy', { zh: { title: '标题' }, en: { title: 1 } }],
     ['empty key', 'test.copy', { zh: { '': '标题' }, en: { '': 'Title' } }],

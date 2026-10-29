@@ -6,8 +6,17 @@
     "test:boot": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__sidebar-commands.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/sidebar-commands/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/sidebar-commands/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",

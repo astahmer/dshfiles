@@ -321,7 +321,7 @@ async function listSkills(ctx: Context, options: { readonly cwd?: string; readon
       name: skill.name,
       description: skill.description,
       provider: skill.provider,
-      ...(skill.source === undefined ? {} : { source: skill.source }),
+      ...(skill.source !== undefined && { source: skill.source }),
       modelInvocable: skill.invocation.modelInvocable,
       userInvocable: skill.invocation.userInvocable,
     }))

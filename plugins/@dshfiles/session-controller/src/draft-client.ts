@@ -4,8 +4,6 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 
-export type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-
 /** Presentation metadata only. The composer owns the complete text and attachments. */
 export interface SessionDraft {
   readonly sessionId: SessionId

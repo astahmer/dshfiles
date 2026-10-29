@@ -47,6 +47,9 @@ export type AttentionColor = (typeof ATTENTION_COLOR_OPTIONS)[number]
 export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished'
 export type AttentionColors = Record<AttentionColorKey, AttentionColor>
 
+export const PROJECT_COLOR_PALETTES = ['balanced', 'cool'] as const
+export type ProjectColorPalette = (typeof PROJECT_COLOR_PALETTES)[number]
+
 /** Every hover action a thread row can offer; the Customize sidebar panel toggles and orders them. */
 export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'settle', 'mute', 'archive', 'restore'] as const
 export type ThreadRowAction = (typeof THREAD_ROW_ACTIONS)[number]
@@ -119,6 +122,7 @@ export interface SidebarPreferences {
   threadRowDensity: ThreadRowDensity
   threadRowProject: boolean
   threadRowProjectColor: boolean
+  projectColorPalette: ProjectColorPalette
   threadRowTitle: boolean
   threadRowMachine: boolean
   threadRowPath: boolean
@@ -194,6 +198,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowDensity: 'compact',
   threadRowProject: true,
   threadRowProjectColor: true,
+  projectColorPalette: 'balanced',
   threadRowTitle: true,
   threadRowMachine: true,
   threadRowPath: false,

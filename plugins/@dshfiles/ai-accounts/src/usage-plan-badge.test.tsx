@@ -10,7 +10,7 @@ describe('UsagePlanBadge', () => {
   it.each(['plus', 'max', 'business', 'pro_200', 'Pro+', 'enterprise'])('preserves provider wording (%s)', plan => {
     const markup = renderToStaticMarkup(<UsagePlanBadge plan={` ${plan} `} />)
     expect(markup).toContain(`aria-label="Subscription plan: ${plan}"`)
-    expect(markup).toContain(`title="Subscription plan: ${plan}"`)
+    expect(markup).not.toContain('title=')
     expect(markup).toContain(`>${plan}</span>`)
   })
 

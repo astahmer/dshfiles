@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 
@@ -63,8 +64,8 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
   return (
     <section className="dshx-root dshx:flex dshx:flex-col dshx:gap-3">
       <p className="dshx:min-w-0 dshx:text-muted-foreground dshx:text-sm">
-        A plugin's browser half rebuilt while its Host half still runs from before the rebuild. The browser keeps the
-        last-good code until the Host loads the new half, so nothing runs out of step.
+        A plugin's browser half rebuilt while its Host half still runs from before the rebuild. The browser keeps the last-good code until the Host loads the
+        new half, so nothing runs out of step.
       </p>
       {packages.length === 0 ? (
         <p className="dshx:text-muted-foreground dshx:text-sm">Nothing is waiting. Every rebuilt plugin is in step with the Host.</p>
@@ -78,9 +79,7 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
           ))}
         </ul>
       )}
-      {packages.length === 0 ? null : (
-        <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH to load the new Host code, then reload this page.</p>
-      )}
+      {packages.length === 0 ? null : <p className="dshx:text-muted-foreground dshx:text-sm">Restart DSH to load the new Host code, then reload this page.</p>}
     </section>
   )
 }
@@ -91,9 +90,9 @@ export default defineClient({
   inject: ['modules', 'slots'],
   setup(ctx) {
     const receive = (data: string): void => {
-      let decoded: unknown
+      let decoded: JsonValue
       try {
-        decoded = JSON.parse(data)
+        decoded = decodeJson(jsonValueSchema, data)
       } catch {
         return
       }

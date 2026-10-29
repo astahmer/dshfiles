@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-query": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
+    "@deepseek-ai/dsh-storage-json": "0.2.1-rc.2",
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",

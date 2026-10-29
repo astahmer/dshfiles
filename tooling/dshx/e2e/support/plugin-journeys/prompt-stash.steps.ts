@@ -15,6 +15,7 @@ const promptOption = ({ page, title }: { page: Page; title: string }) => page.ge
 
 const openPromptLibrary = async ({ page }: { page: Page }): Promise<void> => {
   await page.getByRole('button', { name: 'Prompts', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Saved drafts', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Saved prompts', exact: true })).toBeVisible()
 }
 
@@ -197,66 +198,6 @@ Then('the recent list explains that no sent text prompts are loaded', async ({ p
     await expect(page.getByRole('tab', { name: 'Recent here (0)', exact: true })).toBeVisible()
     await expect(page.getByText('No sent text prompts are loaded from this conversation.', { exact: true })).toBeVisible()
   })
-  await finishJourneyAssertions(page)
-})
-
-When('the empty draft panel is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Saved drafts', exact: true })).toBeVisible()
-})
-
-Then('saving is disabled for an empty draft and sent history is empty', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'empty-draft-cannot-be-saved-and-sent-history-is-empty', async () => {
-    await expect(page.getByRole('button', { name: 'Save current', exact: true })).toBeDisabled()
-    await expect(page.getByText('No saved drafts yet.', { exact: true })).toBeVisible()
-    await expect(page.getByText('No sent text prompts are loaded for this session.', { exact: true })).toBeVisible()
-  })
-})
-
-Then('the empty draft panel is closed', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Saved prompt drafts', exact: true })).toBeHidden()
-})
-
-When('the composer text {string} is saved as {string}', async ({ page }: { page: Page }, text: string, title: string) => {
-  const composer = composerInput({ page })
-  await composer.click()
-  await composer.fill(text)
-  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
-  await page.getByLabel('Draft title', { exact: true }).fill(title)
-  await page.getByRole('button', { name: 'Save current', exact: true }).click()
-})
-
-Then('saving leaves the current composer text unchanged', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'saving-draft-keeps-current-composer-text', async () => {
-    await expect(composerInput({ page })).toHaveText('Draft body to keep')
-    await expect(page.getByRole('status')).toHaveText('Saved to the thread-sidebar stash. The composer draft remains unchanged.')
-  })
-})
-
-When('the composer is cleared and the saved draft {string} is restored', async ({ page }: { page: Page }, title: string) => {
-  const composer = composerInput({ page })
-  const panel = page.getByRole('dialog', { name: 'Saved prompt drafts', exact: true })
-  await expect(panel).toBeVisible()
-  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
-  await expect(panel).toBeHidden()
-  await composer.click()
-  await composer.press('ControlOrMeta+A')
-  await composer.press('Backspace')
-  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
-  await promptOption({ page, title }).click()
-})
-
-Then('the draft is restored without sending and can be removed', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'saved-draft-restores-text-without-sending', async () => {
-    await expect(composerInput({ page })).toHaveText('Draft body to keep')
-    await expect(page.getByRole('status')).toHaveText('Inserted at the saved composer position. Existing text and attachments were kept.')
-  })
-
-  const removeButton = page.getByRole('button', { name: 'Remove Planning prompt', exact: true })
-  await removeButton.hover()
-  await removeButton.click()
-  await recordAssertion(page, 'removed-draft-leaves-empty-draft-list', () => expect(page.getByText('No saved drafts yet.', { exact: true })).toBeVisible())
   await finishJourneyAssertions(page)
 })
 

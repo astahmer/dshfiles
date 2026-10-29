@@ -13,7 +13,12 @@ test('a subagent inherits the scope of the agent whose thread spawned it', () =>
 })
 
 test('a chain is followed for a bounded number of hops', () => {
-  const parents: Record<string, string> = { 'session-3': 'session-2', 'session-2': 'session-1', 'session-1': 'session-root', 'session-root': 'session-above' }
+  const parents = {
+    'session-3': 'session-2',
+    'session-2': 'session-1',
+    'session-1': 'session-root',
+    'session-root': 'session-above',
+  } satisfies Record<string, string>
   const lookup = lookupOf({ 'session-above': { memoryScope: 'agent:planner' } }, parents)
   return Promise.all([
     AgentScope.resolve({ sessionId: 'session-3', lookup }),

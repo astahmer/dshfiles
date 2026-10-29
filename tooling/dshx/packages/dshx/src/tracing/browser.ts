@@ -321,7 +321,7 @@ const createBrowserTracer = (options: BrowserTracerOptions = {}): BrowserTracer 
       const record: BrowserSpanRecord = {
         traceId: this.context.traceId,
         spanId: this.context.spanId,
-        ...(this.#parentSpanId === undefined ? {} : { parentSpanId: this.#parentSpanId }),
+        ...(this.#parentSpanId !== undefined && { parentSpanId: this.#parentSpanId }),
         name: this.#name,
         kind: this.#kind,
         startTimeMs: this.startTimeMs,

@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import { decodeJson, jsonObjectSchema, jsonValueSchema } from '../json.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { InspectProvider, InspectSlotOptions, ServiceSummary, EventSummary, SlotSummary, ToolSummary } from './types.js'
 
@@ -15,13 +17,15 @@ const DEFAULT_TIMEOUT_MS = 10_000
 
 const absolutePathSchema = z.string().refine(isAbsolute)
 
-const bridgeEndpointSchema = z.looseObject({
-  version: z.literal(PROTOCOL_VERSION),
-  packageId: z.string(),
-  root: absolutePathSchema,
-  pid: z.int(),
-  socketPath: absolutePathSchema,
-})
+const bridgeEndpointSchema = z
+  .object({
+    version: z.literal(PROTOCOL_VERSION),
+    packageId: z.string(),
+    root: absolutePathSchema,
+    pid: z.int(),
+    socketPath: absolutePathSchema,
+  })
+  .catchall(jsonValueSchema)
 
 const bridgeCredentialsSchema = z.object({
   version: z.literal(PROTOCOL_VERSION),
@@ -47,7 +51,7 @@ const bridgeErrorResponseSchema = z.object({
 })
 
 const optionalStringSchema = z.string().exactOptional()
-const itemMetadataSchema = z.record(z.string(), z.unknown()).exactOptional()
+const itemMetadataSchema = jsonObjectSchema.exactOptional()
 const itemNameSchema = z.string().trim().min(1)
 
 const slotItemsSchema = z.array(
@@ -105,11 +109,11 @@ export type InspectBridgeState = 'disabled' | 'running' | 'stale' | 'invalid' | 
 
 export interface InspectBridgeStatus {
   readonly state: InspectBridgeState
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly metadata?: JsonObject
   readonly diagnostics: readonly DshxDiagnostic[]
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -117,7 +121,7 @@ function bridgeName(packageId: string): string {
   return createHash('sha256').update(packageId).digest('hex').slice(0, 20)
 }
 
-function endpointPaths(packageId: string, env: Readonly<NodeJS.ProcessEnv>): { metadataPath: string; socketPath: string } {
+function endpointPaths(packageId: string, env: Readonly<NodeJS.ProcessEnv>) {
   const dshHome = env.DSH_HOME?.trim() ? resolve(env.DSH_HOME.trim()) : join(homedir(), '.dsh')
   const directory = join(dshHome, 'runtime', 'dshx', 'inspect')
   const name = bridgeName(packageId)
@@ -131,16 +135,20 @@ function fail(code: 'DSHX3201' | 'DSHX3202' | 'DSHX3203' | 'DSHX3204' | 'DSHX320
   return new DshxError(code, message, { hint })
 }
 
+function errorCode(error: unknown): string | undefined {
+  return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+}
+
 function processAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== 'ESRCH'
+    return errorCode(error) !== 'ESRCH'
   }
 }
 
-function publicMetadata(value: Record<string, unknown>): Readonly<Record<string, unknown>> {
+function publicMetadata(value: JsonObject): JsonObject {
   const { token: _token, ...safe } = value
   return safe
 }
@@ -153,7 +161,7 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
   try {
     text = await readFile(paths.metadataPath, 'utf8')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'disabled', diagnostics: [] }
+    if (errorCode(error) === 'ENOENT') return { state: 'disabled', diagnostics: [] }
     return {
       state: 'invalid',
       diagnostics: [
@@ -167,9 +175,9 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  let value: unknown
+  let value: JsonValue
   try {
-    value = JSON.parse(text)
+    value = decodeJson(jsonValueSchema, text)
   } catch (error) {
     return {
       state: 'invalid',
@@ -274,16 +282,16 @@ async function readMetadata(path: string, project: ResolvedDshxConfig, expectedS
   try {
     text = await readFile(path, 'utf8')
   } catch (cause) {
-    const code = (cause as NodeJS.ErrnoException).code === 'ENOENT' ? 'DSHX3201' : 'DSHX3202'
+    const code = errorCode(cause) === 'ENOENT' ? 'DSHX3201' : 'DSHX3202'
     throw fail(
       code,
       code === 'DSHX3201' ? 'No Host Inspect bridge endpoint is available.' : `Unable to read the Host Inspect bridge metadata: ${String(cause)}`,
       'Start the project with "dshx dev" and enable the Host Inspect bridge.',
     )
   }
-  let value: unknown
+  let value: JsonValue
   try {
-    value = JSON.parse(text)
+    value = decodeJson(jsonValueSchema, text)
   } catch (cause) {
     throw fail(
       'DSHX3203',
@@ -359,7 +367,7 @@ const request = async <Item>({
   const metadata = await readMetadata(paths.metadataPath, project, paths.socketPath)
   const requestId = `inspect-${randomUUID()}`
   const payload =
-    JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
+    JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input !== undefined && { input }) }) + '\n'
   const value = await JsonLineTransport.request(paths.socketPath, payload, {
     maxRequestBytes: MAX_MESSAGE_BYTES,
     maxResponseBytes: MAX_MESSAGE_BYTES,

@@ -28,6 +28,7 @@ export const createApiClient = ApiRuntimeModel.createClient
 
 function runtime(): ReactRuntime {
   if (react !== undefined) return react
+  // SAFETY: a bundler may expose the CommonJS loader on the global object; it loads the React runtime here.
   const loader = typeof require === 'function' ? require : (globalThis as { require?: (name: string) => ReactRuntime }).require
   if (typeof loader !== 'function') throw new Error('React runtime is unavailable for API hooks.')
   react = loader('react')
@@ -46,7 +47,10 @@ const createApiClientRuntime = (ctx: ContextLike, packageId: string): ApiClientR
   return {
     client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods> {
       const existing = clients.get(contract)
-      if (existing !== undefined) return existing as ApiClient<Methods>
+      if (existing !== undefined) {
+        // SAFETY: the map is keyed by contract identity, so a cached client was created for this exact contract.
+        return existing as ApiClient<Methods>
+      }
       const created = ApiRuntimeModel.createClient(ctx, contract, packageId)
       clients.set(contract, created)
       return created
@@ -124,24 +128,26 @@ const startApiQueryEffect = <T>(options: ApiQueryEffectOptions<T>): (() => void)
   }
 }
 
-function stableJson(value: unknown, seen = new Set<object>()): string {
-  if (value === null || typeof value !== 'object') {
-    if (typeof value === 'bigint') throw new TypeError('API query input must be JSON serializable.')
+const isStructuredJsonValue = <T>(value: T): value is T & object =>
+  value !== null && Object(value) === value && Object.prototype.toString.call(value) !== '[object Function]'
+const isBigIntValue = <T>(value: T): boolean => Object.prototype.toString.call(value) === '[object BigInt]'
+
+function formatStableJson(value: unknown, seen = new Set<object>()): string {
+  if (!isStructuredJsonValue(value)) {
+    if (isBigIntValue(value)) throw new TypeError('API query input must be JSON serializable.')
     return JSON.stringify(value) ?? 'undefined'
   }
   if (seen.has(value)) throw new TypeError('API query input must not contain cycles.')
   seen.add(value)
   try {
     const jsonValue = 'toJSON' in value && typeof value.toJSON === 'function' ? value.toJSON() : value
-    if (jsonValue !== value) return stableJson(jsonValue, seen)
+    if (jsonValue !== value) return formatStableJson(jsonValue, seen)
     if (Array.isArray(value))
-      return `[${value.map(item => (item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 'null' : stableJson(item, seen))).join(',')}]`
-    const source = value as Record<string, unknown>
-    return `{${Object.keys(source)
-      .sort()
-      .filter(key => source[key] !== undefined && typeof source[key] !== 'function' && typeof source[key] !== 'symbol')
-      .map(key => `${JSON.stringify(key)}:${stableJson(source[key], seen)}`)
-      .join(',')}}`
+      return `[${value.map(item => (item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 'null' : formatStableJson(item, seen))).join(',')}]`
+    const entries = Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol')
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${formatStableJson(entry, seen)}`).join(',')}}`
   } finally {
     seen.delete(value)
   }
@@ -162,6 +168,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
   method: K,
   ...args: ApiClientInput<Methods[K]> extends void ? [options?: ApiQueryOptions<Methods[K]>] : [options: ApiQueryOptions<Methods[K]>]
 ): ApiQueryResult<ApiClientOutput<Methods[K]>> {
+  // SAFETY: the rest tuple above is either [options?] or [options], so index 0 holds that option.
   const options = args[0] as ApiQueryOptions<Methods[K]> | undefined
   const input = options !== undefined && 'input' in options ? options.input : undefined
   const api = useApi(contract)
@@ -171,7 +178,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     data: undefined,
     error: null,
   })
-  const fingerprint = runtime().useMemo(() => stableJson(input), [input])
+  const fingerprint = runtime().useMemo(() => formatStableJson(input), [input])
   const [revision, setRevision] = runtime().useState(0)
   const manualRevision = runtime().useRef(0)
 
@@ -188,12 +195,12 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     return ApiClientLifecycle.startQuery<ApiClientOutput<Methods[K]>>({
       available: () => ApiRuntimeModel.connectionAvailable(api),
       subscribe: listener => ApiRuntimeModel.subscribeConnection(api, listener),
-      ...(options?.signal === undefined ? {} : { signal: options.signal }),
+      ...(options?.signal !== undefined && { signal: options.signal }),
       onPending: fetchStatus =>
         setState(previous => {
           if (previous.status === 'success') return { status: 'success', fetchStatus, data: previous.data, error: null }
           if (previous.status === 'error' && previous.data !== undefined) {
-            return { status: 'success', fetchStatus, data: previous.data as ApiClientOutput<Methods[K]>, error: null }
+            return { status: 'success', fetchStatus, data: previous.data, error: null }
           }
           return { status: 'pending', fetchStatus, data: undefined, error: null }
         }),
@@ -223,7 +230,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
       return value + 1
     })
   }, [])
-  return { ...state, refetch } as ApiQueryResult<ApiClientOutput<Methods[K]>>
+  return { ...state, refetch }
 }
 
 export class ApiClientLifecycle {

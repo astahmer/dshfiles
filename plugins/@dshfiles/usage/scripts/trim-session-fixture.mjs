@@ -50,20 +50,18 @@ const usage = value =>
           .map(key => [key, value[key]]),
       )
 const reason = value =>
-  value === undefined ? undefined : { kind: value.kind, ...(value.failure === undefined ? {} : { failure: { message: 'redacted', code: value.failure.code } }) }
+  value === undefined ? undefined : { kind: value.kind, ...(value.failure !== undefined && { failure: { message: 'redacted', code: value.failure.code } }) }
 const stream = entries =>
   (entries ?? []).map(entry => ({
     type: entry.type,
-    ...(entry.time === undefined ? {} : { time: entry.time }),
-    ...(entry.chunk === undefined
-      ? {}
-      : {
-          chunk: {
-            type: entry.chunk.type,
-            ...(entry.chunk.usage ? { usage: usage(entry.chunk.usage) } : {}),
-            ...(entry.chunk.reason ? { reason: reason(entry.chunk.reason) } : {}),
-          },
-        }),
+    ...(entry.time !== undefined && { time: entry.time }),
+    ...(entry.chunk !== undefined && {
+      chunk: {
+        type: entry.chunk.type,
+        ...(entry.chunk.usage && { usage: usage(entry.chunk.usage) }),
+        ...(entry.chunk.reason && { reason: reason(entry.chunk.reason) }),
+      },
+    }),
   }))
 
 const trimData = (type, data) => {
@@ -76,29 +74,27 @@ const trimData = (type, data) => {
       return {
         turn: data.turn,
         step: data.step,
-        ...(data.message === undefined
-          ? {}
-          : {
-              message: {
-                role: 'assistant',
-                content: [],
-                id: data.message.id,
-                source: {
-                  kind: source?.kind,
-                  provider: source?.provider,
-                  model: source?.model,
-                  ...(source?.replayState?.response?.stopReason ? { replayState: { response: { stopReason: source.replayState.response.stopReason } } } : {}),
-                },
-              },
-            }),
-        ...(data.usage === undefined ? {} : { usage: usage(data.usage) }),
+        ...(data.message !== undefined && {
+          message: {
+            role: 'assistant',
+            content: [],
+            id: data.message.id,
+            source: {
+              kind: source?.kind,
+              provider: source?.provider,
+              model: source?.model,
+              ...(source?.replayState?.response?.stopReason && { replayState: { response: { stopReason: source.replayState.response.stopReason } } }),
+            },
+          },
+        }),
+        ...(data.usage !== undefined && { usage: usage(data.usage) }),
         stream: stream(data.stream),
       }
     }
     case 'turn/end':
       return {
         turn: data.turn,
-        reason: { kind: data.reason?.kind, ...(data.reason?.error === undefined ? {} : { error: { message: 'redacted', code: data.reason.error.code } }) },
+        reason: { kind: data.reason?.kind, ...(data.reason?.error !== undefined && { error: { message: 'redacted', code: data.reason.error.code } }) },
       }
     case 'llm/retry':
       return { turn: data.turn, step: data.step, provider: data.provider, retry: data.retry, failure: { message: 'redacted', code: data.failure?.code } }
@@ -135,7 +131,7 @@ const KEPT = new Set([
 const trimmed = records.flatMap(record => {
   if (record.type === 'session') {
     const { agentPreset: _preset, ...header } = record
-    return [{ ...header, cwd: values.cwd, ...(header.parentSession === undefined ? {} : { parentSession: 'session-parent' }) }]
+    return [{ ...header, cwd: values.cwd, ...(header.parentSession !== undefined && { parentSession: 'session-parent' }) }]
   }
   if (!KEPT.has(record.type)) return []
   return [{ type: record.type, seq: record.seq, time: record.time, data: trimData(record.type, record.data ?? {}) }]

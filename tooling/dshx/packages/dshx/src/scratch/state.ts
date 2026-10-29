@@ -4,6 +4,7 @@ import { appendFile, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:f
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import { REACH_SEEDS } from '../project/features.js'
 
 /** The live DSH the user works in; a scratch instance never takes its port or its home. */
@@ -94,7 +95,7 @@ const readScratchState = async (stateDir: string, name: string): Promise<Scratch
       `Run "dshx dev up${name === 'default' ? '' : ` --name ${name}`}" first.`,
     )
   }
-  const parsed = ScratchStateSchema.safeParse(JSON.parse(source))
+  const parsed = ScratchStateSchema.safeParse(decodeJson(jsonValueSchema, source))
   if (!parsed.success) {
     throw new ScratchError(
       'invalid-state',

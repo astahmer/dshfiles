@@ -1,14 +1,21 @@
 import { SettingsPageRendererModel, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
+import { SettingsSearchEntriesModel } from '../settings/section-entries.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import { ClientContributionModel } from './define.js'
 import { HostCommandsModel } from './host-commands.js'
 import { LocaleNamespaceModel } from './locale.js'
+import { BrowserBroker } from './broker.js'
+import { PluginHooksModel } from './hooks.js'
+import { PluginContextModel } from './plugin-context.js'
+import { StoreModel } from './store.js'
 
 export const defineClient = ClientContributionModel.defineClient
 export const defineSlot = ClientContributionModel.defineSlot
 export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace
 export const defineLocale = LocaleNamespaceModel.define
-export { CLIENT_SLOT_REFERENCES, findClientSlot, slotOwnerImports, type ClientSlotReference } from './slot-reference.js'
+export const plural = LocaleNamespaceModel.plural
+export { CLIENT_SLOT_REFERENCES, type ClientSlotReference } from 'create-dshx/slot-capabilities'
+export { findClientSlot, slotOwnerImports } from './slot-reference.js'
 export const hasHostCommandRegistry = HostCommandsModel.hasRegistry
 export const runHostCommand = HostCommandsModel.run
 export type {
@@ -19,6 +26,8 @@ export type {
   LocaleDefinition,
   LocaleDictionaries,
   LocaleKeyOf,
+  LocaleSourceDictionaries,
+  PluralKeyOf,
   PropsLocaleOf,
   SlotContribution,
   SlotOptions,
@@ -48,5 +57,61 @@ export type {
   PanelIconProps,
 } from '../sdk/client.js'
 
+export const defineContract = BrowserBroker.defineContract
+export const defineRegistry = BrowserBroker.defineRegistry
+/** Contributions that threw, for a diagnostics view; `useContributionFailures` reads it in React. */
+export const contributionFailures = BrowserBroker.failures
+export type { ContractToken, ContributionFailure, Live, RegistryToken, Subscribable } from './broker.js'
+export type { ItemSource, PluginContext, PluginServices, Track } from './plugin-context.js'
+export const constantSource = PluginContextModel.constant
+export const createSource = PluginContextModel.signal
+
+export { Command, Dialogs, Toasts } from './app-services.js'
+export type {
+  AlertInput,
+  CommandItem,
+  CommandsService,
+  ConfirmInput,
+  DialogsService,
+  LayoutService,
+  PromptInput,
+  SelectInput,
+  SelectOption,
+  ToastInput,
+  ToastsService,
+  ToastTone,
+} from './app-services.js'
+export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from './registries.js'
+export type {
+  ComposerActionItem,
+  HeaderActionItem,
+  OverlayItem,
+  PanelItem,
+  PluginDetailItem,
+  PluginDetailProps,
+  PluginDetailSubject,
+  SessionRowAccessoryItem,
+  SettingsSectionItem,
+} from './registries.js'
+
+export const defineStore = StoreModel.define
+export type { DefinedStore, PersistedStore, StoreDefinition, StoreScope } from './store.js'
+
+export const usePlugin = PluginHooksModel.usePlugin
+export const useSubscribable = PluginHooksModel.useSubscribable
+export const useContract = PluginHooksModel.useContract
+export const useRegistry = PluginHooksModel.useRegistry
+export const useContributionFailures = PluginHooksModel.useContributionFailures
+export const useKeyed = PluginHooksModel.useKeyed
+export const useLatest = PluginHooksModel.useLatest
+export type { LatestState } from './hooks.js'
+
 export const provideSettingsPageRenderer = SettingsPageRendererModel.provide
 export type { SettingsPageRenderer, SettingsPageRendererProps }
+
+/** Search entries every live `settings.section` publishes, read by a Settings shell without mounting the sections. */
+export const settingsSearchEntries = SettingsSearchEntriesModel.current
+export const subscribeSettingsSearchEntries = SettingsSearchEntriesModel.subscribe
+/** For a section registered imperatively through `ctx.slots.register`, which the `metadata` option never reaches. */
+export const publishSettingsSearchEntries = SettingsSearchEntriesModel.publish
+export type { SettingsSearchEntriesBySection, SettingsSearchEntry, SettingsSectionMetadata, SettingsSectionSearchProps } from '../settings/section-entries.js'

@@ -19,8 +19,8 @@ export const connectLocal = ({
     createTransport: async (origin, requestSignal) => {
       const forward = await createLoopbackForward({
         target: origin,
-        ...(originPort === undefined ? {} : { originPort }),
-        ...(requestSignal === undefined ? {} : { signal: requestSignal }),
+        ...(originPort !== undefined && { originPort }),
+        ...(requestSignal !== undefined && { signal: requestSignal }),
       })
       const launch = new URL(locator.launchUrl)
       launch.hostname = forward.address

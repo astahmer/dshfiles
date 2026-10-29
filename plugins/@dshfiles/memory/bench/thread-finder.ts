@@ -155,7 +155,10 @@ const queriesFor = (entries: readonly Modelled[]): readonly Query[] =>
     { kind: 'title' as const, query: entry.title, expected: entry.sessionId },
   ])
 
-const stored = (entry: Modelled): { readonly header: SessionHeader; readonly events: readonly SessionEvent[] } => {
+/** One synthetic session as the bench stores it: its header and full event log. */
+type StoredSession = { readonly header: SessionHeader; readonly events: readonly SessionEvent[] }
+
+const stored = (entry: Modelled): StoredSession => {
   const header: SessionHeader = { version: SESSION_FORMAT_VERSION, id: SessionId(entry.sessionId), createdAt: now, cwd: entry.cwd, isSeeded: false }
   const thread = createThread({ id: entry.sessionId, cwd: entry.cwd })
   thread.exchange(`${entry.paraphrase} (${entry.identifier})`, `Investigated ${entry.identifier}: ${entry.title.toLowerCase()} handled.`)
@@ -163,7 +166,7 @@ const stored = (entry: Modelled): { readonly header: SessionHeader; readonly eve
   return { header, events: [...thread.log().events] }
 }
 
-const stablePersistence = (entries: readonly { readonly header: SessionHeader; readonly events: readonly SessionEvent[] }[]) => ({
+const stablePersistence = (entries: readonly StoredSession[]) => ({
   list: async () => entries.map(entry => ({ header: structuredClone(entry.header), revision: 'revision-1' })),
   open: async (id: string) => {
     const entry = entries.find(candidate => candidate.header.id === id)

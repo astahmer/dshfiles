@@ -47,8 +47,12 @@ const breakdownQuery = (client: BoardsClient, board: BuiltinBoard, windowMinutes
 
 const numeric = 'dshx:text-right dshx:font-mono dshx:text-xs'
 
-const headerOf = (column: BoardColumn, t: TracesAlertsTranslate): string =>
-  column === 'count' ? t('count') : column === 'errorRate' ? t('errorRate') : column === 'measure' ? t('ttft') : column
+const headerOf = (column: BoardColumn, t: TracesAlertsTranslate): string => {
+  if (column === 'count') return t('count')
+  if (column === 'errorRate') return t('errorRate')
+  if (column === 'measure') return t('ttft')
+  return column
+}
 
 const cellOf = (column: BoardColumn, row: BreakdownRow): string => {
   if (column === 'count') return String(row.count)

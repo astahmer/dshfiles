@@ -253,6 +253,13 @@ Feature: Backlog
     And the selected backlog threads are started
     Then the backlog reports that two threads were started
 
+  @scenario:backlog.tweet-context-retrieval
+  Scenario: Older tweet items offer context retrieval
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Tweet context in backlog https://x.com/someone/status/123" is captured
+    Then backlog item b:1 offers tweet retrieval in its feed context menu
+
   @scenario:backlog.item-context-actions
   Scenario: Right-click actions follow items across backlog views
     Given the isolated plugin profile "@dshfiles/backlog" is booted
@@ -335,8 +342,8 @@ Feature: Backlog
     Given the isolated plugin profile "@dshfiles/backlog" is booted
     When the Backlog panel is opened
     And two images are attached to the capture
-    And "Capture screenshots with the issue" is captured
-    Then the captured backlog item keeps both image attachments
+    And the image references are submitted with the capture
+    Then the captured backlog item keeps both image attachments inline
 
   @scenario:backlog.rich-item-text
   Scenario: Save a Markdown description and reply
@@ -357,7 +364,7 @@ Feature: Backlog
     And backlog item b:1 is opened
     And a reply with an image is added
     When the user reply is edited with keyboard navigation
-    Then the edited reply keeps its attachment
+    Then the edited reply has only its replacement attachment
     When the user reply is deleted after confirmation
     Then the reply and its attachment are removed from the activity
 

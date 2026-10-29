@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { attachmentPreviews, messagePreview } from './message-preview.js'
+import { attachmentPreviews, messagePreview, messageText } from './message-preview.js'
 import type { QueuedBlock } from './queue-edit.js'
+
+test('preserves complete text blocks for rich reference rendering', () => {
+  const reference = 'b:412 "queue refs rendering" (backlog item; backlog_get has its details)'
+  assert.equal(messageText([{ type: 'text', text: `Review ${reference}` }, { type: 'image' }]), `Review ${reference}`)
+})
 
 test('flattens text and named blocks while excluding attachments', () => {
   assert.equal(

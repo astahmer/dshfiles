@@ -100,7 +100,9 @@ const applyDelta = (groups: readonly CostGroup[], group: CostGroup, sign: 1 | -1
 const replaceSample = (groups: readonly CostGroup[], previous: CostGroup | undefined, group: CostGroup): CostGroup[] =>
   applyDelta(previous === undefined ? groups : applyDelta(groups, previous, -1), group, 1)
 
-const initialCostState = (): CostState => ({ selection: null, last: null, view: { groups: [], turn: null } })
+const MAX_TURN_COST_GROUPS = 512
+
+const initialCostState = (): CostState => ({ selection: null, last: null, view: { groups: [], turn: null, turns: [] } })
 
 const applyCostEvent = (state: CostState, event: ProjectionEvent): CostState => {
   if (event.type === 'request/header') {
@@ -136,10 +138,25 @@ const applyCostEvent = (state: CostState, event: ProjectionEvent): CostState => 
   }
   const previous = state.last !== null && state.last.turn === turn && state.last.step === step ? state.last.group : undefined
   if (previous !== undefined && JSON.stringify(previous) === JSON.stringify(group)) return state
-  const turnGroups = state.view.turn?.turn === turn ? state.view.turn.groups : []
+  const turnGroups = state.view.turns?.find(candidate => candidate.turn === turn)?.groups ?? (state.view.turn?.turn === turn ? state.view.turn.groups : [])
+  const nextTurnGroups = replaceSample(turnGroups, previous, group)
+  const turns = [
+    ...(state.view.turns ?? (state.view.turn === null ? [] : [state.view.turn])).filter(candidate => candidate.turn !== turn),
+    { turn, groups: nextTurnGroups },
+  ].sort((left, right) => left.turn - right.turn)
+  let retainedGroupCount = 0
+  const retainedTurns = turns
+    .toReversed()
+    .filter(candidate => {
+      if (retainedGroupCount + candidate.groups.length > MAX_TURN_COST_GROUPS) return false
+      retainedGroupCount += candidate.groups.length
+      return true
+    })
+    .toReversed()
   const view: SessionCostView = {
     groups: replaceSample(state.view.groups, previous, group),
-    turn: { turn, groups: replaceSample(turnGroups, state.view.turn?.turn === turn ? previous : undefined, group) },
+    turn: { turn, groups: nextTurnGroups },
+    turns: retainedTurns,
   }
   return { ...state, last: { turn, step, group }, view }
 }
@@ -150,7 +167,7 @@ export class CostProjectionModel {
 }
 
 /** Bump whenever the state shape or fold semantics change, so stale checkpoints refold. */
-const STATE_VERSION = 1
+const STATE_VERSION = 2
 
 const costProjectionDefinition = {
   key: SESSION_COST_PROJECTION_KEY,

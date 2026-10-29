@@ -358,9 +358,8 @@ points:
 - Host `session.search` (⌥⌘K on the web, ⌘K on desktop) opens thread search:
   the native browser stays registered under this one, and its request store is
   followed through the slot ledger.
-- Any bundle can dispatch the cancelable `dshfiles:command-palette` window
-  event with `{ mode: 'all' | 'threads' }`; a `{ probe: true }` detail is only
-  acknowledged (`/goto` uses it).
+- Any bundle opens the palette through the `CommandPalette` contract of
+  `@dshfiles/command-palette/palette-contract`.
 
 **Footer** entries render on one row and never shrink or wrap. Entries that do
 not fit move into More (⋯) together with entries hidden in Customize; overflow
@@ -383,7 +382,7 @@ launcher, brand and reopen badge remain sidebar chrome; Settings already has its
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after @session:<id> :` prefilled and the caret on the next line; normal workspace isolation applies.
+unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after` and a structured session-reference chip prefilled, labeled with the source thread title, and the caret on the next line; normal workspace isolation applies.
 
 **Continue in project** (row menu and thread header menu) fixes a thread that
 started in the wrong folder, or whose work moved to another repository. It lists

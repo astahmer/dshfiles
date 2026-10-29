@@ -103,7 +103,7 @@ export const connectGateway = async ({
   try {
     exchange = await fetch(runtimeLaunch.origin + '/?token=' + encodeURIComponent(runtimeLaunch.token), {
       redirect: 'manual',
-      ...(signal === undefined ? {} : { signal }),
+      ...(signal !== undefined && { signal }),
     })
   } catch {
     await transport.dispose()
@@ -421,7 +421,7 @@ const attemptUntracedRun = async ({ origin, cookie, namespace, method, args, sig
       redirect: 'error',
       headers,
       body: requestBody,
-      ...(signal === undefined ? {} : { signal }),
+      ...(signal !== undefined && { signal }),
     })
   } catch {
     if (signal?.aborted) return { ok: false, code: 'cancelled', message: 'The runtime API request was cancelled.' }

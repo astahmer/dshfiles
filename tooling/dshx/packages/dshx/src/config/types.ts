@@ -1,4 +1,5 @@
 import type { PluginOption } from 'vite'
+import type { JsonObject } from '../json.js'
 
 /** The deliberately bounded Vite extension surface for one DSHX face. */
 export interface DshxViteExtensions {
@@ -102,5 +103,5 @@ export interface ResolvedDshxConfig {
   readonly compatibility: {
     readonly allowUnsupported: boolean
   }
-  readonly manifest: Readonly<Record<string, unknown>>
+  readonly manifest: JsonObject
 }

@@ -2,7 +2,7 @@
   "name": "@dshfiles/prompt-stash",
   "version": "0.1.0",
   "private": true,
-  "description": "Save reusable prompts and bounded composer drafts locally.",
+  "description": "Save and reuse shared prompt snippets.",
   "license": "MIT",
   "files": [
     "dist",

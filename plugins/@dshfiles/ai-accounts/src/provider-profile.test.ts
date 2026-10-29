@@ -292,7 +292,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
       for await (const _chunk of adapter.stream({
         provider: 'opencode-go-test',
         model,
-        ...(reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(reasoningEffort) }),
+        ...(reasoningEffort !== undefined && { reasoningEffort: ReasoningEffortId(reasoningEffort) }),
         messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
       })) {
         // drain

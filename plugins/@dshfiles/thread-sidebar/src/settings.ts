@@ -1,6 +1,13 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, SIDEBAR_ORDER_SECTIONS, SIDEBAR_SECTIONS, THREAD_ROW_ACTIONS } from './organization.js'
+import {
+  ATTENTION_COLOR_OPTIONS,
+  DEFAULT_PREFERENCES,
+  PROJECT_COLOR_PALETTES,
+  SIDEBAR_ORDER_SECTIONS,
+  SIDEBAR_SECTIONS,
+  THREAD_ROW_ACTIONS,
+} from './organization.js'
 import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { THREAD_NOTIFICATION_PLACEMENTS, threadNotificationCategoriesSchema } from './thread-notifications.js'
@@ -41,6 +48,9 @@ export const threadSidebarSettings = defineSettings({
     threadRowProjectColor: Schema.boolean()
       .default(DEFAULT_PREFERENCES.threadRowProjectColor)
       .description('Tint each project name with a stable colour of its own.'),
+    projectColorPalette: Schema.union(PROJECT_COLOR_PALETTES)
+      .default(DEFAULT_PREFERENCES.projectColorPalette)
+      .description('Choose the accessible color family used for project labels.'),
     threadRowTitle: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTitle).description('Show the thread title.'),
     threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine the DSH Host runs on.'),
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),

@@ -2,8 +2,9 @@ import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
@@ -23,6 +24,12 @@ const CLOSE_GRACE_MS = 140
 
 const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
   `${request.sessionId}\u0000${request.cwd}\u0000${request.reference.kind}\u0000${request.reference.value}`
+
+/**
+ * The hidden template chip keeps the native chip's markup; the native component names its label through `title`, so it
+ * travels as typed props rather than a native title attribute.
+ */
+const referenceTemplateProps: ComponentProps<typeof ReferenceChip> = { appearance: 'session', label: 'Jujutsu reference', title: 'Jujutsu reference' }
 
 /**
  * The revision-graph preview for a `jj:` reference in chat. A native session-reference chip lives inside its code node;
@@ -84,44 +91,39 @@ export const ChatReferenceOverlay = (): JSX.Element => {
 
   const titleRequest = titleRequests.at(0) ?? null
   const referenced = request?.reference.value
-  const titleReference = titleRequest?.reference.value
-  const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
-    const read = async (path: string) => {
-      try {
-        const repository = await queryClient.fetchQuery({
-          queryKey: chatReferenceQueryKeys.repository(path),
-          queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
-          staleTime: 30_000,
-        })
-        const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
-        return 'graph' in graph ? { repository, graph } : undefined
-      } catch {
-        return undefined
-      }
+  const readLocalReference = async (cwd: string, reference: string, signal: AbortSignal) => {
+    try {
+      const repository = await queryClient.fetchQuery({
+        queryKey: chatReferenceQueryKeys.repository(cwd),
+        queryFn: ({ signal: querySignal }) => api.registerRepository({ path: cwd }, { signal: querySignal }),
+        staleTime: 30_000,
+      })
+      const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
+      return 'graph' in graph ? { repository, graph } : null
+    } catch {
+      return null
     }
-    const local = await read(cwd)
-    if (local !== undefined) return [local]
+  }
+  const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
+    const local = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.localTitle(cwd, reference),
+      queryFn: ({ signal: querySignal }) => readLocalReference(cwd, reference, querySignal),
+      staleTime: 30_000,
+    })
+    if (local !== null) return [local]
     const projects = await queryClient.fetchQuery({
       queryKey: chatReferenceQueryKeys.projects,
       queryFn: ({ signal: querySignal }) => jjIntegration.projects({}, { signal: querySignal }),
       staleTime: 30_000,
     })
-    const paths = [...projects.projects, ...(projects.workspaces ?? [])].map(project => project.path)
-    const repositories = await Promise.all(
-      [...new Set(paths)].slice(0, 31).map(async path => {
-        try {
-          return {
-            path,
-            repository: await queryClient.fetchQuery({
-              queryKey: chatReferenceQueryKeys.repository(path),
-              queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
-              staleTime: 30_000,
-            }),
-          }
-        } catch {
-          return undefined
-        }
-      }),
+    const paths = [...new Set([...projects.projects, ...(projects.workspaces ?? [])].map(project => project.path))].slice(0, 31)
+    const registered = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.repositories(paths),
+      queryFn: ({ signal: querySignal }) => api.registerRepositories({ paths }, { signal: querySignal }),
+      staleTime: 30_000,
+    })
+    const repositories = registered.repositories.flatMap(entry =>
+      entry.repoId === null || entry.root === null ? [] : [{ path: entry.path, repository: { repoId: entry.repoId, root: entry.root } }],
     )
     const repositoryIds = new Set<string>()
     const candidates = repositories.flatMap(candidate => {
@@ -149,17 +151,16 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', referenced ?? '', signal),
   })
   const titleGraph = useQuery({
-    queryKey: chatReferenceQueryKeys.search(titleRequest?.cwd ?? '', titleReference ?? ''),
-    enabled: titleRequest !== null && titleReference !== undefined,
+    queryKey: chatReferenceQueryKeys.localTitle(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? ''),
+    enabled: titleRequest !== null,
     retry: false,
     staleTime: 30_000,
-    queryFn: ({ signal }) => resolveReference(titleRequest?.cwd ?? '', titleReference ?? '', signal),
+    queryFn: ({ signal }) => readLocalReference(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? '', signal),
   })
 
   useEffect(() => {
     if (titleRequest === null || titleGraph.isFetching || (!titleGraph.isSuccess && !titleGraph.isError)) return
-    const matches = titleGraph.data ?? []
-    const match = ChatReferenceModel.uniqueMatch(matches)
+    const match = titleGraph.data ?? null
     window.dispatchEvent(
       new CustomEvent(chatReferenceTitleResolvedEvent, {
         detail: {
@@ -173,14 +174,31 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     setTitleRequests(current => (current[0] !== undefined && titleRequestKey(current[0]) === completedKey ? current.slice(1) : current))
   }, [titleGraph.data, titleGraph.isError, titleGraph.isFetching, titleGraph.isSuccess, titleRequest])
 
+  useEffect(() => {
+    if (request === null || graph.isFetching || !graph.isSuccess) return
+    const match = ChatReferenceModel.uniqueMatch(graph.data ?? [])
+    if (match === undefined) return
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: {
+          sessionId: request.sessionId,
+          cwd: request.cwd,
+          reference: request.reference,
+          title: match.graph.description?.trim() || request.reference.value,
+          targetPath: match.repository.root,
+        },
+      }),
+    )
+  }, [graph.data, graph.isFetching, graph.isSuccess, request])
+
   const matches = graph.data ?? []
   const referenceGraph = ChatReferenceModel.uniqueMatch(matches)?.graph
   const failure = matches.length > 1 ? 'This reference exists in multiple registered repositories, so it cannot be selected unambiguously.' : undefined
   const rendered = referenceGraph?.graph
   return (
-    <>
+    <TooltipProvider delayDuration={500}>
       <span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden>
-        <ReferenceChip appearance="session" label="Jujutsu reference" title="Jujutsu reference" />
+        <ReferenceChip {...referenceTemplateProps} />
       </span>
       {request === null ? null : (
         <Popover open onOpenChange={open => !open && setRequest(null)}>
@@ -218,7 +236,13 @@ export const ChatReferenceOverlay = (): JSX.Element => {
               <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-xs dshx:text-muted-foreground">
                 {referenceGraph.commitId === null ? null : (
                   <span>
-                    Commit ID: <code title={referenceGraph.commitId}>{referenceGraph.commitId.slice(0, 8)}</code>
+                    Commit ID:{' '}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code>{referenceGraph.commitId.slice(0, 8)}</code>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{referenceGraph.commitId}</TooltipContent>
+                    </Tooltip>
                   </span>
                 )}
                 {referenceGraph.changeId === null ? null : (
@@ -259,6 +283,6 @@ export const ChatReferenceOverlay = (): JSX.Element => {
           </PopoverContent>
         </Popover>
       )}
-    </>
+    </TooltipProvider>
   )
 }

@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Retrieve public tweet context into a backlog item](docs/screenshots/tweet-context-enrichment.png)
+
 ![Configure Jev triage from the Backlog panel](docs/screenshots/jev-settings.png)
 
 ![Set up a missing Jev key from chat](docs/screenshots/jev-secret-setup.png)
@@ -21,6 +23,8 @@
 ![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
 
 ![A board card opens the item detail beside the board](docs/screenshots/board-card-detail.png)
+
+![Choose to open or copy a linked URL](docs/screenshots/url-reference-actions.png)
 
 ![File and scope items by project](docs/screenshots/project-scope.png)
 
@@ -112,8 +116,9 @@ instead.
 
 The peek opens beside the list (over it in a narrow pane). Edit the title and the markdown body in place, change kind and status, pin, link and unlink targets, comment, and read every event
 with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** lists the items that link to
-this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
-leave them alone. Nothing is deleted; `dropped` closes an item.
+this one. Click a URL reference to open a popover with **Open in browser** and **Copy URL** actions. Fields
+the user changes by hand are recorded in `humanFields`, so later automatic moves can leave them alone.
+Nothing is deleted; `dropped` closes an item.
 
 The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
@@ -128,6 +133,12 @@ one opens an inline card with the item's title, kind, status, project and body. 
 thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
 selects that item in the panel. An item that no longer exists says so in the card instead of failing the
 conversation.
+
+## Retrieve tweet context
+
+When a new item, an edited title or description, or an explicit URL link adds a public X/Twitter status, Backlog automatically retrieves its first unimported post through Tweet Context. For an older item—or after a failed or interrupted lookup—right-click its row and choose **Retrieve tweet content**. Retrieval sends the post ID to FxEmbed. Post and thread text is appended as a clearly marked, quoted section; existing descriptions and files are preserved. Available photos and sampled video frames become item attachments within the remaining slots and an eight-image, 16 MiB import budget.
+
+Only public status links already present on the item are accepted. Private, deleted or unavailable posts leave the item unchanged; failed automatic lookups can be retried from the row menu. A successful import is recorded against the normalized post URL, so repeating it does not duplicate content.
 
 ## Starting a thread from an item
 
@@ -166,7 +177,7 @@ model, and a failed link is logged rather than losing the thread.
 
 ### Smart reply routing
 
-On by default (Settings → `dshfiles-backlog` → _Smart thread routing_); turn it off to keep every plain reply as a regular comment. When enabled, a plain reply is classified before it is saved; when configured Jev receives that submitted text using the same Host-held TypeSafe credential as triage. Jev starts a linked `@dsh` thread when confidence meets _Reply thread threshold_. If Jev is off, its key is unavailable, or the request fails, a conservative leading-verb keyword fallback routes explicit work requests and leaves other text as a reply. A leading `@agent` remains an explicit, deterministic dispatch and does not need Jev.
+Off by default (Settings → `dshfiles-backlog` → _Smart thread routing_); plain replies stay regular comments by default, so adding context cannot unexpectedly start a thread. Turn it on to classify plain replies before they are saved; when configured Jev receives that submitted text using the same Host-held TypeSafe credential as triage. Jev starts a linked `@dsh` thread when confidence meets _Reply thread threshold_. If Jev is off, its key is unavailable, or the request fails, a conservative leading-verb keyword fallback routes explicit work requests and leaves other text as a reply. A leading `@agent` remains an explicit, deterministic dispatch and does not need Jev.
 
 For reply-worthy text without attachments, _Smart reply answers_ (on by default) saves the user's comment and then asks the selected agent to add a short AI answer as a separate comment. _Reply agent_ names an optional preferred handle, and _Reply agent order_ chooses whether that or the most recently linked item agent is tried first; `@dsh` and the model catalog's default route are the final fallback. A chosen agent's route and instructions apply, but its session preset and tools do not run for this one-shot answer. The generated comment is visibly prefixed with the chosen handle. Replies carrying files remain ordinary comments because the generator does not inspect attachments. If generation fails, the original reply stays saved and an error is shown. Thread-worthy work still saves the user reply and starts the linked thread; attachments stay with the item.
 

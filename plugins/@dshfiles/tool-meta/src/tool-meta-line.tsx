@@ -1,5 +1,6 @@
 import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { useSettings } from '@dshfiles/dshx/client'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useSyncExternalStore, type ReactElement } from 'react'
 import type { ToolMetaTranslate } from './locales.js'
@@ -66,20 +67,26 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
         )
       : undefined
   return (
-    <span className="dshx:contents">
-      <span
-        role={timing.kind === 'running' ? 'timer' : 'note'}
-        aria-label={label}
-        title={label}
-        data-dshfiles-tool-meta={timing.kind}
-        className={cn(
-          'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:bg-background dshx:pl-2 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-          timing.kind === 'running' && 'dshx:text-foreground',
-        )}
-      >
-        {text}
+    <TooltipProvider delayDuration={500}>
+      <span className="dshx:contents">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              role={timing.kind === 'running' ? 'timer' : 'note'}
+              aria-label={label}
+              data-dshfiles-tool-meta={timing.kind}
+              className={cn(
+                'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:bg-background dshx:pl-2 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                timing.kind === 'running' && 'dshx:text-foreground',
+              )}
+            >
+              {text}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+        {waitTimer !== undefined && <WaitTimerIndicator timer={waitTimer} t={t} />}
       </span>
-      {waitTimer !== undefined && <WaitTimerIndicator timer={waitTimer} t={t} />}
-    </span>
+    </TooltipProvider>
   )
 }

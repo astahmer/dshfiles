@@ -49,7 +49,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
 /** A settings or usage section; numbering is optional for older callers. */
 export const NumberedSection = (props: {
   readonly index?: string
-  readonly title: string
+  readonly heading: string
   readonly description?: string
   readonly actions?: ReactNode
   readonly children: ReactNode
@@ -58,7 +58,7 @@ export const NumberedSection = (props: {
     <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2.5">
         {props.index === undefined ? null : <span className="dshx:font-mono dshx:text-xs dshx:text-info">{props.index}</span>}
-        <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
+        <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
       </div>
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         {props.description === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground">{props.description}</span>}

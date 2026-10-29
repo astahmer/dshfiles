@@ -105,13 +105,13 @@ function parseArgs(argv: readonly string[]): Args {
   const parsed = parseCittyArgs([...argv], createArgs)
   if (parsed._.length > 1) throw new Error('Only one project name may be specified.')
   return {
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
+    ...(parsed.name !== undefined && { name: parsed.name }),
+    ...(parsed.cwd !== undefined && { cwd: parsed.cwd }),
     install: parsed.install ?? true,
     installExplicit: install || noInstall,
-    ...(parsed.packageManager === undefined ? {} : { packageManager: parsed.packageManager as PackageManager }),
-    ...(parsed.template === undefined ? {} : { template: parsed.template as TemplateName }),
-    ...(parsed.style === undefined ? {} : { style: parsed.style as ProjectStyle }),
+    ...(parsed.packageManager !== undefined && { packageManager: parsed.packageManager as PackageManager }),
+    ...(parsed.template !== undefined && { template: parsed.template as TemplateName }),
+    ...(parsed.style !== undefined && { style: parsed.style as ProjectStyle }),
     yes: parsed.yes ?? false,
     help: parsed.help ?? false,
     version: parsed.version ?? false,
@@ -237,18 +237,16 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
       name,
       template,
       style,
-      ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
+      ...(args.cwd !== undefined && { cwd: args.cwd }),
       install: installDependencies,
-      ...(args.packageManager === undefined ? {} : { packageManager: args.packageManager }),
-      ...(installSpinner === undefined
-        ? {}
-        : {
-            onInstallProgress: ({ phase, packageManager }) => {
-              if (phase === 'start') installSpinner.start(`Installing dependencies with ${packageManager}...`)
-              else if (phase === 'success') installSpinner.stop(`Dependencies installed with ${packageManager}`)
-              else installSpinner.error(`Dependency installation failed with ${packageManager}`)
-            },
-          }),
+      ...(args.packageManager !== undefined && { packageManager: args.packageManager }),
+      ...(installSpinner !== undefined && {
+        onInstallProgress: ({ phase, packageManager }) => {
+          if (phase === 'start') installSpinner.start(`Installing dependencies with ${packageManager}...`)
+          else if (phase === 'success') installSpinner.stop(`Dependencies installed with ${packageManager}`)
+          else installSpinner.error(`Dependency installation failed with ${packageManager}`)
+        },
+      }),
     },
     dependencies,
   )

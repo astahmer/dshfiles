@@ -80,7 +80,6 @@ export class AgentComments {
     readonly open?: boolean
     readonly notifyInApp?: boolean
   }): StartThreadRequest {
-    const task = input.task.trim()
     const context = StartThreadForm.message(input.items)
     return {
       items: input.items,
@@ -89,7 +88,7 @@ export class AgentComments {
       provider: null,
       model: null,
       reasoningEffort: undefined,
-      message: task === '' ? context : `${context}\n\n${task}`,
+      message: context,
       open: input.open ?? false,
       notifyInApp: input.notifyInApp ?? true,
     }

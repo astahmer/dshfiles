@@ -34,7 +34,7 @@ const ratesFor = (input: {
     const quote = PricingCatalogModel.resolveRouteQuote({
       route: { provider: route.provider, model: route.model },
       cache: input.cache,
-      ...(kind === undefined ? {} : { accountKind: kind }),
+      ...(kind !== undefined && { accountKind: kind }),
       overrides: {},
     })
     if (quote.price === null) continue

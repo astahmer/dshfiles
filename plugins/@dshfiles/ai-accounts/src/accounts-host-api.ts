@@ -9,6 +9,8 @@ import { hostname } from 'node:os'
 import {
   aiAccountsApi,
   baseModelName,
+  FORECAST_HISTORY_BUCKET_MINUTES,
+  FORECAST_HISTORY_DAYS,
   isKeyEnvName,
   type AccountsFile,
   type AccountsUsage,
@@ -17,6 +19,7 @@ import {
 } from './api.js'
 import { AccountStoreModel, accountStoreService } from './account-store.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
+import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
@@ -197,6 +200,16 @@ export const accountsHostApi = aiAccountsApi.host({
       await refreshRoutes(ctx)
       return accountsFile(ctx)
     }),
+  removeCustomModel: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+      const account = (await accountStoreService.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
+      if (account === undefined) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
+      const patch = ModelCurationModel.removeAdditionalModel({ account, modelId: input.modelId })
+      if (patch === null) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
+      await accountStoreService.upsertAccount({ ...account, ...patch }, undefined, true)
+      await refreshRoutes(ctx)
+      return { removed: true, instanceId: input.instanceId, modelId: input.modelId }
+    }),
   moveAccount: async ({ input, ctx }) => {
     await accountStoreService.moveAccount(input.instanceId, input.direction)
     await refreshRoutes(ctx)
@@ -272,6 +285,20 @@ export const accountsHostApi = aiAccountsApi.host({
   history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
+  }),
+  forecastHistoryBatch: async ({ input, ctx }) => ({
+    histories: (
+      await createUsageHistoryService(ctx).readMany(input.instanceIds, Date.now() - FORECAST_HISTORY_DAYS * 24 * 60 * 60_000, FORECAST_HISTORY_BUCKET_MINUTES)
+    ).map(history => ({
+      instanceId: history.instanceId,
+      points: history.points.map(point => ({
+        at: point.at,
+        windows: point.windows,
+        resetsAt: point.resetsAt,
+        bankedResets: point.bankedResets,
+        bankedResetExpiries: point.bankedResetExpiries ?? [],
+      })),
+    })),
   }),
   fastModeHistory: async ({ input, ctx }) => ({
     instanceId: input.instanceId,

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { createCoalescedWrite } from '@dshfiles/plugin-ui/hooks/coalesced-write'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -39,17 +40,22 @@ const EDGE_SHAPE = {
   bottom: 'dshx:rounded-t-lg dshx:border-b-0',
 } satisfies Record<Edge, string>
 
+interface ViewportSize {
+  readonly innerWidth: number
+  readonly innerHeight: number
+}
+
 const POPOVER_SIDE = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' } as const satisfies Record<Edge, 'left' | 'right' | 'top' | 'bottom'>
 
 const positionSchema = z.object({ edge: z.enum(['left', 'right', 'top', 'bottom']), x: z.number(), y: z.number() })
 
-const clamp = (position: EdgePosition, viewport: { readonly innerWidth: number; readonly innerHeight: number }): EdgePosition => ({
+const clamp = (position: EdgePosition, viewport: ViewportSize): EdgePosition => ({
   edge: position.edge,
   x: Math.min(Math.max(0, position.x), Math.max(0, viewport.innerWidth - 40)),
   y: Math.min(Math.max(0, position.y), Math.max(0, viewport.innerHeight - 40)),
 })
 
-const viewport = (): { readonly innerWidth: number; readonly innerHeight: number } => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
+const viewport = (): ViewportSize => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
 
 const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: positionSchema, fallback: null })
 /** One persisted position per this window while a drag moves the widget. */
@@ -175,7 +181,10 @@ export const EdgeUsageWidget = (props: {
   // trigger inside one anchors to that ancestor instead of the viewport.
   return createPortal(
     <aside aria-label="AI Accounts usage" className="dshx-root">
+      <TooltipProvider delayDuration={500}>
       <Popover onOpenChange={setOpen} open={open}>
+        <Tooltip>
+        <TooltipTrigger asChild>
         <PopoverAnchor asChild>
           <button
             aria-expanded={open}
@@ -193,7 +202,6 @@ export const EdgeUsageWidget = (props: {
             onPointerUp={handlePointerUp}
             ref={triggerRef}
             style={{ left: position.x, top: position.y }}
-            title="Drag to move · click to view AI accounts usage"
             type="button"
           >
             <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
@@ -202,6 +210,9 @@ export const EdgeUsageWidget = (props: {
             </span>
           </button>
         </PopoverAnchor>
+        </TooltipTrigger>
+        <TooltipContent>Drag to move · click to view AI accounts usage</TooltipContent>
+        </Tooltip>
         <PopoverContent
           aria-label="Account quota"
           className="dshx-root dshx:z-[10001] dshx:w-auto dshx:p-0"
@@ -228,6 +239,7 @@ export const EdgeUsageWidget = (props: {
           />
         </PopoverContent>
       </Popover>
+      </TooltipProvider>
     </aside>,
     document.body,
   )

@@ -3,7 +3,7 @@ import type { Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { checkProjectManifest } from '../project/index.js'
+import { checkProjectManifest } from '../project/manifest.js'
 import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
@@ -71,7 +71,13 @@ function importPath(from: string, to: string): string {
   return path.replace(/\.ts$/, '.js')
 }
 
-function modifyHost(source: string, hostFile: string, commandFile: string, name: string): { source?: string; duplicate: boolean; invalidCommands: boolean } {
+interface HostCommandEdit {
+  readonly source?: string
+  readonly duplicate: boolean
+  readonly invalidCommands: boolean
+}
+
+function modifyHost(source: string, hostFile: string, commandFile: string, name: string): HostCommandEdit {
   const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasCommand(sourceFile, name)) return { duplicate: true, invalidCommands: false }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })
@@ -128,7 +134,7 @@ function result(
     generatedFiles: plan.filter(item => item.before === undefined).map(item => item.file),
     diagnostics,
     dryRun: options.dryRun ?? false,
-    ...(diff === undefined ? {} : { diff }),
+    ...(diff !== undefined && { diff }),
   }
 }
 
@@ -295,7 +301,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
       [],
     )
   }
-  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined ? { hostEntry: hostFile } : {}) }
+  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined && { hostEntry: hostFile }) }
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)

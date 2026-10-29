@@ -12,6 +12,8 @@ import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-se
 import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
+import type { PluginContext } from '../client/plugin-context.js'
+import { PluginRuntimeModel } from '../client/plugin-runtime.js'
 import { assertPluginId, createBaseApi, type BasePluginApi } from './lifecycle.js'
 
 export interface UiApi {
@@ -75,7 +77,10 @@ export interface ClientCapabilities {
 }
 
 export type ClientCapability = keyof ClientCapabilities
-export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi<ClientContext> & Pick<ClientCapabilities, Uses[number]>
+/** `add`, `list`, `provide`, `use`, `keyed`, dialogs, toasts, commands and layout come with every plugin. */
+export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi<ClientContext> &
+  PluginContext &
+  Pick<ClientCapabilities, Uses[number]>
 
 export interface ClientPluginDefinition<Uses extends readonly ClientCapability[] = readonly []> extends Omit<ClientDefinition, 'name' | 'setup'> {
   readonly id: string
@@ -90,6 +95,7 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
   uses: readonly ClientCapability[],
   packageId: string,
   decorate: (component: unknown) => unknown = component => component,
+  plugin: PluginContext = PluginRuntimeModel.create({ ctx, packageId, decorate: component => component }).plugin,
 ): ClientPluginApi<Uses> {
   type NativeRegister = (options: { readonly name: string }, component: unknown) => () => void
   const ui: UiApi = {
@@ -166,7 +172,9 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
         throw new TypeError(`Unknown Client capability ${JSON.stringify(capability)}.`)
     }
   }
-  return Object.assign(createBaseApi(ctx), capabilities) as ClientPluginApi<Uses>
+  // Property descriptors keep the plugin's lazy `signal` getter instead of reading it here.
+  const api = Object.defineProperties(createBaseApi(ctx), Object.getOwnPropertyDescriptors(plugin))
+  return Object.assign(api, capabilities) as ClientPluginApi<Uses>
 }
 
 /** Define the explicit browser half of a native DSH plugin. Ordinary React components receive native slot props. */
@@ -182,7 +190,7 @@ export function defineClientPlugin<const Uses extends readonly ClientCapability[
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => CLIENT_CAPABILITY_INJECTIONS[capability])])],
     setup: SdkSetupRuntime.adaptClient(
       ctx => setup?.(createClientPluginApi<Uses>(ctx, uses, id)),
-      (ctx, decorate, metadata) => setup?.(createClientPluginApi<Uses>(ctx, uses, metadata.packageId, decorate)),
+      (ctx, decorate, metadata) => setup?.(createClientPluginApi<Uses>(ctx, uses, metadata.packageId, decorate, metadata.plugin)),
     ),
   }
 }

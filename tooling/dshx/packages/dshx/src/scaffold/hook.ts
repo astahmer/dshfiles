@@ -3,7 +3,7 @@ import type { Program, ObjectProperty } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { checkProjectManifest } from '../project/index.js'
+import { checkProjectManifest } from '../project/manifest.js'
 import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
@@ -82,7 +82,13 @@ const findSetupBody = (setup: ObjectProperty) => {
   return { body: value.body, parameter: value.params[0] }
 }
 
-function modifyHost(source: string, hostFile: string, hookFile: string, event: string) {
+interface HostHookEdit {
+  readonly source?: string
+  readonly duplicate: boolean
+  readonly invalidSetup: boolean
+}
+
+function modifyHost(source: string, hostFile: string, hookFile: string, event: string): HostHookEdit {
   const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasHookRegistration(sourceFile, event)) return { duplicate: true, invalidSetup: false }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })
@@ -144,7 +150,7 @@ function makeResult(
     generatedFiles: plan.filter(item => item.before === undefined).map(item => item.file),
     diagnostics,
     dryRun: options.dryRun ?? false,
-    ...(diff === undefined ? {} : { diff }),
+    ...(diff !== undefined && { diff }),
   }
 }
 
@@ -314,7 +320,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
       [],
     )
   }
-  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined ? { hostEntry: hostFile } : {}) }
+  const postProject: ResolvedDshxConfig = { ...project, ...(hostBefore === undefined && { hostEntry: hostFile }) }
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)

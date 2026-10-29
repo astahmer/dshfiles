@@ -9,9 +9,12 @@ import type {
   ModelCatalogFailure, ModelProviderGroup, ModelSelection, ModelSelectionProjection,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-commands/remote'
+import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { RemoteResult, TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { z } from 'zod'
 import type { ModelCatalogDirectory } from './catalog.ts'
 import type { SessionDrafts } from '@dshfiles/session-controller/draft-client'
 
@@ -37,16 +40,44 @@ export interface ModelDirectoryState {
 
 /** One session's shared directory controller; disposed with the session scope. */
 export class ModelDirectory {
+  static shouldCompactForHandoff = (input: {
+    readonly current: ModelSelection | null
+    readonly target: ModelSelection
+    readonly pressure: Pick<ContextPressureProjection, 'contextWindow' | 'projectedTokens'> | undefined
+    readonly currentContextWindow: number | null
+    readonly targetContextWindow: number | null
+  }): boolean => {
+    if (
+      input.current === null ||
+      (input.current.provider === input.target.provider && input.current.model === input.target.model) ||
+      input.currentContextWindow === null ||
+      input.targetContextWindow === null ||
+      input.targetContextWindow >= input.currentContextWindow ||
+      input.pressure?.contextWindow !== input.currentContextWindow ||
+      input.pressure.projectedTokens === undefined
+    )
+      return false
+    return input.pressure.projectedTokens >= input.targetContextWindow * 0.8
+  }
+
   /** The shared snapshot both entries render from (uSES-safe store). */
   readonly store: SnapshotStore<ModelDirectoryState> = createSnapshotStore<ModelDirectoryState>({
-    current: null, routable: null, groups: [], failures: [], status: 'idle', pending: null, error: null,
+        current: null,
+    routable: null,
+    groups: [], failures: [], status: 'idle', pending: null, error: null,
   })
 
   /** Latest selection operation wins; an older response never overwrites a newer one. */
   private generation = 0
   private disposed = false
+  private readonly contextPressureSchema = z.object({
+    pressureTokens: z.number().optional(),
+    projectedTokens: z.number().optional(),
+    contextWindow: z.number().optional(),
+  })
   private readonly unsubscribeCatalog: () => void
   private readonly unsubscribeSelection: () => void
+  private readonly unsubscribePressure: () => void
   private readonly unsubscribeDrafts: (() => void) | undefined
 
   /**
@@ -64,12 +95,16 @@ export class ModelDirectory {
     private readonly available: () => boolean,
     private readonly catalog: ModelCatalogDirectory,
     private readonly projected: ObservableSnapshot<unknown>,
+    private readonly pressure: ObservableSnapshot<unknown>,
     private readonly isBlank: () => boolean,
+    private readonly resolveContextWindow: (route: Pick<ModelSelection, 'provider' | 'model'>) => Promise<number | null>,
+    private readonly compact: () => Promise<boolean>,
     private readonly track?: TrackProductEvent,
     private readonly drafts?: SessionDrafts,
   ) {
     this.unsubscribeCatalog = catalog.store.subscribe(() => { this.syncInputs() })
     this.unsubscribeSelection = projected.subscribe(() => { this.syncInputs() })
+    this.unsubscribePressure = pressure.subscribe(() => { this.syncInputs() })
     this.unsubscribeDrafts = drafts?.list.subscribe(() => { this.syncInputs() })
     this.syncInputs()
   }
@@ -103,40 +138,64 @@ export class ModelDirectory {
       return { ok: true, value: undefined }
     }
     const previous = this.store.getSnapshot().current
+    const pressure = this.readContextPressure()
     const previousEffort = previous?.reasoningEffort ?? (previous === null ? undefined : this.catalog.reasoningFor(previous)?.defaultEffort)
     const nextEffort = selection.reasoningEffort ?? this.catalog.reasoningFor(selection)?.defaultEffort
     const generation = ++this.generation
-    this.store.update((s) => { s.status = 'selecting'; s.pending = selection; s.error = null })
-    const result = await this.sessions.selectModel({
-      sessionId: this.sessionId,
-      provider: selection.provider,
-      model: selection.model,
-      ...selection.reasoningEffort === undefined
-        ? {}
-        : { reasoningEffort: selection.reasoningEffort },
-    })
-    if (this.disposed || generation !== this.generation) {
-      return result.ok ? { ok: true, value: undefined } : result
-    }
-    if (!result.ok) {
-      this.store.update((s) => {
-        s.status = 'error'
-        s.pending = null
-        s.error = `${result.error.code}: ${result.error.message}`
+    this.store.update((state) => { state.status = 'selecting'; state.pending = selection; state.error = null })
+    try {
+      const routeChanged = previous !== null && (previous.provider !== selection.provider || previous.model !== selection.model)
+      if (routeChanged && previous !== null && pressure !== undefined) {
+        const [currentContextWindow, targetContextWindow] = await Promise.all([
+          this.resolveContextWindow({ provider: previous.provider, model: previous.model }).catch(() => null),
+          this.resolveContextWindow({ provider: selection.provider, model: selection.model }).catch(() => null),
+        ])
+        if (this.disposed || generation !== this.generation) return { ok: true, value: undefined }
+        if (ModelDirectory.shouldCompactForHandoff({ current: previous, target: selection, pressure, currentContextWindow, targetContextWindow })) {
+          await this.compact()
+        }
+      }
+      if (this.disposed || generation !== this.generation) return { ok: true, value: undefined }
+      const result = await this.sessions.selectModel({
+        sessionId: this.sessionId,
+        provider: selection.provider,
+        model: selection.model,
+        ...selection.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: selection.reasoningEffort },
       })
-      return result
+      if (this.disposed || generation !== this.generation) {
+        return result.ok ? { ok: true, value: undefined } : result
+      }
+      if (!result.ok) {
+        this.store.update((state) => {
+          state.status = 'error'
+          state.pending = null
+          state.error = `${result.error.code}: ${result.error.message}`
+        })
+        return result
+      }
+      if (previous !== null) {
+        const from = `${previous.provider}/${previous.model}`
+        const to = `${selection.provider}/${selection.model}`
+        if (from !== to) this.track?.('model_switch', { ...this.isBlank() ? {} : { session_id: this.sessionId }, switch_from: from, switch_to: to })
+        if (from === to && previousEffort !== nextEffort) this.track?.('thinking_level_switch', {
+          ...this.isBlank() ? {} : { session_id: this.sessionId }, model_name: to, switch_from: previousEffort ?? 'default', switch_to: nextEffort ?? 'default',
+        })
+      }
+      this.store.update((state) => { state.status = 'ready'; state.pending = null; state.error = null })
+      this.syncInputs()
+      return { ok: true, value: undefined }
+    } catch (error) {
+      if (!this.disposed && generation === this.generation) {
+        this.store.update((state) => {
+          state.status = 'error'
+          state.pending = null
+          state.error = error instanceof Error ? error.message : String(error)
+        })
+      }
+      throw error
     }
-    if (previous !== null) {
-      const from = `${previous.provider}/${previous.model}`
-      const to = `${selection.provider}/${selection.model}`
-      if (from !== to) this.track?.('model_switch', { ...this.isBlank() ? {} : { session_id: this.sessionId }, switch_from: from, switch_to: to })
-      if (from === to && previousEffort !== nextEffort) this.track?.('thinking_level_switch', {
-        ...this.isBlank() ? {} : { session_id: this.sessionId }, model_name: to, switch_from: previousEffort ?? 'default', switch_to: nextEffort ?? 'default',
-      })
-    }
-    this.store.update((s) => { s.status = 'ready'; s.pending = null; s.error = null })
-    this.syncInputs()
-    return { ok: true, value: undefined }
   }
 
   /**
@@ -157,8 +216,21 @@ export class ModelDirectory {
   dispose(): void {
     this.disposed = true
     this.unsubscribeSelection()
+    this.unsubscribePressure()
     this.unsubscribeCatalog()
     this.unsubscribeDrafts?.()
+  }
+
+  private readContextPressure(): ContextPressureProjection | undefined {
+    const value = this.pressure.getSnapshot()
+    if (value === undefined) return undefined
+    const decoded = this.contextPressureSchema.safeParse(value)
+    if (!decoded.success) return undefined
+    return {
+      ...(decoded.data.pressureTokens === undefined ? {} : { pressureTokens: decoded.data.pressureTokens }),
+      ...(decoded.data.projectedTokens === undefined ? {} : { projectedTokens: decoded.data.projectedTokens }),
+      ...(decoded.data.contextWindow === undefined ? {} : { contextWindow: decoded.data.contextWindow }),
+    }
   }
 
   private assertAvailable(): void {

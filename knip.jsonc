@@ -4,16 +4,31 @@
   "include": ["files", "dependencies", "unlisted", "binaries", "unresolved", "catalog", "catalogReferences"],
   // playwright runs from tooling/dshx (`pnpm --dir tooling/dshx exec playwright`), where it is installed.
   // jujutsu's locales.ts is a dictionary its client does not register yet (docs/guardrails.md).
-  // .local holds machine-local scratch scripts (git-ignored); the rich-composer native skeleton is
-  // vendored for a platform the composer does not select yet.
-  "ignore": ["plugins/@dshfiles/jujutsu/src/locales.ts", ".local/**", "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts"],
-  "ignoreBinaries": ["dsh", "jj", "knip", "playwright"],
+  // .local holds machine-local scratch scripts (git-ignored); the native modules below are vendored for
+  // parity work the fork has not wired yet; extension assets, fixtures and antislop inputs are loaded
+  // by path or by manifest rather than by ES imports.
+  "ignore": [
+    "plugins/@dshfiles/jujutsu/src/locales.ts",
+    ".local/**",
+    "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts",
+    "plugins/@dshfiles/chat/src/native/model/steering-history.ts",
+    "plugins/@dshfiles/chat/src/native/model/tool-call-tree.ts",
+    "plugins/@dshfiles/annotations/extension/**",
+    "plugins/@dshfiles/project-checks/src/test-fixtures/**",
+    "tooling/antislop/repo-rules/fixtures/**",
+    "tooling/antislop/tests/oxlint/**",
+  ],
+  // Foreign binaries the hand-run scripts call: ffmpeg is installed on the Host, and bddgen/vitest come
+  // from the tooling/dshx workspace the scripts are executed from.
+  "ignoreBinaries": ["dsh", "jj", "knip", "playwright", "ffmpeg", "bddgen", "vitest"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!"],
+      // Measurement scripts under .agents, docs and plans run by hand with the arguments in their headers.
+      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!", ".agents/skills/*/scripts/*.mjs", "docs/ade-performance/*.mjs", "plans/**/*.mjs"],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
-      "ignoreDependencies": ["oxlint"],
+      // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.
+      "ignoreDependencies": ["oxlint", "@playwright/test", "playwright"],
     },
     "apps/desktop": {},
     "plugins": {
@@ -25,10 +40,16 @@
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/frame-layout": {
-      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
       // @deepseek-ai/dsh-client-store's node build imports zustand and immer without declaring them; the
       // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
+    },
+    "plugins/@dshfiles/goal-tool": {
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/agent-communication": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
@@ -45,7 +66,33 @@
       // Fixtures are plugin trees loaded from disk, not modules.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignore": ["tests/fixtures/**"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
+    },
+    "plugins/@dshfiles/agents": {
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-workspace-controller"],
+    },
+    "plugins/@dshfiles/backlog": {
+      // devDependency copy of the jj-integration peer the Host provides; listed in docs/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration"],
+    },
+    "plugins/@dshfiles/chat": {
+      // dshx.config.ts bundles util-crypto into the client by name, so no module import references it.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-util-crypto"],
+    },
+    "plugins/@dshfiles/command-palette": {
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
+    },
+    "plugins/@dshfiles/rich-composer": {
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
     "plugins/@dshfiles/memory": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
@@ -90,6 +137,9 @@
         "scripts/smoke-client-slot.mjs",
         "scripts/smoke-multi-host.mjs",
         "scripts/smoke-multi-host-ssh.mjs",
+        // Measurement tools run by hand with the arguments in their own header.
+        "scripts/browser-cost.mjs",
+        "scripts/sidebar-scale-bench.mjs",
       ],
     },
     "tooling/dshx/packages/dshx": {

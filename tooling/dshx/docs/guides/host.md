@@ -8,42 +8,44 @@
 
 ```ts
 interface HostDefinition {
-  readonly name?: string;
-  readonly inject?: readonly string[];
-  readonly tools?: readonly ToolDefinition[];
-  readonly commands?: readonly CommandDefinition[];
-  readonly prompts?: readonly PromptContribution[];
-  readonly settings?: readonly SettingsContribution[];
-  readonly apis?: readonly ApiHostRegistration[];
-  readonly setup?: (ctx: Context) => void | Promise<void>;
+  readonly name?: string
+  readonly inject?: readonly string[]
+  readonly tools?: readonly (ToolDefinition | ((ctx: Context) => ToolDefinition))[]
+  readonly commands?: readonly CommandDefinition[]
+  readonly prompts?: readonly PromptContribution[]
+  readonly settings?: readonly SettingsContribution[]
+  readonly apis?: readonly ApiHostRegistration[]
+  readonly setup?: (ctx: Context) => void | Promise<void>
 }
 ```
 
 `defineHost()` preserves the exact inferred object type and rejects unknown fields. Use only `apis`; the singular `api` field was removed in `0.1.2`.
 
 ```ts
-import { defineHost, defineTool } from "@dshfiles/dshx/host";
+import { defineHost, defineTool } from '@dshfiles/dshx/host'
 
 const statusTool = defineTool({
-  name: "plugin_status",
-  description: "Return plugin status.",
+  name: 'plugin_status',
+  description: 'Return plugin status.',
   parameters: {},
   output: {
-    schema: { type: "string" },
-    render: (_args, value) => [{ type: "text", text: value }],
+    schema: { type: 'string' },
+    render: (_args, value) => [{ type: 'text', text: value }],
   },
   async execute() {
-    return "ready";
+    return 'ready'
   },
-});
+})
 
 export default defineHost({
-  name: "my-plugin",
+  name: 'my-plugin',
   tools: [statusTool],
-});
+})
 ```
 
-`defineTool` is the official DSH Tool helper. `defineCommand` is an identity helper over the official `CommandDefinition`; DSHX does not wrap command parsing or execution.
+`defineTool` is the official DSH Tool helper. A tool may instead be a synchronous factory receiving the Host's injected Cordis context: `tools: [ctx => createMyTool(ctx)]`. Declare every service the factory uses in `inject`. DSHX calls the factory during Host activation and registers the returned tool with the same owner metadata and lifecycle as a static tool. Do not read Host services from the scoped `execution.agent.ctx` unless that context declares them.
+
+`defineCommand` is an identity helper over the official `CommandDefinition`; DSHX does not wrap command parsing or execution.
 
 ## Registration order
 
@@ -78,14 +80,14 @@ Use `setup` for direct official services or behavior that has no DSHX contributi
 
 ```ts
 export default defineHost({
-  inject: ["events"],
+  inject: ['events'],
   setup(ctx) {
     ctx.effect(() => {
-      const dispose = startObserver(ctx);
-      return () => dispose();
-    }, "my-plugin observer");
+      const dispose = startObserver(ctx)
+      return () => dispose()
+    }, 'my-plugin observer')
   },
-});
+})
 ```
 
 DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effect()` or use the disposer semantics of the official registry being called. A Settings `.host({ setup })` disposer is passed to `ctx.effect()` automatically.

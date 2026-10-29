@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -19,8 +20,10 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { multiHostApi, type HostSummary, type RuntimeSummary } from '../api.js'
+import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
+import { CloneProjectDialog } from './clone-project-dialog.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -45,6 +48,8 @@ const HostRow = (props: {
   readonly onMove: (direction: 'up' | 'down') => void
   readonly onHide: (hidden: boolean) => void
   readonly onEdit: () => void
+  readonly onAddProject: () => void
+  readonly onCloneProject: () => void
   readonly onRemove: () => void
 }) => {
   const { api, host, runtime } = props
@@ -150,6 +155,18 @@ const HostRow = (props: {
         >
           {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
         </Button>
+        {host.connector.kind === 'ssh' ? (
+          <>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Add folder
+            </Button>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Clone project
+            </Button>
+          </>
+        ) : null}
         <Button
           size="icon"
           variant="ghost"
@@ -191,6 +208,10 @@ export const HostsPage = () => {
   const [dropId, setDropId] = useState<string | null>(null)
   const [pendingOrder, setPendingOrder] = useState<readonly string[] | null>(null)
   const [form, setForm] = useState<HostDraft | null>(null)
+  const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
+  const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
+  const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
+  const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
 
   const updateDirectoryHosts = (nextHosts: readonly HostSummary[]): void => {
     queryClient.setQueryData<DirectoryData>(multiHostKeys.directory, current =>
@@ -220,6 +241,17 @@ export const HostsPage = () => {
   const remove = useMutation({
     mutationFn: (id: string) => api.hostRemove({ id, removeDirectory: true }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.all }),
+  })
+  const addProject = useMutation({
+    mutationFn: async (input: { readonly runtimeId: string; readonly path: string }) => {
+      const result = await api.runtimeOpenFolder(input)
+      if (!result.ok) throw failure(result)
+      return result
+    },
+    onSuccess: () => {
+      setProjectRuntimeId(null)
+      void queryClient.invalidateQueries({ queryKey: multiHostKeys.all })
+    },
   })
 
   const runtimeFor = (host: HostSummary): RuntimeSummary | undefined => directory.data?.runtimes.find(runtime => runtime.hostId === host.id)
@@ -282,6 +314,11 @@ export const HostsPage = () => {
             <AlertDescription>{errorMessage(remove.error, 'The host could not be removed.')}</AlertDescription>
           </Alert>
         ) : null}
+        {addProject.isError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{errorMessage(addProject.error, 'The remote project could not be added.')}</AlertDescription>
+          </Alert>
+        ) : null}
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
           <p className="dshx:rounded-lg dshx:border dshx:border-dashed dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
@@ -317,6 +354,8 @@ export const HostsPage = () => {
                 if (next !== order) commitOrder(next)
               }}
               onHide={hidden => hide.mutate({ id: host.id, hidden })}
+              onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
+              onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
               onEdit={() =>
                 setForm({
                   hostId: host.id,
@@ -330,6 +369,30 @@ export const HostsPage = () => {
           ))}
         </ul>
       </div>
+      <CloneProjectDialog
+        api={api}
+        runtime={directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)}
+        hostName={hosts.find(host => directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+        onClose={() => setCloneRuntimeId(null)}
+      />
+      {projectRuntime !== undefined && projectHost !== undefined ? (
+        <ProjectFolderPicker
+          projects={[]}
+          directoryPicker={remoteDirectoryPicker(api, projectRuntime.id)}
+          onRegisterWorkspace={async canonicalPath => {
+            const result = await api.runtimeOpenFolder({ runtimeId: projectRuntime.id, path: canonicalPath })
+            if (!result.ok) throw failure(result)
+            return { workspaceId: result.workspaceId, title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath, canonicalPath }
+          }}
+          onSelect={(selection: ProjectFolderSelection) => addProject.mutate({ runtimeId: projectRuntime.id, path: selection.canonicalPath })}
+          onClose={() => setProjectRuntimeId(null)}
+          mode="directories"
+          disabled={addProject.isPending}
+          showNativePicker={false}
+          machineName={projectHost.name}
+          heading={`Add project · ${projectHost.name}`}
+        />
+      ) : null}
       <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
     </main>
   )

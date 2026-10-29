@@ -10,8 +10,10 @@ const COMMON_HELP = `Common options:
   --json               Print one JSON envelope: { schemaVersion, command, ok, data | error: { code, message, hint } }.
   -h, --help           Show help for the action.`
 
-const HELP: Readonly<Record<string, string>> = {
-  overview: `dshx dev <up|doctor|open|shot|keep|down> — drive a scratch DSH for verification.
+const HELP: ReadonlyMap<string, string> = new Map([
+  [
+    'overview',
+    `dshx dev <up|doctor|open|shot|keep|down> — drive a scratch DSH for verification.
 
 A scratch DSH has its own temp DSH_HOME, a free port, the owned plugins under test, a registered
 project, and a headless Chromium that keeps its page between commands. It never touches the live
@@ -41,7 +43,10 @@ names (in the current DSH home, not a scratch one), rebuilds on change and runs 
   --open               Open the development URL.
   --verbose            Print underlying command failures.
   --quiet              Suppress human-readable output; retain exit status.`,
-  up: `dshx dev up — start a scratch DSH.
+  ],
+  [
+    'up',
+    `dshx dev up — start a scratch DSH.
 
 Builds the selected owned plugins (and the client bundles they load), installs a disposable profile
 from ~/.dsh/profiles/web's registry dependencies, seeds a jj project with a "main" bookmark (or
@@ -72,7 +77,10 @@ Example:
   dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
 
 ${COMMON_HELP}`,
-  doctor: `dshx dev doctor — read-only health check of a scratch DSH.
+  ],
+  [
+    'doctor',
+    `dshx dev doctor — read-only health check of a scratch DSH.
 
 Checks: isolated from the live DSH, dsh and Chromium still running (and still ours), the auto-stop
 watchdog running, the URL answers and authenticates, every plugin entry is active and every bundle
@@ -82,7 +90,10 @@ keep, it answers a pending warning and renews the idle lease. Exit code 1 when a
 each failure carries a "fix".
 
 ${COMMON_HELP}`,
-  open: `dshx dev open <feature> — drive the scratch browser to a catalog feature.
+  ],
+  [
+    'open',
+    `dshx dev open <feature> — drive the scratch browser to a catalog feature.
 
 <feature> is a feature id from a plugins/@dshfiles/*/dshx.features.json catalog, optionally
 qualified: "thread-destination", "jj-integration/thread-destination" or
@@ -91,7 +102,7 @@ Notice and provider-setup dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
   hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)
-  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|jev-setup-chat-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts|queue-preview-thread|otlp-sample-trace|otlp-session-turns>
+  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|jev-setup-chat-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts|queue-preview-thread|otlp-sample-trace|otlp-session-turns|app-dialog-sample>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
 A click, rightclick or hover may end with "at <x>,<y>" to hit that point of the element's own box
@@ -111,7 +122,8 @@ chat-reference-thread adds a rendered jj:main link to a fake-provider transcript
 writes synthetic host data for the Hosts page; queue-preview-thread holds a fake-provider turn while queuing an image and file;
 otlp-sample-trace posts one synthetic OTLP trace to the traces receiver (needs @dshfiles/traces);
 otlp-session-turns posts two synthetic agent turns tagged with the open thread's dsh.session.id (list a
-thread seed such as tool-call-thread before it) and returns to that thread.
+thread seed such as tool-call-thread before it) and returns to that thread; app-dialog-sample opens a
+danger confirm and a sticky toast through the page's Dialogs and Toasts providers (needs @dshfiles/dialogs).
 A failing step stops the walk, saves a screenshot and exits 1: fix the catalog when the UI path
 moved, report a regression when the feature broke (skill maintain-verify-dsh).
 
@@ -119,7 +131,10 @@ Options:
   --timeout <ms>       Per-step timeout (default 15000).
 
 ${COMMON_HELP}`,
-  shot: `dshx dev shot — capture evidence from the scratch browser.
+  ],
+  [
+    'shot',
+    `dshx dev shot — capture evidence from the scratch browser.
 
 Saves <evidence-dir>/<time>-<label>.png and a .json summary of console errors, page errors, failed
 requests and HTTP >= 400 responses recorded since up (launch tokens redacted).
@@ -129,7 +144,10 @@ Options:
   --out <dir>          Evidence directory (default <state-dir>/evidence; down keeps it).
 
 ${COMMON_HELP}`,
-  keep: `dshx dev keep — answer a stop warning, or pin the scratch DSH.
+  ],
+  [
+    'keep',
+    `dshx dev keep — answer a stop warning, or pin the scratch DSH.
 
 Cancels a pending warning for this instance and renews its idle lease, so the watchdog's countdown
 starts again; doctor, open and shot do the same implicitly. With --forever the instance is pinned:
@@ -140,7 +158,10 @@ Options:
   --forever            Pin the instance: no idle stop, no warning (still stopped by "dshx dev down").
 
 ${COMMON_HELP}`,
-  down: `dshx dev down — stop exactly what up started.
+  ],
+  [
+    'down',
+    `dshx dev down — stop exactly what up started.
 
 Stops the recorded watchdog, dsh and Chromium process groups only while their command lines still
 match what up started (a reused pid is left alone), deletes the scratch home and the state/log files, and keeps
@@ -150,7 +171,10 @@ Options:
   --dry-run            List what would be stopped and removed; change nothing.
 
 ${COMMON_HELP}`,
-}
+  ],
+])
+
+const helpFor = (action: string): string => HELP.get(action) ?? HELP.get('overview') ?? ''
 
 const write = (stream: Writable, text: string): void => {
   stream.write(text)
@@ -205,19 +229,20 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     return fail(new ScratchError('usage', error instanceof Error ? error.message : String(error), `Run "dshx dev ${action} --help".`))
   }
   if (values.help === true) {
-    write(io.stdout, `${HELP[action] ?? HELP.overview}\n`)
+    write(io.stdout, `${helpFor(action)}\n`)
     return 0
   }
-  const allowed: Readonly<Record<string, readonly string[]>> = {
-    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout', 'warn-minutes'],
-    doctor: [],
-    open: ['timeout'],
-    shot: ['label', 'out'],
-    keep: ['forever'],
-    down: ['dry-run'],
-  }
+  const allowed: ReadonlyMap<string, readonly string[]> = new Map([
+    ['up', ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout', 'warn-minutes']],
+    ['doctor', []],
+    ['open', ['timeout']],
+    ['shot', ['label', 'out']],
+    ['keep', ['forever']],
+    ['down', ['dry-run']],
+  ])
   const common = ['name', 'state-dir', 'json', 'help']
-  const misplaced = Object.keys(values).filter(option => values[option] !== undefined && !common.includes(option) && !(allowed[action] ?? []).includes(option))
+  const accepted = allowed.get(action) ?? []
+  const misplaced = Object.keys(values).filter(option => values[option] !== undefined && !common.includes(option) && !accepted.includes(option))
   if (misplaced.length > 0) return fail(new ScratchError('usage', `--${misplaced[0]} is not an option of dev ${action}.`, `Run "dshx dev ${action} --help".`))
   if (action === 'open' ? positionals.length !== 1 : positionals.length > 0) {
     return fail(
@@ -241,7 +266,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
   }
   const stateDir = ScratchStateRuntime.resolveStateDir({
     name: name.data,
-    ...(typeof values['state-dir'] === 'string' ? { stateDir: values['state-dir'] } : {}),
+    ...(typeof values['state-dir'] === 'string' && { stateDir: values['state-dir'] }),
   })
 
   try {
@@ -262,8 +287,8 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
         bundles: Array.isArray(values.bundle) ? values.bundle : [],
-        ...(typeof values.project === 'string' ? { project: values.project } : {}),
-        ...(port === undefined ? {} : { port }),
+        ...(typeof values.project === 'string' && { project: values.project }),
+        ...(port !== undefined && { port }),
         skipBuild: values['skip-build'] === true,
         fakeSecretCli: values['fake-secret-cli'] === true,
         idleTimeoutMinutes,
@@ -317,7 +342,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     if (action !== 'down') await ScratchStateRuntime.renewLease(stateDir)
     if (action === 'doctor') {
       const { scratchDoctor } = await import('../scratch/lifecycle.js')
-      const checks = await scratchDoctor({ state, ...(answeredWarning === undefined ? {} : { answeredWarning }) })
+      const checks = await scratchDoctor({ state, ...(answeredWarning !== undefined && { answeredWarning }) })
       const ok = checks.every(check => check.ok)
       return succeed(
         { name: state.name, origin: state.origin, checks },

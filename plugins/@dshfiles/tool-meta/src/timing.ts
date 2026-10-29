@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import type { ToolMetaTranslate } from './locales.js'
 
@@ -12,6 +13,7 @@ export interface WaitTimer {
   readonly timeoutMs: number | undefined
   readonly elapsedMs: number
   readonly remainingMs: number | undefined
+  readonly waitingFor: 'job-output' | 'all-jobs' | { readonly kind: 'jobs'; readonly count: number; readonly until: 'settled' | 'any-settled' }
 }
 
 /**
@@ -34,6 +36,9 @@ export type WaitTimerOwner = z.input<typeof waitCallOwnerSchema>
 
 const waitArgumentsSchema = z.object({
   wait: z.boolean().optional(),
+  jobId: z.string().optional(),
+  jobIds: z.array(z.string()).max(20).optional(),
+  until: z.enum(['settled', 'any-settled']).optional(),
   timeout_ms: z.number().int().positive().max(3_600_000).optional(),
   timeoutMs: z.number().int().positive().max(3_600_000).optional(),
 })
@@ -69,9 +74,9 @@ export class ToolTimingModel {
   static readonly waitTimerOf = (owner: WaitTimerOwner, now: number): WaitTimer | undefined => {
     const parsedOwner = waitCallOwnerSchema.safeParse(owner)
     if (!parsedOwner.success) return undefined
-    let rawArguments: unknown
+    let rawArguments: JsonValue
     try {
-      rawArguments = JSON.parse(parsedOwner.data.block.argsRaw)
+      rawArguments = decodeJson(jsonValueSchema, parsedOwner.data.block.argsRaw)
     } catch {
       return undefined
     }
@@ -80,10 +85,17 @@ export class ToolTimingModel {
     if (parsedOwner.data.toolName === 'job_output' && parsedArguments.data.wait !== true) return undefined
     const timeoutMs = parsedArguments.data.timeoutMs ?? parsedArguments.data.timeout_ms
     const elapsedMs = Math.max(0, now - parsedOwner.data.block.time)
+    const waitingFor =
+      parsedOwner.data.toolName === 'job_output'
+        ? 'job-output'
+        : parsedArguments.data.jobIds === undefined
+          ? 'all-jobs'
+          : { kind: 'jobs' as const, count: parsedArguments.data.jobIds.length, until: parsedArguments.data.until ?? 'settled' }
     return {
       timeoutMs,
       elapsedMs,
       remainingMs: timeoutMs === undefined ? undefined : Math.max(0, timeoutMs - elapsedMs),
+      waitingFor,
     }
   }
 

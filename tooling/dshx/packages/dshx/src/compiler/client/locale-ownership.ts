@@ -16,10 +16,10 @@
  */
 
 /** Namespaces registered by shipped packages. No profile may reassign these. */
-const RESERVED_LOCALE_NAMESPACES: Readonly<Record<string, readonly string[]>> = {
+const RESERVED_LOCALE_NAMESPACES = {
   '@deepseek-ai/dsh-client-ui-conversation': ['conversation'],
   '@deepseek-ai/dsh-client-ui-settings': ['settings'],
-}
+} satisfies Readonly<Record<string, readonly string[]>>
 
 /** A namespace claim blocked by another package that already owns it. */
 export interface LocaleNamespaceConflict {
@@ -63,7 +63,7 @@ const findLocaleNamespaceConflict = (ownership: LocaleNamespaceOwnership, claime
   for (const namespace of claimed) {
     const owner = ownership.owners.get(namespace)
     if (owner === undefined || owner === ownership.packageId) continue
-    return { namespace, owner, reserved: RESERVED_LOCALE_NAMESPACES[owner] !== undefined }
+    return { namespace, owner, reserved: Object.hasOwn(RESERVED_LOCALE_NAMESPACES, owner) }
   }
   return undefined
 }

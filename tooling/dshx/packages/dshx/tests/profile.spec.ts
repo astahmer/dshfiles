@@ -2,10 +2,10 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fro
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import { ProfileOrchestrator } from '../src/profile/index.js'
-import type { DshCommandResult, DshCommandRunner, DshCommandRunOptions } from '../src/profile/index.js'
+import { ProfileOrchestrator } from '../src/profile/orchestrator.js'
+import type { DshCommandResult, DshCommandRunner, DshCommandRunOptions } from '../src/profile/types.js'
 
 const temporaryDirectories: string[] = []
 
@@ -51,7 +51,7 @@ function success(stdout = ''): DshCommandResult {
 }
 
 function list(dependencies: Record<string, { path?: string; version?: string }> = {}, path?: string): DshCommandResult {
-  return success(JSON.stringify([{ name: 'dsh-profile-web', ...(path === undefined ? {} : { path }), private: true, dependencies }]))
+  return success(JSON.stringify([{ name: 'dsh-profile-web', ...(path !== undefined && { path }), private: true, dependencies }]))
 }
 
 function composition(source = '[]\n'): DshCommandResult {

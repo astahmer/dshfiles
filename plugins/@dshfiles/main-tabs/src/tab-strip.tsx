@@ -1,6 +1,7 @@
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
@@ -241,111 +242,117 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   )}
                 />
               )}
-              <ContextMenuTrigger asChild>
-                <div
-                  role="tab"
-                  aria-selected={tab.active}
-                  aria-label={label}
-                  title={tab.available ? tab.title : `${tab.title} — ${t('unavailable')}`}
-                  data-tab-id={tab.id}
-                  data-pinned={tab.pinned || undefined}
-                  data-preview={tab.preview || undefined}
-                  tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
-                  draggable={renamingTabId !== tab.id}
-                  className={cn(
-                    'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:max-w-[190px] dshx:flex-[0_1_auto] dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
-                    tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]',
-                    tab.active && 'dshx:bg-(--dsw-alias-markdown-tag) dshx:text-foreground dshx:hover:bg-(--dsw-alias-markdown-tag)',
-                    !tab.available && 'dshx:opacity-50',
-                    dropIndex === index && DROP_CARET,
-                  )}
-                  onClick={() => send({ type: 'tab.select', tabId: tab.id })}
-                  onDoubleClick={() => send({ type: 'tab.keep', tabId: tab.id })}
-                  onMouseDown={event => {
-                    if (event.button === 1) event.preventDefault()
-                  }}
-                  onAuxClick={event => {
-                    if (event.button !== 1) return
-                    event.preventDefault()
-                    send({ type: 'tab.close', tabId: tab.id })
-                  }}
-                  onKeyDown={event => onTabKeyDown(event, tab, index)}
-                  onDragStart={event => {
-                    dragged.current = tab.id
-                    setAsideDrop(false)
-                    if (tab.kind === 'thread') {
-                      ThreadMentionDrag.write(event.dataTransfer, tab.sessionId)
-                      return
-                    }
-                    event.dataTransfer.effectAllowed = 'move'
-                    event.dataTransfer.setData('text/plain', tab.title)
-                  }}
-                  onDragOver={event => {
-                    if (dragged.current === null) return
-                    event.preventDefault()
-                    const box = event.currentTarget.getBoundingClientRect()
-                    setDropIndex(event.clientX > box.left + box.width / 2 ? index + 1 : index)
-                  }}
-                  onDrop={event => {
-                    event.preventDefault()
-                    const tabId = dragged.current
-                    if (tabId === null || dropIndex === null) return
-                    const from = tabs.findIndex(candidate => candidate.id === tabId)
-                    send({ type: 'tab.move', tabId, toIndex: from < dropIndex ? dropIndex - 1 : dropIndex })
-                    setDropIndex(null)
-                  }}
-                  onDragEnd={() => {
-                    dragged.current = null
-                    setDropIndex(null)
-                    clearAsideTarget()
-                  }}
-                >
-                  <span
-                    className={cn(
-                      'dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]',
-                      !tab.pinned &&
-                        'dshx:group-hover:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))] dshx:group-focus-within:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
-                      !tab.pinned && tab.active && 'dshx:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
-                    )}
-                  >
-                    {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                    {tab.status === null ? null : (
-                      <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
-                    )}
-                    {tab.kind === 'thread' && renamingTabId === tab.id ? (
-                      <InlineTitleEditor
-                        value={tab.title}
-                        label={t('renameThread')}
-                        className="dshx:h-5 dshx:min-w-20 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none dshx:text-inherit dshx:focus-visible:ring-0"
-                        onCancel={() => setRenamingTabId(null)}
-                        onCommit={title => void renameTab(tab, title)}
-                      />
-                    ) : (
-                      <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
-                    )}
-                    {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                  </span>
-                  {tab.pinned ? null : (
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label={t('close', { title: tab.title })}
-                      className={cn(
-                        'dshx:absolute dshx:top-1 dshx:right-1 dshx:flex dshx:size-5 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
-                        tab.active
-                          ? 'dshx:opacity-100'
-                          : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
-                      )}
-                      onClick={event => {
-                        event.stopPropagation()
-                        send({ type: 'tab.close', tabId: tab.id })
-                      }}
-                    >
-                      <CloseGlyph />
-                    </button>
-                  )}
-                </div>
-              </ContextMenuTrigger>
+              <TooltipProvider delayDuration={500}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        role="tab"
+                        aria-selected={tab.active}
+                        aria-label={label}
+                        data-tab-id={tab.id}
+                        data-pinned={tab.pinned || undefined}
+                        data-preview={tab.preview || undefined}
+                        tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
+                        draggable={renamingTabId !== tab.id}
+                        className={cn(
+                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:max-w-[190px] dshx:flex-[0_1_auto] dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]',
+                          tab.active && 'dshx:bg-(--dsw-alias-markdown-tag) dshx:text-foreground dshx:hover:bg-(--dsw-alias-markdown-tag)',
+                          !tab.available && 'dshx:opacity-50',
+                          dropIndex === index && DROP_CARET,
+                        )}
+                        onClick={() => send({ type: 'tab.select', tabId: tab.id })}
+                        onDoubleClick={() => send({ type: 'tab.keep', tabId: tab.id })}
+                        onMouseDown={event => {
+                          if (event.button === 1) event.preventDefault()
+                        }}
+                        onAuxClick={event => {
+                          if (event.button !== 1) return
+                          event.preventDefault()
+                          send({ type: 'tab.close', tabId: tab.id })
+                        }}
+                        onKeyDown={event => onTabKeyDown(event, tab, index)}
+                        onDragStart={event => {
+                          dragged.current = tab.id
+                          setAsideDrop(false)
+                          if (tab.kind === 'thread') {
+                            ThreadMentionDrag.write(event.dataTransfer, tab.sessionId)
+                            return
+                          }
+                          event.dataTransfer.effectAllowed = 'move'
+                          event.dataTransfer.setData('text/plain', tab.title)
+                        }}
+                        onDragOver={event => {
+                          if (dragged.current === null) return
+                          event.preventDefault()
+                          const box = event.currentTarget.getBoundingClientRect()
+                          setDropIndex(event.clientX > box.left + box.width / 2 ? index + 1 : index)
+                        }}
+                        onDrop={event => {
+                          event.preventDefault()
+                          const tabId = dragged.current
+                          if (tabId === null || dropIndex === null) return
+                          const from = tabs.findIndex(candidate => candidate.id === tabId)
+                          send({ type: 'tab.move', tabId, toIndex: from < dropIndex ? dropIndex - 1 : dropIndex })
+                          setDropIndex(null)
+                        }}
+                        onDragEnd={() => {
+                          dragged.current = null
+                          setDropIndex(null)
+                          clearAsideTarget()
+                        }}
+                      >
+                        <span
+                          className={cn(
+                            'dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]',
+                            !tab.pinned &&
+                              'dshx:group-hover:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))] dshx:group-focus-within:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
+                            !tab.pinned && tab.active && 'dshx:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
+                          )}
+                        >
+                          {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
+                          {tab.status === null ? null : (
+                            <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
+                          )}
+                          {tab.kind === 'thread' && renamingTabId === tab.id ? (
+                            <InlineTitleEditor
+                              value={tab.title}
+                              label={t('renameThread')}
+                              className="dshx:h-5 dshx:min-w-20 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none dshx:text-inherit dshx:focus-visible:ring-0"
+                              onCancel={() => setRenamingTabId(null)}
+                              onCommit={title => void renameTab(tab, title)}
+                            />
+                          ) : (
+                            <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                          )}
+                          {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
+                        </span>
+                        {tab.pinned ? null : (
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            aria-label={t('close', { title: tab.title })}
+                            className={cn(
+                              'dshx:absolute dshx:top-1 dshx:right-1 dshx:flex dshx:size-5 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
+                              tab.active
+                                ? 'dshx:opacity-100'
+                                : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
+                            )}
+                            onClick={event => {
+                              event.stopPropagation()
+                              send({ type: 'tab.close', tabId: tab.id })
+                            }}
+                          >
+                            <CloseGlyph />
+                          </button>
+                        )}
+                      </div>
+                    </ContextMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{tab.available ? tab.title : `${tab.title} — ${t('unavailable')}`}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <ContextMenuContent className="dshx-root">
                 <TabMenuItems tab={tab} tabs={tabs} send={send} t={t} onRename={() => setRenamingTabId(tab.id)} onStatus={setStatus} />
               </ContextMenuContent>
@@ -353,24 +360,30 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
           )
         })}
       </div>
-      <button
-        type="button"
-        aria-label={t('newTab')}
-        title={props.newTabKeys === '' ? t('newTab') : `${t('newTab')} (${props.newTabKeys})`}
-        className={cn(STRIP_BUTTON, 'dshx:relative', dropIndex === tabs.length && DROP_CARET)}
-        onClick={() => send({ type: 'tab.new' })}
-        onDragOver={event => {
-          if (dragged.current === null) return
-          event.preventDefault()
-          setDropIndex(tabs.length)
-        }}
-        onDrop={event => {
-          event.preventDefault()
-          dropAtEnd()
-        }}
-      >
-        <PlusGlyph />
-      </button>
+      <TooltipProvider delayDuration={500}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={t('newTab')}
+              className={cn(STRIP_BUTTON, 'dshx:relative', dropIndex === tabs.length && DROP_CARET)}
+              onClick={() => send({ type: 'tab.new' })}
+              onDragOver={event => {
+                if (dragged.current === null) return
+                event.preventDefault()
+                setDropIndex(tabs.length)
+              }}
+              onDrop={event => {
+                event.preventDefault()
+                dropAtEnd()
+              }}
+            >
+              <PlusGlyph />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{props.newTabKeys === '' ? t('newTab') : `${t('newTab')} (${props.newTabKeys})`}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <div
         aria-hidden
         className="dshx:h-7 dshx:min-w-6 dshx:flex-1"
@@ -386,9 +399,16 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
       />
       {overflowing ? (
         <DropdownMenu>
-          <DropdownMenuTrigger aria-label={t('allTabs')} title={t('allTabs')} className={STRIP_BUTTON}>
-            <ChevronDownIcon aria-hidden size={15} />
-          </DropdownMenuTrigger>
+          <TooltipProvider delayDuration={500}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger aria-label={t('allTabs')} className={STRIP_BUTTON}>
+                  <ChevronDownIcon aria-hidden size={15} />
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('allTabs')}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <DropdownMenuContent align="end" className="dshx-root dshx:max-h-96 dshx:max-w-80">
             {tabs.map(tab => (
               <DropdownMenuItem key={tab.id} onSelect={() => send({ type: 'tab.select', tabId: tab.id })} className={cn(tab.active && 'dshx:font-semibold')}>

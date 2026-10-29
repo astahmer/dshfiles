@@ -3,7 +3,9 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import { z } from 'zod'
 import { DshxError } from '../diagnostics.js'
+import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
 import { resolveVitePlugins } from './vite-plugins.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import type { DshxConfig, DshxModuleEntry, ResolvedDshxConfig, ResolveDshxConfigOptions } from './types.js'
 
 const CONFIG_FILENAME = 'dshx.config.ts'
@@ -14,7 +16,6 @@ const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
 const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
-const objectSchema = z.record(z.string(), z.unknown())
 const nonEmptyStringSchema = z.string().refine(value => value.trim() !== '')
 const packageRootSchema = z.string().regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/)
 const packageRootsSchema = z.array(packageRootSchema).refine(names => new Set(names).size === names.length && !names.includes('@deepseek-ai/cordis'))
@@ -25,8 +26,13 @@ const providedModulesSchema = z
   .refine(names => new Set(names).size === names.length)
 const manifestSchema = z.object({ name: nonEmptyStringSchema })
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return objectSchema.safeParse(value).success
+/** A project `package.json` whose `name` readManifest already validated. */
+interface ProjectManifest extends JsonObject {
+  readonly name: string
+}
+
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 async function exists(file: string): Promise<boolean> {
@@ -53,20 +59,21 @@ async function findProjectRoot(cwd: string): Promise<string> {
   }
 }
 
-async function readManifest(packageFile: string): Promise<z.infer<typeof manifestSchema>> {
+async function readManifest(packageFile: string): Promise<ProjectManifest> {
   let source: string
   try {
     source = await readFile(packageFile, 'utf8')
   } catch (cause) {
     throw new DshxError('DSHX4002', `Cannot read project manifest: ${packageFile}`, { cause, file: packageFile })
   }
-  let value: unknown
+  let value: JsonObject | undefined
   try {
-    value = JSON.parse(source)
+    const decoded = decodeJsonSafe(jsonObjectSchema, source)
+    if (decoded.success) value = decoded.data
   } catch (cause) {
     throw new DshxError('DSHX4002', `Project manifest is not valid JSON: ${packageFile}`, { cause, file: packageFile })
   }
-  if (!isObject(value)) {
+  if (value === undefined) {
     throw new DshxError('DSHX4002', 'Project package.json must contain a JSON object.', { file: packageFile })
   }
   const manifest = manifestSchema.safeParse(value)
@@ -77,10 +84,10 @@ async function readManifest(packageFile: string): Promise<z.infer<typeof manifes
     })
   }
   // Keep opaque metadata intact: Zod record/object outputs omit an own __proto__ key.
-  return { ...value, ...manifest.data }
+  return { ...value, name: manifest.data.name }
 }
 
-function rejectUnknownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>, label: string, file: string): void {
+function rejectUnknownKeys(value: JsonObject, allowed: ReadonlySet<string>, label: string, file: string): void {
   const unknown = Object.keys(value).filter(key => !allowed.has(key))
   if (unknown.length > 0) {
     throw new DshxError('DSHX4004', `${label} contains unknown field${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}.`, {
@@ -90,7 +97,7 @@ function rejectUnknownKeys(value: Record<string, unknown>, allowed: ReadonlySet<
   }
 }
 
-function optionalNonEmptyString(value: unknown, field: string, file: string): string | undefined {
+function optionalNonEmptyString(value: JsonValue | undefined, field: string, file: string): string | undefined {
   if (value === undefined) return undefined
   const parsed = nonEmptyStringSchema.safeParse(value)
   if (!parsed.success) {
@@ -102,7 +109,7 @@ function optionalNonEmptyString(value: unknown, field: string, file: string): st
   return parsed.data
 }
 
-function optionalPackageNames(value: unknown, field: string, file: string): readonly string[] | undefined {
+function optionalPackageNames(value: JsonValue | undefined, field: string, file: string): readonly string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) {
     throw new DshxError('DSHX4004', `${field} must be an array of bare package roots.`, {
@@ -120,7 +127,7 @@ function optionalPackageNames(value: unknown, field: string, file: string): read
   return names.data
 }
 
-function validateSharedRuntime(client: Record<string, unknown>, file: string): void {
+function validateSharedRuntime(client: JsonObject, file: string): void {
   if (client.shared !== undefined && !sharedSupplierSchema.safeParse(client.shared).success) {
     throw new DshxError('DSHX4004', 'client.shared must be the package id of a shared-runtime supplier.', {
       file,
@@ -144,7 +151,7 @@ function validateSharedRuntime(client: Record<string, unknown>, file: string): v
   rejectUnknownKeys(client.sharedRuntime, new Set(['provide']), 'client.sharedRuntime', file)
 }
 
-function validateConfig(value: unknown, file: string): DshxConfig {
+function checkConfig(value: unknown, file: string): DshxConfig {
   if (!isObject(value)) {
     throw new DshxError('DSHX4003', 'dshx.config.ts must default-export an object.', {
       file,
@@ -296,7 +303,7 @@ async function loadUserConfig(root: string): Promise<{
     })
   }
   return {
-    config: validateConfig(loaded.config, loaded.path),
+    config: checkConfig(loaded.config, loaded.path),
     configFile: loaded.path,
     dependencies: [...loaded.dependencies],
   }
@@ -367,19 +374,19 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     for (const [name, entry] of Object.entries(modules ?? {})) {
       if (!MODULE_NAME_PATTERN.test(name) || RESERVED_MODULE_NAMES.has(name)) {
         throw new DshxError('DSHX4007', `Invalid shared module name ${JSON.stringify(name)}.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
           hint: 'Use a lower-case name such as "contract"; "index", "client", "package" and "cordis" are reserved.',
         })
       }
       if (!nonEmptyStringSchema.safeParse(entry).success) {
         throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} needs a source entry.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
         })
       }
       const absolute = await resolveEntry(root, { entry }, 'src/module.ts', `modules.${name}`, configFile)
       if (absolute === undefined) {
         throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} has no entry.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
         })
       }
       resolved.push({ name, entry: absolute })
@@ -407,26 +414,26 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
   return {
     root,
     packageFile,
-    ...(loaded.configFile === undefined ? {} : { configFile: loaded.configFile }),
+    ...(loaded.configFile !== undefined && { configFile: loaded.configFile }),
     configDependencies: loaded.dependencies,
     packageId,
     name: loaded.config.name ?? packageId,
-    ...(hostEntry === undefined ? {} : { hostEntry }),
-    ...(clientEntry === undefined ? {} : { clientEntry }),
+    ...(hostEntry !== undefined && { hostEntry }),
+    ...(clientEntry !== undefined && { clientEntry }),
     hostBundleDependencies,
-    ...(modules.length === 0 ? {} : { modules }),
+    ...(modules.length !== 0 && { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
-    ...(loaded.config.client === false || loaded.config.client?.shared === undefined ? {} : { clientShared: loaded.config.client.shared }),
-    ...(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined
-      ? {}
-      : { clientSharedRuntime: loaded.config.client.sharedRuntime.provide }),
-    ...(hostVitePlugins.length === 0 ? {} : { hostVitePlugins }),
-    ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
+    ...(!(loaded.config.client === false || loaded.config.client?.shared === undefined) && { clientShared: loaded.config.client.shared }),
+    ...(!(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined) && {
+      clientSharedRuntime: loaded.config.client.sharedRuntime.provide,
+    }),
+    ...(hostVitePlugins.length !== 0 && { hostVitePlugins }),
+    ...(clientVitePlugins.length !== 0 && { clientVitePlugins }),
     outDir: resolve(root, 'dist'),
     profile: loaded.config.profile ?? 'web',
     dev: {
       hostRestart: loaded.config.dev?.hostRestart ?? 'auto',
-      ...(loaded.config.dev?.hostHmr === undefined ? {} : { hostHmr: loaded.config.dev.hostHmr }),
+      ...(loaded.config.dev?.hostHmr !== undefined && { hostHmr: loaded.config.dev.hostHmr }),
     },
     build: {
       sourcemap: loaded.config.build?.sourcemap ?? true,

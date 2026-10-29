@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
+import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
 import { z } from 'zod'
@@ -60,13 +61,13 @@ export const createApplyPatchTool = (ctx: Context) =>
   defineTool({
     name: 'apply_patch',
     description:
-      'Edit one existing text file atomically: reads it first, applies literal replacements in order, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
+      'Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
     parameters: {
       path: { type: 'string', required: true, description: 'File to edit; relative paths resolve against the Session working directory.' },
       edits: {
         type: 'array',
         required: true,
-        description: 'Ordered replacements; each anchor must match once unless replaceAll is set.',
+        description: 'Ordered replacements; identical old/new pairs are ignored, and each other anchor must match once unless replaceAll is set.',
         items: {
           type: 'object',
           additionalProperties: false,
@@ -91,9 +92,11 @@ export const createApplyPatchTool = (ctx: Context) =>
       if (ctx.fs.sandboxMode !== undefined && policy === undefined) {
         throw new Error('apply_patch: the mounted filesystem confines but ctx.sandboxPolicy is missing')
       }
+      const session = agent === undefined ? undefined : ctx.sessions.get(agent.id)
+      if (agent !== undefined && session === undefined) throw new Error('cannot patch because the caller session is no longer live')
       // Match native file tools: resolve the caller's standing mode and original
       // workspace boundary per call, never from the deployment or mutable cwd.
-      const sandboxPolicy = policy?.resolve(agent === undefined ? {} : { session: agent.session })
+      const sandboxPolicy = policy?.resolve(session === undefined ? {} : { session })
       const cwd = agent === undefined ? undefined : await ctx.workingDirectory.ensure(agent, execution.signal)
       const resolveOptions: { readonly cwd?: string; readonly signal: AbortSignal } =
         cwd === undefined ? { signal: execution.signal } : { cwd, signal: execution.signal }

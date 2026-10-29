@@ -36,6 +36,23 @@ describe('applyCostEvent', () => {
     ])
     expect(state.view.turn?.turn).toBe(1)
     expect(state.view.turn?.groups.map(group => group.model)).toEqual(['claude-opus-5-5'])
+    expect(state.view.turns?.map(entry => [entry.turn, entry.groups.map(group => group.model)])).toEqual([
+      [0, ['gpt-6-luna']],
+      [1, ['claude-opus-5-5']],
+    ])
+  })
+
+  it('replaces a turn sample without losing earlier turn groups', () => {
+    const state = fold([
+      header('codex', 'gpt-6-luna'),
+      message(0, 0, { inputTokens: 100, outputTokens: 20 }),
+      message(1, 0, { inputTokens: 10, outputTokens: 1 }),
+      message(1, 0, { inputTokens: 200, outputTokens: 40 }),
+    ])
+    expect(state.view.turns?.map(entry => [entry.turn, entry.groups[0]?.tokens.uncachedInputTokens])).toEqual([
+      [0, 100],
+      [1, 200],
+    ])
   })
 
   it('replaces a failed attempt with the settled message of the same step', () => {

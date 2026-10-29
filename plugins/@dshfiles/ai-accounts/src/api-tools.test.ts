@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aiAccountsApi, type CopilotLoginState } from './api.js'
+import { aiAccountsApi, removeCustomModelInputSchema, type CopilotLoginState } from './api.js'
 import { AccountsHostApiModel } from './accounts-host-api.js'
 
 describe('ai-accounts tool exposure', () => {
@@ -29,6 +29,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_quota',
       'ai_accounts_refresh_pricing',
       'ai_accounts_refresh_quota',
+      'ai_accounts_remove_custom_model',
       'ai_accounts_reorder_account',
       'ai_accounts_resume_continuation',
       'ai_accounts_save_account',
@@ -103,6 +104,12 @@ describe('ai-accounts tool exposure', () => {
     const currentOwner = { ...oldOwner, supportsExpectedScope: true as const }
     expect(AccountsHostApiModel.scopedCatalogValues(currentOwner)).toBe(currentOwner)
     expect(reads).toBe(0)
+  })
+
+  test('custom-model removal requires explicit confirmation', () => {
+    const input = { instanceId: 'codex-main', modelId: 'custom-model' }
+    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: true }).success).toBe(true)
+    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: false }).success).toBe(false)
   })
 
   test('inspection stays read-only and every tool explains itself', () => {

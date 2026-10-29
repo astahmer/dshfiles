@@ -1,9 +1,12 @@
-import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
+import { isApiError, isApiOwnerMissing, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { queryOptions, type QueryClient } from '@dshfiles/plugin-ui/query'
 import { z } from 'zod'
 import {
   accountKindSchema,
   aiAccountsApi,
+  FORECAST_HISTORY_BUCKET_MINUTES,
+  FORECAST_HISTORY_DAYS,
+  MAX_FORECAST_HISTORY_BATCH_SIZE,
   usageCardSchema,
   type AccountsFile,
   type AccountsCatalog,
@@ -17,6 +20,48 @@ type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? 
 const SIGN_IN_POLL_MS = 2_500
 /** A live reload lands a couple of seconds after the profile patch is written. */
 const LIVE_RELOAD_POLL_MS = 3_500
+const unsupportedForecastHistoryClients = new WeakSet<object>()
+
+const isForecastHistoryBatchUnavailable = (error: unknown): boolean =>
+  isApiError(error) && error.apiId === aiAccountsApi.id && error.method === 'forecastHistoryBatch' && (isApiOwnerMissing(error) || error.kind === 'contract')
+
+const readLegacyForecastHistories = async (accounts: Pick<AccountsClient, 'history'>, instanceIds: readonly string[], signal: AbortSignal) => ({
+  histories: await Promise.all(
+    instanceIds.map(async instanceId => {
+      try {
+        return await accounts.history({ instanceId, days: FORECAST_HISTORY_DAYS, bucketMinutes: FORECAST_HISTORY_BUCKET_MINUTES }, { signal })
+      } catch (error) {
+        if (signal.aborted) throw error
+        return { instanceId, points: [] }
+      }
+    }),
+  ),
+})
+
+const readForecastHistoryBatch = async (accounts: Pick<AccountsClient, 'forecastHistoryBatch' | 'history'>, instanceIds: string[], signal: AbortSignal) => {
+  if (unsupportedForecastHistoryClients.has(accounts)) return readLegacyForecastHistories(accounts, instanceIds, signal)
+  try {
+    return await accounts.forecastHistoryBatch({ instanceIds }, { signal })
+  } catch (error) {
+    if (!isForecastHistoryBatchUnavailable(error)) throw error
+    unsupportedForecastHistoryClients.add(accounts)
+    return readLegacyForecastHistories(accounts, instanceIds, signal)
+  }
+}
+
+const readForecastHistories = async (
+  accounts: Pick<AccountsClient, 'forecastHistoryBatch' | 'history'>,
+  instanceIds: readonly string[],
+  signal: AbortSignal,
+) => {
+  const batches: string[][] = []
+  for (let offset = 0; offset < instanceIds.length; offset += MAX_FORECAST_HISTORY_BATCH_SIZE)
+    batches.push(instanceIds.slice(offset, offset + MAX_FORECAST_HISTORY_BATCH_SIZE))
+  const responses = await Promise.all(batches.map(batch => readForecastHistoryBatch(accounts, batch, signal)))
+  return { histories: responses.flatMap(response => response.histories) }
+}
+
+const AI_ACCOUNTS_HISTORY_KEY = ['ai-accounts', 'history'] as const
 
 export const aiAccountsKeys = {
   file: ['ai-accounts', 'file'] as const,
@@ -25,8 +70,9 @@ export const aiAccountsKeys = {
   secretCatalogKeys: (cwd: string | null) => ['ai-accounts', 'secret-catalog-keys', cwd] as const,
   credential: (ref: string) => ['ai-accounts', 'credential', ref] as const,
   catalog: (instanceId: string) => ['ai-accounts', 'catalog', instanceId] as const,
-  history: ['ai-accounts', 'history'] as const,
+  history: AI_ACCOUNTS_HISTORY_KEY,
   historyRange: (instanceId: string, days: number) => ['ai-accounts', 'history', instanceId, days] as const,
+  forecastHistories: (instanceIds: readonly string[]) => [...AI_ACCOUNTS_HISTORY_KEY, 'forecast-batch', [...instanceIds]] as const,
   historySettings: ['ai-accounts', 'history-settings'] as const,
   identity: (instanceId: string) => ['ai-accounts', 'identity', instanceId] as const,
   quotaContinuations: ['ai-accounts', 'quota-continuations'] as const,
@@ -139,16 +185,18 @@ export const aiAccountsQueries = {
       refetchInterval: input.refetchInterval,
     }),
 
-  /**
-   * Five weeks thinned to half-hour readings: enough for coverage weeks and a
-   * day of pace. An older Host ignores `bucketMinutes` and sends its bounded series.
-   */
-  forecastHistory: (accounts: Pick<AccountsClient, 'history'>, input: { readonly instanceId: string; readonly refetchInterval: number }) =>
-    queryOptions({
-      queryKey: [...aiAccountsKeys.history, input.instanceId, 'forecast'] as const,
-      queryFn: ({ signal }) => accounts.history({ instanceId: input.instanceId, days: 36, bucketMinutes: 30 }, { signal }),
+  forecastHistories: (
+    accounts: Pick<AccountsClient, 'forecastHistoryBatch' | 'history'>,
+    input: { readonly instanceIds: readonly string[]; readonly refetchInterval: number },
+  ) => {
+    const instanceIds = [...new Set(input.instanceIds)].sort()
+    return queryOptions({
+      queryKey: aiAccountsKeys.forecastHistories(instanceIds),
+      queryFn: ({ signal }) => readForecastHistories(accounts, instanceIds, signal),
+      enabled: instanceIds.length > 0,
       refetchInterval: input.refetchInterval,
-    }),
+    })
+  },
 
   /** `null` from a Host without history settings, so the page still draws. */
   historySettings: (accounts: Pick<AccountsClient, 'historySettings'>) =>

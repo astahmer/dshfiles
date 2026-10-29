@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -191,9 +192,14 @@ const JobLine = (props: {
               {row.kind} · {durationLabel(row, props.now)} · {formatStarted(row.startedAt, props.now)}
             </span>
           </div>
-          <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs" title={row.label}>
-            {row.label}
-          </code>
+          <TooltipProvider delayDuration={500}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{row.label}</code>
+              </TooltipTrigger>
+              <TooltipContent>{row.label}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.owner === null ? row.id : props.sessionLabel(row.owner)}</span>
         </div>
         {running ? (
@@ -482,18 +488,24 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
                 <h2 className="dshx:text-sm dshx:font-medium">{section.label}</h2>
                 <Badge variant="outline">{section.rows.length}</Badge>
                 {group === 'session' && section.key.startsWith('session-') ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={sessionTarget(props.sessions, section.key) === undefined}
-                    title={sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}
-                    onClick={() => {
-                      const target = sessionTarget(props.sessions, section.key)
-                      if (target !== undefined) props.uiWorkspace.openSession(target)
-                    }}
-                  >
-                    {t('openSession')}
-                  </Button>
+                  <TooltipProvider delayDuration={500}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={sessionTarget(props.sessions, section.key) === undefined}
+                          onClick={() => {
+                            const target = sessionTarget(props.sessions, section.key)
+                            if (target !== undefined) props.uiWorkspace.openSession(target)
+                          }}
+                        >
+                          {t('openSession')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : null}
               </div>
               <div className="dshx:flex dshx:flex-col dshx:gap-2">

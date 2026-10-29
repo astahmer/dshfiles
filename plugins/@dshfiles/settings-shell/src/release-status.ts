@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 const githubReleaseSchema = z.object({
@@ -159,5 +160,5 @@ export const fetchDshReleaseStatus = async (input: {
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return releaseStatusFromGitHub({ currentVersion: input.currentVersion, response: JSON.parse(new TextDecoder().decode(bytes)) })
+  return releaseStatusFromGitHub({ currentVersion: input.currentVersion, response: decodeJson(jsonValueSchema, new TextDecoder().decode(bytes)) })
 }

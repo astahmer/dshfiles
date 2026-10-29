@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 
 import type { BacklogAttention, BacklogKind, BacklogStatus } from './item.js'
 import { activityPhrase } from './activity-phrase.js'
@@ -90,16 +91,20 @@ const AttentionBadge = (props: { readonly attention: BacklogAttention; readonly 
   if (props.attention === 'none') return null
   const Icon = attentionIcons[props.attention]
   return (
-    <span
-      title={attentionLabels[props.attention]}
-      className={cn(
-        'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium',
-        attentionTone[props.attention],
-      )}
-    >
-      <Icon aria-hidden className="dshx:size-3" />
-      {props.compact === true ? null : attentionLabels[props.attention]}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium',
+            attentionTone[props.attention],
+          )}
+        >
+          <Icon aria-hidden className="dshx:size-3" />
+          {props.compact === true ? null : attentionLabels[props.attention]}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{attentionLabels[props.attention]}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -131,10 +136,15 @@ const ProjectDot = (props: { readonly project: string; readonly className?: stri
 
 /** A project as its dot and short name; the full path stays in the tooltip. */
 const ProjectLabel = (props: { readonly project: string; readonly className?: string }): JSX.Element => (
-  <span title={BacklogProjectPaths.displayPath(props.project)} className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', props.className)}>
-    <ProjectDot project={props.project} />
-    <span className="dshx:truncate">{projectName(props.project)}</span>
-  </span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', props.className)}>
+        <ProjectDot project={props.project} />
+        <span className="dshx:truncate">{projectName(props.project)}</span>
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>{BacklogProjectPaths.displayPath(props.project)}</TooltipContent>
+  </Tooltip>
 )
 
 /** An actor as a tiny avatar: the user's initial, a bot for an agent, a wand for automatic triage and signals. */
@@ -142,16 +152,20 @@ const ActorAvatar = (props: { readonly actorId: string | undefined; readonly cla
   const agent = props.actorId?.startsWith('agent:') === true
   const system = props.actorId === 'system'
   return (
-    <span
-      title={actorName(props.actorId)}
-      className={cn(
-        'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-[9px] dshx:font-semibold dshx:ring-2 dshx:ring-background',
-        agent ? 'dshx:bg-violet/20 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/20 dshx:text-info',
-        props.className,
-      )}
-    >
-      {agent ? <BotIcon aria-hidden className="dshx:size-2.5" /> : system ? <WandSparklesIcon aria-hidden className="dshx:size-2.5" /> : 'Y'}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-[9px] dshx:font-semibold dshx:ring-2 dshx:ring-background',
+            agent ? 'dshx:bg-violet/20 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/20 dshx:text-info',
+            props.className,
+          )}
+        >
+          {agent ? <BotIcon aria-hidden className="dshx:size-2.5" /> : system ? <WandSparklesIcon aria-hidden className="dshx:size-2.5" /> : 'Y'}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{actorName(props.actorId)}</TooltipContent>
+    </Tooltip>
   )
 }
 

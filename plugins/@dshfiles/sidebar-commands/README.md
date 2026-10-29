@@ -14,8 +14,7 @@ browser reads. A navigation that fails, for example because the panel was
 unregistered after the popup opened, surfaces in the popup shell and leaves the
 current view in place.
 
-When @dshfiles/thread-sidebar is loaded (it acknowledges a probe of the
-cancelable `dshfiles:command-palette` window event), the popup leads with
+When the command palette runs (its `CommandPalette` contract is active), the popup leads with
 **Open command palette** and **Search threads**. That palette lists every
 sidebar destination dynamically, which covers the BB Cmd-Shift-P page entries
 and the Customize sidebar entry.

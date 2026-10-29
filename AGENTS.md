@@ -23,7 +23,7 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
 - `live-performance-audit` — before planning any performance work, and to prove a fix with before/after numbers.
 - `verify-dsh` — launch, drive and screenshot a scratch DSH (`dshx dev up|doctor|open|shot|down`).
-- `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
+- `maintain-verify-dsh` — after DSH launch, seed, verification, or UI changes (`dshx dev`, e2e support, catalog schema, profile seeding).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
 - `complete-plan` — when a plan's last task is done and verified: move its durable content into docs and delete it.
 - `traces-first` — when something is slow or failing: read the stored traces (`traces_*` tools) before reading code.
@@ -81,11 +81,17 @@ instance. So, before proposing any fix:
   [native forks](docs/native-forks.md) with a `native-fork.json`; run
   `node scripts/native-fork-diff.mjs` after touching one.
 
-Say which option you chose and why. Two rules keep the choice honest:
+Say which option you chose and why. Three rules keep the choice honest:
 
 - **Verify against the installed runtime, not the README.** Read a plugin's peer
   ranges against our DSH version, resolve the imports it uses, and read the
   Service contract it calls.
+- **Find agent-tool ownership before asking for another checkout.** For a
+  reported tool failure, search this repository for the exact tool name and
+  error text, especially under `plugins/@dshfiles/*` and tool registrations.
+  Familiar names such as `apply_patch` may be owned by a local plugin rather
+  than DSH core. If found, fix and verify that plugin in this workspace; ask for
+  another source checkout only after confirming the implementation is absent.
 - **Check the Host boundary before building UI.** A plugin cannot add a method
   to a native Service, but it may expose its own Host API and own the needed
   state/workflow when supported services (for example storage domains and
@@ -417,6 +423,10 @@ with nothing running.
 | Another agent        | `send_message` it, or end the turn — its reply resumes you                                                   |
 | The user             | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you    |
 | Thread questions     | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                              |
+
+## Warnings and errors
+
+Every user-facing warning or error must include an actionable recovery path: tell the user what they can change or do next, and offer a direct control or exact command when available. If no safe recovery exists, explain the limitation and the next practical alternative; never leave the user with a dead-end message.
 
 ## Definition of done
 

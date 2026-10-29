@@ -1,3 +1,4 @@
+import type { JsonValue } from '@dshfiles/dshx/json'
 import { describe, expect, it, vi } from 'vitest'
 
 /**
@@ -13,17 +14,64 @@ import { describe, expect, it, vi } from 'vitest'
 
 const roundPrompt = (round: number): string => `<goal_round>\nObjective: "restyle the sidebar"\nRound: ${round}/256\n\nContinue working toward the objective.`
 
-interface RecordedSessionEvent {
-  readonly type: string
-  readonly data?: unknown
+interface StubSession {
+  readonly id: string
 }
 
-type SessionEventListener = (session: { readonly id: string }, event: RecordedSessionEvent) => void
+interface StubAgent {
+  readonly id: string
+  readonly session: StubSession
+}
+
+/** The goal row `ctx.goals` answers with. */
+interface StubGoal {
+  readonly id: string
+  readonly revision: number
+  readonly phase: 'active' | 'paused'
+}
+
+/** The row config the built entry parses after cordis unwraps it. */
+interface PluginRowConfig {
+  readonly stallThreshold?: number | undefined
+}
+
+/** One replayed `session/event`: the bundle reads `type` and `data` only. */
+interface StubSessionEvent {
+  readonly type: string
+  readonly data?: JsonValue
+}
+
+type SessionEventListener = (session: StubSession, event: StubSessionEvent) => void
+type StubListener = (event: string, handler: SessionEventListener) => void
+
+/** The event surface `createBaseApi` binds when it builds the plugin api. */
+interface StubEventSurface {
+  readonly on: StubListener
+  readonly once: StubListener
+  readonly emit: StubListener
+  readonly parallel: StubListener
+  readonly serial: StubListener
+  readonly bail: StubListener
+  readonly waterfall: StubListener
+  readonly effect: () => void
+  readonly get: () => undefined
+  readonly tools: { readonly register: (definition: { readonly name: string }) => void }
+}
+
+/** The Host context this harness supplies: the event surface plus the services the bundle injects. */
+interface StubContext extends StubEventSurface {
+  readonly agents: { readonly get: (sessionId: string) => StubAgent | undefined }
+  readonly goals: {
+    readonly get: (agent: StubAgent) => StubGoal | undefined
+    readonly pause: (agent: StubAgent, input: { readonly id: string; readonly revision: number }) => void
+  }
+  readonly logger: { readonly warn: (...args: readonly unknown[]) => void }
+}
 
 interface Harness {
   readonly pause: ReturnType<typeof vi.fn>
   readonly registeredToolNames: string[]
-  readonly dispatch: (event: RecordedSessionEvent) => void
+  readonly dispatch: (event: StubSessionEvent) => void
 }
 
 /**
@@ -34,7 +82,7 @@ interface Harness {
  */
 interface BuiltPlugin {
   /** The harness only cares that activation ran; the returned disposable is ignored. */
-  readonly apply: (ctx: unknown, config?: unknown) => void
+  readonly apply: (ctx: StubContext, config?: PluginRowConfig) => void
 }
 
 const builtEntry = new URL('../dist/index.js', import.meta.url).href
@@ -45,8 +93,8 @@ const loadPlugin = async (): Promise<BuiltPlugin> => import(builtEntry)
  * `createBaseApi` binds cordis's whole event surface when it builds the plugin
  * api, so a stub context that only declares `on` throws before the plugin runs.
  */
-const bindableContext = (listeners: Map<string, SessionEventListener>): Record<string, unknown> => {
-  const on = (event: string, handler: SessionEventListener): void => {
+const bindableContext = (listeners: Map<string, SessionEventListener>): StubEventSurface => {
+  const on: StubListener = (event, handler) => {
     listeners.set(event, handler)
   }
   // `get` is what dshx's optional inspect bridge probes; without it the bridge
@@ -54,7 +102,7 @@ const bindableContext = (listeners: Map<string, SessionEventListener>): Record<s
   return { on, once: on, emit: on, parallel: on, serial: on, bail: on, waterfall: on, effect: () => {}, get: () => undefined, tools: { register: () => {} } }
 }
 
-const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {}): Harness => {
+const startHarness = (plugin: BuiltPlugin, config: PluginRowConfig = {}): Harness => {
   let publishing = false
   // Like the real session, a goal change cannot be appended while a session event is still being published.
   const pause = vi.fn(() => {
@@ -78,7 +126,7 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
   }
 
   plugin.apply(ctx, config)
-  const dispatch = (event: RecordedSessionEvent): void => {
+  const dispatch = (event: StubSessionEvent): void => {
     const handler = listeners.get('session/event')
     if (handler === undefined) throw new Error('plugin registered no session/event listener')
     publishing = true
@@ -218,7 +266,7 @@ describe('goal-stall-guard wiring', () => {
     const pause = vi.fn()
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
     const listeners = new Map<string, SessionEventListener>()
-    const ctx = {
+    const ctx: StubContext = {
       ...bindableContext(listeners),
       agents: { get: () => agent },
       goals: { get: () => undefined, pause },
@@ -242,7 +290,7 @@ describe('goal-stall-guard wiring', () => {
     const pause = vi.fn()
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
     const listeners = new Map<string, SessionEventListener>()
-    const ctx = {
+    const ctx: StubContext = {
       ...bindableContext(listeners),
       agents: { get: () => agent },
       goals: { get: () => ({ id: 'goal-1', revision: 4, phase: 'paused' }), pause },
@@ -266,7 +314,7 @@ describe('goal-stall-guard wiring', () => {
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
     const warn = vi.fn()
     const listeners = new Map<string, SessionEventListener>()
-    const ctx = {
+    const ctx: StubContext = {
       ...bindableContext(listeners),
       agents: { get: () => agent },
       goals: {

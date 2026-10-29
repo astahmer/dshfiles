@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
+import type { JsonObject } from '../json.js'
 import type { JsonValue, SessionSummary } from './client.js'
 
 const eventRecordSchema = z.object({
@@ -149,17 +151,17 @@ const homeRelative = (text: string): string => text.replace(/(?<![\w./-])\/(?:Us
 
 const joinPath = (base: string, path: string): string => (path.startsWith('/') ? path : `${base.replace(/\/$/, '')}/${path.replace(/^\.\//, '')}`)
 
-const parseArguments = (value: string | undefined): Readonly<Record<string, unknown>> => {
+const parseArguments = (value: string | undefined): JsonObject => {
   if (value === undefined) return {}
   try {
-    const parsed = z.record(z.string(), z.unknown()).safeParse(JSON.parse(value))
+    const parsed = decodeJsonSafe(jsonObjectSchema, value)
     return parsed.success ? parsed.data : {}
   } catch {
     return {}
   }
 }
 
-const stringArgument = (args: Readonly<Record<string, unknown>>, ...names: string[]): string | undefined => {
+const stringArgument = (args: JsonObject, ...names: string[]): string | undefined => {
   for (const name of names) {
     const value = args[name]
     if (typeof value === 'string' && value.length > 0) return value
@@ -178,7 +180,7 @@ const reasoningHeadlines = (text: string): string[] => [
 ]
 
 /** The directory a shell command runs in: its `workdir` argument, or a leading `cd <dir> &&`. */
-const shellDirectory = (args: Readonly<Record<string, unknown>>): string | undefined => {
+const shellDirectory = (args: JsonObject): string | undefined => {
   const workdir = stringArgument(args, 'workdir', 'cwd')
   if (workdir !== undefined) return workdir
   const command = stringArgument(args, 'command')
@@ -212,7 +214,7 @@ const vcsMessage = (rest: string): string | undefined => {
 }
 
 /** A one-line description of one tool call, keyed on the argument a supervisor needs to see. */
-const describeToolCall = (name: string, args: Readonly<Record<string, unknown>>, display: (path: string) => string, workRoot?: string): string => {
+const describeToolCall = (name: string, args: JsonObject, display: (path: string) => string, workRoot?: string): string => {
   if (shellTools.has(name)) {
     const command = (stringArgument(args, 'command', 'cmd') ?? '').replace(/^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)\s*/, '')
     const background = args.run_in_background === true ? ' (background)' : ''
@@ -242,13 +244,13 @@ const createSessionEventDescriber = (): ((
   return record => {
     const event = decodeEvent(record)
     if (event === undefined) return undefined
-    const base = { seq: event.seq, ...(event.time === undefined ? {} : { time: event.time }), type: event.type }
+    const base = { seq: event.seq, ...(event.time !== undefined && { time: event.time }), type: event.type }
     const describe = (): string => {
       const data = event.data
       if (event.type === 'tool/call') {
         const call = toolCallSchema.safeParse(data)
         if (!call.success) return ''
-        calls.set(call.data.callId, { name: call.data.name, ...(event.time === undefined ? {} : { time: event.time }) })
+        calls.set(call.data.callId, { name: call.data.name, ...(event.time !== undefined && { time: event.time }) })
         return describeToolCall(call.data.name, parseArguments(call.data.arguments), homeRelative)
       }
       if (event.type === 'tool/result') {
@@ -395,9 +397,9 @@ export const digestSession = (input: {
   let retries = 0
   let failedTurns = 0
   const subagents = new Map<string, string | undefined>()
-  const at = (event: SessionEvent): { readonly seq: number; readonly time?: number } => ({
+  const at = (event: SessionEvent) => ({
     seq: event.seq,
-    ...(event.time === undefined ? {} : { time: event.time }),
+    ...(event.time !== undefined && { time: event.time }),
   })
 
   for (const event of events) {
@@ -418,7 +420,7 @@ export const digestSession = (input: {
         tool: call.data.name,
         summary: describeToolCall(call.data.name, args, display, workRoot),
         status,
-        ...(failure === undefined ? {} : { error: failure }),
+        ...(failure !== undefined && { error: failure }),
       })
       const path = stringArgument(args, 'file_path', 'path', 'filePath')
       if (mutatingFileTools.has(call.data.name) && path !== undefined && status !== 'error') {
@@ -428,7 +430,7 @@ export const digestSession = (input: {
       const command = shellTools.has(call.data.name) ? stringArgument(args, 'command') : undefined
       for (const match of command?.matchAll(vcsCommandPattern) ?? []) {
         const message = vcsMessage(match[2] ?? '')
-        revisions.push({ seq: event.seq, command: `jj ${(match[1] ?? '').replace(/\s+/g, ' ')}`, ...(message === undefined ? {} : { message }), status })
+        revisions.push({ seq: event.seq, command: `jj ${(match[1] ?? '').replace(/\s+/g, ' ')}`, ...(message !== undefined && { message }), status })
       }
       continue
     }
@@ -468,7 +470,7 @@ export const digestSession = (input: {
       lastTurnEnd = {
         seq: event.seq,
         kind: parsed.data.reason.kind,
-        ...(parsed.data.reason.error === undefined ? {} : { error: parsed.data.reason.error.message }),
+        ...(parsed.data.reason.error !== undefined && { error: parsed.data.reason.error.message }),
       }
       continue
     }
@@ -542,37 +544,38 @@ export const digestSession = (input: {
 
   return {
     sessionId: input.summary.sessionId,
-    ...(projectedTitle === undefined || projectedTitle === null ? {} : { title: projectedTitle }),
+    ...(!(projectedTitle === undefined || projectedTitle === null) && { title: projectedTitle }),
     running: input.summary.running,
-    ...(cwd === undefined ? {} : { cwd }),
+    ...(cwd !== undefined && { cwd }),
     ...(lastModel === undefined || lastModel === null
       ? model === undefined
         ? {}
         : { model }
       : { model: `${lastModel.provider}/${lastModel.model}${lastModel.reasoningEffort === undefined ? '' : ` (${lastModel.reasoningEffort})`}` }),
-    ...(lastEvent === undefined ? {} : { lastSeq: lastEvent.seq }),
-    ...(lastEventAt === undefined ? {} : { lastEventAt }),
-    ...(idleMs === undefined ? {} : { idleMs }),
+    ...(lastEvent !== undefined && { lastSeq: lastEvent.seq }),
+    ...(lastEventAt !== undefined && { lastEventAt }),
+    ...(idleMs !== undefined && { idleMs }),
     eventCount: events.length,
-    ...(projections.sessionStats === undefined || projections.sessionStats === null
-      ? {}
-      : { turns: projections.sessionStats.turns, steps: projections.sessionStats.steps }),
+    ...(!(projections.sessionStats === undefined || projections.sessionStats === null) && {
+      turns: projections.sessionStats.turns,
+      steps: projections.sessionStats.steps,
+    }),
     compactions,
-    ...(lastTurnEnd === undefined ? {} : { lastTurnEnd }),
+    ...(lastTurnEnd !== undefined && { lastTurnEnd }),
     attention,
-    ...(projectedGoal === undefined ? {} : { goal: projectedGoal }),
+    ...(projectedGoal !== undefined && { goal: projectedGoal }),
     todos: projectedTodos,
     intents: intents.slice(-4),
-    ...(lastUserPrompt === undefined ? {} : { lastUserPrompt }),
-    ...(lastAgentMessage === undefined ? {} : { lastAgentMessage }),
-    ...(lastAssistantText === undefined ? {} : { lastAssistantText }),
+    ...(lastUserPrompt !== undefined && { lastUserPrompt }),
+    ...(lastAgentMessage !== undefined && { lastAgentMessage }),
+    ...(lastAssistantText !== undefined && { lastAssistantText }),
     actions: actions.slice(-(input.actionLimit ?? 15)).map(({ callKey: _callKey, ...action }) => action),
     toolCallCount: actions.length,
     workDirectories: [...directoryCounts.entries()].sort((left, right) => right[1] - left[1]).map(([path, calls]) => ({ path, calls })),
     filesChanged: [...files.entries()].sort((left, right) => right[1].lastSeq - left[1].lastSeq).map(([path, value]) => ({ path, ...value })),
     revisions,
     undescribedEdits: {
-      ...(lastDescribe === undefined ? {} : { sinceSeq: lastDescribe.seq }),
+      ...(lastDescribe !== undefined && { sinceSeq: lastDescribe.seq }),
       edits: editsAfterDescribe.length,
       files: new Set(editsAfterDescribe.map(action => action.summary)).size,
     },
@@ -582,17 +585,15 @@ export const digestSession = (input: {
       failedTurns,
       recent: failedActions.slice(-5).map(action => ({ seq: action.seq, summary: action.summary, error: action.error ?? 'failed' })),
     },
-    ...(tokenUsage === undefined || tokenUsage === null
-      ? {}
-      : {
-          tokens: {
-            input: tokenUsage.uncachedInputTokens,
-            cachedInput: tokenUsage.cacheReadTokens ?? 0,
-            output: tokenUsage.outputTokens,
-            ...(pressure === undefined || pressure === null ? {} : { contextTokens: pressure.projectedTokens, contextWindow: pressure.contextWindow }),
-          },
-        }),
-    subagents: [...subagents.entries()].map(([id, label]) => ({ id, ...(label === undefined ? {} : { label }) })),
+    ...(!(tokenUsage === undefined || tokenUsage === null) && {
+      tokens: {
+        input: tokenUsage.uncachedInputTokens,
+        cachedInput: tokenUsage.cacheReadTokens ?? 0,
+        output: tokenUsage.outputTokens,
+        ...(!(pressure === undefined || pressure === null) && { contextTokens: pressure.projectedTokens, contextWindow: pressure.contextWindow }),
+      },
+    }),
+    subagents: [...subagents.entries()].map(([id, label]) => ({ id, ...(label !== undefined && { label }) })),
   }
 }
 
@@ -611,7 +612,12 @@ const formatEventClock = (time: number | undefined): string => {
   return [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':')
 }
 
-const todoMarks: Readonly<Record<string, string>> = { completed: 'x', in_progress: '>', pending: ' ', cancelled: '-' }
+const TODO_MARKS: ReadonlyMap<string, string> = new Map([
+  ['completed', 'x'],
+  ['in_progress', '>'],
+  ['pending', ' '],
+  ['cancelled', '-'],
+])
 
 /** Renders a digest for a terminal; aims to answer "what is it doing, is it stuck, what changed" in about 60 lines. */
 const renderSessionDigest = (digest: SessionDigest, now: number): string => {
@@ -648,7 +654,7 @@ const renderSessionDigest = (digest: SessionDigest, now: number): string => {
   if (digest.goal !== undefined) lines.push(`Goal [${digest.goal.phase ?? '?'}]: ${oneLine(digest.goal.objective, 240)}`)
   if (digest.todos.length > 0) {
     lines.push(`Todos (${digest.todos.filter(todo => todo.status === 'completed').length}/${digest.todos.length} done):`)
-    for (const todo of digest.todos.slice(0, 10)) lines.push(`  [${todoMarks[todo.status] ?? '?'}] ${oneLine(todo.content, 110)}`)
+    for (const todo of digest.todos.slice(0, 10)) lines.push(`  [${TODO_MARKS.get(todo.status) ?? '?'}] ${oneLine(todo.content, 110)}`)
   }
   if (digest.intents.length > 0) lines.push(`Thinking: ${oneLine(digest.intents.join(' · '), 160)}`)
   if (digest.lastUserPrompt !== undefined)

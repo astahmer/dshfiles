@@ -65,8 +65,8 @@ whole delta is:
 | `src/right-panel.ts`                    | new: frame-lifetime dock action registration; latest live registration wins, independent disposers preserve other registrations, teardown clears all actions |
 | `src/regions.ts`                        | new: the public `MainSurfaceSeat`, `MainSurfaceOwnerProps`, `RightPanelSeat`, `DockPaneActions`, `DockPaneOwnerProps` and `FrameBottomSeat` contracts, their Context augmentations, and `shell.main`/`shell.dock` declarations                                                                                                                                                                                                               |
 
-`src/native/index.ts` stays upstream's no-op Host body, re-exported by `src/host.ts` because the dshx Host entry lives at
-that path.
+`src/native/index.ts` stays upstream's no-op Host body; it is also the dshx Host entry, so no extra forwarding module
+stands between the build and that file.
 
 ### The panel seats
 

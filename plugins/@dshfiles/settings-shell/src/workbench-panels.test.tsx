@@ -73,6 +73,9 @@ describe('Settings workbench sources', () => {
         fields.push(input.field)
         return {
           ...input,
+          sectionEntries: [],
+          sectionTarget: undefined,
+          onReveal: vi.fn(),
           renderSlot: name => {
             if (name !== 'settings.section') return null
             return <input aria-label="Original General control" defaultValue="original value" />

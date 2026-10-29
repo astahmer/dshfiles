@@ -70,6 +70,7 @@ export const RequestLog = (props: {
   const [status, setStatus] = useState<RequestStatus | 'all'>('all')
   const [sort, setSort] = useState<{ readonly column: SortColumn; readonly direction: 'asc' | 'desc' }>({ column: 'startedAt', direction: 'desc' })
   const [notice, setNotice] = useState<string | null>(null)
+  const [mountedAt] = useState(() => Date.now())
   const search = useDebouncedValue({ value: props.search.trim(), delayMs: 200 })
   const query: RequestQuery = {
     from: props.range.from,
@@ -89,7 +90,7 @@ export const RequestLog = (props: {
     refetchInterval: 30_000,
     retry: 1,
   })
-  const now = Date.now()
+  const now = page.dataUpdatedAt === 0 ? mountedAt : page.dataUpdatedAt
   const onSort = (column: SortColumn): void =>
     setSort(current => (current.column === column ? { column, direction: current.direction === 'desc' ? 'asc' : 'desc' } : { column, direction: 'desc' }))
   const open = (row: RequestView): void => {

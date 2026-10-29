@@ -35,7 +35,7 @@ export const renderStartBlock = (input: {
   readonly withThreads?: boolean | undefined
 }): string => {
   const agentScope = input.agentScope ?? null
-  const notes = input.store.blockNotes({ project: input.project, limit: 12, ...(agentScope === null ? {} : { scopes: [agentScope] }) })
+  const notes = input.store.blockNotes({ project: input.project, limit: 12, ...(agentScope !== null && { scopes: [agentScope] }) })
   const own = input.withThreads === false ? [] : input.store.blockThreads({ projects: [input.project], limit: 12, staleDays: input.staleDays })
   const others =
     input.withThreads === false || !input.crossProject

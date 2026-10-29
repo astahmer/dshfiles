@@ -2,7 +2,7 @@ import type { UsageCard } from './api.js'
 import { QuotaMeter } from './panel-primitives.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
 
-export const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
+export const UsageCardView = (props: { readonly usage: UsageCard | undefined; readonly now: number }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined) return null
   if (usage.status !== 'ok' || usage.windows.length === 0) {
@@ -12,7 +12,7 @@ export const UsageCardView = (props: { readonly usage: UsageCard | undefined }):
       </p>
     )
   }
-  const now = Date.now()
+  const now = props.now
   const earliestExpiry = usage.bankedResetExpiries.filter((expiresAt): expiresAt is number => expiresAt !== null).sort((left, right) => left - right)[0]
   return (
     <div className="dshx:grid dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">

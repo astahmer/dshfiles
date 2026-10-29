@@ -4,14 +4,16 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
-import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
+import { z } from 'zod'
+import { jujutsuApi, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { registerRepositoryBatch } from './repository-batch.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
 import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { ReferenceGraphModel } from './reference-graph.js'
-import { composerContextHost } from './composer-context-host.js'
+import { ComposerContextHost } from './composer-context-host.js'
 import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
@@ -25,8 +27,14 @@ const COMMAND_TIMEOUT = 30_000
 const NETWORK_TIMEOUT = 120_000
 const PREVIEW_TTL = 5 * 60_000
 const MAX_REVISIONS = 500
-const INITIAL_GRAPH_PAGE_SIZE = 100
+const INITIAL_GRAPH_PAGE_SIZE = REVISION_PAGE_SIZE
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
+
+/** One `jj evolog` row from EVOLUTION_TEMPLATE. */
+const evolutionRowSchema = z.object({ commitId: z.string(), predecessors: z.array(z.string()) })
+
+/** One `jj operation log` row from OPERATION_TEMPLATE. */
+const operationRowSchema = z.object({ description: z.string(), attributes: z.string(), time: z.string() })
 
 interface RegisteredRepo {
   readonly id: string
@@ -204,7 +212,7 @@ const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSig
   if (confirmed.truncated || (await realpath(confirmed.stdout.trim())) !== root) throw new Error('Repository root changed during registration.')
   await assertRepoIdentity(repo)
   while (repos.size >= 32) {
-    const oldest = repos.keys().next().value as string | undefined
+    const oldest = repos.keys().next().value
     if (oldest === undefined) break
     repos.delete(oldest)
   }
@@ -330,16 +338,11 @@ const readEvolvedCommitIds = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      if (typeof value !== 'object' || value === null) throw new Error('Invalid evolution record.')
-      const row = value as { commitId?: unknown; predecessors?: unknown }
-      if (
-        !JujutsuMutationModel.isCommitId(String(row.commitId ?? '')) ||
-        !Array.isArray(row.predecessors) ||
-        !row.predecessors.every(id => typeof id === 'string' && JujutsuMutationModel.isCommitId(id))
-      ) {
+      const row = evolutionRowSchema.safeParse(value)
+      if (!row.success || !JujutsuMutationModel.isCommitId(row.data.commitId) || !row.data.predecessors.every(id => JujutsuMutationModel.isCommitId(id))) {
         throw new Error('Invalid evolution record.')
       }
-      return { commitId: row.commitId as string, predecessors: row.predecessors as string[] }
+      return row.data
     })
     return {
       commitIds: new Set(rows.filter(row => row.predecessors.length > 0).map(row => row.commitId)),
@@ -389,10 +392,9 @@ const readLastPush = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const operations = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      if (typeof value !== 'object' || value === null) throw new Error('Invalid operation row.')
-      const row = value as { description?: unknown; attributes?: unknown; time?: unknown }
-      if (typeof row.description !== 'string' || typeof row.attributes !== 'string' || typeof row.time !== 'string') throw new Error('Invalid operation row.')
-      return { attributes: row.attributes, time: row.time }
+      const row = operationRowSchema.safeParse(value)
+      if (!row.success) throw new Error('Invalid operation row.')
+      return { attributes: row.data.attributes, time: row.data.time }
     })
     const push = operations.find(row => JujutsuOutputModel.isRecordedJjGitPush(row.attributes))
     return {
@@ -542,6 +544,16 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
           '\nThe current workspace and its working files remain in place.',
       }
     }
+    case 'workspace-edit': {
+      const destination = findRevision(revisions, action.commitId)
+      if (workspacePath === undefined) throw new Error('Workspace destination was not validated.')
+      return {
+        title: 'Move workspace',
+        summary: 'Move workspace ' + action.name + ' to ' + destination.shortestChangeId,
+        detail:
+          'Workspace: ' + action.name + '\nFolder: ' + workspacePath + '\nDestination: ' + destination.shortestChangeId + ' (' + destination.commitId + ')\n\nOnly this workspace’s working copy moves; its uncommitted files are snapshotted by Jujutsu first.',
+      }
+    }
     case 'workspace-forget': {
       return {
         title: 'Remove workspace',
@@ -667,11 +679,12 @@ const prepareMutation = async (
     workspacePath = destination.path
     workspaceParentIdentity = destination.parentIdentity
   }
-  if (action.kind === 'workspace-forget') {
+  if (action.kind === 'workspace-forget' || action.kind === 'workspace-edit') {
     const workspaces = await readWorkspaces(ctx, repo, signal)
     const target = workspaces.find(workspace => workspace.name === action.name)
     if (target === undefined) throw new Error('Workspace is no longer present. Refresh and try again.')
-    if (workspaces.length <= 1) throw new Error('Workspace removal refused: this is the repository’s only workspace.')
+    if (action.kind === 'workspace-forget' && workspaces.length <= 1)
+      throw new Error('Workspace removal refused: this is the repository’s only workspace.')
     workspaceRoot = target.path
     workspacePath = target.path
   }
@@ -761,6 +774,17 @@ const jujutsuHostApi = jujutsuApi.host({
     const repo = await registerRepo(ctx, input.path, signal)
     return { repoId: repo.id, root: repo.root }
   }),
+  registerRepositories: async ({ input, ctx, signal }) => {
+    const repositories = await registerRepositoryBatch({
+      paths: input.paths,
+      signal,
+      register: async path => {
+        const repo = await registerRepo(ctx, path, signal)
+        return { repoId: repo.id, root: repo.root }
+      },
+    })
+    return { repositories: [...repositories] }
+  },
   workspaces: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     return { workspaces: [...(await readWorkspaces(ctx, repo, signal))] }
@@ -867,7 +891,16 @@ const jujutsuHostApi = jujutsuApi.host({
       workspacePath = destination.path
     }
     if (prepared.action.kind === 'workspace-forget') await snapshotWorkspace(ctx, prepared.workspaceRoot, signal)
-    const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
+    const workspaceAction = prepared.action.kind === 'workspace-edit' ? prepared.action : undefined
+    if (workspaceAction !== undefined) {
+      const workspaces = await readWorkspaces(ctx, repo, signal)
+      const target = workspaces.find(workspace => workspace.name === workspaceAction.name)
+      if (target?.path !== prepared.workspaceRoot) throw new Error('Workspace changed after preview. Refresh and prepare the move again.')
+    }
+    const commandRoot = workspaceAction === undefined ? repo.root : prepared.workspaceRoot
+    const expectedIdentity = workspaceAction === undefined ? repo.identity : undefined
+    if (commandRoot === undefined) throw new Error('Workspace destination was not validated.')
+    const result = await runAt(ctx, commandRoot, expectedIdentity, prepared.argv, signal, {
       timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
     })
     await assertRepoIdentity(repo)
@@ -900,7 +933,7 @@ export default defineHost({
   apis: [
     jujutsuHostApi,
     jujutsuReviewProgressApiHost,
-    composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options)),
+    ComposerContextHost.create((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options)),
   ],
   prompts: [chatReferenceSection],
   settings: [jujutsuSettings],

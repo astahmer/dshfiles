@@ -1,7 +1,7 @@
 import type { SecretCatalogValues, SecretReference } from '@dshfiles/credential-port'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { secretScopeSchema } from '@dshfiles/credential-port'
 import type { SecretMetadata } from './secret-metadata.js'
-import { secretScopeSchema } from './secret-metadata.js'
 import type { SecretCatalogOperations } from './secret-operations.js'
 
 const uniqueMatch = (rows: readonly SecretMetadata[], reference: SecretReference): SecretMetadata => {

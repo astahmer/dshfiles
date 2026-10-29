@@ -1,4 +1,5 @@
 import { PassThrough } from 'node:stream'
+import { jsonValueSchema } from '../src/json.js'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { parseCliArgs } from '../src/cli/args.js'
@@ -125,10 +126,10 @@ const inventoryRpc =
   async (namespace, method) => {
     const name = `${namespace}/${method}`
     if (failing.includes(name)) throw new DshPlatformError('rpc-http-error', `${name} failed`)
-    if (name === 'session/list') return { items: [] }
-    if (name === 'pluginManager/listPlugins') return plugins
-    if (name === 'pluginManager/listBundles') return bundles
-    if (name === 'settings/describe') return settingsDescription()
+    if (name === 'session/list') return jsonValueSchema.parse({ items: [] })
+    if (name === 'pluginManager/listPlugins') return jsonValueSchema.parse(plugins)
+    if (name === 'pluginManager/listBundles') return jsonValueSchema.parse(bundles)
+    if (name === 'settings/describe') return jsonValueSchema.parse(settingsDescription())
     throw new Error(`Unexpected RPC ${name}`)
   }
 

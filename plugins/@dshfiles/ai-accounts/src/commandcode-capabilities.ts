@@ -279,8 +279,8 @@ export class CommandCodeCapabilities {
       low: offered('low'),
       medium: offered('medium'),
       high: offered('high'),
-      ...(efforts.includes('xhigh') ? { xhigh: 'xhigh' } : {}),
-      ...(efforts.includes('max') ? { max: 'max' } : {}),
+      ...(efforts.includes('xhigh') && { xhigh: 'xhigh' }),
+      ...(efforts.includes('max') && { max: 'max' }),
     }
   }
 

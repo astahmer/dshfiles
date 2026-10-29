@@ -1,16 +1,27 @@
 // @vitest-environment jsdom
 
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
+import type { LocaleDictionaries } from '@dshfiles/dshx/client'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MarketplaceCard, MarketplaceListOutput } from '../src/api.js'
 import { zh } from '../src/locales.js'
 
-const mocks = vi.hoisted(() => ({
-  list: vi.fn(),
-  install: vi.fn(),
-  settings: { value: undefined as { hubBaseUrl: string; defaultSort: 'latest' | 'stars'; hideIncompatible: boolean } | undefined },
-}))
+interface MockSettings {
+  readonly hubBaseUrl: string
+  readonly defaultSort: 'latest' | 'stars'
+  readonly hideIncompatible: boolean
+}
+
+/** The injected-settings handle the mocked client reads; its value is set per test. */
+interface MockSettingsHandle {
+  value: MockSettings | undefined
+}
+
+const mocks = vi.hoisted(() => {
+  const settings: MockSettingsHandle = { value: undefined }
+  return { list: vi.fn(), install: vi.fn(), settings }
+})
 
 class RecordingObserver implements IntersectionObserver {
   readonly root: Element | Document | null = null
@@ -68,7 +79,7 @@ const intersectLatestObserver = async (): Promise<void> => {
 }
 
 vi.mock('@dshfiles/dshx/client', () => ({
-  defineLocale: (namespace: string, dictionaries: unknown) => ({ namespace, dictionaries }),
+  defineLocale: (namespace: string, dictionaries: LocaleDictionaries) => ({ namespace, dictionaries }),
   useApi: () => ({ list: mocks.list, install: mocks.install }),
   useSettings: () => mocks.settings,
 }))
@@ -118,10 +129,13 @@ function page(overrides: Partial<MarketplaceListOutput> = {}): MarketplaceListOu
   }
 }
 
-function t(key: string, params?: Record<string, unknown>): string {
-  return (zh[key as keyof typeof zh] ?? key).replace(/\{([^}]+)\}/g, (_match, name: string) => String(params?.[name] ?? `{${name}}`))
-}
+const zhMessages = new Map<string, string>(Object.entries(zh))
 
+const t: MarketplaceTabProps['t'] = (key, params) =>
+  (zhMessages.get(key) ?? key).replace(/\{([^}]+)\}/g, (_match, name: string) => String(params?.[name] ?? `{${name}}`))
+
+// SAFETY: the tab component reads only its locale function; every other standard prop is a
+// framework-injected hook that this fixture never renders into.
 const componentProps = { t } as MarketplaceTabProps
 
 const signalOptions = expect.objectContaining({ signal: expect.any(AbortSignal) })

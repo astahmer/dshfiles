@@ -6,8 +6,10 @@ import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import { renderProjectTemplate } from '../../create-dshx/src/templates.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
-import { checkPackageTargets, checkProjectManifest } from '../src/project/index.js'
-import { buildClient, buildHost } from '../src/compiler/index.js'
+import { checkPackageTargets } from '../src/project/package-targets.js'
+import { checkProjectManifest } from '../src/project/manifest.js'
+import { buildClient } from '../src/compiler/client/build.js'
+import { buildHost } from '../src/compiler/host/build.js'
 import { ManifestRepairService } from '../src/project/repair.js'
 import { typecheckProject } from '../src/project/typecheck.js'
 import { testProject } from '../src/toolchain/index.js'
@@ -54,7 +56,7 @@ describe('SDK-first templates', () => {
       await buildHost({
         root,
         packageId: config.packageId,
-        ...(config.hostEntry === undefined ? {} : { entry: config.hostEntry }),
+        ...(config.hostEntry !== undefined && { entry: config.hostEntry }),
         outDir: config.outDir,
         declarations: true,
       })

@@ -42,7 +42,7 @@ export const commentMutation = <Result>(input: { readonly client: QueryClient; r
                     actor: 'user',
                     kind: 'commented',
                     detail: request.text,
-                    ...(commentAttachments.length === 0 ? {} : { attachments: commentAttachments }),
+                    ...(commentAttachments.length !== 0 && { attachments: commentAttachments }),
                   },
                 ],
               },
@@ -98,6 +98,7 @@ export const useBacklogActions = () => {
   const editComment = useMutation({ mutationFn: (input: Parameters<typeof api.editComment>[0]) => api.editComment(input), onSuccess: invalidate })
   const deleteComment = useMutation({ mutationFn: (input: Parameters<typeof api.deleteComment>[0]) => api.deleteComment(input), onSuccess: invalidate })
   const attachFile = useMutation({ mutationFn: (input: Parameters<typeof api.attachFile>[0]) => api.attachFile(input), onSuccess: invalidate })
+  const enrichTweet = useMutation({ mutationFn: (input: Parameters<typeof api.enrichTweet>[0]) => api.enrichTweet(input), onSuccess: invalidate })
   const removeFile = useMutation({ mutationFn: (input: Parameters<typeof api.removeFile>[0]) => api.removeFile(input), onSuccess: invalidate })
   const triage = useMutation({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY, mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
   const backfillTriage = useMutation({
@@ -115,6 +116,7 @@ export const useBacklogActions = () => {
     editComment,
     deleteComment,
     attachFile,
+    enrichTweet,
     removeFile,
     triage,
     backfillTriage,

@@ -56,9 +56,12 @@ export const costGroupSchema = z.object({
 export type CostGroup = z.infer<typeof costGroupSchema>
 
 /** What the Host projection publishes for one session: every route's tokens, and the latest turn's. */
+const turnCostGroupsSchema = z.object({ turn: z.number().int().min(0), groups: z.array(costGroupSchema).max(512) })
+
 export const sessionCostViewSchema = z.object({
   groups: z.array(costGroupSchema).max(512),
-  turn: z.object({ turn: z.number().int().min(0), groups: z.array(costGroupSchema).max(512) }).nullable(),
+  turn: turnCostGroupsSchema.nullable(),
+  turns: z.array(turnCostGroupsSchema).max(512).optional(),
 })
 
 export type SessionCostView = z.infer<typeof sessionCostViewSchema>
@@ -202,6 +205,9 @@ export class CostEstimateModel {
     }
     return { cost, tokens, partial, priced, routes: [...routes.values()] }
   }
+
+  /** Format a list-price estimate, marking it as approximate or a lower bound. */
+  static formatEstimate = (estimate: CostEstimate): string => `${estimate.partial ? '≥' : '≈'}${CostEstimateModel.formatUsd(estimate.cost.total)}`
 
   /** `$0.42`, `$0.0031` below a cent, `<$0.0001` for a session that has barely started. */
   static formatUsd = (amount: number): string => {

@@ -21,6 +21,7 @@
   },
   "scripts": {
     "build": "dshx build",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
@@ -49,7 +50,8 @@
     "@types/react": "catalog:",
     "clsx": "catalog:",
     "react": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

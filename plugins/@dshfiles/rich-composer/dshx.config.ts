@@ -2,6 +2,9 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/rich-composer',
+  modules: {
+    'conversation-contract': 'src/conversation-contract.ts',
+  },
   client: {
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages (no `dsh.client` row and no static seed name), so the

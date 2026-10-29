@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { Session } from '../../src/native/client/sessions/session.js'
 import type { SessionRemotes } from '../../src/native/client/sessions/remotes.js'
 
+/** The tests drive only `session.prompt`; a Session reads nothing else of the remotes on these paths. */
+// SAFETY: the partial remotes object is the exact subset Session reads, assembled here rather than from a Host.
+const sessionRemotes = (prompt: SessionRemotes['session']['prompt']): SessionRemotes => ({ session: { prompt } }) as SessionRemotes
+
 const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt'], options: ConstructorParameters<typeof Session>[2] = {}): Session =>
-  new Session(SessionId('session-retry-test'), { session: { prompt } } as unknown as SessionRemotes, options)
+  new Session(SessionId('session-retry-test'), sessionRemotes(prompt), options)
 
 const text = [{ type: 'text', text: 'hello' }] as const
 

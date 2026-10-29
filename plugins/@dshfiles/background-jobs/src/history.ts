@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { readLogFrom } from '@dshfiles/usage/session-log'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import { boundedLabel } from './bounds.js'
@@ -90,7 +91,7 @@ export class HistoryIndex implements JobHistorySource {
 
   async load(): Promise<void> {
     try {
-      const parsed = jobStateSchema.safeParse(JSON.parse(await readFile(this.options.statePath, 'utf8')))
+      const parsed = decodeJsonSafe(jobStateSchema, await readFile(this.options.statePath, 'utf8'))
       if (!parsed.success) return
       for (const [path, offset] of Object.entries(parsed.data.offsets)) this.offsets.set(path, offset)
       for (const [id, job] of Object.entries(parsed.data.jobs)) this.jobs.set(id, job)

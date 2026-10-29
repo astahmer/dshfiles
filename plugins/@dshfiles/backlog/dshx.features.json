@@ -227,7 +227,7 @@
     {
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
-      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; agent actors show their configured name and open the thread they worked in when that thread is available; fields the user set are recorded as theirs.",
+      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items; URL references offer browser-open and copy actions in a popover. The detail also lists the items that link to it and shows every event with its actor; agent actors show their configured name and open the thread they worked in when that thread is available; fields the user set are recorded as theirs.",
       "reach": [
         "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
@@ -235,13 +235,20 @@
         "expect link \"guide\"",
         "click text \"b:1\"",
         "expect link \"description\"",
+        "click button \"example.com/guide\"",
+        "expect button \"Open in browser\"",
+        "expect button \"Copy URL\"",
+        "click button \"Copy URL\"",
         "click button \"Board\"",
         "rightclick article \"Card b:1\"",
         "hover menuitem \"Project\"",
         "click menuitemradio \"sample\"",
         "click article \"Card b:1\"",
         "expect complementary \"Item detail\"",
-        "expect separator \"Resize item detail\""
+        "expect separator \"Resize item detail\"",
+        "click button \"example.com/guide\"",
+        "expect button \"Open in browser\"",
+        "expect button \"Copy URL\""
       ],
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
@@ -1123,7 +1130,7 @@
     {
       "id": "rich-capture",
       "title": "A chat-sized capture box with files, properties and references",
-      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
+      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft; mentioning an image as `@Image N` turns it into an inline Markdown context-image reference when submitted. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
       "reach": [
         "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
@@ -1632,6 +1639,69 @@
         {
           "kind": "automatic",
           "source": "secret"
+        }
+      ]
+    },
+    {
+      "id": "tweet-context-enrichment",
+      "title": "Retrieve public tweet context into a backlog item",
+      "summary": "Capturing or editing tweet links automatically retrieves the first unimported public X post; older items can use the row-menu action. Text is quoted as untrusted content, images are saved as attachments, and repeated imports do not duplicate data.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Tweet context in backlog https://x.com/someone/status/123\"",
+        "press Enter",
+        "rightclick article \"Item b:1\"",
+        "expect menuitem \"Retrieve tweet content\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "configuration": [],
+      "states": ["unmatched", "retrieving", "imported", "retryable-failure"],
+      "failureModes": [
+        "Only an HTTPS X or Twitter status URL already linked to the item is accepted; private, deleted, or unavailable posts stay unchanged and can be retried from the row menu.",
+        "A fetch failure or unavailable Tweet Context plugin leaves the original description and attachments intact.",
+        "Imported text is appended as quoted untrusted data; media is bounded by the item's remaining attachment slots and the provider's eight-image, 16 MiB budget.",
+        "A repeated import of the same normalized post URL is a no-op."
+      ],
+      "externalDependencies": [
+        {
+          "id": "tweet-context-api",
+          "boundary": "Calls the Tweet Context Host API for public post text, metadata, and saved image references.",
+          "deterministicFake": "The Tweet Context Host integration test uses fixed FxEmbed-shaped responses and local photo/video fixtures; Backlog tests use only deterministic local post data."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.tweet-context-retrieval",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tweet-context-urls",
+          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "testName": "normalizes public X and Twitter status links and rejects lookalike hosts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tweet-context-import",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "imports tweet text and images once without replacing the existing description"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.tweet-context-api",
+          "file": "plugins/@dshfiles/tweet-context/tests/host-integration.test.ts",
+          "testName": "executes for a scoped Agent, saves photo and video frames, and retains plugin ownership"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "backlog tweet import",
+          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "testName": "records one bounded span for the import work unit"
         }
       ]
     }

@@ -129,7 +129,7 @@ afterEach(() => {
 describe('HeaderThreadActions', () => {
   it('keeps Pin as an icon button and moves Park into the More menu', () => {
     const header = mount()
-    expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Pin', 'More thread actions'])
+    expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Copy thread link', 'Pin', 'More thread actions'])
     fireEvent.click(screen.getByRole('button', { name: 'Pin' }))
     expect(header.pinSession).toHaveBeenCalledWith('s1')
 
@@ -198,8 +198,7 @@ describe('HeaderThreadActions', () => {
     await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread ID copied.'))
     expect(writeText).toHaveBeenCalledWith('s1')
 
-    openMoreMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy thread link' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy thread link' }))
     await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread link copied.'))
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?thread=s1')
   })

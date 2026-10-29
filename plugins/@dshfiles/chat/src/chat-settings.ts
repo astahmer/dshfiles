@@ -11,6 +11,18 @@ export const TRANSCRIPT_VIEW_FIELD = 'transcriptView'
 /** Field carrying the independent work-details collapse timing. */
 export const COLLAPSE_TIMING_FIELD = 'collapseTiming'
 
+/** Field selecting which related images appear in a Chat preview gallery. */
+export const IMAGE_GALLERY_SCOPE_FIELD = 'imageGalleryScope'
+
+/** Images a Chat preview can browse together. */
+export const IMAGE_GALLERY_SCOPES = ['turn', 'thread'] as const
+
+/** Gallery scope preference. */
+export type ImageGalleryScope = typeof IMAGE_GALLERY_SCOPES[number]
+
+/** Keep unrelated images out of a preview unless the user opts into thread scope. */
+export const DEFAULT_IMAGE_GALLERY_SCOPE: ImageGalleryScope = 'turn'
+
 /** Available points when a completed Turn returns to its historical presentation. */
 export const COLLAPSE_TIMINGS = ['completion', 'next-input'] as const
 
@@ -68,11 +80,14 @@ export interface ChatSettings {
   performanceUsage: PerformanceUsageMode
   /** Default destination for Chat HTTP(S) links. */
   linkOpening: LinkOpening
+  /** Which loaded conversation images an image preview can browse. */
+  imageGalleryScope?: ImageGalleryScope
 }
 
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
 export const ChatSettingsFields = {
   [COLLAPSE_TIMING_FIELD]: z.union([...COLLAPSE_TIMINGS]).default(DEFAULT_COLLAPSE_TIMING),
+  [IMAGE_GALLERY_SCOPE_FIELD]: z.union([...IMAGE_GALLERY_SCOPES]).default(DEFAULT_IMAGE_GALLERY_SCOPE),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),
   performanceUsage: z.union([...PERFORMANCE_USAGE_MODES]).default(DEFAULT_PERFORMANCE_USAGE),
   // Missing and unrecognized modes defer to the client's default.

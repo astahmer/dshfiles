@@ -4,22 +4,28 @@
   "features": [
     {
       "id": "public-post-context",
-      "title": "Fetch public X post text and sampled video frames",
-      "summary": "Give an agent a public X/Twitter post's text and author, plus up to six bounded image samples from a video post.",
+      "title": "Fetch public X post, photos, video samples, and thread posts",
+      "summary": "Fetch a public post, quote, multiple photos, same-author thread follow-ups, and content-aware video samples with bounded frame and media budgets.",
       "surfaces": ["host", "integration"],
       "configuration": [],
       "states": ["input-validation", "post-fetch", "video-download", "frame-sampling", "attachment-save", "ready", "failed"],
       "failureModes": [
         "Only HTTPS x.com and twitter.com status URLs are accepted; private, deleted, or unavailable posts cannot be retrieved.",
-        "The third-party FxEmbed API and video.twimg.com may be unavailable or return unsupported data.",
-        "Video downloads are capped at 25 MB and 10 minutes; ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB.",
-        "Only sampled still images are returned; audio and continuous motion are unavailable."
+        "The third-party FxEmbed API, pbs.twimg.com and video.twimg.com may be unavailable or return unsupported data; failed media is reported alongside available context.",
+        "At most 12 same-author follow-up posts and eight media items are processed within 100 seconds; photos are capped at 10 MB and video downloads at 25 MB and 10 minutes.",
+        "Video scans at up to 2 FPS over a default 60-second window, then selects distinct sharp frames with temporal coverage; maxFrames defaults to 12 and is capped at 24. ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB.",
+        "Only sampled still images are returned; frame times are approximate and audio and continuous motion are unavailable."
       ],
       "externalDependencies": [
         {
           "id": "fxembed-public-api",
-          "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the response supplies post text, author metadata, and video URLs.",
+          "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the thread response supplies post, quote, and thread text, author metadata, and media URLs.",
           "deterministicFake": "The host test injects a fetcher that serves a fixed FxEmbed-shaped response from a local HTTP fixture; it never calls a public post API."
+        },
+        {
+          "id": "x-image-cdn",
+          "boundary": "Photos are downloaded from pbs.twimg.com and saved as image attachments.",
+          "deterministicFake": "The media tests provide photo responses using a controlled fetch seam and verify host and redirect restrictions."
         },
         {
           "id": "x-video-cdn",
@@ -32,6 +38,12 @@
           "kind": "gherkin",
           "id": "tweet-context.tool-catalog",
           "featureFile": "tooling/dshx/e2e/features/tweet-context.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.thread-and-multiple-photos",
+          "file": "plugins/@dshfiles/tweet-context/tests/media.spec.ts",
+          "testName": "retrieves every photo and only same-author follow-ups from FxEmbed thread endpoint"
         },
         {
           "kind": "unit-test",
@@ -89,6 +101,12 @@
         {
           "kind": "custom",
           "span": "ffmpeg sample",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "records an ffmpeg sample span with the requested frame count"
+        },
+        {
+          "kind": "custom",
+          "span": "ffmpeg scan",
           "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
           "testName": "records an ffmpeg sample span with the requested frame count"
         }

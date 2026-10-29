@@ -17,6 +17,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 const run = promisify(execFile)
 const dshxBin = new URL('../tooling/dshx/packages/dshx/dist/cli/bin.js', import.meta.url).pathname
@@ -31,8 +32,6 @@ const Task = z.object({
 })
 type Task = z.infer<typeof Task>
 const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
-
-const decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
 
 const Created = z.object({ data: z.object({ sessionId: z.string() }) })
 const Digest = z.object({

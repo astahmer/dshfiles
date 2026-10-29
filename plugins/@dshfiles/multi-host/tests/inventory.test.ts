@@ -15,8 +15,8 @@ const startedHere = (input: { runtimeId: string; sessionId: string; title: strin
 const session = (input: { runtimeId: string; sessionId: string; updatedAt: number; running?: boolean; blank?: boolean; cwd?: string; title?: string }) => ({
   runtimeId: input.runtimeId,
   sessionId: input.sessionId,
-  ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-  ...(input.title === undefined ? {} : { title: input.title }),
+  ...(input.cwd !== undefined && { cwd: input.cwd }),
+  ...(input.title !== undefined && { title: input.title }),
   running: input.running ?? false,
   blank: input.blank ?? false,
   updatedAt: input.updatedAt,

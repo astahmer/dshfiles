@@ -58,7 +58,7 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
           method: channel.slice(1) + '/' + method,
           payload: input === undefined ? { version } : { version, input },
         }),
-        ...(signal === undefined ? {} : { signal }),
+        ...(signal !== undefined && { signal }),
       })
     } catch {
       if (signal?.aborted) throw new DshPlatformError('cancelled', 'The DSHX API request was cancelled by the caller.')

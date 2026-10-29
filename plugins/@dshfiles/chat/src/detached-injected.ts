@@ -1,5 +1,6 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
+import type { ImageGalleryScope } from './chat-settings.ts'
 import type { ChatFlowDataInjected, ChatViewInjected } from './native/contract/slots.ts'
 
 /**
@@ -20,8 +21,11 @@ const EMPTY_BOTTOM = { getSnapshot: () => false, subscribe: () => () => {} }
 const EMPTY_PROCESS = { getSnapshot: () => undefined, subscribe: () => () => {} }
 
 /** Empty node sources for a detached flow: every key resolves to nothing. */
-export const detachedFlow = (presentation: ObservableSnapshot<ChatPresentationPolicy>): ChatFlowDataInjected => ({
-  hooks: { presentation },
+export const detachedFlow = (
+  presentation: ObservableSnapshot<ChatPresentationPolicy>,
+  imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
+): ChatFlowDataInjected => ({
+  hooks: { presentation, imageGalleryScope },
   keyedHooks: {
     chatNode: () => EMPTY_NODE,
     chatNodeBottom: () => EMPTY_BOTTOM,
@@ -31,8 +35,11 @@ export const detachedFlow = (presentation: ObservableSnapshot<ChatPresentationPo
 })
 
 /** Detached view: empty sources plus inert actions, so nothing renders and nothing throws. */
-export const detachedView = (presentation: ObservableSnapshot<ChatPresentationPolicy>): ChatViewInjected => ({
-  ...detachedFlow(presentation),
+export const detachedView = (
+  presentation: ObservableSnapshot<ChatPresentationPolicy>,
+  imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
+): ChatViewInjected => ({
+  ...detachedFlow(presentation, imageGalleryScope),
   openExternalLink: noop,
   openFile: async () => {},
   loadOlder: noop,

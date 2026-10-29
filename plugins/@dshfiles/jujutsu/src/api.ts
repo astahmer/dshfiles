@@ -1,6 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
+export const REVISION_PAGE_SIZE = 10
+
 export const revisionSchema = z.object({
   commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
   changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
@@ -13,6 +15,7 @@ export const revisionSchema = z.object({
   parents: z.array(z.string().regex(/^[a-f0-9]{40,64}$/)).max(16),
   bookmarks: z.array(z.string().max(256)).max(64),
   localBookmarks: z.array(z.string().max(256)).max(64),
+  remoteBookmarksText: z.string().max(32_768).default(''),
   tags: z.array(z.string().max(256)).max(64),
   workspaces: z.array(z.string().max(128)).max(32),
   workingCopy: z.boolean(),
@@ -64,6 +67,7 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
   z.object({ kind: z.literal('workspace-add'), parentPath: z.string().min(1).max(2048), name: workspaceNameSchema, commitId: commitIdSchema }),
   z.object({ kind: z.literal('workspace-forget'), name: workspaceNameSchema }),
+  z.object({ kind: z.literal('workspace-edit'), name: workspaceNameSchema, commitId: commitIdSchema }),
   z.object({ kind: z.literal('edit'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('new'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('commit'), commitId: commitIdSchema, message: z.string().min(1).max(4000) }),
@@ -87,6 +91,7 @@ export const previewSchema = z.object({
     'push',
     'workspace-add',
     'workspace-forget',
+    'workspace-edit',
     'edit',
     'new',
     'commit',
@@ -176,6 +181,8 @@ export const revisionRelationshipSchema = graphSliceSchema.extend({
   differenceIds: z.array(commitIdSchema).max(500),
 })
 
+export const graphPageOutputSchema = z.object({ revisions: z.array(revisionSchema).max(REVISION_PAGE_SIZE), hasMore: z.boolean() })
+
 export const referenceGraphSchema = z.object({
   label: z.string().min(1).max(255),
   commitId: commitIdSchema.nullable(),
@@ -227,8 +234,24 @@ export const jujutsuApi = defineApi({
       description: 'Resolve a folder to its jj repository and return the repoId every other jujutsu tool takes. Read-only.',
       tool: { name: 'jj_register_repository', readOnly: true, render: output => `${output.repoId} · ${output.root}` },
     }),
+    registerRepositories: method({
+      input: z.object({ paths: z.array(repoPathSchema).min(1).max(31) }),
+      output: z.object({
+        repositories: z
+          .array(
+            z.object({
+              path: repoPathSchema,
+              repoId: repoIdSchema.nullable(),
+              root: z.string().max(2048).nullable(),
+            }),
+          )
+          .max(31),
+      }),
+      description:
+        'Resolve up to 31 folders to their jj repositories in one call, reporting a null row per non-repository path instead of failing the batch. Read-only.',
+    }),
     load: method({
-      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(500).default(100) }),
+      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(REVISION_PAGE_SIZE).default(REVISION_PAGE_SIZE) }),
       output: z.union([stateSchema, readFailureSchema]),
       description: 'Repository status and the first page of the revision graph: root, revisions, changed paths, remotes and the last push. Read-only.',
       tool: {
@@ -246,7 +269,7 @@ export const jujutsuApi = defineApi({
         query: z.string().max(256).default(''),
         excludeCommitIds: z.array(commitIdSchema).max(10_000),
       }),
-      output: z.union([z.object({ revisions: z.array(revisionSchema).max(100), hasMore: z.boolean() }), readFailureSchema]),
+      output: z.union([graphPageOutputSchema, readFailureSchema]),
       description: 'Load the next revision graph page, or search all visible revisions with a query. Read-only.',
       tool: {
         name: 'jj_graph_page',
@@ -350,7 +373,7 @@ export const jujutsuApi = defineApi({
       input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
       output: previewSchema,
       description:
-        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, edit, new, commit, duplicate, abandon, revert, restore.',
+        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.',
       tool: {
         name: 'jj_prepare_action',
         render: output => `${output.title} · ${output.summary}\n${output.detail}\npreviewId ${output.id} (expires ${new Date(output.expiresAt).toISOString()})`,

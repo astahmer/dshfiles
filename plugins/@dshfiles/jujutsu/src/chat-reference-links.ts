@@ -122,6 +122,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (reference === undefined) return false
     const rect = element.getBoundingClientRect()
     const parsed = chatReferencePreviewRequestSchema.safeParse({
+      sessionId: options.sessionId,
       cwd: options.cwd,
       reference,
       anchor: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },

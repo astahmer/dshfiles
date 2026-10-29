@@ -26,12 +26,19 @@ export const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeP
       if (nativeRenderSlot === undefined) return undefined
       const framed = (key: 'tool.call.toolview', owner: ToolCallOwnerProps, options: RenderOpts): ReactNode => {
         dispatched.current = true
+        const isWaitCall = owner.toolName === 'job_output' || owner.toolName === 'background_jobs_wait'
         return (
           <div className="dshx:relative" data-dshfiles-tool-meta-frame="">
             {nativeRenderSlot(key, owner, options)}
-            <span className="dshx-root dshx:pointer-events-none dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2">
-              <Meta owner={owner} />
-            </span>
+            {isWaitCall ? (
+              <div className="dshx-root dshx:flex dshx:justify-end dshx:pr-2 dshx:pb-2">
+                <Meta owner={owner} />
+              </div>
+            ) : (
+              <span className="dshx-root dshx:pointer-events-none dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2">
+                <Meta owner={owner} />
+              </span>
+            )}
           </div>
         )
       }

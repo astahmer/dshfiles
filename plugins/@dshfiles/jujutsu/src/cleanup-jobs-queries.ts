@@ -50,7 +50,7 @@ export class CleanupJobTrailModel {
     const firstFailure =
       job.result?.workspaces.find(row => row.outcome === 'failed')?.message ?? job.result?.untracked.find(row => row.outcome === 'failed')?.message
     return [
-      `${String(removedWorkspaces)} thread workspace${removedWorkspaces === 1 ? '' : 's'} removed`,
+      removedWorkspaces === 0 ? undefined : `${String(removedWorkspaces)} thread workspaces removed`,
       removedUntracked === 0 ? undefined : `${String(removedUntracked)} untracked folder${removedUntracked === 1 ? '' : 's'} removed`,
       abandoned === 0 ? undefined : `${String(abandoned)} empty revision${abandoned === 1 ? '' : 's'} abandoned`,
       job.progress.kept === 0 ? undefined : `${String(job.progress.kept)} kept`,

@@ -1,6 +1,7 @@
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import type { JsonObject } from '../json.js'
 import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import type { ProfileOrchestratorOptions, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import type { EventSummary, InspectOptions, InspectResult, InspectTarget, ServiceSummary, SlotSummary, ToolSummary } from './types.js'
@@ -65,18 +66,18 @@ function invalidProviderDto(file: string, error: unknown) {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+function optionalString(record: JsonObject, key: string): string | undefined {
   const value = record[key]
   if (value === undefined) return undefined
   if (typeof value !== 'string') throw new Error(`Inspect field ${JSON.stringify(key)} must be a string when present.`)
   return value
 }
 
-function metadata(record: Record<string, unknown>, known: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+function metadata(record: JsonObject, known: readonly string[]): JsonObject | undefined {
   const knownSet = new Set(known)
   const nested = record.metadata
   if (nested !== undefined && !isRecord(nested)) throw new Error('Inspect field "metadata" must be an object when present.')
@@ -100,11 +101,11 @@ const normalizeSlots = (value: unknown): readonly SlotSummary[] => {
     const extra = metadata(entry, known)
     return {
       name: entry.name,
-      ...(type === undefined ? {} : { type }),
-      ...(provider === undefined ? {} : { provider }),
-      ...(kind === undefined ? {} : { kind }),
-      ...(scope === undefined ? {} : { scope }),
-      ...(extra === undefined ? {} : { metadata: extra }),
+      ...(type !== undefined && { type }),
+      ...(provider !== undefined && { provider }),
+      ...(kind !== undefined && { kind }),
+      ...(scope !== undefined && { scope }),
+      ...(extra !== undefined && { metadata: extra }),
     }
   })
 }
@@ -120,9 +121,9 @@ const normalizeTools = (value: unknown): readonly ToolSummary[] => {
     const extra = metadata(entry, known)
     return {
       name: entry.name,
-      ...(provider === undefined ? {} : { provider }),
-      ...(description === undefined ? {} : { description }),
-      ...(extra === undefined ? {} : { metadata: extra }),
+      ...(provider !== undefined && { provider }),
+      ...(description !== undefined && { description }),
+      ...(extra !== undefined && { metadata: extra }),
     }
   })
 }
@@ -138,9 +139,9 @@ const normalizeServices = (value: unknown): readonly ServiceSummary[] => {
     const extra = metadata(entry, known)
     return {
       name: entry.name,
-      ...(provider === undefined ? {} : { provider }),
-      ...(scope === undefined ? {} : { scope }),
-      ...(extra === undefined ? {} : { metadata: extra }),
+      ...(provider !== undefined && { provider }),
+      ...(scope !== undefined && { scope }),
+      ...(extra !== undefined && { metadata: extra }),
     }
   })
 }
@@ -155,8 +156,8 @@ const normalizeEvents = (value: unknown): readonly EventSummary[] => {
     const extra = metadata(entry, known)
     return {
       name: entry.name,
-      ...(provider === undefined ? {} : { provider }),
-      ...(extra === undefined ? {} : { metadata: extra }),
+      ...(provider !== undefined && { provider }),
+      ...(extra !== undefined && { metadata: extra }),
     }
   })
 }
@@ -170,9 +171,9 @@ export class ProviderInspectionModel {
 
 function profileOptions(options: InspectOptions): ProfileOrchestratorOptions {
   return {
-    ...(options.runner === undefined ? {} : { runner: options.runner }),
-    ...(options.env === undefined ? {} : { env: options.env }),
-    ...(options.executable === undefined ? {} : { executable: options.executable }),
+    ...(options.runner !== undefined && { runner: options.runner }),
+    ...(options.env !== undefined && { env: options.env }),
+    ...(options.executable !== undefined && { executable: options.executable }),
   }
 }
 
@@ -197,7 +198,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
     profileLink = await (options.inspectProfile ?? ProfileOrchestrator.inspectProjectProfile)(project, {
       ...profileOptions(options),
       compatibility: dsh.compatibility,
-      ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
+      ...(dsh.executable !== undefined && { executable: dsh.executable }),
     })
     if (profileLink.state === 'absent')
       return {
@@ -206,7 +207,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
         source: 'runtime',
         items: [],
         diagnostics: [absentProfile(project), ...diagnostics],
-        ...(dsh === undefined ? {} : { dsh }),
+        ...(dsh !== undefined && { dsh }),
         profileLink,
       }
   } catch (error) {
@@ -217,8 +218,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       items: [],
       diagnostics: [diagnosticFromError(error, project.packageFile)],
       cause: error,
-      ...(dsh === undefined ? {} : { dsh }),
-      ...(profileLink === undefined ? {} : { profileLink }),
+      ...(dsh !== undefined && { dsh }),
+      ...(profileLink !== undefined && { profileLink }),
     }
   }
   const capability = dsh?.compatibility.inspect?.providerByTarget?.[target] ?? dsh?.compatibility.inspect?.provider
@@ -229,8 +230,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       source: 'runtime',
       items: [],
       diagnostics: [unavailableProvider(project.packageFile), ...diagnostics],
-      ...(dsh === undefined ? {} : { dsh }),
-      ...(profileLink === undefined ? {} : { profileLink }),
+      ...(dsh !== undefined && { dsh }),
+      ...(profileLink !== undefined && { profileLink }),
     }
   }
   const provider =
@@ -238,7 +239,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
     (dsh === undefined
       ? undefined
       : new DshInspectBridgeProvider(project, {
-          ...(options.env === undefined ? {} : { env: options.env }),
+          ...(options.env !== undefined && { env: options.env }),
         }))
   if (provider === undefined)
     return {
@@ -247,8 +248,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       source: 'runtime',
       items: [],
       diagnostics: [unavailableProvider(project.packageFile), ...diagnostics],
-      ...(dsh === undefined ? {} : { dsh }),
-      ...(profileLink === undefined ? {} : { profileLink }),
+      ...(dsh !== undefined && { dsh }),
+      ...(profileLink !== undefined && { profileLink }),
     }
   try {
     const method = { slots: provider.listSlots, tools: provider.listTools, services: provider.listServices, events: provider.listEvents }[target]
@@ -262,8 +263,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
           options.provider === undefined ? unavailableProvider(project.packageFile) : unsupportedTarget(project.packageFile, target),
           ...diagnostics,
         ],
-        ...(dsh === undefined ? {} : { dsh }),
-        ...(profileLink === undefined ? {} : { profileLink }),
+        ...(dsh !== undefined && { dsh }),
+        ...(profileLink !== undefined && { profileLink }),
       }
     let raw: unknown
     try {
@@ -276,8 +277,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
         items: [],
         diagnostics: [diagnosticFromError(error, project.packageFile), ...diagnostics],
         cause: error,
-        ...(dsh === undefined ? {} : { dsh }),
-        ...(profileLink === undefined ? {} : { profileLink }),
+        ...(dsh !== undefined && { dsh }),
+        ...(profileLink !== undefined && { profileLink }),
       }
     }
     let items: readonly SlotSummary[] | readonly ToolSummary[] | readonly ServiceSummary[] | readonly EventSummary[]
@@ -296,8 +297,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
         items: [],
         diagnostics: [invalidProviderDto(project.packageFile, error), ...diagnostics],
         cause: error,
-        ...(dsh === undefined ? {} : { dsh }),
-        ...(profileLink === undefined ? {} : { profileLink }),
+        ...(dsh !== undefined && { dsh }),
+        ...(profileLink !== undefined && { profileLink }),
       }
     }
     return {
@@ -306,8 +307,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       source: 'runtime',
       items,
       diagnostics,
-      ...(dsh === undefined ? {} : { dsh }),
-      ...(profileLink === undefined ? {} : { profileLink }),
+      ...(dsh !== undefined && { dsh }),
+      ...(profileLink !== undefined && { profileLink }),
     }
   } catch (error) {
     return {
@@ -317,8 +318,8 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       items: [],
       diagnostics: [diagnosticFromError(error, project.packageFile), ...diagnostics],
       cause: error,
-      ...(dsh === undefined ? {} : { dsh }),
-      ...(profileLink === undefined ? {} : { profileLink }),
+      ...(dsh !== undefined && { dsh }),
+      ...(profileLink !== undefined && { profileLink }),
     }
   }
 }

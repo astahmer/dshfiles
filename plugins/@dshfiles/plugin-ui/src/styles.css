@@ -83,6 +83,18 @@
 
 @layer base {
   :root {
+    --dshx-project-balanced-0: #075985;
+    --dshx-project-balanced-1: #166534;
+    --dshx-project-balanced-2: #854d0e;
+    --dshx-project-balanced-3: #6b21a8;
+    --dshx-project-balanced-4: #0f766e;
+    --dshx-project-balanced-5: #1d4ed8;
+    --dshx-project-cool-0: #075985;
+    --dshx-project-cool-1: #6b21a8;
+    --dshx-project-cool-2: #0f766e;
+    --dshx-project-cool-3: #166534;
+    --dshx-project-cool-4: #1d4ed8;
+    --dshx-project-cool-5: #854d0e;
     --dshx-kit-teal: oklch(0.58 0.1 185);
     --dshx-kit-violet: oklch(0.55 0.19 295);
     --dshx-kit-graph-1: oklch(0.6 0.11 185);
@@ -92,7 +104,55 @@
     --dshx-kit-graph-5: oklch(0.6 0.15 145);
     --dshx-kit-graph-6: oklch(0.68 0.14 90);
   }
+  .project-tone-balanced-0 {
+    color: var(--dshx-project-balanced-0);
+  }
+  .project-tone-balanced-1 {
+    color: var(--dshx-project-balanced-1);
+  }
+  .project-tone-balanced-2 {
+    color: var(--dshx-project-balanced-2);
+  }
+  .project-tone-balanced-3 {
+    color: var(--dshx-project-balanced-3);
+  }
+  .project-tone-balanced-4 {
+    color: var(--dshx-project-balanced-4);
+  }
+  .project-tone-balanced-5 {
+    color: var(--dshx-project-balanced-5);
+  }
+  .project-tone-cool-0 {
+    color: var(--dshx-project-cool-0);
+  }
+  .project-tone-cool-1 {
+    color: var(--dshx-project-cool-1);
+  }
+  .project-tone-cool-2 {
+    color: var(--dshx-project-cool-2);
+  }
+  .project-tone-cool-3 {
+    color: var(--dshx-project-cool-3);
+  }
+  .project-tone-cool-4 {
+    color: var(--dshx-project-cool-4);
+  }
+  .project-tone-cool-5 {
+    color: var(--dshx-project-cool-5);
+  }
   body[data-ds-dark-theme] {
+    --dshx-project-balanced-0: #7dd3fc;
+    --dshx-project-balanced-1: #86efac;
+    --dshx-project-balanced-2: #fcd34d;
+    --dshx-project-balanced-3: #d8b4fe;
+    --dshx-project-balanced-4: #5eead4;
+    --dshx-project-balanced-5: #93c5fd;
+    --dshx-project-cool-0: #93c5fd;
+    --dshx-project-cool-1: #c4b5fd;
+    --dshx-project-cool-2: #5eead4;
+    --dshx-project-cool-3: #86efac;
+    --dshx-project-cool-4: #7dd3fc;
+    --dshx-project-cool-5: #fcd34d;
     --dshx-kit-teal: oklch(0.76 0.11 182);
     --dshx-kit-violet: oklch(0.72 0.15 300);
     --dshx-kit-graph-1: oklch(0.76 0.11 182);

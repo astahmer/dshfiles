@@ -1,8 +1,5 @@
 import { z } from 'zod'
 
-export { secretScopeSchema } from '@dshfiles/credential-port'
-export type { SecretScope } from '@dshfiles/credential-port'
-
 const secretPrintRowSchema = z
   .object({
     alias: z.string().min(1).max(256),

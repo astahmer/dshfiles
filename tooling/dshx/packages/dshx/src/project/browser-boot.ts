@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 
 export interface BrowserBootOptions {
   readonly timeoutMs: number
@@ -78,7 +80,7 @@ const NativeReadinessSchema = z.object({
 
 /** The part of a Playwright Page the reader drives. Results cross from the browser, so they are decoded here. */
 interface BootPage {
-  evaluate<Argument>(pageFunction: (argument: Argument) => unknown, argument: Argument): Promise<unknown>
+  evaluate<Argument, Result>(pageFunction: (argument: Argument) => Result, argument: Argument): Promise<Result>
 }
 
 /**
@@ -310,9 +312,9 @@ const slotFailures = async (page: BootPage): Promise<readonly SlotRenderFailure[
     if (timeout !== undefined) clearTimeout(timeout)
   }
 
-  let slotNames: unknown
+  let slotNames: JsonValue
   try {
-    slotNames = JSON.parse(z.string().parse(serializedSlotNames))
+    slotNames = decodeJson(jsonValueSchema, z.string().parse(serializedSlotNames))
   } catch {
     throw new Error('The browser returned invalid Slot error-boundary data.')
   }

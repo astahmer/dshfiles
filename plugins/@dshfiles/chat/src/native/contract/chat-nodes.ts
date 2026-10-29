@@ -34,12 +34,19 @@ export type ChatNode<Kind extends ChatNodeKind = ChatNodeKind> = {
   }
 }[Kind]
 
+/** Source-event bounds for one reasoning block. */
+export interface ReasoningBlockTiming {
+  readonly startedAt: number
+  readonly endedAt?: number
+}
+
 /** Final Assistant row payload shared by streaming and settled states. */
 export interface AssistantChatData {
   readonly status: 'running' | 'settled' | 'interrupted'
   readonly turn: number
   readonly step: number
   readonly blocks: readonly AssistantBlock[]
+  readonly reasoningTimings?: readonly (ReasoningBlockTiming | undefined)[]
   readonly time: number
   readonly usage?: unknown
   readonly finalNode?: AssistantMessageNode

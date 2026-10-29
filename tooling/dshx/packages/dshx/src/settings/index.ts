@@ -16,3 +16,5 @@ export type {
   SettingsValue,
 } from './types.js'
 export type { SettingsScope } from './protocol-2.js'
+export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from './section-entries-schema.js'
+export type { SettingsSearchEntry, SettingsSectionMetadata, SettingsSectionSearchProps } from './section-entries.js'

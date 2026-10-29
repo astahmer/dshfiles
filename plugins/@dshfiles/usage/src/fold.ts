@@ -1,4 +1,5 @@
 import type { RegistryToolSource } from '@dshfiles/dshx/api'
+import { decodeJson, decodeJsonSafe, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import type { LogRecord } from './session-log.js'
 import { identifyCommand, shellToolArgumentsSchema, type ShellToolArguments } from './command-identifiers.js'
@@ -106,6 +107,8 @@ const resultCharsOf = (content: readonly { readonly text?: string | undefined }[
   return total
 }
 
+const requestRowValueSchema = z.union([z.looseObject({}), z.array(z.unknown())])
+
 const foldStateSchema = z.object({
   session: z
     .object({
@@ -124,7 +127,7 @@ const foldStateSchema = z.object({
   compactionStarts: z.record(z.string(), z.number()),
   pendingTitle: z.object({ seq: z.number(), startedAt: z.number(), provider: z.string(), model: z.string() }).nullable(),
   /** Attempts that ended without a finish chunk: a retry or the turn's end says whether they failed or were aborted. */
-  openAttempts: z.array(z.object({ key: z.string(), row: z.custom<RequestRow>(value => typeof value === 'object' && value !== null) })),
+  openAttempts: z.array(z.object({ key: z.string(), row: z.custom<RequestRow>(value => requestRowValueSchema.safeParse(value).success) })),
   openTools: z
     .array(
       z.object({
@@ -245,7 +248,7 @@ export class UsageFoldModel {
   /** A stored state that no longer decodes restarts the fold from the file's first byte. */
   static readonly decodeFoldState = (raw: string): FoldState | undefined => {
     try {
-      const parsed = foldStateSchema.safeParse(JSON.parse(raw))
+      const parsed = decodeJsonSafe(foldStateSchema, raw)
       return parsed.success ? parsed.data : undefined
     } catch {
       return undefined
@@ -271,9 +274,9 @@ export class UsageFoldModel {
       if (/^(?:functions\.)?(?:skill|load_skill|read_skill)$/.test(name)) {
         const skillArguments = z.string().max(4_096).safeParse(args)
         if (skillArguments.success) {
-          let parsedArguments: unknown
+          let parsedArguments: JsonValue | undefined
           try {
-            parsedArguments = JSON.parse(skillArguments.data)
+            parsedArguments = decodeJson(jsonValueSchema, skillArguments.data)
           } catch {
             parsedArguments = undefined
           }

@@ -26,6 +26,10 @@
     "./chat-focus": {
       "types": "./src/chat-focus.ts",
       "default": "./dist/chat-focus.js"
+    },
+    "./turn-usage-cost": {
+      "types": "./src/turn-usage-cost.ts",
+      "default": "./dist/turn-usage-cost.js"
     }
   },
   "scripts": {

@@ -50,7 +50,7 @@ const packageVersion = (): string => {
 }
 
 function diagnostic(code: `DSHX${number}`, message: string, file: string, hint: string, cause?: unknown): CreateDiagnostic {
-  return { code, severity: 'error', message, file, hint, ...(cause === undefined ? {} : { cause }) }
+  return { code, severity: 'error', message, file, hint, ...(cause !== undefined && { cause }) }
 }
 
 const validateProjectName = (name: string): CreateDiagnostic | undefined => {

@@ -63,6 +63,8 @@ export const zh = {
   clearSearch: '清除搜索',
   noSearchMatches: '没有与此搜索匹配的插件。',
   retryPlugin: '重试下载 {name}',
+  failedContributions: '{count} 项失败',
+  failedContributionsTitle: '失败的贡献',
 } as const
 
 export type MarketplaceLocaleKey = keyof typeof zh
@@ -129,6 +131,8 @@ export const en = {
   clearSearch: 'Clear search',
   noSearchMatches: 'No plugins match this search.',
   retryPlugin: 'Retry download {name}',
+  failedContributions: '{count} failed',
+  failedContributionsTitle: 'Failed contributions',
 } satisfies Record<MarketplaceLocaleKey, string>
 
 export const marketplaceLocale = defineLocale(MARKETPLACE_LOCALE_NAMESPACE, { zh, en })

@@ -127,23 +127,41 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             )}
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
               {shortLabel?.providerTag === undefined ? null : (
-                <span
-                  className="dshx:shrink-0 dshx:text-[10px] dshx:font-semibold dshx:text-muted-foreground"
-                  data-model-picker-provider
-                  title={shortLabel.title}
-                >
-                  {shortLabel.providerTag}
-                </span>
+                <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="dshx:shrink-0 dshx:text-[10px] dshx:font-semibold dshx:text-muted-foreground" data-model-picker-provider>
+                        {shortLabel.providerTag}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{shortLabel.title}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {/* The name truncates with the composer row (a native container); the row's own compact flag drops the
                 effort instead of the name, so the trigger always says which model answers. */}
-              <span
-                className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
-                data-model-picker-text
-                title={shortLabel?.title}
-              >
-                {triggerLabel}
-              </span>
+              {shortLabel === undefined ? (
+                <span
+                  className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+                  data-model-picker-text
+                >
+                  {triggerLabel}
+                </span>
+              ) : (
+                <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+                        data-model-picker-text
+                      >
+                        {triggerLabel}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{shortLabel.title}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden">
                 ·
               </span>

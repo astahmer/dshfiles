@@ -179,16 +179,19 @@ const SummaryItem = (props: {
             const exhausted = Math.round(window.percentRemaining) <= 0
             const windowTone = exhausted ? 'critical' : quotaTone(window.percentRemaining)
             return (
-              <span
-                className={cn(
-                  'dshx:text-[11px] dshx:font-semibold dshx:tabular-nums',
-                  props.item.disabled ? 'dshx:text-muted-foreground' : QUOTA_TONE_TEXT[windowTone],
-                )}
-                key={window.label}
-                title={window.label}
-              >
-                {String(Math.round(window.percentRemaining))}%
-              </span>
+              <Tooltip key={window.label}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      'dshx:text-[11px] dshx:font-semibold dshx:tabular-nums',
+                      props.item.disabled ? 'dshx:text-muted-foreground' : QUOTA_TONE_TEXT[windowTone],
+                    )}
+                  >
+                    {String(Math.round(window.percentRemaining))}%
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{window.label}</TooltipContent>
+              </Tooltip>
             )
           })}
         </span>
@@ -396,8 +399,12 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
     props.activeAccountId === null ? (UsageOverviewModel.mostCritical(items) ?? items[0]) : items.find(item => item.instanceId === props.activeAccountId)
   const activeLabel =
     activeProfile === undefined ? label : `${activeProfile.displayName}. ${props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'}`
+  const stripTitle = items.map(item => describeItem(item, now)).join('\n') || label
   return (
+    <TooltipProvider delayDuration={500}>
     <Popover onOpenChange={setOpen} open={open}>
+      <Tooltip>
+      <TooltipTrigger asChild>
       <PopoverTrigger asChild>
         <button
           aria-label={activeLabel}
@@ -409,7 +416,6 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
             open && 'dshx:bg-accent dshx:text-foreground',
             activeProfile !== undefined && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
           )}
-          title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
           {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
@@ -439,8 +445,12 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
           )}
         </button>
       </PopoverTrigger>
+      </TooltipTrigger>
+      <TooltipContent className="dshx-root dshx:whitespace-pre-line">{stripTitle}</TooltipContent>
+      </Tooltip>
       <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} onConnectAccount={props.onConnectAccount} />
     </Popover>
+    </TooltipProvider>
   )
 }
 

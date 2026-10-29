@@ -65,7 +65,9 @@ it('stops waiting for a corpus read at the caller budget without repeating the r
   ctx.provide('sessionQuery', {
     listSessions: async () => {
       reads += 1
-      return new Promise<readonly SessionRecord[]>(resolve => { settle = resolve })
+      return new Promise<readonly SessionRecord[]>(resolve => {
+        settle = resolve
+      })
     },
   } as never)
   const list = new ApiSessionList(ctx, 8)

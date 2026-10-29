@@ -94,6 +94,7 @@ const itemSchema = z
     project: z.string().max(MAX_TARGET_CHARS).nullable(),
     tags: z.array(z.string().max(60)).max(MAX_TAGS),
     links: z.array(linkSchema).max(MAX_LINKS),
+    tweetContextUrls: z.array(z.string().url().max(2_048)).max(20).optional(),
     attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).default([]),
     actors: z.array(z.object({ id: actorIdSchema, role: z.enum(['owner', 'contributor']) }).strict()).max(50),
     pinned: z.boolean(),

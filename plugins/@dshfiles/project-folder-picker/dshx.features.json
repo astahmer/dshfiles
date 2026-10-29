@@ -5,7 +5,7 @@
     {
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, open on a Projects tab that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces tabs, and preserve project identity in returned choices.",
+      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
@@ -77,7 +77,7 @@
     {
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
-      "summary": "List recent folders in order on their own tab and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
+      "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["registered-match", "recent-unregistered", "selected"],

@@ -45,17 +45,15 @@ export const RemoteSessionBootstrap = (props: {
         throw { message: `${result.message} (${result.code})`, code: result.code } satisfies BootstrapFailure
       }
       if (active) onStarted.current(result.sessionId)
-    })().catch(error => {
-      if (!active) return
-      const parsed = bootstrapFailureSchema.safeParse(error)
-      setFailure(
-        parsed.success
-          ? parsed.data
-          : { message: errorMessage(error, `Could not start a thread on ${props.hostName}.`) },
-      )
-    }).finally(() => {
-      if (active) setStarting(false)
-    })
+    })()
+      .catch(error => {
+        if (!active) return
+        const parsed = bootstrapFailureSchema.safeParse(error)
+        setFailure(parsed.success ? parsed.data : { message: errorMessage(error, `Could not start a thread on ${props.hostName}.`) })
+      })
+      .finally(() => {
+        if (active) setStarting(false)
+      })
     return () => {
       active = false
     }

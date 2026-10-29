@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import {
   ChevronDownIcon,
@@ -28,6 +28,7 @@ import {
   emptyCategoryBytes,
   processCategoryValues,
   type MemoryPressure,
+  type NodeProcessOrigin,
   type ProcessCategory,
   type ProcessOrigin,
   type ProcessTree,
@@ -81,6 +82,7 @@ const count = (value: number, one: WorktreeMemoryKey, many: WorktreeMemoryKey, t
 const DETACHED_BADGE = 'dshx:shrink-0 dshx:border-destructive/40 dshx:text-destructive'
 // Fusebox-style: the heaviest workspaces stay listed, the long tail folds behind one row.
 const VISIBLE_GROUPS = 6
+const VISIBLE_NODE_ORIGINS = 8
 
 const formatAge = (since: number, now: number, t: WorktreeMemoryTranslate): string => {
   const minutes = Math.floor(Math.max(0, now - since) / 60_000)
@@ -114,13 +116,8 @@ export const MemoryGlyph = (props: { readonly size?: number; readonly t: Worktre
   const status = [strained ? props.t(PRESSURE[pressure].key) : null, detachedBytes > 0 ? `${formatBytes(detachedBytes)} ${props.t('detachedTotal')}` : null]
     .filter(part => part !== null)
     .join(' · ')
-  return (
-    <span
-      className="dshx:relative dshx:inline-flex"
-      title={status.length === 0 ? undefined : status}
-      data-memory-badge-pressure={pressure}
-      data-memory-badge-detached-bytes={String(detachedBytes)}
-    >
+  const glyph = (
+    <span className="dshx:relative dshx:inline-flex" data-memory-badge-pressure={pressure} data-memory-badge-detached-bytes={String(detachedBytes)}>
       <MemoryStickIcon aria-hidden size={props.size ?? 18} strokeWidth={1.7} />
       {strained ? (
         <span
@@ -137,6 +134,15 @@ export const MemoryGlyph = (props: { readonly size?: number; readonly t: Worktre
         </span>
       ) : null}
     </span>
+  )
+  if (status.length === 0) return glyph
+  return (
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>{glyph}</TooltipTrigger>
+        <TooltipContent>{status}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -230,19 +236,30 @@ const TreeRow = (props: {
             origin
           )}
           {tree.sessionId === null ? null : (
-            <button
-              type="button"
-              className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground dshx:hover:underline dshx:@max-pane-narrow:hidden"
-              title={props.t('openThread')}
-              onClick={() => props.onOpenThread(tree.sessionId ?? '')}
-            >
-              {props.threadLabel(tree.sessionId)}
-            </button>
+            <TooltipProvider delayDuration={500}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground dshx:hover:underline dshx:@max-pane-narrow:hidden"
+                    onClick={() => props.onOpenThread(tree.sessionId ?? '')}
+                  >
+                    {props.threadLabel(tree.sessionId)}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{props.t('openThread')}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
-        <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs dshx:text-muted-foreground" title={`${tree.command}\n${tree.cwd}`}>
-          {tree.command}
-        </code>
+        <TooltipProvider delayDuration={500}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">{tree.command}</code>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:whitespace-pre-line">{`${tree.command}\n${tree.cwd}`}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:items-end">
         <span className="dshx:text-sm dshx:tabular-nums">{formatBytes(tree.bytes)}</span>
@@ -284,9 +301,14 @@ const GroupCard = (props: {
           <GroupIcon kind={group.kind} />
           <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
             <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-              <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium" title={group.path}>
-                {title}
-              </span>
+              <TooltipProvider delayDuration={500}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="dshx:max-w-96 dshx:break-all">{group.path}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {group.detachedCount === 0 ? null : (
                 <Badge variant="outline" className={DETACHED_BADGE}>
                   {group.detachedCount} {t('detachedTotal')}
@@ -335,14 +357,20 @@ const GroupCard = (props: {
               {group.threads.map(thread => (
                 <li key={thread.sessionId} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-xs">
                   <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                    <button
-                      type="button"
-                      className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:hover:underline"
-                      title={t('openThread')}
-                      onClick={() => props.onOpenThread(thread.sessionId)}
-                    >
-                      {thread.title ?? props.threadLabel(thread.sessionId)}
-                    </button>
+                    <TooltipProvider delayDuration={500}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:hover:underline"
+                            onClick={() => props.onOpenThread(thread.sessionId)}
+                          >
+                            {thread.title ?? props.threadLabel(thread.sessionId)}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('openThread')}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-muted-foreground">
                       {thread.running ? (
                         <>
@@ -400,6 +428,28 @@ const GroupCard = (props: {
   )
 }
 
+const NodeOriginCard = (props: { readonly origin: NodeProcessOrigin; readonly t: WorktreeMemoryTranslate }): JSX.Element => {
+  const origin = props.origin
+  const sampledPids = origin.samples.map(sample => String(sample.pid)).join(', ')
+  return (
+    <article className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-2">
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{origin.name}</span>
+        <Badge variant="secondary" className="dshx:shrink-0">
+          {origin.source ?? props.t('nodeUnknownSource')}
+        </Badge>
+        <span className="dshx:ml-auto dshx:shrink-0 dshx:text-right dshx:text-sm dshx:tabular-nums">
+          {formatBytes(origin.rssBytes)} {props.t('rss')}
+        </span>
+      </div>
+      {origin.cwd === null ? null : <code className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{origin.cwd}</code>}
+      <span className="dshx:text-xs dshx:text-muted-foreground">
+        {count(origin.processCount, 'process', 'processes', props.t)} · {props.t('topPids')} {sampledPids}
+      </span>
+    </article>
+  )
+}
+
 export interface WorktreeMemoryPanelProps {
   readonly sessions: ISessions
   readonly uiWorkspace: UiWorkspace
@@ -414,6 +464,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   const [armed, setArmed] = useState<string | null>(null)
   const [stopOutcome, setStopOutcome] = useState<StopResult | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [showAllNodeOrigins, setShowAllNodeOrigins] = useState(false)
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
 
   const snapshot = useQuery({
@@ -459,6 +510,9 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   }
 
   const value = snapshot.data
+  const nodeProcesses = value?.nodeProcesses
+  const visibleNodeOrigins =
+    nodeProcesses === undefined ? [] : nodeProcesses.origins.slice(0, showAllNodeOrigins ? nodeProcesses.origins.length : VISIBLE_NODE_ORIGINS)
   const now = value?.takenAt ?? 0
   const groups = value?.groups ?? []
   const openKeys = opened ?? new Set(groups.slice(0, 1).map(group => group.key))
@@ -516,6 +570,39 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
             </>
           )}
         </header>
+
+        {value === undefined || !value.supported ? null : (
+          <section className="dshx:flex dshx:flex-col dshx:gap-2" data-node-process-summary data-node-process-count={String(nodeProcesses?.processCount ?? 0)}>
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <h2 className="dshx:text-sm dshx:font-semibold">{t('nodeProcesses')}</h2>
+              <Badge variant="outline" className="dshx:shrink-0">
+                {t('ruleBased')}
+              </Badge>
+              {nodeProcesses === undefined ? (
+                <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground">{t('nodeSummaryUnavailable')}</span>
+              ) : (
+                <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">
+                  {count(nodeProcesses.processCount, 'process', 'processes', t)} · {formatBytes(nodeProcesses.rssBytes)} {t('rss')}
+                </span>
+              )}
+            </div>
+            {nodeProcesses === undefined ? null : nodeProcesses.origins.length === 0 ? (
+              <p className="dshx:text-sm dshx:text-muted-foreground">{t('noNodeProcesses')}</p>
+            ) : (
+              <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-compact:grid-cols-1">
+                {visibleNodeOrigins.map(origin => (
+                  <NodeOriginCard key={JSON.stringify([origin.name, origin.source, origin.cwd])} origin={origin} t={t} />
+                ))}
+              </div>
+            )}
+            {nodeProcesses === undefined || nodeProcesses.origins.length <= VISIBLE_NODE_ORIGINS ? null : (
+              <Button variant="ghost" size="sm" className="dshx:self-start" onClick={() => setShowAllNodeOrigins(!showAllNodeOrigins)}>
+                {showAllNodeOrigins ? t('showFewerNodeOrigins') : t('showMoreNodeOrigins', { count: nodeProcesses.origins.length })}
+              </Button>
+            )}
+            {nodeProcesses?.truncated ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('nodeOriginLimit')}</p> : null}
+          </section>
+        )}
 
         {snapshot.isPending ? (
           <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">

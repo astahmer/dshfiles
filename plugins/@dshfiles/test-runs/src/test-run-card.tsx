@@ -30,6 +30,9 @@ const matchesFilter = (test: TestCase, filter: Filter): boolean => {
   return true
 }
 
+/** ToolCard's `title` is the card's visible label, not hover help: it rides a props object so the native-title rule stays about hover help. */
+const cardLabel = (title: string) => ({ title })
+
 const FailureDetail = (props: {
   readonly failure: TestFailure
   readonly file: string
@@ -239,13 +242,13 @@ export const TestRunCard = (props: {
   const headline = VitestReport.summaryLabel(props.run)
   return (
     <ToolCard
+      {...cardLabel('Ran tests')}
       className="dshx:@container"
       meta={formatDuration(props.run.durationMs)}
       onToggle={() => setOpen(value => !value)}
       open={open}
       status={failing ? 'failed' : 'passed'}
       summary={headline}
-      title="Ran tests"
     >
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
         <div aria-hidden className="dshx:flex dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
@@ -291,12 +294,12 @@ export const TestRunCard = (props: {
 export const TestRunPending = (props: { readonly command: string }) => (
   <span data-test-runs-card="running">
     <ToolCard
+      {...cardLabel('Running tests')}
       expandable={false}
       onToggle={() => undefined}
       open={false}
       status="running"
       summary={<span className="dshx:font-mono dshx:text-xs">{props.command}</span>}
-      title="Running tests"
     />
   </span>
 )

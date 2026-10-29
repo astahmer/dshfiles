@@ -33,14 +33,14 @@ export class ModelPickerModel {
     return {
       provider: group.id,
       model: model.id,
-      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      ...(reasoningEffort !== undefined && { reasoningEffort }),
     }
   }
 
   static selectionForEffort = (current: ModelSelection, reasoningEffort: string | undefined): ModelSelection => ({
     provider: current.provider,
     model: current.model,
-    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(reasoningEffort !== undefined && { reasoningEffort }),
   })
 
   /** Account providers prefix every model name with their instance id; under its provider the prefix says nothing. */

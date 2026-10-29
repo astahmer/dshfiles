@@ -38,18 +38,16 @@ export default defineClientPlugin({
                     id: model.id,
                     name: model.name,
                     description: model.description ?? model.id,
-                    ...(model.reasoning === undefined
-                      ? {}
-                      : {
-                          reasoning: {
-                            efforts: model.reasoning.efforts.map(effort => ({
-                              id: effort.id,
-                              name: effort.name,
-                              description: effort.description ?? '',
-                            })),
-                            ...(model.reasoning.defaultEffort === undefined ? {} : { defaultEffort: model.reasoning.defaultEffort }),
-                          },
-                        }),
+                    ...(model.reasoning !== undefined && {
+                      reasoning: {
+                        efforts: model.reasoning.efforts.map(effort => ({
+                          id: effort.id,
+                          name: effort.name,
+                          description: effort.description ?? '',
+                        })),
+                        ...(model.reasoning.defaultEffort !== undefined && { defaultEffort: model.reasoning.defaultEffort }),
+                      },
+                    }),
                   })),
                 })) satisfies ModelDirectoryState['groups'],
                 failures: catalog.failures,

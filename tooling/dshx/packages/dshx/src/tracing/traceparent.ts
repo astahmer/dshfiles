@@ -1,5 +1,7 @@
 /** Runtime-neutral W3C Trace Context helpers, shared by the Host tracer and the browser tracer. */
 
+import type { JsonObject } from '../json.js'
+
 export interface SpanContext {
   readonly traceId: string
   readonly spanId: string
@@ -27,12 +29,15 @@ const format = (context: SpanContext): string => `00-${context.traceId}-${contex
  */
 const ENVELOPE_FIELD = 'traceparent'
 
-const fromEnvelope = (payload: unknown): SpanContext | undefined =>
-  typeof payload === 'object' && payload !== null && ENVELOPE_FIELD in payload ? parse(payload[ENVELOPE_FIELD]) : undefined
+const isEnvelopeValue = <T>(value: T): value is T & JsonObject =>
+  value !== null && Object(value) === value && Object.prototype.toString.call(value) !== '[object Function]'
+
+const parseFromEnvelope = (payload: unknown): SpanContext | undefined =>
+  isEnvelopeValue(payload) && ENVELOPE_FIELD in payload ? parse(payload[ENVELOPE_FIELD]) : undefined
 
 export class TraceparentModel {
   static readonly parse = parse
   static readonly format = format
   static readonly envelopeField = ENVELOPE_FIELD
-  static readonly fromEnvelope = fromEnvelope
+  static readonly fromEnvelope = parseFromEnvelope
 }

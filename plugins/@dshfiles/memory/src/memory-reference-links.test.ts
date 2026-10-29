@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { memoryReferencePreviewEvent } from './memory-reference.ts'
+import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema } from './memory-reference.ts'
 import { installMemoryReferenceLinks } from './memory-reference-links.ts'
 
 const links = (): readonly string[] => [...document.querySelectorAll('[data-dshfiles-memory-reference]')].map(element => element.textContent ?? '')
@@ -29,7 +29,11 @@ describe('memory reference links', () => {
   it('asks for a preview when one of those links is clicked', () => {
     document.body.innerHTML = '<div data-conversation-session="s"><p>Memory: t:9356abc7.</p></div>'
     const requests: { readonly id: string; readonly anchorId: number }[] = []
-    const onRequest = (event: Event): void => void requests.push((event as CustomEvent<{ id: string; anchorId: number }>).detail)
+    const onRequest = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return
+      const parsed = memoryReferencePreviewRequestSchema.safeParse(event.detail)
+      if (parsed.success) requests.push(parsed.data)
+    }
     window.addEventListener(memoryReferencePreviewEvent, onRequest)
     const stop = installMemoryReferenceLinks()
 

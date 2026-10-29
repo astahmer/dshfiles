@@ -75,6 +75,12 @@ describe('CleanupJobTrailModel.summary', () => {
 
     expect(CleanupJobTrailModel.summary(older)).toBe('3 thread workspaces removed')
   })
+
+  it('does not report a removal when cleanup removed nothing', () => {
+    const finished = job({ state: 'done', phase: 'done', result: cleanupResult() })
+
+    expect(CleanupJobTrailModel.summary(finished)).toBe('')
+  })
 })
 
 describe('CleanupJobTrailModel.isActive', () => {

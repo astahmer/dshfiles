@@ -40,7 +40,21 @@ const RETRY_COUNTS = [0, 1, 2, 3, 5] as const
 const BACKOFF_MS = [500, 1_000, 2_000, 5_000, 10_000] as const
 const WAIT_SECONDS = [0, 30, 60, 120, 300, 900] as const
 
-const FAILURE_KIND_COPY: Readonly<Record<FailureKind, { readonly title: string; readonly hint: string; readonly options: readonly (keyof KindPolicy)[] }>> = {
+interface FailureKindCopy {
+  readonly title: string
+  readonly hint: string
+  readonly options: readonly (keyof KindPolicy)[]
+}
+
+interface FailureKindCopyTable {
+  readonly transport: FailureKindCopy
+  readonly rateLimit: FailureKindCopy
+  readonly exhausted: FailureKindCopy
+  readonly auth: FailureKindCopy
+  readonly oversized: FailureKindCopy
+}
+
+const FAILURE_KIND_COPY: FailureKindCopyTable = {
   transport: {
     title: 'Connection failure',
     hint: 'Resets, timeouts, 5xx, and Codex replay-buffer overflows.',
@@ -62,8 +76,13 @@ const overridesToText = (overrides: Readonly<Record<string, string>>): string =>
     .map(([route, value]) => `${route} = ${value}`)
     .join('\n')
 
+interface ParsedOverrides {
+  readonly overrides: Record<string, string>
+  readonly skipped: number
+}
+
 /** One `provider/model = value` rule per line; blank and malformed lines are dropped. */
-const textToOverrides = (text: string): { readonly overrides: Record<string, string>; readonly skipped: number } => {
+const textToOverrides = (text: string): ParsedOverrides => {
   const overrides: Record<string, string> = {}
   let skipped = 0
   for (const line of text.split('\n')) {
@@ -75,10 +94,10 @@ const textToOverrides = (text: string): { readonly overrides: Record<string, str
   return { overrides, skipped }
 }
 
-const Group = (props: { readonly title: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
+const Group = (props: { readonly heading: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
     <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
-      <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
+      <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
       {props.description === undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{props.description}</p>}
     </header>
     {props.children}
@@ -210,7 +229,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Alert>
       )}
 
-      <Group description="How edits on the accounts page are written." title="Editing">
+      <Group description="How edits on the accounts page are written." heading="Editing">
         <RadioGroup
           aria-labelledby={saveModeId}
           className="dshx:flex dshx:flex-col dshx:gap-2"
@@ -307,7 +326,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group
           description="For exhausted limits. Automatic resume needs a known provider reset and queues one minute later; an account failover still takes the request first."
-          title="Quota retry"
+          heading="Quota retry"
         >
           <Row hint="Pre-check the per-turn choice in every thread. The default is on." label="Automatically resume after reset by default">
             {id => (
@@ -332,7 +351,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Group>
       ) : null}
 
-      <Group description="Where current quota is shown." title="Usage surfaces">
+      <Group description="Where current quota is shown." heading="Usage surfaces">
         <Row hint="Meters above the sidebar foot (one button on the collapsed rail); click one for the account cards." label="Sidebar usage">
           {id => (
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
@@ -443,7 +462,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <WorkHoursGroup readOnly={readOnly} write={write} />
 
-      <Group description="The Host records one quota snapshot per enabled account on this schedule." title="Usage history">
+      <Group description="The Host records one quota snapshot per enabled account on this schedule." heading="Usage history">
         <Row label="Record every">
           {id => (
             <NumberSelect
@@ -565,7 +584,7 @@ const WorkHoursGroup = (props: { readonly readOnly: boolean; readonly write: (ta
     props.write(settings.set('workHours', { days: [...next.days], startHour: next.startHour, endHour: Math.max(next.endHour, next.startHour + 1) }))
   }
   return (
-    <Group description="Quota forecast counts the gaps with no account free that fall in these hours." title="Work hours">
+    <Group description="Quota forecast counts the gaps with no account free that fall in these hours." heading="Work hours">
       <Row label="Work days">
         {id => (
           <span className="dshx:flex dshx:flex-wrap dshx:gap-3" id={id}>
@@ -644,7 +663,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
   }
 
   return (
-    <Group description="Estimated cost per session beside the composer stats, priced from models.dev. An estimate, never an invoice." title="Cost estimates">
+    <Group description="Estimated cost per session beside the composer stats, priced from models.dev. An estimate, never an invoice." heading="Cost estimates">
       <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show session cost">
         {id => (
           <Switch
@@ -685,7 +704,10 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
         )}
       </Row>
       <Row
-        hint={pricingStatusLine({ pricing, fetchedAge: pricing === null || pricing.fetchedAt === null ? null : relativeTime(pricing.fetchedAt, Date.now()) })}
+        hint={pricingStatusLine({
+          pricing,
+          fetchedAge: pricing === null || pricing.fetchedAt === null ? null : relativeTime(pricing.fetchedAt, status.dataUpdatedAt),
+        })}
         label="Price catalog"
       >
         {() => (
@@ -736,7 +758,7 @@ const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly writ
   return (
     <Group
       description="Options run top to bottom: same account, Luna Reserve, next account of the same provider with the same model (in usage-strip order, hidden accounts skipped), wait, a smaller request. A switch shows as a retry row in the turn."
-      title="Failure recovery"
+      heading="Failure recovery"
     >
       {FAILURE_KINDS.map(kind => {
         const copy = FAILURE_KIND_COPY[kind]

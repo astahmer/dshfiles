@@ -14,7 +14,7 @@ export const QueueTransferDialog = (props: {
     onOpenChange={open => {
       if (!open) props.onCancel()
     }}
-    title="Move to thread"
+    heading="Move to thread"
     description="Pick the thread this queued message moves to. A busy thread queues it; an idle one gets it in its composer."
     className="dshx-root"
   >

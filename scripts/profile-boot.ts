@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 /**
  * Boot a profile and fail on any entry that did not activate.
@@ -41,9 +42,10 @@ if (process.version !== expectedNode) {
   process.exit(2)
 }
 
-const profileManifest = z
-  .object({ dsh: z.object({ profile: z.object({ bundles: z.array(z.string()) }) }) })
-  .parse(JSON.parse(readFileSync(join(homedir(), '.dsh/profiles', values.profile, 'package.json'), 'utf8')))
+const profileManifest = decodeJson(
+  z.object({ dsh: z.object({ profile: z.object({ bundles: z.array(z.string()) }) }) }),
+  readFileSync(join(homedir(), '.dsh/profiles', values.profile, 'package.json'), 'utf8'),
+)
 const composed = execFileSync('dsh', ['--profile', values.profile, '--dump-config'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
 const missing = profileManifest.dsh.profile.bundles.filter(name => name.startsWith('@dshfiles/') && !composed.includes(`name: '${name}'`))
 if (missing.length > 0) {

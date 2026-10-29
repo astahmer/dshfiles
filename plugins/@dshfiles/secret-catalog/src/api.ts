@@ -1,7 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
-import { secretMetadataSchema, secretScopeSchema } from './secret-metadata.js'
+import { secretScopeSchema } from '@dshfiles/credential-port'
+import { secretMetadataSchema } from './secret-metadata.js'
 import { secretReferenceStatusSchema } from './secret-reference-status-schema.js'
 
 const cwdSchema = z.string().max(4096).nullable()

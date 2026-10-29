@@ -104,7 +104,7 @@ export const AccountIdentitySection = (props: {
           Refresh
         </Button>
       }
-      title="Account details"
+      heading="Account details"
     >
       <LabelledControl label="Display name">
         {id => (

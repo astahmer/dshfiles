@@ -4,7 +4,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ChartQuery, type ChartView } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
@@ -94,11 +94,12 @@ export const UsageCharts = (props: {
   readonly openThread: OpenThread
 }): JSX.Element => {
   const api = useApi(usageApi)
+  const [now] = useState(() => Date.now())
   const tzOffsetMinutes = -new Date(props.range.from).getTimezoneOffset()
   const query: ChartQuery = {
     from: props.range.from,
     to: props.range.to,
-    ...(props.purposes === undefined ? {} : { purposes: [...props.purposes] }),
+    ...(props.purposes !== undefined && { purposes: [...props.purposes] }),
     bucket: props.bucket,
     groupBy: props.groupBy,
     tzOffsetMinutes,
@@ -110,10 +111,10 @@ export const UsageCharts = (props: {
     refetchInterval: 60_000,
     retry: 1,
   })
-  const now = new Date()
+  const monthOfNow = new Date(now)
   const jevRange = {
-    from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
-    to: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(),
+    from: new Date(monthOfNow.getFullYear(), monthOfNow.getMonth(), 1).getTime(),
+    to: new Date(monthOfNow.getFullYear(), monthOfNow.getMonth() + 1, 1).getTime(),
   }
   const jevUsage = useQuery({
     queryKey: ['dshfiles-usage', 'jev', jevRange.from],
@@ -305,7 +306,7 @@ export const UsageCharts = (props: {
 
   const summary = view.summary
   const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
-  const days = Math.max(1, (Math.min(Date.now(), props.range.to) - props.range.from) / DAY_MS)
+  const days = Math.max(1, (Math.min(now, props.range.to) - props.range.from) / DAY_MS)
   const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
 
   return (

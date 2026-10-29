@@ -4,9 +4,13 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { MarketplaceHostService } from '../src/host-service.js'
+
+const profileManifestSchema = z.object({ dsh: z.object({ profile: z.object({ bundles: z.array(z.string()) }) }) })
 
 const workspace = resolve(import.meta.dirname, '../../..')
 const packageDirectory = resolve(import.meta.dirname, '..')
@@ -108,7 +112,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
       env: { DSH_HOME: dshHome },
       timeout: 5 * 60_000,
     })
-    const initialManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    const initialManifest = decodeJson(profileManifestSchema, await readFile(join(profileDir, 'package.json'), 'utf8'))
     expect(initialManifest.dsh.profile.bundles).toContain('@dshfiles/plugin-marketplace')
 
     hub = createServer((request, response) => {
@@ -179,6 +183,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
 
   it('installs through the typed marketplace service and loads after Profile restart', async () => {
     process.env.DSH_HOME = dshHome
+    // SAFETY: the Host service reads only `baseUrl` from its Context, which this smoke test supplies.
     const ctx = { baseUrl: pathToFileURL(profileDir).href } as Context
     const service = new MarketplaceHostService({
       settings: () => ({ hubBaseUrl }),
@@ -196,7 +201,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
       packageName: '@dshx-smoke/marketplace-target',
       restartRequired: true,
     })
-    const installedManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    const installedManifest = decodeJson(profileManifestSchema, await readFile(join(profileDir, 'package.json'), 'utf8'))
     expect(installedManifest.dsh.profile.bundles).toEqual(expect.arrayContaining(['@dshfiles/plugin-marketplace', '@dshx-smoke/marketplace-target']))
 
     const restarted = execa(dshCli, ['--profile', 'web', '--no-open', '--port', '0'], {

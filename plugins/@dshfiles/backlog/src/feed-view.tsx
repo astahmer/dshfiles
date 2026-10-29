@@ -116,7 +116,7 @@ const FeedEntry = (props: {
             {rename.renaming ? (
               <BacklogInlineTitle
                 id={item.id}
-                title={item.title}
+                value={item.title}
                 cancel={rename.endRename}
                 className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-sm dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
               />

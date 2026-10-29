@@ -14,11 +14,11 @@ async function execute(command: string, args: readonly string[], options: Parame
     timeout: options.timeoutMs,
   })
   return {
-    ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
+    ...(result.exitCode !== undefined && { exitCode: result.exitCode }),
     stdout: result.stdout,
     stderr: result.stderr,
-    ...(result.code === undefined ? {} : { failureCode: result.code }),
-    ...(result.failed ? { cause: result } : {}),
+    ...(result.code !== undefined && { failureCode: result.code }),
+    ...(result.failed && { cause: result }),
     executable: command === 'pnpm' ? 'local' : 'global',
   }
 }

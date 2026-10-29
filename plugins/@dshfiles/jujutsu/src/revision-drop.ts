@@ -5,6 +5,7 @@ import { SourceControlModel } from './source-control.js'
 export const REVISION_MIME = 'application/x-jujutsu-revision'
 export const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
 export const BOOKMARK_SOURCE_MIME = 'application/x-jujutsu-bookmark-source'
+export const WORKSPACE_MIME = 'application/x-jujutsu-workspace'
 
 export type RevisionDropResolution =
   | { readonly kind: 'action'; readonly action: Mutation; readonly presentation: DropPresentation }
@@ -16,6 +17,8 @@ type DragRevision = {
   readonly parents: readonly Revision['commitId'][]
   readonly immutable: Revision['immutable']
   readonly localBookmarks: readonly string[]
+  readonly workspaces: readonly string[]
+  readonly workingCopy: boolean
 }
 
 export const resolveRevisionDrop = (input: {
@@ -33,6 +36,26 @@ export const resolveRevisionDrop = (input: {
     kind: 'action',
     action: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
     presentation: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
+  }
+}
+
+export const resolveWorkspaceDrop = (input: {
+  readonly workspace: string
+  readonly target: DragRevision
+  readonly revisions: readonly DragRevision[]
+}): RevisionDropResolution => {
+  const source = input.revisions.find(revision => revision.workspaces.includes(input.workspace)) ??
+    (input.workspace === 'default' ? input.revisions.find(revision => revision.workingCopy) : undefined)
+  if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
+  return {
+    kind: 'action',
+    action: { kind: 'workspace-edit', name: input.workspace, commitId: input.target.commitId },
+    presentation: {
+      kind: 'workspace-move',
+      sourceId: source.commitId,
+      destinationId: input.target.commitId,
+      workspace: input.workspace,
+    },
   }
 }
 

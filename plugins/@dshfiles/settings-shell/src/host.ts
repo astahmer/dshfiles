@@ -4,8 +4,10 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { Context } from '@deepseek-ai/cordis'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
-import { createSettingsTools, type SettingsSurface } from './settings-tools.js'
+import { createSettingsTools, type SearchEntriesStore, type SettingsSurface } from './settings-tools.js'
+import type { SectionEntryRow } from './settings-search.js'
 import { settingsShellApi } from './shell-api.js'
 import { settingsShellSettings } from './settings.js'
 import { PORTED_FROM, WELCOME_PORTED_FROM } from './upstream.js'
@@ -24,7 +26,15 @@ const requireSettings = (ctx: Context): SettingsSurface => {
   return settings
 }
 
-const settingsTools = (ctx: Context) => createSettingsTools(() => requireSettings(ctx))
+let publishedSearchEntries: readonly SectionEntryRow[] = []
+const searchEntries: SearchEntriesStore = {
+  read: () => publishedSearchEntries,
+  replace: entries => {
+    publishedSearchEntries = entries
+  },
+}
+
+const settingsTools = (ctx: Context) => createSettingsTools({ settings: () => requireSettings(ctx), searchEntries })
 
 /** A native package's version as the running `dsh` resolves it, read from beside its entry script; null when unreadable. */
 const installedVersion = (packageName: string): string | null => {
@@ -33,7 +43,7 @@ const installedVersion = (packageName: string): string | null => {
   try {
     const require = createRequire(realpathSync(entry))
     const manifestPath = require.resolve(`${packageName}/package.json`)
-    return packageVersionSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8'))).version
+    return decodeJson(packageVersionSchema, readFileSync(manifestPath, 'utf8')).version
   } catch {
     return null
   }
@@ -86,6 +96,7 @@ export default defineHost({
       list: context => settingsTools(context.ctx).list(context),
       set: context => settingsTools(context.ctx).set(context),
       unset: context => settingsTools(context.ctx).unset(context),
+      publishSearchEntries: context => settingsTools(context.ctx).publishSearchEntries(context),
     }),
   ],
   setup(ctx) {

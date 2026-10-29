@@ -515,7 +515,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             }}
             onSelect={selectFolder}
             projects={projects}
-            title={t('chooseProjectFolderTitle')}
+            heading={t('chooseProjectFolderTitle')}
           />
         )}
         {dialog !== null && (

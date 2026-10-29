@@ -37,6 +37,22 @@ describe('matchesShortcut', () => {
   })
 })
 
+describe('parseChord', () => {
+  it.each([
+    ['Mod+K', { key: 'KeyK', alsoShift: false }],
+    ['mod+shift+k', { key: 'KeyK', alsoShift: true }],
+    ['Primary+1', { key: 'Digit1', alsoShift: false }],
+    ['Mod+,', { key: 'Comma', alsoShift: false }],
+    ['Cmd+Enter', { key: 'Enter', alsoShift: false }],
+  ])('reads %s', (chord, expected) => {
+    expect(ShortcutKeyboardModel.parseChord(chord)).toEqual(expected)
+  })
+
+  it.each(['K', 'Shift+K', 'Mod+Alt+K', 'Mod+', 'Mod+F13'])('leaves %s unbound', chord => {
+    expect(ShortcutKeyboardModel.parseChord(chord)).toBeUndefined()
+  })
+})
+
 describe('isEditableTarget', () => {
   it('accepts text fields and editable regions, refuses buttons and checkboxes', () => {
     const editable = document.createElement('div')
@@ -79,6 +95,17 @@ describe('installShortcuts', () => {
     handled.preventDefault()
     document.body.dispatchEvent(handled)
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('lets a run that returns false decline the key', () => {
+    const bubbled = vi.fn()
+    disposers.push(installShortcuts(window, [searchShortcut(() => false)]))
+    window.addEventListener('keydown', bubbled)
+    disposers.push(() => window.removeEventListener('keydown', bubbled))
+    const chord = press(primaryHeld())
+    document.body.dispatchEvent(chord)
+    expect(chord.defaultPrevented).toBe(false)
+    expect(bubbled).toHaveBeenCalledOnce()
   })
 
   it('stops listening once disposed', () => {

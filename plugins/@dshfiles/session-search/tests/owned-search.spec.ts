@@ -10,6 +10,7 @@ import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { createRequire } from 'node:module'
 import { homedir, loadavg, tmpdir } from 'node:os'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { basename, join, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
@@ -96,7 +97,7 @@ const startProbe = async (socketPath: string) => {
       }
       await new Promise(resolveClose => server.close(() => resolveClose()))
       await rm(socketPath, { force: true })
-      const parsed = probeReadingSchema.safeParse(JSON.parse(output || 'null'))
+      const parsed = decodeJsonSafe(probeReadingSchema, output || 'null')
       return parsed.success ? parsed.data : { samples: 0, maxRttMs: -1, p99RttMs: -1, gapsOverBudget: -1 }
     },
   }

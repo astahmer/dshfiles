@@ -3,6 +3,7 @@ import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/c
 import type {} from '@deepseek-ai/dsh-client-resources/client'
 import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@dshfiles/input-trigger/client'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@dshfiles/session-controller/draft-client'
@@ -47,7 +48,7 @@ import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
-import { PALETTE_EVENT, PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
 import { SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
@@ -140,7 +141,9 @@ export default defineClient({
     'modules',
   ],
   // Every registered component reads Settings, so each one goes through decorate.
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) ctx.effect(() => PaletteBridge.connect(plugin), 'thread-sidebar: palette bridge')
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
     const syncPanels = (): void => {
       const next = ctx.slots
@@ -217,7 +220,7 @@ export default defineClient({
             const next = store.getSnapshot().searchRequest
             if (next === handled) return
             handled = next
-            window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } }))
+            PaletteBridge.open('threads')
           })
           return
         }
@@ -412,7 +415,7 @@ export default defineClient({
           for (const controller of pendingControllers) controller.abort()
           pendingControllers.clear()
         }
-      }, [props.inputActions, props.sessionId, translate])
+      }, [props.inputActions, props.sessionId])
 
       return (
         <>
@@ -632,7 +635,7 @@ export default defineClient({
               if (current.current.collapsed) current.current.toggleSidebar()
             },
             startSession: () => current.current.startSession(),
-            searchThreads: () => window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } })),
+            searchThreads: () => PaletteBridge.open('threads'),
             newThreadLabel: translate('threadSidebarNewThread'),
             searchThreadsLabel: translate('threadSidebarSearch'),
             sidebarSettingsLabel: translate('threadSidebarSettings'),
@@ -830,7 +833,11 @@ export default defineClient({
           const reference = ctx.sessions.retain(followUpSessionId, { source: 'threadSidebarFollowUp' })
           try {
             await reference.ready
-            ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: followUpPrompt(sessionId), clearPreviousDraft: true })
+            const threadLabel = ctx.sessions.list.getSnapshot().byId[sessionId]?.displayTitle ?? 'thread'
+            ctx.conversation.input.requestDraftInitialization(reference.binding, {
+              prompt: followUpPrompt(sessionId, threadLabel),
+              clearPreviousDraft: true,
+            })
           } catch (cause) {
             console.warn(`thread-sidebar: follow-up thread ${followUpSessionId} opened without its draft: ${String(cause)}`)
           } finally {
@@ -923,14 +930,16 @@ export default defineClient({
     )
     ctx.effect(
       () =>
-        PaletteApi.registerAction({
-          id: '@dshfiles/thread-sidebar/open-board',
-          label: () => translate('threadSidebarBoardTitle'),
-          aliases: ['thread board', 'board', 'kanban', 'columns'],
-          icon: <LayoutGridIcon className="dshx:size-4" />,
-          group: 'destination',
-          run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
-        }),
+        PaletteBridge.addActions([
+          {
+            id: '@dshfiles/thread-sidebar/open-board',
+            label: () => translate('threadSidebarBoardTitle'),
+            aliases: ['thread board', 'board', 'kanban', 'columns'],
+            icon: <LayoutGridIcon className="dshx:size-4" />,
+            group: 'destination',
+            run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
+          },
+        ]),
       'thread-sidebar: open the thread board',
     )
 

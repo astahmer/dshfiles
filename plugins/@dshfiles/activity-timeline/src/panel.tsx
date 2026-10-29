@@ -24,6 +24,9 @@ import type { ActivityTimelineTranslate } from './locales.js'
 const feedKey = ['activity-timeline', 'feed'] as const
 const statsKey = ['activity-timeline', 'stats'] as const
 
+/** A stable empty page, so a feed with nothing loaded keeps the merge memo from re-evaluating every render. */
+const NO_ITEMS: readonly CondensedItem[] = []
+
 const badgeVariant = (item: CondensedItem): 'default' | 'secondary' | 'outline' | 'destructive' => {
   if (item.level === 'attention') return 'destructive'
   if (item.source === 'integration') return 'default'
@@ -115,9 +118,9 @@ export const ActivityTimelinePanel = (props: {
         request: hostSignal =>
           api.page(
             {
-              ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-              ...(sources.length === 0 ? {} : { sources: [...sources] }),
-              ...(attentionOnly ? { levels: [...attentionLevels] } : {}),
+              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
+              ...(sources.length !== 0 && { sources: [...sources] }),
+              ...(attentionOnly && { levels: [...attentionLevels] }),
               detailed,
               limit: 80,
             },
@@ -141,9 +144,9 @@ export const ActivityTimelinePanel = (props: {
           api.page(
             {
               cursor,
-              ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-              ...(sources.length === 0 ? {} : { sources: [...sources] }),
-              ...(attentionOnly ? { levels: [...attentionLevels] } : {}),
+              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
+              ...(sources.length !== 0 && { sources: [...sources] }),
+              ...(attentionOnly && { levels: [...attentionLevels] }),
               detailed,
               limit: 80,
             },
@@ -191,7 +194,7 @@ export const ActivityTimelinePanel = (props: {
     },
     retry: false,
   })
-  const newestItems = feedQuery.data?.items ?? []
+  const newestItems = feedQuery.data?.items ?? NO_ITEMS
   const items = useMemo(() => {
     const merged = mergeFeedItems({ older, newest: newestItems, previous: mergedItems.current })
     mergedItems.current = merged

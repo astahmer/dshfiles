@@ -167,6 +167,12 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
   await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveValue('secret:DSH_TEST_JEV')
 })
 
+When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  await capture.fill('Capture screenshots with the issue\n\n@Image 1 @Image 2')
+  await capture.press('Enter')
+})
+
 When('two images are attached to the capture', async ({ page }: { page: Page }) => {
   const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
   const contentRegion = page.locator('[data-backlog-content-region]')
@@ -525,6 +531,13 @@ When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { pa
     .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
     .click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Start thread…', exact: true }).click()
+})
+
+Then('backlog item b:{int} offers tweet retrieval in its feed context menu', async ({ page }: { page: Page }, id: number) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await expect(contextMenu(page).getByRole('menuitem', { name: 'Retrieve tweet content', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
 })
 
 Then('backlog item b:{int} exposes all context actions in the {string} view', async ({ page }: { page: Page }, id: number, view: string) => {
@@ -1023,11 +1036,13 @@ Then('the backfill dialog explains that it runs Jev and the configured triage mo
   await finishJourneyAssertions(page)
 })
 
-Then('the captured backlog item keeps both image attachments', async ({ page }: { page: Page }) => {
+Then('the captured backlog item keeps both image attachments inline', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-rich-capture-images', async () => {
     await row(page, 'Capture screenshots with the issue').click()
-    await expect(peek(page).getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
-    await expect(peek(page).getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    const detail = peek(page)
+    await expect(detail.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    await expect(detail.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(detail).not.toContainText('@Image')
   })
   await finishJourneyAssertions(page)
 })
@@ -1077,8 +1092,13 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
   await page.keyboard.press('Enter')
   const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
   await expect(editor).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  await activity.getByRole('button', { name: 'Remove red.png', exact: true }).click()
+  await activity.locator('input[type="file"]').setInputFiles(join(attachmentFixtures, 'blue.png'))
+  await expect(activity.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
   await editor.fill('Edited reply')
   await editor.focus()
+  await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
   const save = activity.getByRole('button', { name: 'Save reply', exact: true })
   await expect(save).toBeFocused()
@@ -1086,10 +1106,11 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
   await expect(activity).toContainText('Edited reply')
 })
 
-Then('the edited reply keeps its attachment', async ({ page }: { page: Page }) => {
+Then('the edited reply has only its replacement attachment', async ({ page }: { page: Page }) => {
   const activity = peek(page).getByRole('list', { name: 'Activity' })
   await expect(activity).toContainText('Edited reply')
-  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
 })
 
 When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {

@@ -6,6 +6,7 @@ import { openMarkdownExternalLink, openMarkdownFileLink } from '../src/native/ch
 describe('Chat Markdown image links', () => {
   it('opens a resolvable local image link in the gallery', () => {
     const images: LightboxImage[] = []
+    const imagePaths: string[] = []
     const files: { readonly path: string; readonly options: OpenFileOptions | undefined }[] = []
 
     openMarkdownFileLink({
@@ -13,8 +14,9 @@ describe('Chat Markdown image links', () => {
       kind: 'image',
       options: undefined,
       resolveImage: path => `file-api:${path}`,
-      openImage: image => {
+      openImage: (image, path) => {
         images.push(image)
+        imagePaths.push(path)
       },
       openFile: (path, options) => {
         files.push({ path, options })
@@ -22,6 +24,7 @@ describe('Chat Markdown image links', () => {
     })
 
     expect(images).toEqual([{ src: 'file-api:/workspace/artifacts/chart.webp', alt: 'chart.webp' }])
+    expect(imagePaths).toEqual(['/workspace/artifacts/chart.webp'])
     expect(files).toEqual([])
   })
 

@@ -1,6 +1,7 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ActivityIcon,
   BookOpenIcon,
@@ -111,10 +112,10 @@ const EventRow = (props: { readonly event: MemoryEvent; readonly openThread: (id
   )
 }
 
-const PanelCard = (props: { readonly title: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
+const PanelCard = (props: { readonly heading: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/60 dshx:p-3">
     <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
-      <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
+      <h3 className="dshx:text-sm dshx:font-semibold">{props.heading}</h3>
       {props.description === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.description}</span>}
     </div>
     {props.children}
@@ -188,6 +189,7 @@ export const AnalyticsTab = (props: {
           </SelectContent>
         </Select>
       </div>
+      <TooltipProvider delayDuration={500}>
       <div className="dshx:grid dshx:grid-cols-5 dshx:gap-2 dshx:@max-pane-compact:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
         <StatCard
           label="Digest calls"
@@ -274,13 +276,14 @@ export const AnalyticsTab = (props: {
           spark={points.map(point => point.blockRequests)}
         />
       </div>
+      </TooltipProvider>
       <div className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
         <DigestActivityChart points={chartPoints} />
         <RetrievalChart points={chartPoints} />
         <CostChart points={chartPoints} />
       </div>
       <div className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-        <PanelCard title="Recall" description="How often retrieval returns useful results.">
+        <PanelCard heading="Recall" description="How often retrieval returns useful results.">
           <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:py-1">
             <div>
               <MetricBar
@@ -300,7 +303,7 @@ export const AnalyticsTab = (props: {
             </div>
           </div>
         </PanelCard>
-        <PanelCard title="Correctness" description="Signals about memory quality and corrections.">
+        <PanelCard heading="Correctness" description="Signals about memory quality and corrections.">
           <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1">
             <MetricBar
               label="Cited memories"
@@ -327,7 +330,7 @@ export const AnalyticsTab = (props: {
         </PanelCard>
       </div>
       <div className="dshx:grid dshx:grid-cols-[1.7fr_1fr] dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-        <PanelCard title="Recent events" description="Latest notable memory-related events.">
+        <PanelCard heading="Recent events" description="Latest notable memory-related events.">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
             {(['all', 'citation', 'digest', 'note'] as const).map(kind => (
               <Button key={kind} size="xs" variant={eventKind === kind ? 'secondary' : 'ghost'} onClick={() => setEventKind(kind)}>
@@ -355,7 +358,7 @@ export const AnalyticsTab = (props: {
             </table>
           </div>
         </PanelCard>
-        <PanelCard title="Top memories by usage" description="Most frequently retrieved.">
+        <PanelCard heading="Top memories by usage" description="Most frequently retrieved.">
           {topNotes.length === 0 ? <p className="dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No cited memory yet.</p> : null}
           <ol className="dshx:flex dshx:flex-col dshx:gap-2">
             {topNotes.map((note, index) => {

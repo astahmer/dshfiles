@@ -5,6 +5,7 @@ import {
   accountKindSchema,
   createSetupAccountInputSchema,
   configureAccountConnectionInputSchema,
+  forecastHistoryBatchInputSchema,
   prepareAccountConnectionInputSchema,
   type AccountDraft,
 } from './api.js'
@@ -88,6 +89,18 @@ describe('setup-account creation boundary', () => {
   it('rejects unsupported provider kinds', () => {
     expect(createSetupAccountInputSchema.safeParse({ kind: '../escape', requestId: '11111111-1111-4111-8111-111111111111' }).success).toBe(false)
   })
+})
+
+describe('forecast history batch boundary', () => {
+  it('accepts one or two distinct account ids', () => {
+    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work'] }).success).toBe(true)
+    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work', 'home'] }).success).toBe(true)
+  })
+
+  it.each([{ instanceIds: [] }, { instanceIds: [''] }, { instanceIds: ['work', 'work'] }, { instanceIds: ['a', 'b', 'c'] }, { instanceIds: ['x'.repeat(65)] }])(
+    'rejects invalid account batches',
+    input => expect(forecastHistoryBatchInputSchema.safeParse(input).success).toBe(false),
+  )
 })
 
 describe('account model labels', () => {

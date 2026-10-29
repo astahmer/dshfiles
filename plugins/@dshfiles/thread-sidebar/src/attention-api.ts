@@ -68,10 +68,22 @@ export const threadSidebarAttentionApi = defineApi({
       output: threadAttentionSnapshotSchema,
       description: 'Drop every attention record for one thread, as when the user opens it.',
     }),
+    clearUnreadMany: method({
+      input: z
+        .object({ entries: z.array(z.object({ sessionId: sessionIdSchema, version: z.number().int().positive() }).strict()).max(MAX_ATTENTION_SESSIONS) })
+        .strict(),
+      output: threadAttentionSnapshotSchema,
+      description: 'Drop the attention records for many threads in one request, without clearing records newer than the caller saw.',
+    }),
     markUnread: method({
       input: z.object({ sessionId: sessionIdSchema }).strict(),
       output: threadAttentionSnapshotSchema,
       description: 'Mark one thread unread by hand; the mark persists until the thread is opened or acknowledged.',
+    }),
+    markUnreadMany: method({
+      input: z.object({ sessionIds: z.array(sessionIdSchema).max(MAX_ATTENTION_SESSIONS) }).strict(),
+      output: threadAttentionSnapshotSchema,
+      description: 'Mark many threads unread by hand in one request; existing finish records are preserved.',
     }),
     migrate: method({
       input: z.object({ entries: z.array(threadAttentionMigrationEntrySchema).max(MAX_ATTENTION_SESSIONS) }).strict(),

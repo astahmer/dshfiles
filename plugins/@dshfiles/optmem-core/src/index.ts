@@ -19,6 +19,37 @@ export { Redaction } from './redaction.ts'
 export { Scopes } from './scopes.ts'
 export { StreamIds } from './stream-ids.ts'
 export { TreeMath } from './tree-math.ts'
-export type * from './types.ts'
+export type {
+  AppendedEvent,
+  Clock,
+  CursorName,
+  EventMeta,
+  EventRole,
+  MemoryAccess,
+  MemoryConfig,
+  MemoryEvent,
+  MemoryEventInput,
+  MemoryLogger,
+  MemoryNode,
+  MemoryScope,
+  MemorySearch,
+  MemoryStore,
+  NodeAddress,
+  NormalizedEvent,
+  SearchQuery,
+  Snapshot,
+  StoreSnapshot,
+  StoredSearchHit,
+  StreamEntry,
+  StreamEvent,
+  StreamId,
+  StreamSummary,
+  Summarizer,
+  SummaryRequest,
+  SummaryResult,
+  SummaryUsage,
+  ViewKind,
+  ViewState,
+} from './types.ts'
 export { Utf8 } from './utf8.ts'
 export { ViewMath } from './view-math.ts'

@@ -65,10 +65,12 @@ const setup = (options: { readonly markThread?: (sessionId: string) => Promise<b
   const alerts = openAlertStore({ path: ':memory:', now: () => clock.now })
   for (const builtin of alerts.rules()) alerts.remove(builtin.id)
   const marked: string[] = []
+  const running = new Set<string>()
   const engine = createAlertEngine({
     samples: traces,
     alerts,
     now: () => clock.now,
+    runningSessionIds: () => running,
     markThread:
       options.markThread ??
       (sessionId => {
@@ -76,7 +78,7 @@ const setup = (options: { readonly markThread?: (sessionId: string) => Promise<b
         return Promise.resolve(true)
       }),
   })
-  return { clock, traces, alerts, engine, marked }
+  return { clock, traces, alerts, engine, marked, running }
 }
 
 const failingMinute = (traces: ReturnType<typeof openTraceStore>, at: number): void => {
@@ -101,7 +103,7 @@ describe('alert engine', () => {
   })
 
   test('a long span counts in the window it ended in even when it started before it', async () => {
-    const { clock, traces, engine } = setup()
+    const { clock, traces, engine, running } = setup()
     engine.save({
       ...errorRule,
       name: 'Long turns',
@@ -110,6 +112,10 @@ describe('alert engine', () => {
       threshold: 15 * 60_000,
     })
     traces.ingest([span({ endMs: clock.now - 60_000, durationMs: 20 * 60_000, name: 'invoke_agent deepseek', sessionId: 'session-slow' })], retention)
+    expect((await engine.evaluate()).firing).toBe(0)
+    expect(engine.snapshot({ historyLimit: 10 }).rules[0]?.state).toMatchObject({ status: 'ok', sampleCount: 0 })
+
+    running.add('session-slow')
     expect((await engine.evaluate()).firing).toBe(1)
   })
 

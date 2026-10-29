@@ -1,30 +1,28 @@
 # pulls.review
 
-![Group a thread workspace's changes into review scopes](docs/screenshots/thread-review-scopes.png)
-
-Review this thread's changes the way [pulls.review](https://pulls.review) does:
-changed files grouped into scopes, one scope at a time, with review progress —
-inside DSH, for the thread's own jj workspace.
+Review a project's or workspace's changes the way [pulls.review](https://pulls.review) does:
+all changed-file diffs in one vertically scrollable view, grouped by scope and
+with per-file review progress — inside DSH.
 
 Open the reusable **pulls.review: Reviews** view from navigation or the Workbench chooser.
 
 ## What it does
 
-A thread works in its own jj workspace, so its changes are `jj diff --from
-<base> --to @`. The Host reads that patch and groups it with
+Choose any registered project or workspace in the panel, and optionally enter
+a base bookmark (the Host otherwise chooses `main`, `master` or `trunk`). Changes
+are read as `jj diff --from <base> --to @`. The Host reads that patch and groups it with
 [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
 rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
 `Dependencies` / `Generated` / `Other` here exactly as it does there.
 
-The panel shows the range and totals, a scope chip per group with its reviewed
-count, the selected scope's files with per-file `+/-` stats, and that scope's
-diff. Marking a file reviewed persists locally, keyed by workspace, base and
-working-copy revision, so a new revision — or a base that moved under the same
-`@` — starts fresh; the record keeps the 20 most recently touched scopes. A
-plain click on a file row still toggles that file; Shift-click extends a range
-and Cmd/Ctrl-click toggles the selection, and the scope header's checkbox plus
-the Mark selected action mark (or clear) the whole selection in one write.
+The panel shows the range and totals, then every changed-file diff in one
+scrollable view. Each diff header carries its scope and summary, and a per-file
+action marks that file reviewed. The review-wide selector can batch-mark files
+across scopes. Review marks persist locally, keyed by
+workspace, base and working-copy revision, so a new revision — or a base that
+moved under the same `@` — starts fresh; the record keeps the 20 most recently
+touched scopes.
 
 **Summarize** replaces the deterministic scope text with one model call over the
 whole diff, using the provider the thread last requested with and the first model

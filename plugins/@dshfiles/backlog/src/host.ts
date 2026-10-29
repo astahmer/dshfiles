@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { AttachmentId, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import type { PromptContentPart, SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
@@ -11,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import { agentsApi, type Agent } from '@dshfiles/agents/contract'
+import { tweetContextBacklogApi } from '@dshfiles/tweet-context/backlog-api'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { usageApi, type JevUsageRecord } from '@dshfiles/usage/api'
@@ -22,12 +24,14 @@ import { createHostApiClient } from '@dshfiles/dshx/host'
 import { AgentComments } from './agent-dispatch.js'
 import { BacklogStartContext } from './backlog-start-context.js'
 import { createAiActivityTracker } from './ai-activity.js'
-import { backlogApi } from './api.js'
+import { backlogApi, type BacklogDetailResult } from './api.js'
+import { BacklogTweetContext } from './backlog-tweet-context.js'
+import { BacklogTweetContextSpan } from './backlog-tweet-context-span.js'
 import { writeAttachmentFile } from './attachment-file.js'
 import { BacklogBackfill, type TriageOutcome } from './backfill.js'
 import { jevNeedsSecretSetup } from './jev-setup-status.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
-import type { BacklogEvent, BacklogItem } from './item.js'
+import { BacklogItems, type BacklogEvent, type BacklogFileInput, type BacklogItem } from './item.js'
 import { StartThreadForm, startThreadItemOf } from './start-thread.js'
 import { StartThreadPlacementPlan } from './start-thread-workspace.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
@@ -748,6 +752,95 @@ const startThreadForItems = async (
   return { sessionId, linked, missing }
 }
 
+const importTweetContext = async (input: {
+  readonly ctx: Context
+  readonly id: number
+  readonly url: string
+  readonly actor: BacklogActor
+}): Promise<BacklogDetailResult> =>
+  BacklogTweetContextSpan.run({
+    itemId: input.id,
+    work: async () => {
+      const store = await backlogFor(input.ctx)
+      const found = store.get(input.id)
+      if (!found.ok) return found
+      const item = found.value.item
+      const url = BacklogTweetContext.normalizeUrl(input.url)
+      if (url === undefined || !BacklogTweetContext.urls(`${item.title}\n${item.body}`).includes(url)) {
+        throw new PluginApiError('That public X post URL is not in the backlog item.', { code: 'tweet-url-not-in-item' })
+      }
+      if (item.tweetContextUrls?.includes(url)) return found
+      const tweetContext = createHostApiClient(input.ctx, tweetContextBacklogApi, '@dshfiles/backlog')
+      const retrieved = await tweetContext.safe.retrieve({ url })
+      if (!retrieved.ok) {
+        if (isApiOwnerMissing(retrieved.error)) {
+          throw new PluginApiError('Tweet Context is not available in this DSH profile.', { code: 'tweet-context-unavailable' })
+        }
+        throw new PluginApiError('The public tweet could not be retrieved.', { code: 'tweet-context-failed' })
+      }
+      const remainingAttachments = Math.max(0, BacklogItems.maxAttachments - item.attachments.length)
+      const files: BacklogFileInput[] = []
+      for (const image of retrieved.value.images.slice(0, remainingAttachments)) {
+        const attachment: ImageAttachmentRef = {
+          attachmentId: AttachmentId(image.attachmentId),
+          mediaType: image.mediaType,
+          bytes: image.bytes,
+          width: image.width,
+          height: image.height,
+          name: image.name,
+        }
+        const stored = await input.ctx.attachments.readImage(attachment)
+        if (stored.data.byteLength !== image.bytes) {
+          throw new PluginApiError('The retrieved tweet image failed its byte-count check.', { code: 'tweet-image-invalid' })
+        }
+        files.push({
+          id: randomUUID(),
+          kind: 'image' as const,
+          name: image.name,
+          mediaType: image.mediaType,
+          bytes: stored.data.byteLength,
+          width: image.width,
+          height: image.height,
+          data: Buffer.from(stored.data).toString('base64'),
+        })
+      }
+      const separatorLength = item.body === '' ? 0 : 2
+      const bodySection = BacklogTweetContext.section({
+        url,
+        posts: retrieved.value.posts,
+        room: BacklogItems.maxBodyChars - item.body.length - separatorLength,
+      })
+      if (bodySection === '') {
+        throw new PluginApiError('The backlog description has no room for tweet context. Shorten it before retrying.', {
+          code: 'tweet-description-full',
+        })
+      }
+      const imported = await store.importTweetContext({ id: item.id, url, bodySection, files, actor: input.actor })
+      return imported
+    },
+  })
+
+const activeTweetContextImports = new Set<string>()
+
+const scheduleTweetContextImport = (ctx: Context, id: number): void => {
+  void backlogFor(ctx)
+    .then(store => {
+      const found = store.get(id)
+      if (!found.ok) return
+      const item = found.value.item
+      const url = BacklogTweetContext.urlsForItem(item)[0]
+      if (url === undefined) return
+      const key = `${String(id)}:${url}`
+      if (activeTweetContextImports.has(key)) return
+      activeTweetContextImports.add(key)
+      void aiActivity
+        .track(() => importTweetContext({ ctx, id, url, actor: { kind: 'system' } }))
+        .catch(() => undefined)
+        .finally(() => activeTweetContextImports.delete(key))
+    })
+    .catch(() => undefined)
+}
+
 const backlogApiHost = backlogApi.host({
   list: async ({ ctx, input }) => (await backlogFor(ctx)).list(input),
   get: async ({ ctx, input }) => (await backlogFor(ctx)).get(input.id),
@@ -763,6 +856,7 @@ const backlogApiHost = backlogApi.host({
     if (project !== undefined) captureInput.project = project
     const detail = await (await backlogFor(ctx)).capture(captureInput)
     scheduleTriage(ctx, detail.item.id)
+    scheduleTweetContextImport(ctx, detail.item.id)
     return detail
   },
   triage: async ({ ctx, input }) => triageItem(ctx, input.id),
@@ -772,6 +866,7 @@ const backlogApiHost = backlogApi.host({
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),
   attachFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).attachFile({ id: input.id, file: input.file, actor: actorOf(caller) }),
+  enrichTweet: async ({ ctx, input, caller }) => importTweetContext({ ctx, id: input.id, url: input.url, actor: actorOf(caller) }),
   readFile: async ({ ctx, input }) => {
     const result = await (await backlogFor(ctx)).readFile(input)
     if (!result.ok || input.save !== true) return result
@@ -843,8 +938,16 @@ const backlogApiHost = backlogApi.host({
     }),
   transcribeSpeech: async ({ ctx, input, signal }) => aiActivity.track(() => transcribeSpeech(ctx, input.audioBase64, signal)),
 
-  update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),
-  link: async ({ ctx, input, caller }) => (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) }),
+  update: async ({ ctx, input, caller }) => {
+    const updated = await (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) })
+    if (updated.ok && (input.title !== undefined || input.body !== undefined)) scheduleTweetContextImport(ctx, input.id)
+    return updated
+  },
+  link: async ({ ctx, input, caller }) => {
+    const result = await (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) })
+    if (result.ok && input.link.type === 'url') scheduleTweetContextImport(ctx, input.id)
+    return result
+  },
   startThread: async ({ ctx, input, caller }) => startThreadForItems(ctx, input, caller),
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),
   editComment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).editComment({ ...input, actor: actorOf(caller) }),
@@ -868,7 +971,7 @@ const itemLifecycleSection = definePromptSection({
 
 export default defineHost({
   name: '@dshfiles/backlog',
-  inject: ['storageDomain', 'sessionController'],
+  inject: ['storageDomain', 'sessionController', 'attachments'],
   apis: [backlogApiHost],
   prompts: [itemLifecycleSection],
   settings: [ownedSettings],

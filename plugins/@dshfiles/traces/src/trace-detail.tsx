@@ -1,6 +1,7 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ChevronRightIcon, CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState } from 'react'
@@ -65,9 +66,12 @@ const SpanDetailPanel = (props: {
       <header className="dshx:flex dshx:flex-col dshx:gap-1">
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
           <ServiceDot service={span.service} error={span.status === 'error'} />
-          <h3 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold" title={span.name}>
-            {span.name}
-          </h3>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h3 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{span.name}</h3>
+            </TooltipTrigger>
+            <TooltipContent>{span.name}</TooltipContent>
+          </Tooltip>
         </div>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-xs">
           <Badge variant="outline">{span.service}</Badge>
@@ -76,9 +80,16 @@ const SpanDetailPanel = (props: {
           <span className="dshx:font-mono">{TraceFormat.duration(span.durationMs)}</span>
           <span className="dshx:text-muted-foreground">+{TraceFormat.duration(span.offsetMs)}</span>
           {costUsd === null ? null : (
-            <Badge variant="outline" className="dshx:font-mono" data-span-cost={costUsd} title={props.t('costHint')}>
-              {TraceFormat.usd(costUsd)}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="dshx:inline-flex">
+                  <Badge variant="outline" className="dshx:font-mono" data-span-cost={costUsd}>
+                    {TraceFormat.usd(costUsd)}
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{props.t('costHint')}</TooltipContent>
+            </Tooltip>
           )}
         </div>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -237,10 +248,15 @@ export const TraceDetailView = (props: {
                     <span className="dshx:size-4 dshx:shrink-0" aria-hidden />
                   )}
                   <ServiceDot service={span.service} error={span.status === 'error'} />
-                  <span className="dshx:min-w-0 dshx:truncate" title={`${span.service} · ${span.name}`}>
-                    <span className={cn(span.status === 'error' ? 'dshx:text-destructive' : '')}>{span.name}</span>
-                    <span className="dshx:ml-1 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{span.service}</span>
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="dshx:min-w-0 dshx:truncate">
+                        <span className={cn(span.status === 'error' ? 'dshx:text-destructive' : '')}>{span.name}</span>
+                        <span className="dshx:ml-1 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{span.service}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{`${span.service} · ${span.name}`}</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="dshx:relative dshx:h-4 dshx:rounded-sm dshx:bg-muted/30">
                   <div
