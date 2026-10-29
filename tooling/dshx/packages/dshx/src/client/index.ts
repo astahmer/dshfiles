@@ -70,6 +70,8 @@ export const constantSource = PluginContextModel.constant
 export const createSource = PluginContextModel.signal
 
 export { Command, Dialogs, Toasts } from './app-services.js'
+export { LinkHandler, MarkdownLinks } from './links.js'
+export type { LinkHandlerItem, LinkTarget } from './links.js'
 export type {
   AlertInput,
   AppearanceState,

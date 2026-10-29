@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 import { BrowserBroker, type Live, type Subscribable } from './broker.js'
 import { HostCommandsModel } from './host-commands.js'
+import { MarkdownLinks } from './links.js'
 import { LocaleNamespaceModel } from './locale.js'
 
 export interface ConfirmInput {
@@ -215,6 +216,8 @@ export interface SystemService {
   save(input: SaveFileInput): boolean
   /** Open an http(s) or mailto URL in a new browser tab; false for any other URL. */
   openExternal(url: string): boolean
+  /** Open a custom-scheme link (`jj:main`) through its `LinkHandler`, else as `openExternal`; false when neither can. */
+  openLink(href: string): boolean
 }
 
 const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
@@ -262,6 +265,7 @@ const system: SystemService = {
     window.open(url, '_blank', 'noopener,noreferrer')
     return true
   },
+  openLink: href => MarkdownLinks.open(href) || system.openExternal(href),
 }
 
 export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported'

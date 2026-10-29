@@ -40,6 +40,7 @@ const CLIENT_HOST_COMMANDS_PATH = fileURLToPath(new URL('../../client/host-comma
 const CLIENT_API_PATH = fileURLToPath(new URL('../../api/client.js', import.meta.url))
 const CLIENT_BROKER_PATH = fileURLToPath(new URL('../../client/broker.js', import.meta.url))
 const CLIENT_APP_SERVICES_PATH = fileURLToPath(new URL('../../client/app-services.js', import.meta.url))
+const CLIENT_LINKS_PATH = fileURLToPath(new URL('../../client/links.js', import.meta.url))
 const CLIENT_REGISTRIES_PATH = fileURLToPath(new URL('../../client/registries.js', import.meta.url))
 const CLIENT_STORE_PATH = fileURLToPath(new URL('../../client/store.js', import.meta.url))
 const CLIENT_HOOKS_PATH = fileURLToPath(new URL('../../client/hooks.js', import.meta.url))
@@ -177,6 +178,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const constantSource = PluginContextModel.constant',
           'export const createSource = PluginContextModel.signal',
           `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
+          `export { LinkHandler, MarkdownLinks } from ${JSON.stringify(CLIENT_LINKS_PATH)}`,
           `export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
           'export const defineStore = StoreModel.define',
