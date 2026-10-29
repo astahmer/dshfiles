@@ -1,3 +1,4 @@
+import { z } from 'zod/mini'
 import { BrowserBroker, type Live, type Subscribable } from './broker.js'
 import { HostCommandsModel } from './host-commands.js'
 import { LocaleNamespaceModel } from './locale.js'
@@ -302,21 +303,18 @@ const isNativeLocale = (value: unknown): value is NativeLocale =>
 const isNativeTheme = (value: unknown): value is NativeTheme =>
   typeof value === 'object' && value !== null && 'getTheme' in value && typeof value.getTheme === 'function'
 
-const activeLocaleOf = (snapshot: unknown): string | undefined =>
-  typeof snapshot === 'object' && snapshot !== null && 'active' in snapshot && typeof snapshot.active === 'string' && snapshot.active !== ''
-    ? snapshot.active
-    : undefined
+const LocaleSnapshot = z.object({ active: z.string().check(z.minLength(1)) })
+const ThemeSnapshot = z.object({
+  active: z.object({ colorScheme: z.enum(['light', 'dark']) }),
+  fontFamilies: z.object({ text: z.string(), code: z.string(), terminal: z.string() }),
+})
+const TextInfo = z.object({ direction: z.string() })
+
+const activeLocaleOf = (snapshot: unknown): string | undefined => LocaleSnapshot.safeParse(snapshot).data?.active
 
 const appearanceOf = (snapshot: unknown): AppearanceState | undefined => {
-  if (typeof snapshot !== 'object' || snapshot === null || !('active' in snapshot) || !('fontFamilies' in snapshot)) return undefined
-  const { active, fontFamilies } = snapshot
-  if (typeof active !== 'object' || active === null || !('colorScheme' in active)) return undefined
-  if (active.colorScheme !== 'light' && active.colorScheme !== 'dark') return undefined
-  if (typeof fontFamilies !== 'object' || fontFamilies === null || !('text' in fontFamilies) || !('code' in fontFamilies) || !('terminal' in fontFamilies))
-    return undefined
-  const { text, code, terminal } = fontFamilies
-  if (typeof text !== 'string' || typeof code !== 'string' || typeof terminal !== 'string') return undefined
-  return { colorScheme: active.colorScheme, fonts: { text, code, terminal } }
+  const theme = ThemeSnapshot.safeParse(snapshot).data
+  return theme === undefined ? undefined : { colorScheme: theme.active.colorScheme, fonts: theme.fontFamilies }
 }
 
 // Chromium and Firefox ship `getTextInfo()`; older engines and Node expose the `textInfo` getter instead.
@@ -325,7 +323,7 @@ const directionOf = (localeId: string): TextDirection => {
     const locale = new Intl.Locale(localeId)
     const info: unknown =
       'getTextInfo' in locale && typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : 'textInfo' in locale ? locale.textInfo : undefined
-    return typeof info === 'object' && info !== null && 'direction' in info && info.direction === 'rtl' ? 'rtl' : 'ltr'
+    return TextInfo.safeParse(info).data?.direction === 'rtl' ? 'rtl' : 'ltr'
   } catch {
     return 'ltr'
   }
