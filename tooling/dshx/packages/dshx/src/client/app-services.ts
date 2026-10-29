@@ -199,10 +199,73 @@ const createLayout = (layout: () => unknown): LayoutService => ({
   },
 })
 
+export interface SaveFileInput {
+  readonly name: string
+  readonly content: string | Blob
+  /** Media type of string content; `text/plain` by default. */
+  readonly type?: string
+}
+
+export interface SystemService {
+  /** Copy text through the Host clipboard; false when the browser refused. */
+  copy(text: string): Promise<boolean>
+  /** Download content as a file named `name`; false outside a browser page. */
+  save(input: SaveFileInput): boolean
+  /** Open an http(s) or mailto URL in a new browser tab; false for any other URL. */
+  openExternal(url: string): boolean
+}
+
+const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+const PRIMITIVES_MODULE = '@deepseek-ai/dsh-client-ui-primitives'
+
+// The Host's clipboard helper falls back to execCommand where navigator.clipboard is missing (plain-http remote pages).
+// The platform module is read through the Client module loader's `require` so the bundler leaves it alone.
+const hostClipboard = (text: string): Promise<boolean> | undefined => {
+  try {
+    const load = typeof require === 'function' ? require : undefined
+    const primitives: unknown = load?.(PRIMITIVES_MODULE)
+    if (typeof primitives !== 'object' || primitives === null || !('writeClipboard' in primitives) || typeof primitives.writeClipboard !== 'function') return undefined
+    return Promise.resolve(primitives.writeClipboard(text)).then(written => written === true)
+  } catch {
+    return undefined
+  }
+}
+
+// Revoking the object URL right after the click cancels the download in some browsers.
+const DOWNLOAD_URL_TTL_MS = 60_000
+
+const system: SystemService = {
+  copy: text =>
+    hostClipboard(text) ??
+    globalThis.navigator?.clipboard?.writeText(text).then(
+      () => true,
+      () => false,
+    ) ??
+    Promise.resolve(false),
+  save: input => {
+    if (typeof document === 'undefined') return false
+    const blob = typeof input.content === 'string' ? new Blob([input.content], { type: input.type ?? 'text/plain' }) : input.content
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = input.name
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_TTL_MS)
+    return true
+  },
+  openExternal: url => {
+    if (typeof window === 'undefined' || !URL.canParse(url) || !EXTERNAL_PROTOCOLS.has(new URL(url).protocol)) return false
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return true
+  },
+}
+
 export class AppServicesModel {
   static readonly dialogs = dialogs
   static readonly toast = toast
   static readonly browserDialogs = browserDialogs
   static readonly createCommands = createCommands
   static readonly createLayout = createLayout
+  static readonly system = system
 }

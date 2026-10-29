@@ -45,6 +45,7 @@ const services = {
   toast: AppServicesModel.toast,
   commands: AppServicesModel.createCommands(() => undefined),
   layout: AppServicesModel.createLayout(() => undefined),
+  system: AppServicesModel.system,
 }
 
 const createPlugin = (
@@ -287,6 +288,49 @@ describe('services', () => {
     const provider = createPlugin('@test/dialogs')
     provider.plugin.provide(Dialogs, provided)
     expect(await createPlugin('@test/owner').plugin.dialogs.confirm({ title: 'Sure?' })).toBe(true)
+  })
+})
+
+describe('system', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('copies through the clipboard and reports a refused write', async () => {
+    const writeText = vi.fn(async (_text: string) => {})
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    expect(await AppServicesModel.system.copy('b:12')).toBe(true)
+    expect(writeText).toHaveBeenCalledWith('b:12')
+    writeText.mockRejectedValueOnce(new Error('denied'))
+    expect(await AppServicesModel.system.copy('b:12')).toBe(false)
+  })
+
+  it('downloads string content under the given name', () => {
+    const link = { href: '', download: '', click: vi.fn() }
+    const blobs: Blob[] = []
+    vi.stubGlobal('document', { createElement: () => link })
+    const createObjectURL = (blob: Blob): string => {
+      blobs.push(blob)
+      return 'blob:report'
+    }
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() })
+    expect(AppServicesModel.system.save({ name: 'report.json', content: '{}', type: 'application/json' })).toBe(true)
+    expect(link).toMatchObject({ href: 'blob:report', download: 'report.json' })
+    expect(link.click).toHaveBeenCalledTimes(1)
+    expect(blobs[0]?.type).toBe('application/json')
+  })
+
+  it('opens only http(s) and mailto URLs, without an opener', () => {
+    const open = vi.fn()
+    vi.stubGlobal('window', { open })
+    expect(AppServicesModel.system.openExternal('javascript:alert(1)')).toBe(false)
+    expect(AppServicesModel.system.openExternal('file:///etc/passwd')).toBe(false)
+    expect(AppServicesModel.system.openExternal('not a url')).toBe(false)
+    expect(open).not.toHaveBeenCalled()
+    expect(AppServicesModel.system.openExternal('https://example.test/docs')).toBe(true)
+    expect(AppServicesModel.system.openExternal('mailto:team@example.test')).toBe(true)
+    expect(open.mock.calls).toEqual([
+      ['https://example.test/docs', '_blank', 'noopener,noreferrer'],
+      ['mailto:team@example.test', '_blank', 'noopener,noreferrer'],
+    ])
   })
 })
 

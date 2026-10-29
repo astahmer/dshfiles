@@ -1,4 +1,4 @@
-import type { CommandsService, DialogsService, LayoutService, ToastsService } from './app-services.js'
+import type { CommandsService, DialogsService, LayoutService, SystemService, ToastsService } from './app-services.js'
 import { BrowserBroker, type ContractToken, type Live, type RegistryToken, type Subscribable } from './broker.js'
 
 /** Reads a source and recomputes the calling item whenever that source changes. */
@@ -46,6 +46,8 @@ export interface PluginServices {
   readonly toast: ToastsService
   readonly commands: CommandsService
   readonly layout: LayoutService
+  /** Copy, save a file, open an external URL. */
+  readonly system: SystemService
 }
 
 /** The per-plugin surface every contribution goes through. */

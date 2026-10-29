@@ -133,6 +133,7 @@ is no longer current.
 | `api.toast.show(input)` | a toast through the `Toasts` contract; logged while no provider runs |
 | `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run |
 | `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()` |
+| `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab; each resolves or returns false when the browser cannot |
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.
 

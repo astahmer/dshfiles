@@ -49,6 +49,7 @@ const createPluginRuntime = (input: {
       toast: AppServicesModel.toast,
       commands: AppServicesModel.createCommands(() => input.ctx.get('shortcuts')),
       layout: AppServicesModel.createLayout(() => input.ctx.get('layout')),
+      system: AppServicesModel.system,
     },
   })
   return { plugin, decorate }
