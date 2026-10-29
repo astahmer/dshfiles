@@ -3,7 +3,7 @@
 ## Context
 
 - DSH [AI Accounts](../plugins/@dshfiles/ai-accounts/README.md) stores provider quota windows and reset snapshots; it is not request-token history.
-- DSH [Usage](../plugins/@dshfiles/usage/README.md) already owns DSH request analytics and Host-side SQLite, but it is not included in the current [web profile](../profiles/web/package.json#L44-L84).
+- DSH [Usage](../plugins/@dshfiles/usage/README.md) already owns DSH request analytics and Host-side SQLite, and is in the [web profile](../profiles/web/package.json).
 - [TokiToki](https://github.com/astahmer/tokitoki) already provides local multi-harness usage reports. Its current MCP also exposes prompt-derived session search/detail; its public package/license contract is unclear. Cursor/T3 counts may be estimates, not exact usage.
 - Codex rollout and OpenCode local stores are possible best-effort sources; Claude's official OTel request events are forward-only; Cursor has no documented local token schema. See [Codex rollout source](https://github.com/openai/codex/blob/main/codex-rs/rollout/src/lib.rs), [OpenCode schema](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/sql.ts), and [Claude OTel event](https://code.claude.com/docs/en/monitoring-usage#api-request-event).
 
@@ -116,7 +116,7 @@ Store only allowlisted counts, model, time, source label, dedupe hash, and cost 
 3. Confirm TokiToki license and versioned usage-only contract; do not embed, fork, or expose session-search tools without both.
 4. Define the Usage external-source DTO, separate storage, dedupe key, version detection, scan bounds, retention, and source status.
 5. Implement one approved adapter with synthetic fixtures; keep Codex/OpenCode support explicitly best-effort unless completeness is proven.
-6. Add the External Usage view and source setup/status UI; enable Usage in a probe profile before considering the web profile.
+6. Add the External Usage view and source setup/status UI.
 7. Verify no prompt-derived text/path crosses persistence, API, logs, errors, or UI; verify quota and cost provenance remain separate.
 
 ## Open questions

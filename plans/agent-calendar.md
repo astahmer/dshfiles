@@ -3,7 +3,7 @@
 ## Context
 
 - BB's third-party Agent Calendar measures turn intervals, merges turns across a configurable idle gap, and provides calendar/project/timesheet CSV views. It reports wall-clock agent time, not tokens or billable compute: [listing](https://getbb.app/marketplace/agent-calendar), [README](https://raw.githubusercontent.com/charpeni/bb-plugins/main/plugins/agent-calendar/README.md).
-- DSH [Activity Timeline](../plugins/@dshfiles/activity-timeline/README.md#L62-L71) is lifecycle-level, not a turn calendar. DSH [Usage](../plugins/@dshfiles/usage/README.md#L3-L39) owns request token/cost analytics but is not in the current [web profile](../profiles/web/package.json#L44-L86).
+- DSH [Activity Timeline](../plugins/@dshfiles/activity-timeline/README.md#L62-L71) is lifecycle-level, not a turn calendar. DSH [Usage](../plugins/@dshfiles/usage/README.md#L3-L39) owns request token/cost analytics and is in the [web profile](../profiles/web/package.json).
 - Host `sessionQuery` can list the complete logical Session corpus and read replay-validated event logs; DSH turn markers carry `turn/start` and `turn/end`. `session/event` provides committed events. Existing Session metadata includes parent/origin lineage but no definitive hidden/background visibility flag.
 - Adjacent competitors are not equivalent: [TokiToki](https://github.com/astahmer/tokitoki) focuses on normalized token/cost/quota/request analytics; [OpenUsage.ai](https://www.openusage.ai/) focuses on limits/cost, not turn-time timesheets.
 
@@ -17,7 +17,7 @@ Add a Calendar tab inside existing Usage rather than a standalone plugin. Projec
 
 ## Why
 
-The user's Agent Calendar interest is “when and how long did agents run?” DSH already stores turn markers and offers a Host query seam, so a local projection is feasible without a core API addition. Reusing Usage avoids another analytics owner; adoption requires enabling Usage separately.
+The user's Agent Calendar interest is “when and how long did agents run?” DSH already stores turn markers and offers a Host query seam, so a local projection is feasible without a core API addition. Reusing Usage avoids another analytics owner.
 
 ## How
 
@@ -106,13 +106,12 @@ Store only derived Session/turn IDs, seqs, timestamps, outcome, project/cwd labe
 
 ## Implementation steps
 
-1. Confirm Usage is the desired analytics home; test in a probe profile because it is not currently bundled in Web.
+1. Confirm Usage is the desired analytics home.
 2. Implement and test a pure turn-pair fold: duplicate/out-of-order events, missing end, aborted/error outcomes, invalid timestamps, and child lineage.
 3. Add separate `turn_intervals` storage, bounded `sessionQuery` backfill/reconciliation, and idempotent `session/event` updates.
 4. Expose validated range/summary APIs only; keep raw logs and event bodies Host-side.
 5. Add Calendar/agenda UI, project/date filters, child toggle, merge-gap/rounding controls, Session navigation, and CSV.
 6. Verify archived/deleted reconciliation, timezone/DST behavior, duplicate delivery, privacy, and large-corpus latency in scratch DSH.
-7. Propose enabling Usage in Web only after probe and explicit profile approval.
 
 ## Open questions
 
