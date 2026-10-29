@@ -5,7 +5,7 @@
     {
       "id": "send-after-upload",
       "title": "Send when the attachment upload finishes",
-      "summary": "Enter, or a press on the disabled Send button, while a file attachment is still uploading queues the send behind a 'Sending when upload finishes\u2026' banner with Cancel. Editing the text or the attachments, Escape or Cancel drops it; it sends on its own once every upload is ready.",
+      "summary": "Enter, or a press on the disabled Send button, while a file attachment is still uploading queues the send behind a 'Sending when upload finishes\u2026' composer pill whose menu has Cancel. Editing the text or the attachments, Escape or Cancel drops it; it sends on its own once every upload is ready.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["idle", "waiting", "sending", "failed"],

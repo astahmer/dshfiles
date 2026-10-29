@@ -2,11 +2,10 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ComposerPill, defineClient } from '@dshfiles/dshx/client'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { useSelector } from '@dshfiles/plugin-ui/machine'
-import { disposeSessionComposers, sessionComposer, type SessionComposer } from './session-composer.js'
+import { useCallback, useSyncExternalStore } from 'react'
+import { disposeSessionComposers, sessionComposer } from './session-composer.js'
 import { SEND_AFTER_UPLOAD_LOCALE_NAMESPACE, sendAfterUploadLocale } from './locales.js'
 
 const isSessionId = (value: string): value is SessionId => value.length > 0
@@ -25,44 +24,11 @@ const isDisabledSendButton = (target: EventTarget | null): boolean => {
   return button !== null && button.disabled && /(?:^|\s)\S*_primary(?:\s|$)/u.test(button.className)
 }
 
-const PendingSendBanner = (props: {
-  readonly composer: SessionComposer
-  readonly t: (key: 'waiting' | 'cancel' | 'dismiss' | `failed.${'upload' | 'timeout' | 'send'}`) => string
-}) => {
-  const state = useSelector(
-    props.composer.actor,
-    snapshot => ({
-      waiting: snapshot.matches('waiting') || snapshot.matches('sending'),
-      failure: snapshot.matches('failed') ? snapshot.context.failure : null,
-    }),
-    (left, right) => left.waiting === right.waiting && left.failure === right.failure,
-  )
-  if (!state.waiting && state.failure === null) return null
-  return (
-    <div
-      role="status"
-      data-testid="dshfiles-pending-send"
-      className="dshx-root dshx:mx-auto dshx:mb-1 dshx:flex dshx:w-full dshx:max-w-3xl dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground"
-    >
-      {state.waiting ? <Spinner className="dshx:size-3.5" /> : null}
-      <span className="dshx:flex-1">{state.failure === null ? props.t('waiting') : props.t(`failed.${state.failure}`)}</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="dshx:h-6 dshx:px-2 dshx:text-xs"
-        onClick={() => props.composer.actor.send({ type: state.waiting ? 'cancel' : 'dismiss' })}
-      >
-        {state.waiting ? props.t('cancel') : props.t('dismiss')}
-      </Button>
-    </div>
-  )
-}
-
 export default defineClient({
   name: '@dshfiles/send-after-upload',
   locales: [sendAfterUploadLocale],
   inject: ['slots', 'sessions'],
-  setup(ctx, decorate) {
+  setup(ctx, _decorate, metadata) {
     const t = ctx.locale.bind(SEND_AFTER_UPLOAD_LOCALE_NAMESPACE)
 
     const requestSend = (event: Event, sessionId: SessionId, root: Element): void => {
@@ -110,13 +76,27 @@ export default defineClient({
       }
     }, 'dshfiles-send-after-upload: composer Enter and Send while uploading')
 
-    ctx.slots.inject('conversation.input.dock', () =>
-      ctx.slots.register(
-        { name: 'conversation.input.dock', id: 'dshfiles-pending-send', order: 5, inject: sessionId => ({ composer: sessionComposer(ctx, sessionId) }) },
-        decorate((props: { readonly composer: SessionComposer | undefined }) =>
-          props.composer === undefined ? null : <PendingSendBanner composer={props.composer} t={t} />,
-        ),
-      ),
-    )
+    metadata?.plugin?.add(ComposerPill, {
+      id: 'dshfiles-pending-send',
+      order: 5,
+      usePill: session => {
+        const composer = isSessionId(session.sessionId) ? sessionComposer(ctx, session.sessionId) : undefined
+        const subscribe = useCallback((listener: () => void) => composer?.actor.subscribe(listener).unsubscribe ?? (() => {}), [composer])
+        const snapshot = useSyncExternalStore(subscribe, () => composer?.actor.getSnapshot())
+        if (composer === undefined || snapshot === undefined) return undefined
+        const waiting = snapshot.matches('waiting') || snapshot.matches('sending')
+        const failure = snapshot.matches('failed') ? snapshot.context.failure : null
+        if (!waiting && failure === null) return undefined
+        return {
+          label: failure === null ? t('waiting') : t(`failed.${failure}`),
+          ...(waiting && { icon: <Spinner className="dshx:size-3.5" /> }),
+          menu: [
+            waiting
+              ? { id: 'cancel', title: t('cancel'), run: () => composer.actor.send({ type: 'cancel' }) }
+              : { id: 'dismiss', title: t('dismiss'), run: () => composer.actor.send({ type: 'dismiss' }) },
+          ],
+        }
+      },
+    })
   },
 })

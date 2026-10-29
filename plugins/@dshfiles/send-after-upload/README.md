@@ -1,8 +1,8 @@
 # @dshfiles/send-after-upload
 
 Native DSH refuses Enter while a file attachment uploads (a "still uploading"
-toast) and disables Send. This plugin queues the send instead: a banner above
-the composer reads "Sending when upload finishes…" with Cancel, and the
+toast) and disables Send. This plugin queues the send instead: a pill above
+the composer reads "Sending when upload finishes…" with Cancel in its menu, and the
 message sends by itself once every upload is ready.
 
 - **Hook:** a window `keydown` capture listener runs before the editor's own
