@@ -113,6 +113,14 @@ keeps its bare imports external, and fails when the subpath is missing. Never
 point a runtime export at raw TypeScript source, and never restate another
 plugin's API schemas locally: both make the contract drift silently.
 
+**Plugin dependencies point one way.** When plugin A shows something plugin B
+produces, A (the owner of the screen or slot) declares a `defineContract` or
+`defineRegistry` token as a dshx module and B, which already depends on A,
+provides it; A renders nothing when B is absent. Add a separate integration
+plugin only when the integration is large and both sides must work without it.
+Never close a cycle with an optional peer dependency: `pnpm check:cycles` fails
+on any cycle. See [plugin boundaries](docs/plugin-boundaries.md).
+
 ## Never restart the running DSH instance
 
 Never kill or restart the live instance: other agents may be mid-turn.
