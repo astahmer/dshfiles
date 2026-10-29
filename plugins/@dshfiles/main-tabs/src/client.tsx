@@ -32,6 +32,8 @@ import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, StripMount } from './st
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
 import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
 import { createWorkbenchTabsPublication } from './workbench-tabs-publication.js'
+import { createMainTabsService } from './main-tabs-service.js'
+import { MainTabs } from './tabs-contract.js'
 import { requestThreadAside } from './thread-aside.js'
 import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
@@ -110,7 +112,7 @@ export default defineClient({
   name: '@dshfiles/main-tabs',
   locales: [mainTabsLocale],
   inject: ['slots', 'layout', 'sessions', 'uiSession', 'workspaces', 'uiWorkspace', 'shortcuts', 'remote', 'remote.session'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(MAIN_TABS_LOCALE_NAMESPACE)
     const mainSurface = ctx.get('mainSurface')
 
@@ -275,12 +277,14 @@ export default defineClient({
       actor.send(event)
       if (event.type === 'tab.select') selectThreadTab(event.tabId)
     }
+    const tabsEnabled = (): boolean => actor.getSnapshot().matches('on')
+    const currentSet = () => {
+      const snapshot = actor.getSnapshot()
+      return snapshot.context.sets[snapshot.context.scopeKey]
+    }
     const workbenchActions = createWorkbenchTabsActions({
-      enabled: () => actor.getSnapshot().matches('on'),
-      currentSet: () => {
-        const snapshot = actor.getSnapshot()
-        return snapshot.context.sets[snapshot.context.scopeKey]
-      },
+      enabled: tabsEnabled,
+      currentSet,
       send: sendStripEvent,
       reselect: selectThreadTab,
       dockAside: WorkbenchTabDocking.request,
@@ -311,6 +315,15 @@ export default defineClient({
       () => ctx.uiSession.adapter.current.getSnapshot().key,
     )
     ctx.effect(() => connectWorkbenchTabs(publication.provider), 'main-tabs: workbench semantics provider')
+    metadata?.plugin?.provide(
+      MainTabs,
+      createMainTabsService({
+        provider: publication.provider,
+        enabled: tabsEnabled,
+        currentSet,
+        isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
+      }),
+    )
 
     const subscribeMainSurface = (listener: () => void): (() => void) => mainSurface?.subscribe(listener) ?? (() => undefined)
     const mainSurfaceMode = () => mainSurface?.mode() ?? 'native'
