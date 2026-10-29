@@ -113,35 +113,59 @@ All scaffold targets accept `--file`, `--dry-run`, and `--json`. They generate s
 ### `dshx add <package>`: install a plugin into a profile
 
 ```bash
-dshx add <package|path> [--profile <name>] [--option key=value ...] [--home <dir>] [--dry-run] [--json]
+dshx add <package[@version]|path> [--profile <name>] [--option key=value ...] [--home <dir>] [--dry-run] [--json]
 ```
 
-Any operand that is not a scaffold target installs one plugin into a DSH profile in one step:
+Any operand that is not a scaffold target installs one plugin into a DSH profile in one step. One package carries every half of a plugin: its Host entry, its Client entry and the contract modules other plugins import install together, and the plan lists them as `parts` (`host, client, ./tabs-contract`).
 
-- An owned bundle (`@dshfiles/<name>`, or a path to `plugins/@dshfiles/<name>`) is linked and installed with `scripts/profile-sync.ts --bundle <name>`, the same path as `pnpm profile:sync --bundle`. A registry package goes through `dsh plugin --profile <name> add <package>`. Either step is skipped when the profile already lists the package.
+- An owned bundle (`@dshfiles/<name>`, or a path to `plugins/@dshfiles/<name>`) is linked and installed with `scripts/profile-sync.ts --bundle <name>`, the same path as `pnpm profile:sync --bundle`. It follows this checkout, so it takes no version.
+- Any other plugin directory (a path, optionally written `link:<path>`) goes through `dsh plugin --profile <name> add link:<absolute path>`. The directory's `package.json` must declare `dsh.bundle`; otherwise DSH would install it as a plain dependency, so `dshx add` refuses it.
+- A registry package goes through `dsh plugin --profile <name> add <package>`, pinned when the spec names a version or range (`dsh-plugin-example@1.2.0`, `@scope/name@^1`). DSH checks the named version's compatibility before pnpm runs. A listed package whose installed version satisfies the requested range is left alone.
 - Each `--option key=value` (value parsed as a YAML scalar) merges into the plugin's Loader row config in the profile's `cordis.patch.yml`. The row id is read from the bundle's own `cordis.patch.yml` insert (the scope-kept slug, e.g. `dshfiles-shortcuts`). A patch entry replaces the row's whole `config`, so a new override starts from the bundle's row config; an existing override keeps its other keys. Comments and `!!js` values elsewhere in the patch are preserved.
-- Options are validated against the `Config` the plugin's built Host entry exports (Standard Schema, or a callable Schemastery schema) before anything is installed. When the entry is not built or exports none, options pass through with a warning.
+- Options are validated against the `Config` the plugin's built Host entry exports (Standard Schema, or a callable Schemastery schema). A local package is validated before anything is installed; a registry package once it is installed. When the entry is not built or exports none, options pass through with a warning.
 - Client `dsh.client.inject` edges come from the bundle's own manifest; the plan lists them.
 
-The plan names every command and file. Running it twice changes nothing and reports `up to date`. Any change needs **Restart the DSH host process**, which `dshx add` never does. `--profile` defaults to `probe`; `web` is only touched when named explicitly. A missing profile, an unknown `@dshfiles/*` package and options the schema rejects exit 1; usage errors exit 2.
+The plan names every command and file. Running it twice changes nothing and reports `up to date`. Any change needs **Restart the DSH host process**, which `dshx add` never does. `--profile` defaults to `probe`; `web` is only touched when named explicitly. A missing profile, an unknown `@dshfiles/*` package, a version on an owned bundle, a directory without `dsh.bundle` and options the schema rejects exit 1; usage errors exit 2.
+
+### `dshx update` and `dshx remove`: the rest of a plugin's lifecycle
+
+```bash
+dshx update <package[@version]> [--latest] [--profile <name>] [--home <dir>] [--dry-run] [--json]
+dshx remove <package> [--profile <name>] [--home <dir>] [--dry-run] [--json]
+```
+
+Both read where the plugin came from out of the profile manifest and print the same plan as `dshx add`, with `version before → after`:
+
+- `update` moves a registry package within its declared range (`dsh plugin update <package>`), past it with `--latest` (`dsh plugin update --latest <package>`), or to the version you name (`dsh plugin add <package>@<version>`, compatibility-checked by DSH first). An owned bundle linked to another checkout is relinked to this one with profile-sync; one already linked here is up to date. A plugin linked from another directory loads what is built there, so `update` only says to rebuild it in place. A plugin the profile does not list exits 1 and names the `dshx add` to run.
+- `remove` runs `dsh plugin --profile <name> remove <package>`, which drops the dependency and its `dsh.profile.bundles` entry, then removes the plugin's row override from `cordis.patch.yml` so the patch does not target a row nothing inserts. A second run reports `up to date`. When the repository's checked-in seed for that profile still lists the plugin, the plan warns that the next profile-sync adds it back.
+
+Neither restarts DSH; a change needs **Restart the DSH host process**. These are profile-file commands and need no running DSH; `dshx plugins` and `dshx bundles` change the running Host instead.
+
+### `dshx publish --dry-run`: check a registry release without uploading
+
+```bash
+dshx publish --dry-run
+```
+
+Runs `dshx package`'s build and package-target checks, then npm's real pack list (`npm pack --dry-run`), and checks what a registry install needs: no `"private": true` (`DSHX6405`), a semver `version` (`DSHX6406`), no `link:`/`file:` dependency (`DSHX6407` error; `workspace:`/`catalog:` is a `DSHX6407` warning because only `pnpm publish` rewrites them), and a `license` (`DSHX6408` warning). It prints the tarball name and file count it would publish, writes no tarball and never uploads. Without `--dry-run` it exits 2: dshx has no upload step, so a release is `npm publish` (or `pnpm publish`) of a package that passed this check.
 
 ## Shared options
 
-| Option                | Commands                                   | Effect                                                                    |
-| --------------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
-| `--cwd <path>`        | project commands; sessions create/start    | Resolve another project or create a Session in a working directory        |
-| `--verbose`           | all                                        | Include underlying provider/process causes                                |
-| `--json`              | check, inspect, add, DSH platform commands | Stable machine-readable output                                            |
-| `--quiet`             | all                                        | Suppress human success output; preserve JSON and errors                   |
-| `--no-color`          | all                                        | Disable terminal styling                                                  |
-| `--url <launch-url>`  | DSH platform commands                      | Override `DSHX_URL` for this invocation                                   |
-| `--title <title>`     | sessions start                             | Name the new Session; otherwise the Host titles it from its first message |
-| `--runtime`           | check                                      | Enable Profile/Composition/runtime validation                             |
-| `--fix`               | check                                      | Apply deterministic manifest repairs                                      |
-| `--dry-run`           | check --fix, add                           | Produce a plan/diff without writing                                       |
-| `--open`              | dev                                        | Open the development URL                                                  |
-| `--port <0-65535>`    | dev                                        | Select the DSH Web port; `0` allocates one                                |
-| `--help`, `--version` | all                                        | Print CLI metadata                                                        |
+| Option                | Commands                                                   | Effect                                                                    |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `--cwd <path>`        | project commands; sessions create/start                    | Resolve another project or create a Session in a working directory        |
+| `--verbose`           | all                                                        | Include underlying provider/process causes                                |
+| `--json`              | check, inspect, add, update, remove, DSH platform commands | Stable machine-readable output                                            |
+| `--quiet`             | all                                                        | Suppress human success output; preserve JSON and errors                   |
+| `--no-color`          | all                                                        | Disable terminal styling                                                  |
+| `--url <launch-url>`  | DSH platform commands                                      | Override `DSHX_URL` for this invocation                                   |
+| `--title <title>`     | sessions start                                             | Name the new Session; otherwise the Host titles it from its first message |
+| `--runtime`           | check                                                      | Enable Profile/Composition/runtime validation                             |
+| `--fix`               | check                                                      | Apply deterministic manifest repairs                                      |
+| `--dry-run`           | check --fix, add, update, remove, publish                  | Produce a plan/diff without writing                                       |
+| `--open`              | dev                                                        | Open the development URL                                                  |
+| `--port <0-65535>`    | dev                                                        | Select the DSH Web port; `0` allocates one                                |
+| `--help`, `--version` | all                                                        | Print CLI metadata                                                        |
 
 ## DSH platform control plane
 

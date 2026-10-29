@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runAddPluginCli } from '../src/cli/add-plugin.js'
+import { runProfilePluginCli } from '../src/cli/add-plugin.js'
+import type { DshCommandRunner } from '../src/profile/types.js'
 import { runCli } from '../src/cli/run.js'
 
 const writeFile = (path: string, content: string): void => {
@@ -42,7 +43,7 @@ describe('dshx add <package>', () => {
   })
   const addFixture = async (...argv: string[]) => {
     const run = capture()
-    const status = await runAddPluginCli(['@dshfiles/fixture-plugin', '--home', home, ...argv], run.io, { pluginsRoot })
+    const status = await runProfilePluginCli('add', ['@dshfiles/fixture-plugin', '--home', home, ...argv], run.io, { pluginsRoot })
     return { status, output: run.output(), errors: run.errors() }
   }
 
@@ -91,7 +92,7 @@ describe('dshx add <package>', () => {
     const status = await runCli(['add', '@dshfiles/goal-stall-guard', '--home', home, '--option', 'stallThreshold=5', '--dry-run'], { io: run.io })
     expect(run.errors()).toBe('')
     expect(status).toBe(0)
-    expect(run.output()).toContain('@dshfiles/goal-stall-guard → profile probe (dry run)')
+    expect(run.output()).toContain('add @dshfiles/goal-stall-guard → profile probe (dry run)')
     expect(run.output()).toContain('row        dshfiles-goal-stall-guard')
     expect(run.output()).toMatch(/run {8}\S+ \S+scripts\/profile-sync\.ts --profile probe --home \S+ --bundle @dshfiles\/goal-stall-guard/)
     expect(run.output()).toContain('config     {"stallThreshold":5}')
@@ -158,6 +159,13 @@ describe('dshx add <package>', () => {
       expect(readProfile()).toEqual(before)
     })
 
+    it('has nothing to update while the bundle is linked to this checkout', async () => {
+      const run = capture()
+      expect(await runProfilePluginCli('update', ['@dshfiles/fixture-plugin', '--home', home], run.io, { pluginsRoot })).toBe(0)
+      expect(run.output()).toContain('up to date; nothing to restart')
+      expect(run.output()).not.toContain('run ')
+    })
+
     it('passes options through with a warning when the schema is unreadable', async () => {
       rmSync(join(fixtureRoot, 'dist'), { recursive: true })
       const result = await addFixture('--option', 'threshold=many')
@@ -188,5 +196,143 @@ describe('dshx add <package>', () => {
     const run = capture()
     await runCli(['add', 'tool', '--help'], { io: run.io })
     expect(run.output()).not.toContain('install one plugin into a DSH profile')
+  })
+
+  describe('versions, local packages, update and remove', () => {
+    let calls: string[][]
+    /** Stands in for the external `dsh plugin` CLI: applies the pnpm verb to the profile manifest the way DSH reconciles it. */
+    const fakeDsh: DshCommandRunner = async args => {
+      calls.push([...args])
+      const [, , , verb, ...rest] = args
+      const profileManifest = JSON.parse(readFileSync(join(profileRoot, 'package.json'), 'utf8'))
+      const spec = rest.at(-1) ?? ''
+      const versioned = /^((?:@[^/@]+\/)?[^@]+)@(.+)$/u.exec(spec)
+      const name = spec.startsWith('link:') ? JSON.parse(readFileSync(join(spec.slice(5), 'package.json'), 'utf8')).name : (versioned?.[1] ?? spec)
+      if (verb === 'remove') {
+        delete profileManifest.dependencies[name]
+        profileManifest.dsh.profile.bundles = profileManifest.dsh.profile.bundles.filter((bundle: string) => bundle !== name)
+      } else {
+        const version = verb === 'update' ? '1.5.0' : (versioned?.[2] ?? '1.0.0')
+        profileManifest.dependencies[name] = spec.startsWith('link:') ? spec : `^${version}`
+        if (!profileManifest.dsh.profile.bundles.includes(name)) profileManifest.dsh.profile.bundles.push(name)
+        if (!spec.startsWith('link:')) writeFile(join(profileRoot, 'node_modules', name, 'package.json'), JSON.stringify({ name, version, main: 'index.js' }))
+      }
+      writeFileSync(join(profileRoot, 'package.json'), JSON.stringify(profileManifest, null, 2))
+      return { exitCode: 0, stdout: '', stderr: '' }
+    }
+    const run = async (command: 'add' | 'update' | 'remove', ...argv: string[]) => {
+      const captured = capture()
+      const status = await runProfilePluginCli(command, [...argv, '--home', home], captured.io, {
+        pluginsRoot,
+        runDsh: fakeDsh,
+        seedsRoot: join(root, 'seeds'),
+      })
+      return { status, output: captured.output(), errors: captured.errors() }
+    }
+
+    beforeEach(() => {
+      calls = []
+    })
+
+    it('installs a registry package at the version named in one spec, then leaves a satisfied range alone', async () => {
+      const first = await run('add', 'dsh-plugin-example@1.2.0')
+      expect(first.errors).toBe('')
+      expect(first.output).toContain('add dsh-plugin-example@1.2.0 → profile probe')
+      expect(calls).toEqual([['plugin', '--profile', 'probe', 'add', 'dsh-plugin-example@1.2.0']])
+      expect(first.output).toContain('version    none → 1.2.0')
+      const again = await run('add', 'dsh-plugin-example@^1')
+      expect(again.output).toContain('up to date; nothing to restart')
+      expect(calls).toHaveLength(1)
+    })
+
+    it('links any plugin directory through dsh plugin add link:, and reports the parts it ships', async () => {
+      const external = join(root, 'elsewhere/@acme/notes')
+      writeFile(
+        join(external, 'package.json'),
+        JSON.stringify({
+          name: '@acme/notes',
+          version: '0.3.0',
+          main: './dist/index.js',
+          exports: { '.': './dist/index.js', './client': './dist/client.js', './notes-api': './dist/notes-api.js', './package.json': './package.json' },
+          dsh: { bundle: { patch: './cordis.patch.yml' }, client: { inject: [] } },
+        }),
+      )
+      writeFile(join(external, 'cordis.patch.yml'), "- insert:\n    - id: acme-notes\n      name: '@acme/notes'\n")
+      const added = await run('add', external)
+      expect(added.errors).toBe('')
+      expect(calls).toEqual([['plugin', '--profile', 'probe', 'add', `link:${external}`]])
+      expect(added.output).toContain('source     local package')
+      expect(added.output).toContain('row        acme-notes')
+      expect(added.output).toContain('parts      host, client, ./notes-api')
+      expect((await run('add', external)).output).toContain('up to date; nothing to restart')
+      expect(calls).toHaveLength(1)
+      const updated = await run('update', '@acme/notes')
+      expect(updated.output).toContain('rebuild it in place')
+      expect(calls).toHaveLength(1)
+    })
+
+    it('refuses a directory that is not a DSH bundle', async () => {
+      writeFile(join(root, 'plain/package.json'), JSON.stringify({ name: 'plain' }))
+      const result = await run('add', join(root, 'plain'))
+      expect(result.status).toBe(1)
+      expect(result.errors).toContain('declares no dsh.bundle')
+    })
+
+    it('refuses a version on an owned bundle', async () => {
+      const result = await run('add', '@dshfiles/fixture-plugin@1.0.0')
+      expect(result.status).toBe(1)
+      expect(result.errors).toContain('takes no version')
+    })
+
+    it('updates a registry package within its range, to the latest, or to a named version', async () => {
+      await run('add', 'dsh-plugin-example@1.2.0')
+      const inRange = await run('update', 'dsh-plugin-example')
+      expect(calls.at(-1)).toEqual(['plugin', '--profile', 'probe', 'update', 'dsh-plugin-example'])
+      expect(inRange.output).toContain('version    1.2.0 → 1.5.0')
+      expect(inRange.output).toContain('restart    Restart the DSH host process')
+      await run('update', 'dsh-plugin-example', '--latest')
+      expect(calls.at(-1)).toEqual(['plugin', '--profile', 'probe', 'update', '--latest', 'dsh-plugin-example'])
+      const named = await run('update', 'dsh-plugin-example@2.0.0')
+      expect(calls.at(-1)).toEqual(['plugin', '--profile', 'probe', 'add', 'dsh-plugin-example@2.0.0'])
+      expect(named.output).toContain('version    1.5.0 → 2.0.0')
+    })
+
+    it('previews an update without running it', async () => {
+      await run('add', 'dsh-plugin-example@1.2.0')
+      const before = readProfile()
+      const preview = await run('update', 'dsh-plugin-example', '--dry-run')
+      expect(preview.output).toContain('run        dsh plugin --profile probe update dsh-plugin-example')
+      expect(calls).toHaveLength(1)
+      expect(readProfile()).toEqual(before)
+    })
+
+    it('refuses to update a plugin the profile does not have', async () => {
+      const result = await run('update', 'dsh-plugin-example')
+      expect(result.status).toBe(1)
+      expect(result.errors).toContain('is not installed in profile probe')
+    })
+
+    it('removes a plugin with its row override, keeps the rest of the patch, and is idempotent', async () => {
+      await run('add', 'dsh-plugin-example@1.2.0')
+      writeFile(join(profileRoot, 'cordis.patch.yml'), `${profilePatch}- id: dsh-plugin-example\n  config:\n    mode: b\n`)
+      const removed = await run('remove', 'dsh-plugin-example')
+      expect(removed.errors).toBe('')
+      expect(calls.at(-1)).toEqual(['plugin', '--profile', 'probe', 'remove', 'dsh-plugin-example'])
+      expect(removed.output).toContain('row dsh-plugin-example override removed')
+      expect(readProfile().patch).toBe(profilePatch)
+      expect(JSON.parse(readProfile().manifest).dependencies).toEqual({})
+      const again = await run('remove', 'dsh-plugin-example')
+      expect(again.output).toContain('up to date; nothing to restart')
+      expect(calls.at(-1)?.[3]).toBe('remove')
+      expect(calls.filter(call => call[3] === 'remove')).toHaveLength(1)
+    })
+
+    it('warns when the checked-in seed would add a removed plugin back', async () => {
+      writeFile(join(profileRoot, 'package.json'), manifest({ '@dshfiles/fixture-plugin': `link:${fixtureRoot}` }, ['@dshfiles/fixture-plugin']))
+      writeFile(join(root, 'seeds/probe/package.json'), JSON.stringify({ dependencies: { '@dshfiles/fixture-plugin': 'link:../x' } }))
+      const removed = await run('remove', '@dshfiles/fixture-plugin')
+      expect(removed.output).toContain('source     owned bundle')
+      expect(removed.output).toContain('the next profile-sync adds it back')
+    })
   })
 })

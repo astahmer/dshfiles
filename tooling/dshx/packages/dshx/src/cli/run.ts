@@ -12,7 +12,7 @@ import { resolveDshxConfig } from '../config/resolve.js'
 import { startDevSession } from '../dev/orchestrator.js'
 import type { DevEvent, DevSession } from '../dev/types.js'
 import { relative as relativePath } from 'node:path'
-import { packageProject, testProject } from '../toolchain/index.js'
+import { packageProject, previewPublish, testProject } from '../toolchain/index.js'
 import type { TestProjectOptions } from '../toolchain/index.js'
 import { packageTargets } from '../project/package-targets.js'
 import { DshxError } from '../diagnostics.js'
@@ -50,7 +50,7 @@ import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../plat
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
-import { runAddPluginCli } from './add-plugin.js'
+import { runProfilePluginCli } from './add-plugin.js'
 import { runCheckoutCli } from './checkout.js'
 import { runRepositoryCheckCli } from './repository-check.js'
 import { SCRATCH_ACTIONS, runScratchCli } from './scratch.js'
@@ -1535,7 +1535,9 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   if (argv[0] === 'checkout') return runCheckoutCli(argv.slice(1), io)
   if (argv[0] === 'check' && argv[1] === 'repo') return runRepositoryCheckCli(argv.slice(2), io)
   const addOperand = argv[0] === 'add' ? argv[1] : undefined
-  if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand)) return runAddPluginCli(argv.slice(1), io)
+  if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand))
+    return runProfilePluginCli('add', argv.slice(1), io)
+  if (argv[0] === 'update' || argv[0] === 'remove') return runProfilePluginCli(argv[0], argv.slice(1), io)
   if (argv[0] === 'dev' && argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return runScratchCli(['', '--help'], io)
   let args: CliArgs
   try {
@@ -1645,7 +1647,11 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       const testOutput: TestProjectOptions = { stdout: io.stdout, stderr: io.stderr }
       return await (runtime.testProject ?? testProject)(project.root, args.file === undefined ? testOutput : { ...testOutput, file: args.file })
     }
-    if (args.command === 'package') {
+    if (args.command === 'publish' && !args.dryRun) {
+      write(io.stderr, 'error: dshx publish only validates and never uploads; run "dshx publish --dry-run".\n')
+      return 2
+    }
+    if (args.command === 'package' || args.command === 'publish') {
       const exitCode = await runBuild(args, options, project)
       if (exitCode !== 0) return exitCode
       const targetDiagnostics = await (runtime.checkPackageTargets ?? checkPackageTargets)(project)
@@ -1658,6 +1664,17 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
         dsh?.bundle?.patch ?? 'cordis.patch.yml',
       ]
       if (project.clientEntry) required.push(relativePath(project.root, resolvePath(project.outDir, 'client.js')))
+      if (args.command === 'publish') {
+        const preview = await previewPublish(project.root, project.manifest, required)
+        for (const item of preview.diagnostics) printDiagnostic(io, item)
+        const label = `${preview.name ?? 'unnamed'}@${preview.version ?? 'unversioned'}`
+        if (hasErrors(preview.diagnostics)) {
+          write(io.stderr, `${label} is not publishable; nothing was uploaded.\n`)
+          return 1
+        }
+        write(io.stdout, `Would publish ${label} as ${preview.filename} (${String(preview.files)} files); nothing was uploaded.\n`)
+        return 0
+      }
       const tarball = await (runtime.packageProject ?? packageProject)(project.root, required)
       write(io.stdout, `Packaged ${relativePath(project.root, tarball)}\n`)
       return 0

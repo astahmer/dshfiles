@@ -12,7 +12,9 @@ For one plugin plus its row config, `dshx add <package> [--profile <name>]
 [--option key=value ...] [--dry-run]` does it in one step: it runs this
 sync with `--bundle` for an owned bundle (or `dsh plugin add` for a registry
 package) and merges the options into the plugin's row in `cordis.patch.yml`,
-idempotently. See the
+idempotently. `dshx update` and `dshx remove` finish the lifecycle (newer version,
+uninstall plus its row override), and any other plugin directory installs through
+`dsh plugin add link:<path>`, which works where a bare path does not (below). See the
 [CLI reference](../tooling/dshx/docs/cli-reference.md#dshx-add-package-install-a-plugin-into-a-profile).
 
 ```sh
@@ -94,6 +96,11 @@ profile already wants:
 ```sh
 cd ~/.dsh/profiles/<name> && pnpm install
 ```
+
+`dsh plugin --profile <name> add link:/abs/path` is the exception: the explicit
+`link:` protocol skips name resolution, and DSH adds the bundle entry itself
+(checked with DSH 0.2.1-rc.2 on a scratch home). `dshx add <path>` uses it for a
+plugin directory outside `plugins/@dshfiles`.
 
 `plugin_manager install_bundle` shells out to `pnpm add`, so it cannot express
 this. Use `install_bundle` for registry packages, and the manifest plus
