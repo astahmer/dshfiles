@@ -1,0 +1,4 @@
+# Loader ids share one namespace per profile, so the scope stays in the id.
+- insert:
+    - id: dshfiles-mcp-endpoint
+      name: '@dshfiles/mcp-endpoint'

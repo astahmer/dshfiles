@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "mcp-endpoint",
+      "title": "Drive DSH threads from an outside agent over MCP",
+      "summary": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or steer a message, wait for the turn to end (at most 5 minutes) and stop a turn. Every tool is a sessions API call made as @dshfiles/mcp-endpoint.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["no-token", "accepted", "unauthorized", "refused-remote", "refused-origin", "method-not-allowed"],
+      "failureModes": [
+        "Without an issued token every request gets 401 naming Settings › MCP endpoint, where the token is generated.",
+        "A wrong or rotated token gets 401; the DSH launch cookie is never accepted instead.",
+        "A client on another machine gets 403 until LAN access is turned on.",
+        "A request with a browser Origin other than the endpoint's own host gets 403 (DNS-rebinding protection).",
+        "A body over 1 MiB gets 413; a non-JSON body gets a JSON-RPC parse error.",
+        "A refused sessions call (unknown thread, busy agent, missing session-controller) reaches the MCP client as a tool error with DSH's message and code."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "Every MCP tool except list_projects is one sessionsApi call (list, messages, create, prompt, wait, interrupt) made in process as @dshfiles/mcp-endpoint; the endpoint never touches native Session services itself.",
+          "deterministicFake": "src/mcp-endpoint.test.ts mounts a sessionsApi owner that records the calls and drives it with the official MCP SDK client over real HTTP."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "mcp request",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "drives threads through MCP tools backed by the sessions API, one span per request"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mcp-endpoint.outside-agent",
+          "featureFile": "tooling/dshx/e2e/features/mcp-endpoint.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "mcp-endpoint.bearer-token",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "refuses every client until a token is issued, then only the bearer of the current token"
+        },
+        {
+          "kind": "host-test",
+          "id": "mcp-endpoint.drive-threads",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "drives threads through MCP tools backed by the sessions API, one span per request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-endpoint.local-address",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "treats only loopback and this machine’s own addresses as local"
+        }
+      ]
+    },
+    {
+      "id": "mcp-endpoint-settings",
+      "title": "Issue the MCP token and copy the Claude Code command",
+      "summary": "Settings › MCP endpoint shows the endpoint URL, generates or rotates the bearer token and shows it once with a copyable `claude mcp add --transport http dsh <url> --header \"Authorization: Bearer …\"` command, revokes it, and turns LAN access on or off. Only the token's SHA-256 is stored. The agent can read the status, revoke the token (explicit confirm) and switch LAN access; it cannot issue a token, so a token never enters a transcript.",
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings\"",
+        "click button \"MCP endpoint\"",
+        "click button \"Generate token\"",
+        "expect button \"Rotate\""
+      ],
+      "surfaces": ["client", "host", "settings", "api", "tool"],
+      "configuration": [
+        {
+          "key": "lan-enabled",
+          "defaultValue": "false",
+          "constraints": "Plugin storage; this machine's own addresses are always allowed.",
+          "coveredBy": ["mcp-endpoint.lan-access"]
+        }
+      ],
+      "states": ["no-token", "token-issued", "token-shown-once", "lan-off", "lan-on"],
+      "failureModes": [
+        "An old Host without this plugin leaves the section with a restart-and-retry message instead of controls.",
+        "Rotating replaces the previous token at once; clients using it get 401 until updated."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mcp-endpoint.settings-token",
+          "featureFile": "tooling/dshx/e2e/features/mcp-endpoint.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "mcp-endpoint.lan-access",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "keeps LAN access off until the user turns it on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-endpoint.claude-command",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "builds the Claude Code command with the endpoint URL and bearer header"
+        }
+      ]
+    }
+  ]
+}
