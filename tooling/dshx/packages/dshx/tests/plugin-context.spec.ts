@@ -500,6 +500,20 @@ describe('stores', () => {
     })
     expect(prefs.get()).toEqual({ enabled: false })
   })
+
+  it('keeps a memory store on the page across a reload of the dshx copy, out of browser storage', async () => {
+    const schema = z.object({ expanded: z.array(z.string()) })
+    const before = StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial: { expanded: [] }, storage: 'memory' })
+    before('p1').set({ expanded: ['src'] })
+    expect(memory.size).toBe(0)
+    vi.resetModules()
+    const reloaded: { readonly StoreModel: typeof StoreModel } = await import('../src/client/store.js')
+    const after = reloaded.StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial: { expanded: [] }, storage: 'memory' })
+    expect(after('p1').get()).toEqual({ expanded: ['src'] })
+    expect(after('p2').get()).toEqual({ expanded: [] })
+    after('p1').remove()
+    expect(before('p1').get()).toEqual({ expanded: [] })
+  })
 })
 
 describe('React', () => {

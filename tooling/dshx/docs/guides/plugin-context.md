@@ -154,6 +154,8 @@ drafts(sessionId).set('…')
   stored value reads as `initial`.
 - `from` imports the value once from earlier keys, newest first.
 - Values live in browser storage, are ready before setup and follow other tabs.
+- `storage: 'memory'` keeps the value on the page instead: it survives a plugin reload or HMR but not a page
+  reload, and other tabs do not see it (an expanded tree, a scroll position).
 
 ## Failures
 

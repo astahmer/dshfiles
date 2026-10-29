@@ -13,6 +13,11 @@ export interface StoreDefinition<T, Scope extends StoreScope = StoreScope> {
   readonly initial: T
   /** Earlier keys to import the value from once while this store holds none, newest first. */
   readonly from?: string | readonly string[]
+  /**
+   * `local` (default) keeps the value in browser storage. `memory` keeps it on the page: it survives a plugin reload
+   * or HMR, but not a page reload, and other tabs do not see it.
+   */
+  readonly storage?: 'local' | 'memory'
 }
 
 /** One stored value: read it, observe it, write it. */
@@ -34,11 +39,26 @@ interface StorageLike {
 
 const STORAGE_PREFIX = 'dshx:'
 
-const storage = (): StorageLike | undefined => {
+declare global {
+  // Every plugin bundles its own dshx copy, so memory values live on the page to outlive one copy's reload.
+  var __dshxMemoryStoreV1: Map<string, string> | undefined
+}
+
+const localStorageOf = (): StorageLike | undefined => {
   try {
     return globalThis.localStorage
   } catch {
     return undefined
+  }
+}
+
+const memoryStorage = (): StorageLike => {
+  globalThis.__dshxMemoryStoreV1 ??= new Map()
+  const values = globalThis.__dshxMemoryStoreV1
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => void values.set(key, value),
+    removeItem: key => void values.delete(key),
   }
 }
 
@@ -79,6 +99,7 @@ const createPersisted = <T>(definition: StoreDefinition<T>, scopeId: string | un
   const key = storageKey(definition.key, definition.scope, scopeId)
   const legacyKeys = definition.from === undefined ? [] : typeof definition.from === 'string' ? [definition.from] : definition.from
   let cached: { readonly raw: string | null; readonly value: T } | undefined
+  const storage = definition.storage === 'memory' ? memoryStorage : localStorageOf
 
   const migrate = (): void => {
     const target = storage()
