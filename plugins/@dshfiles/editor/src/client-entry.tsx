@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, FileViewer } from '@dshfiles/dshx/client'
+import { defineClient, FileViewer, Files, type FilesService } from '@dshfiles/dshx/client'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -12,7 +12,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WORKBENCH_MAIN_PANEL_ID, workbenchPanels } from '@dshfiles/workbench/registry'
 import { useEffect, useSyncExternalStore } from 'react'
 import { z } from 'zod'
-import { createEditorStore } from './editor-store.js'
+import { createEditorStore, type EditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
 import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
@@ -197,15 +197,18 @@ export default defineClient({
     }
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: FILE_LINK_ID }, FileLinkRedirect))
 
+    const openFile = (request: Parameters<EditorStore['open']>[1]): boolean => {
+      const sessionId = currentSession()
+      if (sessionId === undefined) return false
+      store.open(sessionId, request)
+      showEditor()
+      return true
+    }
     ctx.effect(() => {
       const onOpenFile = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
         const request = openFileRequestSchema.safeParse(event.detail)
-        const sessionId = currentSession()
-        if (!request.success || sessionId === undefined) return
-        event.preventDefault()
-        store.open(sessionId, request.data)
-        showEditor()
+        if (request.success && openFile(request.data)) event.preventDefault()
       }
       const onGoToLine = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
@@ -241,25 +244,41 @@ export default defineClient({
         },
         watch: (sessionId, path, signal) => ctx.remote.workspaceFiles.changes(sessionId, path, signal),
       })
+      const watch: FilesService['watch'] = (listener, options = {}) => {
+        const sessionId = currentSession()
+        if (sessionId === undefined) {
+          listener({ status: 'no-session' })
+          return () => {}
+        }
+        const stop = fileIndex.request(sessionId, listener)
+        options.signal?.addEventListener('abort', stop, { once: true })
+        return stop
+      }
       const onFilesRequest = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
         const request = workspaceFilesRequestSchema.safeParse(event.detail)
         if (!request.success) return
         event.preventDefault()
-        const sessionId = currentSession()
-        if (sessionId === undefined) {
-          request.data.respond({ status: 'no-session' })
-          return
-        }
-        const stop = fileIndex.request(sessionId, request.data.respond)
-        request.data.signal?.addEventListener('abort', stop, { once: true })
+        watch(request.data.respond, request.data.signal === undefined ? {} : { signal: request.data.signal })
       }
       window.addEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
+      const withdraw =
+        metadata?.plugin?.provide(Files, {
+          watch,
+          open: openFile,
+          openIn: async input => {
+            const result = await ctx.remote.session.openWorkspacePath(
+              input.reveal === true ? { path: input.path, action: 'reveal' } : input.application === undefined ? { path: input.path } : { path: input.path, application: input.application },
+            )
+            return result.ok
+          },
+        }) ?? (() => {})
       return () => {
+        withdraw()
         window.removeEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
         fileIndex.dispose()
       }
-    }, 'dshfiles-editor: workspace file listing')
+    }, 'dshfiles-editor: workspace file listing and the Files contract')
   },
 })
 
