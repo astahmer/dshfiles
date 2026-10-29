@@ -28,6 +28,7 @@ import type { LayoutStoreSurface } from './layout-store.js'
 import { SurfaceAction } from './surface-action.js'
 import { MainSurfaceGuard } from './main-surface-guard.js'
 import { WindowFloatingGeometry } from './window-floating.js'
+import { GroupMinimums } from './group-minimums.js'
 import { TabRows } from './tab-row-visibility.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 
@@ -111,8 +112,15 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   const selectView = useRef<(definition: WorkbenchPanelDefinition, target?: NewViewSelection) => void>(() => undefined)
 
   const rowVisibility = useRef<ReturnType<typeof TabRows.retain>>()
+  const groupMinimums = useRef<ReturnType<typeof GroupMinimums.retain>>()
   const [rowMenu, setRowMenu] = useState<TabRowMenuTarget | null>(null)
-  useLayoutEffect(() => () => rowVisibility.current?.dispose(), [])
+  useLayoutEffect(
+    () => () => {
+      rowVisibility.current?.dispose()
+      groupMinimums.current?.dispose()
+    },
+    [],
+  )
 
   const components = useMemo(() => {
     const RegisteredPanel = (panelProps: IDockviewPanelProps): JSX.Element => {
@@ -211,6 +219,8 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     rowVisibility.current?.dispose()
     // Observe group-model additions before native restoration populates members.
     rowVisibility.current = TabRows.retain(event.api, () => store.set(event.api.toJSON()))
+    groupMinimums.current?.dispose()
+    groupMinimums.current = GroupMinimums.retain(event.api)
     if (windowFloats && dropBoundary.current !== null) WindowFloatingGeometry.prepare(dropBoundary.current)
     WorkbenchLayout.restoreLayout(event.api, store, registry.list(), defaultLayout)
     // Dockview only reports layout changes for later gestures, so without this a freshly applied default layout would
