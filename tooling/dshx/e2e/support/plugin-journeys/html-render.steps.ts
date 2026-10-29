@@ -71,5 +71,26 @@ Then('the card expands to full screen and is still there after a reload', async 
     await expect(page.getByText(/^Completed in /).last()).toBeVisible()
     await expectIsolatedPage(page)
   })
+})
+
+const PREVIEW_TITLE = 'Preview fixture'
+const PREVIEW_DIRECTIVE = `[[call html_preview ${JSON.stringify({ path: 'fixtures/preview/index.html', title: PREVIEW_TITLE, height: 200 })}]]`
+
+When('the fake model shows a workspace HTML file with html_preview', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(PREVIEW_DIRECTIVE)
+  await composer.press('Enter')
+  await expect(page.getByText('Tool finished.', { exact: true })).toHaveCount(2, { timeout: 60_000 })
+})
+
+Then('the preview card shows the file with its relative stylesheet and script inlined', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'html-preview-card-inlines-assets', async () => {
+    const card = page.getByRole('region', { name: PREVIEW_TITLE })
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await expect(card.locator('iframe[data-html-render-frame]')).toHaveAttribute('sandbox', 'allow-scripts')
+    const frame = card.frameLocator('iframe[data-html-render-frame]')
+    await expect(frame.getByRole('heading', { name: PREVIEW_TITLE })).toBeVisible()
+    await expect(frame.locator('#status')).toHaveText('stylesheet and script inlined', { timeout: 10_000 })
+  })
   await finishJourneyAssertions(page)
 })

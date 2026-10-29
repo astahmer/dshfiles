@@ -2,13 +2,13 @@
 
 ![Agent-published HTML page as a sandboxed card](docs/screenshots/html-page-card.png)
 
-The `html_render` agent tool publishes a self-contained HTML page — a chart, a mockup, a table — and the chat transcript
-shows it as a card instead of a tool row:
+The `html_render` agent tool publishes a self-contained HTML page — a chart, a mockup, a table — and `html_preview` shows
+an HTML file from the thread's workspace; the chat transcript shows either as a card instead of a tool row:
 
 - a sandboxed iframe themed with the DSH light/dark tokens;
 - resizable from its bottom edge, **Expand** to full screen;
 - **Copy HTML** and **Open in new tab**;
-- still visible after the Turn completes: the plugin registers `html_render` in Chat's `PinnedToolCalls`
+- still visible after the Turn completes: the plugin registers `html_render` and `html_preview` in Chat's `PinnedToolCalls`
   (`@dshfiles/chat/pinned-tool-calls`), so the call stays outside the "Completed in" fold and the step groups.
 
 Built with dshx (no port). The idea comes from t3code's visual replies (`plans/t3code-parity.md`, A2); nothing is
@@ -36,6 +36,27 @@ window that lost the call still shows the card. A result without that metadata f
 arguments.
 
 An oversized or empty page is refused: the error names the size and how to shrink or split it, and the card shows it.
+
+## Showing a workspace file
+
+`html_preview` shows an HTML file the thread already has (a generated report, a built page) in the same card.
+
+| Argument | Required | Meaning                                                           |
+| -------- | -------- | ----------------------------------------------------------------- |
+| `path`   | yes      | An `.html`/`.htm` file, relative to the thread working directory. |
+| `title`  | no       | Card header; defaults to the file name.                           |
+| `height` | no       | As for `html_render`.                                             |
+| `theme`  | no       | As for `html_render`.                                             |
+
+- **Boundary.** The path resolves through the Host filesystem (`ctx.fs`, symlinks followed) and must land inside the
+  thread's workspace (the Session's creation `cwd`); a path outside it, absolute or through a symlink, is refused.
+- **Assets.** Relative `<link rel="stylesheet" href>`, `<script src>` and `<img src>` (png, jpeg, gif, webp, avif, svg,
+  ico, bmp) are inlined when they resolve inside the workspace, at most 32 of them. The rest stays as written and the
+  card's no-network policy blocks it: CSS `url()` and `@import`, web fonts, `srcset`, `<source>`, `fetch`,
+  root-absolute (`/x.css`) and remote URLs. The model's summary lists what was not inlined.
+- **Size.** At most 512 KB, after inlining, like `html_render`.
+
+The file is read once when the tool runs; the card keeps that copy, so later edits need another `html_preview` call.
 
 ## Isolation
 

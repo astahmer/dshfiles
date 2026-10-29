@@ -65,6 +65,60 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "html-preview-card",
+      "title": "Workspace HTML file shown as a sandboxed card",
+      "summary": "The html_preview agent tool shows an HTML file from the calling thread's workspace in the same sandboxed, themed card as html_render. The path is relative to the thread working directory and must resolve (symlinks followed) inside the thread workspace. Relative <link rel=\"stylesheet\">, <script src> and <img src> files inside the workspace are inlined; other references stay as written and are blocked by the card's no-network policy. The page is persisted in the tool result's presentation metadata; the model gets a one-line summary naming what was not inlined.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
+        "press Enter",
+        "expect text \"Tool finished.\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
+        "press Enter",
+        "expect region \"Workspace page\""
+      ],
+      "surfaces": ["host", "client"],
+      "configuration": [],
+      "states": ["preparing", "running", "published", "refused"],
+      "failureModes": [
+        "A path outside the thread workspace (relative, absolute or through a symlink) is refused with the workspace path and the html_render alternative.",
+        "A missing file, a non-.html file, a non-UTF-8 file or a page above 512 KB after inlining is refused with an error that says how to fix it.",
+        "Assets outside the workspace, missing, of an unknown image type, too large for the remaining budget or beyond 32 references stay unresolved and are listed in the model's summary; CSS url(), @import, fonts, srcset and remote URLs are never inlined."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "html-render.preview-card",
+          "featureFile": "tooling/dshx/e2e/features/html-render.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.preview-inlines-assets",
+          "file": "plugins/@dshfiles/html-render/src/html-preview-tool.test.ts",
+          "testName": "shows a workspace file with its simple relative assets inlined"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.preview-workspace-boundary",
+          "file": "plugins/@dshfiles/html-render/src/html-preview-tool.test.ts",
+          "testName": "refuses a path outside the workspace, including through a symlink, and never inlines an outside asset"
+        },
+        {
+          "kind": "unit-test",
+          "id": "html-render.preview-refusals",
+          "file": "plugins/@dshfiles/html-render/src/html-preview-tool.test.ts",
+          "testName": "refuses non-HTML, missing, oversized and non-UTF-8 files with a recovery path"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }

@@ -1,20 +1,15 @@
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from 'vitest'
 import { HtmlPageLimits, HtmlPageModel, htmlPageSchema } from './html-page.js'
-import hostDefinition from './host.js'
+import { createHtmlRenderHost, textOf } from './test-host.js'
 
 const runTool = async (args: unknown) => {
-  const host = await createTestHost()
+  const host = await createHtmlRenderHost()
   try {
-    await host.mount(hostDefinition, { packageId: '@dshfiles/html-render' })
-    return await host.tools.execute({ callId: ToolCallId('html-render-call'), name: 'html_render', arguments: args, signal: AbortSignal.timeout(10_000) })
+    return await host.run('html_render', args)
   } finally {
     await host.dispose()
   }
 }
-
-const textOf = (content: readonly { readonly type: string; readonly text?: string }[]): string => content.map(block => block.text ?? '').join('\n')
 
 describe('html_render tool', () => {
   it('persists the page as presentation metadata and tells the model only a summary', async () => {
