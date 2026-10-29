@@ -3,7 +3,6 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import { z } from 'zod'
 import { DshxError } from '../diagnostics.js'
-import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
 import { resolveVitePlugins } from './vite-plugins.js'
 import type { JsonObject, JsonValue } from '../json.js'
 import type { DshxConfig, DshxModuleEntry, ResolvedDshxConfig, ResolveDshxConfigOptions } from './types.js'
@@ -66,14 +65,14 @@ async function readManifest(packageFile: string): Promise<ProjectManifest> {
   } catch (cause) {
     throw new DshxError('DSHX4002', `Cannot read project manifest: ${packageFile}`, { cause, file: packageFile })
   }
-  let value: JsonObject | undefined
+  let value: unknown
   try {
-    const decoded = decodeJsonSafe(jsonObjectSchema, source)
-    if (decoded.success) value = decoded.data
+    // A schema decode would drop an own __proto__ key, so parse raw and narrow with isObject below.
+    value = JSON.parse(source)
   } catch (cause) {
     throw new DshxError('DSHX4002', `Project manifest is not valid JSON: ${packageFile}`, { cause, file: packageFile })
   }
-  if (value === undefined) {
+  if (!isObject(value)) {
     throw new DshxError('DSHX4002', 'Project package.json must contain a JSON object.', { file: packageFile })
   }
   const manifest = manifestSchema.safeParse(value)
