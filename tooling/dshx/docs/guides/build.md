@@ -122,11 +122,25 @@ export default defineConfig({ client: { shared: '@scope/shared-runtime' } })
 ```
 
 - The supplier's chunk exports `sharedModules` (one namespace per provided specifier) and writes `dist/shared-runtime.json`: each module's export names and the hash of its stylesheet.
-- In a consumer, an import whose specifier exactly matches a provided module resolves to a small side-effect-free facade over `require(supplier).sharedModules[specifier]`. Other specifiers, subpaths included, stay private. A `bundleDependencies` entry wins over the supplier.
+- In a consumer, an import whose specifier exactly matches a provided module resolves to a small side-effect-free facade over `require(supplier).sharedModules[specifier]`. A subpath of a provided package (`zod/mini` when the supplier provides `zod`) would bundle a second copy of that package, so the build refuses it (`DSHX1209`, below): add the subpath to the supplier's `provide`. A `bundleDependencies` entry wins over the supplier.
 - When the consumer's CSS hash equals the supplier's, the consumer only emits its ownership marker and the supplier injects the sheet. A consumer whose CSS differs keeps injecting its own sheet.
 - Build the supplier first. A missing manifest, or a supplier not listed in `dsh.client.external`, fails the build (`DSHX1208`, `DSHX4233`).
 - A supplier module is shared by every consumer, so its module-level state is shared too: keep anything meant to be per-plugin (a per-bundle QueryClient, for example) in the consumer's own code.
 - The Host must install the supplier: a consumer built with `shared` does not activate in a profile without it. To go back, drop `shared` and rebuild.
+
+## Modules the page already provides
+
+A Client build fails with `DSHX1209` when its final chunk keeps code from a package the page already loads:
+
+| Provided by                  | Packages                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| DSH, for every Client        | the adapter's platform modules and preloaded externals (`react`, `react-dom`, `@deepseek-ai/cordis`, `@deepseek-ai/dsh-client-ui-slots`, …) |
+| The Host, before this Client | `@deepseek-ai/*` entries of `dsh.client.inject` and `dsh.client.external`                                                                  |
+| The shared runtime           | every module the `client.shared` supplier provides                                                                                         |
+
+Externals match exact specifiers, so a subpath (`react/jsx-dev-runtime`) or a dependency's deep import reaches the bundle silently, and the copy then runs beside the loaded one with its own module state. The guard matches the package that owns each retained file instead, and the error names the package, why it is provided and the import chain from the Client entry. The list comes from the adapter, the package manifest and the supplier's `shared-runtime.json`; there is no second list to maintain.
+
+Fix it by importing the provided specifier exactly, or by providing the subpath from the shared-runtime supplier. When a private copy is intended, list the package in `client.bundleDependencies` with a comment saying why; platform modules cannot be bundled (`DSHX4004`). Owned packages in `inject`/`external` are not matched by package: their dshx modules (`modules:` in `dshx.config.ts`) are contracts every consumer bundles on purpose, and the exact specifier always stays external.
 
 ## Tailwind v4 without Preflight
 

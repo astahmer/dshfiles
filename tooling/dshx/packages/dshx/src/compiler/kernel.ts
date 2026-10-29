@@ -186,6 +186,22 @@ const dependencyManifestPlugin = (options: {
   }
 }
 
+/**
+ * Rolldown reports a hook's thrown error inside an aggregate and moves its code to `pluginCode`. Rethrow the DshxError a
+ * DSHX guard threw with its own code, file and hint, so the CLI prints the guard's diagnostic.
+ */
+const surfaceGuardError = (error: unknown): never => {
+  const errors = typeof error === 'object' && error !== null && 'errors' in error && Array.isArray(error.errors) ? (error.errors as unknown[]) : []
+  const guard = errors.find(item => item instanceof DshxError)
+  if (guard === undefined) throw error
+  const code = 'pluginCode' in guard && typeof guard.pluginCode === 'string' ? guard.pluginCode : guard.code
+  throw new DshxError(code, guard.message.replace(/^DSHX\d+\n\n/u, ''), {
+    cause: error,
+    ...(guard.file !== undefined && { file: guard.file }),
+    ...(guard.hint !== undefined && { hint: guard.hint }),
+  })
+}
+
 export class CompilerKernel {
   static readonly resolveUserPlugins = resolveUserPlugins
   static readonly boundaryPlugin = kernelBoundaryPlugin
@@ -193,4 +209,5 @@ export class CompilerKernel {
   static readonly dependencyManifestPlugin = dependencyManifestPlugin
   static readonly buildReport = buildReport
   static readonly buildWatcher = buildWatcher
+  static readonly surfaceGuardError = surfaceGuardError
 }

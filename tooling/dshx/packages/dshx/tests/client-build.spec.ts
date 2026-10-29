@@ -1316,6 +1316,91 @@ describe('client compiler', () => {
     expect(code).toContain('require("@dshx/shared-runtime")')
   })
 
+  it('fails with the import chain when a dependency bundles a platform package through a subpath', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'dshx-provided-'))
+    temporaryDirectories.push(root)
+    const files = {
+      'package.json': { name: '@dshx/provided-fixture', type: 'module' },
+      'node_modules/react/package.json': { name: 'react', exports: { '.': './index.js', './jsx-dev-runtime': './jsx-dev-runtime.js' } },
+      'node_modules/widget-lib/package.json': { name: 'widget-lib', type: 'module', exports: './index.js' },
+    }
+    for (const [file, content] of Object.entries(files)) {
+      await mkdir(resolve(root, file, '..'), { recursive: true })
+      await writeFile(resolve(root, file), JSON.stringify(content))
+    }
+    await writeFile(resolve(root, 'node_modules/react/index.js'), 'module.exports = {}\n')
+    await writeFile(resolve(root, 'node_modules/react/jsx-dev-runtime.js'), 'exports.jsxDEV = function jsxDEV() { return "second react copy" }\n')
+    await writeFile(resolve(root, 'node_modules/widget-lib/index.js'), "import { jsxDEV } from 'react/jsx-dev-runtime'\nexport const widget = () => jsxDEV()\n")
+    await mkdir(resolve(root, 'src'))
+    await writeFile(resolve(root, 'src/client.ts'), "import { widget } from 'widget-lib'\nglobalThis.probe = widget()\nexport function apply() {}\n")
+    const failure = buildClient({ packageId: '@dshx/provided-fixture', root, entry: 'src/client.ts', outDir: 'dist' })
+    await expect(failure).rejects.toMatchObject({ code: 'DSHX1209' })
+    await expect(failure).rejects.toThrow(
+      'Import chain: virtual:dshx-client-entry -> src/client.ts -> node_modules/widget-lib/index.js -> node_modules/react/jsx-dev-runtime.js',
+    )
+  })
+
+  it('fails a consumer that bundles a subpath of a shared-runtime package unless it opts into a private copy', async () => {
+    const project = async (name: string, client: string, external: readonly string[]): Promise<string> => {
+      const root = await mkdtemp(resolve(tmpdir(), 'dshx-provided-'))
+      temporaryDirectories.push(root)
+      await mkdir(resolve(root, 'src'), { recursive: true })
+      await mkdir(resolve(root, 'node_modules/shared-lib'), { recursive: true })
+      await writeFile(resolve(root, 'package.json'), JSON.stringify({ name, type: 'module', dsh: { client: { platform: 'web', inject: [], external } } }))
+      await writeFile(
+        resolve(root, 'node_modules/shared-lib/package.json'),
+        JSON.stringify({ name: 'shared-lib', type: 'module', exports: { '.': './index.js', './extra': './extra.js' } }),
+      )
+      await writeFile(resolve(root, 'node_modules/shared-lib/index.js'), "export const named = 'shared'\n")
+      await writeFile(resolve(root, 'node_modules/shared-lib/extra.js'), "export const extra = 'private-extra-copy'\n")
+      await writeFile(resolve(root, 'src/client.ts'), client)
+      return root
+    }
+    const supplierRoot = await project(
+      '@dshx/shared-runtime',
+      "import { defineClient } from '@dshfiles/dshx/client'\nexport default defineClient({ setup() {} })\n",
+      [],
+    )
+    await buildClient({ packageId: '@dshx/shared-runtime', root: supplierRoot, entry: 'src/client.ts', outDir: 'dist', sharedRuntime: ['shared-lib'] })
+    const consumerRoot = await project(
+      '@dshx/consumer',
+      "import { named } from 'shared-lib'\nimport { extra } from 'shared-lib/extra'\nglobalThis.probe = [named, extra]\nexport function apply() {}\n",
+      ['@dshx/shared-runtime'],
+    )
+    await mkdir(resolve(consumerRoot, 'node_modules/@dshx'), { recursive: true })
+    await symlink(supplierRoot, resolve(consumerRoot, 'node_modules/@dshx/shared-runtime'), 'dir')
+    const options = {
+      packageId: '@dshx/consumer',
+      root: consumerRoot,
+      entry: 'src/client.ts',
+      outDir: 'dist',
+      shared: '@dshx/shared-runtime',
+      external: ['@dshx/shared-runtime'],
+    }
+    await expect(buildClient(options)).rejects.toThrow('shared runtime "@dshx/shared-runtime" provides "shared-lib"')
+    await buildClient({ ...options, bundleDependencies: ['shared-lib'] })
+    expect(await readFile(resolve(consumerRoot, 'dist/client.js'), 'utf8')).toContain('private-extra-copy')
+  })
+
+  it('lets a consumer bundle a contract module of an owned package it also loads', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'dshx-provided-'))
+    temporaryDirectories.push(root)
+    await mkdir(resolve(root, 'src'), { recursive: true })
+    await mkdir(resolve(root, 'node_modules/@dshx/provider/dist'), { recursive: true })
+    await writeFile(resolve(root, 'package.json'), JSON.stringify({ name: '@dshx/consumer', type: 'module' }))
+    await writeFile(
+      resolve(root, 'node_modules/@dshx/provider/package.json'),
+      JSON.stringify({ name: '@dshx/provider', type: 'module', exports: { '.': './dist/index.js', './contract': './dist/contract.js' } }),
+    )
+    await writeFile(resolve(root, 'node_modules/@dshx/provider/dist/contract.js'), "export const contract = 'bundled-contract'\n")
+    await writeFile(
+      resolve(root, 'src/client.ts'),
+      "import { contract } from '@dshx/provider/contract'\nglobalThis.probe = contract\nexport function apply() {}\n",
+    )
+    await buildClient({ packageId: '@dshx/consumer', root, entry: 'src/client.ts', outDir: 'dist', external: ['@dshx/provider'], inject: ['@dshx/provider'] })
+    expect(await readFile(resolve(root, 'dist/client.js'), 'utf8')).toContain('bundled-contract')
+  })
+
   it('does not remove the Host artifact from the shared output directory', async () => {
     const root = await temporaryProject()
     await mkdir(resolve(root, 'dist'), { recursive: true })

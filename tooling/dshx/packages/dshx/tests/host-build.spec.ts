@@ -468,13 +468,9 @@ describe('host compiler', () => {
     }
 
     await expect(buildHost(options)).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          name: 'DshxError',
-          pluginCode: 'DSHX4005',
-          message: expect.stringContaining('@deepseek-ai/dsh-llm, @deepseek-ai/dsh-scope'),
-        }),
-      ]),
+      name: 'DshxError',
+      code: 'DSHX4005',
+      message: expect.stringContaining('@deepseek-ai/dsh-llm, @deepseek-ai/dsh-scope'),
     })
 
     const packageFile = resolve(root, 'package.json')

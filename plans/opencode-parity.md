@@ -44,13 +44,13 @@ Resume here: pick the next item.
 
 ## C. Platform and tooling
 
-| #   | Gap                                                                                                                                                                               |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C25 | Effect-native API: plugin, RPC and client return Effects/Streams; plugin lifetime is an Effect Scope                                                                              |
-| C26 | SDKs: JS client for the HTTP API, embeddable in-process host, Cloudflare Durable Object runtime                                                                                   |
-| C27 | One package with server/TUI/GUI/RPC parts installed from one config line (versions, local paths, options); `plugin update/remove`; npm publishing. `dshx add` covers only install |
-| C28 | Build guard that fails when a plugin bundles a module the app already provides                                                                                                    |
-| C29 | TUI plugin surface (no terminal UI in DSH)                                                                                                                                        |
+| #   | Gap                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C25 | Effect-native API: plugin, RPC and client return Effects/Streams; plugin lifetime is an Effect Scope                                                                                     |
+| C26 | SDKs: JS client for the HTTP API, embeddable in-process host, Cloudflare Durable Object runtime                                                                                          |
+| C27 | One package with server/TUI/GUI/RPC parts installed from one config line (versions, local paths, options); `plugin update/remove`; npm publishing. `dshx add` covers only install        |
+| C28 | Done: `DSHX1209` fails a Client bundle that keeps a platform, injected or shared-runtime package ([build guide](../tooling/dshx/docs/guides/build.md#modules-the-page-already-provides)) |
+| C29 | TUI plugin surface (no terminal UI in DSH)                                                                                                                                               |
 
 ## D. Core product features (not plugin API)
 

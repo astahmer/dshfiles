@@ -15,7 +15,7 @@ import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabili
 import { installedLocaleNamespaces } from './installed.js'
 import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
-import { clientGuardPlugin, singleClientChunkPlugin } from './guards.js'
+import { ClientCompilerGuards } from './guards.js'
 import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
 
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
@@ -528,6 +528,17 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     options.shared === undefined
       ? undefined
       : await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
+  const provided = new Map<string, string>()
+  const provide = (specifiers: Iterable<string>, reason: (specifier: string) => string): void => {
+    for (const specifier of specifiers) if (!provided.has(specifier)) provided.set(specifier, reason(specifier))
+  }
+  provide(protectedModules, specifier => `DSH loads ${JSON.stringify(specifier)} for every Client`)
+  // DSH serves its own packages whole. An owned package can publish dshx modules next to its Client, and every
+  // consumer bundles those contracts on purpose; its exact specifier always stays external anyway.
+  const dshPackages = (specifiers: readonly string[] = []): readonly string[] => specifiers.filter(specifier => specifier.startsWith('@deepseek-ai/'))
+  provide(dshPackages(options.inject), specifier => `the Host loads ${JSON.stringify(specifier)} first through dsh.client.inject`)
+  provide(dshPackages(options.external), specifier => `the Host serves ${JSON.stringify(specifier)} through dsh.client.external`)
+  provide(supplier?.modules.keys() ?? [], specifier => `shared runtime ${JSON.stringify(options.shared)} provides ${JSON.stringify(specifier)}`)
   let sheetHash: string | undefined
   const assetsInlineLimit = (): boolean => true
   const output = {
@@ -551,7 +562,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     plugins: [
       clientEntryPlugin(paths, options),
       ...(watch ? [clientSetupServiceGuardPlugin(paths, options)] : []),
-      clientGuardPlugin(externals, options.packageId, bundleDependencies),
+      ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
       CompilerKernel.artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
       CompilerKernel.dependencyManifestPlugin({ face: 'client', root: paths.root, outDir: paths.outDir, entryFile: 'client.js' }),
@@ -578,6 +589,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         },
       }),
       clientCapabilitiesPlugin(options),
+      ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies }),
       CompilerKernel.boundaryPlugin({
         face: 'client',
         root: paths.root,
@@ -588,7 +600,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         output,
         cssCodeSplit: false,
       }),
-      singleClientChunkPlugin(),
+      ClientCompilerGuards.singleClientChunkPlugin(),
     ],
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
@@ -652,5 +664,5 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  return CompilerKernel.buildReport(await build(config), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
+  return CompilerKernel.buildReport(await build(config).catch(CompilerKernel.surfaceGuardError), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
 }

@@ -392,6 +392,13 @@ export async function buildHost(options: BuildHostOptions): Promise<HostBuildRes
   const paths = await resolveOptions(options)
   const config = await hostConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  const report = CompilerKernel.buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
+  const report = CompilerKernel.buildReport(
+    await build(config).catch(CompilerKernel.surfaceGuardError),
+    'host',
+    'index.js',
+    paths.outDir,
+    declarations,
+    'DSHX1304',
+  )
   return options.generation === undefined ? report : hostGenerationReport(report, declarations)
 }
