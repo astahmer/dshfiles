@@ -293,7 +293,7 @@ export const cliCommandMetadata = {
   test: 'Run project-local Vitest tests.',
   package: 'Build, validate, and pack a native plugin bundle.',
   build: 'Build Host and Client plugin artifacts.',
-  check: 'Validate compatibility and project wiring.',
+  check: 'Validate compatibility and project wiring; check repo runs repository health checks (dshx check repo --help).',
   dev: 'Run a compatibility-aware DSH development session; dev up|doctor|open|shot|down drive a scratch DSH (dshx dev up --help).',
   checkout: 'Bring the jj checkout that runs DSH onto main, then reinstall and rebuild what changed (dshx checkout sync --help).',
   inspect: 'Inspect Slots, Tools, Services, or Events.',

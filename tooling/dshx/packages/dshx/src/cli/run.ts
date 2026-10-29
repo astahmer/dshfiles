@@ -51,6 +51,7 @@ import { runPlatformCli } from './platform.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
 import { runAddPluginCli } from './add-plugin.js'
 import { runCheckoutCli } from './checkout.js'
+import { runRepositoryCheckCli } from './repository-check.js'
 import { SCRATCH_ACTIONS, runScratchCli } from './scratch.js'
 
 export interface CliIO {
@@ -1526,6 +1527,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (argv[0] === 'dev' && SCRATCH_ACTIONS.has(argv[1] ?? '')) return runScratchCli(argv.slice(1), io)
   if (argv[0] === 'checkout') return runCheckoutCli(argv.slice(1), io)
+  if (argv[0] === 'check' && argv[1] === 'repo') return runRepositoryCheckCli(argv.slice(2), io)
   const addOperand = argv[0] === 'add' ? argv[1] : undefined
   if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand)) return runAddPluginCli(argv.slice(1), io)
   if (argv[0] === 'dev' && argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return runScratchCli(['', '--help'], io)

@@ -30,6 +30,24 @@ dshx check --runtime --json
 
 Runtime mode additionally requires a supported DSH installation, the configured Profile link, Composition/runtime readiness, optional runtime plugin state, and Inspect bridge state. JSON output always separates `static`, `typecheck`, and `runtime` status; offline output reports runtime as `skipped`.
 
+### Repository health: `dshx check repo`
+
+`check repo` checks the repository around the plugins instead of one project: this monorepo, or a standalone plugin repository made by `create-dshx`. It finds the root from `--cwd` (the nearest `pnpm-workspace.yaml`, else the nearest `package.json`) and reads the workspace packages from `pnpm-workspace.yaml`, or the root package alone. It runs offline and needs no DSH.
+
+| Check           | Reports                                                                                                                                                                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cycles`        | Workspace packages that depend on each other through any dependency field, peer and optional dependencies included, at the `package.json` line of one edge.                                                                                                 |
+| `boundaries`    | `relative-dist-import`: a plugin importing another plugin's `dist/` by relative path. `contract-imports-provider`: a contract module (a `dshx.config.ts` `modules` entry calling `defineContract`/`defineRegistry`), or a file it imports relatively, importing a plugin that imports that module. |
+| `stale-bundles` | A built bundle older than a source its last build read whose content differs from the hash in `dist/*.js.deps.json`. Packages never built are counted, not reported; `scripts/profile-sync.ts` uses the same check for linked bundles.                       |
+
+```bash
+dshx check repo
+dshx check repo --only cycles
+dshx check repo --json
+```
+
+Each finding names `file:line`, the rule and a `fix`. `--json` prints `{ schemaVersion, command: "check repo", ok, data: { root, checks: [{ name, ok, inspected, findings }] } }`, or `error: { code, message, hint }`. Exit codes: 0 no findings, 1 findings or error, 2 usage. In this repository `pnpm check:repo` runs it after the plugin build in `check:green`, and `pnpm check:cycles` (`scripts/workspace-cycles.mjs`) runs the cycle check from dshx source before anything is built.
+
 ## `dshx build`
 
 ```bash

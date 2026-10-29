@@ -4,7 +4,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 
 | Document                                                     | Purpose                                                                                                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `check:cycles`.                                           |
+| [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `dshx check repo`.                                       |
 | [Fork maintenance](fork-maintenance.md)                      | Upstream sync, selective plugin PRs, ownership policy, sanitized publication history, and the separate deployment boundary.                             |
 | [Personal configuration](personal-configuration.md)          | Machine-local launcher choices, private paths and deployment settings.                                                                                  |
 | [25 October upstream sync](upstream-sync-20261025.md)        | Isolated candidate, deliberate conflict resolutions, verification evidence and deployment caveats.                                                      |
