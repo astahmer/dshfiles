@@ -1,4 +1,4 @@
-import type { ChartQuery, ChartView, RequestPage } from '@dshfiles/usage/api'
+import type { ChartQuery, ChartView, RequestPage } from './api.js'
 
 export type UsagePeriod = (typeof AccountUsageDashboardModel.USAGE_PERIODS)[number]
 

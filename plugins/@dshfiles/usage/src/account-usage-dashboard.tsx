@@ -7,16 +7,10 @@ import { CalendarIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { usageApi, type ChartQuery, type ChartView, type RequestPage } from '@dshfiles/usage/api'
+import { usageApi, type ChartQuery, type ChartView, type RequestPage } from './api.js'
 import { useMemo, useState, type ReactNode } from 'react'
+import type { AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { AccountUsageDashboardModel, type AccountUsageDay, type UsagePeriod } from './account-usage-dashboard-model.js'
-
-export interface AccountUsageDashboardProps {
-  /** Exact recorded provider route, including account instance id; native routes use the same field. */
-  readonly accountId: string
-  readonly displayName: string
-  readonly onOpenUsageHistory: () => void
-}
 
 const Panel = (props: { heading: string; children: ReactNode; action?: ReactNode; className?: string }): JSX.Element => (
   <section className={cn('dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3', props.className)}>
@@ -343,7 +337,7 @@ export const AccountUsageDashboardContent = (props: {
   )
 }
 
-export const AccountUsageDashboard = (props: AccountUsageDashboardProps): JSX.Element => {
+export const AccountUsageDashboard = (props: AccountUsageViewProps): JSX.Element => {
   const api = useApi(usageApi)
   const [period, setPeriod] = useState<UsagePeriod>(7)
   const query = useMemo(() => AccountUsageDashboardModel.accountUsageQuery(props.accountId, period, Date.now()), [props.accountId, period])

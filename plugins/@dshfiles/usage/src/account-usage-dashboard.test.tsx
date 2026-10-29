@@ -1,4 +1,4 @@
-import type { ChartView, RequestPage } from '@dshfiles/usage/api'
+import type { ChartView, RequestPage } from './api.js'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { AccountUsageDashboardContent } from './account-usage-dashboard.js'
