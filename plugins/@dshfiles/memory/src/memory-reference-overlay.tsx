@@ -1,4 +1,4 @@
-import { MarkdownText, writeClipboard, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -10,6 +10,7 @@ import { ArrowUpRightIcon, BookOpenIcon, CheckIcon, CopyIcon, MessageSquareIcon,
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 
 import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryApi, type MemoryPreview, type PanelNote, type PanelThread } from './api.ts'
@@ -393,7 +394,7 @@ export const MemoryReferenceOverlay = (props: {
   const api = useApi(memoryApi)
   const [request, setRequest] = useState<MemoryReferencePreviewRequest | null>(null)
   const [anchor, setAnchor] = useState<MemoryReferencePreviewRequest['anchor'] | null>(null)
-  const [copied, setCopied] = useState(false)
+  const textCopy = useCopyFeedback()
   const preview = useQuery({
     queryKey: ['dshfiles-memory', 'reference-preview', request?.id, request?.range],
     enabled: request !== null,
@@ -436,12 +437,6 @@ export const MemoryReferenceOverlay = (props: {
       window.removeEventListener('resize', remeasure)
     }
   }, [request])
-
-  useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 1_500)
-    return () => window.clearTimeout(timer)
-  }, [copied])
 
   if (request === null) return null
   const card = previewCard(preview.data)
@@ -519,11 +514,11 @@ export const MemoryReferenceOverlay = (props: {
             variant="ghost"
             disabled={copyText.length === 0}
             onClick={() => {
-              void writeClipboard(copyText).then(() => setCopied(true))
+              void textCopy.copy(copyText)
             }}
           >
-            {copied ? <CheckIcon /> : <CopyIcon />}
-            {copied ? 'Copied' : 'Copy'}
+            {textCopy.copied ? <CheckIcon /> : <CopyIcon />}
+            {textCopy.copied ? 'Copied' : 'Copy'}
           </Button>
           <Button
             size="xs"

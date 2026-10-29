@@ -49,6 +49,7 @@ import {
   TextCursorInputIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   useCallback,
@@ -610,7 +611,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const refetchClientUpdates = clientUpdates.refetch
   const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
   const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
-  const [launchUrlCopied, setLaunchUrlCopied] = useState(false)
+  const launchUrlCopy = useCopyFeedback()
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -1795,14 +1796,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   size="icon-sm"
                   className="dshx:shrink-0 dshx:text-muted-foreground"
                   aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
-                  onClick={() =>
-                    void navigator.clipboard.writeText(launchUrl).then(() => {
-                      setLaunchUrlCopied(true)
-                      window.setTimeout(() => setLaunchUrlCopied(false), 1500)
-                    })
-                  }
+                  onClick={() => void launchUrlCopy.copy(launchUrl)}
                 >
-                  {launchUrlCopied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
+                  {launchUrlCopy.copied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">{text(props.t, 'threadSidebarCopyLaunchUrl')}</TooltipContent>

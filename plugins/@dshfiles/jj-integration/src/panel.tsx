@@ -1,5 +1,5 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/palette-contract'
@@ -45,6 +45,7 @@ import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } fr
 import { useApi, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
@@ -381,7 +382,7 @@ const ThreadRow = (props: {
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const nameCopy = useCopyFeedback()
   const [integrationBookmark, setIntegrationBookmark] = useState(props.bookmark)
   const previewId = useId()
   useEffect(() => {
@@ -424,13 +425,6 @@ const ThreadRow = (props: {
         ? t('pendingRevision', { count: assessment.pendingRevisions })
         : t('pendingRevisions', { count: assessment.pendingRevisions })
   const lifecycleText = lifecycleLabel(t, props.lifecycle)
-  const copyName = (): void => {
-    void writeClipboard(thread.name).then(ok => {
-      if (!ok) return
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1_500)
-    })
-  }
   const details = (
     <>
       {assessment.blockers.length === 0 ? null : (
@@ -459,13 +453,13 @@ const ThreadRow = (props: {
                 size="icon-sm"
                 variant="ghost"
                 className="dshx:shrink-0"
-                aria-label={copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}
-                onClick={copyName}
+                aria-label={nameCopy.copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}
+                onClick={() => void nameCopy.copy(thread.name)}
               >
-                {copied ? <CheckIcon className="dshx:text-success" /> : <CopyIcon />}
+                {nameCopy.copied ? <CheckIcon className="dshx:text-success" /> : <CopyIcon />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}</TooltipContent>
+            <TooltipContent>{nameCopy.copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}</TooltipContent>
           </Tooltip>
         </dd>
       </dl>

@@ -56,6 +56,15 @@ export const Tag = (props: { tone?: string; className?: string | undefined; chil
   <span data-tone={props.tone}>{props.children}</span>
 )
 
+export const writeClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const StateDot = (props: { state: string }): JSX.Element => <span aria-hidden data-state={props.state} />
 
 export const Tooltip = (props: { content?: ReactNode; label?: ReactNode; children?: ReactNode }): JSX.Element => <>{props.children}</>

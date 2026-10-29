@@ -1,10 +1,10 @@
-import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { BarChart3Icon, CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon, SlidersHorizontalIcon, UserRoundIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { KIND_LABEL, routedKind } from './account-labels.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
@@ -153,7 +153,7 @@ export const AccountInlineSettings = (props: SettingsProps & { readonly onConnec
 
 export const AccountSettings = (props: SettingsProps & { readonly folderPicker: WorkspacePickerPorts; readonly onConnect: () => void }): JSX.Element => {
   const [editing, setEditing] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const accountIdCopy = useCopyFeedback()
   const selected = props.state.selected
   const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
   return (
@@ -196,8 +196,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
             <Button
               aria-label="Copy account ID"
               onClick={() =>
-                void writeClipboard(props.draft.instanceId).then(success => {
-                  setCopied(success)
+                void accountIdCopy.copy(props.draft.instanceId).then(success => {
                   if (!success) props.state.setNotice('Could not copy the account ID. Select and copy the route text instead.')
                 })
               }
@@ -205,7 +204,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
               type="button"
               variant="ghost"
             >
-              {copied ? <CheckIcon /> : <CopyIcon />}
+              {accountIdCopy.copied ? <CheckIcon /> : <CopyIcon />}
             </Button>
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Authentication</dt>
