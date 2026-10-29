@@ -2,7 +2,14 @@
 
 Plugins here that vendor a whole native DSH package, disable its Loader row and carry a small recorded delta. Why and
 how to fork: [replacing native DSH plugins](native-plugin-overrides.md). Each fork's `native-fork.json` is the
-machine-readable record (upstream package, pinned ref, path mapping, delta files); its README explains each delta.
+machine-readable record; its README explains each delta:
+
+| Field      | Holds                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| `upstream` | `repository`, `package`, `version`, the pinned git `ref` and the package `path` inside the repository        |
+| `files`    | `{ upstream, local }` path mappings, relative to the upstream package and to the plugin                      |
+| `delta`    | vendored files (they exist upstream at `ref`) that carry a local change                                      |
+| `added`    | optional: owned files that live under a mapped `local` path but have no upstream counterpart (extra modules, tests) |
 
 | Fork                                                                      | Upstream package                            | Pinned            | Loader row replaced  | Why                                                                                                                                                                                                                                   |
 | ------------------------------------------------------------------------- | ------------------------------------------- | ----------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,8 +49,12 @@ node scripts/native-fork-diff.mjs chat --to <new-tag>     # what a bump changes:
 ```
 
 The first form fails when a vendored file differs from the pinned ref without being listed in `delta`, when a listed
-delta file is back to upstream, or when the fork gained or lost files under a vendored path. Run it after editing a
-fork. The second form fetches the new ref into the upstream cache (`~/.cache/dshfiles/deepseek-harness`) and splits
+delta file is back to upstream or is not an upstream file at all, when a vendored file is missing, when a file under a
+vendored path is neither upstream nor listed in `added`, or when an `added` entry no longer exists or became an
+upstream file. It compares git blob ids against the cached blobless clone, so it reads no upstream content and runs in
+a few seconds once the clone exists; `pnpm check:native-forks` runs it as part of `check:green`. Its first run clones
+the upstream repository (network). Run it after editing a fork, and list a new owned file in `added` rather than
+leaving it undeclared. The second form fetches the new ref into the upstream cache (`~/.cache/dshfiles/deepseek-harness`) and splits
 the upstream diff into plain copies and delta files to merge by hand.
 
 To bump a fork: copy the upstream files listed under `copy`, merge the ones under `reapplyDelta`, set

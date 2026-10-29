@@ -49,7 +49,6 @@
     "src/native/chat/TurnTailNodeView.tsx",
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",
-    "src/native/chat/markdown-image-links.ts",
     "src/native/chat/register-node-renderers.ts",
     "src/native/chat/use-chat-viewport.ts",
     "src/native/contract/chat-nodes.ts",
@@ -61,5 +60,16 @@
     "src/native/conversation-nodes/turn-process.ts",
     "src/native/conversation-nodes/turn-tail.ts",
     "src/native/locale.ts"
+  ],
+  "added": [
+    "src/native/chat/ReasoningTiming.tsx",
+    "src/native/chat/external-link-opening.ts",
+    "src/native/chat/image-gallery.ts",
+    "src/native/chat/markdown-image-links.ts",
+    "src/native/chat/session-sidebar.test.ts",
+    "src/native/chat/session-sidebar.ts",
+    "src/native/chat/user-image-references.ts",
+    "src/native/image-gallery-scope.ts",
+    "src/native/settings/ImageGalleryScopeRow.tsx"
   ]
 }

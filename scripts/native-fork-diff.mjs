@@ -8,10 +8,12 @@
  *   node scripts/native-fork-diff.mjs <fork> --to <ref>       upgrade: upstream files changed from the pinned ref to <ref>,
  *                                                              split into plain copies and files carrying a local delta
  *
- * Upstream is a blobless clone cached in ~/.cache/dshfiles/deepseek-harness; blobs are fetched on first read.
+ * Upstream is a blobless clone cached in ~/.cache/dshfiles/deepseek-harness. Drift compares git blob ids, so it
+ * reads no upstream blob; an upgrade diff fetches only the trees it needs.
  */
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -33,9 +35,15 @@ const ensureRef = (repository, ref) => {
 }
 
 const upstreamFiles = (ref, path) =>
-  String(git(['ls-tree', '-r', '--name-only', ref, '--', path]))
+  String(git(['ls-tree', '-r', '--full-tree', ref, '--', path]))
     .split('\n')
     .filter(Boolean)
+    .map(line => {
+      const [meta, upstreamPath] = line.split('\t')
+      return { upstreamPath, blob: meta.split(' ')[2] }
+    })
+
+const blobId = content => createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex')
 
 const localFiles = root => {
   if (!existsSync(root)) return []
@@ -56,21 +64,23 @@ const vendoredPairs = fork => {
   const { upstream, files } = fork.manifest
   return files.flatMap(mapping => {
     const upstreamRoot = `${upstream.path}/${mapping.upstream}`
-    return upstreamFiles(upstream.ref, upstreamRoot).map(upstreamPath => ({
+    return upstreamFiles(upstream.ref, upstreamRoot).map(({ upstreamPath, blob }) => ({
       upstreamPath,
+      blob,
       local: join(mapping.local, upstreamPath.slice(upstreamRoot.length)).replace(/\/$/, ''),
     }))
   })
 }
 
 const drift = fork => {
-  const { upstream, files, delta } = fork.manifest
+  const { upstream, files, delta, added: declaredAdded = [] } = fork.manifest
   ensureRef(upstream.repository, upstream.ref)
   const deltaFiles = new Set(delta)
+  const ownedFiles = new Set(declaredAdded)
   const pairs = vendoredPairs(fork)
   const vendored = new Set(pairs.map(pair => pair.local))
   const undeclared = []
-  const staleDelta = []
+  const staleDelta = delta.filter(path => !vendored.has(path))
   const missing = []
   for (const pair of pairs) {
     const localPath = join(fork.root, pair.local)
@@ -78,17 +88,20 @@ const drift = fork => {
       missing.push(pair.local)
       continue
     }
-    const same = Buffer.compare(git(['show', `${upstream.ref}:${pair.upstreamPath}`]), readFileSync(localPath)) === 0
+    const same = blobId(readFileSync(localPath)) === pair.blob
     if (!same && !deltaFiles.has(pair.local)) undeclared.push(pair.local)
     if (same && deltaFiles.has(pair.local)) staleDelta.push(pair.local)
   }
-  const added = files
+  const unvendored = files
     .flatMap(mapping => localFiles(join(fork.root, mapping.local)))
     .map(path => relative(fork.root, path))
     .filter(path => !vendored.has(path))
-  const report = { fork: fork.name, upstream: `${upstream.package}@${upstream.version} (${upstream.ref})`, undeclared, staleDelta, missing, added }
+  const added = unvendored.filter(path => !ownedFiles.has(path))
+  const present = new Set(unvendored)
+  const staleAdded = declaredAdded.filter(path => !present.has(path))
+  const report = { fork: fork.name, upstream: `${upstream.package}@${upstream.version} (${upstream.ref})`, undeclared, staleDelta, missing, added, staleAdded }
   console.log(JSON.stringify(report, null, 2))
-  return undeclared.length + staleDelta.length + missing.length + added.length === 0
+  return undeclared.length + staleDelta.length + missing.length + added.length + staleAdded.length === 0
 }
 
 const upgrade = (fork, target) => {

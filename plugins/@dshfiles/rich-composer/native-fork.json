@@ -41,5 +41,16 @@
     "src/native/skeleton/ConversationRoot.module.css",
     "src/native/queue/QueueDock.tsx",
     "src/native/service.ts"
+  ],
+  "added": [
+    "src/native/conversation/live-bindings.test.ts",
+    "src/native/conversation/live-bindings.ts",
+    "src/native/image-attachment-references.test.ts",
+    "src/native/image-attachment-references.ts",
+    "src/native/input/editor/keymap.test.ts",
+    "src/native/input/editor/reference-activation.test.ts",
+    "src/native/input/machine.test.ts",
+    "src/native/input/retained-send.test.ts",
+    "src/native/input/retained-send.ts"
   ]
 }
