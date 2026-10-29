@@ -6,9 +6,17 @@
       "id": "workbench-conversation-views",
       "title": "Dock an independently bound Conversation view",
       "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["source-available", "panel-open", "session-unavailable", "panel-closed", "restored"],
+      "states": [
+        "source-available",
+        "panel-open",
+        "session-unavailable",
+        "panel-closed",
+        "restored"
+      ],
       "failureModes": [
         "Failed acquisition displays an error instead of another thread.",
         "Removed views or deleted threads retire their source; Workbench keeps its standard unavailable-panel recovery."
@@ -21,7 +29,11 @@
         }
       ],
       "verification": [
-        { "kind": "gherkin", "id": "rich-composer.workbench-header", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" },
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.workbench-header",
+          "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature"
+        },
         {
           "kind": "unit-test",
           "id": "rich-composer.header-single-declarer",
@@ -40,7 +52,11 @@
           "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
           "testName": "selects native child views independently in two fixed Sessions without replacing either editor"
         },
-        { "kind": "gherkin", "id": "rich-composer.workbench-conversation-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.workbench-conversation-views",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "rich-composer.canonical-editor-return",
@@ -77,15 +93,24 @@
       "id": "paste-session-mentions",
       "title": "Paste session mentions as reference chips",
       "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["composer-ready", "mention-pasted", "reference-chip-visible"],
+      "states": [
+        "composer-ready",
+        "mention-pasted",
+        "reference-chip-visible"
+      ],
       "failureModes": [
         "Invalid or unsupported session-reference wire text remains ordinary editable text.",
         "The original clipboard HTML is never inserted into the composer DOM."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": [
+        "click button \"New session\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -110,9 +135,15 @@
       "id": "image-attachment-reference",
       "title": "Add inline references for image attachments",
       "summary": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["composer-ready", "image-attached", "image-reference-visible"],
+      "states": [
+        "composer-ready",
+        "image-attached",
+        "image-reference-visible"
+      ],
       "failureModes": [
         "An image rejected by attachment validation does not get an inline reference.",
         "References preserve attachment order and remain tied to the image draft id."
@@ -154,9 +185,16 @@
       "id": "image-reference-mentions",
       "title": "Reuse image references and open the selected image",
       "summary": "Attached images remain reusable @ candidates; repeated picks create distinct chips, and activating a chip opens that exact image in the attachment gallery.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["composer-ready", "images-attached", "image-reference-visible", "gallery-open"],
+      "states": [
+        "composer-ready",
+        "images-attached",
+        "image-reference-visible",
+        "gallery-open"
+      ],
       "failureModes": [
         "A stale or removed image reference does not open an unrelated attachment.",
         "Repeated picks of one image remain separate occurrences in the composer."
@@ -203,9 +241,16 @@
       "id": "rename-thread-title",
       "title": "Rename a thread from its header title",
       "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
+      "states": [
+        "title-idle",
+        "title-editing",
+        "title-committed",
+        "title-cancelled"
+      ],
       "failureModes": [
         "A rename the Host refuses keeps the editor open with an error and the previous title stays on the thread.",
         "An unchanged or blank draft closes the editor without a Host call."
@@ -229,6 +274,39 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: Rename a thread from its header title renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "composer-contract",
+      "title": "Composer contract for other plugins",
+      "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote and note chips, the next message's model and variant, and focus. Quote and note chips keep their text in the chip, so a restored draft still sends them.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "no-composer",
+        "composer-current",
+        "composer-focused"
+      ],
+      "failureModes": [
+        "Every verb returns false when no composer is retained for the addressed session or the draft is locked by a send in flight.",
+        "setModel returns false when no model directory service runs or the Host refuses the selection."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.composer-snippets",
+          "file": "plugins/@dshfiles/rich-composer/tests/composer-snippets.test.ts",
+          "testName": "sends a quote as a Markdown block quote under a short label"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the Composer contract edits browser draft state; setModel uses the model picker's existing Host call."
         }
       ]
     }

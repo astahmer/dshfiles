@@ -1,8 +1,10 @@
-import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { Composer, createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
+import { createComposerService } from './composer-service.ts'
+import { ComposerSnippets } from './composer-snippets.ts'
 import { apply, inject } from './native/index.js'
 
 type ComposerControls = SettingsValue<typeof composerControlsSettings.schema>
@@ -12,8 +14,12 @@ const HiddenPermissionSelector = (): null => null
 export default defineClient({
   name: '@dshfiles/rich-composer',
   inject: [...inject, 'sessionDrafts'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     apply(ctx)
+    metadata?.plugin?.provide(Composer, createComposerService(ctx))
+    ctx.inject(['inputTriggers'], scope => {
+      scope.effect(() => ComposerSnippets.register(scope.get('inputTriggers')), 'rich-composer: quote and note chips')
+    })
 
     const warmup = createApiClient(ctx, agentWarmupApi)
     ctx.on('dshfiles/composer/first-edit', sessionId => {

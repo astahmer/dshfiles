@@ -64,6 +64,10 @@ The root assembly declares only its own session-scoped child. That child calls t
 
 The upstream editor handles clipboard `text/plain` as editable text. This fork parses canonical `@[label](dsh-session:<base64url>)` values in that text and inserts each through the native session-scoped reference action, preserving surrounding text and selection. Unsupported or invalid wire values remain ordinary text. HTML clipboard data is never inserted into the DOM; when plain text is absent, it is reduced to text and valid `dsh-session:` anchors are converted to the same canonical wire format.
 
+## Composer contract
+
+The fork provides dshx's `Composer` contract (`src/composer-service.ts`) over its per-session input shells, so other plugins read and edit the draft, add chips, pick the model and move focus without a slot of their own. Quote and note chips are reference chips of the `composer-snippet` input-trigger source (`src/composer-snippets.ts`): the chip carries its text in `ref`, so a restored draft still sends it, and the model reads a quote as a Markdown block quote and a note inside `<note>` tags. File chips use the native `reference` source the composer's file drop already uses. `setModel` goes through the `modelDirectories` service, the same path as the model picker.
+
 ## Composer settings
 
 `hidePermissionSelector` (Plugins page, off by default) hides the permission mode selector. The seat is a single Slot, so an empty occupant at priority -1 shadows the native selector while the setting is on and is disposed when it turns off; the change applies live.

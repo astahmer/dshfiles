@@ -4314,6 +4314,9 @@ importers:
       '@dshfiles/workbench':
         specifier: workspace:*
         version: link:../workbench
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4

@@ -34,7 +34,8 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
-    "@dshfiles/workbench": "workspace:*"
+    "@dshfiles/workbench": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
