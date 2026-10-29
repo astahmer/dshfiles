@@ -2,7 +2,7 @@
   "agent-questions": "Styles and scans the native question card. It renders no surface of its own; the card it decorates belongs to DSH core and needs a live model turn to appear.",
   "diff-viewed": "Adds a Viewed toggle to the deliverables review pane. The pane only exists for a turn that produced reviewable files, and the scratch seeds create none.",
   "goal-stall-guard": "Host-side goal policy. It renders nothing itself: the pause, continue or close it decides appears in the native goal controls.",
-  "send-after-upload": "Its banner exists only while an attachment upload is still finishing, which a local scratch upload never holds open long enough to capture.",
+  "send-after-upload": "Its composer pill exists only while an attachment upload is still running. The upload is an XHR in a Web Worker that only a Playwright route can hold, and that route ends when `dshx dev open` disconnects, so no reach path can keep the pill on screen for `dshx dev shot`; the send-after-upload.queued-send journey covers it.",
   "shared-runtime": "Loads the one shared copy of the Client UI modules. It renders no surface of its own to screenshot.",
   "shortcuts": "Installs keyboard chords only. Every visible result belongs to the surface whose control the chord drives, not to this plugin.",
   "ui-styles": "Compiles and injects the shared plugin stylesheet once per page. It has no screen of its own, only the sheets other plugins render with."

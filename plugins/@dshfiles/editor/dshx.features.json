@@ -4,14 +4,17 @@
     {
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
-      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, and save through Host file APIs.",
+      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview, and save through Host file APIs.",
       "surfaces": ["client", "host", "settings", "integration"],
       "reach": [
         "seed tool-call-thread",
         "click button \"Collapse sidebar\"",
         "click button \"New tab\"",
         "click button \"Editor: Files\"",
-        "expect tree \"Workspace files\""
+        "expect tree \"Workspace files\"",
+        "click text \"README.md\"",
+        "click button \"Preview\"",
+        "expect heading \"Sample\""
       ],
       "configuration": [
         {
