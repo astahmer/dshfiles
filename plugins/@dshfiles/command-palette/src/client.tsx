@@ -295,7 +295,7 @@ export default defineClient({
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
-      plugin.keyed(plugin.list(Command), ContributedCommandsModel.list)
+      plugin.keyed(plugin.commands.keys, keys => ContributedCommandsModel.list(plugin.list(Command).get(), keys))
       plugin.keyed(plugin.list(PaletteActions), ContributedCommandsModel.listActions)
       let lastState: CommandPaletteState = { mode: null, recentLimit: 10 }
       plugin.provide(CommandPalette, {

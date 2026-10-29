@@ -37,6 +37,8 @@ export interface PaletteAction {
   readonly label: string | (() => string)
   readonly aliases?: readonly string[]
   readonly keys?: readonly string[]
+  /** Listed before anything is typed, like a recently used command. */
+  readonly suggested?: boolean
   readonly icon?: ReactNode
   readonly group?: 'destination' | 'command' | 'action'
   readonly isAvailable?: (context: PaletteActionContext) => boolean

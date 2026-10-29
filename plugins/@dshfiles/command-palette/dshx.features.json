@@ -428,6 +428,30 @@
           "reason": "Client-only: Keep palette ranking within the interaction budget renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "command-effective-keys",
+      "title": "Commands show the keys they answer to",
+      "summary": "Command rows show each command's effective keys from api.commands.keys, so a binding the user changed shows at once, and commands marked suggested appear before anything is typed.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["default-keys", "user-binding", "suggested"],
+      "failureModes": ["A command with no effective keys shows no chord."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "command-palette.command-effective-keys",
+          "file": "plugins/@dshfiles/command-palette/src/contributed-commands.test.ts",
+          "testName": "shows the keys a command answers to now and marks a suggested one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the palette renders registry rows and starts no Host work."
+        }
+      ]
     }
   ],
   "kind": "bundle"

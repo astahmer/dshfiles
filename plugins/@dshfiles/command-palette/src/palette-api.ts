@@ -31,6 +31,7 @@ const paletteActionSchema = z.object({
   label: z.custom<PaletteAction['label']>(isActionLabel),
   aliases: z.array(z.string().trim().min(1)).max(20).exactOptional(),
   keys: z.array(z.string().trim().min(1)).max(5).exactOptional(),
+  suggested: z.boolean().exactOptional(),
   icon: z.custom<ReactNode>().exactOptional(),
   group: z.enum(['destination', 'command', 'action']).exactOptional(),
   isAvailable: z.custom<NonNullable<PaletteAction['isAvailable']>>(isOptionalAction).exactOptional(),

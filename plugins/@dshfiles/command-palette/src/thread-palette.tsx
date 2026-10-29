@@ -333,10 +333,11 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
     if (deferredQuery.trim().length > 0)
       return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
-    return PaletteRules.rankActions({ actions: commands.filter(command => boosts.has(command.id)), query: '', boost: id => boosts.get(id) ?? 0 }).slice(
-      0,
-      FRECENT_COMMANDS_ON_EMPTY,
-    )
+    return PaletteRules.rankActions({
+      actions: commands.filter(command => boosts.has(command.id) || command.suggested === true),
+      query: '',
+      boost: id => boosts.get(id) ?? 0,
+    }).slice(0, FRECENT_COMMANDS_ON_EMPTY)
   }, [actionOptions, boosts, deferredQuery, view])
 
   const rows: PaletteRow[] = useMemo(
