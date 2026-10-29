@@ -128,7 +128,15 @@ export const MarkdownText = (props: { text: string; variant?: string; streaming?
   for (const match of props.text.matchAll(MARKDOWN_LINK)) {
     parts.push(props.text.slice(last, match.index))
     const href = match[2] ?? ''
-    parts.push(/^(https?|mailto):/u.test(href) ? <a key={match.index} href={href}>{match[1]}</a> : match[1])
+    parts.push(
+      /^(https?|mailto):/u.test(href) ? (
+        <a key={match.index} href={href}>
+          {match[1]}
+        </a>
+      ) : (
+        match[1]
+      ),
+    )
     last = match.index + match[0].length
   }
   parts.push(props.text.slice(last))

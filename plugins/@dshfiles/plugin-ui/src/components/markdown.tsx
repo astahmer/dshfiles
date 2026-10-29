@@ -18,7 +18,14 @@ export interface MarkdownProps {
 /** The Host Markdown renderer with English chrome, whose custom-scheme links open through `LinkHandler`. */
 export const Markdown = (props: MarkdownProps): JSX.Element => {
   const handlers = useRegistry(LinkHandler)
-  const text = useMemo(() => MarkdownLinks.rewrite(props.text, handlers.map(handler => handler.scheme)), [props.text, handlers])
+  const text = useMemo(
+    () =>
+      MarkdownLinks.rewrite(
+        props.text,
+        handlers.map(handler => handler.scheme),
+      ),
+    [props.text, handlers],
+  )
   return (
     <div className={cn('dshx:min-w-0', props.className)} onClickCapture={MarkdownLinks.openFromClick} onAuxClickCapture={MarkdownLinks.openFromClick}>
       <MarkdownText text={text} labels={props.labels ?? englishLabels} variant={props.variant ?? 'compact'} streaming={props.streaming ?? false} />

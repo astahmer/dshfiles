@@ -20,7 +20,11 @@ describe('Markdown', () => {
 
       await act(async () => {
         await client.mount(
-          defineClientPlugin({ id: 'links', uses: ['ui'], setup: api => void api.add(LinkHandler, { id: 'jj', scheme: 'jj', open: link => opened.push(link) }) }),
+          defineClientPlugin({
+            id: 'links',
+            uses: ['ui'],
+            setup: api => void api.add(LinkHandler, { id: 'jj', scheme: 'jj', open: link => opened.push(link) }),
+          }),
           { packageId: '@test/links' },
         )
       })

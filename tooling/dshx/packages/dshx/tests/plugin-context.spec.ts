@@ -244,14 +244,17 @@ describe('registries', () => {
     let label: string | undefined = 'Sending after upload'
     plugin.add(ComposerPill, {
       id: 'pending',
-      usePill: session => (label === undefined ? undefined : { label: `${label} ${session.sessionId}`, menu: [{ id: 'cancel', title: 'Cancel', run: () => {} }] }),
+      usePill: session =>
+        label === undefined ? undefined : { label: `${label} ${session.sessionId}`, menu: [{ id: 'cancel', title: 'Cancel', run: () => {} }] },
     })
     const [entry] = host.registered
     expect(entry?.name).toBe('conversation.input.dock')
     const inject = entry?.options.inject
     expect(typeof inject === 'function' ? inject('s1') : undefined).toEqual({ sessionId: 's1' })
     const Frame = entry?.component as ComponentType<{ readonly sessionId: string }>
-    expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toContain('<button type="button" aria-haspopup="menu" aria-expanded="false">Sending after upload s1</button>')
+    expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toContain(
+      '<button type="button" aria-haspopup="menu" aria-expanded="false">Sending after upload s1</button>',
+    )
     label = undefined
     expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toBe('')
   })
@@ -341,9 +344,12 @@ describe('layout.side', () => {
 
   it('refuses without a side region or while no session is on screen', () => {
     expect(AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => undefined }).side.open()).toBe(false)
-    const throwing = { isExpanded: () => false, toggleExpanded: () => {
-      throw new Error('no session on screen')
-    } }
+    const throwing = {
+      isExpanded: () => false,
+      toggleExpanded: () => {
+        throw new Error('no session on screen')
+      },
+    }
     const side = AppServicesModel.createLayout({ layout: () => undefined, sidebarRight: () => throwing }).side
     expect(side.toggle()).toBe(false)
     expect(side.expanded.get()).toBe(false)

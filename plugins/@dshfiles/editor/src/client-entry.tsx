@@ -268,7 +268,11 @@ export default defineClient({
           open: openFile,
           openIn: async input => {
             const result = await ctx.remote.session.openWorkspacePath(
-              input.reveal === true ? { path: input.path, action: 'reveal' } : input.application === undefined ? { path: input.path } : { path: input.path, application: input.application },
+              input.reveal === true
+                ? { path: input.path, action: 'reveal' }
+                : input.application === undefined
+                  ? { path: input.path }
+                  : { path: input.path, application: input.application },
             )
             return result.ok
           },

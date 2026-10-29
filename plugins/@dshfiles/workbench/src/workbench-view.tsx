@@ -93,9 +93,7 @@ const Chooser = (props: {
   readonly visible: boolean
   readonly onSelect: (definition: WorkbenchPanelDefinition) => void
   readonly onRun: () => void
-}): JSX.Element => (
-  <NewViewChooser definitions={usePanelDefinitions(props.registry)} onSelect={props.onSelect} onRun={props.onRun} autoFocus={props.visible} />
-)
+}): JSX.Element => <NewViewChooser definitions={usePanelDefinitions(props.registry)} onSelect={props.onSelect} onRun={props.onRun} autoFocus={props.visible} />
 
 /** What a surface with no saved layout of its own opens with, by the region it is. */
 const defaultLayoutOf = (surface: WorkbenchViewProps['surface']): WorkbenchDefaultLayout =>

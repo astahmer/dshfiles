@@ -327,7 +327,13 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           ))}
         </div>
         {viewer !== undefined && active !== undefined && (
-          <Button aria-label={viewer.title} aria-pressed={viewing} onClick={() => toggleViewer(active.id)} size="icon-xs" variant={viewing ? 'secondary' : 'ghost'}>
+          <Button
+            aria-label={viewer.title}
+            aria-pressed={viewing}
+            onClick={() => toggleViewer(active.id)}
+            size="icon-xs"
+            variant={viewing ? 'secondary' : 'ghost'}
+          >
             <EyeIcon />
           </Button>
         )}

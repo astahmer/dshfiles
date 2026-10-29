@@ -181,11 +181,16 @@ PluginContextModel.registerNativeMount(ComposerAction, ({ item, owner, slots, de
 })
 
 interface PillPrimitives {
-  readonly Pill: ComponentType<{ readonly children?: ReactNode; readonly onClick?: () => void; readonly 'aria-haspopup'?: 'menu'; readonly 'aria-expanded'?: boolean }>
+  readonly Pill: ComponentType<{
+    readonly children?: ReactNode
+    readonly onClick?: () => void
+    readonly 'aria-haspopup'?: 'menu'
+    readonly 'aria-expanded'?: boolean
+  }>
   readonly Menu: ComponentType<{
     readonly open: boolean
     readonly anchor: ReactNode
-    readonly items: readonly { readonly id: string; readonly label: ReactNode; readonly disabled?: boolean; readonly danger?: boolean }[]
+    readonly items: readonly { readonly id: string; readonly label: ReactNode; readonly disabled: boolean | undefined; readonly danger: boolean | undefined }[]
     readonly onSelect: (id: string) => void
     readonly onClose: () => void
     readonly side: 'top'
@@ -228,7 +233,7 @@ const composerPillFrame = (item: ComposerPillItem): ComponentType<{ readonly ses
         side: 'top',
         portal: true,
         anchor: createElement(primitives.Pill, { onClick: () => setOpen(!open), 'aria-haspopup': 'menu', 'aria-expanded': open }, ...content),
-        items: rows.map(row => ({ id: row.id, label: row.title, ...(row.disabled === undefined ? {} : { disabled: row.disabled }), ...(row.danger === undefined ? {} : { danger: row.danger }) })),
+        items: rows.map(row => ({ id: row.id, label: row.title, disabled: row.disabled, danger: row.danger })),
         onSelect: select,
         onClose: () => setOpen(false),
       })
@@ -242,7 +247,13 @@ const composerPillFrame = (item: ComposerPillItem): ComponentType<{ readonly ses
         ? createElement(
             'span',
             { role: 'menu' },
-            ...rows.map(row => createElement('button', { key: row.id, type: 'button', role: 'menuitem', disabled: row.disabled === true, onClick: () => select(row.id) }, row.title)),
+            ...rows.map(row =>
+              createElement(
+                'button',
+                { key: row.id, type: 'button', role: 'menuitem', disabled: row.disabled === true, onClick: () => select(row.id) },
+                row.title,
+              ),
+            ),
           )
         : null,
     )
