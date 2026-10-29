@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "session-references",
+      "title": "Attach named outside directories and git repositories to a thread",
+      "summary": "Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["saved", "attached", "detached", "removed", "clone-failed"],
+      "failureModes": [
+        "A relative path, a missing directory or a ref on a directory is refused before anything is saved.",
+        "A failed clone (bad URL, ref or credentials) saves nothing and names the git error.",
+        "Removing a reference detaches it from every Session and deletes only its own clone, never a directory."
+      ],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "Fixed-argv `git clone --depth 1` with a five-minute timeout and terminal prompts disabled.",
+          "deterministicFake": "Real temporary git repositories cloned over file:// in src/references.test.ts; no git mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "references.kind",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "tells a git URL from a directory and refuses a relative path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "references.attachments",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "attaches per Session, keeps the order, and detaches everywhere when a reference is removed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "references.prompt",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "names each attached reference with its path and origin, and nothing when none is attached"
+        },
+        {
+          "kind": "host-test",
+          "id": "references.directory",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "reads a directory in place and refuses one that does not exist"
+        },
+        {
+          "kind": "host-test",
+          "id": "references.clone",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "shallow-clones a git URL at a ref into the clones directory, replacing an earlier clone"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "git clone",
+          "file": "plugins/@dshfiles/references/src/references.test.ts",
+          "testName": "shallow-clones a git URL at a ref into the clones directory, replacing an earlier clone"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    }
+  ]
+}

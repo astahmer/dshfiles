@@ -46,6 +46,7 @@
     "@dshfiles/prompt-stash": "link:../../plugins/@dshfiles/prompt-stash",
     "@dshfiles/pulls-review": "link:../../plugins/@dshfiles/pulls-review",
     "@dshfiles/queue-reorder": "link:../../plugins/@dshfiles/queue-reorder",
+    "@dshfiles/references": "link:../../plugins/@dshfiles/references",
     "@dshfiles/request-messages": "link:../../plugins/@dshfiles/request-messages",
     "@dshfiles/rich-composer": "link:../../plugins/@dshfiles/rich-composer",
     "@dshfiles/secret-catalog": "link:../../plugins/@dshfiles/secret-catalog",
@@ -151,6 +152,7 @@
         "@dshfiles/agent-toolkit",
         "@dshfiles/home",
         "@dshfiles/git-worktrees",
+        "@dshfiles/references",
         "@dshfiles/hmr-gate"
       ]
     }

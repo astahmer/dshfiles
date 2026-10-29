@@ -59,4 +59,4 @@ Resume here: pick the next item.
 | D30 | Undo/redo snapshots rolling back conversation and files together         |
 | D31 | Session warming to keep provider prompt caches alive between prompts     |
 | D32 | Policies: binary denies layered on permissions                           |
-| D33 | References: named outside directories or git repos attached to a session |
+| D33 | Done: `@dshfiles/references` saves a named directory (read in place) or git URL (shallow clone under `$DSH_HOME/references`), attaches it per Session (`/reference`, `reference_*` tools) and names attached ones with their paths in the runtime context; stored in the `dshfiles_references` storage domain |
