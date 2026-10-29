@@ -65,6 +65,8 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
       throw new DshPlatformError('api-unreachable', 'The DSHX API request failed. Confirm that the connected DSH runtime is running.')
     }
     if (response.status === 401) throw new DshPlatformError('authentication-expired', 'The DSH session expired. Use the current tokenized launch URL.')
+    // Connection answers a route nobody registered with HTTP 404: the owning plugin is not loaded.
+    if (response.status === 404) throw new DshPlatformError('api-not-served', `${packageId} does not serve ${apiId}/${method} in this DSH.`)
     if (!response.ok) throw new DshPlatformError('api-http-error', 'DSH API returned HTTP ' + response.status + ' for ' + apiId + '/' + method + '.')
     let body: unknown
     try {

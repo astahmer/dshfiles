@@ -338,6 +338,26 @@ if (!result.ok && isApiOwnerMissing(result.error)) return undefined // jj-integr
 
 The call runs the owner's input schema, handler and output schema, and both sides receive a detached JSON copy, exactly as over Connection. The handler sees `caller: { kind: 'plugin', packageId }`. `isApiServed(ctx, contract)` and `listApis(ctx)` read the registry without calling.
 
+### From a script, a CLI or another process
+
+```ts
+import { connectDshxApiClient } from '@dshfiles/dshx/platform'
+import { notesApi } from '@acme/notes/notes-api'
+
+const notes = await connectDshxApiClient(notesApi) // url: DSHX_URL or the recorded runtime URL
+const note = await notes.get({ id: 'a' })
+```
+
+`connectDshxApiClient(contract, { url?, origin?, cookie?, fetch? })` is the Node-side SDK client for one dshx API: the same methods, `.safe` results and `ApiError` kinds as a Client's `useApi` client, so `isApiOwnerMissing` and `DshxEffect.client` work unchanged. It exchanges the tokenized launch URL for a session cookie (`url`, else `DSHX_URL`, else `~/.dsh/runtime/web-url`), then posts to the API's Connection routes; with `origin` it skips that exchange and calls an already-authenticated session. The contract must declare `owner`. Schemas run on the Host as for any caller; the handler sees `caller: { kind: 'client' }`. It needs Node's `fetch` and is not for the browser, which uses `useApi`.
+
+Against the in-process Host from `@dshfiles/dshx/testing`, pass its Connection's fetch:
+
+```ts
+const host = await createTestHost()
+await host.mount(plugin, { packageId: '@acme/notes' })
+const notes = await connectDshxApiClient(notesApi, { origin: 'http://dshx.test', fetch: host.connection.fetch })
+```
+
 ### When the owner is not loaded
 
 A Host call fails with `ApiError { kind: 'unavailable', remoteCode: 'owner-missing' }` without touching the network. A Client call to routes nobody registered gets Connection's HTTP 404, which dshx reports as the same error. Test it with `isApiOwnerMissing(error)` and stop polling or hide the feature; do not match on transport messages.

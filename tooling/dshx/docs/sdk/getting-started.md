@@ -323,7 +323,9 @@ try {
 }
 ```
 
-The Host harness uses actual Cordis, CommandRuntime, ToolRuntime and SystemPrompt. It does not emulate a session, model execution, RPC transport or profile persistence. Register extra native providers through `host.ctx` when your plugin needs them.
+The Host harness uses actual Cordis, CommandRuntime, ToolRuntime and SystemPrompt. It does not emulate a session, model execution or profile persistence. Register extra native providers through `host.ctx` when your plugin needs them.
+
+The same harness embeds a Host in a script: mount the plugins, then call their APIs in process with `createHostApiClient(host.ctx, contract, callerPackageId)`, or over their real Connection routes with `connectDshxApiClient(contract, { origin: 'http://dshx.test', fetch: host.connection.fetch })` from `@dshfiles/dshx/platform` (see [Typed API](../guides/api.md#from-a-script-a-cli-or-another-process)). `host.connection.fetch` answers as the admitted owner; there is no network listener, browser or launch URL.
 
 New projects include Vitest, a `pnpm test` script, and a native registration/unload test in `tests/host.spec.ts`. Full-stack templates test their tool contributions independently of connection and settings providers. Existing projects can install `vitest` in devDependencies and run `pnpm exec dshx test`. `--file tests/plugin.spec.ts` filters the run. The command uses that project's Vitest installation and propagates test failures.
 

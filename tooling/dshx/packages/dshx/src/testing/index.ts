@@ -41,6 +41,8 @@ export interface TestConnection {
   }): Promise<Response>
   /** One Connection RPC exactly as a browser Client posts it (`endpoint` without `/api/`), so a client half can run against the real routes. */
   requestRpc(request: { readonly endpoint: string; readonly payload: unknown }): Promise<Response>
+  /** `fetch` against the registered routes as the admitted owner, for an out-of-browser client such as `connectDshxApiClient` from `@dshfiles/dshx/platform`. */
+  fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>
   dispose(): void
 }
 
@@ -109,6 +111,7 @@ export function provideTestConnection(ctx: Context): TestConnection {
     requestApi: ({ packageId, apiId, method, version, input }) =>
       requestRpc({ endpoint: `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),
     requestRpc,
+    fetch: (input, init) => handler.fetch(new Request(input, init), peer),
     dispose,
   }
 }

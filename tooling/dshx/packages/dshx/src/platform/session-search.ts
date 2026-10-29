@@ -65,6 +65,7 @@ const fatalCodes = new Set([
   'invalid-method',
   'api-unreachable',
   'api-http-error',
+  'api-not-served',
 ])
 
 const codeOf = (error: unknown): string => {
