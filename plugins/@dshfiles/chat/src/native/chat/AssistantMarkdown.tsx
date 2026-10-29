@@ -3,6 +3,7 @@ import { fileMediaUrl } from '@deepseek-ai/dsh-util-workspace-path'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ReactNode } from 'react'
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { LinkHandler, MarkdownLinks, useRegistry } from '@dshfiles/dshx/client'
 import type { MarkdownFileMentions, MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ReasoningBlockTiming } from '../contract/chat-nodes.ts'
 import type { ChatNodeOwnerProps, ChatViewSlotProps, UseDisclosure, UsePresentation, UseGroupAction } from '../contract/slots.ts'
@@ -66,6 +67,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   const pathImages = useMemo<MarkdownPathImages>(() => {
     return { resolve: value => localPathMediaUrl(document.baseURI, value) }
   }, [])
+  const linkSchemes = useRegistry(LinkHandler).map(handler => handler.scheme)
   const last = blocks.length - 1
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
@@ -85,7 +87,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(
           <MarkdownText
             key={i}
-            text={block.text}
+            text={MarkdownLinks.rewrite(block.text, linkSchemes)}
             streaming={streaming}
             labels={labels}
             fileMentions={mentions}
@@ -145,7 +147,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     }
   }
   return (
-    <div className={css.root} data-streaming={streaming || undefined}>
+    <div className={css.root} data-streaming={streaming || undefined} onClickCapture={MarkdownLinks.openFromClick} onAuxClickCapture={MarkdownLinks.openFromClick}>
       <div className={css.body}>
         {rendered}
         {interrupted && (groupPart === undefined || groupPart === 'response'
