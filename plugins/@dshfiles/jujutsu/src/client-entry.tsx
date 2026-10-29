@@ -24,6 +24,7 @@ import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { sidePanelRepository } from './side-panel-repository.js'
+import { SurfaceVisibility } from './surface-visibility.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
@@ -102,14 +103,19 @@ export default defineClient({
         defaultPath: defaultPath === undefined || defaultPath.length === 0 ? null : defaultPath,
       }
     }
-    const MainSurfacePanel = decorate(() => {
+    const MainSurfacePanel = decorate((props: PropsRuntime<'main'>) => {
       const scope = useActiveJujutsuScope()
-      return panel({ surface: 'main', scope, view: 'graph' })
+      const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: PANEL_ID })
+      return panel({ surface: 'main', scope, visible, view: 'graph' })
     })
-    const MainSourceControlPanel = decorate(() => panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, view: 'source' }))
-    const SideSurfacePanel = decorate(() => {
+    const MainSourceControlPanel = decorate((props: PropsRuntime<'main'>) => {
+      const visible = SurfaceVisibility.useMainPanelVisible({ usePanelInfo: props.usePanelInfo, panelId: SOURCE_CONTROL_PANEL_ID })
+      return panel({ surface: 'main', scope: DEFAULT_PANEL_SCOPE, visible, view: 'source' })
+    })
+    const SideSurfacePanel = decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => {
       const target = useMountedSession()
-      return panel({ surface: 'side-panel', scope: target.scope, defaultPath: target.defaultPath })
+      const visible = SurfaceVisibility.useSideTabVisible(props.useTabInfo)
+      return panel({ surface: 'side-panel', scope: target.scope, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
       panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'graph' }),
