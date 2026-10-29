@@ -17,6 +17,7 @@ import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
 import type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
 type DraggedMove =
@@ -312,9 +313,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           )}
                         >
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                          {tab.status === null ? null : (
-                            <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
-                          )}
+                          {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (
                             <InlineTitleEditor
                               value={tab.title}
@@ -413,9 +412,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
             {tabs.map(tab => (
               <DropdownMenuItem key={tab.id} onSelect={() => send({ type: 'tab.select', tabId: tab.id })} className={cn(tab.active && 'dshx:font-semibold')}>
                 <span className="dshx:truncate">{tab.title}</span>
-                {tab.status === null ? null : (
-                  <span aria-hidden className={cn('dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-full', statusDotClass[tab.status])} />
-                )}
+                {tab.status === null ? null : <StatusDot className={cn('dshx:ml-auto', statusDotClass[tab.status])} />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

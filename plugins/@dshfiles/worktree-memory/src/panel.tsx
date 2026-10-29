@@ -35,6 +35,7 @@ import {
   type StopResult,
   type WorkspaceGroup,
 } from './types.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const snapshotKey = ['worktree-memory', 'snapshot'] as const
 const POLL_MS = 5_000
@@ -119,12 +120,7 @@ export const MemoryGlyph = (props: { readonly size?: number; readonly t: Worktre
   const glyph = (
     <span className="dshx:relative dshx:inline-flex" data-memory-badge-pressure={pressure} data-memory-badge-detached-bytes={String(detachedBytes)}>
       <MemoryStickIcon aria-hidden size={props.size ?? 18} strokeWidth={1.7} />
-      {strained ? (
-        <span
-          aria-hidden
-          className={cn('dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:size-2 dshx:rounded-full dshx:ring-2 dshx:ring-background', PRESSURE[pressure].dot)}
-        />
-      ) : null}
+      {strained ? <StatusDot className={cn('dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:ring-2 dshx:ring-background', PRESSURE[pressure].dot)} /> : null}
       {detachedBytes > 0 ? (
         <span
           aria-hidden
@@ -540,7 +536,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
             <MemoryStickIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
             <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
             <Badge variant="secondary" className="dshx:shrink-0" data-memory-pressure={value?.pressure ?? 'unknown'}>
-              <span aria-hidden className={cn('dshx:size-1.5 dshx:rounded-full', pressure.dot)} />
+              <StatusDot size="sm" className={pressure.dot} />
               {t(pressure.key)}
             </Badge>
             <span className="dshx:ml-auto dshx:text-lg dshx:font-semibold dshx:tabular-nums">

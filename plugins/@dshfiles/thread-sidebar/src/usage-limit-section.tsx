@@ -14,6 +14,7 @@ import { MoreVerticalIcon, RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icon
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ThreadSidebarLocaleKey } from './locales.js'
 import { UsageLimitRowsModel, type UsageLimitRow } from './usage-limit-rows.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export type UsageLimitSnooze = 'one-hour' | 'four-hours' | 'one-day' | 'unsnooze'
 
@@ -93,13 +94,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             className="dshx:group/usage dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:hover:bg-accent/40"
             key={row.continuation.continuationId}
           >
-            <span
-              aria-hidden="true"
-              className={cn(
-                'dshx:size-2 dshx:shrink-0 dshx:self-start dshx:mt-1.5 dshx:rounded-full',
-                snoozed ? 'dshx:bg-muted-foreground/45' : 'dshx:bg-warning',
-              )}
-            />
+            <StatusDot className={cn('dshx:self-start dshx:mt-1.5', snoozed ? 'dshx:bg-muted-foreground/45' : 'dshx:bg-warning')} />
             <button
               draggable
               className="dshx:min-w-0 dshx:flex-1 dshx:text-left"

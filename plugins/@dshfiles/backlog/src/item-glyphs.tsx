@@ -19,6 +19,7 @@ import type { BacklogAttention, BacklogKind, BacklogStatus } from './item.js'
 import { activityPhrase } from './activity-phrase.js'
 import { actorName } from './actor-name.js'
 import { BacklogProjectPaths } from './project-paths.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const statusLabels = { inbox: 'Inbox', todo: 'Todo', doing: 'In progress', done: 'Done', dropped: 'Dropped' } satisfies Record<BacklogStatus, string>
 const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', question: 'Question' } satisfies Record<BacklogKind, string>
@@ -131,7 +132,7 @@ const projectTone = (project: string): string => {
 }
 
 const ProjectDot = (props: { readonly project: string; readonly className?: string }): JSX.Element => (
-  <span aria-hidden className={cn('dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full', projectTone(props.project), props.className)} />
+  <StatusDot className={cn('dshx:inline-block', projectTone(props.project), props.className)} />
 )
 
 /** A project as its dot and short name; the full path stays in the tooltip. */

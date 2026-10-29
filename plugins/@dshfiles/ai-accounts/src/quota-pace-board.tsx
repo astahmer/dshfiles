@@ -6,6 +6,7 @@ import { KIND_LABEL } from './account-labels.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QuotaForecastFormat as Format } from './quota-forecast-format.js'
 import { QuotaPaceModel, type PaceAccount, type PacePoint, type PastWindow } from './quota-pace-model.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 type Mode = 'current' | 'past'
 
@@ -286,7 +287,7 @@ export class PaceBoardView {
             <span>- - If the pace holds</span>
             {mode === 'past' ? <span className="dshx:opacity-70">— Past windows, newest brightest</span> : null}
             <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-destructive" />
+              <StatusDot tone="destructive" />
               {mode === 'current' ? 'Runs out' : 'Ran out'}
             </span>
           </div>

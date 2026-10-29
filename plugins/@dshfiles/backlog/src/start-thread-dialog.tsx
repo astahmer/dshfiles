@@ -2,7 +2,6 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 
@@ -15,6 +14,7 @@ import {
   type StartThreadRequest,
 } from './start-thread.js'
 import { continueMarkdownList } from './list-continuation.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 
@@ -140,9 +140,7 @@ export const StartThreadDialog = (props: {
                 const project = props.projects.find(candidate => `project:${candidate.id}` === option.value)
                 return (
                   <>
-                    {project === undefined ? null : (
-                      <span aria-hidden className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', StartThreadForm.projectTone(projectIndex(project.id)))} />
-                    )}
+                    {project === undefined ? null : <StatusDot className={StartThreadForm.projectTone(projectIndex(project.id))} />}
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
                     {option.description === undefined ? null : (
                       <span className="dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.description}</span>

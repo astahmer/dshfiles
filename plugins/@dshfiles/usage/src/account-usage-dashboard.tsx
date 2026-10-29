@@ -11,6 +11,7 @@ import { usageApi, type ChartQuery, type ChartView, type RequestPage } from './a
 import { useMemo, useState, type ReactNode } from 'react'
 import type { AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { AccountUsageDashboardModel, type AccountUsageDay, type UsagePeriod } from './account-usage-dashboard-model.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const Panel = (props: { heading: string; children: ReactNode; action?: ReactNode; className?: string }): JSX.Element => (
   <section className={cn('dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3', props.className)}>
@@ -274,11 +275,9 @@ const RecentRequests = (props: { requests: RequestPage; onViewAll: () => void })
                 <td className={cellClass}>{AccountUsageDashboardModel.usageCost(row.cost)}</td>
                 <td className={cellClass}>
                   <span className="dshx:inline-flex dshx:items-center dshx:gap-1.5">
-                    <span
-                      className={cn(
-                        'dshx:size-1.5 dshx:rounded-full',
-                        row.status === 'ok' ? 'dshx:bg-success' : row.status === 'failed' ? 'dshx:bg-destructive' : 'dshx:bg-muted-foreground',
-                      )}
+                    <StatusDot
+                      size="sm"
+                      className={row.status === 'ok' ? 'dshx:bg-success' : row.status === 'failed' ? 'dshx:bg-destructive' : 'dshx:bg-muted-foreground'}
                     />
                     {row.status === 'ok' ? 'Success' : row.status === 'failed' ? 'Failed' : 'Aborted'}
                   </span>

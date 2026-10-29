@@ -5,6 +5,7 @@ import { ProviderGlyph } from './provider-glyph.js'
 import { KIND_LABEL } from './account-labels.js'
 import { QuotaForecastFormat as Format } from './quota-forecast-format.js'
 import type { AccountForecast, ForecastBoard, ForecastCell, WindowForecast } from './quota-forecast-model.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const HOUR_MS = 3_600_000
 
@@ -349,7 +350,7 @@ const ForecastDetail = (props: { readonly account: AccountForecast; readonly now
         <span>- - Current pace</span>
         <span>····· Even pace</span>
         <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-          <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-destructive" />
+          <StatusDot tone="destructive" />
           Runs out
         </span>
         <span className="dshx:flex dshx:items-center dshx:gap-1.5">

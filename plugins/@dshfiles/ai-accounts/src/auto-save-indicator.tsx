@@ -3,6 +3,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from '@dshfiles/plugin-ui/icons'
 import type { AutoSaveStatus } from './auto-save.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** A quiet status line for auto-saved edits; only a failure asks for attention. */
 export const AutoSaveIndicator = (props: {
@@ -58,7 +59,7 @@ export const AutoSaveIndicator = (props: {
   if (props.status.kind === 'pending' || props.dirty) {
     return (
       <span className={`${base} dshx:text-muted-foreground`} role="status">
-        <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-warning" />
+        <StatusDot size="sm" tone="warning" />
         Unsaved changes…
       </span>
     )

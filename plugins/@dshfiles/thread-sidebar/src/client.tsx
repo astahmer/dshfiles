@@ -223,6 +223,7 @@ import {
   type ThreadMute,
   type ThreadMuteOption,
 } from './thread-mute.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const sessionActivityAt = (options: {
   readonly session: Pick<SessionSummary, 'id' | 'updatedAt'>
@@ -583,7 +584,7 @@ const MutedMarker = (props: { readonly mute: ThreadMute; readonly t: ThreadSideb
   </Tooltip>
 )
 
-const StatusDot = (props: {
+const SessionStatusDot = (props: {
   readonly session: SessionSummary
   readonly unread: boolean
   readonly unreadLabel: string
@@ -597,14 +598,7 @@ const StatusDot = (props: {
     unread,
     running: props.session.running,
   })
-  return (
-    <span
-      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', dotClass)}
-      role={unread ? 'img' : undefined}
-      aria-label={unread ? props.unreadLabel : undefined}
-      aria-hidden={unread ? undefined : true}
-    />
-  )
+  return <StatusDot className={dotClass} aria-label={unread ? props.unreadLabel : undefined} />
 }
 
 const ChildThreadList = (props: {
@@ -651,7 +645,7 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
-          <StatusDot
+          <SessionStatusDot
             session={child}
             unread={props.unreadSessionIds.has(child.id)}
             unreadLabel={t('threadSidebarUnread')}
@@ -1116,7 +1110,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
                   {rowStyle.statusDot ? (
-                    <StatusDot
+                    <SessionStatusDot
                       session={session}
                       unread={unread}
                       unreadLabel={t('threadSidebarUnread')}
@@ -1226,10 +1220,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 {props.childThreads.slice(0, 3).map(child => {
                   const attentionLabel = props.childAttentionLabels.get(child.id)
                   return (
-                    <span
+                    <StatusDot
                       key={child.id}
                       className={cn(
-                        'dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background',
+                        'dshx:ring-1 dshx:ring-background',
                         ThreadAttentionPresentationModel.attentionDotClass({
                           attentionLabel,
                           attentionColors: rowStyle.attentionColors,
@@ -2188,10 +2182,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-1.5"
                 aria-label={`${props.tSidebar(label)}: ${props.tSidebar('threadSidebarAttentionColor')} ${colorLabel}`}
               >
-                <span
-                  className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(color))}
-                  aria-hidden="true"
-                />
+                <StatusDot className={ThreadAttentionPresentationModel.attentionColorDotClass(color)} />
                 <span className="dshx:truncate">{colorLabel}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -2206,10 +2197,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               >
                 {attentionColorOptions.map(option => (
                   <DropdownMenuRadioItem key={option} value={option}>
-                    <span
-                      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(option))}
-                      aria-hidden="true"
-                    />
+                    <StatusDot className={ThreadAttentionPresentationModel.attentionColorDotClass(option)} />
                     {props.tSidebar(attentionColorLabelKeys[option])}
                   </DropdownMenuRadioItem>
                 ))}
@@ -4359,11 +4347,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         <span className="dshx:truncate">{label}</span>
                       )}
                       {attentionLabel === undefined ? null : (
-                        <span
-                          aria-hidden="true"
+                        <StatusDot
+                          size="sm"
                           data-testid="thread-view-attention-dot"
                           className={cn(
-                            'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
                             ThreadAttentionPresentationModel.attentionDotClass({
                               attentionLabel,
                               attentionColors: preferences.attentionColors,

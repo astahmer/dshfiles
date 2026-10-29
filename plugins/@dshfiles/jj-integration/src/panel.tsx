@@ -66,6 +66,7 @@ import {
 import { useToast } from './toast.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
@@ -141,7 +142,7 @@ const toneClasses = {
 
 const statusChip = (props: { readonly label: string; readonly tone: ThreadIntegrationCategory }): JSX.Element => (
   <Badge variant="outline" className={cn('dshx:w-fit dshx:gap-1.5 dshx:px-2.5 dshx:py-1', toneClasses[props.tone].chip)}>
-    <span className={cn('dshx:size-1.5 dshx:rounded-full', toneClasses[props.tone].dot)} aria-hidden="true" />
+    <StatusDot size="sm" className={toneClasses[props.tone].dot} />
     {props.label}
   </Badge>
 )
@@ -1174,7 +1175,7 @@ export const ThreadWorkspacesPanel = (props: {
                   aria-pressed={filter === tab.id}
                   onClick={() => setFilter(tab.id)}
                 >
-                  {tab.dot === undefined ? null : <span className={cn('dshx:size-1.5 dshx:rounded-full', tab.dot)} aria-hidden="true" />}
+                  {tab.dot === undefined ? null : <StatusDot size="sm" className={tab.dot} />}
                   {tab.label}
                   <span className={cn('dshx:tabular-nums', filter === tab.id ? 'dshx:opacity-80' : 'dshx:text-muted-foreground')}>{counts[tab.id]}</span>
                 </Button>

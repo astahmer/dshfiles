@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { GripVerticalIcon, ServerIcon } from '@dshfiles/plugin-ui/icons'
 import type { RemoteSidebarThread } from './remote-thread-inventory.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const RemoteThreadItem = (props: {
   readonly runtimeId: string
@@ -25,7 +26,7 @@ export const RemoteThreadItem = (props: {
       >
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.label}</span>
         <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:px-1 dshx:text-[11px] dshx:text-muted-foreground">
-          <span className={cn('dshx:size-1.5 dshx:rounded-full', props.connected ? 'dshx:bg-emerald-500' : 'dshx:bg-muted-foreground/50')} aria-hidden />
+          <StatusDot size="sm" className={props.connected ? 'dshx:bg-emerald-500' : 'dshx:bg-muted-foreground/50'} />
           {props.hostName}
         </span>
       </button>

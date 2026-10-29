@@ -22,6 +22,7 @@ import type { EditorStore, OpenDocument } from './editor-store.js'
 import { editorEngineLoaderMachine } from './editor-engine-machine.js'
 import { FileTree } from './file-tree.js'
 import { useEditorSaveMachine } from './use-editor-save-machine.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
@@ -302,7 +303,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
               >
                 {document.name}
               </button>
-              {document.dirty && <span aria-label="Unsaved changes" className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-warning" />}
+              {document.dirty && <StatusDot aria-label="Unsaved changes" size="sm" tone="warning" className="dshx:flex-none" />}
               <button
                 aria-label={`Close ${document.name}`}
                 className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded-sm dshx:opacity-60 dshx:hover:bg-background dshx:hover:opacity-100"

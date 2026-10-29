@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { settingsShellApi } from './shell-api.js'
 import type { DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const RELEASE_STATUS_QUERY_KEY = ['settings-shell', 'release-status'] as const
 const RELEASE_STATUS_REFRESH_MS = 6 * 60 * 60 * 1000
@@ -45,7 +46,7 @@ export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.
   const label = props.t('releaseNotice.badge', { version })
   return (
     <Tooltip label={label} side="right">
-      <span aria-label={label} className="dshx:absolute dshx:end-0 dshx:top-0 dshx:size-1.5 dshx:rounded-full dshx:bg-warning" role="img" />
+      <StatusDot aria-label={label} size="sm" tone="warning" className="dshx:absolute dshx:end-0 dshx:top-0" />
     </Tooltip>
   )
 }

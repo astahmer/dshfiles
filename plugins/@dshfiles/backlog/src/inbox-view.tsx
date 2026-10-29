@@ -12,6 +12,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const threadReasons = {
   completed: { label: 'finished and waits for review', Icon: CircleCheckIcon, tone: 'dshx:text-success' },
@@ -137,10 +138,7 @@ export const InboxView = (props: {
                 )}
               >
                 {isUnread(item) || threads.length > 0 ? (
-                  <span
-                    aria-label="Unread"
-                    className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:size-1.5 dshx:-translate-y-1/2 dshx:rounded-full dshx:bg-info"
-                  />
+                  <StatusDot aria-label="Unread" size="sm" tone="info" className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:-translate-y-1/2" />
                 ) : null}
                 {item.proposal !== null && item.attention === 'none' ? (
                   <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-violet/15 dshx:text-violet">

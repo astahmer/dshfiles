@@ -33,8 +33,8 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { agentCommunicationApi, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput } from './api.js'
 import { MessagePages } from './message-pages.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AgentCommunicationTranslate } from './locales.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const diagnosticsKey = ['agent-communication', 'diagnostics'] as const
 const browseKey = ['agent-communication', 'browse'] as const
@@ -647,17 +647,10 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                             {/* A dot, not a badge: the 15rem column needs its width for the thread title. */}
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span
+                                <StatusDot
                                   aria-label={agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
-                                  className={cn(
-                                    'dshx:size-2 dshx:shrink-0 dshx:rounded-full',
-                                    agent === undefined
-                                      ? 'dshx:border dshx:border-muted-foreground'
-                                      : agent.status === 'running'
-                                        ? 'dshx:bg-success'
-                                        : 'dshx:bg-muted-foreground/50',
-                                  )}
-                                  role="img"
+                                  className={agent === undefined ? 'dshx:border dshx:border-muted-foreground' : undefined}
+                                  tone={agent === undefined ? undefined : agent.status === 'running' ? 'success' : 'muted'}
                                 />
                               </TooltipTrigger>
                               <TooltipContent>

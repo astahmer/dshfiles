@@ -17,6 +17,7 @@ import { useAutoSaver } from './auto-save.js'
 import { NativeProvidersList } from './native-providers-list.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { usePreferences } from './use-preferences.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** The one credential field each kind needs to work, edited in place. */
 const CREDENTIAL_FIELD = {
@@ -178,11 +179,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
                   </div>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span
-                        aria-label={profile.signedIn ? 'Signed in' : 'Not signed in'}
-                        className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', profile.signedIn ? 'dshx:bg-success' : 'dshx:bg-destructive')}
-                        role="img"
-                      />
+                      <StatusDot aria-label={profile.signedIn ? 'Signed in' : 'Not signed in'} tone={profile.signedIn ? 'success' : 'destructive'} />
                     </TooltipTrigger>
                     {(profile.signedIn ? 'Signed in' : profile.loginHint) === '' ? null : (
                       <TooltipContent>{profile.signedIn ? 'Signed in' : profile.loginHint}</TooltipContent>

@@ -14,6 +14,7 @@ import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const cardClass =
   'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:border-border/70 dshx:bg-card dshx:p-5 dshx:@max-pane-narrow:p-4'
@@ -211,7 +212,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dd>{accountAuthenticationLabel(props.draft)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Token status</dt>
           <dd className={cn('dshx:inline-flex dshx:items-center dshx:gap-2', status?.tone === 'success' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
-            <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+            <StatusDot tone="current" />
             {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Last checked</dt>

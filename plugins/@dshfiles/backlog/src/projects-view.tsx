@@ -12,6 +12,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
 import { BacklogQueries, type BacklogUpdateInput, useBacklogActions } from './use-backlog-actions.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const DAY_MS = 86_400_000
 const NO_PROJECT = ''
@@ -405,7 +406,7 @@ export const ProjectsView = (props: {
                         recent ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground',
                       )}
                     >
-                      <span aria-hidden className={cn('dshx:size-1.5 dshx:rounded-full', recent ? 'dshx:bg-success' : 'dshx:bg-muted-foreground')} />
+                      <StatusDot size="sm" className={recent ? 'dshx:bg-success' : 'dshx:bg-muted-foreground'} />
                       {recent ? 'Active' : 'Quiet'}
                     </span>
                   </div>

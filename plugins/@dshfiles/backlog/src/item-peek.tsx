@@ -74,6 +74,7 @@ import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
 import { workspaceReferenceLabel } from './workspace-reference-label.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -705,7 +706,7 @@ const Conversation = (props: {
             aria-hidden
             className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
           >
-            <span className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+            <StatusDot size="sm" tone="info" className="dshx:animate-pulse" />
           </span>
           <span className="dshx:animate-pulse">Thinking…</span>
         </li>
@@ -911,10 +912,7 @@ const LinkRow = (props: {
             props.thread.running ? 'dshx:text-info' : 'dshx:text-muted-foreground',
           )}
         >
-          <span
-            aria-hidden
-            className={cn('dshx:size-1.5 dshx:rounded-full', props.thread.running ? 'dshx:animate-pulse dshx:bg-info' : 'dshx:bg-muted-foreground/50')}
-          />
+          <StatusDot size="sm" tone={props.thread.running ? 'info' : 'muted'} className={props.thread.running ? 'dshx:animate-pulse' : undefined} />
           {props.thread.running ? 'running' : 'idle'}
         </span>
       )}
@@ -1159,7 +1157,7 @@ const PeekBody = (props: {
             >
               {running.map(thread => (
                 <div key={thread.id} className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
-                  <span aria-hidden className="dshx:mt-1 dshx:size-1.5 dshx:shrink-0 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+                  <StatusDot size="sm" tone="info" className="dshx:mt-1 dshx:animate-pulse" />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                     <span className="dshx:text-muted-foreground">Running in</span>
                     <span className="dshx:truncate dshx:font-medium">{thread.title}</span>

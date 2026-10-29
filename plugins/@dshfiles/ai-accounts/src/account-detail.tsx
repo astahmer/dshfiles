@@ -35,6 +35,7 @@ import { QuotaSection } from './quota-section.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const AccountDetail = (props: {
   readonly state: AccountsPanelState
@@ -89,7 +90,7 @@ export const AccountDetail = (props: {
             )}
           >
             <span className="dshx:flex dshx:items-center dshx:gap-2">
-              <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+              <StatusDot tone="current" />
               {status?.label ?? 'Not connected'}
             </span>
             <small className="dshx:mt-1 dshx:block dshx:text-[10px]">

@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { usageApi, type RequestQuery, type RequestView } from './api.js'
 import type { RequestPurpose, RequestStatus } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const PAGE_SIZE = 200
 
@@ -210,7 +211,7 @@ export const RequestLog = (props: {
                 <TableCell>
                   <span className="dshx:flex dshx:flex-col">
                     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-                      <span aria-hidden className={cn('dshx:size-2 dshx:rounded-full', STATUS_DOT[row.status])} />
+                      <StatusDot className={STATUS_DOT[row.status]} />
                       {STATUS_LABEL[row.status]}
                     </span>
                     <span className="dshx:text-[11px] dshx:text-muted-foreground">{row.errorCode ?? row.stopReason ?? ''}</span>
