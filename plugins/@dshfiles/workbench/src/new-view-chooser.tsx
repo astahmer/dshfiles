@@ -2,6 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useRef, useState } from 'react'
+import { NewThreadSource } from './new-thread-source.js'
 import type { WorkbenchPanelDefinition } from './registry.js'
 
 export const NewViewChooser = (props: {
@@ -25,8 +26,10 @@ export const NewViewChooser = (props: {
   )
   const matches = (definition: WorkbenchPanelDefinition): boolean => definition.title.toLocaleLowerCase().includes(query)
   const views = available.filter(matches).sort((left, right) => {
-    const priority = (definition: WorkbenchPanelDefinition): number =>
-      definition.id === 'dshfiles-settings' ? 0 : definition.id === 'dshfiles-thread-sidebar.workbench-navigation' ? 1 : 2
+    const priority = (definition: WorkbenchPanelDefinition): number => {
+      const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
+      return index === -1 ? 3 : index
+    }
     return priority(left) - priority(right) || left.title.localeCompare(right.title)
   })
   return (
