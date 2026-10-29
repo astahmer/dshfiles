@@ -68,7 +68,7 @@ type SyncState = z.infer<typeof syncStateSchema>
 const readJson = <Schema extends z.ZodType>(schema: Schema, path: string): z.output<Schema> => decodeJson(schema, readFileSync(path, 'utf8'))
 const errorCode = (error: unknown): string | undefined => z.object({ code: z.string() }).safeParse(error).data?.code
 const isOwned = (name: string): boolean => name.startsWith('@dshfiles/')
-const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex')
+const sha256 = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex')
 const log = (message: string): void => console.log(`profile-sync: ${message}`)
 
 const { values } = parseArgs({
@@ -366,8 +366,53 @@ const syncOwnedBundles = async (): Promise<void> => {
   })
 }
 
+const bundleSourcesSchema = z.object({ sources: z.array(z.string()), hashes: z.record(z.string(), z.string().nullable()).optional() })
+const pluginScriptsSchema = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
+
+/**
+ * Linked plugins whose bundle is missing or was built from a workspace source that has since changed. DSH loads a dist
+ * as it is, so after a base change or a failed build an old bundle boots against newer neighbours and fails on imports.
+ * A source newer than its bundle counts only when its content differs from the hash the build recorded, since a jj
+ * checkout rewrites files it leaves unchanged.
+ */
+const staleLinkedBundles = (): readonly string[] => {
+  if (!existsSync(manifestPath)) return []
+  const manifest = readJson(profileManifestSchema, manifestPath)
+  return Object.entries(manifest.dependencies).flatMap(([name, spec]) => {
+    if (!isOwned(name) || !spec.startsWith('link:')) return []
+    const directory = resolve(profileDirectory, spec.slice('link:'.length))
+    const packagePath = join(directory, 'package.json')
+    if (!existsSync(packagePath) || readJson(pluginScriptsSchema, packagePath).scripts.build === undefined) return []
+    const distDirectory = join(directory, 'dist')
+    if (!existsSync(join(distDirectory, 'index.js'))) return [name]
+    const stale = readdirSync(distDirectory)
+      .filter(file => file.endsWith('.js.deps.json'))
+      .some(file => {
+        const bundlePath = join(distDirectory, file.slice(0, -'.deps.json'.length))
+        if (!existsSync(bundlePath)) return true
+        const builtAt = statSync(bundlePath).mtimeMs
+        const dependencies = readJson(bundleSourcesSchema, join(distDirectory, file))
+        return dependencies.sources
+          .filter(source => !source.includes('node_modules/'))
+          .some(source => {
+            const sourcePath = resolve(directory, source)
+            if (!existsSync(sourcePath)) return true
+            if (statSync(sourcePath).mtimeMs <= builtAt) return false
+            const recorded = dependencies.hashes?.[source]
+            return recorded === undefined || recorded !== sha256(readFileSync(sourcePath))
+          })
+      })
+    return stale ? [name] : []
+  })
+}
+
 try {
   await (values.bundle === undefined && existsSync(seedManifestPath) ? syncSeededProfile() : syncOwnedBundles())
+  const stale = staleLinkedBundles()
+  if (stale.length > 0) {
+    console.warn(`profile-sync: warning: ${stale.length} plugin bundles are older than their sources and DSH will load the old code: ${stale.join(', ')}`)
+    console.warn(`profile-sync: run \`pnpm build --continue\` in ${repositoryRoot}, then restart DSH.`)
+  }
 } catch (error) {
   console.error(`profile-sync: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1

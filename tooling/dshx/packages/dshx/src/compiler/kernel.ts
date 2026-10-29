@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import type { InlineConfig, Plugin, PluginOption, ResolvedConfig, Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
@@ -164,10 +165,21 @@ const dependencyManifestPlugin = (options: {
     },
     async writeBundle() {
       const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()
+      // Content hashes let a freshness check ignore a checkout that rewrote a source without changing it.
+      const hashes = Object.fromEntries(
+        await Promise.all(
+          sources
+            .filter(source => !source.includes('node_modules/'))
+            .map(async source => {
+              const content = await readFile(resolve(options.root, source)).catch(() => undefined)
+              return [source, content === undefined ? null : createHash('sha256').update(content).digest('hex')] as const
+            }),
+        ),
+      )
       await mkdir(options.outDir, { recursive: true })
       await writeFile(
         resolve(options.outDir, `${options.entryFile}.deps.json`),
-        `${JSON.stringify({ version: 1, face: options.face, sources }, null, 2)}\n`,
+        `${JSON.stringify({ version: 1, face: options.face, sources, hashes }, null, 2)}\n`,
         'utf8',
       )
     },
