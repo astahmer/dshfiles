@@ -4,7 +4,8 @@ import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, FileViewer } from '@dshfiles/dshx/client'
+import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -54,7 +55,13 @@ export default defineClient({
   name: '@dshfiles/editor',
   locales: [editorSettingsLocale],
   inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles', 'configForms'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    metadata?.plugin?.add(FileViewer, {
+      id: 'dshfiles-editor.markdown-preview',
+      title: 'Preview',
+      matches: path => /\.(?:md|markdown|mdx)$/iu.test(path),
+      component: props => <Markdown text={props.text} variant="body" />,
+    })
     // The form's value is the Host's schema-resolved section, so its fields arrive with their defaults applied.
     const settingsForm = ctx.configForms.get<SettingsValue<typeof editorSettings.schema>>(EDITOR_SETTINGS_NAMESPACE)
     const mirrorSettings = (): void => {

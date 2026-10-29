@@ -11,8 +11,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { FileViewer, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { EyeIcon, ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -181,6 +182,16 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }
 
   const editable = active?.status === 'ready' && active.content.kind === 'text'
+  const viewers = useRegistry(FileViewer)
+  const viewer = editable ? viewers.find(candidate => candidate.matches(active.path)) : undefined
+  const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
+  const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
+  const toggleViewer = (documentId: string): void =>
+    setViewedDocuments(current => {
+      const next = new Set(current)
+      if (!next.delete(documentId)) next.add(documentId)
+      return next
+    })
   const savePending = saveSnapshot.matches('writing')
   useEffect(() => {
     if (!editable) {
@@ -315,6 +326,11 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
             </div>
           ))}
         </div>
+        {viewer !== undefined && active !== undefined && (
+          <Button aria-label={viewer.title} aria-pressed={viewing} onClick={() => toggleViewer(active.id)} size="icon-xs" variant={viewing ? 'secondary' : 'ghost'}>
+            <EyeIcon />
+          </Button>
+        )}
         <Button
           aria-label="Save"
           disabled={!editable || savePending || saveSnapshot.matches('approval') || saveSnapshot.matches('conflict')}
@@ -356,6 +372,11 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       <div className="dshx:relative dshx:min-h-0 dshx:flex-1">
         <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
         {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
+        {viewing && (
+          <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
+            <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? ''} />
+          </div>
+        )}
         {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
         {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
         {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
