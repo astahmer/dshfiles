@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -20,6 +21,9 @@ const ProfilePackage = z
   .passthrough()
 const WorkspacePackage = z.object({ packageManager: z.string() }).passthrough()
 const ProjectPackage = z.object({ dsh: z.unknown() }).passthrough()
+const ClientExternals = z
+  .object({ dsh: z.object({ client: z.object({ external: z.array(z.string()).default([]) }).passthrough().optional() }).passthrough() })
+  .passthrough()
 const PnpmModules = z.object({ packageManager: z.string(), storeDir: z.string().min(1) }).passthrough()
 const SHARED_CORDIS_PACKAGES = Object.keys(CORDIS_IDENTITY_DEPENDENCIES)
 
@@ -162,15 +166,23 @@ const prepareBootProfiles = async (
   if (pinnedNode !== '' && process.versions.node !== pinnedNode) {
     throw new Error(`Boot checks require repository Node ${pinnedNode}; current Node is ${process.versions.node}.`)
   }
-  for (const bundle of localBundles) {
+  // A bundle that keeps an owned package external (shared-runtime) cannot load without it, so its provider joins the profile.
+  const composedBundles: [BootProfileBundle, ...BootProfileBundle[]] = [...localBundles]
+  for (const bundle of composedBundles) {
     const projectManifest = ProjectPackage.parse(decodeJson(jsonValueSchema, await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')))
     if (typeof projectManifest.dsh !== 'object' || projectManifest.dsh === null || Array.isArray(projectManifest.dsh)) {
       throw new Error(`Cannot prepare a DSH boot profile for ${bundle.packageId}: package.json has no dsh bundle metadata.`)
     }
     assertSharedCordisIdentity(bundle.projectRoot)
+    for (const external of ClientExternals.parse(projectManifest).dsh.client?.external ?? []) {
+      const providerRoot = join(WORKSPACE_ROOT, 'plugins', external)
+      if (!external.startsWith('@dshfiles/') || composedBundles.some(composed => composed.packageId === external)) continue
+      if (!existsSync(join(providerRoot, 'package.json'))) continue
+      composedBundles.push({ projectRoot: providerRoot, packageId: external })
+    }
   }
 
-  const [firstBundle, ...remainingBundles] = localBundles
+  const [firstBundle, ...remainingBundles] = composedBundles
   const packageIds: [string, ...string[]] = [firstBundle.packageId, ...remainingBundles.map(bundle => bundle.packageId)]
   const additionalBundleIds = options.additionalBundleIds ?? []
   const expectedBundles: [string, ...string[]] = [packageIds[0], ...packageIds.slice(1), ...additionalBundleIds]
@@ -192,7 +204,7 @@ const prepareBootProfiles = async (
     }
     const bundles =
       options.includeSourceProfileBundles === true ? [...new Set(sourceManifest.dsh.profile.bundles)] : [...new Set([...BASE_BUNDLES, ...expectedBundles])]
-    for (const bundle of localBundles) dependencies[bundle.packageId] = `link:${resolve(bundle.projectRoot)}`
+    for (const bundle of composedBundles) dependencies[bundle.packageId] = `link:${resolve(bundle.projectRoot)}`
     const manifest = {
       name: 'dshx-boot-profile',
       version: '0.0.0',
