@@ -291,6 +291,7 @@ export default defineClient({
       threadAside: requestThreadAside,
       panelAside: requestPanelAside,
       renameThread,
+      startSession: () => ctx.uiWorkspace.startSession(),
     })
     const publication = createWorkbenchTabsPublication(
       workbenchActions,

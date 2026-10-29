@@ -49,6 +49,8 @@ export interface WorkbenchTabsActions {
   readonly moveAside: (tabId: string) => boolean
   readonly open: (target: TabTarget, newTab?: boolean, title?: string) => void
   readonly newTab: () => void
+  /** Start a thread the way the Start page and sidebar do; absent on older providers. */
+  readonly newThread?: () => void
   readonly renameThread: (sessionId: string, title: string) => Promise<void>
 }
 
@@ -85,6 +87,7 @@ const createWorkbenchTabsChannel = () => {
     moveAside: id => provider?.actions.moveAside(id) ?? false,
     open: (target, newTab, title) => provider?.actions.open(target, newTab, title),
     newTab: () => provider?.actions.newTab(),
+    newThread: () => provider?.actions.newThread?.(),
     renameThread: (sessionId, title) => provider?.actions.renameThread(sessionId, title) ?? Promise.reject(new Error('Main tabs provider unavailable.')),
   }
   return {

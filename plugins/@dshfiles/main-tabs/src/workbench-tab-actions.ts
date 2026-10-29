@@ -13,6 +13,7 @@ interface WorkbenchTabsActionPorts {
   readonly threadAside: (sessionId: string) => boolean
   readonly panelAside: (panelId: string) => boolean
   readonly renameThread: WorkbenchTabsActions['renameThread']
+  readonly startSession: () => void
 }
 
 /** Adapter only: all tab transitions still run on the one existing actor. */
@@ -51,6 +52,11 @@ export const createWorkbenchTabsActions = (ports: WorkbenchTabsActionPorts): Wor
     },
     newTab: () => {
       if (ports.enabled()) ports.send({ type: 'tab.new' })
+    },
+    newThread: () => {
+      if (!ports.enabled()) return
+      ports.send({ type: 'start.newThread' })
+      ports.startSession()
     },
     renameThread: ports.renameThread,
   }

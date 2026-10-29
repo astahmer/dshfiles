@@ -21,6 +21,7 @@ const start = (dockAside?: (tabId: string) => boolean | undefined) => {
   const threadAside = vi.fn(() => false)
   const panelAside = vi.fn(() => false)
   const reselect = vi.fn()
+  const startSession = vi.fn()
   const docking: DockingFixturePort = {}
   if (dockAside !== undefined) docking.dockAside = dockAside
   const actions = createWorkbenchTabsActions({
@@ -32,6 +33,7 @@ const start = (dockAside?: (tabId: string) => boolean | undefined) => {
     threadAside,
     panelAside,
     renameThread: vi.fn(async () => undefined),
+    startSession,
   })
   const publication = createWorkbenchTabsPublication(actions)
   const publish = (status: 'running' | 'unread' | null = null): void => {
@@ -57,7 +59,7 @@ const start = (dockAside?: (tabId: string) => boolean | undefined) => {
     )
   }
   const open = (target: TabTarget, newTab = false) => actions.open(target, newTab)
-  return { actor, actions, currentSet, navigate, reselect, threadAside, panelAside, publication, publish, open }
+  return { actor, actions, currentSet, navigate, reselect, startSession, threadAside, panelAside, publication, publish, open }
 }
 
 afterEach(() => {
@@ -101,6 +103,22 @@ describe('workbench tabs semantics bridge', () => {
     unsubscribe()
     disconnect()
     expect(bridge.getSnapshot().enabled).toBe(false)
+    tabs.actor.stop()
+  })
+
+  it('starts a New thread through the page channel and keeps the stale host thread from reclaiming the tab', () => {
+    const tabs = start()
+    const disconnect = connectWorkbenchTabs(tabs.publication.provider)
+    tabs.actor.send({ type: 'host.navigated', target: { kind: 'thread', sessionId: 'a' }, projectId: null })
+    workbenchTabs().actions.newThread?.()
+    expect(tabs.startSession).toHaveBeenCalledOnce()
+    tabs.actor.send({ type: 'host.navigated', target: null, projectId: null })
+    tabs.actor.send({ type: 'host.navigated', target: { kind: 'thread', sessionId: 'a' }, projectId: null })
+    expect(tabs.currentSet()?.activeTabId).toBeNull()
+    tabs.actor.send({ type: 'preferences.changed', preferences: { ...DEFAULT_TAB_PREFERENCES, enabled: false } })
+    workbenchTabs().actions.newThread?.()
+    expect(tabs.startSession).toHaveBeenCalledOnce()
+    disconnect()
     tabs.actor.stop()
   })
 
