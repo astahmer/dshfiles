@@ -161,7 +161,8 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
       'KbdInteractiveAuthentication no',
       'PermitRootLogin prohibit-password',
       'UsePAM no',
-      'StrictModes yes',
+      // The scratch root sits under /tmp on Linux, which StrictModes rejects as group/world-writable.
+      'StrictModes no',
       'AllowAgentForwarding no',
       'AllowTcpForwarding yes',
       'GatewayPorts no',
