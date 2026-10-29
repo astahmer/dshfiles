@@ -22,6 +22,7 @@
     "src/native/apply.ts",
     "src/native/locales.ts",
     "src/native/skeleton/InputBar.tsx",
+    "src/native/skeleton/InputBar.module.css",
     "src/native/input/editor/keymap.ts",
     "src/native/input/editor/ComposerContentEditable.tsx",
     "src/native/input/editor/view-binding.ts",

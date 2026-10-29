@@ -37,6 +37,7 @@ import {
 import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
+import { LargePasteModel } from '../../large-paste.ts'
 import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { observeControlRow } from './control-row-layout.ts'
@@ -210,8 +211,8 @@ export const InputBar = memo(function InputBar({
   // client-side size or count limit and upload as soon as they are picked.
   // The host enforces the same image limits at submit for callers that bypass
   // this composer.
-  const intakeFiles = useCallback((files: readonly File[], directories?: ReadonlySet<File>): void => {
-    if (locked || machineBusy || (subagent !== null && !continuable) || addFiles === undefined || files.length === 0) return
+  const intakeFiles = useCallback((files: readonly File[], directories?: ReadonlySet<File>): boolean => {
+    if (locked || machineBusy || (subagent !== null && !continuable) || addFiles === undefined || files.length === 0) return false
     const rejected = ((): string | null => {
       // Child prompts support images, but not generic file receipts or the
       // Desktop path-reference fallback. Refuse mixed batches before intake.
@@ -237,10 +238,11 @@ export const InputBar = memo(function InputBar({
       return addFiles(files, directories)
     })()
     if (rejected !== null) showToast(rejected)
+    return rejected === null
   }, [locked, machineBusy, subagent, continuable, addFiles, attachments, imageLimits, showToast, t])
 
   const canAcceptDrop = (subagent === null || continuable) && !locked && !machineBusy && addFiles !== undefined
-  const pasteText = useCallback((text: string): void => {
+  const insertText = useCallback((text: string): void => {
     if (keyboard === undefined) return
     if (inputActions === undefined || insertReference === undefined) {
       keyboard.paste(text)
@@ -255,6 +257,32 @@ export const InputBar = memo(function InputBar({
     }
   }, [inputActions, insertReference, keyboard])
 
+  // A paste of 32 KiB or more becomes a text file attachment; the notice offers it back as text.
+  const [largePaste, setLargePaste] = useState<{ readonly file: File; readonly text: string } | null>(null)
+  useEffect(() => { setLargePaste(null) }, [sessionId])
+  const largePasteId = largePaste === null
+    ? undefined
+    : attachments.find(attachment => attachment.kind === 'file' && attachment.file === largePaste.file)?.id
+  useEffect(() => {
+    if (largePaste !== null && largePasteId === undefined) setLargePaste(null)
+  }, [largePaste, largePasteId])
+  const pasteText = useCallback((text: string): void => {
+    if (!continuable && LargePasteModel.isLarge(text)) {
+      const file = LargePasteModel.fileFor({ text, at: new Date() })
+      if (intakeFiles([file])) {
+        setLargePaste({ file, text })
+        return
+      }
+    }
+    insertText(text)
+  }, [continuable, intakeFiles, insertText])
+  const pasteLargeAsText = (): void => {
+    if (largePaste === null) return
+    if (largePasteId !== undefined) removeAttachment?.(largePasteId)
+    setLargePaste(null)
+    if (editor !== null) focusDraftEditor(editor, revealSelection)
+    insertText(largePaste.text)
+  }
   // A plain prompt replaces the draft in one write. A prompt holding thread references is rebuilt as chips, but only
   // after the clearing write commits: inserting inside the same key handler lands in the document that write replaces.
   const replaceDraft = useCallback((text: string): void => {
@@ -264,8 +292,8 @@ export const InputBar = memo(function InputBar({
       return
     }
     inputActions.setDraft('')
-    queueMicrotask(() => { pasteText(text) })
-  }, [inputActions, pasteText])
+    queueMicrotask(() => { insertText(text) })
+  }, [inputActions, insertText])
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const onPickFiles = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -412,6 +440,14 @@ export const InputBar = memo(function InputBar({
       {notice?.level === 'info' && (
         <div className={css.notice} role="status">
           {notice.text}
+        </div>
+      )}
+      {largePaste !== null && (
+        <div className={clsx(css.notice, css.largePaste)} role="status">
+          <span>{t('largePaste.attached', { name: largePaste.file.name })}</span>
+          <button type="button" className={css.largePasteAction} onMouseDown={keepFocus} onClick={pasteLargeAsText}>
+            {t('largePaste.asText')}
+          </button>
         </div>
       )}
       {/* Trigger clicks land on the card, not the editor: the toolbar row's

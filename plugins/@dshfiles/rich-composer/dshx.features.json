@@ -329,6 +329,40 @@
           "reason": "Client-only: prompt recall reads the Session event window already in the browser and starts no Host work."
         }
       ]
+    },
+    {
+      "id": "large-paste-file",
+      "title": "Attach a large paste as a text file",
+      "summary": "A text paste of 32 KiB or more becomes a pasted-<date>-<time>.txt file attachment through the composer's existing upload path, and a notice offers Paste as text to remove the file and insert the text instead.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["composer-ready", "pasted-as-file", "pasted-as-text"],
+      "failureModes": [
+        "When the composer refuses the file (busy, locked, or a subagent composer), the paste stays inline text.",
+        "Removing the file chip by hand dismisses the Paste as text notice."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.large-paste-unit-threshold",
+          "file": "plugins/@dshfiles/rich-composer/src/large-paste.test.ts",
+          "testName": "a paste of 32 KiB or more counts as large, measured in UTF-8 bytes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.large-paste-unit-file",
+          "file": "plugins/@dshfiles/rich-composer/src/large-paste.test.ts",
+          "testName": "the file is plain text named after the local paste time and holds the exact text"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the file is built in the browser and uploads through the composer's existing file path, which this feature does not change."
+        }
+      ]
     }
   ]
 }

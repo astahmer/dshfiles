@@ -42,6 +42,36 @@
   line-height: 18px;
 }
 
+.largePaste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.largePaste > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.largePasteAction {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.largePasteAction:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .card {
   box-sizing: border-box;
   position: relative; /* overlay anchor positioning context */
