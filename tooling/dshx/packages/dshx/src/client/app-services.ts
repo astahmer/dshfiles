@@ -88,10 +88,11 @@ export interface ComposerTarget {
   readonly sessionId?: string
 }
 
-/** A chip in the composer: a workspace file, or text sent as a quote or a note. */
+/** A chip in the composer: a workspace file, text sent as a quote or a note, or a comment on file lines. */
 export type ComposerAttachment =
   | { readonly kind: 'file'; readonly path: string }
   | { readonly kind: 'quote' | 'note'; readonly text: string; readonly label?: string }
+  | { readonly kind: 'comment'; readonly path: string; readonly line: number; readonly endLine?: number; readonly text: string }
 
 export interface ComposerModelSelection {
   readonly provider: string
@@ -118,8 +119,44 @@ export interface ComposerService {
   focus(target?: ComposerTarget): boolean
 }
 
+export type WorkspaceFilesState =
+  | { readonly status: 'no-session' }
+  | { readonly status: 'indexing' | 'ready'; readonly sessionId: string; readonly files: readonly string[]; readonly truncated: boolean }
+
+export interface WorkspaceEntry {
+  readonly name: string
+  /** Workspace-relative. */
+  readonly path: string
+  readonly type: 'file' | 'directory' | 'other'
+}
+
+export interface WorkspaceSearchHit {
+  readonly path: string
+  readonly kind: 'file' | 'directory'
+}
+
+/** Leave `sessionId` out to address the session side panels follow (`mounted`). */
+export interface WorkspaceFilesService {
+  /** Workspace-relative file paths of the mounted session, walked and kept fresh while someone subscribes. */
+  readonly index: Subscribable<WorkspaceFilesState>
+  /** One directory of the tree; `''` is the workspace root. Undefined when it cannot be listed. */
+  list(input: { readonly path: string; readonly sessionId?: string; readonly signal?: AbortSignal }): Promise<readonly WorkspaceEntry[] | undefined>
+  /** The Host's file search, ranked as `@` mentions rank it. */
+  search(input: { readonly query: string; readonly sessionId?: string; readonly signal?: AbortSignal }): Promise<readonly WorkspaceSearchHit[]>
+}
+
+/** The session screen: which session shows, and its workspace files. */
+export interface SessionScreenService {
+  /** The session the main view shows; undefined while a panel takes it. */
+  readonly current: Subscribable<string | undefined>
+  /** The session side panels follow: the last one shown, kept while a panel takes the main view. */
+  readonly mounted: Subscribable<string | undefined>
+  readonly files: WorkspaceFilesService
+}
+
 export const Dialogs = BrowserBroker.defineContract<DialogsService>('dshx.dialogs')
 export const Composer = BrowserBroker.defineContract<ComposerService>('dshx.composer')
+export const SessionScreen = BrowserBroker.defineContract<SessionScreenService>('dshx.session-screen')
 export const Toasts = BrowserBroker.defineContract<ToastsService>('dshx.toasts')
 export const Command = BrowserBroker.defineRegistry<CommandItem>('dshx.command')
 

@@ -217,9 +217,31 @@ await composer.setModel({ selection: { provider: 'deepseek', model: 'deepseek-ch
 | --- | --- |
 | `current`, `focused` | live session id of the composer on screen, and whether it holds keyboard focus |
 | `text()`, `setText({ text })`, `insert({ text })` | the draft with chips in clipboard form; replace it; insert at the caret |
-| `attach({ attachment })` | a chip: `{ kind: 'file', path }`, or `{ kind: 'quote' \| 'note', text, label? }` sent as a block quote or inside `<note>` |
+| `attach({ attachment })` | a chip: `{ kind: 'file', path }`; `{ kind: 'quote' \| 'note', text, label? }` sent as a block quote or inside `<note>`; `{ kind: 'comment', path, line, endLine?, text }`, a comment on file lines sent with the next message inside `<comment path lines>` |
 | `setModel({ selection })` | `provider`, `model` and `variant` (reasoning effort) for the next message |
 | `focus()` | give the composer keyboard focus |
+
+### Session screen
+
+`SessionScreen` (from `@dshfiles/dshx/client`, provided by `@dshfiles/editor`) says which session shows and reads its
+workspace files. `files` verbs address the `mounted` session unless given `sessionId`.
+
+```ts
+const screen = await api.whenActive(SessionScreen)
+const stop = screen.files.index.subscribe(() => render(screen.files.index.get()))
+const hits = await screen.files.search({ query: 'retry' })
+```
+
+| Member | What |
+| --- | --- |
+| `current` | the session the main view shows; undefined while a panel takes it |
+| `mounted` | the session side panels follow: the last one shown |
+| `files.index` | `{ status: 'no-session' }`, or `indexing`/`ready` with workspace-relative `files` and `truncated`; walked and watched only while subscribed |
+| `files.list({ path })` | one tree level (`''` is the root) as `{ name, path, type }`, undefined when the Host refuses |
+| `files.search({ query })` | the Host's file search as `@` mentions rank it |
+
+Line comments ride the composer: `Composer.attach({ attachment: { kind: 'comment', … } })` puts a chip in the draft, so the
+user sees and can remove it before it goes with the next message.
 
 ## Stored state: `defineStore`
 
