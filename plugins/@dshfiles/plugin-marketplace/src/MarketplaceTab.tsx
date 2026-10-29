@@ -1,4 +1,3 @@
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { useApi, useSettings, type PropsLocaleOf } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -35,7 +34,7 @@ import { pluginMarketplaceApi } from './api.js'
 import { marketplaceLocale, type MarketplaceLocaleKey } from './locales.js'
 import { DEFAULT_HUB_BASE_URL, marketplaceSettings } from './settings.js'
 
-export type MarketplaceTabProps = PropsRuntime<'settings.plugins.tab'> & PropsLocaleOf<typeof marketplaceLocale>
+export type MarketplaceTabProps = PropsLocaleOf<typeof marketplaceLocale>
 
 type Translate = MarketplaceTabProps['t']
 type ModalState =

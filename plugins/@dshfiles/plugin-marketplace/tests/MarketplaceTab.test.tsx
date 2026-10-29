@@ -136,7 +136,7 @@ const t: MarketplaceTabProps['t'] = (key, params) =>
 
 // SAFETY: the tab component reads only its locale function; every other standard prop is a
 // framework-injected hook that this fixture never renders into.
-const componentProps = { t } as MarketplaceTabProps
+const componentProps: MarketplaceTabProps = { t }
 
 const signalOptions = expect.objectContaining({ signal: expect.any(AbortSignal) })
 
