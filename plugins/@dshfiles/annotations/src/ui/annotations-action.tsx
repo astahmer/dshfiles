@@ -4,7 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { annotationsApi } from '../api.js'
@@ -42,6 +42,7 @@ const pickFailureMessage = ({
 
 export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const api = useApi(annotationsApi)
+  const plugin = usePlugin()
   const queryClient = useQueryClient()
   const sessionId = props.sessionId
   const [open, setOpen] = useState(false)
@@ -348,7 +349,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     size="sm"
                     variant="ghost"
                     className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                    onClick={() => void navigator.clipboard.writeText(setupQuery.data?.extensionPath ?? '')}
+                    onClick={() => void plugin.system.copy(setupQuery.data?.extensionPath ?? '')}
                   >
                     Copy
                   </Button>
@@ -389,7 +390,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     size="sm"
                     variant="ghost"
                     className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                    onClick={() => void navigator.clipboard.writeText(tokenQuery.data?.token ?? '')}
+                    onClick={() => void plugin.system.copy(tokenQuery.data?.token ?? '')}
                   >
                     Copy
                   </Button>
