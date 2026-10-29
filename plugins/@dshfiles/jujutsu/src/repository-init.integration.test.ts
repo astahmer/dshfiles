@@ -79,7 +79,8 @@ const dirty = async (repo: string, git: (args: readonly string[]) => string): Pr
   await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 1, 254, 255]))
   git(['add', 'tracked.txt', 'staged-new.bin'])
   await writeFile(join(repo, 'tracked.txt'), 'unstaged\n')
-  await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 2, 253, 255]))
+  // A different size: Git cannot tell a same-size rewrite in the same timestamp tick from its staged copy ("racy clean").
+  await writeFile(join(repo, 'staged-new.bin'), Buffer.from([0, 2, 253, 255, 7]))
   await rm(join(repo, 'deleted.txt'))
   await writeFile(join(repo, 'untracked.bin'), Buffer.from([0, 9, 128, 255]))
 }
