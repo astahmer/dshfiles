@@ -218,9 +218,14 @@ export function apply(ctx: ClientContext): void {
           let releaseProjection: (() => void) | undefined
           const navigationSubscriptions = new Map<TabId, () => void>()
           const sync = (): void => {
-            const rows = Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {}).filter(
-              tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel',
-            )
+            // Only the on-screen Session projects into the Workbench: every loaded Session keeps its own store, and
+            // projecting them all opened one dock panel per Session for the same tab kind.
+            const rows =
+              controller.mounted.getSnapshot() !== sessionId
+                ? []
+                : Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {}).filter(
+                    tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel',
+                  )
             for (const [tabId, unsubscribe] of navigationSubscriptions) {
               if (!rows.some(tab => tab.id === tabId)) {
                 unsubscribe()
@@ -251,10 +256,12 @@ export function apply(ctx: ClientContext): void {
           }
           const unsubscribe = instance.subscribe(sync)
           const unsubscribeMode = workbenchMode.subscribe(sync)
+          const unsubscribeMounted = controller.mounted.subscribe(sync)
           sync()
           sessionReleases.set(sessionId, () => {
             unsubscribe()
             unsubscribeMode()
+            unsubscribeMounted()
             releaseProjection?.()
             for (const unsubscribe of navigationSubscriptions.values()) unsubscribe()
             navigationSubscriptions.clear()
