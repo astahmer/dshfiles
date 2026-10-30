@@ -1,6 +1,6 @@
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { globalPanelLink } from '../plugin-view-names.js'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -8,7 +8,7 @@ import { threadWorkspacePathFor } from './jj-integration.steps.js'
 
 const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 const THREAD_CHANGES = [
-  { path: 'README.md', content: '# Review fixture\n\nDocumentation change in the Docs scope.\n' },
+  { path: 'README.md', content: `# Review fixture\n\n${Array.from({ length: 80 }, (_, index) => `Documentation line ${String(index + 1)}.`).join('\n')}\n` },
   { path: 'src/app.ts', content: 'export const reviewFixture = true\n' },
 ]
 
@@ -23,16 +23,7 @@ Then('the pulls.review panel reads the thread workspace against {string}', async
   await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
     const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
     await expect(projectPicker).toBeVisible()
-    await projectPicker.click()
-    const pickerDialog = page.getByRole('dialog')
-    await expect(pickerDialog).toBeVisible()
-    await pickerDialog.getByRole('button', { name: 'Filter by scope', exact: true }).click()
-    await page.getByRole('menuitemradio', { name: 'Workspaces', exact: true }).click()
-    const workspaceOption = pickerDialog.getByRole('option').first()
-    await expect(workspaceOption).toBeVisible()
-    await workspaceOption.click()
-    await expect(pickerDialog).toBeHidden()
-    await expect(projectPicker).toContainText(/thread-/)
+    await expect(projectPicker).toContainText(threadWorkspacePathFor(page))
     const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
     await expect(baseSelector).toBeVisible()
     await baseSelector.fill(base)
@@ -61,7 +52,13 @@ Then('the thread shows the pulls.review scope report', async ({ page }: { page: 
  */
 When('the thread workspace holds changed files in different scopes', async ({ page }: { page: Page }) => {
   const workspace = threadWorkspacePathFor(page)
-  await Promise.all(THREAD_CHANGES.map(file => writeFile(join(workspace, file.path), file.content)))
+  await Promise.all(
+    THREAD_CHANGES.map(async file => {
+      const path = join(workspace, file.path)
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, file.content)
+    }),
+  )
 })
 
 Then("every scope's file diffs appear in the same scrollable review", async ({ page }: { page: Page }) => {
@@ -73,6 +70,12 @@ Then("every scope's file diffs appear in the same scrollable review", async ({ p
     await expect(review.getByText('Docs', { exact: true })).toBeVisible()
     await expect(review.getByText('Code', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Next scope', exact: true })).toHaveCount(0)
+    const scroller = review.locator('[class*="overflow-auto"]').first()
+    await expect(scroller).toBeVisible()
+    await expect.poll(() => scroller.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0)
+    await scroller.hover()
+    await page.mouse.wheel(0, 500)
+    await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
   })
   await finishJourneyAssertions(page)
 })
