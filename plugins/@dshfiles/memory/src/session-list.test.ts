@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { MemorySessionList } from './session-list.ts'
+import { MemorySessionList, sessionTitleListRequest } from './session-list.ts'
 
 const header = (id: string) => ({ id, createdAt: 1 })
 
 describe('MemorySessionList', () => {
+  it('requests only the title projection for thread search', () => {
+    expect(sessionTitleListRequest).toEqual({ projections: ['title'] })
+  })
+
   it('lists Sessions once until one is created or disposed, or a minute passes', async () => {
     let lists = 0
     let now = 0

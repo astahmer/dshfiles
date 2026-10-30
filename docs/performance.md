@@ -112,6 +112,22 @@ Result on live (2026-10-20, after the session-search and memory fixes, within on
 12–54 ms and the worker's own search in 8–33 ms; a palette search shows results in 0.3–0.9 s including typing and the
 200 ms debounce. A replaced session no longer scans the index (slowest ingest pass after a restart 1.9 s, was 14.7 s).
 
+### Thread search follow-up (2026-10-30)
+
+The live palette reproduced an 11.5 s `findThreads` request (HTTP 200, 12 results); its server span was 10,086 ms.
+Host lag p99/max reached 101 ms (no stalls above 250 ms), a direct memory search for the same term took 137 ms,
+and the session-content worker reported a 2 ms search. The live corpus held 2,244 Sessions, 1,629 digests and 24,538 indexed messages. This points away from the search engine and toward record preparation around it.
+
+`memory` was calling `sessionController.list({})` with a 10 s timeout to obtain titles, then reading only the `title`
+projection. The Session-list contract says omitting `projections` reads every registered projection. The caller now
+requests only `title` via `sessionTitleListRequest`.
+
+| Live `findThreads` latency | Before | After |
+| -------------------------- | ------ | ----- |
+| Server span               | 10,086 ms | Not measured: the live Host still serves its old bundle; restarting it was not authorized. |
+
+The remaining validation is the same live search after the user restarts the Host; no restart was performed here.
+
 ## First open of a thread (2026-10-20)
 
 Opening a cold thread used to resume its Agent right after the snapshot went out: agent restore, `dsh-context` and

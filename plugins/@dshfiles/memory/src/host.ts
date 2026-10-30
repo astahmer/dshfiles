@@ -31,7 +31,7 @@ import { ProjectScripts, type WorkspaceScripts } from './project-scripts.ts'
 import { renderUsageSummary, snapshotOf } from './usage-summary.js'
 import { workspaceScriptsApi } from './workspace-scripts-api.ts'
 import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices, type SessionTitleRead } from './runtime.ts'
-import { MemorySessionList } from './session-list.ts'
+import { MemorySessionList, sessionTitleListRequest } from './session-list.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { sessionContentHits } from './session-content.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
@@ -179,7 +179,7 @@ const hostServices = (ctx: Context): MemoryServices => {
       // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
       const listed = await ctx
         .get('sessionController')
-        ?.list({}, AbortSignal.timeout(10_000))
+        ?.list(sessionTitleListRequest, AbortSignal.timeout(10_000))
         .catch(() => undefined)
       const fromList = new Map<string, SessionTitleRead>()
       for (const item of listed?.items ?? []) {

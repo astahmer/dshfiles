@@ -10,6 +10,8 @@ type SessionReadSource = {
 /** The finder's Session list stays fresh through create/dispose events; the clock only bounds header drift. */
 const SESSION_LIST_TTL_MS = 60_000
 
+export const sessionTitleListRequest = { projections: ['title'] } as const
+
 /**
  * The finder's Session list. Core lists Sessions by reading every log header (944 here), once per thread-content
  * search; the list only changes when a Session is created or disposed, so it is kept until then. Titles are kept by
