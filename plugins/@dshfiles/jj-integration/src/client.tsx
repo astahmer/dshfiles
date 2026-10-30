@@ -399,13 +399,8 @@ export default defineClient({
       })
       const settings = useSettings(jjIntegrationSettings).value ?? defaultJjIntegrationSettings
       const noticeActions = IntegratedNoticeActions.forSettings(settings)
-      const [settledHere, setSettledHere] = useState(false)
       const settle = (): void => {
-        if (!requestThreadSettle(props.sessionId)) {
-          noticeToast.show({ text: translate('settleUnavailable'), success: false })
-          return
-        }
-        setSettledHere(true)
+        if (!requestThreadSettle(props.sessionId)) noticeToast.show({ text: translate('settleUnavailable'), success: false })
       }
       const cancelQueue = useMutation({
         mutationFn: () => {
@@ -497,7 +492,7 @@ export default defineClient({
               )}
               {archived || marker.kind !== 'integrated' || marker.at !== thread.rebasedAt ? null : (
                 <>
-                  {noticeActions.includes('settle') && !settledHere ? (
+                  {noticeActions.includes('settle') ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button

@@ -958,7 +958,7 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     expect(descriptionOf(repository, 'main')).toBe(description)
 
     await expect(notice).toBeVisible()
-    await expect(notice).toContainText(`Integrated into main (${changeIdOf(repository, 'main')})`)
+    await expect(notice).toContainText(`Integrated into main (${changeIdOf(repository, 'main').slice(0, 12)}`)
     await expect(notice.getByRole('button', { name: 'Settle this integrated thread', exact: true })).toBeEnabled()
     await expect(notice.getByRole('button', { name: 'Archive this integrated thread', exact: true })).toHaveCount(0)
     // A thread lands more than once, so each land is a row in the transcript rather than a banner in the composer dock.
@@ -1038,8 +1038,8 @@ Then('Rebase reflects the external rebase without reloading', async ({ page }: {
 When('the thread is settled from the rebase notice', async ({ page }: { page: Page }) => {
   const notice = page.getByTestId('jj-thread-rebased-notice').last()
   await notice.getByRole('button', { name: 'Settle this integrated thread', exact: true }).click()
-  // The sidebar answered the request, so the notice stops offering an action that already happened.
-  await expect(notice.getByRole('button', { name: 'Settle this integrated thread', exact: true })).toHaveCount(0)
+  // Settled status belongs to the sidebar; this notice remains available instead of tracking the local click.
+  await expect(notice.getByRole('button', { name: 'Settle this integrated thread', exact: true })).toBeEnabled()
 })
 
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
