@@ -200,6 +200,10 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
   await recordAssertion(page, 'jujutsu-hide-immutable-drops-the-root', async () => {
     await expect(rootRow).toHaveCount(0)
     await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible()
+    await revisionsRegion(page).evaluate(element => {
+      element.scrollTop = 0
+    })
+    await expect(revisionsRegion(page).getByText('default', { exact: true })).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })

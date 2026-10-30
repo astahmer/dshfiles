@@ -630,6 +630,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const selectedRemote = remoteNames.includes(remote) ? remote : (remoteNames[0] ?? '')
   const localBookmarkNames = useMemo(() => [...new Set(state?.revisions.flatMap(row => row.localBookmarks) ?? [])], [state])
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
+  const defaultWorkspaceCommitId = state?.revisions.find(revision => revision.workspaces.includes('default'))?.commitId ?? workingCopy?.commitId ?? null
   const defaultBookmark = workingCopy?.localBookmarks[0] ?? localBookmarkNames[0] ?? ''
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const pushedRevision = remoteBookmarkRevision({ revisions: allRevisions, bookmark: selectedBookmark, remote: selectedRemote })
@@ -1798,6 +1799,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       }}
                       rowHeight={rowHeight}
                       revision={item.revision}
+                      defaultWorkspaceCommitId={defaultWorkspaceCommitId}
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
@@ -1994,14 +1996,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Refresh</TooltipContent>
               </Tooltip>
-              <span aria-live="polite" className="dshx:flex dshx:items-center" role="status">
-                {loadingRepository && (
-                  <>
-                    <Spinner aria-hidden="true" className="dshx:size-3" />
-                    <span className="dshx:sr-only">Loading repository…</span>
-                  </>
-                )}
-              </span>
+              {loadingRepository && (
+                <span aria-live="polite" className="dshx:sr-only" role="status">
+                  Loading repository…
+                </span>
+              )}
               <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
                 {props.surface === 'main' && props.view !== 'source' ? (
                   <Tooltip>
@@ -2426,6 +2425,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
 
 interface RevisionRowProps {
   readonly revision: Revision
+  readonly defaultWorkspaceCommitId: string | null
   readonly expanded: boolean
   readonly dimmed: boolean
   readonly connectionDimmed: boolean
@@ -2456,7 +2456,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const draggable = !revision.immutable
   const described = revision.description.trim().length > 0
   const changeId = reverseHexChangeId(revision.changeId, Math.max(3, revision.shortestChangeId.length))
-  const rowWorkspaces = WorkspaceLabels.forRow(revision)
+  const rowWorkspaces = WorkspaceLabels.forRow(revision, props.defaultWorkspaceCommitId)
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(

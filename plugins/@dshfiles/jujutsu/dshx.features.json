@@ -60,19 +60,15 @@
       "title": "Browse and filter the revision graph",
       "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; search descriptions, IDs and revision labels, and filter by author, mine, immutability, or date.",
       "reach": [
-        "seed rebase-ready-thread",
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
-        "click tab \"Workspaces\"",
-        "expect text \"JJ workspace\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
         "expect button \"Sample project*\"",
-        "expect text \"(no description)\"",
-        "click button \"Choose repository\"",
-        "click tab \"Workspaces\"",
-        "expect text \"JJ workspace\""
+        "expect checkbox \"Hide immutable\"",
+        "click checkbox \"Hide immutable\"",
+        "expect checkbox \"Hide immutable\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
