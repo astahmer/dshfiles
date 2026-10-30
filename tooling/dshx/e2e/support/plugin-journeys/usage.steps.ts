@@ -208,9 +208,9 @@ Then('the Jev usage card shows DSH-local token estimates', async ({ page }: { pa
   await captureUsageEvidence(page, 'charts')
 })
 
-Then('selecting a model in the cost breakdown shows its requests in the log', async ({ page }: { page: Page }) => {
+Then('selecting a model in the sortable usage table shows its requests in the log', async ({ page }: { page: Page }) => {
   await page
-    .getByRole('button', { name: /^gpt-6\.1-sol\s*\$/ })
+    .getByRole('button', { name: /^gpt-6\.1-sol/ })
     .first()
     .click()
   await recordAssertion(page, 'usage-breakdown-filters-the-log', async () => {

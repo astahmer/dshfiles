@@ -106,7 +106,18 @@ const completenessShape = {
   /** Requests with token counts but no applicable catalog price. */
   unpriced: z.number().int().min(0).optional(),
 }
-const breakdownSchema = z.object({ key: z.string(), cost: z.number(), requests: z.number().int(), tokens: z.number(), ...completenessShape })
+const breakdownSchema = z.object({
+  key: z.string(),
+  cost: z.number(),
+  requests: z.number().int(),
+  sessions: z.number().int().optional(),
+  input: z.number().min(0).optional(),
+  cacheRead: z.number().min(0).optional(),
+  cacheWrite: z.number().min(0).optional(),
+  output: z.number().min(0).optional(),
+  tokens: z.number(),
+  ...completenessShape,
+})
 
 export const chartViewSchema = z.object({
   /** Echoed only after the Host applies the exact provider filter. Older Hosts omit it. */
@@ -149,7 +160,12 @@ export const chartViewSchema = z.object({
       ...completenessShape,
     }),
   ),
-  breakdown: z.object({ model: z.array(breakdownSchema), provider: z.array(breakdownSchema), project: z.array(breakdownSchema) }),
+  breakdown: z.object({
+    model: z.array(breakdownSchema),
+    provider: z.array(breakdownSchema),
+    project: z.array(breakdownSchema),
+    purpose: z.array(breakdownSchema).optional(),
+  }),
   latency: z.array(
     z.object({
       start: z.number(),

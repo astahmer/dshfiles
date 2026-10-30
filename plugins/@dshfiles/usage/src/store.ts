@@ -210,6 +210,11 @@ const breakdownRowSchema = z.object({
   key: z.string().nullable(),
   cost: z.number(),
   requests: z.number(),
+  sessions: z.number(),
+  input: z.number(),
+  cache_read: z.number(),
+  cache_write: z.number(),
+  output: z.number(),
   tokens: z.number(),
   missing_usage: z.number(),
   unpriced: z.number(),
@@ -766,7 +771,9 @@ export const openUsageStore = (path: string) => {
         .array(breakdownRowSchema)
         .parse(
           prepare(
-            `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
+            `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
+               COUNT(DISTINCT r.session_id) AS sessions, COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
+               COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
                COALESCE(SUM(r.input IS NULL OR r.output IS NULL OR r.cache_read IS NULL OR r.cache_write IS NULL), 0) AS missing_usage,
                COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
              FROM ${FROM_SQL} WHERE ${where} GROUP BY key ORDER BY cost DESC, requests DESC`,
@@ -776,12 +783,17 @@ export const openUsageStore = (path: string) => {
           key: row.key ?? '(none)',
           cost: row.cost,
           requests: row.requests,
+          sessions: row.sessions,
+          input: row.input,
+          cacheRead: row.cache_read,
+          cacheWrite: row.cache_write,
+          output: row.output,
           tokens: row.tokens,
           missingUsage: row.missing_usage,
           unpriced: row.unpriced,
         }))
 
-    const byDimension = { model: breakdown('model'), provider: breakdown('provider'), project: breakdown('project') }
+    const byDimension = { model: breakdown('model'), provider: breakdown('provider'), project: breakdown('project'), purpose: breakdown('purpose') }
     const ranked = query.groupBy === 'purpose' ? breakdown('purpose') : byDimension[query.groupBy]
     const leading = new Set(ranked.slice(0, ranked.length > SERIES_KEYS ? SERIES_KEYS - 1 : SERIES_KEYS).map(row => row.key))
     const keys = [...leading, ...(ranked.length > leading.size ? [OTHER_KEY] : [])]

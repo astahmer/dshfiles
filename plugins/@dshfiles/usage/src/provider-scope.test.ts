@@ -101,6 +101,18 @@ describe('exact account provider scope', () => {
     expect(charts.summary.cost).toBeCloseTo(0.00004)
     expect(charts.summary.previous.cost).toBeCloseTo(0.00002)
     expect(charts.breakdown.provider.map(entry => entry.key)).toEqual(['Account'])
+    expect(charts.breakdown.provider[0]).toMatchObject({
+      requests: 2,
+      sessions: 1,
+      input: 20,
+      cacheRead: 0,
+      cacheWrite: 0,
+      output: 10,
+      tokens: 30,
+      missingUsage: 0,
+      unpriced: 0,
+    })
+    expect(charts.breakdown.purpose?.[0]?.key).toBe('agent')
     expect(charts.buckets.reduce((sum, entry) => sum + entry.requests, 0)).toBe(2)
     expect(charts.latency[0]).toMatchObject({ durationP50: 300, durationP90: 300 })
     expect(charts.topThreads.map(entry => entry.sessionId)).toEqual(['Account'])

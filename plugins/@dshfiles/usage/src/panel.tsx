@@ -17,11 +17,9 @@ import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
 import { UsageToolsTab } from './tools-tab.js'
 
-const DAY_MS = 86_400_000
-
 const preferencesSchema = z.object({
   tab: z.enum(['log', 'charts', 'activity']).catch('log'),
-  preset: z.enum(['today', '7d', '30d', 'custom']).catch('7d'),
+  preset: z.enum(['today', '7d', '30d', '365d', 'custom']).catch('7d'),
   customFrom: z.string().catch(''),
   customTo: z.string().catch(''),
   bucket: z.enum(['hour', 'day']).catch('day'),
@@ -32,12 +30,19 @@ const preferencesSchema = z.object({
 type Preferences = z.infer<typeof preferencesSchema>
 
 const DEFAULT_PREFERENCES: Preferences = { tab: 'log', preset: '7d', customFrom: '', customTo: '', bucket: 'day', groupBy: 'model', purposes: [] }
+type UsageDateRange = { readonly from: number; readonly to: number }
 
 const storedPreferences = createStoredValue({ key: 'dshfiles-usage:view.v1', schema: preferencesSchema, fallback: DEFAULT_PREFERENCES })
 
 const startOfDay = (at: number): number => {
   const date = new Date(at)
   date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+
+const moveDays = (at: number, days: number): number => {
+  const date = new Date(at)
+  date.setDate(date.getDate() + days)
   return date.getTime()
 }
 
@@ -52,16 +57,18 @@ const parseDateInput = (value: string): number | null => {
 }
 
 /** A half-open `[from, to)` range in ms; it snaps to day boundaries, so query keys stay stable between renders. */
-const rangeOf = (preferences: Preferences, now: number): { readonly from: number; readonly to: number } => {
+const rangeOf = (preferences: Preferences, now: number): UsageDateRange => {
   const today = startOfDay(now)
-  if (preferences.preset === 'today') return { from: today, to: today + DAY_MS }
-  if (preferences.preset === '30d') return { from: today - 29 * DAY_MS, to: today + DAY_MS }
+  const tomorrow = moveDays(today, 1)
+  if (preferences.preset === 'today') return { from: today, to: tomorrow }
+  if (preferences.preset === '30d') return { from: moveDays(today, -29), to: tomorrow }
+  if (preferences.preset === '365d') return { from: moveDays(today, -364), to: tomorrow }
   if (preferences.preset === 'custom') {
-    const from = parseDateInput(preferences.customFrom) ?? today - 6 * DAY_MS
-    const to = (parseDateInput(preferences.customTo) ?? today) + DAY_MS
-    return to > from ? { from, to } : { from: to - DAY_MS, to }
+    const from = parseDateInput(preferences.customFrom) ?? moveDays(today, -6)
+    const to = moveDays(parseDateInput(preferences.customTo) ?? today, 1)
+    return to > from ? { from, to } : { from: moveDays(to, -1), to }
   }
-  return { from: today - 6 * DAY_MS, to: today + DAY_MS }
+  return { from: moveDays(today, -6), to: tomorrow }
 }
 
 const statusKey = ['dshfiles-usage', 'status'] as const
@@ -137,19 +144,20 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
           size="sm"
           value={preferences.preset}
           onValueChange={value => {
-            const preset = z.enum(['today', '7d', '30d', 'custom']).safeParse(value)
+            const preset = z.enum(['today', '7d', '30d', '365d', 'custom']).safeParse(value)
             if (!preset.success) return
             update({
               preset: preset.data,
               bucket: preset.data === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
               ...(preset.data === 'custom' &&
-                preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(range.to - DAY_MS) }),
+                preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
             })
           }}
         >
           <ToggleGroupItem value="today">Today</ToggleGroupItem>
           <ToggleGroupItem value="7d">7 d</ToggleGroupItem>
           <ToggleGroupItem value="30d">30 d</ToggleGroupItem>
+          <ToggleGroupItem value="365d">1 y</ToggleGroupItem>
           <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
         </ToggleGroup>
         {preferences.preset === 'custom' ? (
@@ -229,7 +237,14 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
             bucket={preferences.bucket}
             groupBy={preferences.groupBy}
             onGroupBy={groupBy => update({ groupBy })}
-            onShowRequests={search => {
+            onShowRequests={(search, groupBy) => {
+              if (groupBy === 'purpose') {
+                const purpose = purposeSchema.safeParse(search)
+                if (!purpose.success) return
+                setLogSearch('')
+                update({ tab: 'log', purposes: [purpose.data] })
+                return
+              }
               setLogSearch(search)
               update({ tab: 'log' })
             }}

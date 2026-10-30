@@ -148,11 +148,30 @@
     {
       "id": "usage-charts",
       "title": "Usage charts",
-      "summary": "Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), cost over time stacked by model, provider, project or purpose, cost per model, provider and project (selecting one filters the log), tokens split into input, cache read, cache write and output, cache hit ratio, requests and failures, TTFT and duration percentiles, and the top threads by cost, grouped hourly or daily. Grouping by purpose answers where tokens went: agent, subagent, compaction, title, memory summary or another side call. Cache savings are the difference between the input rate and the cache-read rate on cached prompt tokens, per list price.",
-      "reach": ["click button \"Usage: Analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\"", "expect text \"Cache savings (estimate)\""],
+      "summary": "Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), usage over time switchable between cost, tokens and requests and grouped by model, exact provider/account route, project or purpose, a sortable usage distribution table with requests, sessions, average tokens per request, token types, cache share, cost share and estimated cost, and a daily heatmap switchable between tokens, estimated cost and requests for up to a year. Tokens by type, cache hit ratio, requests and failures, TTFT and duration percentiles, and top threads by cost remain available. Missing token and price totals are shown as incomplete. Vendor is not guessed from a route slug and machine is omitted because neither is a reliable captured request dimension.",
+      "reach": [
+        "click button \"Usage: Analytics\"",
+        "click tab \"Charts\"",
+        "expect text \"Cost over time\"",
+        "click text \"1 y\"",
+        "expect text \"Usage distribution\"",
+        "click text \"Daily calendar\"",
+        "expect text \"Cache savings (estimate)\""
+      ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["empty", "hourly", "daily", "custom-range", "grouped", "grouped-by-purpose", "unpriced-route"],
+      "states": [
+        "empty",
+        "hourly",
+        "daily",
+        "year-range",
+        "custom-range",
+        "grouped",
+        "grouped-by-purpose",
+        "sorted-breakdown",
+        "calendar-metric",
+        "unpriced-route"
+      ],
       "failureModes": [
         "Series beyond the five most expensive fold into Other so the legend stays readable.",
         "Cache savings and cost are list-price estimates from the models.dev catalog; an unpriced route contributes no savings and is counted in the unpriced tally.",
@@ -164,6 +183,12 @@
           "kind": "gherkin",
           "id": "usage.charts-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.history-breakdown-calendar",
+          "file": "plugins/@dshfiles/usage/src/usage-history.test.tsx",
+          "testName": "renders sortable group metrics and cache/cost distribution shares"
         },
         {
           "kind": "unit-test",

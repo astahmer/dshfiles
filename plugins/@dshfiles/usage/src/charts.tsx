@@ -5,11 +5,12 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
-import { usageApi, type ChartQuery, type ChartView } from './api.js'
+import { usageApi, type ChartQuery } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
+import { UsageBreakdownTable, UsageCalendar } from './usage-history.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
@@ -43,58 +44,18 @@ const Change = (props: { readonly current: number; readonly previous: number }):
   )
 }
 
-const Breakdown = (props: {
-  readonly title: string
-  readonly rows: ChartView['breakdown']['model']
-  readonly onSelect: (key: string) => void
-}): JSX.Element => {
-  const top = props.rows.slice(0, 8)
-  const max = Math.max(...top.map(row => row.cost), 0)
-  return (
-    <Panel title={props.title} description="Select a row to see its requests.">
-      {top.length === 0 ? (
-        <p className="dshx:text-xs">No requests.</p>
-      ) : (
-        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-          {top.map(row => (
-            <li key={row.key}>
-              <button
-                type="button"
-                onClick={() => props.onSelect(row.key)}
-                className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-0.5 dshx:rounded dshx:px-1 dshx:py-0.5 dshx:text-left dshx:hover:bg-accent"
-              >
-                <span className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-xs dshx:text-foreground">
-                  <span className="dshx:truncate">{row.key}</span>
-                  <span className="dshx:shrink-0 dshx:tabular-nums">
-                    {UsageFormattingModel.formatCost(row.cost)} · {row.requests.toLocaleString()} req
-                  </span>
-                </span>
-                <span className="dshx:h-1.5 dshx:w-full dshx:rounded-full dshx:bg-muted">
-                  <span
-                    className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1"
-                    style={{ width: `${max === 0 ? 0 : Math.max(2, (row.cost / max) * 100)}%` }}
-                  />
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
-  )
-}
-
 export const UsageCharts = (props: {
   readonly range: { readonly from: number; readonly to: number }
   readonly purposes: readonly RequestPurpose[] | undefined
   readonly bucket: 'hour' | 'day'
   readonly groupBy: ChartQuery['groupBy']
   readonly onGroupBy: (groupBy: ChartQuery['groupBy']) => void
-  readonly onShowRequests: (search: string) => void
+  readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
   readonly openThread: OpenThread
 }): JSX.Element => {
   const api = useApi(usageApi)
   const [now] = useState(() => Date.now())
+  const [trendMetric, setTrendMetric] = useState<'cost' | 'tokens' | 'requests'>('cost')
   const tzOffsetMinutes = -new Date(props.range.from).getTimezoneOffset()
   const query: ChartQuery = {
     from: props.range.from,
@@ -157,6 +118,12 @@ export const UsageCharts = (props: {
       total.failed += row.failed
       totals.set(row.start, total)
     }
+    const groupedTokens = buckets.map(row => ({
+      label: labelOf.get(row.start) ?? '',
+      key: keyOf(row.key),
+      value: row.input + row.cacheRead + row.cacheWrite + row.output,
+    }))
+    const groupedRequests = buckets.map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), value: row.requests }))
     const tokens = [...totals.entries()].flatMap(([start, total]) => {
       const label = labelOf.get(start) ?? ''
       return [
@@ -187,7 +154,16 @@ export const UsageCharts = (props: {
     })
     const order = new Map(labels.map((label, index) => [label, index]))
     const byTime = (left: { readonly label: string }, right: { readonly label: string }): number => (order.get(left.label) ?? 0) - (order.get(right.label) ?? 0)
-    return { labels, cost: cost.sort(byTime), tokens: tokens.sort(byTime), cache, requests: requests.sort(byTime), latency }
+    return {
+      labels,
+      cost: cost.sort(byTime),
+      groupedTokens: groupedTokens.sort(byTime),
+      groupedRequests: groupedRequests.sort(byTime),
+      tokens: tokens.sort(byTime),
+      cache,
+      requests: requests.sort(byTime),
+      latency,
+    }
   }, [view, props.range.from, props.range.to, props.bucket, props.groupBy, tzOffsetMinutes])
 
   const xAxis = useMemo(
@@ -219,13 +195,28 @@ export const UsageCharts = (props: {
     [series.labels, props.bucket, props.range.from, props.range.to],
   )
 
-  const costChart = useMemo(
+  const trendRows =
+    trendMetric === 'cost'
+      ? series.cost.map(row => ({ label: row.label, key: row.key, value: row.cost }))
+      : trendMetric === 'tokens'
+        ? series.groupedTokens
+        : series.groupedRequests
+  const trendChart = useMemo(
     () =>
       defineChart({
-        marks: [barY(series.cost, { x: 'label', y: 'cost', color: 'key' })],
+        marks: [barY(trendRows, { x: 'label', y: 'value', color: 'key' })],
         scales: {
           x: xAxis,
-          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCost(Number(value)) } } },
+          y: {
+            scale: scaleLinear,
+            grid: true,
+            axis: {
+              ticks: {
+                count: 4,
+                format: value => (trendMetric === 'cost' ? UsageFormattingModel.formatCost(Number(value)) : UsageFormattingModel.formatCount(Number(value))),
+              },
+            },
+          },
         },
         color: {
           domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
@@ -234,10 +225,10 @@ export const UsageCharts = (props: {
         tooltip: {
           use: tooltip,
           format: point =>
-            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.key}: ${UsageFormattingModel.formatCost(point.datum.cost)}`,
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.key}: ${trendMetric === 'cost' ? UsageFormattingModel.formatCost(point.datum.value) : UsageFormattingModel.formatCount(point.datum.value)}`,
         },
       }),
-    [series.cost, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to],
+    [trendRows, trendMetric, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to],
   )
   const tokenChart = useMemo(
     () =>
@@ -354,36 +345,52 @@ export const UsageCharts = (props: {
         <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
       </div>
 
-      <Panel title="Cost over time" description="List-price estimate, stacked by the largest series.">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          aria-label="Stack cost by"
-          value={props.groupBy}
-          onValueChange={value => {
-            if (value === 'model' || value === 'provider' || value === 'project') props.onGroupBy(value)
-          }}
-          className="dshx:self-start"
-        >
-          <ToggleGroupItem value="model">Model</ToggleGroupItem>
-          <ToggleGroupItem value="provider">Provider</ToggleGroupItem>
-          <ToggleGroupItem value="project">Project</ToggleGroupItem>
-          <ToggleGroupItem value="purpose">Purpose</ToggleGroupItem>
-        </ToggleGroup>
+      <Panel
+        title={`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
+        description={trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
+      >
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-label="Usage measure"
+            value={trendMetric}
+            onValueChange={value => {
+              if (value === 'cost' || value === 'tokens' || value === 'requests') setTrendMetric(value)
+            }}
+          >
+            <ToggleGroupItem value="cost">Cost</ToggleGroupItem>
+            <ToggleGroupItem value="tokens">Tokens</ToggleGroupItem>
+            <ToggleGroupItem value="requests">Requests</ToggleGroupItem>
+          </ToggleGroup>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-label="Stack cost by"
+            value={props.groupBy}
+            onValueChange={value => {
+              if (value === 'model' || value === 'provider' || value === 'project' || value === 'purpose') props.onGroupBy(value)
+            }}
+            className="dshx:self-start"
+          >
+            <ToggleGroupItem value="model">Model</ToggleGroupItem>
+            <ToggleGroupItem value="provider">Provider / account</ToggleGroupItem>
+            <ToggleGroupItem value="project">Project</ToggleGroupItem>
+            <ToggleGroupItem value="purpose">Purpose</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
         <Chart
-          ariaLabel="Cost over time"
-          ariaDescription={`Cost per ${props.bucket}, stacked by ${props.groupBy}.`}
-          definition={costChart}
+          ariaLabel={`${trendMetric} over time`}
+          ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}
+          definition={trendChart}
           height={CHART_HEIGHT}
         />
       </Panel>
 
-      <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-3">
-        <Breakdown title="Cost per model" rows={view.breakdown.model} onSelect={props.onShowRequests} />
-        <Breakdown title="Cost per provider" rows={view.breakdown.provider} onSelect={props.onShowRequests} />
-        <Breakdown title="Cost per project" rows={view.breakdown.project} onSelect={props.onShowRequests} />
-      </div>
+      <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
+      <UsageCalendar view={view} range={props.range} />
 
       <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-2">
         <Panel title="Tokens" description="Uncached input, cache reads, cache writes and output.">

@@ -3,6 +3,7 @@
 ![Tool and Jev activity report](docs/screenshots/usage-activity-report.png)
 
 ![Request log](docs/screenshots/usage-request-log.png)
+![Usage distribution and daily calendar](docs/screenshots/usage-charts.png)
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
 
 A **Usage: Analytics** reusable view (sidebar) with a model request log, usage charts,
@@ -16,14 +17,17 @@ call observations. Observation only.
   call) and a date range. A row opens its thread.
 - **Charts**: headline tiles against the previous period — cost, per day,
   requests, failures, tokens, cache hit, estimated cache savings and cost per
-  turn — cost over time stacked by model, provider, project or purpose, cost
-  per model, provider and project (selecting one filters the log), tokens by
-  kind, cache hit ratio, requests and failures, TTFT and duration p50/p90, and
-  the top threads by cost, hourly or daily. Grouping by purpose shows where
-  tokens went: agent, subagent, compaction, title, memory summary or another
-  side call. Cache savings prices the cache-read tokens at the input rate they
-  avoided, per list price, and cost per turn divides the range cost by the
-  turns that made a request. Charts use TanStack Charts from
+  turn — usage over time switchable between cost, tokens and requests, grouped
+  by model, provider/account route, project or purpose. The sortable group
+  table compares request and session counts, average tokens per request, input,
+  cache-read, cache-write and output tokens, cache share, cost share and
+  estimated cost; incomplete totals remain unavailable or marked as partial.
+  A daily heatmap switches between tokens, estimated cost and requests for up
+  to a year. Tokens by type, cache hit ratio, requests and failures, TTFT and
+  duration p50/p90, and top threads by cost remain available. Grouping by
+  purpose shows where tokens went: agent, subagent, compaction, title, memory
+  summary or another side call. Cache savings prices cache-read tokens at the
+  input rate they avoided, per list price. Charts use TanStack Charts from
   `@dshfiles/plugin-ui`.
 - **Jev API usage**: DSH-origin calls from Backlog and Memory, grouped by the
   configured secret reference (or the `TYPESAFE_API_KEY` environment-variable
@@ -51,6 +55,8 @@ call observations. Observation only.
   tool events are attributed by start time.
 
 ## Data
+
+Provider values are the exact recorded DSH route IDs; for configured AI Accounts routes these act as account/route keys, not verified billing identities. Usage does not infer vendor from a route slug or store a machine identifier: historical vendor-kind snapshots and a stable, privacy-safe machine identity are not present in request records. The dashboard uses the provider/account route dimension rather than presenting guessed vendor or machine groups.
 
 The Host walks `<sessions root>/<project>/<session>/session[.vN].jsonl.zstd`
 (newest generation only) and keeps, per log, the byte offset of the last

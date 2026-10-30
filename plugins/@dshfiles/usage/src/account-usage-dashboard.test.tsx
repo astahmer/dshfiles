@@ -24,7 +24,7 @@ const emptyView = (): ChartView => ({
   },
   keys: [],
   buckets: [],
-  breakdown: { model: [], provider: [], project: [] },
+  breakdown: { model: [], provider: [], project: [], purpose: [] },
   latency: [],
   topThreads: [],
 })
