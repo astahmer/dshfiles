@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -6,6 +7,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type ThreadView } from '@dshfiles/jj-integration/api'
 import { jujutsuApi } from './api.js'
 import { jujutsuQueryKeys } from './repository-query-cache.js'
+import { isWorkspaceMissing } from './workspace-removal-state.js'
 
 const workspacesKey = (repoRoot: string) => ['jujutsu', repoRoot, 'workspace-removal', 'workspaces'] as const
 const threadKey = (repoRoot: string, name: string) => ['jujutsu', repoRoot, 'workspace-removal', 'thread', name] as const
@@ -55,7 +57,12 @@ export const InlineWorkspaceRemoval = (props: {
     retry: false,
   })
   const thread = threadQuery.data?.thread ?? null
-  const missing = workspaces.data !== undefined && path === undefined
+  const missing = isWorkspaceMissing({ fetching: workspaces.isFetching, found: path !== undefined })
+  useEffect(() => {
+    if (!missing) return
+    void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(props.repoRoot) })
+    props.onRemoved()
+  }, [missing, props.onRemoved, props.repoRoot, queryClient])
   const forget = useQuery({
     queryKey: forgetPreviewKey(props.repoRoot, props.name),
     enabled: threadQuery.data !== undefined && thread === null,
