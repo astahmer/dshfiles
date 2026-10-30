@@ -15,6 +15,9 @@
         "click button \"Projects\"",
         "expect textbox \"Capture\"",
         "click button \"Inbox\"",
+        "expect textbox \"Capture\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "fill textbox \"Capture\" \"Inspect @Image 1\"",
         "expect textbox \"Capture\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],

@@ -37,6 +37,7 @@ import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-au
 import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
+import { ImageReferenceOverlay } from './image-reference-overlay.js'
 import { fileInput } from './composer-files.js'
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
@@ -208,6 +209,7 @@ export const Composer = (props: {
   const [transcribing, setTranscribing] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
   const ownRef = useRef<HTMLTextAreaElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const captureRef = useRef<VoiceCapture | null>(null)
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -423,6 +425,10 @@ export const Composer = (props: {
   const chat = props.variant === 'chat'
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true
+  const inputClass = cn(
+    'dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
+    chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]',
+  )
   const voiceTitle = (() => {
     if (transcribing) return 'Transcribing…'
     if (recording) return 'Stop recording'
@@ -465,70 +471,75 @@ export const Composer = (props: {
         }}
       />
 
-      <textarea
-        ref={input}
-        aria-label="Capture"
-        rows={3}
-        autoFocus={props.autoFocus}
-        placeholder={props.placeholder}
-        value={text}
-        onPaste={event => pasteFiles(event, files => void addFiles(files))}
-        onChange={event => {
-          setText(event.currentTarget.value)
-          setCaret(event.currentTarget.selectionStart)
-        }}
-        onSelect={event => setCaret(event.currentTarget.selectionStart)}
-        onKeyDown={event => {
-          if (suggestions.length > 0) {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              event.preventDefault()
-              setNavigated(true)
-              setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
-              return
-            }
-            // Project suggestions are the command's direct result, so Enter picks the highlighted project without first navigating.
-            // Other inline suggestions keep Enter-to-send unless the user has moved the highlight.
-            if (event.key === 'Tab' || (event.key === 'Enter' && BacklogProjectCommand.picksOnEnter(projectCommand, navigated))) {
-              const chosen = suggestions[highlight]
-              if (chosen !== undefined) {
+      <div className="dshx:relative">
+        {text === '' ? null : <ImageReferenceOverlay text={text} files={attachments.files} className={inputClass} overlayRef={overlayRef} />}
+        <textarea
+          ref={input}
+          aria-label="Capture"
+          rows={3}
+          autoFocus={props.autoFocus}
+          placeholder={props.placeholder}
+          value={text}
+          onPaste={event => pasteFiles(event, files => void addFiles(files))}
+          onChange={event => {
+            setText(event.currentTarget.value)
+            setCaret(event.currentTarget.selectionStart)
+          }}
+          onSelect={event => setCaret(event.currentTarget.selectionStart)}
+          onKeyDown={event => {
+            if (suggestions.length > 0) {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault()
-                pick(chosen)
+                setNavigated(true)
+                setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
                 return
               }
+              // Project suggestions are the command's direct result, so Enter picks the highlighted project without first navigating.
+              // Other inline suggestions keep Enter-to-send unless the user has moved the highlight.
+              if (event.key === 'Tab' || (event.key === 'Enter' && BacklogProjectCommand.picksOnEnter(projectCommand, navigated))) {
+                const chosen = suggestions[highlight]
+                if (chosen !== undefined) {
+                  event.preventDefault()
+                  pick(chosen)
+                  return
+                }
+              }
             }
-          }
-          if (event.key === 'ArrowUp' && text === '' && props.onNavigateUp?.()) {
+            if (event.key === 'ArrowUp' && text === '' && props.onNavigateUp?.()) {
+              event.preventDefault()
+              return
+            }
+            if (event.key === 'Escape') {
+              event.currentTarget.blur()
+              return
+            }
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+            if (event.shiftKey) {
+              const continuation = continueMarkdownList({
+                text,
+                start: event.currentTarget.selectionStart,
+                end: event.currentTarget.selectionEnd,
+              })
+              if (continuation === null) return
+              event.preventDefault()
+              setText(continuation.value)
+              requestAnimationFrame(() => {
+                input.current?.setSelectionRange(continuation.caret, continuation.caret)
+                setCaret(continuation.caret)
+              })
+              return
+            }
             event.preventDefault()
-            return
-          }
-          if (event.key === 'Escape') {
-            event.currentTarget.blur()
-            return
-          }
-          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-          if (event.shiftKey) {
-            const continuation = continueMarkdownList({
-              text,
-              start: event.currentTarget.selectionStart,
-              end: event.currentTarget.selectionEnd,
-            })
-            if (continuation === null) return
-            event.preventDefault()
-            setText(continuation.value)
-            requestAnimationFrame(() => {
-              input.current?.setSelectionRange(continuation.caret, continuation.caret)
-              setCaret(continuation.caret)
-            })
-            return
-          }
-          event.preventDefault()
-          submit()
-        }}
-        className={cn(
-          'dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
-          chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]',
-        )}
-      />
+            submit()
+          }}
+          className={cn(inputClass, text !== '' && 'dshx:relative dshx:z-10 dshx:text-transparent dshx:caret-foreground')}
+          onScroll={event => {
+            if (overlayRef.current === null) return
+            overlayRef.current.scrollTop = event.currentTarget.scrollTop
+            overlayRef.current.scrollLeft = event.currentTarget.scrollLeft
+          }}
+        />
+      </div>
 
       {failed !== null ? (
         <p role="alert" className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">

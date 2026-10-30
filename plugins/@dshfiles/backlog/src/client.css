@@ -1,7 +1,11 @@
 @source './';
 
-[data-dshfiles-backlog-reference] {
+[data-dshfiles-backlog-reference],
+[data-dshfiles-image-reference] {
   color: var(--dsw-alias-state-business-primary);
+}
+
+[data-dshfiles-backlog-reference] {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;

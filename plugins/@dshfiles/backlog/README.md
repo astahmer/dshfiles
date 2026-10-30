@@ -20,7 +20,7 @@
 
 ![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)
 
-![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
+![Capture an attached image reference highlighted in the composer](docs/screenshots/capture-and-triage.png)
 
 ![A board card opens the item detail beside the board](docs/screenshots/board-card-detail.png)
 
@@ -48,7 +48,7 @@ toolbar:
 - `+` picks images or any files, or links a backlog item or a thread. Picked references land in the text as
   `b:<n>` or a `session-…` id.
 - Status and kind chips are editable before sending; the kind chip otherwise follows the text prefix.
-- Files can be picked, pasted or dropped. Images are scaled to 1600 px and re-encoded as WebP; other files
+- Files can be picked, pasted or dropped. An attached image mentioned as `@Image N` is highlighted in blue while editing; on submit it becomes a rendered Markdown image reference. Images are scaled to 1600 px and re-encoded as WebP; other files
   keep their bytes. The Host keeps the bytes in their own storage domain, never in the item row. An item
   shows images as a thumbnail grid and other files as download rows; a feed row shows a paperclip count.
   At most eight files, 16 MB each (20 MB before an image is shrunk).

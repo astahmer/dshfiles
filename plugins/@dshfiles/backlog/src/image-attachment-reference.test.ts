@@ -26,6 +26,16 @@ describe('backlog image references', () => {
     expect(ImageAttachmentReferenceModel.imageReferenceLabels([file, image('one'), image('two')])).toEqual(['Image 1', 'Image 2'])
   })
 
+  it('highlights only image references backed by current image attachments', () => {
+    expect(ImageAttachmentReferenceModel.highlightSegments('Before @Image 1, @Image 2 and @Image 3 after', [image('one'), file, image('two')])).toEqual([
+      { text: 'Before ', isReference: false },
+      { text: '@Image 1', isReference: true },
+      { text: ', ', isReference: false },
+      { text: '@Image 2', isReference: true },
+      { text: ' and @Image 3 after', isReference: false },
+    ])
+  })
+
   it('inserts image mentions at the caret with separators', () => {
     expect(
       ImageAttachmentReferenceModel.insertImageReferences({
