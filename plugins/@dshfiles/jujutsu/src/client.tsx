@@ -2614,6 +2614,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       className={cn(
         'dshx:group/row dshx:relative dshx:@container',
         props.expanded && 'dshx:bg-muted-foreground/[0.07]',
+        revision.empty && 'dshx:bg-muted/50',
         props.dimmed && 'dshx:opacity-40',
         props.highlighted && 'dshx:bg-primary/10',
       )}
