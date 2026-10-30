@@ -32,13 +32,26 @@ describe('ImageReferenceTextNode', () => {
       { discrete: true },
     )
 
+    editor.update(
+      () => {
+        const node = $getRoot().getFirstDescendant()
+        if ($isImageReferenceTextNode(node)) node.setValid(false)
+      },
+      { discrete: true },
+    )
     const projection = editor.getEditorState().read(() => {
       const node = $getRoot().getFirstDescendant()
       if (!$isImageReferenceTextNode(node)) return null
-      return { text: $getRoot().getTextContent(), mode: node.getMode(), attachmentId: node.getAttachmentId(), entity: node.isTextEntity() }
+      return { text: $getRoot().getTextContent(), mode: node.getMode(), attachmentId: node.getAttachmentId(), entity: node.isTextEntity(), valid: node.isValid() }
     })
 
-    expect(projection).toEqual({ text: '@Image 1', mode: 'token', attachmentId: 'image-one', entity: true })
+    expect(projection).toEqual({
+      text: '@Image 1',
+      mode: 'token',
+      attachmentId: 'image-one',
+      entity: true,
+      valid: false,
+    })
   })
 
   it('seeds rich content inside a paragraph and preserves line breaks', () => {

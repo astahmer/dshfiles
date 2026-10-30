@@ -27,7 +27,7 @@ export class ImageReferenceTextNode extends TextNode {
     super(text, key)
     this.__attachmentId = attachmentId
     this.__valid = valid
-    this.setMode('token')
+    this.__mode = 1
   }
 
   override exportJSON(): SerializedImageReferenceTextNode {
