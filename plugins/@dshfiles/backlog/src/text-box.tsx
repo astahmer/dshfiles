@@ -1,5 +1,6 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { CornerDownLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
@@ -43,6 +44,10 @@ export const BacklogTextBox = (props: {
   const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const input = useRef<BacklogImageEditorHandle | null>(null)
+  const root = useRef<HTMLDivElement | null>(null)
+  const pendingBlur = useRef(false)
+  const threadMentionDrag = useRef(false)
+  const droppedIntoBox = useRef(false)
   const completion = useMentionCompletion({
     text: props.value,
     caret,
@@ -81,6 +86,44 @@ export const BacklogTextBox = (props: {
   )
 
   useEffect(() => {
+    if (props.onBlur === undefined) return
+    const savePendingBlur = (): void => {
+      if (!pendingBlur.current || threadMentionDrag.current) return
+      pendingBlur.current = false
+      props.onBlur?.()
+    }
+    const onDragStart = (event: DragEvent): void => {
+      if (!ThreadMentionDrag.has(event.dataTransfer)) return
+      threadMentionDrag.current = true
+    }
+    const onDrop = (event: DragEvent): void => {
+      if (!threadMentionDrag.current) return
+      const target = event.target
+      droppedIntoBox.current = target instanceof Node && root.current?.contains(target) === true
+    }
+    const onDragEnd = (): void => {
+      if (!threadMentionDrag.current) return
+      threadMentionDrag.current = false
+      if (droppedIntoBox.current) pendingBlur.current = false
+      else savePendingBlur()
+      droppedIntoBox.current = false
+    }
+    const onPointerUp = (): void => {
+      if (!droppedIntoBox.current) savePendingBlur()
+    }
+    document.addEventListener('dragstart', onDragStart, true)
+    document.addEventListener('drop', onDrop, true)
+    document.addEventListener('dragend', onDragEnd, true)
+    document.addEventListener('pointerup', onPointerUp, true)
+    return () => {
+      document.removeEventListener('dragstart', onDragStart, true)
+      document.removeEventListener('drop', onDrop, true)
+      document.removeEventListener('dragend', onDragEnd, true)
+      document.removeEventListener('pointerup', onPointerUp, true)
+    }
+  }, [props.onBlur])
+
+  useEffect(() => {
     setHighlight(0)
     setNavigated(false)
     setDismissed(false)
@@ -105,11 +148,16 @@ export const BacklogTextBox = (props: {
   const blur = (event: FocusEvent<HTMLDivElement>): void => {
     const next = event.relatedTarget
     if (next instanceof Node && event.currentTarget.contains(next)) return
+    if (next instanceof HTMLElement && next.draggable) {
+      pendingBlur.current = true
+      return
+    }
     props.onBlur?.()
   }
 
   return (
     <div
+      ref={root}
       {...drop.dragProps}
       onBlur={blur}
       className={cn(

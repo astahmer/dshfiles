@@ -69,6 +69,7 @@ const sidebarThreadRow = (page: Page, sessionId: string) => threadSidebar(page).
 const threadTab = (page: Page, sessionId: string) => strip(page).locator(`[data-tab-id="thread:${sessionId}"]`)
 
 const nativeWorkspaceRoots = new WeakMap<Page, string>()
+const backlogDropSessions = new WeakMap<Page, string>()
 const nativePanelMoves = new WeakMap<Page, string>()
 const newThreadButton = (page: Page) =>
   page
@@ -326,6 +327,7 @@ Then('the side panel hosts that thread beside the main view', async ({ page }: {
 
 When('a kept thread tab is present while text is typed into Backlog', async ({ page }: { page: Page }) => {
   const sessionId = await startSidebarThread(page, 'Backlog capture typing')
+  backlogDropSessions.set(page, sessionId)
   await threadTab(page, sessionId).dblclick()
   const navigation = page.getByRole('navigation', { name: 'Sidebar navigation', exact: true })
   const destination = navigation.getByRole('button', { name: 'Backlog: Items', exact: true })
@@ -338,10 +340,31 @@ When('a kept thread tab is present while text is typed into Backlog', async ({ p
   }
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
-  await capture.pressSequentially('Keyboard capture from Backlog')
+  await capture.fill('Keyboard capture from Backlog')
+  await threadTab(page, sessionId).dragTo(capture)
+  await expect(capture).toContainText('@[Backlog capture typing](dsh-session:')
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   await capture.press('Enter')
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
+})
+
+When('the kept thread tab is dropped into its description and reply', async ({ page }: { page: Page }) => {
+  const sessionId = backlogDropSessions.get(page)
+  if (sessionId === undefined) throw new Error('The backlog drop journey has no source thread.')
+  const reference = '@[Backlog capture typing](dsh-session:'
+  const description = page.getByRole('button', { name: 'Edit description', exact: true })
+  await description.click()
+  const body = page.getByRole('textbox', { name: 'Body', exact: true })
+  await body.fill('Description before drop')
+  await threadTab(page, sessionId).dragTo(body)
+  await expect(body).toContainText(reference)
+  await body.press('ControlOrMeta+Enter')
+  const reply = page.getByRole('textbox', { name: 'Comment', exact: true })
+  await reply.fill('Reply before drop')
+  await threadTab(page, sessionId).dragTo(reply)
+  await expect(reply).toContainText(reference)
+  await page.getByRole('button', { name: 'Reply', exact: true }).click()
+  await expect(page.getByRole('list', { name: 'Activity', exact: true })).toContainText('Backlog capture typing')
 })
 
 Then('Backlog remains the active main tab after capture typing', async ({ page }: { page: Page }) => {

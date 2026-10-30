@@ -84,11 +84,13 @@ Feature: Main view tabs
     Then the side panel hosts that thread beside the main view
 
   @scenario:main-tabs.backlog-capture-with-thread-tab
-  Scenario: Typing in Backlog does not activate a kept thread tab
+  Scenario: Dropping a thread tab into Backlog inserts its mention without activating the tab
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/backlog, @dshfiles/input-trigger, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a disposable native-tabs workspace is selected
     And a kept thread tab is present while text is typed into Backlog
     Then Backlog remains the active main tab after capture typing
+    When backlog item b:1 is opened
+    And the kept thread tab is dropped into its description and reply
 
   @scenario:main-tabs.move-tab-between-panels
   Scenario: A thread tab moves into the side panel and back to the main view
