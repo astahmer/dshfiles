@@ -1,6 +1,11 @@
-export const repositoryLoadingState = (input: { readonly registering: boolean; readonly fetching: boolean; readonly hasState: boolean }) => {
+export const repositoryLoadingState = (input: {
+  readonly registering: boolean
+  readonly fetching: boolean
+  readonly hasState: boolean
+  readonly hasError: boolean
+}) => {
   const loading = input.registering || input.fetching
-  return { loading, showEmptyPrompt: !input.hasState && !loading }
+  return { loading, showEmptyPrompt: !input.hasState && !loading && !input.hasError, showLoadFailure: !input.hasState && !loading && input.hasError }
 }
 
 export const shouldReregisterRepository = (input: {

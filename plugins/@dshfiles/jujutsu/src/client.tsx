@@ -623,7 +623,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state])
 
   const busy = registerMutation.isPending || stateQuery.isFetching || actionBusy
-  const repositoryStatus = repositoryLoadingState({ registering: registerMutation.isPending, fetching: stateQuery.isFetching, hasState: state !== undefined })
+  const repositoryStatus = repositoryLoadingState({
+    registering: registerMutation.isPending,
+    fetching: stateQuery.isFetching,
+    hasState: state !== undefined,
+    hasError: stateQuery.error !== null || registerMutation.error !== null,
+  })
   const loadingRepository = repositoryStatus.loading
 
   const remoteNames = state?.remoteNames ?? []
@@ -1835,7 +1840,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     PanelScopes.requestTab({ scope: PanelScopes.newMainTab(), path: shownRoot })
   }
 
-  const emptyState = repositoryStatus.showEmptyPrompt ? (
+  const emptyState = repositoryStatus.showLoadFailure ? (
+    <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
+      <EmptyHeader>
+        <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Repository could not be loaded.</EmptyTitle>
+        <Button className="dshx:mt-2" disabled={busy} onClick={() => registerRepository({ path, readOnly: true })} size="sm" type="button" variant="outline">
+          Retry
+        </Button>
+      </EmptyHeader>
+    </Empty>
+  ) : repositoryStatus.showEmptyPrompt ? (
     <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
       <EmptyHeader>
         <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Choose a repository to open its revision graph.</EmptyTitle>
