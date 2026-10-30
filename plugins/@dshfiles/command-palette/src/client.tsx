@@ -446,7 +446,7 @@ export default defineClient({
         icon: <SunIcon className="dshx:size-4" />,
         group: 'action',
         isSelected: context => context.themePreference === 'light',
-        run: () => ctx.theme.setTheme('light'),
+        run: context => ctx.theme.setTheme(context.themePreference === 'light' ? 'dark' : 'light'),
       },
       {
         id: '@dshfiles/command-palette/theme/dark',
@@ -455,7 +455,7 @@ export default defineClient({
         icon: <MoonIcon className="dshx:size-4" />,
         group: 'action',
         isSelected: context => context.themePreference === 'dark',
-        run: () => ctx.theme.setTheme('dark'),
+        run: context => ctx.theme.setTheme(context.themePreference === 'dark' ? 'light' : 'dark'),
       },
       {
         id: '@dshfiles/command-palette/theme/system',

@@ -247,6 +247,26 @@ Then('the registered dark-theme action is available and can run', async ({ page 
   await finishJourneyAssertions(page)
 })
 
+Then('selecting active light and dark actions toggles the theme', async ({ page }: { page: Page }) => {
+  const selectTheme = async (name: RegExp) => {
+    await openPalette(page)
+    await paletteInput(page).fill('>')
+    await paletteOption(page, name).click()
+    await expect(paletteDialog(page)).not.toBeVisible()
+  }
+  const isDark = async () => page.locator('body').evaluate(body => body.hasAttribute('data-ds-dark-theme'))
+
+  await selectTheme(/Use light theme/)
+  await recordAssertion(page, 'light-action-selects-light', async () => expect.poll(isDark).toBe(false))
+  await selectTheme(/Use light theme/)
+  await recordAssertion(page, 'active-light-action-toggles-to-dark', async () => expect.poll(isDark).toBe(true))
+  await selectTheme(/Use dark theme/)
+  await recordAssertion(page, 'active-dark-action-toggles-to-light', async () => expect.poll(isDark).toBe(false))
+  await selectTheme(/Use dark theme/)
+  await recordAssertion(page, 'dark-action-selects-dark', async () => expect.poll(isDark).toBe(true))
+  await finishJourneyAssertions(page)
+})
+
 Then('the contributed Toggle sidebar command is listed with its keys and runs', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'contributed-command-is-listed', () => expect(paletteOption(page, /Toggle sidebar/)).toBeVisible())
   await paletteOption(page, /Toggle sidebar/).click()

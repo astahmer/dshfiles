@@ -35,6 +35,12 @@ Feature: Command palette
     When the palette query is ">"
     Then the registered dark-theme action is available and can run
 
+  @scenario:command-palette.theme-toggle
+  Scenario: Selecting the active theme action toggles to the opposite theme
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    Then selecting active light and dark actions toggles the theme
+
   @scenario:command-palette.contributed-command
   Scenario: A command another plugin contributes through dshx is listed and runs
     Given the isolated plugin composition of "@dshfiles/command-palette, @dshfiles/shortcuts" is booted
