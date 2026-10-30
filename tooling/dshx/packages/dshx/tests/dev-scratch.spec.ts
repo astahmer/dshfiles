@@ -72,6 +72,43 @@ describe('dshx dev scratch commands', () => {
     }
   })
 
+  it('seeds shared workspaces only in the scratch sample and can be retried', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dshx-shared-workspaces-'))
+    cleanups.push(() => rm(home, { recursive: true, force: true }))
+    const sample = await ScratchSeedRuntime.sampleProject(home)
+    const project = { path: sample, workspaceId: 'sample', ownedByScratch: true }
+    await ScratchSeedRuntime.seedSharedWorkspaces({ home, project })
+    await ScratchSeedRuntime.seedSharedWorkspaces({ home, project })
+    const jj = (cwd: string, args: string[]): string => {
+      const result = spawnSync('jj', ['--color=never', '--no-pager', ...args], { cwd, env: { ...process.env, HOME: home }, encoding: 'utf8' })
+      expect(result.status, result.stderr).toBe(0)
+      return result.stdout.trim()
+    }
+    jj(sample, ['new'])
+    await ScratchSeedRuntime.seedSharedWorkspaces({ home, project })
+    const names = jj(sample, ['workspace', 'list', '-T', 'name ++ "\\n"']).split('\n')
+    expect(names).toEqual(['default', 'review-01', 'review-02', 'review-03', 'review-04', 'review-05'])
+    const source = jj(sample, ['log', '--no-graph', '-r', '@', '-T', 'commit_id'])
+    for (const name of names.slice(1)) {
+      expect(jj(join(home, 'projects', 'shared-workspaces', name), ['log', '--no-graph', '-r', '@', '-T', 'commit_id'])).toBe(source)
+    }
+    await expect(ScratchSeedRuntime.seedSharedWorkspaces({ home, project: { ...project, ownedByScratch: false } })).rejects.toThrow('disposable sample project')
+    await expect(ScratchSeedRuntime.seedSharedWorkspaces({ home, project: { ...project, path: home } })).rejects.toThrow('disposable sample project')
+  }, 30_000)
+
+  it('reports how to recover if a partial shared-workspace seed cannot be retried', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dshx-shared-workspaces-'))
+    cleanups.push(() => rm(home, { recursive: true, force: true }))
+    const sample = await ScratchSeedRuntime.sampleProject(home)
+    const occupied = join(home, 'projects', 'shared-workspaces', 'review-01')
+    await mkdir(occupied, { recursive: true })
+    await writeFile(join(occupied, 'keep.txt'), 'kept')
+    await expect(
+      ScratchSeedRuntime.seedSharedWorkspaces({ home, project: { path: sample, workspaceId: 'sample', ownedByScratch: true } }),
+    ).rejects.toMatchObject({ code: 'project-seed-failed', hint: expect.stringContaining('start a fresh scratch instance without --project') })
+    expect(await readFile(join(occupied, 'keep.txt'), 'utf8')).toBe('kept')
+  }, 30_000)
+
   it('matches native and ThreadSidebar start buttons by accessible name', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('New thread')).toBe(true)
     expect(NEW_THREAD_START_BUTTON_NAME.test('New session')).toBe(true)

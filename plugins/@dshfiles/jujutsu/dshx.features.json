@@ -375,11 +375,6 @@
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {
-          "kind": "gherkin",
-          "id": "jujutsu.workspace-overflow-drag",
-          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
-        },
-        {
           "kind": "unit-test",
           "id": "jujutsu.bookmark-set",
           "file": "plugins/@dshfiles/jujutsu/src/bookmark-set.integration.test.ts",
@@ -398,6 +393,34 @@
           "testName": "records a jj log span with flag names only and whether output was cut"
         }
       ]
+    },
+    {
+      "id": "workspace-overflow",
+      "title": "Move a workspace from a shared revision",
+      "summary": "Open the overflow chip to see, drag, or use actions on additional workspaces that share a revision.",
+      "reach": [
+        "seed shared-workspaces",
+        "click button \"Jujutsu: Revision graph\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "click button \"Show 2 more workspaces\"",
+        "expect text \"review-05\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["collapsed", "expanded"],
+      "failureModes": ["A failed workspace move is reported by the existing preview flow."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.workspace-overflow-drag",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only presentation of workspaces already loaded by the graph." }]
     },
     {
       "id": "workspace-at-revision",

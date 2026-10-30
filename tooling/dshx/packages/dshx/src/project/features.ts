@@ -60,7 +60,8 @@ const externalDependencySchema = z
   .strict()
 
 /**
- * State a reach needs that one short UI path cannot create, set up once per scratch instance by `dshx dev open`:
+ * State a reach needs that one short UI path cannot create, set up by `dshx dev open`:
+ * `shared-workspaces` creates five named workspaces on the scratch sample project's working copy;
  * `rebase-ready-thread` is a thread in its own jj workspace whose described revision is ready to rebase (the agent's edit
  * is stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would;
  * `tool-call-thread` is a thread whose model (a loopback fake provider) ran a few-second `bash` tool call;
@@ -79,6 +80,7 @@ const externalDependencySchema = z
  * (needs @dshfiles/dialogs), as another plugin's `api.dialogs.confirm` / `api.toast.show` call does.
  */
 export const REACH_SEEDS = [
+  'shared-workspaces',
   'rebase-ready-thread',
   'pending-restart',
   'tool-call-thread',

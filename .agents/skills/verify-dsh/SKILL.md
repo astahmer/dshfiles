@@ -58,7 +58,7 @@ dshx dev open home-screen
 Goes to the app root, dismisses Preview Notice and the provider-setup dialog
 (legacy "Add an API key" or current "Get started"), then runs the feature's
 `reach` steps. A `seed` step first sets up state no short UI path
-creates, once per instance: `rebase-ready-thread` (a jj workspace thread with a
+creates: `shared-workspaces` (five workspaces on the scratch sample's working copy; refuses `--project`, re-aligns on each open), `rebase-ready-thread` (a jj workspace thread with a
 described revision, for Rebase), `pending-restart` (changes thread-sidebar's
 `dist/index.js`; `down` restores it), and `tool-call-thread` (an AI Accounts
 Command Code account on a loopback fake provider, which `down` stops, and a

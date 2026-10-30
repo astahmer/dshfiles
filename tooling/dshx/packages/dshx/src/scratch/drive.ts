@@ -158,6 +158,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
             !alreadySeeded ||
             parsed.seed === 'tool-call-thread' ||
             parsed.seed === 'rebase-ready-thread' ||
+            parsed.seed === 'shared-workspaces' ||
             parsed.seed === 'otlp-session-turns' ||
             parsed.seed === 'app-dialog-sample'
           ) {

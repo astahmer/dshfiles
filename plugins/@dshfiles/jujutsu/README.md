@@ -1,5 +1,7 @@
 # @dshfiles/jujutsu
 
+![Move a workspace from a shared revision](docs/screenshots/workspace-overflow.png)
+
 ![Describe and review the working copy in Source Control](docs/screenshots/source-control.png)
 
 ![Show exact revision counts against the selected base](docs/screenshots/composer-context.png)

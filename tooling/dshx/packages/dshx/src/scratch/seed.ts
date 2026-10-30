@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodeJson, jsonValueSchema } from '../json.js'
@@ -145,7 +145,13 @@ const PENDING_RESTART_MARKER = '\n// dshx dev seed: pending restart\n'
 /** thread-sidebar reports pending Host updates, so its own Host entry is the one a seeded rebuild changes. */
 const PENDING_RESTART_PLUGIN = '@dshfiles/thread-sidebar'
 
-const runJj = (input: { readonly cwd: string; readonly home: string; readonly args: readonly string[]; readonly purpose: string }): void => {
+const runJj = (input: {
+  readonly cwd: string
+  readonly home: string
+  readonly args: readonly string[]
+  readonly purpose: string
+  readonly hint?: string
+}): string => {
   const result = spawnSync('jj', ['--color=never', '--no-pager', ...input.args], {
     cwd: input.cwd,
     env: {
@@ -162,9 +168,10 @@ const runJj = (input: { readonly cwd: string; readonly home: string; readonly ar
     throw new ScratchError(
       'project-seed-failed',
       `jj ${input.args[0] ?? ''} failed while ${input.purpose}: ${result.stderr ?? result.error?.message ?? ''}`,
-      'Install jj, or pass --project <dir> to register an existing folder.',
+      input.hint ?? 'Install jj, or pass --project <dir> to register an existing folder.',
     )
   }
+  return result.stdout
 }
 
 /** A jj repository with a `main` bookmark, so jj-integration's destination bar has a bookmark and isolation to show. */
@@ -187,6 +194,26 @@ const seedSampleProject = async (home: string): Promise<string> => {
     runJj({ cwd: project, home, args, purpose: 'seeding the sample project' })
   }
   return project
+}
+
+const seedSharedWorkspaces = async (input: Pick<ScratchState, 'home' | 'project'>): Promise<void> => {
+  const sample = join(input.home, 'projects', 'sample')
+  if (!input.project.ownedByScratch || (await realpath(input.project.path)) !== (await realpath(sample))) {
+    throw new ScratchError('seed-needs-sample', 'Seed shared-workspaces needs the disposable sample project.', 'Start a scratch DSH without --project.')
+  }
+  const parent = join(input.home, 'projects', 'shared-workspaces')
+  await mkdir(parent, { recursive: true })
+  const workspaceJj = (command: { readonly cwd: string; readonly args: readonly string[]; readonly purpose: string }): string =>
+    runJj({ ...command, home: input.home, hint: 'Check jj is installed, or run dshx dev down and start a fresh scratch instance without --project.' })
+  const names = workspaceJj({ cwd: sample, args: ['workspace', 'list', '-T', 'name ++ "\\n"'], purpose: 'listing sample workspaces' }).split('\n')
+  for (let index = 1; index <= 5; index += 1) {
+    const name = `review-0${index}`
+    const path = join(parent, name)
+    if (!names.includes(name)) {
+      workspaceJj({ cwd: sample, args: ['workspace', 'add', '--name', name, '--revision', '@', path], purpose: 'creating sample workspaces' })
+    }
+    workspaceJj({ cwd: path, args: ['edit', 'default@'], purpose: 'sharing the sample working copy' })
+  }
 }
 
 /**
@@ -1185,6 +1212,10 @@ const applySeed = async (input: {
   readonly timeoutMs: number
 }): Promise<{ readonly changedFile?: string; readonly fakeProvider?: NonNullable<ScratchState['fakeProvider']> }> => {
   if (input.seed === 'pending-restart') return { changedFile: await seedPendingRestart(input.state) }
+  if (input.seed === 'shared-workspaces') {
+    await seedSharedWorkspaces(input.state)
+    return {}
+  }
   if (input.seed === 'fake-secret-cli') {
     await seedFakeSecretCli(input.state)
     return {}
@@ -1221,6 +1252,7 @@ const applySeed = async (input: {
 
 export class ScratchSeedRuntime {
   static readonly sampleProject = seedSampleProject
+  static readonly seedSharedWorkspaces = seedSharedWorkspaces
   static readonly restorePendingRestart = restorePendingRestart
   static readonly installFakeSecretCli = installFakeSecretCli
   static readonly openAIAccountsPanel = openAIAccountsPanel

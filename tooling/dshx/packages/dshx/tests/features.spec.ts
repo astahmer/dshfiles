@@ -85,6 +85,7 @@ describe('plugin feature metadata', () => {
   it('accepts context-menu clicks and seeds that come before the walk', () => {
     const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(withReach(['seed rebase-ready-thread', 'seed pending-restart', 'rightclick text "Seeded*"', 'expect menuitem "Mark unread"'])).toEqual([])
+    expect(withReach(['seed shared-workspaces', 'click button "Show 2 more workspaces"', 'expect text "review-05"'])).toEqual([])
     expect(
       withReach([
         'seed fake-secret-cli',
