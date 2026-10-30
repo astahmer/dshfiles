@@ -47,7 +47,10 @@ export interface ThreadPaletteCopy {
   /** Accessible name of the search box; the dialog's description is only linked, not a name. */
   readonly searchLabel: string
   readonly sessionNotFound: string
-  readonly unassigned: string
+      readonly unassigned: string
+    readonly working: string
+    readonly idle: string
+
   readonly prefixHint: string
   readonly viewAll: string
   readonly viewCommands: string
@@ -750,13 +753,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
                         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-                          {project}
-                          {thread.cwd.length > 0 ? (
-                            <>
-                              {' · '}
-                              <span className="dshx:font-mono">{thread.cwd}</span>
-                            </>
-                          ) : null}
+                          {[
+                            project,
+                            thread.updatedAt > 0 ? new Date(thread.updatedAt).toLocaleDateString() : null,
+                            thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
+                          ]
+                            .filter(value => value !== null)
+                            .join(' · ')}
                         </span>
                       </span>
                       {shortcut(row)}

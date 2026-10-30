@@ -68,6 +68,7 @@ const samePaletteSession = (left: SessionSummary, right: SessionSummary): boolea
   left.origin === right.origin &&
   left.blank === right.blank &&
   left.updatedAt === right.updatedAt &&
+  left.running === right.running &&
   (left.retainedBy.mainView ?? 0) === (right.retainedBy.mainView ?? 0)
 
 const samePaletteSessions = (left: readonly SessionSummary[], right: readonly SessionSummary[]): boolean =>
@@ -232,6 +233,8 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         searchLabel: props.translate('commandPaletteSearchLabel'),
         sessionNotFound: props.translate('commandPaletteSessionNotFound'),
         unassigned: props.translate('commandPaletteUnassigned'),
+        working: props.translate('commandPaletteWorking'),
+        idle: props.translate('commandPaletteIdle'),
         prefixHint: props.translate('commandPalettePrefixHint'),
         viewAll: props.translate('commandPaletteViewAll'),
         viewCommands: props.translate('commandPaletteCommands'),

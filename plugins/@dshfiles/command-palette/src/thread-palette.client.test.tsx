@@ -34,6 +34,8 @@ const copy: ThreadPaletteCopy = {
   searchLabel: 'Search the command palette',
   sessionNotFound: 'Session {id} was not found.',
   unassigned: 'Unassigned',
+  working: 'Working',
+  idle: 'Idle',
   prefixHint: 'Type ? for prefixes',
   viewAll: 'Everything',
   viewCommands: 'Commands',
@@ -319,7 +321,7 @@ describe('Ask DSH keyboard submit', () => {
 })
 
 describe('Threads tab project scope', () => {
-  const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }
+  const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2, running: true }
   const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1 }
 
   it('retries empty content results when fresh Host activity updates the thread list', async () => {
@@ -423,6 +425,31 @@ describe('Threads tab project scope', () => {
     await screen.findByText(copy.empty, { exact: true })
     expect(searchContent).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('subagent-only excerpt')).toBeNull()
+  })
+
+  it('shows project, date, and status without the absolute workspace path', async () => {
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[{ ...here, updatedAt: new Date(2026, 9, 30).getTime() }]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const result = await screen.findByRole('option', { name: /Here work/ })
+    expect(result.textContent).toContain('dshfiles')
+    expect(result.textContent).toContain('2026')
+    expect(result.textContent).toContain('Working')
+    expect(result.textContent).not.toContain('/dev/dshfiles')
   })
 
   it('lists only the current project on Threads and every project on Everything', async () => {
