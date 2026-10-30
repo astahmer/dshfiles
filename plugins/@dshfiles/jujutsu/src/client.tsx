@@ -36,6 +36,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/u
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
@@ -2455,6 +2456,25 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
     revision.workingCopy
       ? `Working copy of workspace ${workspace} · drag onto a revision to move this workspace · right-click for actions`
       : `Workspace ${workspace} · drag onto a revision to move this workspace · right-click for actions`
+  const workspaceChip = (workspace: string): JSX.Element =>
+    workspace === 'default' ? (
+      <Tooltip key={workspace}>
+        <TooltipTrigger asChild>
+          <span>{workspaceLabel(workspace)}</span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
+      </Tooltip>
+    ) : (
+      <ContextMenu key={workspace}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <ContextMenuTrigger asChild>{workspaceLabel(workspace)}</ContextMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
+        </Tooltip>
+        {props.workspaceMenu(workspace, revision.commitId)}
+      </ContextMenu>
+    )
   const remoteBookmarkLabels = revision.remoteBookmarksText
     .split('\n')
     .filter(Boolean)
@@ -2470,35 +2490,26 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   ]
   const labels = (
     <>
-      {rowWorkspaces.shown.map(workspace =>
-        workspace === 'default' ? (
-          <Tooltip key={workspace}>
-            <TooltipTrigger asChild>
-              <span>{workspaceLabel(workspace)}</span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <ContextMenu key={workspace}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ContextMenuTrigger asChild>{workspaceLabel(workspace)}</ContextMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
-            </Tooltip>
-            {props.workspaceMenu(workspace, revision.commitId)}
-          </ContextMenu>
-        ),
-      )}
+      {rowWorkspaces.shown.map(workspaceChip)}
       {rowWorkspaces.hidden.length > 0 && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="dshx:h-4 dshx:flex-none dshx:rounded-full dshx:border dshx:border-border dshx:px-1.5 dshx:text-[11px] dshx:leading-[14px] dshx:font-medium dshx:text-muted-foreground">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              aria-label={`Show ${rowWorkspaces.hidden.length} more workspaces`}
+              className="dshx:h-4 dshx:flex-none dshx:rounded-full dshx:border dshx:border-border dshx:px-1.5 dshx:text-[11px] dshx:leading-[14px] dshx:font-medium dshx:text-muted-foreground dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+              type="button"
+            >
               +{rowWorkspaces.hidden.length} more
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{rowWorkspaces.overflowHint}</TooltipContent>
-        </Tooltip>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            aria-label="More workspaces"
+            className="dshx-root dshx:max-h-60 dshx:w-64 dshx:max-w-[calc(100vw-16px)] dshx:overflow-y-auto dshx:p-2"
+          >
+            <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">{rowWorkspaces.hidden.map(workspaceChip)}</div>
+          </PopoverContent>
+        </Popover>
       )}
       {bookmarks.map(({ name, label, key, local }) => (
         <ContextMenu key={key}>

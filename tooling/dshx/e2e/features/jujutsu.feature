@@ -1,8 +1,8 @@
 Feature: Jujutsu revision interactions
 
   These journeys use disposable local repositories and the real isolated
-  plugin profile. Opening a Git-only checkout initializes JJ; mutation previews
-  in the drag/drop journey are cancelled before any repository change.
+  plugin profile. Opening a Git-only checkout initializes JJ; revision and bookmark
+  previews are cancelled, while workspace moves affect only the disposable fixture.
 
   @scenario:jujutsu.git-auto-init
   Scenario: Opening a dirty Git-only checkout initializes JJ once and preserves Git history and file bytes
@@ -23,6 +23,12 @@ Feature: Jujutsu revision interactions
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted
     When a disposable Jujutsu repository is selected
     Then revision and bookmark moves preview in the target context without changing history
+
+  @scenario:jujutsu.workspace-overflow-drag
+  Scenario: Move an overflow workspace from a shared revision
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with six workspaces on one revision is selected
+    Then an overflow workspace can be dragged to another revision and moved independently
 
   @scenario:jujutsu.stale-repository-recovery
   Scenario: a missing repository offers a direct recovery path

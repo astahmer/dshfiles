@@ -165,6 +165,63 @@ When('a disposable Jujutsu repository is selected', async ({ page }: { page: Pag
   await selectRepository(page, fixture)
 })
 
+When('a disposable Jujutsu repository with six workspaces on one revision is selected', async ({ page }: { page: Page }) => {
+  const fixture = await createFixture(page)
+  for (let index = 1; index <= 6; index += 1) {
+    const name = `review-0${index}`
+    const path = join(fixture.temporaryRoot, name)
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['workspace', 'add', '--name', name, '--revision', fixture.commitId, path])
+    jjAt(path, fixture.temporaryRoot, ['edit', fixture.commitId])
+  }
+  await selectRepository(page, fixture)
+})
+
+Then('an overflow workspace can be dragged to another revision and moved independently', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const source = revisionRow(page, fixture.sourceDescription)
+  const overflow = source.getByRole('button', { name: 'Show 2 more workspaces', exact: true })
+  const panel = page
+    .locator('main.dshx-root')
+    .filter({ has: page.getByRole('region', { name: 'Revisions', exact: true }) })
+    .last()
+  await panel.evaluate(element => {
+    element.style.width = '360px'
+    element.style.maxWidth = '360px'
+  })
+  await overflow.click()
+  await expect(page.getByRole('dialog', { name: 'More workspaces', exact: true }).getByText('review-06', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await panel.evaluate(element => {
+    element.style.removeProperty('width')
+    element.style.removeProperty('max-width')
+  })
+  await overflow.focus()
+  await page.keyboard.press('Enter')
+  const list = page.getByRole('dialog', { name: 'More workspaces', exact: true })
+  await expect(list.getByText('review-05', { exact: true })).toBeVisible()
+  await expect(list.getByText('review-06', { exact: true })).toBeVisible()
+  await list.getByText('review-05', { exact: true }).click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Remove workspace…', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menuitem', { name: 'Remove workspace…', exact: true })).toBeHidden()
+  if (await list.isVisible()) await page.keyboard.press('Escape')
+  await expect(list).toHaveCount(0)
+  await overflow.click()
+  await expect(list).toBeVisible()
+  await list.getByText('review-06', { exact: true }).dragTo(revisionRow(page, fixture.targetDescription))
+  const preview = page.getByRole('group', { name: 'Preview workspace move', exact: true })
+  await expect(preview).toContainText('review-06')
+  await expect(preview).toContainText(fixture.targetDescription)
+  await preview.getByRole('button', { name: 'Move workspace', exact: true }).click()
+  await expect(preview).toBeHidden({ timeout: 10_000 })
+  const moved = currentCommitId(join(fixture.temporaryRoot, 'review-06'), fixture.temporaryRoot)
+  expect(moved).toBe(currentCommitId(fixture.repositoryPath, fixture.temporaryRoot))
+  for (let index = 1; index <= 5; index += 1) {
+    expect(currentCommitId(join(fixture.temporaryRoot, `review-0${index}`), fixture.temporaryRoot)).toBe(fixture.commitId)
+  }
+  await finishJourneyAssertions(page)
+})
+
 Then('removing the selected repository offers a way to choose another', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
   await rm(fixture.repositoryPath, { recursive: true, force: true })

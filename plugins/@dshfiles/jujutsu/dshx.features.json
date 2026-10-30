@@ -337,7 +337,7 @@
     {
       "id": "previewed-revision-mutations",
       "title": "Preview and confirm repository mutations",
-      "summary": "Create, squash, duplicate, revert, rebase, set bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state.",
+      "summary": "Create, squash, duplicate, revert, rebase, move workspaces and bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state. Open the overflow chip to drag or use actions on additional workspaces sharing a revision.",
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
@@ -372,6 +372,11 @@
         {
           "kind": "gherkin",
           "id": "jujutsu.drag-drop-preview",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.workspace-overflow-drag",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {
