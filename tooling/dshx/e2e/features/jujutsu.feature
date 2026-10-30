@@ -123,11 +123,12 @@ Feature: Jujutsu revision interactions
     And clicking the foreign reference opens the panel on the other repository focused on that revision
 
   @scenario:jujutsu.workspace-cleanup
-  Scenario: The repository menu previews a background cleanup before removing anything
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/home, @dshfiles/multi-host" is booted
-    When a disposable Jujutsu repository is selected
+  Scenario: Cleanup removes an older-page workspace and refreshes its graph label
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/home, @dshfiles/multi-host, @dshfiles/workspace-folder-picker" is booted
+    When a disposable Jujutsu cleanup repository with an empty older-page workspace is selected
+    Then the empty workspace label appears on its older main ancestor
     And two stale untracked folders exist beside the repository
     And the repository actions menu opens the workspace cleanup
     Then the cleanup dialog shows age presets without removing anything
-    When only one stale untracked folder is selected for cleanup
-    Then cleanup removes only the selected folder
+    When one stale untracked folder and the older-page workspace are selected for cleanup
+    Then cleanup removes only the selected folder and clears the old graph workspace label without reloading

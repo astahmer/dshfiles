@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { registerWorkspaceFolder } from '../threads.js'
 
 interface JujutsuFixture {
   readonly temporaryRoot: string
@@ -18,6 +19,13 @@ interface JujutsuFixture {
 }
 
 const fixtures = new WeakMap<Page, JujutsuFixture>()
+interface CleanupGraphFixture {
+  readonly workspaceName: string
+  readonly mainCommitId: string
+  readonly targetDescription: string
+  readonly visibleRevisionCount: number
+}
+const cleanupGraphFixtures = new WeakMap<Page, CleanupGraphFixture>()
 const cleanupFolderNames = { selected: 'stale-cleanup-selected', preserved: 'stale-cleanup-preserved' } as const
 const cleanupFolderPaths = (fixture: JujutsuFixture) => ({
   selected: join(fixture.temporaryRoot, 'repo-threads', cleanupFolderNames.selected),
@@ -45,6 +53,89 @@ const jjAt = (cwd: string, home: string, args: readonly string[]): string => {
 
 const currentCommitId = (repositoryPath: string, home: string): string =>
   jjAt(repositoryPath, home, ['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'commit_id']).trim()
+
+const cleanupWorkspaceFor = async (fixture: JujutsuFixture): Promise<CleanupGraphFixture> => {
+  const workspaceName = 'thread-e2e001'
+  const targetDescription = 'Cleanup older main ancestor workspace'
+  const historyCount = 24
+  for (let index = 1; index <= 6; index += 1) {
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['new'])
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['describe', '--message', `Cleanup main history ${String(index).padStart(2, '0')}`])
+  }
+  const workspaceBaseCommitId = currentCommitId(fixture.repositoryPath, fixture.temporaryRoot)
+  const workspacePath = join(fixture.temporaryRoot, 'repo-threads', workspaceName)
+  await mkdir(join(fixture.temporaryRoot, 'repo-threads'), { recursive: true })
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+    'workspace',
+    'add',
+    '--no-colocate',
+    '--name',
+    workspaceName,
+    '--revision',
+    workspaceBaseCommitId,
+    workspacePath,
+  ])
+  jjAt(workspacePath, fixture.temporaryRoot, ['describe', '--message', targetDescription])
+  const workspaceCommitId = currentCommitId(workspacePath, fixture.temporaryRoot)
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['new', workspaceCommitId])
+  for (let index = 7; index <= historyCount; index += 1) {
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['new'])
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['describe', '--message', `Cleanup main history ${String(index).padStart(2, '0')}`])
+  }
+  const mainCommitId = currentCommitId(fixture.repositoryPath, fixture.temporaryRoot)
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['bookmark', 'set', 'main', '--revision', mainCommitId])
+  expect(
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '--revisions',
+      `(::${workspaceName}@ ~ ::main) ~ empty()`,
+      '--template',
+      'commit_id ++ "\\n"',
+    ]).trim(),
+  ).toBe('')
+  expect(
+    jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '--revisions',
+      `${workspaceName}@ & ::main`,
+      '--template',
+      'commit_id',
+    ]).trim(),
+  ).toBe(workspaceCommitId)
+  const firstPageIds = jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '--limit',
+    '10',
+    '--revisions',
+    'all()',
+    '--template',
+    'commit_id ++ "\\n"',
+  ])
+    .split('\n')
+    .filter(Boolean)
+  expect(firstPageIds).not.toContain(workspaceCommitId)
+  const visibleRevisionCount = jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '--revisions',
+    'all()',
+    '--template',
+    'commit_id ++ "\\n"',
+  ])
+    .split('\n')
+    .filter(Boolean).length
+  return { workspaceName, mainCommitId, targetDescription, visibleRevisionCount }
+}
+
+const workspaceNames = (fixture: JujutsuFixture): readonly string[] =>
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"']).split('\n').filter(Boolean)
 
 const snapshotRepository = (fixture: JujutsuFixture): string =>
   jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
@@ -145,10 +236,11 @@ const dispatchDrop = async (
     return drop.defaultPrevented
   }, input)
 
-const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
+const selectRepository = async (page: Page, fixture: JujutsuFixture, waitForFixtureRows = true): Promise<void> => {
   await page.evaluate(({ key, path }) => localStorage.setItem(key, JSON.stringify(path)), { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath })
   await page.reload()
   await openGlobalPanel(page, 'Jujutsu: Revision graph')
+  if (!waitForFixtureRows) return
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })
 }
@@ -222,6 +314,27 @@ Then('an overflow workspace can be dragged to another revision and moved indepen
   await finishJourneyAssertions(page)
 })
 
+When('a disposable Jujutsu cleanup repository with an empty older-page workspace is selected', async ({ page }: { page: Page }) => {
+  const fixture = await createFixture(page)
+  cleanupGraphFixtures.set(page, await cleanupWorkspaceFor(fixture))
+  await registerWorkspaceFolder(page, fixture.repositoryPath)
+  await selectRepository(page, fixture, false)
+})
+
+Then('the empty workspace label appears on its older main ancestor', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const cleanupFixture = cleanupGraphFixtures.get(page)
+  if (cleanupFixture === undefined) throw new Error('The cleanup workspace fixture was not created.')
+  expect(currentCommitId(fixture.repositoryPath, fixture.temporaryRoot)).toBe(cleanupFixture.mainCommitId)
+  const revisions = page.getByRole('region', { name: 'Revisions', exact: true })
+  await expect.poll(async () => Number(await revisions.getAttribute('data-loaded-revisions')), { timeout: 30_000 }).toBeGreaterThan(10)
+  await revisions.evaluate(element => {
+    element.scrollTop = element.scrollHeight
+  })
+  const targetRow = revisionRow(page, cleanupFixture.targetDescription)
+  await expect(targetRow).toBeVisible({ timeout: 30_000 })
+  await expect(targetRow.getByText(cleanupFixture.workspaceName, { exact: true })).toBeVisible()
+})
 Then('removing the selected repository offers a way to choose another', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
   await rm(fixture.repositoryPath, { recursive: true, force: true })
@@ -419,6 +532,7 @@ After(async ({ page }: { page: Page }) => {
   const fixture = fixtures.get(page)
   if (fixture === undefined) return
   fixtures.delete(page)
+  cleanupGraphFixtures.delete(page)
   await rm(fixture.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
@@ -467,26 +581,46 @@ Then('the cleanup dialog shows age presets without removing anything', async ({ 
   expect(existsSync(paths.selected)).toBe(true)
   expect(existsSync(paths.preserved)).toBe(true)
   expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
-  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
+  const visibleRevisionDescription = cleanupGraphFixtures.get(page)?.targetDescription ?? fixture.sourceDescription
+  await expect(revisionRow(page, visibleRevisionDescription)).toBeVisible()
 })
 
-When('only one stale untracked folder is selected for cleanup', async ({ page }: { page: Page }) => {
+When('one stale untracked folder and the older-page workspace are selected for cleanup', async ({ page }: { page: Page }) => {
+  const cleanupFixture = cleanupGraphFixtures.get(page)
+  if (cleanupFixture === undefined) throw new Error('The cleanup workspace fixture was not created.')
   const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await dialog.getByRole('radio', { name: 'All', exact: true }).click()
+  await dialog.getByRole('button', { name: /^Empty/ }).click()
+  const selectedWorkspace = dialog.getByRole('checkbox', { name: `Select ${cleanupFixture.workspaceName}`, exact: true })
+  await selectedWorkspace.click()
+  await expect(selectedWorkspace).toBeChecked()
   const selectedFolder = dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })
   await selectedFolder.click()
   await expect(selectedFolder).toBeChecked()
-  await expect(dialog.getByRole('button', { name: 'Clean up 1', exact: true })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Clean up 2', exact: true })).toBeEnabled()
 })
 
-Then('cleanup removes only the selected folder', async ({ page }: { page: Page }) => {
+Then('cleanup removes only the selected folder and clears the old graph workspace label without reloading', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
+  const cleanupFixture = cleanupGraphFixtures.get(page)
+  if (cleanupFixture === undefined) throw new Error('The cleanup workspace fixture was not created.')
   const paths = cleanupFolderPaths(fixture)
   const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
-  await dialog.getByRole('button', { name: 'Clean up 1', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Clean up 2', exact: true }).click()
   await expect(dialog).toBeHidden()
   await expect.poll(() => existsSync(paths.selected), { timeout: 20_000 }).toBe(false)
   expect(existsSync(paths.preserved)).toBe(true)
+  await expect.poll(() => workspaceNames(fixture), { timeout: 30_000 }).not.toContain(cleanupFixture.workspaceName)
+  await expect(page.getByRole('status').filter({ hasText: '1 thread workspaces removed' })).toBeVisible({ timeout: 30_000 })
   expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
-  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
+  const revisions = page.getByRole('region', { name: 'Revisions', exact: true })
+  await expect.poll(async () => Number(await revisions.getAttribute('data-loaded-revisions')), { timeout: 30_000 }).toBe(cleanupFixture.visibleRevisionCount)
+  await revisions.evaluate(element => {
+    element.scrollTop = element.scrollHeight
+  })
+  const targetRow = revisionRow(page, cleanupFixture.targetDescription)
+  await expect(targetRow).toBeVisible({ timeout: 30_000 })
+  await expect(targetRow.getByText(cleanupFixture.workspaceName, { exact: true })).toHaveCount(0)
+  await expect(targetRow).toBeVisible()
   await finishJourneyAssertions(page)
 })

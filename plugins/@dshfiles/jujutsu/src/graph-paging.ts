@@ -2,7 +2,13 @@
 const MINIMUM_LOOKAHEAD = 2400
 const LOOKAHEAD_VIEWPORTS = 8
 
+type GraphPageScope = { readonly repoId: string | null; readonly query: string; readonly generation: number }
+
 export class GraphPagingModel {
+  /** Cached pages and delayed responses belong only to the exact repository/search/refresh snapshot that requested them. */
+  static readonly samePageSet = (left: GraphPageScope, right: GraphPageScope): boolean =>
+    left.repoId === right.repoId && left.query === right.query && left.generation === right.generation
+
   /** Revisions the graph loads before anything scrolls, so a first look is never a single page. */
   static readonly revisionFloor = 200
 
