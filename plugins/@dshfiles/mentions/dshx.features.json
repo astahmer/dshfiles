@@ -5,20 +5,21 @@
     {
       "id": "ranked-mentions",
       "title": "Ranked @ mentions for files and threads",
-      "summary": "One @ menu that interleaves files and threads by match quality (exact title or basename, prefix, substring or fuzzy), then recency, then workspace or project, hides blank threads, and narrows with @thread: / @t: or @file: / @f:; @skill: and @mcp: hand the menu to the skill (thread-sidebar) and MCP (mcp-servers) sources, which stay out of the thread and file scopes. Picks insert the native reference chips.",
+      "summary": "One @ menu that interleaves local files and threads plus this DSH's remote threads by match quality, recency, and workspace or project; @thread: / @t: and @file: / @f: narrow results, and picks insert native reference chips.",
       "reach": [
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
         "press Enter",
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
         "expect text \"Threads \u00b7 @f: files\""
       ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["all", "thread-scope", "file-scope", "drilled-directory", "empty"],
+      "states": ["all", "thread-scope", "file-scope", "remote-threads", "drilled-directory", "empty"],
       "failureModes": [
         "A failed Host lookup drops that kind of candidate and keeps the other one.",
+        "A missing multi-host API keeps local file and thread candidates available.",
         "A quoted path cannot keep its scope prefix through a drill, so it continues as a plain @ mention."
       ],
       "externalDependencies": [],
@@ -32,6 +33,11 @@
           "kind": "gherkin",
           "id": "mentions.skill-and-mcp-scopes",
           "featureFile": "tooling/dshx/e2e/features/mentions.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "mentions.remote-thread-selection",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
           "kind": "unit-test",
@@ -56,12 +62,18 @@
           "id": "mentions.rank-budget",
           "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
           "testName": "caps the menu and ranks 500 entries in well under a frame"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.remote-thread-candidates",
+          "file": "plugins/@dshfiles/mentions/src/remote-mention-candidates.test.ts",
+          "testName": "offers recorded remote threads as native mentions and omits absent or blank sessions"
         }
       ],
       "telemetry": [
         {
-          "kind": "not-applicable",
-          "reason": "Client-only: Ranked @ mentions for files and threads renders browser state and starts no Host work of its own."
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -70,10 +82,8 @@
       "title": "Referenced threads open on click",
       "summary": "A thread chip in the composer, the thread chip in a sent message and its \"Referenced session \u00b7 \u2026\" line open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
-        "press Enter",
-        "click button \"New thread\"",
+        "seed tool-call-thread",
+        "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
         "expect text \"Threads \u00b7 @f: files\"",
         "press Enter",

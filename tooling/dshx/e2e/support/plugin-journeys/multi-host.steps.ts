@@ -116,7 +116,9 @@ const inventoryStatusSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
 ])
 
-const remoteThreadListSchema = z.object({ threads: z.array(z.object({ runtimeId: z.string(), sessionId: z.string() }).passthrough()) })
+const remoteThreadListSchema = z.object({
+  threads: z.array(z.object({ runtimeId: z.string(), sessionId: z.string(), mention: z.string().optional() }).passthrough()),
+})
 
 type InventoryObservation = {
   readonly runtimeId: string
@@ -371,6 +373,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
     manager = await bootComposedPluginProfile({
       packageIds: [
         '@dshfiles/multi-host',
+        '@dshfiles/mentions',
         '@dshfiles/thread-sidebar',
         '@dshfiles/jj-integration',
         '@dshfiles/rich-composer',
@@ -406,7 +409,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
-  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await page.getByRole('button', { name: 'Multi-host: Hosts', exact: true }).click()
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
   await page.getByRole('button', { name: 'Add host', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
@@ -500,7 +503,7 @@ When('the remote model picker selects its model', async ({ page }: { readonly pa
   await picker.click()
   const models = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
   await expect(models).toBeVisible()
-  const model = models.getByRole('button', { name: /gpt-6-luna/u })
+  const model = models.getByRole('button', { name: /GPT-6 Luna/u })
   await expect(model).toBeVisible()
   await model.click()
   await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
@@ -519,7 +522,7 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
 })
 
 When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
-  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await page.getByRole('button', { name: 'Multi-host: Hosts', exact: true }).click()
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
 })
 
@@ -530,6 +533,27 @@ Then('the Hosts page shows live resource metrics', async ({ page }: { readonly p
   await expect(hostsPage.getByText('Memory used', { exact: true }).first()).toBeVisible()
   await expect(hostsPage.getByTestId(/^host-resources-/).first()).toBeVisible()
   await expect(hostsPage.getByText(/^Every machine this one can run threads on/)).toHaveCount(0)
+})
+
+When('the manager composer selects the recorded remote thread mention', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  const created = remoteThreadListSchema.parse(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId)
+  if (created === undefined || created.mention === undefined) throw new Error('The manager did not expose a canonical mention for the remote thread.')
+
+  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await expect(composer).toBeVisible({ timeout: 30_000 })
+  await composer.click()
+  await composer.pressSequentially(`@t:${observation.sessionId}`)
+  const option = page.getByRole('listbox').getByRole('option').filter({ hasText: observation.sessionId }).first()
+  await expect(option).toBeVisible({ timeout: 30_000 })
+  await option.click()
+
+  const chip = page.locator('[data-composer-card] [data-composer-chip="reference"]')
+  await expect(chip).toHaveCount(1)
+  await expect(chip).toContainText(observation.sessionId)
 })
 
 Then('the new thread is owned by the automatically selected remote runtime', async ({ page }: { readonly page: Page }) => {
@@ -658,11 +682,6 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
 When('the mirrored thread opens its owning host UI', async ({ page }: { readonly page: Page }) => {
   const observation = autoDestinationObservations.get(page)
   if (observation === undefined) throw new Error('The remote thread composer journey did not produce an observation.')
-
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
-  await page.getByRole('checkbox', { name: 'Show remote threads in a separate group', exact: true }).check()
-  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
-  await page.getByRole('button', { name: 'Remote threads started from this DSH', exact: true }).click()
 
   const remoteThread = page.locator('[data-remote-thread-id]').filter({ hasText: scratchRemoteName })
   await expect(remoteThread).toHaveAttribute('data-remote-thread-id', `${observation.runtimeId}:${observation.sessionId}`, { timeout: 30_000 })

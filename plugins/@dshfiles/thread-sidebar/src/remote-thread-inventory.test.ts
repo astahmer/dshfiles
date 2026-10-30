@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { buildRemoteSidebarThreads, filterRemoteSidebarThreads, runtimesWithStartedThreads } from './remote-thread-inventory.js'
 
 const status = {
@@ -29,6 +31,7 @@ test('remote inventory enriches started-here threads without adding host-only se
         sessionId: 'live-thread',
         cwd: '/work/Atlas',
         title: 'Stored title',
+        mention: formatSessionReferenceMention({ sessionId: SessionId('live-thread'), label: 'Stored title' }),
         createdAt: '2025-01-01T00:00:00.000Z',
         hostName: 'Build host',
         connected: false,
@@ -38,6 +41,7 @@ test('remote inventory enriches started-here threads without adding host-only se
         sessionId: 'stored-only',
         cwd: '/work/Atlas',
         title: 'Stored only',
+        mention: formatSessionReferenceMention({ sessionId: SessionId('stored-only'), label: 'Stored only' }),
         createdAt: '2025-01-01T00:00:00.000Z',
         hostName: 'Build host',
         connected: false,

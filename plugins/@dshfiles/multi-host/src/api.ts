@@ -214,6 +214,7 @@ const remoteThreadSchema = z.object({
   sessionId: sessionIdSchema,
   cwd: z.string(),
   title: z.string(),
+  mention: z.string().max(2048).optional(),
   createdAt: z.string().datetime(),
   hostName: z.string(),
   connected: z.boolean(),

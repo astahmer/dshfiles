@@ -53,6 +53,16 @@ Feature: Multi-host loopback SSH lifecycle
     And the native composer sends a prompt to the remote Session
     Then the new thread is owned by the automatically selected remote runtime
     And the mirrored thread opens its owning host UI
+  @scenario:mentions.remote-thread-selection
+  Scenario: A local composer can reference a recorded remote thread
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    Then the new thread is owned by the automatically selected remote runtime
+    And the manager composer selects the recorded remote thread mention
+
   @scenario:multi-host.remote-inventory
   Scenario: A thread started on the host appears in the manager's inventory
     Given a loopback SSH DSH pair is booted

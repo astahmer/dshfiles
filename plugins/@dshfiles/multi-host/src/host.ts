@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
+import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
@@ -23,6 +25,7 @@ import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './co
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
+import { registerRemoteReferenceMiddleware } from './remote-reference-middleware.js'
 import { knownSessionRuntime } from './session-runtime.js'
 import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
 import { ResourceSnapshotModel } from './resource-snapshot.js'
@@ -182,6 +185,20 @@ interface ViewLease {
 
 let configuredProfile: string | undefined
 const activeSessionSources = new Set<SessionSourceRegistry>()
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'multi-host-remote-reference': {
+      readonly kind: 'multi-host-remote-reference'
+      readonly form: 'recall'
+      readonly references: readonly {
+        readonly sessionId: string
+        readonly label: string
+        readonly capturedThroughSeq: number
+      }[]
+    }
+  }
+}
 const viewLeases = new Map<string, ViewLease>()
 const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
@@ -1250,7 +1267,16 @@ const multiHostHandlers = multiHostApi.host({
       threads: threads.flatMap(thread => {
         const runtime = runtimes.find(item => item.id === thread.runtimeId)
         const host = hosts.find(item => item.id === runtime?.hostId)
-        return runtime === undefined ? [] : [{ ...thread, hostName: host?.name ?? runtime.name, connected: pool.status(runtime.id) !== undefined }]
+        if (runtime === undefined) return []
+        const label = thread.title.trim() || thread.sessionId
+        return [
+          {
+            ...thread,
+            mention: formatSessionReferenceMention({ sessionId: SessionId(thread.sessionId), label }),
+            hostName: host?.name ?? runtime.name,
+            connected: pool.status(runtime.id) !== undefined,
+          },
+        ]
       }),
     }
   },
@@ -1404,7 +1430,22 @@ export default defineHost({
           },
         }),
       )
+      const unregisterReferenceMiddleware = registerRemoteReferenceMiddleware({
+        ctx,
+        recordedThreads: () => RemoteThreadStore.list(),
+        sessionSources: () => [...activeSessionSources],
+        follow: async ({ runtimeId, sessionId, maxMessages, signal }) => {
+          const frames = await withRuntime(
+            runtimeId,
+            gateway =>
+              gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
+            { mutation: false },
+          )
+          return frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+        },
+      })
       scoped.effect(() => () => {
+        unregisterReferenceMiddleware()
         unregister()
         activeSessionSources.delete(scoped.sessionSources)
       })

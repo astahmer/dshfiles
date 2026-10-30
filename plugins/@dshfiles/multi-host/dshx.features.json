@@ -316,6 +316,51 @@
       ]
     },
     {
+      "id": "remote-thread-references",
+      "title": "Mention remote threads safely",
+      "summary": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["local-reference", "remote-reference", "remote-snapshot-added", "remote-snapshot-unavailable"],
+      "failureModes": [
+        "An unrecorded or unauthorized remote Session never receives a remote read.",
+        "An unavailable or empty remote snapshot leaves the canonical reference untouched for the native resolver to handle."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"New session\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "expect text \"Threads \u00b7 @f: files\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.remote-reference-context",
+          "file": "plugins/@dshfiles/multi-host/src/remote-reference-context.test.ts",
+          "testName": "traces bounded remote reference resolution without recording content"
+        },
+        {
+          "kind": "host-test",
+          "id": "multi-host.remote-reference-model-input",
+          "file": "plugins/@dshfiles/multi-host/src/remote-reference-middleware.integration.test.ts",
+          "testName": "injects only authorized remote Session context into the actual model request"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.remote-reference-not-applicable",
+          "reason": "The Host pre-step is an internal adapter rather than a standalone screen; its actual model input is covered by a Host test, while remote mention selection is covered in the mentions catalog."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "multi-host remote thread reference resolve",
+          "file": "plugins/@dshfiles/multi-host/src/remote-reference-context.test.ts",
+          "testName": "traces bounded remote reference resolution without recording content"
+        }
+      ]
+    },
+    {
       "id": "remote-inventory",
       "title": "Every thread on every host",
       "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",

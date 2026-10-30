@@ -11,6 +11,7 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { MainTabs } from '@dshfiles/main-tabs/tabs-contract'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 import { FileMentions } from './file-mentions.js'
+import { remoteMentionCandidates } from './remote-mention-candidates.js'
 import { MENTIONS_LOCALE_NAMESPACE, mentionsLocale } from './locales.js'
 import { MentionRanking, type FileEntry, type MentionQuery, type ThreadEntry } from './mention-ranking.js'
 import { SessionLinks } from './session-links.js'
@@ -194,36 +195,56 @@ export default defineClient({
         const query = MentionRanking.parseQuery(request.query)
         if (query.scope === 'skill' || query.scope === 'mcp' || query.scope === 'backlog' || query.scope === 'agent') return []
         const quoted = request.quoted === true
-        const [files, threads] = await sessions.using(session.sessionId, { source: 'mentionCandidates', signal: request.signal }, async reference => {
-          request.signal.throwIfAborted()
-          const state = reference.binding.session.getSnapshot()
-          if (state.openState !== 'open') throw state.openError ?? new Error(`session "${session.sessionId}" is not open`)
-          const fileLookup: Promise<readonly FileReferenceCandidate[]> =
-            query.scope === 'thread'
-              ? Promise.resolve([])
-              : (async () => {
-                  const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
-                  if (!ownership.ok) return []
-                  if (ownership.runtimeId === null) {
-                    const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
-                    return result.ok ? result.value : []
-                  }
-                  const result = await multiHost.runtimeFileReferences(
-                    { runtimeId: ownership.runtimeId, sessionId: session.sessionId, query: query.text },
-                    { signal: request.signal },
-                  )
-                  return result.ok ? result.candidates : []
-                })()
-          const threadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
-            query.scope === 'file'
-              ? Promise.resolve([])
-              : ctx.remote.sessionReferenceResolver.candidates(session.sessionId, query.text, request.signal).then(result => (result.ok ? result.value : []))
-          return Promise.all([fileLookup, threadLookup])
-        })
+        const [files, threads, remoteThreads] = await sessions.using(
+          session.sessionId,
+          { source: 'mentionCandidates', signal: request.signal },
+          async reference => {
+            request.signal.throwIfAborted()
+            const state = reference.binding.session.getSnapshot()
+            if (state.openState !== 'open') throw state.openError ?? new Error(`session "${session.sessionId}" is not open`)
+            const fileLookup: Promise<readonly FileReferenceCandidate[]> =
+              query.scope === 'thread'
+                ? Promise.resolve([])
+                : (async () => {
+                    const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
+                    if (!ownership.ok) return []
+                    if (ownership.runtimeId === null) {
+                      const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
+                      return result.ok ? result.value : []
+                    }
+                    const result = await multiHost.runtimeFileReferences(
+                      { runtimeId: ownership.runtimeId, sessionId: session.sessionId, query: query.text },
+                      { signal: request.signal },
+                    )
+                    return result.ok ? result.candidates : []
+                  })()
+            const threadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
+              query.scope === 'file'
+                ? Promise.resolve([])
+                : ctx.remote.sessionReferenceResolver.candidates(session.sessionId, query.text, request.signal).then(result => (result.ok ? result.value : []))
+            const remoteThreadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
+              query.scope === 'file'
+                ? Promise.resolve([])
+                : multiHost
+                    .threadList(undefined, { signal: request.signal })
+                    .then(result => {
+                      const listed = sessions.list.getSnapshot().byId
+                      return remoteMentionCandidates({
+                        threads: result.threads,
+                        sessions: listed,
+                        currentSessionId: session.sessionId,
+                        currentCwd: listed[session.sessionId]?.cwd,
+                      })
+                    })
+                    .catch(() => [])
+            return Promise.all([fileLookup, threadLookup, remoteThreadLookup])
+          },
+        )
         if (request.signal.aborted) return []
 
         const now = Date.now()
         const listed = sessions.list.getSnapshot().byId
+        const allThreads = [...threads, ...remoteThreads.filter(remote => !threads.some(local => local.sessionId === remote.sessionId))]
         const ownCwd = listed[session.sessionId]?.cwd
         const withLocation = crumbsFor(query, quoted, request.drilled) === undefined
         const section = t(`scope.${query.scope}`)
@@ -248,7 +269,7 @@ export default defineClient({
         })
 
         const threadRows = new Map<ThreadEntry, InputTriggerCandidate>()
-        for (const candidate of threads) {
+        for (const candidate of allThreads) {
           const summary = listed[candidate.sessionId]
           if (summary?.blank === true) continue
           const label = candidate.displayTitle ?? candidate.label
@@ -280,7 +301,7 @@ export default defineClient({
           const row = entry.kind === 'file' ? fileRows.get(entry) : threadRows.get(entry)
           return row === undefined ? [] : [row]
         })
-        performance.measure(TIMING_MEASURE, { start: startedAt, detail: { scope: query.scope, files: files.length, threads: threads.length } })
+        performance.measure(TIMING_MEASURE, { start: startedAt, detail: { scope: query.scope, files: files.length, threads: allThreads.length } })
         return rows
       },
       header(_session, request) {

@@ -135,6 +135,7 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/mentions.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/ai-accounts.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/mentions.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/cordis.patch.yml",

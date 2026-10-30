@@ -43,6 +43,7 @@ import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-
 import { openThreadInMain, requestThreadMainTab } from './main-tab-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { multiHostApi } from '@dshfiles/multi-host/api'
 import { HoverPrefetch } from './hover-prefetch.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
@@ -144,6 +145,7 @@ export default defineClient({
   ],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate, metadata) {
+    const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     const plugin = metadata?.plugin
     if (plugin !== undefined) ctx.effect(() => PaletteBridge.connect(plugin), 'thread-sidebar: palette bridge')
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
@@ -330,7 +332,29 @@ export default defineClient({
                 return
               }
               failurePhase = 'candidate-processing-exception'
-              const candidate = result.value.find(item => item.sessionId === targetSessionId)
+              let candidate = result.value.find(item => item.sessionId === targetSessionId)
+              if (candidate === undefined) {
+                const targetSummary = ctx.sessions.list.getSnapshot().byId[SessionId(targetSessionId)]
+                const remoteThread =
+                  targetSummary === undefined
+                    ? undefined
+                    : await multiHost
+                        .threadList(undefined, { signal: controller.signal })
+                        .then(list => list.threads.find(thread => thread.sessionId === targetSessionId))
+                        .catch(() => undefined)
+                if (remoteThread?.mention !== undefined && targetSummary !== undefined) {
+                  const label = remoteThread.title.trim() || remoteThread.sessionId
+                  candidate = {
+                    sessionId: targetSummary.id,
+                    label,
+                    displayTitle: label,
+                    cwd: remoteThread.cwd,
+                    sameWorkspace: remoteThread.cwd === targetSummary.cwd,
+                    createdAt: Date.parse(remoteThread.createdAt),
+                    mention: remoteThread.mention,
+                  }
+                }
+              }
               if (candidate === undefined) {
                 input.notify('info', translate('threadSidebarMentionUnavailable'))
                 return
