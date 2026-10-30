@@ -220,7 +220,7 @@ const createQuotaContinuationService = ({
         return
       }
 
-      const dueAt = Math.max(record.resetAt, record.snoozedUntil ?? 0) + AUTO_RESUME_DELAY_MS
+      const dueAt = Math.max(record.resetAt, record.snoozedUntil ?? 0, now()) + AUTO_RESUME_DELAY_MS
       const afterSeconds = Math.max(1, Math.ceil((dueAt - now()) / 1_000))
       const created = await scheduler.create(SessionId(record.sessionId), {
         title: 'Quota recovery',

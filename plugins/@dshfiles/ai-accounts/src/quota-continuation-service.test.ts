@@ -136,6 +136,41 @@ describe('quota continuation service', () => {
     }
   })
 
+  it('waits a full minute when the reported quota reset is already in the past', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-stale-reset-'))
+    const now = () => 4_000_000
+    const sessionId = SessionId('quota-stale-reset-session')
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({
+        context,
+        readResetAt: async () => now() - 60_000,
+        schedule: scheduler.schedule,
+        now,
+      })
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', true, {
+        provider: 'codex_work',
+        model: 'gpt-6-luna',
+      })
+
+      expect(scheduler.requests[0]?.after_seconds).toBe(60)
+      expect((await service.list()).continuations[0]).toMatchObject({
+        failedProvider: 'codex_work',
+        failedModel: 'gpt-6-luna',
+        resetAt: now() - 60_000,
+        scheduled: true,
+      })
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets one waiting continuation opt into and out of retry-at-reset', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-quota-opt-in-'))
     const now = () => 3_000_000
