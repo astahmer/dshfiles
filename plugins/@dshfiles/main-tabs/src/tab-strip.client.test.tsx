@@ -132,6 +132,20 @@ const openAsideFromMenu = async (): Promise<void> => {
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Open in side panel' }))
 }
 
+describe('TabStrip layout', () => {
+  it('lets long tab titles shrink inside the capped tab width', () => {
+    const longTitle = 'A conversation title that is much wider than the tab strip should allow'
+    const longTabs = tabs.map(tab => (tab.id === 'thread:thread-1' ? { ...tab, title: longTitle } : tab))
+    mount(() => {}, async () => {}, longTabs)
+
+    const title = screen.getByText(longTitle)
+
+    expect(title.className).toContain('dshx:min-w-0')
+    expect(title.className).toContain('dshx:flex-1')
+    expect(title.className).toContain('dshx:truncate')
+  })
+})
+
 describe('TabStrip thread actions', () => {
   it('offers copy actions in thread tab menus', async () => {
     mount()

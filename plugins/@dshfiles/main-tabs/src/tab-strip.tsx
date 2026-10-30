@@ -323,7 +323,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                               onCommit={title => void renameTab(tab, title)}
                             />
                           ) : (
-                            <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                            <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
                           )}
                           {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                         </span>
