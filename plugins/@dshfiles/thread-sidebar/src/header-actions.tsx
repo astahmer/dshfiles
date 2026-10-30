@@ -27,6 +27,7 @@ import { SidebarOrganization } from './organization.js'
 import { ThreadUrlModel } from './thread-url.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
+import { SettledThreadsModel } from './settled-threads.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -45,6 +46,7 @@ type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.u
 
 // Read at the click, outside render.
 const muteUntilNow = (option: ThreadMuteOption): number | null => ThreadMuteModel.muteUntil(option, Date.now())
+const settleAtNow = (): number => Date.now()
 
 // Room the native title cluster keeps for the breadcrumb before Pin folds into the menu.
 const TITLE_MIN_WIDTH = 160
@@ -131,6 +133,29 @@ export const HeaderThreadActions = ({
       else parkedIds.delete(targetId)
     }
     updatePreferences({ parkedSessionIds: [...parkedIds] })
+  }
+  const settled = preferences.settledSessionIds.includes(sessionId)
+  const settleDisabled =
+    session.running || targetIds.some(targetId => SidebarOrganization.hasRunningDescendant({ sessionId: targetId, sessions: Object.values(sessionState.byId) }))
+  const updateSettled = (): void => {
+    setActionFailed(false)
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    if (settled) {
+      updatePreferences(SettledThreadsModel.unsettle(status, targetIds))
+      return
+    }
+    if (settleDisabled) return
+    updatePreferences(
+      SettledThreadsModel.settleAndUnpark({
+        status,
+        parkedSessionIds: preferences.parkedSessionIds,
+        sessionIds: targetIds,
+        now: settleAtNow(),
+      }),
+    )
+    void Promise.all(targetIds.filter(targetId => pinnedSessionIds.includes(targetId)).map(targetId => unpinSession(targetId))).catch(() =>
+      setActionFailed(true),
+    )
   }
   const updateThreadOperation = async (operation: 'pin' | 'unpin' | 'archive' | 'unarchive'): Promise<void> => {
     setActionFailed(false)
@@ -232,6 +257,9 @@ export const HeaderThreadActions = ({
                 <DropdownMenuItem disabled={session.running} onSelect={updateParked}>
                   <PauseIcon aria-hidden="true" />
                   {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!settled && settleDisabled} onSelect={updateSettled}>
+                  {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>

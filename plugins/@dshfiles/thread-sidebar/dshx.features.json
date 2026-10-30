@@ -1831,7 +1831,7 @@
     {
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
-      "summary": "Keep Pin as an icon button in the conversation header and put park, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "summary": "Keep Pin as an icon button in the conversation header and put park, settle or unsettle, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -1842,14 +1842,15 @@
         "press Enter",
         "expect group \"Thread actions\"",
         "click button \"More thread actions\"",
-        "expect menuitem \"Archive\""
+        "expect menuitem \"Archive\"",
+        "expect menuitem \"Settle\""
       ],
       "surfaces": ["client", "host", "storage", "integration"],
       "configuration": [],
-      "states": ["active", "pinned", "parked", "snoozed", "archived", "crowded"],
+      "states": ["active", "pinned", "parked", "settled", "snoozed", "archived", "crowded"],
       "failureModes": [
         "Blank sessions have no header actions.",
-        "Running sessions cannot be parked or archived.",
+        "Running sessions cannot be parked, settled or archived, and ancestors with running descendants cannot be settled.",
         "Failed Host mutations are reported beside the action.",
         "A narrow header folds Pin into the More menu instead of overlapping the title."
       ],
@@ -1888,7 +1889,13 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-running-state",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "disables park and archive while a thread is running"
+          "testName": "disables park, settle and archive while a thread is running"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-settle-and-unsettle",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "settles and unsets the thread from the header menu"
         },
         {
           "kind": "unit-test",

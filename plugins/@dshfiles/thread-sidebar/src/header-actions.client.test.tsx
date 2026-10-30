@@ -7,6 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HeaderThreadActions } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
 import { SidebarStateProvider } from './sidebar-state.js'
+import { DEFAULT_PREFERENCES } from './organization.js'
 
 const labels = {
   threadSidebarPin: 'Pin',
@@ -15,6 +16,8 @@ const labels = {
   threadSidebarUnpark: 'Unpark',
   threadSidebarArchive: 'Archive',
   threadSidebarRestore: 'Restore',
+  threadSidebarSettle: 'Settle',
+  threadSidebarUnsettle: 'Unsettle',
   threadSidebarMute: 'Mute thread',
   threadSidebarMuted: 'Muted',
   threadSidebarMuteFor1Hour: 'For 1 hour',
@@ -54,7 +57,7 @@ const resizeTitleCluster = (width: number): void => {
   })
 }
 
-const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; nativeHeader?: boolean }) => {
+const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; nativeHeader?: boolean; pinned?: boolean }) => {
   const sessionId = SessionId('s1')
   const session: SessionSummary = {
     id: sessionId,
@@ -70,7 +73,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
   const workspaces: WorkspaceSnapshot = {
     items: [],
     archivedSessionIds: options?.archived ? [sessionId] : [],
-    pinnedSessionIds: [],
+    pinnedSessionIds: options?.pinned ? [sessionId] : [],
     state: 'idle',
     phase: 'ready',
     error: null,
@@ -78,6 +81,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
   const pinSession = vi.fn(async () => {
     if (options?.failPin === true) throw new Error('pin failed')
   })
+  const unpinSession = vi.fn(async () => {})
   const headerActionProps: Parameters<typeof HeaderThreadActions>[0] = {
     sessionId,
     useSessions: select => select(sessions),
@@ -85,7 +89,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     archiveSession: vi.fn(async () => {}),
     unarchiveSession: vi.fn(async () => {}),
     pinSession,
-    unpinSession: vi.fn(async () => {}),
+    unpinSession,
     openThread: vi.fn(),
     continueInProject: vi.fn(async () => sessionId),
     t: key => labelFor(key),
@@ -108,7 +112,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
       actions
     ),
   )
-  return { ...view, pinSession }
+  return { ...view, pinSession, unpinSession }
 }
 
 const openMoreMenu = (): void => {
@@ -203,10 +207,30 @@ describe('HeaderThreadActions', () => {
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?thread=s1')
   })
 
-  it('disables park and archive while a thread is running', () => {
+  it('settles and unsets the thread from the header menu', async () => {
+    storedPreferences.set({ ...DEFAULT_PREFERENCES, parkedSessionIds: ['s1'] })
+    const header = mount({ pinned: true })
+    openMoreMenu()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settle' }))
+    await vi.waitFor(() => expect(storedPreferences.get()?.settledSessionIds).toContain('s1'))
+    expect(storedPreferences.get()?.settledAt.s1).toBeGreaterThan(0)
+    expect(storedPreferences.get()?.parkedSessionIds).toEqual([])
+    await vi.waitFor(() => expect(header.unpinSession).toHaveBeenCalledWith('s1'))
+
+    cleanup()
+    const settledHeader = mount({ pinned: true })
+    openMoreMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unsettle' }))
+    expect(storedPreferences.get()?.settledSessionIds).not.toContain('s1')
+    expect(settledHeader.unpinSession).not.toHaveBeenCalled()
+  })
+
+  it('disables park, settle and archive while a thread is running', () => {
     mount({ running: true })
     openMoreMenu()
     expect(screen.getByRole('menuitem', { name: 'Park' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: 'Settle' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.getByRole('menuitem', { name: 'Archive' }).getAttribute('aria-disabled')).toBe('true')
   })
 
