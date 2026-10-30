@@ -16,6 +16,7 @@ import { pullsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { ReviewedMarksModel, type ReviewedMarks } from './reviewed.js'
 import { PageReviewContextModel } from './review-page-context.js'
+import { reviewWithHistoryFallback } from './review-source.js'
 import type { SessionFocus } from './session-focus.js'
 
 export interface PullsReviewPanelProps {
@@ -91,10 +92,21 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     queryKey: ['pulls-review', reviewPath, baseRef],
     enabled: reviewPath.length > 0,
     queryFn: ({ signal }) =>
-      runHostRequest({
-        signal,
-        timeoutMs: 60_000,
-        request: hostSignal => api.review(baseRef === '' ? { path: reviewPath } : { path: reviewPath, base: baseRef }, { signal: hostSignal }),
+      reviewWithHistoryFallback({
+        path: reviewPath,
+        ...(baseRef === '' ? undefined : { base: baseRef }),
+        readReview: input =>
+          runHostRequest({
+            signal,
+            timeoutMs: 60_000,
+            request: hostSignal => api.review(input, { signal: hostSignal }),
+          }),
+        readHistory: path =>
+          runHostRequest({
+            signal,
+            timeoutMs: 30_000,
+            request: hostSignal => jjApi.reviewHistory({ path }, { signal: hostSignal }),
+          }),
       }),
   })
 

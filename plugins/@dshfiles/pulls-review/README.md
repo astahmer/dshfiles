@@ -20,11 +20,12 @@ projects. You can also browse to a folder. If a selected workspace has
 disappeared, choose another project or workspace without leaving the review.
 Optionally enter a base bookmark (the Host otherwise chooses `main`, `master` or
 `trunk`). Live workspaces are read as `jj diff --from <base> --to @`. Landed
-threads also retain an exact range of persistent JJ change IDs, so the range
-can still be reviewed from the owning repository after the thread workspace is
-removed. Use `jj_thread_review_history` to get the saved base/head IDs and call
-`pulls_review` with `path` set to the repository root plus `fromChangeId` and
-`toChangeId`. The Host reads that patch and groups it with
+threads also retain exact ranges of persistent JJ change IDs. When the panel's
+current thread workspace has been removed, it automatically reads that thread's
+saved integration history and shows the latest landed range from the owning
+repository. Agents can use `jj_thread_review_history` to get the saved base/head
+IDs and call `pulls_review` with `path` set to the repository root plus
+`fromChangeId` and `toChangeId`. The Host reads that patch and groups it with
 [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
 rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
