@@ -61,6 +61,7 @@ import {
 } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache, readWorkspaceSessionActivity as readScopedWorkspaceSessionActivity } from './session-activity-cache.js'
 import { createRepositoryViewsCache } from './repository-views-cache.js'
+import { readRepositoryView } from './repository-view-read.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { IntegrationRecovery } from './integration-recovery.js'
@@ -473,6 +474,13 @@ const cachedThreadStatuses = async (threads: Threads, repoRoot: string): Promise
   return statuses
 }
 
+const invalidateRepositoryLocation = (repoRoot: string): void => {
+  threadStatusCache.delete(repoRoot)
+  for (const [path, cached] of locationCache) {
+    if (cached.value?.repoRoot === repoRoot) locationCache.delete(path)
+  }
+}
+
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */
 const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const registry = registryOf()
@@ -484,20 +492,24 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const present = presentWorkspaces(workspaces)
   const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
   const repoRoots = [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
-  const statusesByRepo = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot => cachedThreadStatuses(active, repoRoot))
-  return Promise.all(
-    repoRoots.map(async (repoRoot, index) => {
-      const owner = byPath.get(repoRoot)
-      const bookmarks = await active.bookmarks(repoRoot)
-      return {
-        repoRoot,
-        title: owner?.title ?? basename(repoRoot),
-        workspaceId: owner?.id ?? null,
-        bookmarks: [...bookmarks.names],
-        threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
-      }
+  const repositories = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot =>
+    readRepositoryView<RepositoryView>({
+      read: async () => {
+        const statuses = await cachedThreadStatuses(active, repoRoot)
+        const bookmarks = await active.bookmarks(repoRoot)
+        const owner = byPath.get(repoRoot)
+        return {
+          repoRoot,
+          title: owner?.title ?? basename(repoRoot),
+          workspaceId: owner?.id ?? null,
+          bookmarks: [...bookmarks.names],
+          threads: statuses.map(status => threadView(status, byPath.get(status.path), archived, activity)),
+        }
+      },
+      onNotRepository: () => invalidateRepositoryLocation(repoRoot),
     }),
   )
+  return repositories.filter((repository): repository is RepositoryView => repository !== undefined)
 }
 
 const repositoryViewsCache = createRepositoryViewsCache({ read: scanRepositories, ttlMs: REPOSITORY_VIEW_TTL_MS })
