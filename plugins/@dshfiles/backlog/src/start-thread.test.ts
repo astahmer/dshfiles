@@ -161,6 +161,15 @@ describe('start thread form', () => {
     expect(StartThreadForm.requests({ ...request, mode: 'together' })).toEqual([{ ...request, mode: 'together' }])
   })
 
+  it('omits Markdown images from the thread title while keeping surrounding text', () => {
+    expect(StartThreadForm.title([item({ title: 'Fix sidebar ![image.png](dsh-context://v1/image/image_abc123) title' })])).toBe('Fix sidebar title')
+    expect(StartThreadForm.title([item({ title: '![image.png](dsh-context://v1/image/image_abc123) Fix sidebar title' })])).toBe('Fix sidebar title')
+  })
+
+  it('uses a non-image fallback when an item title contains only an image', () => {
+    expect(StartThreadForm.title([item({ title: '![image.png](dsh-context://v1/image/image_abc123)' })])).toBe('Backlog item')
+  })
+
   it('clips the thread title to the Session title limit', () => {
     expect(StartThreadForm.title([item({ title: 'x'.repeat(400) })])).toHaveLength(200)
   })

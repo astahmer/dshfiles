@@ -127,7 +127,14 @@ export interface StartThreadRequest {
 export type StartThreadOutcome = { readonly ok: true; readonly sessionId: string } | { readonly ok: false; readonly reason: string }
 
 const TITLE_MAX = 200
+
 const MESSAGE_MAX = 4_000
+
+const titleWithoutImages = (title: string): string =>
+  title
+    .replace(/!\[(?:\\.|[^\]\\])*\]\((?:\\.|[^)])*\)/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
 
 /** Pure dialog decisions: which project preselects, which models list, and what the first message says. */
 export class StartThreadForm {
@@ -236,7 +243,7 @@ export class StartThreadForm {
 
   /** The thread title the sidebar shows: the first item, and how many more the selection carried. */
   static title(items: readonly StartThreadItem[]): string {
-    const first = items[0]?.title ?? ''
+    const first = titleWithoutImages(items[0]?.title ?? '') || 'Backlog item'
     const extra = items.length - 1
     return (extra > 0 ? `${first} +${String(extra)}` : first).slice(0, TITLE_MAX)
   }

@@ -47,13 +47,13 @@ describe('backlog image references', () => {
 
   it('turns image mentions into rendered Markdown context references on submit', () => {
     expect(ImageAttachmentReferenceModel.markdownImageReferences('Compare @Image 1 with @Image 2.', [image('one'), file, image('two')])).toBe(
-      'Compare ![one.png](t3-context://v1/image/image_one) with ![two.png](t3-context://v1/image/image_two).',
+      'Compare ![one.png](dsh-context://v1/image/image_one) with ![two.png](dsh-context://v1/image/image_two).',
     )
   })
 
   it('leaves unresolved image mentions unchanged and escapes Markdown labels', () => {
     expect(ImageAttachmentReferenceModel.markdownImageReferences('@Image 1 @Image 2', [{ ...image('abc123'), name: 'a]b.png' }])).toBe(
-      '![a\\]b.png](t3-context://v1/image/image_abc123) @Image 2',
+      '![a\\]b.png](dsh-context://v1/image/image_abc123) @Image 2',
     )
   })
 })

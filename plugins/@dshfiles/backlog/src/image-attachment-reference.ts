@@ -18,7 +18,7 @@ export class ImageAttachmentReferenceModel {
       const image = images[Number(number) - 1]
       if (image === undefined) return reference
       const id = image.id.startsWith('image_') ? image.id : `image_${image.id}`
-      return `![${markdownLabel(image.name)}](t3-context://v1/image/${id})`
+      return `![${markdownLabel(image.name)}](dsh-context://v1/image/${id})`
     })
   }
 
