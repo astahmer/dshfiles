@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ReasoningEffortId, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
@@ -192,6 +193,66 @@ describe('account provider profiles', () => {
     })
 
     expect(modelsFor(profile).map(model => model.id)).not.toContain('deepseek-v4.1-flash')
+  })
+})
+
+describe('Codex OAuth request refresh', () => {
+  it('sends a refreshed access token after resolving an expired stored credential', async () => {
+    const claimsFor = (accountId: string) => btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, 'https://api.openai.com/auth': { chatgpt_account_id: accountId } }))
+    const expiredAccess = `e30.${claimsFor('acct-old')}.sig`
+    const refreshedAccess = `e30.${claimsFor('acct-fresh')}.sig`
+    let storedCredential: OAuthCredential = { type: 'oauth', access: expiredAccess, refresh: 'refresh-old', expires: 0, accountId: 'acct-old', persist: false }
+    let requestAuthorization: string | undefined
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'codex-refresh-test',
+      displayName: 'Codex Refresh Test',
+      additionalModelIds: [],
+    })
+    const model = modelsFor(profile)[0]
+    if (model === undefined) throw new Error('The Codex profile must offer a model.')
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['codex-refresh-test', profile]]),
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: {
+            read: async () => storedCredential,
+            list: async () => [],
+            modify: async (_provider, mutate) => {
+              const next = await mutate(storedCredential)
+              if (next?.type === 'oauth') storedCredential = next
+              return next
+            },
+            delete: async () => undefined,
+          },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
+    )
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async (input, init) => {
+      if (String(input) === 'https://auth.openai.com/oauth/token') {
+        return Response.json({ access_token: refreshedAccess, refresh_token: 'refresh-new', expires_in: 3600 })
+      }
+      requestAuthorization = new Headers(init?.headers).get('authorization') ?? undefined
+      return new Response('expired token', { status: 401 })
+    }
+    try {
+      for await (const _chunk of adapter.stream({
+        provider: 'codex-refresh-test',
+        model: model.id,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      })) {
+        // drain
+      }
+      expect(requestAuthorization).toBe(`Bearer ${refreshedAccess}`)
+      expect(storedCredential.access).toBe(refreshedAccess)
+      expect(storedCredential.refresh).toBe('refresh-new')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })
 

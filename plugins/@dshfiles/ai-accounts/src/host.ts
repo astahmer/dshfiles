@@ -74,7 +74,6 @@ declare module '@deepseek-ai/dsh-session/types' {
 }
 import { randomUUID } from 'node:crypto'
 import { materializeCodexShadowHome } from './codex-home.js'
-import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
@@ -572,10 +571,7 @@ export default definePlugin({
         resolveApiKey: async provider => {
           const route = routes.get(provider)
           if (route === undefined) return undefined
-          if (route.kind === CODEX_KIND) {
-            await materializeCodexShadowHome(route.layout)
-            return readCodexAccessToken(route.layout.effectiveHomePath)
-          }
+          if (route.kind === CODEX_KIND) return undefined
           if (route.kind === GITHUB_COPILOT_KIND) return undefined
           if (route.kind === CLAUDE_KIND) {
             if (ClaudeAccountModel.usesCliTransport(route)) return CLAUDE_CLI_TOKEN

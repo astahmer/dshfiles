@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
-import { readCodexAccessToken } from './read-codex-token.js'
+import { readCodexOAuthCredential } from './codex-credential.js'
 import { readCodexUsage } from './usage.js'
 import { seedInertCodexLogin } from './inert-codex-login.fixture.js'
 
@@ -28,7 +28,7 @@ it('satisfies only credential presence in a private home and refuses quota befor
     await mkdir(join(home, 'plugins/ai-accounts'), { recursive: true })
     await writeFile(join(home, 'plugins/ai-accounts/accounts.json'), JSON.stringify({ accounts: [draft] }))
     await seedInertCodexLogin(home, 'Codex 1')
-    expect(await readCodexAccessToken(target)).toBe('inert-e2e-access')
+    expect(await readCodexOAuthCredential(target)).toMatchObject({ access: 'inert-e2e-access', refresh: 'inert-e2e-refresh' })
     expect(await readCodexUsage(target)).toMatchObject({ status: 'error', message: 'The Codex account identifier was not found in its sign-in data.' })
     expect(fetch).not.toHaveBeenCalled()
     expect((await stat(join(target, 'auth.json'))).mode & 0o777).toBe(0o600)
