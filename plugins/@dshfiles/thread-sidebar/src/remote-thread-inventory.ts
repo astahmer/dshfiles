@@ -1,7 +1,9 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { multiHostApi, multiHostKeys, multiHostQueries, type MultiHostClient, type RemoteThreadSummary } from '@dshfiles/multi-host/destination'
 import { useMemo } from 'react'
+import { ThreadViewModel, type ThreadStatusFilters, type ThreadSourceFilter } from './thread-view.js'
 import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 
 type RemoteRuntimeStatus = Awaited<ReturnType<MultiHostClient['runtimeStatus']>>
@@ -17,6 +19,29 @@ export type RemoteSidebarThread = {
   readonly updatedAt: number
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+}
+
+export const filterRemoteSidebarThreads = (input: {
+  readonly threads: readonly RemoteSidebarThread[]
+  readonly filters: ThreadStatusFilters
+  readonly sourceFilter: ThreadSourceFilter
+  readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
+  readonly mutedSessionIds: ReadonlySet<string>
+}): readonly RemoteSidebarThread[] => {
+  if (input.sourceFilter === 'subagents') return []
+  return input.threads.filter(thread => {
+    const sessionId = SessionId(thread.sessionId)
+    return ThreadViewModel.matchesStatusFilter({
+      filters: input.filters,
+      running: thread.running,
+      labels: [],
+      unread: false,
+      archived: input.archivedSessionIds.has(sessionId),
+      settled: input.settledSessionIds.has(sessionId),
+      muted: input.mutedSessionIds.has(sessionId),
+    })
+  })
 }
 
 type RemoteRuntimeStatusEntry = {
@@ -45,12 +70,16 @@ export const buildRemoteSidebarThreads = (input: {
 }): readonly RemoteSidebarThread[] => {
   const startedHere = new Map(input.startedHere.map(thread => [threadKey(thread.runtimeId, thread.sessionId), thread]))
   const rows = new Map<string, RemoteSidebarThread>()
+  const blank = new Set<string>()
 
   for (const entry of input.statuses) {
     if (!entry.status.ok) continue
     for (const session of entry.status.sessions) {
-      if (session.blank) continue
       const key = threadKey(session.runtimeId, session.sessionId)
+      if (session.blank) {
+        blank.add(key)
+        continue
+      }
       const started = startedHere.get(key)
       if (started === undefined) continue
       const cwd = session.cwd ?? started.cwd
@@ -74,7 +103,7 @@ export const buildRemoteSidebarThreads = (input: {
 
   for (const thread of input.startedHere) {
     const key = threadKey(thread.runtimeId, thread.sessionId)
-    if (rows.has(key)) continue
+    if (rows.has(key) || blank.has(key)) continue
     const workspaceTitle = folderName(thread.cwd)
     rows.set(key, {
       runtimeId: thread.runtimeId,

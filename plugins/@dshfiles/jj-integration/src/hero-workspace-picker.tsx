@@ -1,7 +1,7 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import {
   ProjectFolderPicker,
   type DirectoryPickerPort,
@@ -12,9 +12,10 @@ import {
 import { useApi } from '@dshfiles/dshx/client'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap } from '@dshfiles/multi-host/destination'
+import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap, shouldBootstrapRemoteSession } from '@dshfiles/multi-host/destination'
 import { useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
+import { mainViewSessionId } from './main-view-session.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { prepareRemoteFolder, RemoteDestinationChips } from './remote-destination.js'
@@ -59,8 +60,28 @@ export const HeroWorkspacePicker = (
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
+  const currentSessionId = mainViewSessionId(services.sessions.list.getSnapshot())
+  const currentSessionOwner = useQuery({
+    queryKey: ['multi-host', 'session-runtime', currentSessionId],
+    enabled: destination.kind === 'runtime' && currentSessionId !== undefined,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      if (currentSessionId === undefined) return null
+      const result = await multiHost.sessionRuntime({ sessionId: currentSessionId }, { signal })
+      if (!result.ok) throw new Error(result.message)
+      return result.runtimeId
+    },
+  })
   const remote = destination.kind === 'runtime'
   const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === props.selectedId)?.path
+  const bootstrapRemoteSession =
+    destination.kind === 'runtime' &&
+    shouldBootstrapRemoteSession({
+      currentSessionId,
+      ownerKnown: currentSessionId === undefined || currentSessionOwner.isSuccess,
+      ownerRuntimeId: currentSessionOwner.data,
+      destinationRuntimeId: destination.runtimeId,
+    })
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
     enabled: !remote,
@@ -76,14 +97,25 @@ export const HeroWorkspacePicker = (
       // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
       <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
         <HostChipSlot localProjectPath={localProjectPath} />
-        <RemoteSessionBootstrap
-          api={multiHost}
-          runtimeId={destination.runtimeId}
-          hostName={hostName}
-          cwd={destination.folder}
-          prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
-          onStarted={props.services.openSession}
-        />
+        {bootstrapRemoteSession ? (
+          <RemoteSessionBootstrap
+            api={multiHost}
+            runtimeId={destination.runtimeId}
+            hostName={hostName}
+            cwd={destination.folder}
+            prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
+            onStarted={props.services.openSession}
+          />
+        ) : currentSessionId !== undefined && currentSessionOwner.isError ? (
+          <p role="alert" className="dshx:text-xs dshx:text-destructive">
+            Could not verify whether this thread is remote ({errorMessage(currentSessionOwner.error, 'unknown error')}). Reload the page to retry.
+          </p>
+        ) : currentSessionId !== undefined && !currentSessionOwner.isSuccess ? (
+          <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+            Checking the current thread's host…
+          </p>
+        ) : null}
+
         <RemoteDestinationChips
           api={multiHost}
           destination={destination}

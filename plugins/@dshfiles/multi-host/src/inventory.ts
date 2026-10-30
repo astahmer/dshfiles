@@ -34,15 +34,22 @@ export const mergeInventory = (input: {
 }): readonly InventoryRow[] => {
   const rows = new Map<string, InventoryRow>()
   const live = new Map<string, { readonly running: boolean; readonly updatedAt: number }>()
+  const blank = new Set<string>()
   for (const source of input.statuses) {
     if (!source.status.ok) continue
     for (const session of source.status.sessions) {
-      if (session.blank) continue
-      live.set(rowKey(session.runtimeId, session.sessionId), { running: session.running, updatedAt: session.updatedAt })
+      const key = rowKey(session.runtimeId, session.sessionId)
+      if (session.blank) {
+        blank.add(key)
+        continue
+      }
+      live.set(key, { running: session.running, updatedAt: session.updatedAt })
     }
   }
   for (const thread of input.startedHere) {
-    const status = live.get(rowKey(thread.runtimeId, thread.sessionId))
+    const key = rowKey(thread.runtimeId, thread.sessionId)
+    if (blank.has(key)) continue
+    const status = live.get(key)
     const updatedAt = status?.updatedAt ?? Date.parse(thread.createdAt)
     rows.set(rowKey(thread.runtimeId, thread.sessionId), {
       runtimeId: thread.runtimeId,

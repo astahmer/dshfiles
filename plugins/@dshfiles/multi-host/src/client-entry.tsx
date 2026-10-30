@@ -22,13 +22,14 @@ export default defineClient({
     const openRemoteSession = (rawSessionId: string): void => {
       const sessionId = SessionId(rawSessionId)
       const openIfListed = (): void => {
-        if (!ctx.sessions.list.getSnapshot().ids.includes(sessionId)) {
-          console.error(`multi-host: remote Session ${sessionId} is absent after refreshing the local Session list`)
+        const session = ctx.sessions.list.getSnapshot().byId[sessionId]
+        if (session === undefined || session.blank) {
+          console.error(`multi-host: remote Session ${sessionId} is absent or blank after refreshing the local Session list`)
           return
         }
         ctx.uiWorkspace.openSession(sessionId)
       }
-      if (ctx.sessions.list.getSnapshot().ids.includes(sessionId)) {
+      if (ctx.sessions.list.getSnapshot().byId[sessionId] !== undefined) {
         openIfListed()
         return
       }

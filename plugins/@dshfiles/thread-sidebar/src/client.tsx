@@ -18,7 +18,7 @@ import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
-import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
+import { filterRemoteSidebarThreads, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
@@ -1292,7 +1292,7 @@ type SidebarGroupedViewEntry = {
 }
 
 const EMPTY_UNSENT_DRAFTS: Readonly<Record<string, SessionDraft>> = Object.freeze({})
-const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set()
+
 const EMPTY_HOISTED_SESSIONS: readonly SessionSummary[] = []
 const EMPTY_HOISTED_USAGE_LIMIT_ROWS: readonly UsageLimitRow<SessionSummary>[] = []
 const ABSENT_CURRENT_SESSION_ID: ObservableSnapshot<string | undefined> = {
@@ -3395,32 +3395,28 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const orderedSections = useMemo(() => SidebarOrganization.orderSections(preferences.sectionOrder), [preferences.sectionOrder])
   // The board has no separate Remote threads group: remote threads join the columns they belong to.
   const separatesRemoteThreads = preferences.separateRemoteThreads && !isBoard
-  const visibleRemoteThreads = useMemo(
+  const filteredRemoteThreads = useMemo(
     () =>
-      separatesRemoteThreads || threadView.sourceFilter === 'subagents'
-        ? []
-        : remoteThreads.filter(thread =>
-            ThreadViewModel.matchesStatusFilter({
-              filters: threadView.statusFilters,
-              running: thread.running,
-              labels: [],
-              unread: false,
-              archived: false,
-              settled: false,
-              muted: false,
-            }),
-          ),
-    [separatesRemoteThreads, remoteThreads, threadView.sourceFilter, threadView.statusFilters],
+      filterRemoteSidebarThreads({
+        threads: remoteThreads,
+        filters: threadView.statusFilters,
+        sourceFilter: threadView.sourceFilter,
+        archivedSessionIds,
+        settledSessionIds,
+        mutedSessionIds,
+      }),
+    [archivedSessionIds, mutedSessionIds, remoteThreads, settledSessionIds, threadView.sourceFilter, threadView.statusFilters],
   )
+  const visibleRemoteThreads = useMemo(() => (separatesRemoteThreads ? [] : filteredRemoteThreads), [filteredRemoteThreads, separatesRemoteThreads])
   const remoteRowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, RemoteSidebarThread[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
     for (const thread of visibleRemoteThreads) {
       const section = SidebarOrganization.sectionForSession({
-        session: { id: SessionId(`remote:${thread.runtimeId}:${thread.sessionId}`), running: thread.running, updatedAt: thread.updatedAt },
-        archivedSessionIds: EMPTY_SESSION_IDS,
-        pinnedSessionIds: EMPTY_SESSION_IDS,
-        parkedSessionIds: EMPTY_SESSION_IDS,
-        settledSessionIds: EMPTY_SESSION_IDS,
+        session: { id: SessionId(thread.sessionId), running: thread.running, updatedAt: thread.updatedAt },
+        archivedSessionIds,
+        pinnedSessionIds,
+        parkedSessionIds,
+        settledSessionIds,
         now,
         idleMinutes: preferences.idleMinutes,
       })
@@ -3428,7 +3424,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
     return rows
-  }, [now, preferences.idleMinutes, visibleRemoteThreads])
+  }, [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, settledSessionIds, visibleRemoteThreads])
   const activityAtBySessionId = useMemo(() => new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt])), [visibleThreadEntries])
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
@@ -4833,7 +4829,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     return !preferences.separateRemoteThreads || props.openRemoteThreads === undefined ? null : (
                       <RemoteThreadsSection
                         key="remote"
-                        threads={remoteThreads}
+                        threads={filteredRemoteThreads}
                         headerClassName={stickyHeaderClass}
                         onOpen={props.openRemoteThreads}
                         onOpenSession={props.openRemoteSession}
@@ -5110,7 +5106,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           </div>
           {threadView.groupBy !== 'status' && separatesRemoteThreads && props.openRemoteThreads !== undefined ? (
             <RemoteThreadsSection
-              threads={remoteThreads}
+              threads={filteredRemoteThreads}
               headerClassName={stickyHeaderClass}
               onOpen={props.openRemoteThreads}
               onOpenSession={props.openRemoteSession}

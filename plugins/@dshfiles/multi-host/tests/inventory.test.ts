@@ -90,7 +90,7 @@ describe('remote inventory merge', () => {
 
   test('blank sessions never reach the list', () => {
     const rows = mergeInventory({
-      startedHere: [],
+      startedHere: [startedHere({ runtimeId: 'runtime-a', sessionId: 'blank', title: 'Empty remote thread', createdAt: '2026-10-20T08:00:00.000Z' })],
       statuses: [
         reachable({
           runtimeId: 'runtime-a',

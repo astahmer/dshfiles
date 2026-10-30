@@ -954,7 +954,24 @@ export default defineClient({
         if (activePanelId !== null) ctx.layout.selectPanel(activePanelId)
       },
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
-      openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
+      openRemoteSession: (sessionId: string) => {
+        const id = SessionId(sessionId)
+        const openIfListed = (): void => {
+          const session = ctx.sessions.list.getSnapshot().byId[id]
+          if (session === undefined || session.blank) return
+          openSessionRestoringArchived(id)
+        }
+        if (ctx.sessions.list.getSnapshot().byId[id] !== undefined) {
+          openIfListed()
+          return
+        }
+        void ctx.sessions
+          .refresh()
+          .then(openIfListed)
+          .catch(error => {
+            console.warn(`thread-sidebar: could not refresh the Session list before opening remote Session ${id}`, error)
+          })
+      },
     })
 
     ctx.slots.inject('sidebar.workspaces', () =>

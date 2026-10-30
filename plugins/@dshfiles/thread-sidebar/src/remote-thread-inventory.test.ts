@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { buildRemoteSidebarThreads, runtimesWithStartedThreads } from './remote-thread-inventory.js'
+import { buildRemoteSidebarThreads, filterRemoteSidebarThreads, runtimesWithStartedThreads } from './remote-thread-inventory.js'
 
 const status = {
   ok: true,
@@ -42,6 +42,15 @@ test('remote inventory enriches started-here threads without adding host-only se
         hostName: 'Build host',
         connected: false,
       },
+      {
+        runtimeId: 'runtime-a',
+        sessionId: 'blank-thread',
+        cwd: '/work/Atlas',
+        title: 'Empty remote thread',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        hostName: 'Build host',
+        connected: false,
+      },
     ],
     statuses: [{ runtimeId: 'runtime-a', hostName: 'Build host', status }],
   })
@@ -67,4 +76,54 @@ test('remote inventory enriches started-here threads without adding host-only se
     },
   ])
   expect(rows.some(row => row.sessionId === 'host-thread' || row.sessionId === 'blank-thread')).toBe(false)
+})
+
+test('remote rows respect settled status and source filters', () => {
+  const threads = [
+    {
+      runtimeId: 'runtime-a',
+      sessionId: 'settled-thread',
+      title: 'Settled',
+      cwd: '/work/Atlas',
+      hostName: 'Build host',
+      connected: true,
+      running: false,
+      updatedAt: 3,
+      workspaceId: 'remote-project:runtime-a:Atlas',
+      workspaceTitle: 'Atlas',
+    },
+    {
+      runtimeId: 'runtime-a',
+      sessionId: 'active-thread',
+      title: 'Active',
+      cwd: '/work/Atlas',
+      hostName: 'Build host',
+      connected: true,
+      running: false,
+      updatedAt: 2,
+      workspaceId: 'remote-project:runtime-a:Atlas',
+      workspaceTitle: 'Atlas',
+    },
+  ]
+
+  expect(
+    filterRemoteSidebarThreads({
+      threads,
+      filters: ['not-running'],
+      sourceFilter: 'all',
+      archivedSessionIds: new Set(),
+      settledSessionIds: new Set(['settled-thread']),
+      mutedSessionIds: new Set(),
+    }).map(thread => thread.sessionId),
+  ).toEqual(['active-thread'])
+  expect(
+    filterRemoteSidebarThreads({
+      threads,
+      filters: [],
+      sourceFilter: 'subagents',
+      archivedSessionIds: new Set(),
+      settledSessionIds: new Set(),
+      mutedSessionIds: new Set(),
+    }),
+  ).toEqual([])
 })
