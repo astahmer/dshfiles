@@ -510,6 +510,17 @@ A live forecast render with seven enabled accounts sent seven successful `ai-acc
 
 The Host scans quota storage once per batch, and the client falls back to the unchanged single-account endpoint when an older Host lacks the batch route or a batch contract fails. The scratch `quota-forecast` browser journey passed with its two fake accounts. The package-wide E2E command exited 1 on four other journeys (the plan-title assertion, two quota-recovery journeys, and model-effort fast-mode); those paths are outside this change. The scratch `dshx dev open` path was corrected to expect the real no-account empty state; its screenshot intentionally had no history requests.
 
+## Jujutsu revision graph prefetch (2026-10-30; live baseline)
+
+| Measure | Live baseline | Thread change | After in scratch DSH |
+| --- | --- | --- | --- |
+| First graph row after selecting the `dshfiles` repository | 2.98 s; the initial `jujutsu/load` span was 2.12 s | No change to the initial `load` request | 288 ms in scratch; separate Host, not a like-for-like comparison |
+| Graph-page requests while opening the graph | 20; one took 11.86 s, with 11.69 s in `jj evolog` | Initial fill floor 200 → 40 revisions; lookahead 8 → 2 viewports (minimum 2.4 → 1.2 kpx) | 9 requests (145–222 ms each), 44 visible revisions; same repository in a 1280×800 headless browser |
+| Browser long tasks during graph opening | 29 tasks, 2.20 s total, 321 ms max | No DOM/rendering change | 0 during the scratch graph-open probe |
+| Workspace drag to preview readiness | Live drag probe did not produce a preview | No drag or preview code changed | p50 583 ms over 3 runs (466–770 ms); 0 long tasks; each preview canceled before applying |
+
+The baseline came from the live Jujutsu panel; the after probe used a disposable DSH with the same repository path and a complete plugin composition. Scratch doctor passed all checks (5 bundles loaded, 171 active entries, no Host errors), and the browser probe had 0 console, page, request, or HTTP errors. Host/runtime conditions differed, so the request counts are indicative rather than a strict same-runtime before/after. The page still loads past 40 revisions to fill the two-viewport buffer. The first `jujutsu/load` request is unchanged. Dragging the current thread-workspace chip produced a workspace-move preview; every trial was canceled without applying it. The live DSH was neither changed nor profiled; a live after-probe still requires integration.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

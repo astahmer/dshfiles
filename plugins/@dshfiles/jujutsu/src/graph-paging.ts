@@ -1,6 +1,6 @@
 /** Already-loaded history the graph keeps below the viewport before it asks the Host for another page. */
-const MINIMUM_LOOKAHEAD = 2400
-const LOOKAHEAD_VIEWPORTS = 8
+const MINIMUM_LOOKAHEAD = 1200
+const LOOKAHEAD_VIEWPORTS = 2
 
 type GraphPageScope = { readonly repoId: string | null; readonly query: string; readonly generation: string }
 
@@ -10,7 +10,7 @@ export class GraphPagingModel {
     left.repoId === right.repoId && left.query === right.query && left.generation === right.generation
 
   /** Revisions the graph loads before anything scrolls, so a first look is never a single page. */
-  static readonly revisionFloor = 200
+  static readonly revisionFloor = 40
 
   /** Every loaded revision joins the next layout, so an automatic chain stops before that work outgrows a page. */
   static readonly revisionLimit = 2000
