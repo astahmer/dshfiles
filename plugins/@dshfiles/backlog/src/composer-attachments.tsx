@@ -1,3 +1,4 @@
+import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { ImageLightbox } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { FileIcon, PaperclipIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -6,6 +7,9 @@ import { useCallback, useId, useState, type ChangeEvent, type ClipboardEvent, ty
 
 import { readComposerFile, type ComposerFile } from './composer-files.js'
 import { BacklogItems } from './item.js'
+import { threadMentionText } from './thread-mention-drop.js'
+
+export { threadMentionText } from './thread-mention-drop.js'
 
 export const fileSizeLabel = (bytes: number): string =>
   bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${String(Math.max(1, Math.round(bytes / 1024)))} KB`
@@ -75,13 +79,20 @@ export const useComposerFiles = (props: {
 }
 
 /** A box accepts files dropped anywhere on it, with the same highlight in every composer. */
-export const useFileDrop = ({ onFiles }: { readonly onFiles: (files: readonly File[]) => void }) => {
+export const useFileDrop = ({
+  onFiles,
+  onThreadMention,
+}: {
+  readonly onFiles: (files: readonly File[]) => void
+  readonly onThreadMention?: (sessionId: string) => void
+}) => {
   const [dragging, setDragging] = useState(false)
   return {
     dragging,
     dragProps: {
       onDragOver: (event: DragEvent) => {
-        if (!event.dataTransfer.types.includes('Files')) return
+        const threadMention = ThreadMentionDrag.has(event.dataTransfer)
+        if (!threadMention && !event.dataTransfer.types.includes('Files')) return
         event.preventDefault()
         setDragging(true)
       },
@@ -91,6 +102,13 @@ export const useFileDrop = ({ onFiles }: { readonly onFiles: (files: readonly Fi
         setDragging(false)
       },
       onDrop: (event: DragEvent) => {
+        const sessionId = ThreadMentionDrag.read(event.dataTransfer)
+        if (sessionId !== null) {
+          event.preventDefault()
+          setDragging(false)
+          onThreadMention?.(sessionId)
+          return
+        }
         if (!event.dataTransfer.types.includes('Files')) return
         event.preventDefault()
         setDragging(false)

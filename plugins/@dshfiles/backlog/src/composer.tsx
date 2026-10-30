@@ -32,7 +32,7 @@ import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
-import { AttachmentTray, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { AttachmentTray, threadMentionText, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
@@ -312,7 +312,13 @@ export const Composer = (props: {
     if (result.added.length === 0) return
     input.current?.insertImageReferences(result.added, result.firstImageNumber)
   }
-  const drop = useFileDrop({ onFiles: files => void addFiles(files) })
+  const drop = useFileDrop({
+    onFiles: files => void addFiles(files),
+    onThreadMention: sessionId => {
+      const thread = props.threads.find(candidate => candidate.id === sessionId)
+      insert(threadMentionText({ sessionId, title: thread?.title ?? sessionId }))
+    },
+  })
   const addFromPicker = (): void => fileInputRef.current?.click()
 
   const stopVoice = async (): Promise<void> => {

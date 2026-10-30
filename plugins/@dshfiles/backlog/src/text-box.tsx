@@ -4,7 +4,7 @@ import { CornerDownLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 
-import { AttachFilesButton, AttachmentTray, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { AttachFilesButton, AttachmentTray, threadMentionText, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { BacklogImageEditor } from './image-reference-editor.js'
 import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { InlineCompletion } from './inline-completion.js'
@@ -57,7 +57,21 @@ export const BacklogTextBox = (props: {
     if (result.added.length === 0) return
     input.current?.insertImageReferences(result.added, result.firstImageNumber)
   }
-  const drop = useFileDrop({ onFiles: files => void addFiles(files) })
+  const drop = useFileDrop({
+    onFiles: files => void addFiles(files),
+    onThreadMention: sessionId => {
+      const thread = props.threads.find(candidate => candidate.id === sessionId)
+      const mention = threadMentionText({ sessionId, title: thread?.title ?? sessionId })
+      const text = input.current?.getMarkdownText() ?? props.value
+      const range = input.current?.getSelectionRange() ?? { start: text.length, end: text.length }
+      const next = `${text.slice(0, range.start)}${mention}${text.slice(range.end)}`
+      input.current?.replaceRange(range.start, range.end, mention)
+      props.onChange(next)
+      const position = range.start + mention.length
+      setCaret(position)
+      requestAnimationFrame(() => input.current?.setCaret(position))
+    },
+  })
   const reply = props.variant === 'reply'
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:bg-transparent dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
