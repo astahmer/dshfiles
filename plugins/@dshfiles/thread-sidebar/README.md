@@ -5,6 +5,7 @@
 ![The same account Preview docked as an ordinary view with its single tab row hidden](docs/screenshots/preview-as-regular-tab.png)
 
 ![Tab-controlled Navigation and Threads between fixed sidebar controls](docs/screenshots/workbench-assemblies.png)
+![Thread navigation icons and a pinned More menu in the collapsed sidebar](docs/screenshots/collapsed-sidebar-navigation.png)
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)

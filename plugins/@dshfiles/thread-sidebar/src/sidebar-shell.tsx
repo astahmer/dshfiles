@@ -1114,6 +1114,37 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
 
+        {props.collapsed ? (
+          <nav className="dshx:w-full dshx:flex-none dshx:overflow-hidden" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
+            <NavigationIconRow
+              items={navigationItems}
+              overflow="scroll-menu"
+              orientation="vertical"
+              onCustomize={openCustomize}
+              settings={
+                footerSnapshot.settingsId === null ? null : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
+              }
+              onReorder={(fromIndex, toIndex) =>
+                updatePreferences({
+                  headerOrder: SidebarOrganization.reorderVisibleEntry({
+                    orderedIds: orderedHeaderEntries.map(entry => entry.id),
+                    visibleIds: visibleHeaderEntries.map(entry => entry.id),
+                    fromVisible: fromIndex,
+                    toVisible: toIndex,
+                  }),
+                })
+              }
+              labels={{
+                more: text(props.t, 'threadSidebarMoreDestinations'),
+                filter: text(props.t, 'threadSidebarFilterDestinations'),
+                empty: text(props.t, 'threadSidebarNoDestinations'),
+                customize: text(props.t, 'threadSidebarCustomize'),
+                navigation: text(props.t, 'threadSidebarHeaderNavigation'),
+              }}
+            />
+          </nav>
+        ) : null}
+
         <SidebarContentSeat renderSlot={props.renderSlot} collapsed={props.collapsed}>
           <div
             ref={headerRegionRef}
@@ -1130,29 +1161,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined
             }
           >
-            {props.collapsed ? (
-              <nav className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:pb-2" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
-                {navigationItems.map(item => (
-                  <Tooltip key={item.id}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className={cn(
-                          'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
-                          item.active && 'dshx:bg-accent dshx:text-foreground',
-                        )}
-                        aria-label={item.label}
-                        aria-current={item.active ? 'page' : undefined}
-                        onClick={item.run}
-                      >
-                        {item.icon}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{item.label}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </nav>
-            ) : iconRow ? (
+            {iconRow ? (
               <nav aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
                 <NavigationIconRow
                   items={navigationItems}

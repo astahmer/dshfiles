@@ -29,7 +29,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const renderRow = (options: { readonly overflow: NavigationOverflow; readonly rowWidth: number; readonly withSettings?: boolean }) => {
+const renderRow = (options: {
+  readonly overflow: NavigationOverflow
+  readonly rowWidth: number
+  readonly withSettings?: boolean
+  readonly orientation?: 'horizontal' | 'vertical'
+}) => {
   // Two 32px icons plus the reserved More button fit in 120px of content after the row's 16px padding.
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(options.rowWidth)
   const run = vi.fn()
@@ -40,6 +45,7 @@ const renderRow = (options: { readonly overflow: NavigationOverflow; readonly ro
       <NavigationIconRow
         items={destinationLabels.map(label => ({ id: label, label, icon: null, active: false, run: () => run(label) }))}
         overflow={options.overflow}
+        orientation={options.orientation ?? 'horizontal'}
         labels={labels}
         settings={options.withSettings === true ? { label: 'Settings', open: openSettings } : null}
         onCustomize={onCustomize}
@@ -94,6 +100,20 @@ describe('NavigationIconRow', () => {
   it('keeps every icon in the scrolling row and lists every destination in the More menu', () => {
     renderRow({ overflow: 'scroll-menu', rowWidth: 136 })
     expect(rowButtonNames()).toEqual(destinationLabels)
+    expect(menuOptionNames(openMenu())).toEqual([...destinationLabels, labels.customize])
+  })
+
+  it('keeps every collapsed destination in a capped vertical scroller with a pinned More menu', () => {
+    renderRow({ overflow: 'menu', orientation: 'vertical', rowWidth: 56 })
+    const toolbar = screen.getByRole('toolbar', { name: labels.navigation })
+    expect(
+      within(toolbar)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(destinationLabels)
+    expect(toolbar.className).toContain('overflow-y-auto')
+    expect(toolbar.className).toContain('max-h-[min(320px,calc(100vh-96px))]')
+    expect(screen.getByRole('button', { name: labels.more }).parentElement?.parentElement).not.toBe(toolbar)
     expect(menuOptionNames(openMenu())).toEqual([...destinationLabels, labels.customize])
   })
 
