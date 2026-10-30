@@ -101,6 +101,7 @@ When('a disposable native-tabs workspace is selected', async ({ page }: { page: 
     const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     await expect(picker).toBeVisible()
     await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(root)
+    await expect(picker.getByRole('listbox', { name: 'Folders', exact: true })).toHaveAttribute('aria-busy', 'false')
     await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
     await expect(picker).toBeHidden()
   }
