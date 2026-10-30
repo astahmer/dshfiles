@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_FILES } from '../src/api.js'
+import { MAX_FILES, reviewResultSchema } from '../src/api.js'
 import { groupPatch } from '../src/scopes.js'
 
 const PATCH = [
@@ -46,6 +46,40 @@ describe('groupPatch', () => {
   it('reports an empty patch as no scopes rather than an error', async () => {
     const grouped = await groupPatch({ patch: '', title: 'main..@' })
     expect(grouped).toEqual({ fileCount: 0, additions: 0, deletions: 0, files: [], scopes: [], clipped: false })
+  })
+
+  it('omits parser entries with empty paths so review output still satisfies its schema', async () => {
+    const patch = [
+      'diff --git a/ b/',
+      '--- a/',
+      '+++ b/',
+      '@@ -0,0 +1 @@',
+      '+unaddressable',
+      'diff --git a/src/app.ts b/src/app.ts',
+      '--- a/src/app.ts',
+      '+++ b/src/app.ts',
+      '@@ -0,0 +1 @@',
+      '+export const answer = 42',
+      '',
+    ].join('\n')
+    const grouped = await groupPatch({ patch, title: 'main..@' })
+    const result = {
+      status: 'ok' as const,
+      path: '/workspace',
+      base: 'main',
+      head: 'abcdef12',
+      range: 'main..@',
+      patch,
+      truncated: false,
+      fileCount: grouped.fileCount,
+      additions: grouped.additions,
+      deletions: grouped.deletions,
+      files: [...grouped.files],
+      scopes: [...grouped.scopes],
+    }
+
+    expect(grouped.files.map(file => file.path)).toEqual(['src/app.ts'])
+    expect(reviewResultSchema.safeParse(result).success).toBe(true)
   })
 
   it('caps the listed files and scales each scope down to what it still lists', async () => {

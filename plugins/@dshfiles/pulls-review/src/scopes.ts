@@ -34,13 +34,14 @@ export const groupPatch = async (input: { readonly patch: string; readonly title
   const payload = await source.fetch()
   const adapter = createRuleBasedAdapter(key => RULE_TEXTS[key])
   const grouped = await adapter.analyze(payload)
-  const byPath = new Map(payload.files.map(file => [file.path, file]))
-  const files = payload.files.slice(0, limit)
+  const validFiles = payload.files.filter(file => file.path.length > 0)
+  const byPath = new Map(validFiles.map(file => [file.path, file]))
+  const files = validFiles.slice(0, limit)
   const kept = new Set(files.map(file => file.path))
   const scopes = grouped.groups
     .map(group => {
       const key = scopeKeySchema.safeParse(group.key)
-      const filePaths = group.filePaths.filter(path => kept.has(path))
+      const filePaths = group.filePaths.filter(path => path.length > 0 && kept.has(path))
       let additions = 0
       let deletions = 0
       for (const path of filePaths) {
@@ -62,11 +63,11 @@ export const groupPatch = async (input: { readonly patch: string; readonly title
     // A scope the cap emptied would render as an empty row; `clipped` already says the lists are short.
     .filter(scope => scope.filePaths.length > 0)
   return {
-    fileCount: payload.files.length,
-    additions: payload.files.reduce((total, file) => total + file.additions, 0),
-    deletions: payload.files.reduce((total, file) => total + file.deletions, 0),
+    fileCount: validFiles.length,
+    additions: validFiles.reduce((total, file) => total + file.additions, 0),
+    deletions: validFiles.reduce((total, file) => total + file.deletions, 0),
     files: files.map(file => ({ path: file.path, status: file.status, additions: file.additions, deletions: file.deletions })),
     scopes,
-    clipped: payload.files.length > files.length,
+    clipped: validFiles.length > files.length,
   }
 }
