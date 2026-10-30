@@ -6,7 +6,13 @@
       "title": "Search threads and workspace files",
       "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
       "surfaces": ["client"],
-      "reach": ["press Meta+Shift+P", "click tab \"Threads\"", "expect tab \"Everything\""],
+      "reach": [
+        "seed tool-call-thread",
+        "press Meta+Shift+P",
+        "click tab \"Threads\"",
+        "fill combobox \"Search the command palette\" \"Fake thread title\"",
+        "expect option \"Fake thread title*\""
+      ],
       "configuration": [
         {
           "key": "threadsScope",

@@ -1,5 +1,7 @@
 # Command Palette
 
+![Search threads and workspace files](docs/screenshots/palette-search.png)
+
 ![Route prefixed searches to the right content](docs/screenshots/palette-prefix-routing.png)
 
 ![Register and invoke typed palette actions](docs/screenshots/action-registry.png)

@@ -188,6 +188,13 @@ Then('thread content search finds the message and opens its thread', async ({ pa
     journey.releasePrompt()
   }
   await recordAssertion(page, 'thread-content-search-refreshes-after-host-accepts-message', () => expect(matchingResult).toBeVisible({ timeout: 30_000 }))
+  const title = matchingResult.getByText('Fake thread title', { exact: true })
+  await expect(title).toHaveCount(1)
+  const metadata = title.locator('..').locator(':scope > span').nth(1).locator(':scope > *')
+  await expect(metadata).toHaveCount(3)
+  await expect(metadata.nth(0)).toHaveText(/\S+/u)
+  await expect(metadata.nth(1)).toHaveText(/\S+/u)
+  await expect(metadata.nth(2)).toHaveText(/\S+/u)
   await page.unroute('**/api/session/prompt')
   await matchingResult.click()
   await recordAssertion(page, 'thread-content-search-opens-the-matching-session', async () => {
