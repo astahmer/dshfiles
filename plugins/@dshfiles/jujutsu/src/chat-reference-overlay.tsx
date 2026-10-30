@@ -35,7 +35,7 @@ const referenceTemplateProps: ComponentProps<typeof ReferenceChip> = { appearanc
  * The revision-graph preview for a `jj:` reference in chat. A native session-reference chip lives inside its code node;
  * the request arrives as a window event carrying the chip's anchor, so one overlay serves every message.
  */
-export const ChatReferenceOverlay = (): JSX.Element => {
+export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (sessionId: string) => string | undefined }): JSX.Element => {
   const api = useApi(jujutsuApi)
   const jjIntegration = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
@@ -91,6 +91,8 @@ export const ChatReferenceOverlay = (): JSX.Element => {
 
   const titleRequest = titleRequests.at(0) ?? null
   const referenced = request?.reference.value
+  const projectPath = request === null ? undefined : props.projectPathForSession(request.sessionId)
+  const titleProjectPath = titleRequest === null ? undefined : props.projectPathForSession(titleRequest.sessionId)
   const readLocalReference = async (cwd: string, reference: string, signal: AbortSignal) => {
     try {
       const repository = await queryClient.fetchQuery({
@@ -104,7 +106,16 @@ export const ChatReferenceOverlay = (): JSX.Element => {
       return null
     }
   }
-  const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
+  const resolveReference = async (cwd: string, projectPath: string | undefined, reference: string, signal: AbortSignal) => {
+    const preferred =
+      projectPath === undefined
+        ? null
+        : await queryClient.fetchQuery({
+            queryKey: chatReferenceQueryKeys.localTitle(cwd, reference, projectPath),
+            queryFn: ({ signal: querySignal }) => readLocalReference(projectPath, reference, querySignal),
+            staleTime: 30_000,
+          })
+    if (preferred !== null) return [preferred]
     const local = await queryClient.fetchQuery({
       queryKey: chatReferenceQueryKeys.localTitle(cwd, reference),
       queryFn: ({ signal: querySignal }) => readLocalReference(cwd, reference, querySignal),
@@ -144,18 +155,26 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     return matches.filter(match => match !== undefined)
   }
   const graph = useQuery({
-    queryKey: chatReferenceQueryKeys.search(request?.cwd ?? '', referenced ?? ''),
+    queryKey: chatReferenceQueryKeys.search(request?.cwd ?? '', referenced ?? '', projectPath),
     enabled: request !== null && referenced !== undefined,
     retry: false,
     staleTime: 30_000,
-    queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', referenced ?? '', signal),
+    queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', projectPath, referenced ?? '', signal),
   })
   const titleGraph = useQuery({
-    queryKey: chatReferenceQueryKeys.localTitle(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? ''),
+    queryKey: chatReferenceQueryKeys.localTitle(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? '', titleProjectPath),
     enabled: titleRequest !== null,
     retry: false,
     staleTime: 30_000,
-    queryFn: ({ signal }) => readLocalReference(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? '', signal),
+    queryFn: async ({ signal }) => {
+      if (titleRequest === null) return null
+      const projectPath = props.projectPathForSession(titleRequest.sessionId)
+      if (projectPath !== undefined) {
+        const preferred = await readLocalReference(projectPath, titleRequest.reference.value, signal)
+        if (preferred !== null) return preferred
+      }
+      return readLocalReference(titleRequest.cwd, titleRequest.reference.value, signal)
+    },
   })
 
   useEffect(() => {

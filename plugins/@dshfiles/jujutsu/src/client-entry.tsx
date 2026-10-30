@@ -241,13 +241,28 @@ export default defineClient({
         return () => undefined
       }
     }, 'dshfiles-jujutsu: toggle command')
+    const ReferenceOverlay = (): JSX.Element => {
+      const subscribeSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
+      const sessionsById = useSyncExternalStore(
+        subscribeSessions,
+        () => ctx.sessions.list.getSnapshot().byId,
+        () => ({}),
+      )
+      const subscribeWorkspaces = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
+      const workspaces = useSyncExternalStore(
+        subscribeWorkspaces,
+        () => ctx.workspaces.list.getSnapshot().items,
+        () => [],
+      )
+      return <ChatReferenceOverlay projectPathForSession={sessionId => sessionProjectPath(sessionId, sessionsById, workspaces)} />
+    }
     // One overlay serves every message: a chat reference is a native `<code>` node, so the request arrives as an event.
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(
         { name: 'shell.overlay', id: 'dshfiles-jujutsu-reference-preview', order: 60 },
         decorate(() => (
           <PluginQueryProvider>
-            <ChatReferenceOverlay />
+            <ReferenceOverlay />
           </PluginQueryProvider>
         )),
       ),

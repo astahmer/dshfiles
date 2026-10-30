@@ -23,8 +23,8 @@ const BOOKMARK = /^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/u
 export const CHAT_REFERENCE_PREFIX = 'jj:'
 
 export const chatReferenceQueryKeys = {
-  localTitle: (cwd: string, reference: string) => ['jujutsu', 'reference-local-title', cwd, reference] as const,
-  search: (cwd: string, reference: string) => ['jujutsu', 'reference-search', cwd, reference] as const,
+  localTitle: (cwd: string, reference: string, projectPath?: string) => ['jujutsu', 'reference-local-title', cwd, projectPath ?? '', reference] as const,
+  search: (cwd: string, reference: string, projectPath?: string) => ['jujutsu', 'reference-search', cwd, projectPath ?? '', reference] as const,
   projects: ['jujutsu', 'reference-projects'] as const,
   repository: (path: string) => ['jujutsu', 'reference-repository', path] as const,
   repositories: (paths: readonly string[]) => ['jujutsu', 'reference-repositories', [...paths].sort().join('\n')] as const,

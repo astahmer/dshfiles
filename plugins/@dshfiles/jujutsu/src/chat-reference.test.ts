@@ -11,6 +11,8 @@ describe('chat reference tokens', () => {
 
     expect(chatReferenceQueryKeys.localTitle(preview.cwd, preview.reference.value)).toEqual(chatReferenceQueryKeys.localTitle(title.cwd, title.reference.value))
     expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.search('/repo', 'main'))
+    expect(chatReferenceQueryKeys.search('/repo', 'main', '/project')).not.toEqual(chatReferenceQueryKeys.search('/repo', 'main', '/other-project'))
+    expect(chatReferenceQueryKeys.localTitle('/repo', 'main', '/project')).not.toEqual(chatReferenceQueryKeys.localTitle('/repo', 'main', '/other-project'))
     expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.localTitle('/other', 'main'))
     expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.localTitle('/repo', 'release'))
   })
