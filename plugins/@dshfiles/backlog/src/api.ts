@@ -5,6 +5,12 @@ import { BacklogItems } from './item.js'
 const idSchema = z.number().int().positive()
 const freshnessSchema = z.enum(BacklogItems.freshnessStates)
 const fileInputSchema = BacklogItems.attachmentSchema.omit({ createdAt: true }).extend({ data: z.string().min(1).max(24_000_000) })
+const agentContinuationCandidateSchema = z
+  .object({
+    sessionId: z.string().min(1).max(256),
+    title: z.string().max(200),
+  })
+  .strict()
 
 const commentInputSchema = z
   .object({
@@ -356,6 +362,23 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
       tool: { name: 'backlog_link', readOnly: false, render: renderDetailPreview },
+    }),
+    agentContinuationCandidates: method({
+      input: z.object({ id: idSchema, handle: z.string().min(1).max(80) }).strict(),
+      output: z.array(agentContinuationCandidateSchema).max(50),
+      description: 'List threads for an agent that are already linked to one backlog item, for an explicit continue-or-new choice.',
+    }),
+    continueAgentThread: method({
+      input: z
+        .object({
+          id: idSchema,
+          handle: z.string().min(1).max(80),
+          sessionId: z.string().min(1).max(256),
+          text: z.string().min(1).max(BacklogItems.maxBodyChars),
+        })
+        .strict(),
+      output: z.object({ sessionId: z.string().min(1), queued: z.literal(true) }).strict(),
+      description: 'Validate one linked thread belongs to the mentioned agent and queue the task into it.',
     }),
     startThread: method({
       input: z

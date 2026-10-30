@@ -6,7 +6,7 @@ import type { PromptContentPart, SessionCreateRequest, SessionRequestId } from '
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { BlockAssembler, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions } from '@deepseek-ai/dsh-llm'
-import type { Session } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
@@ -22,7 +22,8 @@ import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { randomUUID } from 'node:crypto'
 import { createHostApiClient } from '@dshfiles/dshx/host'
-import { AgentComments } from './agent-dispatch.js'
+import { AgentContinuation } from './agent-continuation.js'
+import { AgentComments, type AgentContinuationThread } from './agent-dispatch.js'
 import { BacklogStartContext } from './backlog-start-context.js'
 import { createAiActivityTracker } from './ai-activity.js'
 import { backlogApi, type BacklogDetailResult } from './api.js'
@@ -641,6 +642,65 @@ const agentForStart = async (ctx: Context, handle: string): Promise<Agent> => {
  * first message, and every item link. The panel and `backlog_start_thread` share this, so a thread an agent starts is
  * the same thread the dialog starts.
  */
+const agentContinuationCandidates = async (ctx: Context, input: { readonly id: number; readonly handle: string }) => {
+  const store = await backlogFor(ctx)
+  const found = store.get(input.id)
+  if (!found.ok) throw new PluginApiError(`Backlog item b:${String(input.id)} is unavailable.`, { code: 'item-not-found' })
+  await agentForStart(ctx, input.handle)
+  const agents = createHostApiClient(ctx, agentsApi, '@dshfiles/backlog')
+  const linkedSessions = found.value.item.links.filter(link => link.type === 'thread').map(link => link.target)
+  const candidates = await Promise.all(
+    linkedSessions.map(async sessionId => {
+      const owner = await agents.safe.threadAgent({ sessionId })
+      if (!owner.ok) throw new PluginApiError(`Thread ownership could not be checked: ${owner.error.message}`, { code: 'agents-unavailable' })
+      if (owner.value.agent?.handle !== input.handle) return null
+      return { sessionId, title: sessionId }
+    }),
+  )
+  const ownedThreads = candidates.filter((candidate): candidate is AgentContinuationThread => candidate !== null)
+  return AgentContinuation.candidates({ links: found.value.item.links, threads: ownedThreads })
+}
+
+const queueAgentContinuation = async (
+  ctx: Context,
+  input: { readonly id: number; readonly handle: string; readonly sessionId: string; readonly text: string },
+): Promise<{ readonly sessionId: string; readonly queued: true }> => {
+  const store = await backlogFor(ctx)
+  const found = store.get(input.id)
+  if (!found.ok) throw new PluginApiError(`Backlog item b:${String(input.id)} is unavailable.`, { code: 'item-not-found' })
+  if (!found.value.item.links.some(link => link.type === 'thread' && link.target === input.sessionId)) {
+    throw new PluginApiError(`Thread ${input.sessionId} is not linked to backlog item b:${String(input.id)}.`, { code: 'thread-not-linked' })
+  }
+  await agentForStart(ctx, input.handle)
+  const agents = createHostApiClient(ctx, agentsApi, '@dshfiles/backlog')
+  const owner = await agents.safe.threadAgent({ sessionId: input.sessionId })
+  if (!owner.ok) throw new PluginApiError(`Thread ownership could not be verified: ${owner.error.message}`, { code: 'agents-unavailable' })
+  if (
+    !AgentContinuation.ownsLinkedThread({
+      links: found.value.item.links,
+      sessionId: input.sessionId,
+      requestedHandle: input.handle,
+      ownerHandle: owner.value.agent?.handle ?? null,
+    })
+  ) {
+    throw new PluginApiError(`Thread ${input.sessionId} was not started by @${input.handle} or is no longer linked to this item.`, {
+      code: 'thread-agent-mismatch',
+    })
+  }
+  const controller = ctx.get('sessionController')
+  if (controller === undefined) throw new PluginApiError('The Host session controller is unavailable.', { code: 'sessions-unavailable' })
+  await controller.prompt(
+    {
+      requestId: randomUUID() as SessionRequestId,
+      sessionId: SessionId(input.sessionId),
+      mode: 'queue',
+      content: [{ type: 'text', text: input.text }],
+    },
+    AbortSignal.timeout(120_000),
+  )
+  return { sessionId: input.sessionId, queued: true }
+}
+
 const attachmentChunks = (bytes: Uint8Array): AsyncIterable<Uint8Array> => ({
   async *[Symbol.asyncIterator]() {
     const chunkBytes = 64 * 1024
@@ -737,6 +797,11 @@ const startThreadForItems = async (
     throw new PluginApiError(`Session ${sessionId} was created, but mandatory backlog context was not delivered: ${reason}`, {
       code: 'thread-context-not-delivered',
     })
+  }
+  if (agent !== null) {
+    const agents = createHostApiClient(ctx, agentsApi, '@dshfiles/backlog')
+    const recorded = await agents.safe.recordUse({ handle: agent.handle, thread: { sessionId, title: StartThreadForm.title(details) } })
+    if (!recorded.ok) logFailure(`Agent @${agent.handle} thread history was not updated`)(recorded.error)
   }
   const actor = actorOf(caller)
   const linked: number[] = []
@@ -948,6 +1013,8 @@ const backlogApiHost = backlogApi.host({
     if (result.ok && input.link.type === 'url') scheduleTweetContextImport(ctx, input.id)
     return result
   },
+  agentContinuationCandidates: async ({ ctx, input }) => agentContinuationCandidates(ctx, input),
+  continueAgentThread: async ({ ctx, input }) => queueAgentContinuation(ctx, input),
   startThread: async ({ ctx, input, caller }) => startThreadForItems(ctx, input, caller),
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),
   editComment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).editComment({ ...input, actor: actorOf(caller) }),

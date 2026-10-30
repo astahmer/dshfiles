@@ -18,7 +18,7 @@ Then('the agent thread {string} opens with its instructions for {string}', async
     // The sent message renders the agent mention as a chip, then its instructions, then the item heading the backlog
     // adds before the task, so the thread can find the item it was started for.
     await expect(page.getByText('Work as', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'dsh', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'dsh', exact: true }).first()).toBeVisible()
     await expect(page.getByText(new RegExp(`---\\s*Work on b:\\d+: ${title}[\\s\\S]*${task}`, 'u'))).toBeVisible()
   })
   await finishJourneyAssertions(page)
@@ -45,6 +45,26 @@ Then('the item links the @{word} thread {string}', async ({ page }: { page: Page
         .first(),
     ).toBeVisible()
   })
+  await finishJourneyAssertions(page)
+})
+
+Then('the continuation choice offers the linked thread {string} and a new thread', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'agents-comment-offers-explicit-continuation-choice', async () => {
+    await expect(page.getByRole('dialog', { name: 'Continue @dsh?' })).toBeVisible()
+    await expect(page.getByRole('option', { name: new RegExp(title, 'u') })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'Start a new thread', exact: true })).toBeVisible()
+  })
+})
+
+When('the linked thread {string} is chosen', async ({ page }: { page: Page }, title: string) => {
+  await page.getByRole('option', { name: new RegExp(title, 'u') }).click()
+})
+
+Then('the task {string} is queued in the selected thread', async ({ page }: { page: Page }, task: string) => {
+  await expect(page.getByText('Queued task in existing thread')).toBeVisible()
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await expect(page.getByText(task, { exact: true })).toBeVisible()
+  await expect(page.getByRole('treeitem', { name: /Mention the reviewer/u })).toHaveCount(1)
   await finishJourneyAssertions(page)
 })
 

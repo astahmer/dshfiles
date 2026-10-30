@@ -149,7 +149,7 @@ export default defineClient({
         if (!generated.value.ok) return { ok: false, reason: 'The backlog item no longer exists.' }
         return { ok: true }
       },
-      dispatch: async ({ item, text, files, open, smartThreadRouting = true, notificationDelivery = 'in-app' }) => {
+      dispatch: async ({ item, text, files, open, smartThreadRouting = true, notificationDelivery = 'in-app', chooseContinuation }) => {
         const mention = AgentComments.mention(text)
         const automatic = mention === null && files.length === 0 && smartThreadRouting
         let task = ''
@@ -187,6 +187,42 @@ export default defineClient({
           return automatic
             ? { kind: 'failed', reason: 'The @dsh agent is disabled, so the reply was not routed.' }
             : { kind: 'skipped', reason: 'disabled-agent' }
+        if (mention !== null) {
+          const candidates = await api.safe.agentContinuationCandidates({ id: item.id, handle })
+          if (!candidates.ok) return { kind: 'failed', reason: `Existing threads could not be checked: ${candidates.error.message}` }
+          if (candidates.value.length > 0) {
+            const selection = await chooseContinuation({ agent: AgentComments.choice(agent), threads: candidates.value })
+            if (selection.kind === 'cancel') return { kind: 'skipped', reason: 'continuation-cancelled' }
+            if (selection.kind === 'existing') {
+              const queued = await api.safe.continueAgentThread({
+                id: item.id,
+                handle,
+                sessionId: selection.sessionId,
+                text: mention.task || `Continue work on b:${String(item.id)}: ${item.title}.`,
+              })
+              if (!queued.ok) return { kind: 'failed', reason: queued.error.message }
+              if (open) {
+                try {
+                  ctx.uiWorkspace.openSession(queued.value.sessionId as SessionId)
+                } catch (cause) {
+                  console.warn(`backlog: thread ${queued.value.sessionId} could not be opened: ${String(cause)}`)
+                }
+              }
+              if (notificationDelivery === 'system' || notificationDelivery === 'both')
+                metadata?.plugin?.notifications.notify({
+                  title: 'Backlog thread continued',
+                  body: `b:${item.id} · ${item.title}`,
+                  onClick: () => ctx.uiWorkspace.openSession(queued.value.sessionId as SessionId),
+                })
+              BacklogNotices.show({
+                text: 'Queued task in existing thread',
+                kind: 'success',
+                sessionId: open ? null : (queued.value.sessionId as SessionId),
+              })
+              return { kind: 'dispatched' }
+            }
+          }
+        }
         const projects = startThreadPorts.listProjects()
         const items = [item]
         const systemNotification = notificationDelivery === 'system' || notificationDelivery === 'both'

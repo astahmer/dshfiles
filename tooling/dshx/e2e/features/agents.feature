@@ -18,6 +18,10 @@ Feature: Persistent agents
     And backlog item b:1 is opened
     Then the item links the @dsh thread "Mention the reviewer"
     And the start thread dialog offers the agent "@dsh"
+    When "@dsh check one more thing" is commented on the open item
+    Then the continuation choice offers the linked thread "Mention the reviewer" and a new thread
+    When the linked thread "Mention the reviewer" is chosen
+    Then the task "check one more thing" is queued in the selected thread
 
   @scenario:agents.thread-workspace-picker
   Scenario: Start-thread workspace picker uses the shared Combobox and excludes thread workspaces

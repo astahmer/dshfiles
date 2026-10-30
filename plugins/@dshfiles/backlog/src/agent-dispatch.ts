@@ -7,7 +7,10 @@ import { StartThreadForm } from './start-thread.js'
 /** What a leading `@handle` comment box did: started a thread, stayed an ordinary comment, or failed. */
 export type AgentDispatchOutcome =
   | { readonly kind: 'dispatched' }
-  | { readonly kind: 'skipped'; readonly reason: 'no-mention' | 'reply-only' | 'unknown-agent' | 'disabled-agent' | 'agents-unavailable' }
+  | {
+      readonly kind: 'skipped'
+      readonly reason: 'no-mention' | 'reply-only' | 'unknown-agent' | 'disabled-agent' | 'agents-unavailable' | 'continuation-cancelled'
+    }
   | { readonly kind: 'failed'; readonly reason: string }
 
 /** One enabled agent as the comment box offers it, without the instructions a dispatch does not need to show. */
@@ -18,6 +21,13 @@ export interface AgentChoice {
   readonly description: string
 }
 
+export interface AgentContinuationThread {
+  readonly sessionId: string
+  readonly title: string
+}
+
+export type AgentContinuationSelection = { readonly kind: 'new' } | { readonly kind: 'existing'; readonly sessionId: string } | { readonly kind: 'cancel' }
+
 /** The Host lookup and thread start the comment box needs; owned by the client entry. */
 export interface AgentDispatchPort {
   dispatch(input: {
@@ -27,6 +37,10 @@ export interface AgentDispatchPort {
     readonly open: boolean
     readonly smartThreadRouting?: boolean
     readonly notificationDelivery?: 'off' | 'in-app' | 'system' | 'both'
+    readonly chooseContinuation: (input: {
+      readonly agent: AgentChoice
+      readonly threads: readonly AgentContinuationThread[]
+    }) => Promise<AgentContinuationSelection>
   }): Promise<AgentDispatchOutcome>
   answerReply(input: {
     readonly item: StartThreadItem

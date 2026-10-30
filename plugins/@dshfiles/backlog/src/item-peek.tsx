@@ -1,5 +1,6 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
+import { CommandDialog, CommandGroup, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -68,6 +69,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
+import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
@@ -731,7 +733,42 @@ const CommentBox = (props: {
   const [pending, setPending] = useState(false)
   const submitting = useRef(false)
   const [failed, setFailed] = useState<string | null>(null)
+  const [continuationChoice, setContinuationChoice] = useState<{ readonly agentHandle: string; readonly threads: readonly AgentContinuationThread[] } | null>(
+    null,
+  )
+  const continuationResolver = useRef<((selection: AgentContinuationSelection) => void) | null>(null)
   const attachments = useComposerFiles({ onError: setFailed })
+
+  const chooseContinuation = (input: {
+    readonly agent: { readonly handle: string }
+    readonly threads: readonly AgentContinuationThread[]
+  }): Promise<AgentContinuationSelection> =>
+    new Promise(resolve => {
+      continuationResolver.current = resolve
+      setContinuationChoice({
+        agentHandle: input.agent.handle,
+        threads: input.threads.map(thread => ({
+          ...thread,
+          title: props.threads.find(candidate => candidate.id === thread.sessionId)?.title ?? thread.title,
+        })),
+      })
+    })
+
+  const resolveContinuation = (selection: AgentContinuationSelection): void => {
+    const resolve = continuationResolver.current
+    continuationResolver.current = null
+    setContinuationChoice(null)
+    if (selection.kind === 'cancel') setFailed('Comment saved; no thread was started.')
+    resolve?.(selection)
+  }
+
+  useEffect(
+    () => () => {
+      continuationResolver.current?.({ kind: 'cancel' })
+      continuationResolver.current = null
+    },
+    [],
+  )
 
   /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
   const submit = async (submittedText: string): Promise<void> => {
@@ -761,6 +798,7 @@ const CommentBox = (props: {
                     open: props.openCreatedByDefault,
                     smartThreadRouting: props.smartThreadRouting,
                     notificationDelivery: props.threadStartNotifications,
+                    chooseContinuation,
                   }),
                 answerReply: ({ text: replyText }) => dispatch.answerReply({ item: props.item, text: replyText }),
                 smartReplyAnswers: props.smartReplyAnswers,
@@ -799,6 +837,36 @@ const CommentBox = (props: {
         pending={pending}
         onSubmit={submittedText => void submit(submittedText)}
       />
+      <CommandDialog
+        open={continuationChoice !== null}
+        onOpenChange={open => {
+          if (!open) resolveContinuation({ kind: 'cancel' })
+        }}
+        heading={`Continue @${continuationChoice?.agentHandle ?? 'agent'}?`}
+        description=" "
+      >
+        <CommandList>
+          <CommandGroup heading="Existing threads">
+            {(continuationChoice?.threads ?? []).map(thread => (
+              <CommandItem
+                key={thread.sessionId}
+                value={`${thread.title} ${thread.sessionId}`}
+                onSelect={() => resolveContinuation({ kind: 'existing', sessionId: thread.sessionId })}
+              >
+                <MessageSquareIcon aria-hidden />
+                <span className="dshx:min-w-0 dshx:truncate">{thread.title}</span>
+                <span className="dshx:ml-auto dshx:shrink-0 dshx:font-mono! dshx:text-[10px] dshx:text-muted-foreground">{thread.sessionId.slice(-6)}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="Start new">
+            <CommandItem value="new thread" onSelect={() => resolveContinuation({ kind: 'new' })}>
+              <PlusIcon aria-hidden />
+              Start a new thread
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
       {failed === null ? null : (
         <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
           {failed}
