@@ -71,6 +71,50 @@ describe('repository views cache', () => {
     expect(cache.read()).toEqual({ value: 'recovered', refreshing: false, refreshFailed: false })
   })
 
+  test('keeps the last repository view after invalidation until its replacement arrives', async () => {
+    const next = deferred<string>()
+    let reads = 0
+    const cache = createRepositoryViewsCache({
+      read: () => {
+        reads += 1
+        return reads === 1 ? Promise.resolve('before') : next.promise
+      },
+      ttlMs: 10_000,
+    })
+
+    await expect(cache.refreshAndRead()).resolves.toBe('before')
+    cache.invalidate()
+    expect(cache.read()).toEqual({ value: 'before', refreshing: true, refreshFailed: false })
+    expect(reads).toBe(2)
+    next.resolve('after')
+    await expect(cache.refreshAndRead()).resolves.toBe('after')
+    expect(cache.read()).toEqual({ value: 'after', refreshing: false, refreshFailed: false })
+  })
+
+  test('keeps an invalidated view after a failed refresh and retries after the cooldown', async () => {
+    let now = 0
+    let reads = 0
+    const cache = createRepositoryViewsCache({
+      read: () => {
+        reads += 1
+        if (reads === 1) return Promise.resolve('before')
+        if (reads === 2) return Promise.reject(new Error('scan failed'))
+        return Promise.resolve('after')
+      },
+      ttlMs: 10,
+      now: () => now,
+    })
+
+    await expect(cache.refreshAndRead()).resolves.toBe('before')
+    cache.invalidate()
+    await expect(cache.refreshAndRead()).rejects.toThrow('scan failed')
+    expect(cache.read()).toEqual({ value: 'before', refreshing: false, refreshFailed: true })
+    now = 10
+    expect(cache.read()).toEqual({ value: 'before', refreshing: true, refreshFailed: false })
+    await expect(cache.refreshAndRead()).resolves.toBe('after')
+    expect(cache.read()).toEqual({ value: 'after', refreshing: false, refreshFailed: false })
+  })
+
   test('does not publish a scan invalidated while it was running', async () => {
     const outdated = deferred<string>()
     const current = deferred<string>()

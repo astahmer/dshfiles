@@ -12,6 +12,7 @@ export const createRepositoryViewsCache = <Value>(options: { readonly read: () =
   let cached: CacheEntry<Value> | undefined
   let scan: Promise<ScanResult<Value>> | undefined
   let generation = 0
+  let invalidated = false
   let failedAt: number | undefined
 
   const startScan = () => {
@@ -28,6 +29,7 @@ export const createRepositoryViewsCache = <Value>(options: { readonly read: () =
       value => {
         if (scanGeneration === generation) {
           cached = { value, at: now() }
+          invalidated = false
           failedAt = undefined
         }
         const result: ScanResult<Value> = { ok: true, value }
@@ -51,7 +53,7 @@ export const createRepositoryViewsCache = <Value>(options: { readonly read: () =
     const currentTime = now()
     const recentFailure = failedAt !== undefined && currentTime - failedAt < options.ttlMs
     if (scan !== undefined) return { value: cached?.value, refreshing: true, refreshFailed: false }
-    if (cached !== undefined && currentTime - cached.at < options.ttlMs) {
+    if (!invalidated && cached !== undefined && currentTime - cached.at < options.ttlMs) {
       return { value: cached.value, refreshing: false, refreshFailed: recentFailure }
     }
     if (recentFailure) return { value: cached?.value, refreshing: false, refreshFailed: true }
@@ -67,7 +69,7 @@ export const createRepositoryViewsCache = <Value>(options: { readonly read: () =
 
   const invalidate = (): void => {
     generation += 1
-    cached = undefined
+    invalidated = true
     scan = undefined
     failedAt = undefined
   }
