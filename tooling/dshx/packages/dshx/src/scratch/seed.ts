@@ -114,16 +114,14 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   if (currentModelLabel.includes(modelId)) return
 
   await modelPicker.click({ timeout: Math.min(input.timeoutMs, 5_000) })
-  const modelList = input.page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  const modelList = input.page.getByRole('list', { name: 'Models and accounts', exact: true })
   const hasModelEffortPicker = (await modelList.count()) > 0
-  // The native menu names an option by its `<route>/<model>` id; model-effort-picker groups options under the account
-  // name and shows only the model id.
+  // The native menu uses the full route id; the flat account list marks its model option explicitly.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  // Each option holds its display name and model id in adjacent spans whose text runs together, so match one span.
   const routeOption = input.page
     .getByRole('menuitemradio', { name: modelId, exact: true })
-    .or(modelList.getByRole('button').filter({ has: input.page.locator('span').filter({ hasText: bareModelWord }) }))
+    .or(modelList.locator('[data-model-picker-option]').filter({ has: input.page.locator('span').filter({ hasText: bareModelWord }) }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 

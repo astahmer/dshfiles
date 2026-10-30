@@ -29,7 +29,10 @@ export class ModelPickerModel {
   }
 
   static selectionForModel = (group: Pick<ModelGroup, 'id'>, model: CatalogModel, current: ModelSelection | null): ModelSelection => {
-    const reasoningEffort = group.id === current?.provider && model.id === current.model ? current.reasoningEffort : model.reasoning?.defaultEffort
+    const keepsEffort =
+      current?.model === model.id &&
+      (current.reasoningEffort === undefined || model.reasoning?.efforts.some(effort => effort.id === current.reasoningEffort) === true)
+    const reasoningEffort = keepsEffort ? current?.reasoningEffort : model.reasoning?.defaultEffort
     return {
       provider: group.id,
       model: model.id,

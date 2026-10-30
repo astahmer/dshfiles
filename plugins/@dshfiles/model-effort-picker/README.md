@@ -1,10 +1,12 @@
 # @dshfiles/model-effort-picker
 
-![Edit the model fallback chain from the composer picker](docs/screenshots/model-fallbacks.png)
+![Flat model picker rows with account, quota, and effort cues](docs/screenshots/model-selection.png)
 
-![Enable Fast mode on an eligible Codex route](docs/screenshots/fast-mode.png)
+![Compact model details and fallback controls in the composer picker](docs/screenshots/model-fallbacks.png)
 
-Replaces the composer model control with a searchable, provider-grouped model picker. Its reasoning slider uses only the selected model’s advertised effort levels and writes through DSH’s shared per-session model directory, so the native model popup stays in sync.
+![Compact reasoning and Fast mode controls for a supported Codex model](docs/screenshots/fast-mode.png)
+
+Replaces the composer model control with a compact, flat account-and-model list, quota labels, and an on-demand details view for account switching, reasoning effort, Fast mode, and fallbacks. Selections still write through DSH’s shared per-session model directory, so the native model popup stays in sync.
 
 ## Account swap
 

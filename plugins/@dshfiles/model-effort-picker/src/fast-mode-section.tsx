@@ -36,23 +36,21 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
   }
 
   return (
-    <section
-      className="dshx:mt-3 dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-2.5"
-      data-model-fast-mode
-    >
-      <p className="dshx:text-sm dshx:font-semibold">Fast mode</p>
+    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5" data-model-fast-mode>
+      <span className="dshx:text-[10px] dshx:text-muted-foreground">Fast</span>
       <Switch
         aria-label="Fast mode; may cost more"
         checked={status.enabled}
+        className="dshx:scale-75"
         data-model-fast-mode-toggle
         disabled={disabled || pending}
         onCheckedChange={(enabled: boolean) => void update(enabled)}
       />
       {error !== null && (
-        <p className="dshx:w-full dshx:text-xs dshx:text-destructive" role="alert">
+        <p className="dshx:absolute dshx:text-[10px] dshx:text-destructive" role="alert">
           {error}
         </p>
       )}
-    </section>
+    </div>
   )
 }

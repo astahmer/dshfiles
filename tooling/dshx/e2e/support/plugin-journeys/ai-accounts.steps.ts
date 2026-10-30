@@ -2085,19 +2085,30 @@ const composerPicker = (page: Page) => page.getByRole('button', { name: /, reaso
 const fallbacks = (page: Page) => page.getByRole('region', { name: 'Fallbacks', exact: true })
 
 const pickAccountModel = async (page: Page, account: string): Promise<void> => {
-  await page
-    .getByRole('region', { name: account, exact: true })
-    .getByRole('button', { name: /gpt-6-luna/ })
-    .click()
-  await expect(page.getByRole('region', { name: account, exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute('aria-pressed', 'true')
+  const dialog = page.getByRole('dialog')
+  const accountChip = dialog.getByRole('button', { name: account, exact: true })
+  if ((await accountChip.count()) > 0) {
+    await accountChip.click()
+    await expect(accountChip).toHaveAttribute('aria-pressed', 'true')
+    return
+  }
+  const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const row = modelList
+    .locator('[data-model-picker-row]')
+    .filter({ hasText: account })
+    .filter({ hasText: /gpt-6-luna/iu })
+  await row.locator('[data-model-picker-option]').click()
+  await expect(row.locator('[data-model-picker-option]')).toHaveAttribute('aria-pressed', 'true')
+  await row.getByRole('button', { name: /Details for/iu }).click()
 }
 
 When('a new thread falls back from the first account to the third one in the composer picker', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await composerPicker(page).click()
   await pickAccountModel(page, 'Command Code 3')
-  await fallbacks(page).getByRole('button', { name: 'Add current selection', exact: true }).click()
+  await fallbacks(page).getByRole('button', { name: 'Add fallback', exact: true }).click()
   await expect(fallbacks(page).getByRole('listitem')).toHaveCount(1)
+  await page.screenshot({ path: test.info().outputPath('model-fallbacks.png') })
   await pickAccountModel(page, 'Command Code 1')
   await page.keyboard.press('Escape')
 })
@@ -2125,18 +2136,12 @@ Then('the picker offers to return the thread to its selection', async ({ page }:
   const serving = fallbacks(page).getByRole('status')
   await recordAssertion(page, 'ai-accounts-fallback-chain-moves-the-picker', async () => {
     await expect(serving).toContainText('Command Code 3')
-    await expect(page.getByRole('region', { name: 'Command Code 3', exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    await expect(composerPicker(page)).toContainText('CC3')
   })
-  await serving.getByRole('button', { name: 'Return to selection', exact: true }).click()
+  await serving.getByRole('button', { name: 'Return', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-fallback-chain-returns-to-the-selection', async () => {
     await expect(serving).toHaveCount(0)
-    await expect(page.getByRole('region', { name: 'Command Code 1', exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    await expect(page.getByLabel('Available accounts').getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
   })
   await finishJourneyAssertions(page)
 })

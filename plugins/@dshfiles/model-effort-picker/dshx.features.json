@@ -4,10 +4,11 @@
   "features": [
     {
       "id": "model-selection",
-      "title": "Search and select provider models",
-      "summary": "Search provider-grouped model catalogs in the composer, expose supported reasoning controls, and delegate context-aware route handoff to the shared selection directory.",
+      "title": "Search and select account models",
+      "summary": "Search flat account-and-model catalogs in the composer, expose compact reasoning controls, and delegate context-aware route handoff to the shared selection directory.",
       "surfaces": ["client", "host", "api", "integration"],
       "configuration": [],
+      "reach": ["seed tool-call-thread", "click button \", reasoning *\"", "expect list \"Models and accounts\""],
       "states": ["closed", "open", "searching", "empty", "handoff-check", "compacting"],
       "failureModes": [
         "A search with no catalog match shows an explicit empty state without clearing the current model or reasoning effort.",
@@ -52,21 +53,6 @@
       "id": "fast-mode",
       "title": "Enable Fast mode on supported Codex models",
       "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models. AI Accounts can enable it by default, with per-session route overrides, and adds the legacy service_tier=priority through pi-ai's supported payload hook. The composer shows a lightning icon while Fast mode is enabled.",
-      "reach": [
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a scratch session for Fast mode\"",
-        "click button \"Send message\"",
-        "expect text \"MISSING_CREDENTIAL\"",
-        "click button \"AI Accounts\"",
-        "click button \"Add account\"",
-        "click menuitem \"Codex account\"",
-        "click text \"Open a scratch session for*\"",
-        "click button \"reasoning*\"",
-        "fill textbox \"Search models and providers\" \"gpt-6-luna\"",
-        "click button \"GPT-6 Luna*\"",
-        "expect switch \"Fast mode; may cost more\"",
-        "click switch \"Fast mode; may cost more\"",
-        "expect switch \"Fast mode; may cost more\""
-      ],
       "surfaces": ["client", "host", "api"],
       "configuration": [],
       "states": ["hidden", "available", "enabled", "updating", "error"],
@@ -159,8 +145,8 @@
     {
       "id": "model-fallbacks",
       "title": "Edit the model fallback chain from the composer picker",
-      "summary": "A Fallbacks section in the composer model picker adds the current selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. AI Accounts owns the chain on the Host and walks it under Priority distribution.",
-      "reach": ["click button \", reasoning *\"", "expect region \"Fallbacks\""],
+      "summary": "A compact Fallbacks subview in the composer model picker adds the current selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. AI Accounts owns the chain on the Host and walks it under Priority distribution.",
+      "reach": ["seed tool-call-thread", "click button \", reasoning *\"", "click button \"Details for*\"", "expect region \"Fallbacks\""],
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["unavailable", "follows-default", "thread-chain", "serving-fallback"],

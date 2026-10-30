@@ -38,6 +38,22 @@ describe('model picker selection rules', () => {
       provider: 'northstar',
       model: 'spark-1',
     })
+    expect(ModelPickerModel.selectionForModel({ id: 'another-account' }, nova, currentSelection)).toEqual({
+      provider: 'another-account',
+      model: 'nova-3',
+      reasoningEffort: 'deep',
+    })
+    expect(
+      ModelPickerModel.selectionForModel(
+        { id: 'another-account' },
+        { ...nova, reasoning: { defaultEffort: 'fast', efforts: [{ id: 'fast', name: 'Fast' }] } },
+        currentSelection,
+      ),
+    ).toEqual({
+      provider: 'another-account',
+      model: 'nova-3',
+      reasoningEffort: 'fast',
+    })
     expect(ModelPickerModel.selectionForModel(northstar, nova, null)).toEqual({
       provider: 'northstar',
       model: 'nova-3',

@@ -2,7 +2,7 @@
   "name": "@dshfiles/model-effort-picker",
   "version": "0.1.0",
   "private": true,
-  "description": "Search provider-grouped model catalogs, tune reasoning effort and enable provider Fast mode where supported.",
+  "description": "Pick models across accounts, tune reasoning effort and enable Fast mode on supported routes.",
   "files": [
     "dist",
     "cordis.patch.yml"

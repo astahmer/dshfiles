@@ -234,13 +234,13 @@ describe('dshx dev scratch commands', () => {
         <button id="model-picker" aria-label="deepseek-flash, reasoning Default" onclick="document.querySelector('#models').showModal()">deepseek-flash</button>
         <dialog id="models" aria-label="Models">
           <button aria-label="${modelId}, reasoning Provider default">${modelId} · Provider default</button>
-          <div role="list" aria-label="Models grouped by provider">
-            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${modelId}, reasoning Provider default')"><span>Command Code</span><span>gpt-6-luna</span></button>
+          <div role="list" aria-label="Models and accounts">
+            <button id="route-option" data-model-picker-option="true" aria-pressed="false" onclick="this.setAttribute('aria-pressed', 'true'); document.querySelector('#model-picker').setAttribute('aria-label', '${modelId}, reasoning Provider default')"><span>Command Code</span><span>gpt-6-luna</span></button>
           </div>
         </dialog>
       `)
       await ScratchSeedRuntime.chooseFakeProviderModel({ page, timeoutMs: 1_000, modelId })
-      expect(await page.locator('#route-option').getAttribute('data-selected')).toBe('true')
+      expect(await page.locator('#route-option').getAttribute('aria-pressed')).toBe('true')
       expect(await page.locator('#models').evaluate(element => element.hasAttribute('open'))).toBe(false)
       await page.setContent(`
         <button aria-label="New thread" onclick="setTimeout(() => { document.querySelector('#composer').hidden = false }, 50)">New thread</button>
