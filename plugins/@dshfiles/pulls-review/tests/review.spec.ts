@@ -64,6 +64,11 @@ describe('reviewWorkspace', () => {
     expect(result.status === 'ok' ? result.scopes.map(scope => scope.key) : []).toEqual(['code'])
   })
 
+  it('falls back to the origin bookmark when no local base bookmark exists', async () => {
+    const result = await ReviewWorkspaceModel.review({ run: fakeRun({ revisions: ['main@origin', '@'] }), path: workspace })
+    expect(result).toMatchObject({ status: 'ok', base: 'main@origin', range: 'main@origin..@' })
+  })
+
   it('prefers an explicit base and refuses one that does not resolve', async () => {
     const explicit = await ReviewWorkspaceModel.review({ run: fakeRun({ revisions: ['release', '@'] }), path: workspace, base: 'release' })
     expect(explicit).toMatchObject({ status: 'ok', base: 'release' })
