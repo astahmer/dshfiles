@@ -405,7 +405,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
     expect(status).toMatchObject({ name: target.name, path: target.path, unlanded: [{ description: 'feat: target only' }] })
     expect(status).toEqual((await threads.list(repo)).find(thread => thread.name === target.name))
-    expect(invocations).toHaveLength(2)
+    expect(invocations).toHaveLength(3)
     expect(invocations.every(invocation => invocation.cwd === target.path && invocation.command === 'log')).toBe(true)
   })
 
@@ -422,6 +422,24 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(existsSync(thread.path)).toBe(false)
   })
 
+  it('uses main@origin for status and cleanup safety when local main is absent', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'work.txt'), 'unlanded\n')
+    jj(thread.path, 'commit', '-m', 'unlanded work')
+    const origin = join(root, 'origin.git')
+    execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' })
+    jj(repo, 'git', 'remote', 'add', 'origin', origin)
+    jj(repo, 'git', 'push', '--remote', 'origin', '--bookmark', 'main')
+    jj(repo, 'git', 'fetch', '--remote', 'origin')
+    jj(repo, 'bookmark', 'delete', 'main')
+
+    const status = await threads.status(repo, thread.name)
+    expect(status.unlanded.map(revision => revision.description)).toContain('unlanded work')
+    expect((await threads.list(repo)).find(item => item.name === thread.name)?.unlanded).toEqual(status.unlanded)
+    expect(await threads.discardMany({ repoRoot: repo, names: [thread.name], force: false })).toMatchObject({
+      results: [{ name: thread.name, status: 'has-work' }],
+    })
+  })
   it('reports a workspace that only sits behind the bookmark as behind with nothing to integrate', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(repo, 'shared.txt'), 'one\nadvanced\n')

@@ -685,14 +685,23 @@ export const createThreads = (options: {
     return commitId
   }
 
-  const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${bookmarkRevset(options.bookmark())}) ~ empty()`
+  const targetRevset = async (repoRoot: string, bookmark = options.bookmark()): Promise<string> => {
+    const local = await revisions(bookmarkRevset(bookmark), repoRoot, true)
+    if (local.length > 0) return bookmarkRevset(bookmark)
+    const remote = await revisions(`remote_bookmarks(${exactBookmarkNamePattern(bookmark)}, remote=${exactBookmarkNamePattern('origin')})`, repoRoot, true)
+    const remoteCommit = remote[0]
+    if (remote.length === 1 && remoteCommit !== undefined) return commitIdRevset(remoteCommit.commitId)
+    if (remote.length > 1) return `remote_bookmarks(${exactBookmarkNamePattern(bookmark)}, remote=${exactBookmarkNamePattern('origin')})`
+    return bookmarkRevset(bookmark)
+  }
+  const unlandedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ empty()`
   const unlandedRevsetAt = (name: string, bookmarkCommitId: string): string => `(::${name}@ ~ ::${commitIdRevset(bookmarkCommitId)}) ~ empty()`
   /**
    * Commits the bookmark has that this working copy lacks. Comparing the other way round counts the workspace's own
    * commits — including its always-present empty working copy — so a workspace that merely predates the bookmark's
    * advance looked like it held work to integrate.
    */
-  const behindRevset = (workingCopy: string): string => `(::${bookmarkRevset(options.bookmark())} ~ ::${workingCopy}) ~ empty()`
+  const behindRevset = (workingCopy: string, target: string): string => `(::${target} ~ ::${workingCopy}) ~ empty()`
 
   type RebasedStateScan =
     | { readonly status: 'not-eligible' }
@@ -801,6 +810,7 @@ export const createThreads = (options: {
     const spares = new Set(Object.values(await readSpares(repoRoot)))
     const names = listedNames.filter(name => name.length > 0 && !spares.has(name) && !inFlightSpares.has(name))
     const rebaseMetadata = await readRebaseMetadata(repoRoot)
+    const target = await targetRevset(repoRoot)
     /** Two read-only `jj` calls per thread, run with bounded parallelism: a store with dozens of thread workspaces stays responsive. */
     const statuses = new Array<ThreadStatus | undefined>(names.length)
     let next = 0
@@ -814,8 +824,8 @@ export const createThreads = (options: {
         const path = join(directory, name)
         const present = existsSync(join(path, '.jj'))
         if (!present && !name.startsWith('thread-')) continue
-        const unlanded = await revisions(unlandedRevset(name), repoRoot, true)
-        const behind = await revisions(behindRevset(`${name}@`), repoRoot, true, undefined, MAX_BEHIND_REVISIONS + 1)
+        const unlanded = await revisions(unlandedRevset(name, target), repoRoot, true)
+        const behind = await revisions(behindRevset(`${name}@`, target), repoRoot, true, undefined, MAX_BEHIND_REVISIONS + 1)
         statuses[index] = withRebaseMetadata(
           {
             name,
@@ -852,9 +862,10 @@ export const createThreads = (options: {
   const status = async (repoRoot: string, name: string): Promise<ThreadStatus> => {
     const path = join(options.threadsDirectory(repoRoot), name)
     const bookmark = options.bookmark()
+    const target = await targetRevset(path, bookmark)
     const [unlanded, behind, rebaseMetadata] = await Promise.all([
-      revisions(`(::@ ~ ::${bookmarkRevset(bookmark)}) ~ empty()`, path, true),
-      revisions(behindRevset('@'), path, true, undefined, MAX_BEHIND_REVISIONS + 1),
+      revisions(`(::@ ~ ::${target}) ~ empty()`, path, true),
+      revisions(behindRevset('@', target), path, true, undefined, MAX_BEHIND_REVISIONS + 1),
       readRebaseMetadata(repoRoot),
     ])
     const threadStatus = {
@@ -1478,9 +1489,10 @@ export const createThreads = (options: {
       const workspaceRoot = join(directory, threadName)
       // Snapshot first so edits still on disk count as work.
       if (existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
-      const work = await revisions(unlandedRevset(threadName), repoRoot, true)
+      const target = await targetRevset(repoRoot)
+      const work = await revisions(unlandedRevset(threadName, target), repoRoot, true)
       if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work }
-      const owned = await revisions(`(::${threadName}@ ~ ::${options.bookmark()}) ~ ::(working_copies() ~ ${threadName}@)`, repoRoot, true)
+      const owned = await revisions(`(::${threadName}@ ~ ::${target}) ~ ::(working_copies() ~ ${threadName}@)`, repoRoot, true)
       await jj(['--ignore-working-copy', 'workspace', 'forget', threadName], repoRoot)
       if (owned.length > 0) await jj(['--ignore-working-copy', 'abandon', ...owned.map(revision => revision.commitId)], repoRoot)
       await rm(workspaceRoot, { recursive: true, force: true })
@@ -1490,6 +1502,7 @@ export const createThreads = (options: {
   /** When each workspace's working-copy commit last changed, in epoch milliseconds, keyed by workspace name. */
   const discardMany = (input: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean }) =>
     serialized(input.repoRoot, async () => {
+      const target = await targetRevset(input.repoRoot)
       const candidates: { readonly name: string; readonly workspaceRoot: string; readonly owned: readonly ThreadRevision[] }[] = []
       const results: {
         readonly name: string
@@ -1505,12 +1518,12 @@ export const createThreads = (options: {
           if (name.includes('/') || name.startsWith('.')) throw new ThreadError('unsafe-path', `Refusing to discard workspace ${name}.`)
           const workspaceRoot = join(options.threadsDirectory(input.repoRoot), name)
           if (existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
-          const work = await revisions(unlandedRevset(name), input.repoRoot, true)
+          const work = await revisions(unlandedRevset(name, target), input.repoRoot, true)
           if (work.length > 0 && !input.force) {
             results.push({ name, status: 'has-work', revisions: work, error: null })
             continue
           }
-          const owned = await revisions(`(::${name}@ ~ ::${options.bookmark()}) ~ ::(working_copies() ~ ${name}@)`, input.repoRoot, true)
+          const owned = await revisions(`(::${name}@ ~ ::${target}) ~ ::(working_copies() ~ ${name}@)`, input.repoRoot, true)
           candidates.push({ name, workspaceRoot, owned })
         } catch (error) {
           results.push({ name, status: 'error', revisions: [], error: error instanceof Error ? error.message : String(error) })
@@ -1586,7 +1599,8 @@ export const createThreads = (options: {
       const beforeStatus = await readWorkingCopyId()
       const status = await execute(['status'], actualRoot)
       const afterStatus = await readWorkingCopyId()
-      const unlanded = await revisions(`(::@ ~ ::${options.bookmark()}) ~ empty()`, actualRoot, true).then(
+      const target = await targetRevset(realRepoRoot)
+      const unlanded = await revisions(`(::@ ~ ::${target}) ~ empty()`, actualRoot, true).then(
         value => ({ value, known: true as const }),
         () => ({ value: [], known: false as const }),
       )

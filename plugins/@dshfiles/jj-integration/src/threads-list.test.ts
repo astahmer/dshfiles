@@ -54,7 +54,7 @@ describe('threads.list', () => {
 
     expect(statuses.map(status => status.name)).toEqual(names)
     expect(statuses.every(status => status.unlanded.length === 0 && status.behind === false && status.missing === false)).toBe(true)
-    expect(listing.logReads()).toBe(names.length * 2)
+    expect(listing.logReads()).toBe(names.length * 2 + 2)
     expect(listing.maximumConcurrent()).toBeGreaterThan(1)
     expect(listing.maximumConcurrent()).toBeLessThanOrEqual(MAX_CONCURRENT_THREAD_READS)
   })
