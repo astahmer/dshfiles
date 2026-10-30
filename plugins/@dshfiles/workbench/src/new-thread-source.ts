@@ -15,7 +15,7 @@ export class NewThreadSource {
     let pending:
       | { readonly api: DockviewApi; readonly selection: NewViewSelection; readonly scopeKey: string; readonly knownTabIds: ReadonlySet<string> }
       | undefined
-    const definition: WorkbenchPanelDefinition = { id: NewThreadSource.id, title: 'New thread', component: () => null }
+    const definition: WorkbenchPanelDefinition = { id: NewThreadSource.id, title: 'New thread', component: () => null, allowMultiple: false }
     return {
       definition,
       open: (source: WorkbenchPanelDefinition, api: DockviewApi, selection: NewViewSelection = {}): boolean => {

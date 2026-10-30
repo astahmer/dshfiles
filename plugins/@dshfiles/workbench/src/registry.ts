@@ -24,7 +24,7 @@ export interface WorkbenchPanelDefinition {
   readonly tabId?: string
   /** Runtime occurrences (thread/resource tabs) are not duplicate Add-panel sources. */
   readonly hiddenFromAdd?: boolean
-  /** A reusable source may create independent view occurrences instead of moving a singleton. */
+  /** Reusable views open independent occurrences by default; set false for a singleton or launcher. */
   readonly allowMultiple?: boolean
   /** A semantic Start occurrence uses the same New tab chooser as every pane. */
   readonly newView?: boolean

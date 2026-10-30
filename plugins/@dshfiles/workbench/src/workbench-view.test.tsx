@@ -10,6 +10,8 @@ import { connectWorkbenchTabs, type WorkbenchTabsSnapshot } from './tabs.js'
 import { NewViewTabs } from './new-view.js'
 import { workbenchRegions } from './dock-regions.js'
 import { canMovePanelToRegion, nestedPanelId, nestedSurfacePath } from './nested-surfaces.js'
+import { NewThreadSource } from './new-thread-source.js'
+import { createWorkbenchTerminalSource } from './terminal-source.js'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -471,12 +473,15 @@ describe('WorkbenchView', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     fireEvent.click(screen.getByText('c', { selector: 'button span' }))
     expect(api.panels.some(panel => NewViewTabs.isChooser(panel.id))).toBe(false)
-    expect(api.getPanel('c')?.group).toBe(target)
+    expect(api.activePanel?.toJSON().params?.sourceId).toBe('c')
+    expect(api.activePanel?.group).toBe(target)
   })
 
-  it('offers an already-open reusable view and moves it into the chosen group without remounting', () => {
+  it('moves an explicitly singleton view into the chosen group without remounting', () => {
     mounts.clear()
-    const { api, view } = renderWorkbench(registryWith('a', 'b'))
+    const registry = registryWith('a', 'b')
+    registry.register({ id: 'a', title: 'a', component: DraftPanel, allowMultiple: false })
+    const { api, view } = renderWorkbench(registry)
     const target = api.getPanel('b')?.group
     const plus = view.container.querySelectorAll('.dv-tabs-and-actions-container button[aria-label="New tab"]')[1]
     if (target === undefined || plus === undefined) throw new Error('Missing target group')
@@ -499,7 +504,7 @@ describe('WorkbenchView', () => {
 
   it('routes empty-pane view choices through that pane rather than the global main router', () => {
     const registry = createWorkbenchPanelRegistry()
-    registry.register({ id: 'plugin-view', title: 'Plugin view', component: DraftPanel, showInEmptyState: true })
+    registry.register({ id: 'plugin-view', title: 'Plugin view', component: DraftPanel, showInEmptyState: true, allowMultiple: false })
     const open = vi.fn()
     render(
       <WorkbenchView registry={registry} store={createLayoutStore({ storage: memoryStorage() })} t={t} region="bottom" surface="bottom" onOpenPanel={open} />,
@@ -508,6 +513,30 @@ describe('WorkbenchView', () => {
     expect(open).toHaveBeenCalledOnce()
     expect(open.mock.calls[0]?.[0]?.id).toBe('plugin-view')
     expect(registry.hasOpenRequests()).toBe(false)
+  })
+
+  it('routes native launchers instead of mounting duplicate placeholder views', () => {
+    const registry = createWorkbenchPanelRegistry()
+    const terminal = createWorkbenchTerminalSource({ openPage: () => false, close: () => undefined }, registry)
+    const thread = NewThreadSource.create(() => undefined)
+    registry.register(terminal.definition)
+    registry.register(thread.definition)
+    const open = vi.fn()
+    render(
+      <WorkbenchView
+        registry={registry}
+        store={createLayoutStore({ storage: memoryStorage() })}
+        t={t}
+        region="bottom"
+        defaultLayout="empty"
+        onOpenPanel={open}
+      />,
+    )
+    fireEvent.click(screen.getByText('Terminal: Terminal', { selector: 'button span' }))
+    expect(open.mock.calls[0]?.[0]).toBe(terminal.definition)
+    fireEvent.click(screen.getByText('New thread', { selector: 'button span' }))
+    expect(open.mock.calls[1]?.[0]).toBe(thread.definition)
+    expect(screen.queryByText(/native terminal provider/)).toBeNull()
   })
 
   it('closes the right pane after its last tab is removed without creating a chooser', async () => {
@@ -790,9 +819,9 @@ describe('WorkbenchView', () => {
     expect(screen.getByLabelText('Choose a view')).toBeDefined()
   })
 
-  it('opens repeated plugin view occurrences and restores their source identity', async () => {
+  it('opens repeated plugin view occurrences by default and restores their source identity', async () => {
     const registry = registryWith('a')
-    registry.register({ id: 'repeatable-view', title: 'Repeatable view', component: DraftPanel, allowMultiple: true })
+    registry.register({ id: 'repeatable-view', title: 'Repeatable view', component: DraftPanel })
     const storage = memoryStorage()
     const first = renderWorkbench(registry, storage, 'bottom')
     fireEvent.click(screen.getByText('Repeatable view', { selector: 'button span' }))
@@ -804,12 +833,64 @@ describe('WorkbenchView', () => {
     expect(first.api.panels).toHaveLength(2)
     expect(first.api.panels.every(panel => panel.toJSON().params?.sourceId === 'repeatable-view')).toBe(true)
     expect(first.api.activePanel).not.toBe(one)
+    if (one === undefined || first.api.activePanel === undefined) throw new Error('Missing repeated views')
+    const two = first.api.activePanel
+    fireEvent.change(draftOf(one.id), { target: { value: 'first draft' } })
+    fireEvent.change(draftOf(two.id), { target: { value: 'second draft' } })
+    expect(draftOf(one.id).value).toBe('first draft')
+    expect(draftOf(two.id).value).toBe('second draft')
     await flushLayoutChange()
     first.view.unmount()
     const restored = renderWorkbench(registry, storage, 'bottom')
     expect(restored.api.panels).toHaveLength(2)
     expect(screen.queryByText(/missingPanel/)).toBeNull()
     for (const panel of restored.api.panels) expect(draftOf(panel.id)).toBeTruthy()
+    act(() => restored.api.getPanel(one.id)?.api.close())
+    expect(restored.api.getPanel(two.id)).toBeDefined()
+    expect(draftOf(two.id)).toBeTruthy()
+  })
+
+  it('opens a second instance in another region without moving the original', () => {
+    const registry = createWorkbenchPanelRegistry()
+    registry.register({ id: 'backlog', title: 'Backlog: Items', component: DraftPanel })
+    const storage = memoryStorage()
+    let right: DockviewApi | undefined
+    let main: DockviewApi | undefined
+    render(
+      <>
+        <WorkbenchView
+          registry={registry}
+          store={createLayoutStore({ surface: 'dock', storage })}
+          t={t}
+          region="right"
+          surface="dock"
+          onApi={api => (right = api)}
+        />
+        <WorkbenchView
+          registry={registry}
+          store={createLayoutStore({ surface: 'main', storage })}
+          t={t}
+          region="main"
+          defaultLayout="empty"
+          onApi={api => (main = api)}
+        />
+      </>,
+    )
+    if (right === undefined || main === undefined) throw new Error('Missing workbench region')
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- Preserve the narrowed API inside the callback.
+    const rightApi = right
+    act(() => {
+      rightApi.addPanel({ id: 'backlog', title: 'Backlog: Items', component: WORKBENCH_COMPONENT })
+    })
+    const mainChooser = within(document.querySelector('[data-workbench-region="main"]') ?? document.body).getByLabelText('Choose a view')
+    const original = right.activePanel
+    if (original === undefined) throw new Error('Missing original panel')
+    fireEvent.change(draftOf(original.id), { target: { value: 'preserved' } })
+    fireEvent.click(within(mainChooser).getByText('Backlog: Items', { selector: 'button span' }))
+    expect(right.getPanel(original.id)).toBe(original)
+    expect(draftOf(original.id).value).toBe('preserved')
+    expect(main.activePanel?.id).not.toBe(original.id)
+    expect(main.activePanel?.toJSON().params?.sourceId).toBe('backlog')
   })
 
   it('replaces a semantic start chooser and closes only that semantic actor', () => {

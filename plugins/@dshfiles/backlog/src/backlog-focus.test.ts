@@ -20,6 +20,18 @@ describe('backlog focus', () => {
     stop()
   })
 
+  it('lets only one mounted panel take each capture and preserves newer requests', () => {
+    BacklogFocusModel.requestCapture('first')
+    const first = BacklogFocusModel.readCapture()
+    if (first === null) throw new Error('Missing capture')
+    expect(BacklogFocusModel.takeCapture(first.id)).toEqual(first)
+    expect(BacklogFocusModel.takeCapture(first.id)).toBeNull()
+    BacklogFocusModel.requestCapture('second')
+    expect(BacklogFocusModel.takeCapture(first.id)).toBeNull()
+    expect(BacklogFocusModel.readCapture()?.text).toBe('second')
+    BacklogFocusModel.clearCapture()
+  })
+
   it('keeps the item a reference asked for until the panel takes it', () => {
     const seen: (number | null)[] = []
     const stop = BacklogFocusModel.subscribe(() => {

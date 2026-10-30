@@ -173,6 +173,10 @@ When('the right pane is opened from the main Pane options', async ({ page }: { p
   if ((await dockTab(dockRegion(page), 'Jujutsu').count()) === 0) await addRegisteredPanel(page, paneRoot(page, 'right'), 'Jujutsu')
 })
 
+When('the empty right pane is opened', async ({ page }: { page: Page }) => {
+  await setRightPaneVisible(page, true)
+})
+
 When('the right pane is closed with its own Close pane control', async ({ page }: { page: Page }) => {
   await setRightPaneVisible(page, false)
 })
@@ -444,6 +448,45 @@ const addRegisteredPanel = async (_page: Page, pane: Locator, title: string): Pr
 When('the main workbench adds the registered {string} panel', async ({ page }: { page: Page }, title: string) => {
   await addRegisteredPanel(page, mainPane(page), title)
   await expect(dockTab(mainDock(page), title)).toBeVisible()
+})
+
+When('Backlog is opened in the right and main panes', async ({ page }: { page: Page }) => {
+  await addRegisteredPanel(page, dockRegion(page), 'Backlog')
+  await addRegisteredPanel(page, mainPane(page), 'Backlog')
+})
+
+Then('both Backlog views remain open with independent drafts', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, acceptanceId(page, 'repeated-backlog-drafts'), async () => {
+    const right = dockTab(dockRegion(page), 'Backlog')
+    const main = dockTab(mainDock(page), 'Backlog')
+    await expect(right).toBeVisible()
+    await expect(main).toBeVisible()
+    const rightCapture = (await panelBodyForTab(right)).getByRole('textbox', { name: 'Capture', exact: true })
+    const mainCapture = (await panelBodyForTab(main)).getByRole('textbox', { name: 'Capture', exact: true })
+    await rightCapture.fill('Right draft')
+    await mainCapture.fill('Main draft')
+    await expect(rightCapture).toHaveValue('Right draft')
+    await expect(mainCapture).toHaveValue('Main draft')
+    await expect(page.locator('[data-slot-error]')).toHaveCount(0)
+  })
+})
+
+Then('both Backlog views restore and closing one leaves the other', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, acceptanceId(page, 'repeated-backlog-restore-close'), async () => {
+    const right = dockTab(dockRegion(page), 'Backlog')
+    const main = dockTab(mainDock(page), 'Backlog')
+    await expect(right).toBeVisible()
+    await expect(main).toBeVisible()
+    await expect((await panelBodyForTab(right)).getByRole('textbox', { name: 'Capture', exact: true })).toHaveValue('Right draft')
+    await main.click()
+    await expect((await panelBodyForTab(main)).getByRole('textbox', { name: 'Capture', exact: true })).toHaveValue('Main draft')
+    await main.getByRole('button', { name: `Close ${reusableViewName('Backlog')}`, exact: true }).click()
+    await expect(main).toHaveCount(0)
+    await expect(right).toBeVisible()
+    await expect((await panelBodyForTab(right)).getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+    await expect(page.locator('[data-slot-error]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
@@ -1549,16 +1592,20 @@ Then('the left pane content is tab controlled between fixed chrome', async ({ pa
 
 When('the real Threads view is opened through every pane chooser', async ({ page }: { page: Page }) => {
   const panes = ['main', 'right', 'bottom', 'left'] as const
+  let count = await page.getByRole('tab', { name: reusableViewName('Threads'), exact: true }).count()
   for (const target of panes) {
     const pane = page.locator(`[data-workbench-region="${target}"]`).first()
     await addRegisteredPanel(page, pane, 'Threads')
+    count += 1
     await assertTabPlusAlignment(page)
     await recordAssertion(page, acceptanceId(page, `threads-view-in-${target}`), async () => {
-      await expect(dockTab(pane, 'Threads')).toBeVisible()
-      await expect(pane.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-threads"]')).toBeVisible()
-      await expect(pane.locator('[data-slot="sidebar.workspaces"]')).toBeAttached()
-      await expect(pane.getByRole('button', { name: 'New thread', exact: true })).toBeVisible()
-      await expect(page.getByRole('tab', { name: reusableViewName('Threads'), exact: true })).toHaveCount(1)
+      const tab = dockTab(pane, 'Threads').filter({ has: page.locator('[data-workbench-tab-id^="view/dshfiles-thread-sidebar.workbench-threads/"]') })
+      await expect(tab).toBeVisible()
+      const body = await panelBodyForTab(tab)
+      await expect(body.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-threads"]')).toBeVisible()
+      await expect(body.locator('[data-slot="sidebar.workspaces"]')).toBeAttached()
+      await expect(body.getByRole('button', { name: 'New thread', exact: true })).toBeVisible()
+      await expect(page.getByRole('tab', { name: reusableViewName('Threads'), exact: true })).toHaveCount(count)
       await expect(page.locator('[data-slot-error]')).toHaveCount(0)
       if (target === 'bottom') await page.screenshot({ path: test.info().outputPath('threads-in-bottom-pane.png'), animations: 'disabled' })
     })

@@ -67,8 +67,7 @@ interface WorkbenchViewProps {
    */
   readonly acceptDroppedPanel?: (event: DockviewDndOverlayEvent) => void
   /**
-   * Where an "Add panel" or a queued open goes. The embedder routes it so a
-   * panel already shown in another region moves here instead of being duplicated.
+   * Routes singleton views and launchers through the embedder.
    */
   readonly onOpenPanel?: (definition: WorkbenchPanelDefinition, api: DockviewApi, target?: NewViewSelection) => void
   /** Renders a close control in the header, for a surface the embedder can hide. */
@@ -407,7 +406,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       if (api === null) return
       const target = selection ?? {}
       target.group?.api.setActive()
-      if (definition.allowMultiple) {
+      if (selection !== undefined && definition.allowMultiple !== false && !definition.hiddenFromAdd && definition.tabId === undefined) {
         const options = {
           id: `view/${definition.id}/${crypto.randomUUID()}`,
           component: WORKBENCH_COMPONENT,

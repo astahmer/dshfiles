@@ -43,7 +43,7 @@ it('keeps registration, passive fallback mount and layout restore free of termin
   api.fromJSON(saved)
   expect(openPage).not.toHaveBeenCalled()
   expect(source.definition.title).toBe('Terminal: Terminal')
-  expect(source.definition.allowMultiple).toBeUndefined()
+  expect(source.definition.allowMultiple).toBe(false)
 })
 
 it('admits two exact native identities synchronously into the requested groups and closes only their chooser', () => {

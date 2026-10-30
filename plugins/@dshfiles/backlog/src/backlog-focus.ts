@@ -18,12 +18,29 @@ const requestBacklogFocus = (id: number): void => {
 
 const readBacklogFocus = (): number | null => focus
 
+const takeBacklogFocus = (id: number): number | null => {
+  if (focus !== id) return null
+  focus = null
+  notify()
+  return id
+}
+
 const requestBacklogCapture = (text: string): void => {
   capture = { id: ++nextCaptureId, text }
   notify()
 }
 
 const readBacklogCapture = (): { readonly id: number; readonly text: string } | null => capture
+
+const takeBacklogCapture = (id: number): { readonly id: number; readonly text: string } | null => {
+  if (capture?.id !== id) return null
+  // Preserve the claimed request before clearing the shared slot.
+  // oxlint-disable-next-line antislop/no-passthrough-variable
+  const taken = capture
+  capture = null
+  notify()
+  return taken
+}
 
 const clearBacklogCapture = (): void => {
   if (capture === null) return
@@ -45,8 +62,10 @@ const subscribeBacklogFocus = (listener: () => void): (() => void) => {
 export class BacklogFocusModel {
   static readonly request = requestBacklogFocus
   static readonly read = readBacklogFocus
+  static readonly take = takeBacklogFocus
   static readonly requestCapture = requestBacklogCapture
   static readonly readCapture = readBacklogCapture
+  static readonly takeCapture = takeBacklogCapture
   static readonly clearCapture = clearBacklogCapture
   static readonly clear = clearBacklogFocus
   static readonly subscribe = subscribeBacklogFocus

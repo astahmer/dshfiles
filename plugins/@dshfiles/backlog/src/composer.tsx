@@ -27,13 +27,14 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
 import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
+import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { fileInput } from './composer-files.js'
@@ -57,9 +58,6 @@ export interface ComposerThread {
 type Suggestion = { readonly key: string; readonly insert: string; readonly label: ReactNode; readonly hint: string; readonly project?: string }
 type ReferenceMode = 'item' | 'thread'
 
-const draftsSchema = z.record(z.string(), z.string().max(20_000))
-const noDrafts: z.infer<typeof draftsSchema> = {}
-const drafts = createStoredValue({ key: 'dshfiles.backlog.draft.v1', schema: draftsSchema, fallback: noDrafts })
 const captureProject = createStoredValue({
   key: 'dshfiles.backlog.capture-project.v1',
   schema: z.string().max(BacklogItems.maxTargetChars).nullable(),
@@ -191,10 +189,9 @@ export const Composer = (props: {
     refetchInterval: 15_000,
     staleTime: 10_000,
   })
-  const storedDrafts = drafts.useValue()
+  const { text, setText, appendText, restoreText } = useComposerDraft(props.draftKey)
   const storedProject = captureProject.useValue()
   const reuseProject = props.reuseProject ?? true
-  const [text, setTextState] = useState(() => storedDrafts[props.draftKey] ?? '')
   const [caret, setCaret] = useState(0)
   const [failed, setFailed] = useState<string | null>(null)
   const [highlight, setHighlight] = useState(0)
@@ -215,25 +212,6 @@ export const Composer = (props: {
   const captureRef = useRef<VoiceCapture | null>(null)
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const input = props.inputRef ?? ownRef
-
-  const setText = useCallback(
-    (value: string): void => {
-      setTextState(value)
-      const next = { ...drafts.get() }
-      if (value === '') delete next[props.draftKey]
-      else next[props.draftKey] = value
-      drafts.set(next)
-    },
-    [props.draftKey],
-  )
-
-  const appendText = (chunk: string): void => {
-    setTextState(current => {
-      const next = current === '' || current.endsWith(' ') ? `${current}${chunk}` : `${current} ${chunk}`
-      drafts.set({ ...drafts.get(), [props.draftKey]: next })
-      return next
-    })
-  }
 
   useEffect(() => {
     if (props.status !== undefined && props.status !== null) setStatus(props.status)
@@ -432,7 +410,7 @@ export const Composer = (props: {
       onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
       onError: error => {
         setFailed(errorMessage(error, 'The item was not saved.'))
-        setTextState((current: string) => (current === '' ? submitted.text : current))
+        restoreText(submitted.text)
         attachments.restore(submitted.files)
         setStatus(submitted.status)
         setKind(submitted.kind)

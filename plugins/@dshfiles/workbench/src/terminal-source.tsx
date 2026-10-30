@@ -17,6 +17,7 @@ export const createWorkbenchTerminalSource = (resources: Pick<SidebarResourcePan
   const definition: WorkbenchPanelDefinition = {
     id: TERMINAL_SOURCE_ID,
     title: 'Terminal: Terminal',
+    allowMultiple: false,
     // This is a launcher, not a repeatable mounted component. Each successful
     // selection creates an independent *native* resource occurrence instead.
     component: () => (

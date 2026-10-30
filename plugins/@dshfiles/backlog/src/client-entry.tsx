@@ -24,13 +24,14 @@ import { BacklogMentionChip } from './backlog-mention-chip.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
+import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
 import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
 import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
 import './client.css'
 
-const PANEL_ID = 'dshfiles-backlog-panel'
+const PANEL_ID = 'dshfiles-backlog-panel' satisfies typeof BACKLOG_PANEL_ID
 const backlogCaptureEventSchema = z.object({ text: z.string().max(20_000) })
 
 export default defineClient({
@@ -216,10 +217,12 @@ export default defineClient({
       search: async (query, limit, signal) => BacklogViews.list(await api.list({ query, freshness: 'active', limit }, { signal })).items,
     })
     ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'backlog: @ mentions')
-    const PanelView = (): JSX.Element => (
+    const PanelView = (props: { readonly panelId?: string; readonly visible?: boolean }): JSX.Element => (
       <PluginQueryProvider>
         <AgentDispatchProvider port={dispatchPort}>
           <BacklogPanel
+            panelId={props.panelId}
+            visible={props.visible}
             startThread={startThreadPorts}
             listThreads={() => {
               const state = ctx.sessions.list.getSnapshot()

@@ -36,13 +36,12 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
 import { BoardView } from './board-view.js'
-import { BacklogFocusModel } from './backlog-focus.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
@@ -54,6 +53,7 @@ import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
 import { ItemsView } from './items-view.js'
+import { panelDraftKey } from './panel-draft.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
 import { ProjectFilterPicker } from './project-picker.js'
@@ -64,6 +64,7 @@ import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BACKLOG_TRIAGE_MUTATION_KEY, BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { usePanelRequests } from './use-panel-requests.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
@@ -401,11 +402,14 @@ const BacklogSettingsPanel = (): JSX.Element => {
 }
 
 export const BacklogPanel = (props: {
+  readonly panelId?: string | undefined
+  readonly visible?: boolean | undefined
   readonly openThread: OpenThread
   readonly listThreads: () => readonly ComposerThread[]
   readonly startThread: StartThreadPorts
   readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
 }): JSX.Element => {
+  const draftKey = panelDraftKey(props.panelId)
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
   const triagePending = useIsMutating({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY }) > 0
@@ -489,22 +493,16 @@ export const BacklogPanel = (props: {
     if (lastRevision.current !== undefined && lastRevision.current !== revision.data) void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
     lastRevision.current = revision.data
   }, [revision.data, queryClient])
-  // A conversation reference asks for one item; selecting it here is what the sidebar row cannot know.
-  const focus = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.read, () => null)
-  const pendingCapture = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.readCapture, () => null)
-  useEffect(() => {
-    if (pendingCapture === null) return
-    setCaptureRequest(pendingCapture)
-    BacklogFocusModel.clearCapture()
-  }, [pendingCapture])
-  useEffect(() => {
-    if (focus === null) return
-    setOpenId(focus)
-    setCursorId(focus)
-    setExpanded(false)
-    const timer = window.setTimeout(BacklogFocusModel.clear, 0)
-    return () => window.clearTimeout(timer)
-  }, [focus, setCursorId, setOpenId])
+  usePanelRequests({
+    draftKey,
+    visible: props.visible !== false,
+    onCapture: setCaptureRequest,
+    onFocus: itemId => {
+      setOpenId(itemId)
+      setCursorId(itemId)
+      setExpanded(false)
+    },
+  })
   const projectFilters: (string | null)[] =
     stored.projects.length > 0
       ? stored.projects.map(project => (project === '' ? null : project))
@@ -1057,8 +1055,9 @@ export const BacklogPanel = (props: {
           <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
             <div className="dshx:mx-auto dshx:max-w-4xl">
               <Composer
+                key={draftKey}
                 variant="chat"
-                draftKey="feed"
+                draftKey={draftKey}
                 placeholder="Capture a thought, a task, a bug… like sending a message"
                 tags={tags}
                 threads={threads}

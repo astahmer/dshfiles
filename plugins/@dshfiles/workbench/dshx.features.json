@@ -298,6 +298,7 @@
       "externalDependencies": [],
       "verification": [
         { "kind": "gherkin", "id": "workbench.add-a-main-panel", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.repeated-plugin-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
         { "kind": "gherkin", "id": "workbench.new-tab-chooser", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
         { "kind": "gherkin", "id": "workbench.plugin-view-names", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
         {
@@ -328,7 +329,7 @@
           "kind": "unit-test",
           "id": "workbench.repeat-plugin-view",
           "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
-          "testName": "opens repeated plugin view occurrences and restores their source identity"
+          "testName": "opens repeated plugin view occurrences by default and restores their source identity"
         },
         {
           "kind": "unit-test",

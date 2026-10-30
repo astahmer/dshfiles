@@ -29,6 +29,16 @@ Feature: Workbench layouts
     When the editor plugin is enabled again
     Then the Editor tab shows the editor again
 
+  @scenario:workbench.repeated-plugin-views
+  Scenario: The same Backlog view opens independently in two panes
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/backlog" is booted
+    When the unified Workbench is ready
+    And the empty right pane is opened
+    And Backlog is opened in the right and main panes
+    Then both Backlog views remain open with independent drafts
+    When the Workbench main page is reloaded
+    Then both Backlog views restore and closing one leaves the other
+
   @scenario:workbench.surface-layouts
   Scenario: The right pane keeps a layout apart from the main Workbench
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/editor, @dshfiles/jujutsu" is booted

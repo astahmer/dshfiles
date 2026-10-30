@@ -27,6 +27,7 @@ import { workbenchPanels, NativeAsideOwners, type WORKBENCH_MAIN_PANEL_ID, type 
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
+import { panelMainTarget } from './panel-main-target.js'
 import { createTabPanelAdapter } from './tab-panels.js'
 import { createSemanticPanelOpener } from './semantic-panel-opener.js'
 import { createResettableAsidePlacement, WorkbenchReset } from './reset-layout.js'
@@ -494,7 +495,7 @@ export default defineClient({
     }
 
     const moveToMainView = (api: DockviewApi, panelId: string): void => {
-      const target = registry.get(panelId)?.mainPanelId
+      const target = panelMainTarget({ panel: api.getPanel(panelId), registry })
       if (target === undefined || !isMainPanelId(target)) return
       api.getPanel(panelId)?.api.close()
       ctx.layout.selectPanel(target)
@@ -777,7 +778,7 @@ export default defineClient({
       const api = props.api
       const active = api?.activePanel
       const movable =
-        active === undefined ? [] : [{ definition: { title: active.title, mainPanelId: registry.get(active.id)?.mainPanelId }, panelId: active.id }]
+        active === undefined ? [] : [{ definition: { title: active.title, mainPanelId: panelMainTarget({ panel: active, registry }) }, panelId: active.id }]
       if (api === null || movable.length === 0) return null
       const destinations = (['left', 'right', 'bottom', 'main'] as const).filter(destination => destination !== props.from)
       // One flat list: a submenu per panel costs a hover for a choice that is
