@@ -83,7 +83,7 @@ Then('the Backlog capture composer opens with {string}', async ({ page }: { page
     await expect(dialog).not.toBeVisible()
     const capture = page.getByRole('textbox', { name: 'Capture' })
     await expect(capture).toBeVisible()
-    await expect(capture).toHaveValue(text)
+    await expect(capture).toHaveText(text)
     await expect(page.getByRole('button', { name: 'Add a file or a reference' })).toBeVisible()
   })
   await finishJourneyAssertions(page)
