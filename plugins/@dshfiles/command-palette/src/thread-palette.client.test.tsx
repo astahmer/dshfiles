@@ -391,6 +391,40 @@ describe('Threads tab project scope', () => {
     expect(result.textContent).toContain('useful excerpt')
   })
 
+  it('does not render native content hits that are not in the top-level thread list', async () => {
+    let releaseSearch: ((hits: readonly { readonly sessionId: string; readonly snippet: string }[]) => void) | undefined
+    const searchContent = vi.fn(
+      () =>
+        new Promise<readonly { readonly sessionId: string; readonly snippet: string }[]>(resolve => {
+          releaseSearch = resolve
+        }),
+    )
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[{ id: 'session-parent', title: 'Parent thread', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={searchContent}
+        onBacklogCapture={vi.fn()}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#subagent-only' } })
+
+    await screen.findByText(copy.contentSearching, { exact: true })
+    if (releaseSearch === undefined) throw new Error('Native content search did not start')
+    releaseSearch([{ sessionId: 'session-subagent', snippet: 'subagent-only excerpt' }])
+    await screen.findByText(copy.empty, { exact: true })
+    expect(searchContent).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('subagent-only excerpt')).toBeNull()
+  })
+
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(

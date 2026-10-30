@@ -94,6 +94,12 @@
           "id": "command-palette.content-search-metadata",
           "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
           "testName": "shows content-hit metadata without repeating a title used as the snippet prefix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.content-search-native-subagents",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "does not render native content hits that are not in the top-level thread list"
         }
       ],
       "telemetry": [
