@@ -44,6 +44,7 @@ import { BackfillDialog } from './backfill-dialog.js'
 import { BoardView } from './board-view.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
+import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { FeedView } from './feed-view.js'
 import type { BacklogSort } from './backlog-sort.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
@@ -466,7 +467,7 @@ export const BacklogPanel = (props: {
   const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
   const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
-  const captureComposer = useRef<HTMLTextAreaElement>(null)
+  const captureComposer = useRef<BacklogImageEditorHandle | null>(null)
   const panelRoot = useRef<HTMLElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
@@ -630,8 +631,8 @@ export const BacklogPanel = (props: {
 
   const navigateToNearestItem = (): boolean => {
     const root = panelRoot.current
-    const composer = captureComposer.current
-    if (root === null || composer === null) return false
+    const composer = captureComposer.current?.element()
+    if (root === null || composer === null || composer === undefined) return false
     const composerTop = composer.getBoundingClientRect().top
     const nearest = Array.from(root.querySelectorAll<HTMLElement>('[data-backlog-item-id]'))
       .map(element => {

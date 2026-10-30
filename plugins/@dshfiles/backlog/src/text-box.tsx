@@ -4,13 +4,12 @@ import { CornerDownLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 
-import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { AttachFilesButton, AttachmentTray, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { BacklogImageEditor } from './image-reference-editor.js'
+import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { InlineCompletion } from './inline-completion.js'
-import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
-import { ImageReferenceOverlay } from './image-reference-overlay.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
-import { replyTextAtSubmit } from './reply-input.js'
 import { serializeProjectReferenceDraft } from './project-reference-draft.js'
 
 export type ComposerFiles = ReturnType<typeof useComposerFiles>
@@ -43,8 +42,7 @@ export const BacklogTextBox = (props: {
   const [highlight, setHighlight] = useState(0)
   const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const input = useRef<HTMLTextAreaElement>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
+  const input = useRef<BacklogImageEditorHandle | null>(null)
   const completion = useMentionCompletion({
     text: props.value,
     caret,
@@ -57,26 +55,12 @@ export const BacklogTextBox = (props: {
   const addFiles = async (files: readonly File[]): Promise<void> => {
     const result = await props.attachments.add(files)
     if (result.added.length === 0) return
-    const element = input.current
-    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
-      text: element?.value ?? props.value,
-      start: element?.selectionStart ?? props.value.length,
-      end: element?.selectionEnd ?? props.value.length,
-      files: result.added,
-      firstImageNumber: result.firstImageNumber,
-    })
-    if (insertion.text === (element?.value ?? props.value)) return
-    props.onChange(insertion.text)
-    setCaret(insertion.caret)
-    requestAnimationFrame(() => {
-      element?.focus()
-      element?.setSelectionRange(insertion.caret, insertion.caret)
-    })
+    input.current?.insertImageReferences(result.added, result.firstImageNumber)
   }
   const drop = useFileDrop({ onFiles: files => void addFiles(files) })
   const reply = props.variant === 'reply'
   const inputClass = cn(
-    'dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
+    'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:bg-transparent dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
     reply
       ? 'dshx:max-h-40 dshx:min-h-10 dshx:text-[13px]'
       : 'dshx:min-h-28 dshx:rounded-lg dshx:border dshx:border-input dshx:p-2.5 dshx:text-[13px] dshx:leading-relaxed',
@@ -91,17 +75,16 @@ export const BacklogTextBox = (props: {
   const pick = (suggestion: MentionSuggestion): void => {
     if (completion.token === null) return
     const { text: next, caret: position } = InlineCompletion.applyPick({ text: props.value, token: completion.token, insert: suggestion.insert })
+    const inserted = next.slice(completion.token.start, next.length - props.value.slice(completion.token.end).length)
+    input.current?.replaceRange(completion.token.start, completion.token.end, inserted)
     props.onChange(next)
     setCaret(position)
     setDismissed(true)
-    requestAnimationFrame(() => {
-      input.current?.focus()
-      input.current?.setSelectionRange(position, position)
-    })
+    requestAnimationFrame(() => input.current?.setCaret(position))
   }
 
   const submit = (): void => {
-    const text = reply ? replyTextAtSubmit(input.current, props.value) : props.value
+    const text = input.current?.getMarkdownText() ?? props.value
     props.onSubmit?.(serializeProjectReferenceDraft(text, props.projects ?? []))
   }
 
@@ -129,80 +112,64 @@ export const BacklogTextBox = (props: {
         onHover={setHighlight}
       />
       <AttachmentTray files={props.attachments.files} onRemove={props.attachments.remove} />
-      <div className="dshx:relative">
-        {props.value === '' ? null : (
-          <ImageReferenceOverlay text={props.value} files={props.attachments.files} className={inputClass} overlayRef={overlayRef} />
-        )}
-        <textarea
-          ref={input}
-          aria-label={props.ariaLabel}
-          autoFocus={props.autoFocus}
-          rows={reply ? 1 : 3}
-          value={props.value}
-          placeholder={props.placeholder}
-          onPaste={event => pasteFiles(event, files => void addFiles(files))}
-          onChange={event => {
-            props.onChange(event.currentTarget.value)
-            setCaret(event.currentTarget.selectionStart)
-          }}
-          onSelect={event => setCaret(event.currentTarget.selectionStart)}
-          onFocus={props.onFocus}
-          onKeyDown={event => {
-            if (rows.length > 0) {
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault()
-                setNavigated(true)
-                setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length)
-                return
-              }
-              // A reply completes an open mention on Enter too: sending `@rev` half-typed would dispatch nothing.
-              if (event.key === 'Tab' || (event.key === 'Enter' && (navigated || reply))) {
-                const chosen = rows[highlight]
-                if (chosen !== undefined) {
-                  event.preventDefault()
-                  pick(chosen)
-                  return
-                }
-              }
-            }
-            if (event.key === 'Escape') {
-              if (rows.length > 0) {
-                setDismissed(true)
-                return
-              }
-              props.onCancel?.()
+      <BacklogImageEditor
+        ref={input}
+        ariaLabel={props.ariaLabel}
+        autoFocus={props.autoFocus}
+        value={props.value}
+        files={props.attachments.files}
+        placeholder={props.placeholder}
+        placeholderClassName={reply ? '' : 'dshx:p-2.5'}
+        className={inputClass}
+        onChange={props.onChange}
+        onCaretChange={setCaret}
+        onPasteFiles={files => void addFiles(files)}
+        onFocus={props.onFocus}
+        onKeyDown={event => {
+          if (rows.length > 0) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              setNavigated(true)
+              setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length)
               return
             }
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) {
-              const continuation = continueMarkdownList({
-                text: props.value,
-                start: event.currentTarget.selectionStart,
-                end: event.currentTarget.selectionEnd,
-              })
-              if (continuation !== null) {
+            // A reply completes an open mention on Enter too: sending `@rev` half-typed would dispatch nothing.
+            if (event.key === 'Tab' || (event.key === 'Enter' && (navigated || reply))) {
+              const chosen = rows[highlight]
+              if (chosen !== undefined) {
                 event.preventDefault()
-                props.onChange(continuation.value)
-                setCaret(continuation.caret)
-                requestAnimationFrame(() => {
-                  input.current?.setSelectionRange(continuation.caret, continuation.caret)
-                })
+                pick(chosen)
                 return
               }
-              if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) return
             }
-            if (event.shiftKey) return
-            event.preventDefault()
-            submit()
-          }}
-          className={cn(inputClass, props.value !== '' && 'dshx:relative dshx:z-10 dshx:text-transparent dshx:caret-foreground')}
-          onScroll={event => {
-            if (overlayRef.current === null) return
-            overlayRef.current.scrollTop = event.currentTarget.scrollTop
-            overlayRef.current.scrollLeft = event.currentTarget.scrollLeft
-          }}
-        />
-      </div>
+          }
+          if (event.key === 'Escape') {
+            if (rows.length > 0) {
+              setDismissed(true)
+              return
+            }
+            props.onCancel?.()
+            return
+          }
+          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+          if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) {
+            const range = input.current?.getSelectionRange() ?? { start: caret, end: caret }
+            const continuation = continueMarkdownList({ text: input.current?.getText() ?? props.value, ...range })
+            if (continuation !== null) {
+              event.preventDefault()
+              input.current?.replaceText(continuation.value)
+              props.onChange(continuation.value)
+              setCaret(continuation.caret)
+              requestAnimationFrame(() => input.current?.setCaret(continuation.caret))
+              return
+            }
+            if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) return
+          }
+          if (event.shiftKey) return
+          event.preventDefault()
+          submit()
+        }}
+      />
       {props.children}
       {reply ? (
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">

@@ -27,17 +27,17 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
-import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { AttachmentTray, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
-import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
-import { ImageReferenceOverlay } from './image-reference-overlay.js'
+import { BacklogImageEditor } from './image-reference-editor.js'
+import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { fileInput } from './composer-files.js'
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
@@ -177,7 +177,7 @@ export const Composer = (props: {
   readonly status?: BacklogStatus | null
   readonly onClearStatus?: () => void
   readonly onNavigateUp?: () => boolean
-  readonly inputRef?: RefObject<HTMLTextAreaElement>
+  readonly inputRef?: MutableRefObject<BacklogImageEditorHandle | null>
   readonly variant: 'chat' | 'compact'
   readonly autoFocus?: boolean
   readonly captureRequest?: { readonly id: number; readonly text: string }
@@ -208,8 +208,7 @@ export const Composer = (props: {
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
-  const ownRef = useRef<HTMLTextAreaElement>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
+  const ownRef = useRef<BacklogImageEditorHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const captureRef = useRef<VoiceCapture | null>(null)
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -225,7 +224,7 @@ export const Composer = (props: {
     setText(request.text)
     requestAnimationFrame(() => {
       input.current?.focus()
-      input.current?.setSelectionRange(request.text.length, request.text.length)
+      input.current?.setCaret(request.text.length)
       setCaret(request.text.length)
     })
   }, [input, props.captureRequest, setText])
@@ -276,11 +275,12 @@ export const Composer = (props: {
       if (projectCommand === null) return
       const next = BacklogProjectCommand.strip(text, projectCommand)
       setNavigated(false)
+      input.current?.replaceText(next)
       setText(next)
       setProject(suggestion.project)
       requestAnimationFrame(() => {
         input.current?.focus()
-        input.current?.setSelectionRange(next.length, next.length)
+        input.current?.setCaret(next.length)
         setCaret(next.length)
       })
       return
@@ -291,42 +291,26 @@ export const Composer = (props: {
     setText(next)
     requestAnimationFrame(() => {
       input.current?.focus()
-      input.current?.setSelectionRange(position, position)
+      input.current?.setCaret(position)
       setCaret(position)
     })
   }
 
   const insert = (value: string): void => {
-    const element = input.current
-    const start = element?.selectionStart ?? text.length
-    const end = element?.selectionEnd ?? text.length
-    const next = `${text.slice(0, start)}${value}${text.slice(end)}`
+    const range = input.current?.getSelectionRange() ?? { start: text.length, end: text.length }
+    const next = `${text.slice(0, range.start)}${value}${text.slice(range.end)}`
+    input.current?.replaceRange(range.start, range.end, value)
     setText(next)
     requestAnimationFrame(() => {
-      element?.focus()
-      element?.setSelectionRange(start + value.length, start + value.length)
-      setCaret(start + value.length)
+      input.current?.setCaret(range.start + value.length)
+      setCaret(range.start + value.length)
     })
   }
 
   const addFiles = async (files: readonly File[]): Promise<void> => {
     const result = await attachments.add(files)
     if (result.added.length === 0) return
-    const element = input.current
-    const insertion = ImageAttachmentReferenceModel.insertImageReferences({
-      text: element?.value ?? text,
-      start: element?.selectionStart ?? text.length,
-      end: element?.selectionEnd ?? text.length,
-      files: result.added,
-      firstImageNumber: result.firstImageNumber,
-    })
-    if (insertion.text === (element?.value ?? text)) return
-    setText(insertion.text)
-    setCaret(insertion.caret)
-    requestAnimationFrame(() => {
-      element?.focus()
-      element?.setSelectionRange(insertion.caret, insertion.caret)
-    })
+    input.current?.insertImageReferences(result.added, result.firstImageNumber)
   }
   const drop = useFileDrop({ onFiles: files => void addFiles(files) })
   const addFromPicker = (): void => fileInputRef.current?.click()
@@ -388,7 +372,14 @@ export const Composer = (props: {
 
   const submit = (): void => {
     if (text.trim() === '' && attachments.files.length === 0) return
-    const submitted = { text, files: attachments.files, status, kind, project }
+    const submitted = {
+      text: input.current?.getText() ?? text,
+      markdownText: input.current?.getMarkdownText() ?? text,
+      files: attachments.files,
+      status,
+      kind,
+      project,
+    }
     setText('')
     attachments.clear()
     setKind(null)
@@ -397,10 +388,7 @@ export const Composer = (props: {
     setStatus('inbox')
     setFailed(null)
     props.onClearStatus?.()
-    const serializedText = serializeProjectReferenceDraft(
-      ImageAttachmentReferenceModel.markdownImageReferences(submitted.text, submitted.files),
-      props.projects,
-    )
+    const serializedText = serializeProjectReferenceDraft(submitted.markdownText, props.projects)
     const payload: Parameters<typeof api.capture>[0] = {
       text: serializedText.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : serializedText,
     }
@@ -426,7 +414,7 @@ export const Composer = (props: {
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true
   const inputClass = cn(
-    'dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
+    'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
     chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]',
   )
   const voiceTitle = (() => {
@@ -471,75 +459,62 @@ export const Composer = (props: {
         }}
       />
 
-      <div className="dshx:relative">
-        {text === '' ? null : <ImageReferenceOverlay text={text} files={attachments.files} className={inputClass} overlayRef={overlayRef} />}
-        <textarea
-          ref={input}
-          aria-label="Capture"
-          rows={3}
-          autoFocus={props.autoFocus}
-          placeholder={props.placeholder}
-          value={text}
-          onPaste={event => pasteFiles(event, files => void addFiles(files))}
-          onChange={event => {
-            setText(event.currentTarget.value)
-            setCaret(event.currentTarget.selectionStart)
-          }}
-          onSelect={event => setCaret(event.currentTarget.selectionStart)}
-          onKeyDown={event => {
-            if (suggestions.length > 0) {
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      <BacklogImageEditor
+        ref={input}
+        ariaLabel="Capture"
+        className={cn(inputClass, chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-[13px]')}
+        value={text}
+        files={attachments.files}
+        placeholder={props.placeholder}
+        autoFocus={props.autoFocus}
+        onChange={setText}
+        onCaretChange={setCaret}
+        onPasteFiles={files => void addFiles(files)}
+        onKeyDown={event => {
+          if (suggestions.length > 0) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              setNavigated(true)
+              setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
+              return
+            }
+            // Project suggestions are the command's direct result, so Enter picks the highlighted project without first navigating.
+            // Other inline suggestions keep Enter-to-send unless the user has moved the highlight.
+            if (event.key === 'Tab' || (event.key === 'Enter' && BacklogProjectCommand.picksOnEnter(projectCommand, navigated))) {
+              const chosen = suggestions[highlight]
+              if (chosen !== undefined) {
                 event.preventDefault()
-                setNavigated(true)
-                setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
+                pick(chosen)
                 return
               }
-              // Project suggestions are the command's direct result, so Enter picks the highlighted project without first navigating.
-              // Other inline suggestions keep Enter-to-send unless the user has moved the highlight.
-              if (event.key === 'Tab' || (event.key === 'Enter' && BacklogProjectCommand.picksOnEnter(projectCommand, navigated))) {
-                const chosen = suggestions[highlight]
-                if (chosen !== undefined) {
-                  event.preventDefault()
-                  pick(chosen)
-                  return
-                }
-              }
             }
-            if (event.key === 'ArrowUp' && text === '' && props.onNavigateUp?.()) {
-              event.preventDefault()
-              return
-            }
-            if (event.key === 'Escape') {
-              event.currentTarget.blur()
-              return
-            }
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            if (event.shiftKey) {
-              const continuation = continueMarkdownList({
-                text,
-                start: event.currentTarget.selectionStart,
-                end: event.currentTarget.selectionEnd,
-              })
-              if (continuation === null) return
-              event.preventDefault()
-              setText(continuation.value)
-              requestAnimationFrame(() => {
-                input.current?.setSelectionRange(continuation.caret, continuation.caret)
-                setCaret(continuation.caret)
-              })
-              return
-            }
+          }
+          if (event.key === 'ArrowUp' && text === '' && props.onNavigateUp?.()) {
             event.preventDefault()
-            submit()
-          }}
-          className={cn(inputClass, text !== '' && 'dshx:relative dshx:z-10 dshx:text-transparent dshx:caret-foreground')}
-          onScroll={event => {
-            if (overlayRef.current === null) return
-            overlayRef.current.scrollTop = event.currentTarget.scrollTop
-            overlayRef.current.scrollLeft = event.currentTarget.scrollLeft
-          }}
-        />
-      </div>
+            return
+          }
+          if (event.key === 'Escape') {
+            input.current?.element()?.blur()
+            return
+          }
+          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+          if (event.shiftKey) {
+            const range = input.current?.getSelectionRange() ?? { start: caret, end: caret }
+            const continuation = continueMarkdownList({ text, ...range })
+            if (continuation === null) return
+            event.preventDefault()
+            input.current?.replaceText(continuation.value)
+            setText(continuation.value)
+            requestAnimationFrame(() => {
+              input.current?.setCaret(continuation.caret)
+              setCaret(continuation.caret)
+            })
+            return
+          }
+          event.preventDefault()
+          submit()
+        }}
+      />
 
       {failed !== null ? (
         <p role="alert" className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">

@@ -189,7 +189,7 @@ When('{string} is captured', async ({ page }: { page: Page }, text: string) => {
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.fill(text)
   await capture.press('Enter')
-  await expect(capture).toHaveValue('')
+  await expect(capture).toHaveText('')
   await StartupDialogs.dismissProviderSetupIfShown(page)
   await expect(feed(page)).toContainText(text.replace(/^\w+:\s*/, '').replace(/(\s+#[\w-]+)+$/, ''))
 })
@@ -738,7 +738,7 @@ When('an item with linked title and description is captured', async ({ page }: {
   const description = 'Read [description](https://example.org/description) https://example.org'
   await capture.fill(`${title}\n${description}`)
   await capture.press('Enter')
-  await expect(capture).toHaveValue('')
+  await expect(capture).toHaveText('')
   await expect(row(page, 'Open')).toBeVisible()
 })
 
@@ -1257,7 +1257,7 @@ When('an item with a deterministic fake triage proposal is captured', async ({ p
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.fill('[[answer {"confidence":0.99,"title":"Automatic triage proposal"}]]')
   await capture.press('Enter')
-  await expect(capture).toHaveValue('')
+  await expect(capture).toHaveText('')
 })
 
 Then('automatic triage applies the fake model title to the item', async ({ page }: { page: Page }) => {
@@ -1314,7 +1314,7 @@ When('the backlog item mention is picked', async ({ page }: { page: Page }) => {
 
 Then('the comment box contains {string}', async ({ page }: { page: Page }, value: string) => {
   await recordAssertion(page, 'backlog-mentions-inserted', async () => {
-    await expect(peek(page).getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(value)
+    await expect(peek(page).getByRole('textbox', { name: 'Comment', exact: true })).toHaveText(value)
   })
   await finishJourneyAssertions(page)
 })

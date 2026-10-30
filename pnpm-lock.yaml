@@ -356,6 +356,15 @@ catalogs:
     '@hono/node-server':
       specifier: 2.1.5
       version: 2.1.5
+    '@lexical/history':
+      specifier: 0.49.0
+      version: 0.49.0
+    '@lexical/plain-text':
+      specifier: 0.49.0
+      version: 0.49.0
+    '@lexical/text':
+      specifier: 0.49.0
+      version: 0.49.0
     '@modelcontextprotocol/sdk':
       specifier: 1.32.2
       version: 1.32.2
@@ -416,6 +425,9 @@ catalogs:
     jsdom:
       specifier: 26.1.0
       version: 26.1.0
+    lexical:
+      specifier: 0.49.0
+      version: 0.49.0
     oxfmt:
       specifier: 0.71.0
       version: 0.71.0
@@ -1605,6 +1617,12 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session-persistence@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-timeout@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-storage-domain@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-storage@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-typert-protocol@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
+      '@lexical/history':
+        specifier: 'catalog:'
+        version: 0.49.0(typescript@7.0.2)
+      '@lexical/plain-text':
+        specifier: 'catalog:'
+        version: 0.49.0(typescript@7.0.2)
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -1617,6 +1635,9 @@ importers:
       jsdom:
         specifier: 26.1.0
         version: 26.1.0
+      lexical:
+        specifier: 'catalog:'
+        version: 0.49.0(typescript@7.0.2)
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -4841,13 +4862,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@lexical/history':
-        specifier: 0.49.0
+        specifier: 'catalog:'
         version: 0.49.0(typescript@7.0.2)
       '@lexical/plain-text':
-        specifier: 0.49.0
+        specifier: 'catalog:'
         version: 0.49.0(typescript@7.0.2)
       '@lexical/text':
-        specifier: 0.49.0
+        specifier: 'catalog:'
         version: 0.49.0(typescript@7.0.2)
       '@lexical/utils':
         specifier: 0.49.0
@@ -4868,7 +4889,7 @@ importers:
         specifier: 'catalog:'
         version: 26.1.0
       lexical:
-        specifier: 0.49.0
+        specifier: 'catalog:'
         version: 0.49.0(typescript@7.0.2)
       react:
         specifier: 'catalog:'

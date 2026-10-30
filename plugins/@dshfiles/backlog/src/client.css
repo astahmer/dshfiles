@@ -5,6 +5,19 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+[data-dshfiles-image-reference] {
+  display: inline-flex;
+  align-items: baseline;
+  user-select: none;
+  font-weight: 500;
+}
+
+[data-dshfiles-image-reference][data-invalid='true'] {
+  color: var(--dsw-alias-state-error-primary);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 [data-dshfiles-backlog-reference] {
   cursor: pointer;
   text-decoration: underline;
