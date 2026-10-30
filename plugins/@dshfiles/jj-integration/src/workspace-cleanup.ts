@@ -24,7 +24,8 @@ export interface CleanupThread {
   readonly sessionIds: readonly string[]
   readonly integrationQueued: boolean
   readonly secondary?: boolean
-  readonly workingCopyState?: 'clean' | 'dirty' | 'unknown'
+  readonly missing?: boolean
+  readonly workingCopyState?: 'clean' | 'dirty' | 'unknown' | 'missing'
   /** Every timestamp that says the workspace was used: its working-copy commit, its creation, its lands. */
   readonly usedAt: readonly (number | undefined)[]
 }
@@ -51,7 +52,7 @@ const decide = (input: {
   const usedAt = lastUsedAt(thread)
   const skip = (reason: CleanupSkipReason): CleanupDecision => ({ action: 'skip', reason, lastUsedAt: usedAt })
   if (thread.secondary === true && thread.workingCopyState === 'dirty') return skip('working-copy-dirty')
-  if (thread.secondary === true && thread.workingCopyState !== 'clean') return skip('workspace-state-unknown')
+  if (thread.secondary === true && thread.workingCopyState !== 'clean' && thread.workingCopyState !== 'missing') return skip('workspace-state-unknown')
   if (thread.secondary === true && usedAt === 0) return skip('workspace-state-unknown')
   if (thread.unlandedCount > 0) return skip('has-work')
   if (thread.integrationQueued) return skip('queued')

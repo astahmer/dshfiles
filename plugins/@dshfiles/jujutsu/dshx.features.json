@@ -584,7 +584,7 @@
     {
       "id": "workspace-cleanup",
       "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Other JJ workspaces remain manual-only and require explicit selection.",
+      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Other JJ workspaces remain manual-only and require explicit selection.",
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
@@ -606,7 +606,7 @@
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
         "A Host restart drops the trail with the job; what it already removed stays removed.",
         "Other JJ workspaces are manual-only and opt-in; automatic cleanup never includes them.",
-        "A workspace with uncommitted changes, unverifiable state, unknown last-use time, or a nested JJ workspace stays.",
+        "A workspace with uncommitted changes, unverifiable state, unknown last-use time, or a nested JJ workspace stays. Missing checkout folders are visibly marked; unlanded work remains protected, and a secondary path recreated after preview is never deleted.",
         "If the Host cannot enumerate Sessions to verify secondary workspace activity, cleanup preview fails closed.",
         "Normal jj status can snapshot unsnapshotted changes into the workspace working-copy revision while preserving their files."
       ],

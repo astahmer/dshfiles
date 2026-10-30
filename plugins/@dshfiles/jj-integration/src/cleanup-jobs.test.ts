@@ -12,6 +12,7 @@ const result = (input: { readonly workspaces: number; readonly untracked?: numbe
     path: `/work/sample-threads/thread-${String(index).padStart(6, '0')}`,
     kind: 'empty' as const,
     lastUsedAt: 1,
+    missing: false,
     outcome: 'removed' as const,
   })),
   skipped: [],

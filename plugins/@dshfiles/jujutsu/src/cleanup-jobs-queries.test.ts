@@ -55,9 +55,9 @@ describe('CleanupJobTrailModel.summary', () => {
       result: {
         applied: true,
         workspaces: [
-          { repoRoot: '/work/sample', name: 'thread-aaaaaa', path: '/t/a', kind: 'empty', lastUsedAt: 1, outcome: 'removed' },
-          { repoRoot: '/work/sample', name: 'thread-bbbbbb', path: '/t/b', kind: 'empty', lastUsedAt: 1, outcome: 'removed' },
-          { repoRoot: '/work/sample', name: 'thread-cccccc', path: '/t/c', kind: 'empty', lastUsedAt: 1, outcome: 'failed', message: 'busy' },
+          { repoRoot: '/work/sample', name: 'thread-aaaaaa', path: '/t/a', kind: 'empty', lastUsedAt: 1, missing: false, outcome: 'removed' },
+          { repoRoot: '/work/sample', name: 'thread-bbbbbb', path: '/t/b', kind: 'empty', lastUsedAt: 1, missing: false, outcome: 'removed' },
+          { repoRoot: '/work/sample', name: 'thread-cccccc', path: '/t/c', kind: 'empty', lastUsedAt: 1, missing: false, outcome: 'failed', message: 'busy' },
         ],
         skipped: [],
         untracked: [{ repoRoot: '/work/sample', name: 'stray.log', path: '/t/stray.log', modifiedAt: 1, outcome: 'removed' }],

@@ -85,6 +85,7 @@ describe('SettleCleanupModel', () => {
           path: `/t/${target.name}`,
           kind: 'integrated',
           lastUsedAt: 0,
+          missing: false,
           outcome: 'removed',
         })),
         skipped: [],

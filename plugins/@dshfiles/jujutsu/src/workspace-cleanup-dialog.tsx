@@ -39,6 +39,7 @@ interface CleanupRow {
   readonly key: string
   readonly target: CleanupTarget
   readonly at: number
+  readonly missing: boolean
 }
 
 const cleanupRows = (result: CleanupResult): CleanupRow[] => [
@@ -46,11 +47,13 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
     key: JSON.stringify([workspace.repoRoot, workspace.name, workspace.kind]),
     target: { repoRoot: workspace.repoRoot, name: workspace.name, kind: workspace.kind },
     at: workspace.lastUsedAt,
+    missing: workspace.missing,
   })),
   ...result.untracked.map(entry => ({
     key: JSON.stringify([entry.repoRoot, entry.name, 'untracked']),
     target: { repoRoot: entry.repoRoot, name: entry.name, kind: 'untracked' as const },
     at: entry.modifiedAt,
+    missing: false,
   })),
 ]
 
@@ -228,6 +231,7 @@ export const WorkspaceCleanupDialog = (props: {
                           onCheckedChange={checkedValue => toggleRow(row, checkedValue === true)}
                         />
                         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{row.target.name}</span>
+                        {row.missing && <span className="dshx:shrink-0 dshx:text-xs dshx:text-warning">Folder missing</span>}
                         <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatAge(row.at)}</span>
                       </li>
                     ))}
@@ -252,7 +256,11 @@ export const WorkspaceCleanupDialog = (props: {
           )}
         </div>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-5 dshx:py-4">
-          <span className="dshx:text-xs dshx:text-muted-foreground">Unlanded work is always protected</span>
+          <span className="dshx:text-xs dshx:text-muted-foreground">
+            {selectedRows.some(row => row.missing)
+              ? 'Missing checkouts are only forgotten; their paths are never removed. Unlanded work is always protected.'
+              : 'Unlanded work is always protected'}
+          </span>
           <DialogFooter className="dshx:gap-2">
             <Button onClick={() => props.onOpenChange(false)} size="sm" type="button" variant="ghost">
               Cancel

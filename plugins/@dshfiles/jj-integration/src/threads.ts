@@ -130,8 +130,9 @@ export interface SecondaryWorkspaceStatus {
   readonly name: string
   readonly path: string
   readonly repoRoot: string
+  readonly missing: boolean
   readonly unlanded: readonly ThreadRevision[]
-  readonly workingCopyState: 'clean' | 'dirty' | 'unknown'
+  readonly workingCopyState: 'clean' | 'dirty' | 'unknown' | 'missing'
 }
 
 export interface SecondaryDiscardResult {
@@ -1563,12 +1564,17 @@ export const createThreads = (options: {
       const reportedRoot = resolve(record.path)
       if (
         record.name.startsWith('thread-') ||
-        !existsSync(join(reportedRoot, '.jj')) ||
         pathsOverlap(reportedRoot, realRepoRoot) ||
         pathsOverlap(reportedRoot, threadDirectory) ||
         rootRecords.some(other => other.name !== record.name && pathIsWithin(reportedRoot, resolve(other.path)))
       )
         continue
+      if (!existsSync(reportedRoot)) {
+        const unlanded = await revisions(`(::${record.name}@ ~ ::${bookmarkRevset(options.bookmark())}) ~ empty()`, realRepoRoot, true)
+        out.push({ name: record.name, path: reportedRoot, repoRoot: realRepoRoot, missing: true, unlanded, workingCopyState: 'missing' })
+        continue
+      }
+      if (!existsSync(join(reportedRoot, '.jj'))) continue
       const actualRoot = realpathSync(reportedRoot)
       if (actualRoot !== reportedRoot || storeRootOf(actualRoot) !== realRepoRoot) continue
       const readWorkingCopyId = async (): Promise<string | undefined> => {
@@ -1590,14 +1596,14 @@ export const createThreads = (options: {
           : beforeStatus === afterStatus
             ? 'clean'
             : 'dirty'
-      out.push({ name: record.name, path: actualRoot, repoRoot: realRepoRoot, unlanded: unlanded.value, workingCopyState })
+      out.push({ name: record.name, path: actualRoot, repoRoot: realRepoRoot, missing: false, unlanded: unlanded.value, workingCopyState })
     }
     return out
   }
 
   const discardSecondaryMany = (input: {
     readonly repoRoot: string
-    readonly workspaces: readonly { readonly name: string; readonly path: string }[]
+    readonly workspaces: readonly { readonly name: string; readonly path: string; readonly missing: boolean }[]
   }): Promise<{ readonly results: readonly SecondaryDiscardResult[] }> =>
     serialized(input.repoRoot, async () => {
       const results: SecondaryDiscardResult[] = []
@@ -1607,11 +1613,11 @@ export const createThreads = (options: {
         seen.add(expected.name)
         try {
           const current = (await secondaryWorkspaces(input.repoRoot)).find(workspace => workspace.name === expected.name)
-          if (current === undefined || current.path !== expected.path) {
+          if (current === undefined || current.path !== expected.path || current.missing !== expected.missing) {
             results.push({ name: expected.name, path: expected.path, status: 'error', message: 'The JJ workspace name or root changed after preview.' })
             continue
           }
-          if (current.workingCopyState !== 'clean' || current.unlanded.length > 0) {
+          if ((!current.missing && current.workingCopyState !== 'clean') || current.unlanded.length > 0) {
             const message =
               current.workingCopyState === 'unknown'
                 ? 'The working-copy state could not be verified.'
@@ -1622,7 +1628,7 @@ export const createThreads = (options: {
             continue
           }
           await jj(['--ignore-working-copy', 'workspace', 'forget', expected.name], input.repoRoot)
-          await rm(current.path, { recursive: true, force: false })
+          if (!current.missing) await rm(current.path, { recursive: true, force: false })
           results.push({ name: expected.name, path: expected.path, status: 'discarded', message: null })
         } catch (error) {
           results.push({ name: expected.name, path: expected.path, status: 'error', message: error instanceof Error ? error.message : String(error) })

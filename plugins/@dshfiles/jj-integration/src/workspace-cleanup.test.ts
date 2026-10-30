@@ -180,6 +180,24 @@ describe('WorkspaceCleanupModel.decide', () => {
     })
   })
 
+  it('allows explicitly selected missing secondary workspaces when their revisions and activity are verified', () => {
+    const missing = idleThread({ secondary: true, missing: true, workingCopyState: 'missing', sessionIds: [] })
+
+    expect(
+      WorkspaceCleanupModel.decide({ thread: missing, archived: new Set(), activity: new Map(), now, olderThanMs: 6 * HOUR, kinds: ['secondary'] }),
+    ).toMatchObject({ action: 'remove', kind: 'secondary' })
+    expect(
+      WorkspaceCleanupModel.decide({
+        thread: { ...missing, unlandedCount: 1 },
+        archived: new Set(),
+        activity: new Map(),
+        now,
+        olderThanMs: 6 * HOUR,
+        kinds: ['secondary'],
+      }),
+    ).toMatchObject({ action: 'skip', reason: 'has-work' })
+  })
+
   it('keeps dirty, unknown, or undated secondary workspaces', () => {
     expect(decide(idleThread({ secondary: true, workingCopyState: 'dirty' }))).toMatchObject({ action: 'skip', reason: 'working-copy-dirty' })
     expect(decide(idleThread({ secondary: true, workingCopyState: 'unknown' }))).toMatchObject({ action: 'skip', reason: 'workspace-state-unknown' })

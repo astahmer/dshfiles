@@ -1012,7 +1012,14 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
         skipped.push({ repoRoot: repository.repoRoot, name: thread.name, reason: decision.reason })
         continue
       }
-      workspaces.push({ repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
+      workspaces.push({
+        repoRoot: repository.repoRoot,
+        name: thread.name,
+        path: thread.path,
+        kind: decision.kind,
+        lastUsedAt: decision.lastUsedAt,
+        missing: thread.missing,
+      })
     }
     if (kinds.includes('secondary')) {
       const secondary = await active.secondaryWorkspaces(repository.repoRoot).catch((error: unknown) => {
@@ -1044,6 +1051,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
             sessionIds,
             integrationQueued: deferredIntegrations.get(workspace.path) !== undefined,
             secondary: true,
+            missing: workspace.missing,
             workingCopyState: sessionRecords === undefined ? 'unknown' : workspace.workingCopyState,
             usedAt: [changedAt.get(workspace.name), createdAt === undefined ? undefined : Date.parse(createdAt)],
           },
@@ -1057,7 +1065,14 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
           skipped.push({ repoRoot: repository.repoRoot, name: workspace.name, reason: decision.reason })
           continue
         }
-        workspaces.push({ repoRoot: repository.repoRoot, name: workspace.name, path: workspace.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
+        workspaces.push({
+          repoRoot: repository.repoRoot,
+          name: workspace.name,
+          path: workspace.path,
+          kind: decision.kind,
+          lastUsedAt: decision.lastUsedAt,
+          missing: workspace.missing,
+        })
       }
     }
     const entries = kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
@@ -1126,7 +1141,7 @@ const applyCleanup = async (input: {
         ? { results: [] }
         : await active.discardSecondaryMany({
             repoRoot,
-            workspaces: secondaryWorkspaces.map(planned => ({ name: planned.name, path: planned.path })),
+            workspaces: secondaryWorkspaces.map(planned => ({ name: planned.name, path: planned.path, missing: planned.missing })),
           })
     const resultByName = new Map<string, { readonly status: string; readonly error: string | null }>()
     for (const result of threadOutcome.results) resultByName.set(result.name, { status: result.status, error: result.error })
@@ -1576,7 +1591,9 @@ const api = jjIntegrationApi.host({
     const workspacePath = resolve(input.path)
     const name = basename(workspacePath)
     const threadDirectory = dirname(workspacePath)
-    const project = registryOf().list().find(workspace => resolve(threadsDirectory(workspace.path)) === threadDirectory)
+    const project = registryOf()
+      .list()
+      .find(workspace => resolve(threadsDirectory(workspace.path)) === threadDirectory)
     if (project === undefined) throw new PluginApiError('The owning project for this removed thread workspace is not registered.', { code: 'not-a-thread' })
     return requireThreads().reviewHistory({ repoRoot: project.path, name })
   },

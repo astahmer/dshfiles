@@ -102,11 +102,68 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(listed).toContainEqual(expect.objectContaining({ name: 'projection-selector', path: secondaryPath, workingCopyState: 'clean', unlanded: [] }))
     expect(listed.some(workspace => workspace.path === repo)).toBe(false)
 
-    const removed = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'projection-selector', path: secondaryPath }] })
+    const removed = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'projection-selector', path: secondaryPath, missing: false }] })
 
     expect(removed.results).toEqual([{ name: 'projection-selector', path: secondaryPath, status: 'discarded', message: null }])
     expect(existsSync(secondaryPath)).toBe(false)
     expect(readFileSync(join(decoyPath, 'keep.txt'), 'utf8')).toBe('decoy\n')
+  })
+
+  it('keeps unlanded revisions of a missing secondary workspace', async () => {
+    const secondaryPath = join(root, 'missing-unlanded')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'missing-unlanded')
+    writeFileSync(join(secondaryPath, 'feature.txt'), 'unlanded work\n')
+    jj(secondaryPath, 'commit', '-m', 'feat: unlanded missing workspace')
+    rmSync(secondaryPath, { recursive: true, force: true })
+
+    const missing = (await threads.secondaryWorkspaces(repo)).find(workspace => workspace.name === 'missing-unlanded')
+    expect(missing).toMatchObject({
+      missing: true,
+      workingCopyState: 'missing',
+      unlanded: [expect.objectContaining({ description: 'feat: unlanded missing workspace' })],
+    })
+
+    const result = await threads.discardSecondaryMany({
+      repoRoot: repo,
+      workspaces: [{ name: 'missing-unlanded', path: secondaryPath, missing: true }],
+    })
+
+    expect(result.results[0]).toMatchObject({ status: 'has-work' })
+    expect(jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).toContain('missing-unlanded')
+  })
+
+  it('forgets a missing secondary workspace without removing any path', async () => {
+    const secondaryPath = join(root, 'missing-secondary')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'missing-secondary')
+    rmSync(secondaryPath, { recursive: true, force: true })
+
+    const result = await threads.discardSecondaryMany({
+      repoRoot: repo,
+      workspaces: [{ name: 'missing-secondary', path: secondaryPath, missing: true }],
+    })
+
+    expect(result.results[0]).toMatchObject({ status: 'discarded' })
+    expect(existsSync(secondaryPath)).toBe(false)
+    expect(jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).not.toContain('missing-secondary')
+  })
+
+  it('forgets a missing secondary workspace without deleting a folder recreated after preview', async () => {
+    const secondaryPath = join(root, 'missing-secondary')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'missing-secondary')
+    rmSync(secondaryPath, { recursive: true, force: true })
+
+    const missing = (await threads.secondaryWorkspaces(repo)).find(workspace => workspace.name === 'missing-secondary')
+    expect(missing).toMatchObject({ missing: true, workingCopyState: 'missing', unlanded: [] })
+
+    mkdirSync(secondaryPath, { recursive: true })
+    writeFileSync(join(secondaryPath, 'keep.txt'), 'keep this recreated folder\n')
+    const stalePreview = await threads.discardSecondaryMany({
+      repoRoot: repo,
+      workspaces: [{ name: 'missing-secondary', path: secondaryPath, missing: true }],
+    })
+
+    expect(stalePreview.results[0]).toMatchObject({ status: 'error' })
+    expect(readFileSync(join(secondaryPath, 'keep.txt'), 'utf8')).toBe('keep this recreated folder\n')
   })
 
   it('skips a workspace whose root JJ does not know instead of failing the listing', async () => {
@@ -145,7 +202,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     )
     writeFileSync(join(secondaryPath, 'late-change.txt'), 'keep me\n')
 
-    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'changes-after-preview', path: secondaryPath }] })
+    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'changes-after-preview', path: secondaryPath, missing: false }] })
 
     expect(result.results[0]).toMatchObject({ status: 'has-work' })
     expect(existsSync(join(secondaryPath, 'late-change.txt'))).toBe(true)
@@ -170,8 +227,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const removed = await threads.discardSecondaryMany({
       repoRoot: repo,
       workspaces: [
-        { name: 'dirty', path: dirtyPath },
-        { name: 'unlanded', path: unlandedPath },
+        { name: 'dirty', path: dirtyPath, missing: false },
+        { name: 'unlanded', path: unlandedPath, missing: false },
       ],
     })
 
@@ -190,7 +247,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     jj(originalPath, '--ignore-working-copy', 'workspace', 'forget', 'secondary')
     jj(repo, 'workspace', 'add', replacementPath, '--name', 'secondary')
 
-    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'secondary', path: originalPath }] })
+    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'secondary', path: originalPath, missing: false }] })
 
     expect(result.results[0]).toMatchObject({ status: 'error' })
     expect(existsSync(replacementPath)).toBe(true)
@@ -350,6 +407,19 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(status).toEqual((await threads.list(repo)).find(thread => thread.name === target.name))
     expect(invocations).toHaveLength(2)
     expect(invocations.every(invocation => invocation.cwd === target.path && invocation.command === 'log')).toBe(true)
+  })
+
+  it('keeps a missing thread checkout discoverable and preserves its unlanded revisions', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'keep this history\n')
+    jj(thread.path, 'describe', '-m', 'feat: keep missing checkout work')
+    rmSync(thread.path, { recursive: true, force: true })
+
+    const status = (await threads.list(repo)).find(candidate => candidate.name === thread.name)
+
+    expect(status).toMatchObject({ missing: true })
+    expect(status?.unlanded.map(revision => revision.description)).toEqual(['feat: keep missing checkout work'])
+    expect(existsSync(thread.path)).toBe(false)
   })
 
   it('reports a workspace that only sits behind the bookmark as behind with nothing to integrate', async () => {

@@ -364,7 +364,11 @@ folder leaves jj's recorded root stale.
 
 A workspace is kept when it holds unlanded revisions, a non-archived Session in
 it is working, waiting for an answer or its activity cannot be read, or an
-integration is queued. "Last used" is the latest of its working-copy commit
+integration is queued. A missing managed thread folder is labeled in the preview;
+a missing secondary checkout is listed only when its owning JJ repository still
+exists, and can be selected for forgetting only when its root stays absent and
+it has no unlanded work or live Session. Cleanup never removes a missing
+secondary path, so a folder recreated after preview is left untouched. "Last used" is the latest of its working-copy commit
 time, its creation and its last land. A later turn in a thread whose workspace
 was removed checks a fresh workspace out from the bookmark. Agents get the same
 verb as `jj_thread_cleanup` (`apply: false` previews, `apply: true` waits for
