@@ -203,6 +203,16 @@ describe('lane allocation', () => {
     expect(rowOf(rows, 'old0').outgoing).toEqual([{ fromLane: 1, toLane: 1, color: rowOf(rows, 'old0').color, dashed: false, terminal: true }])
   })
 
+  test('hiding long immutable ancestry keeps its bridge depth and terminal link', () => {
+    const head = revision('head', ['immutable0'])
+    const immutable = chain('immutable', 1200, undefined, () => ({ immutable: true }))
+    const rows = layout([head], false, [head, ...immutable])
+    expect(rowOf(rows, 'head').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'head').color, dashed: true, terminal: true }])
+    expect(RevisionGraphModel.graphParentLinks(head, new Map([head, ...immutable].map(row => [row.commitId, row])), false, new Set(['head']))).toEqual([
+      { commitId: 'immutable1199', label: 'immutable1199', hiddenParentCount: 1200, terminal: true },
+    ])
+  })
+
   test('mine-only graph links bridge hidden ancestry with dashed rails', () => {
     const feature = revision('feature', ['foreign'])
     const foreign = revision('foreign', ['trunk'])

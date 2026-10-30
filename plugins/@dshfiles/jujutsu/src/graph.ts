@@ -82,7 +82,8 @@ const graphParentLinks = (
   visibleCommitIds?: ReadonlySet<string>,
 ): GraphParentLink[] => {
   const links = new Map<string, GraphParentLink>()
-  const visit = (commitId: string, hiddenParentCount: number, seen: ReadonlySet<string>): void => {
+  const seen = new Set([revision.commitId])
+  const visit = (commitId: string, hiddenParentCount: number): void => {
     const parent = revisionsById.get(commitId)
     if (parent === undefined) {
       links.set(commitId, { commitId, label: commitId.slice(0, 8), hiddenParentCount, terminal: false })
@@ -94,7 +95,7 @@ const graphParentLinks = (
       return
     }
     if (seen.has(commitId)) return
-    const nextSeen = new Set(seen).add(commitId)
+    seen.add(commitId)
     if (parent.parents.length === 0) {
       links.set(commitId, {
         commitId,
@@ -102,11 +103,13 @@ const graphParentLinks = (
         hiddenParentCount: hiddenParentCount + 1,
         terminal: true,
       })
+      seen.delete(commitId)
       return
     }
-    for (const nextParent of parent.parents) visit(nextParent, hiddenParentCount + 1, nextSeen)
+    for (const nextParent of parent.parents) visit(nextParent, hiddenParentCount + 1)
+    seen.delete(commitId)
   }
-  for (const parentId of revision.parents) visit(parentId, 0, new Set([revision.commitId]))
+  for (const parentId of revision.parents) visit(parentId, 0)
   return [...links.values()]
 }
 
