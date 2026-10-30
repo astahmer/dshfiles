@@ -123,8 +123,10 @@ const SummaryItem = (props: {
     return (
       <span className="dshx:inline-flex dshx:items-center dshx:gap-1">
         <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
-        <SummaryName name={props.showShortName ? props.item.shortName : props.item.displayName} off={props.item.disabled === true} />
-        <span className="dshx:text-[10px] dshx:text-muted-foreground">{props.item.unavailable.label}</span>
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:items-start dshx:leading-none">
+          <SummaryName name={props.showShortName ? props.item.shortName : props.item.displayName} off={props.item.disabled === true} />
+          <span className="dshx:text-[10px] dshx:text-muted-foreground">{props.item.unavailable.label}</span>
+        </span>
       </span>
     )
   const lines = UsageOverviewModel.meterLines(props.item, props.now, props.label)

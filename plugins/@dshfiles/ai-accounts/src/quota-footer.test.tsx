@@ -439,6 +439,7 @@ describe('actual quota strip and usage popover unavailable-account regression', 
     expect(button.getAttribute('aria-label')).toBe(UNAVAILABLE_LABEL)
     expect(button.textContent).toContain('EX')
     expect(button.textContent).toContain('Sign in again')
+    expect(button.querySelector('[class~="dshx:flex-col"]')?.textContent).toContain('Sign in again')
     expect(button.querySelector('[role="img"][aria-label="Codex"]')).not.toBeNull()
     expectNoSyntheticQuota(button)
     expect(host.usage).toHaveBeenCalledWith(undefined, expect.objectContaining({ signal: expect.any(AbortSignal) }))
