@@ -1347,7 +1347,7 @@ const ItemPeek = (props: {
         'dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background',
         props.expanded || props.embedded === true
           ? 'dshx:min-w-0 dshx:flex-1'
-          : 'dshx:min-w-0 dshx:max-w-[55%] dshx:shrink-0 dshx:border-l dshx:border-border dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-2 dshx:duration-150 dshx:@max-pane-compact:absolute dshx:@max-pane-compact:inset-0 dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:w-auto dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:border-l-0',
+          : 'dshx:min-w-0 dshx:max-w-[55%] dshx:shrink-0 dshx:border-l dshx:border-border dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-2 dshx:duration-150 dshx:@max-pane-compact:relative dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:h-[45%] dshx:@max-pane-compact:min-h-48 dshx:@max-pane-compact:w-full dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:flex-none dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:border-t',
       )}
     >
       {props.expanded || props.embedded === true ? null : (
