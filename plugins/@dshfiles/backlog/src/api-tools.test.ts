@@ -1,7 +1,26 @@
 import { describe, expect, test } from 'vitest'
 import { backlogApi } from './api.js'
+import { BacklogItems } from './item.js'
 
 describe('backlog tool exposure', () => {
+  test('empty actor filters mean no filter without weakening actor ID validation', async () => {
+    const schema = backlogApi.methods.list.input
+    if (schema === undefined) throw new Error('List input schema is missing')
+    const validate = (value: unknown) => schema['~standard'].validate(value)
+
+    expect(BacklogItems.actorIdSchema.safeParse('').success).toBe(false)
+    const emptyActor = await validate({ actor: '' })
+    expect(emptyActor.issues).toBeUndefined()
+    if ('issues' in emptyActor) throw new Error('Empty actor should be normalized to no filter')
+    expect(emptyActor.value).toMatchObject({ actor: undefined })
+    for (const actor of ['user', 'system', 'agent:session-123']) {
+      expect((await validate({ actor })).issues).toBeUndefined()
+    }
+    for (const actor of ['agent:', 'other']) {
+      expect((await validate({ actor })).issues).toBeDefined()
+    }
+  })
+
   test('comments allow attachment-only replies but reject empty replies', async () => {
     const schema = backlogApi.methods.comment.input
     if (schema === undefined) throw new Error('Comment input schema is missing')

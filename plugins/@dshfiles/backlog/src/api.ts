@@ -118,7 +118,11 @@ const listInputSchema = z
       .optional()
       .describe('Several absolute project paths; null includes items outside any project, and an empty array applies no project filter.'),
     tag: z.string().max(60).optional(),
-    actor: BacklogItems.actorIdSchema.optional().describe('`user`, `system` or `agent:<sessionId>`.'),
+    actor: z
+      .union([z.literal(''), BacklogItems.actorIdSchema])
+      .optional()
+      .transform(actor => (actor === '' ? undefined : actor))
+      .describe('`user`, `system` or `agent:<sessionId>`. Empty means no actor filter.'),
     freshness: z
       .enum(['active', 'all', ...BacklogItems.freshnessStates])
       .optional()
