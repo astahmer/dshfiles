@@ -37,7 +37,7 @@ export type MemoryServices = {
     readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean; readonly persisted: boolean }[]
   >
   /** Folded titles for the requested sessions; a per-session failure leaves that title absent instead of failing the batch. */
-  readonly readSessionTitles: (sessionIds: readonly string[]) => Promise<readonly SessionTitleRead[]>
+  readonly readSessionTitles: (sessionIds: readonly string[], signal?: AbortSignal) => Promise<readonly SessionTitleRead[]>
   /** Full-text search over Session content through the supported session-query backend. */
   readonly searchSessionContent: (
     request: { readonly query: string; readonly limit: number },
@@ -576,9 +576,17 @@ export const createMemoryRuntime = (options: {
   /** Folded session titles are read for the newest sessions only: older ones still match by digest title, identifier, or indexed message. */
   const titleReadLimit = 80
 
-  const threadRecords = async (): Promise<readonly ThreadFinderRecord[]> => {
+  const threadRecords = async (signal?: AbortSignal): Promise<readonly ThreadFinderRecord[]> => {
     const sessions = await services.listSessions()
-    const titled = await services.readSessionTitles(sessions.slice(0, titleReadLimit).map(session => session.header.id)).catch(() => [])
+    const titled = await services
+      .readSessionTitles(
+        sessions.slice(0, titleReadLimit).map(session => session.header.id),
+        signal,
+      )
+      .catch(() => {
+        signal?.throwIfAborted()
+        return []
+      })
     const titles = new Map(titled.map(entry => [entry.sessionId, entry]))
     // Project resolution is a per-cwd lookup that may await a Host call; resolve the distinct ones together, in order.
     const projects = await Promise.all(sessions.map(session => projectOf(session.header)))
@@ -698,14 +706,15 @@ export const createMemoryRuntime = (options: {
       })
   }
 
-  const finderFor = async (own: string): Promise<ThreadFinder> => {
-    const records = await threadRecords()
+  const finderFor = async (own: string, signal?: AbortSignal): Promise<ThreadFinder> => {
+    const records = await threadRecords(signal)
     return createThreadFinder({
       listSessions: async () => records,
       warmContent: warmSessionContent,
       searchContent: (request, signal) => services.searchSessionContent(request, signal),
       searchMemory: request => finderMemoryHits(request, own),
       readDigest: async sessionId => store.thread(sessionId)?.digest ?? null,
+      signal,
       logger: { info: (message, fields) => logger.info(`memory: ${message} ${JSON.stringify(fields)}`) },
     })
   }
@@ -722,10 +731,11 @@ export const createMemoryRuntime = (options: {
       readonly createdTo?: number | undefined
       readonly includeNotes?: boolean | undefined
     },
+    signal?: AbortSignal,
   ): Promise<ThreadFinderPage & { readonly project: string }> => {
     const own = await projectOf(caller.session.header)
     const clientCaller = isClientCaller(caller)
-    const finder = await finderFor(own)
+    const finder = await finderFor(own, signal)
     const page = await withFinderErrors(() =>
       finder.find({
         query: args.query,
@@ -746,10 +756,11 @@ export const createMemoryRuntime = (options: {
   const relatedThreads = async (
     caller: Caller,
     args: { readonly sessionId: string; readonly project?: string | undefined; readonly limit?: number | undefined },
+    signal?: AbortSignal,
   ): Promise<ThreadFinderRelations & { readonly project: string }> => {
     const own = await projectOf(caller.session.header)
     const clientCaller = isClientCaller(caller)
-    const finder = await finderFor(own)
+    const finder = await finderFor(own, signal)
     const relations = await withFinderErrors(() =>
       finder.related({ sessionId: args.sessionId, projects: projectsFilterFor(own, args.project?.trim(), clientCaller), limit: args.limit ?? 8 }),
     )

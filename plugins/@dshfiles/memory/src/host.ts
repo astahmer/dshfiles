@@ -173,14 +173,20 @@ const hostServices = (ctx: Context): MemoryServices => {
     },
     agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId),
     listSessions: () => sessionList.listSessions(),
-    readSessionTitles: async sessionIds => {
+    readSessionTitles: async (sessionIds, signal) => {
+      if (sessionIds.length === 0) return []
       // The Session list serves each title from the projection cache (a log-prefix read, kept until the Session
       // changes). A Session it has no title for is left untitled here, so the finder falls back to its digest's title:
       // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
+      const timeout = AbortSignal.timeout(10_000)
+      const readSignal = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
       const listed = await ctx
         .get('sessionController')
-        ?.list(sessionTitleListRequest, AbortSignal.timeout(10_000))
-        .catch(() => undefined)
+        ?.list(sessionTitleListRequest, readSignal)
+        .catch(() => {
+          signal?.throwIfAborted()
+          return undefined
+        })
       const fromList = new Map<string, SessionTitleRead>()
       for (const item of listed?.items ?? []) {
         const title = listedTitleSchema.safeParse(item.projections?.values.title)
@@ -541,15 +547,19 @@ const workspaceScriptsHost = workspaceScriptsApi.host({
 
 const panelApi = memoryApi.host({
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
-  findThreads: ({ input, caller }) =>
+  findThreads: ({ input, caller, signal }) =>
     withMemory(active =>
-      active.findThreads(callerOf(caller), {
-        ...input,
-        createdFrom: instant(input.createdFrom, false),
-        createdTo: instant(input.createdTo, true),
-      }),
+      active.findThreads(
+        callerOf(caller),
+        {
+          ...input,
+          createdFrom: instant(input.createdFrom, false),
+          createdTo: instant(input.createdTo, true),
+        },
+        signal,
+      ),
     ),
-  relatedThreads: ({ input, caller }) => withMemory(active => active.relatedThreads(callerOf(caller), input)),
+  relatedThreads: ({ input, caller, signal }) => withMemory(active => active.relatedThreads(callerOf(caller), input, signal)),
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
   preview: ({ input }) =>
     withMemory(async active => {

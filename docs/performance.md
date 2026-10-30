@@ -63,17 +63,17 @@ repository already used for the composer.
 
 ## Findings (live profile, October 2026)
 
-| Cost                                                                                    | Evidence                                                                                                                         | Fix                                                                                                                                                                                                           | Owner                                     |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Cost                                                                                    | Evidence                                                                                                                                                                       | Fix                                                                                                                                                                                                           | Owner                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Host event loop blocked up to 6 s; every request queued behind it                       | `host-lag` max 5.96 s; CPU profile: 7.4 s/min in `settings.describe()` reached from dshx `SettingsScope.get()` per Session event ([profile](host-stall-profile-2026-10-19.md)) | settings read cached on the Loader entry's fiber, `fiber.config` and `options.config` identities                                                                                                              | dshx                                      |
-| Thread open mounted 1.9k–42k DOM nodes, 0.4–14 s to history                             | DOM per row: collapsed historical Turn groups (17 px) held 1k–7k nodes each, kept mounted and hidden for browser find            | `@dshfiles/chat` forks the native Chat row: newest 24 rows mounted, older ones as the reader scrolls up, collapsed groups mount on first open                                                                 | chat                                      |
-| Each switch fired 10–20 requests, several over 250 ms                                   | request list per click                                                                                                           | `@` skill and MCP sources read on first `@` query (no `warm`); MCP quick panel reads `list` with a stale time instead of `refresh` (which reconciles every MCP client); prompt-stash snapshots stale for 30 s | thread-sidebar, mcp-servers, prompt-stash |
-| New thread's first prompt lost when another New thread opened before isolation finished | 4/4 prompts lost on a scratch Host                                                                                               | first send isolates on its own: provision, `connectWorkspace`, copy draft/attachments/references into that Session, send there                                                                                | jj-integration                            |
-| Opening window of 26 MB on Anthropic threads                                            | `snapshot-bytes`: `replayState.blocks` (thinking signatures) sent twice per assistant message, 17 of 26 MB                       | `@dshfiles/session-controller` forks the native Session controller row: the browser copy drops replay blocks, and threads open on the latest Turn (20–120 messages)                                           | session-controller                        |
-| `session/list` re-read every cold Session log                                           | Host CPU profile: `summarizeCold → readZstdPrefix`, 1.4 s per minute of switching                                                | cold projection columns kept until the Session attaches, appends or detaches                                                                                                                                  | session-controller                        |
-| jj reads 80–340 ms each, up to 875 ms per composer `context` and 815 ms per `threadAt`  | the store has 52 workspaces; every jj spawn loads the repository view                                                            | `--ignore-working-copy` reads reused until the store's `op_heads` change                                                                                                                                      | jujutsu, jj-integration                   |
-| Rebase idle guard folded all ~800 stored Sessions before checking one workspace         | ~18 s cold `sessionController.list()` fold; unrelated Sessions do not affect the decision                                        | Guard reads live Agent status and projections only for that workspace's Session ids (typically 1–3); bulk reads remain for views and repository-wide cleanup. Post-change Host latency is not yet measured.   | jj-integration                            |
-| "Load earlier" had to be clicked                                                        | —                                                                                                                                | older rows and pages load as the reader scrolls up; an open widens itself at most three steps                                                                                                                 | chat                                      |
+| Thread open mounted 1.9k–42k DOM nodes, 0.4–14 s to history                             | DOM per row: collapsed historical Turn groups (17 px) held 1k–7k nodes each, kept mounted and hidden for browser find                                                          | `@dshfiles/chat` forks the native Chat row: newest 24 rows mounted, older ones as the reader scrolls up, collapsed groups mount on first open                                                                 | chat                                      |
+| Each switch fired 10–20 requests, several over 250 ms                                   | request list per click                                                                                                                                                         | `@` skill and MCP sources read on first `@` query (no `warm`); MCP quick panel reads `list` with a stale time instead of `refresh` (which reconciles every MCP client); prompt-stash snapshots stale for 30 s | thread-sidebar, mcp-servers, prompt-stash |
+| New thread's first prompt lost when another New thread opened before isolation finished | 4/4 prompts lost on a scratch Host                                                                                                                                             | first send isolates on its own: provision, `connectWorkspace`, copy draft/attachments/references into that Session, send there                                                                                | jj-integration                            |
+| Opening window of 26 MB on Anthropic threads                                            | `snapshot-bytes`: `replayState.blocks` (thinking signatures) sent twice per assistant message, 17 of 26 MB                                                                     | `@dshfiles/session-controller` forks the native Session controller row: the browser copy drops replay blocks, and threads open on the latest Turn (20–120 messages)                                           | session-controller                        |
+| `session/list` re-read every cold Session log                                           | Host CPU profile: `summarizeCold → readZstdPrefix`, 1.4 s per minute of switching                                                                                              | cold projection columns kept until the Session attaches, appends or detaches                                                                                                                                  | session-controller                        |
+| jj reads 80–340 ms each, up to 875 ms per composer `context` and 815 ms per `threadAt`  | the store has 52 workspaces; every jj spawn loads the repository view                                                                                                          | `--ignore-working-copy` reads reused until the store's `op_heads` change                                                                                                                                      | jujutsu, jj-integration                   |
+| Rebase idle guard folded all ~800 stored Sessions before checking one workspace         | ~18 s cold `sessionController.list()` fold; unrelated Sessions do not affect the decision                                                                                      | Guard reads live Agent status and projections only for that workspace's Session ids (typically 1–3); bulk reads remain for views and repository-wide cleanup. Post-change Host latency is not yet measured.   | jj-integration                            |
+| "Load earlier" had to be clicked                                                        | —                                                                                                                                                                              | older rows and pages load as the reader scrolls up; an open widens itself at most three steps                                                                                                                 | chat                                      |
 
 Before and after on the same 10 threads (live, `switch-probe.mjs`):
 
@@ -114,19 +114,33 @@ Result on live (2026-10-20, after the session-search and memory fixes, within on
 
 ### Thread search follow-up (2026-10-30)
 
-The live palette reproduced an 11.5 s `findThreads` request (HTTP 200, 12 results); its server span was 10,086 ms.
-Host lag p99/max reached 101 ms (no stalls above 250 ms), a direct memory search for the same term took 137 ms,
-and the session-content worker reported a 2 ms search. The live corpus held 2,244 Sessions, 1,629 digests and 24,538 indexed messages. This points away from the search engine and toward record preparation around it.
+The live palette reproduced an 11.5 s `findThreads` request (HTTP 200, 12 results); its server span was 10,086 ms,
+with only a 673 ms SSH child span. A direct memory search for the same term took 137 ms and the session-content worker
+reported 2 ms. The live corpus held 2,244 Sessions, 1,629 digests and 24,538 indexed messages. The unexplained parent
+wait is around the record preparation, not the search engines.
 
-`memory` was calling `sessionController.list({})` with a 10 s timeout to obtain titles, then reading only the `title`
-projection. The Session-list contract says omitting `projections` reads every registered projection. The caller now
-requests only `title` via `sessionTitleListRequest`.
+Host-lag measurements were not simultaneous with that request: one separate probe recorded p99/max 101 ms with no
+stalls above 250 ms; a later 10 s probe at 23:07 recorded p99/max 562 ms and two >250 ms stalls at load average 12.34.
+Neither proves or excludes Host scheduling delay during the 22:29 search.
 
-| Live `findThreads` latency | Before | After |
-| -------------------------- | ------ | ----- |
-| Server span               | 10,086 ms | Not measured: the live Host still serves its old bundle; restarting it was not authorized. |
+`memory` called `sessionController.list({})` with a 10 s timeout to obtain titles, then read only the `title` projection.
+Omitting `projections` makes the Session-list service read every registered projection, so the caller now requests only
+`title` via `sessionTitleListRequest`. A second trace showed a superseded `findThreads` request aborted after 6,173 ms;
+previously the title-list call had its own independent 10 s timeout. The current code forwards the API cancellation signal
+to that list request and no longer swallows cancellation.
 
-The remaining validation is the same live search after the user restarts the Host; no restart was performed here.
+The current `SessionListRequest` has no session-id filter or page size, and `ApiSessionList.list` still traverses and
+sorts the full corpus. The title allowlist reduces projection work per row, not the number of rows. A targeted
+`readTitleSnapshots` alternative is not automatically faster: a cold read of 57 titles took 3.1 s. If the live probe
+remains slow after deployment, use its trace to choose the next optimization rather than infer from a scratch corpus.
+
+| Live `findThreads` probe | Before                                                     | After                                                            |
+| ------------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| Server span              | 10,086 ms                                                  | Not measured: the live Host still serves its old bundle.         |
+| Superseded request       | Aborted at 6,173 ms; title read had an independent timeout | Cancellation now reaches the title read; live effect unmeasured. |
+
+The remaining validation is the same live search after integration and a user-initiated Host restart; neither was
+performed here.
 
 ## First open of a thread (2026-10-20)
 
@@ -473,9 +487,9 @@ A fresh read-only live-DB probe on a 10-core machine (load 3.8) measured separat
 
 A live forecast render with seven enabled accounts sent seven successful `ai-accounts/history` requests. Request-start through response-body-read times were 133–292 ms; the bodies totalled 2,137,208 bytes (37,148–495,259 bytes each). One combined response would exceed dshx's 1,048,576-byte JSON limit. Even the two largest captured bodies sum to 944,594 bytes, leaving room for the batched envelope without dropping forecast history.
 
-| Path | RPCs / quota-table scans | Payload and timing |
-| --- | --- | --- |
-| Before | 7 / 7 | 2,137,208 bytes total; 133–292 ms per response through body read |
+| Path                          | RPCs / quota-table scans      | Payload and timing                                                                                                                                                                                                                          |
+| ----------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before                        | 7 / 7                         | 2,137,208 bytes total; 133–292 ms per response through body read                                                                                                                                                                            |
 | After, verified by query test | 4 / 4 (batches of 2, 2, 2, 1) | All seven histories retained; the seven-account test asserts the exact four-call grouping. No post-change 7-account live timing was captured: the live Host was not restarted, and the scratch browser journey uses two synthetic accounts. |
 
 The Host scans quota storage once per batch, and the client falls back to the unchanged single-account endpoint when an older Host lacks the batch route or a batch contract fails. The scratch `quota-forecast` browser journey passed with its two fake accounts. The package-wide E2E command exited 1 on four other journeys (the plan-title assertion, two quota-recovery journeys, and model-effort fast-mode); those paths are outside this change. The scratch `dshx dev open` path was corrected to expect the real no-account empty state; its screenshot intentionally had no history requests.

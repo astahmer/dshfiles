@@ -51,6 +51,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
   const logs = new Map<string, SessionLog>()
   const summaries: string[] = []
   const titles = new Map<string, string>()
+  const titleReadSignals: (AbortSignal | undefined)[] = []
   const scopes = new Map<string, string>()
   const content: SessionSearchState = {
     hits: [],
@@ -63,7 +64,11 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     projectPath: projectPathFor,
     agentMemoryScope: async (sessionId: string) => scopes.get(sessionId) ?? null,
     listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false, persisted: true })),
-    readSessionTitles: async (ids: readonly string[]) => ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined })),
+    readSessionTitles: async (ids: readonly string[], signal?: AbortSignal) => {
+      titleReadSignals.push(signal)
+      signal?.throwIfAborted()
+      return ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined }))
+    },
     searchSessionContent: async () => {
       content.calls += 1
       if (content.error !== null) throw content.error
@@ -100,7 +105,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     id,
     session: { header: origin === undefined ? { id, cwd } : { id, cwd, origin, parentSession: 'session-parent' } },
   })
-  return { logs, summaries, store, runtime, caller, titles, content, scopes, jevUsage }
+  return { logs, summaries, store, runtime, caller, titles, content, scopes, jevUsage, titleReadSignals }
 }
 
 const halyardThread = (id: string) => {
@@ -476,6 +481,18 @@ describe('memory runtime', () => {
     expect(page.hits[0]?.sources).toContain('session-content')
     expect(page.degraded).toEqual([])
     expect(store.usage().tools.map(entry => entry.tool)).toContain('find_threads')
+  })
+
+  it('cancels title loading when a caller aborts thread search', async () => {
+    const { logs, runtime, caller, titleReadSignals } = setup()
+    const thread = halyardThread('session-cancelled-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    const controller = new AbortController()
+    const reason = new Error('search cancelled')
+    controller.abort(reason)
+
+    await expect(runtime.findThreads(caller('session-reader'), { query: 'northwind' }, controller.signal)).rejects.toBe(reason)
+    expect(titleReadSignals).toEqual([controller.signal])
   })
 
   it('answers memory message hits from stored excerpts without reading Session logs', async () => {
