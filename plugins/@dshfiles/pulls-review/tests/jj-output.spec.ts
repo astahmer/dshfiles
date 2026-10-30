@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -58,8 +58,44 @@ describe('jj diff output', () => {
     expect(result.status === 'ok' ? result.head : '').toMatch(/^[a-f0-9]{8,}$/)
   })
 
+  it.skipIf(!available)('reviews an exact saved change-id range after forgetting and deleting its workspace', async () => {
+    const repository = await mkdtemp(join(tmpdir(), 'pulls-review-removed-'))
+    const threadPath = join(repository, '.threads', 'thread-a1b2c3')
+    try {
+      await jj(repository, ['git', 'init'])
+      await writeFile(join(repository, 'README.md'), '# Base\\n')
+      await jj(repository, ['commit', '-m', 'base'])
+      await jj(repository, ['bookmark', 'create', 'main', '-r', '@'])
+      await mkdir(join(repository, '.threads'))
+      const fromChangeId = (await run('jj', [...CONFIG, 'log', '-r', '@', '--no-graph', '-T', 'change_id'], { cwd: repository })).stdout.trim()
+      await jj(repository, ['workspace', 'add', threadPath, '--name', 'thread-a1b2c3', '-r', 'main'])
+      await writeFile(join(threadPath, 'README.md'), '# Reviewed after cleanup\\n')
+      await jj(threadPath, ['commit', '-m', 'update'])
+      const toChangeId = (await run('jj', [...CONFIG, 'log', '-r', '@', '--no-graph', '-T', 'change_id'], { cwd: threadPath })).stdout.trim()
+      const before = await ReviewWorkspaceModel.review({ run: createRealRunner(), path: repository, fromChangeId, toChangeId })
+      expect(before).toMatchObject({ status: 'ok', range: `${fromChangeId}..${toChangeId}`, fileCount: 1 })
+      await jj(threadPath, ['bookmark', 'set', 'main', '-r', '@'])
+      await jj(threadPath, ['new', 'main'])
+      await jj(repository, ['workspace', 'forget', 'thread-a1b2c3'])
+      await rm(threadPath, { recursive: true, force: true })
+      const after = await ReviewWorkspaceModel.review({ run: createRealRunner(), path: repository, fromChangeId, toChangeId })
+      expect(after).toMatchObject({ status: 'ok', range: `${fromChangeId}..${toChangeId}`, fileCount: 1 })
+      expect(after.status === 'ok' ? after.patch : '').toContain('# Reviewed after cleanup')
+    } finally {
+      await rm(repository, { recursive: true, force: true })
+    }
+  })
+
   it.skipIf(!available)('builds the revision and diff argv the review passes to jj', () => {
     expect(ReviewWorkspaceModel.revisionArgs('@')).toEqual(['log', '-r', '@', '--no-graph', '-T', 'commit_id.short()'])
     expect(ReviewWorkspaceModel.diffArgs('main')).toEqual(['diff', '--git', '--from', 'main', '--to', '@'])
+    expect(ReviewWorkspaceModel.diffArgs('change_id("base")', 'change_id("head")')).toEqual([
+      'diff',
+      '--git',
+      '--from',
+      'change_id("base")',
+      '--to',
+      'change_id("head")',
+    ])
   })
 })

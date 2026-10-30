@@ -102,7 +102,14 @@ export const pullsReviewApi = defineApi({
   version: 1,
   methods: {
     review: method({
-      input: z.object({ path: z.string().min(1).max(2048), base: z.string().min(1).max(256).optional() }),
+      input: z
+          .object({
+            path: z.string().min(1).max(2048),
+            base: z.string().min(1).max(256).optional(),
+            fromChangeId: z.string().min(1).max(128).optional(),
+            toChangeId: z.string().min(1).max(128).optional(),
+          })
+          .strict(),
       output: reviewResultSchema,
       description: "Read a workspace's changes since a base bookmark and group the changed files into review scopes.",
     }),

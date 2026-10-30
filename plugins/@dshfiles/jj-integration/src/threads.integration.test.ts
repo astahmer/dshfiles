@@ -28,6 +28,7 @@ const bookmarkTargetCommitId = (cwd: string): string =>
 const commitIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id').trim()
 const changeIdAt = (cwd: string, revset: string): string =>
   jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id.short(12)').trim()
+const fullChangeIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id').trim()
 
 describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   let root: string
@@ -397,6 +398,23 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
     expect(outcome.status).toBe('landed')
     expect(status).toMatchObject({ unlanded: [], behind: false, behindCount: 0, rebasedAt: expect.any(Number) })
+  })
+
+  it('keeps an exact review range readable after removing the landed workspace', async () => {
+    const thread = await threads.provision(repo)
+    const baseChangeId = fullChangeIdAt(repo, 'main')
+    writeFileSync(join(thread.path, 'reviewable.txt'), 'review me\\n')
+    jj(thread.path, 'describe', '-m', 'feat: reviewable work')
+    const outcome = await threads.land(thread.path)
+    expect(outcome.status).toBe('landed')
+    const expectedTip = fullChangeIdAt(repo, 'main')
+
+    await expect(threads.discard({ repoRoot: repo, name: thread.name, force: false })).resolves.toMatchObject({ status: 'discarded' })
+    const history = await threads.reviewHistory({ repoRoot: repo, name: thread.name })
+
+    expect(history.repoRoot).toBe(repo)
+    expect(history.integrations).toMatchObject([{ baseChangeId, tipChangeId: expectedTip }])
+    expect(existsSync(thread.path)).toBe(false)
   })
 
   it('keeps every land of a thread that keeps working after it integrates', async () => {
@@ -905,7 +923,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
     const outcome = await observedThreads.landAt({ ...location, threadName })
     expect(outcome).toMatchObject({ status: 'landed' })
-    expect(invocations).toHaveLength(4)
+    expect(invocations).toHaveLength(6)
     expect(invocations.some(args => args.includes('root'))).toBe(false)
   })
 

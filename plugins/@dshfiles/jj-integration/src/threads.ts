@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
@@ -45,6 +45,13 @@ export interface ThreadRevision {
   readonly commitId: string
   readonly description: string
   readonly conflict: boolean
+}
+
+export interface ThreadReviewRecord {
+  readonly at: number
+  readonly tipChangeId?: string | undefined
+  readonly baseChangeId?: string | undefined
+  readonly sessionId?: string | undefined
 }
 
 export interface ThreadLocation {
@@ -178,7 +185,12 @@ const PATCH_TARGET_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ c
 const PATCH_BODY_TEMPLATE = 'commit_id ++ "\\t" ++ json(stringify(diff.git(3))) ++ "\\n"'
 const rebaseTimestampSchema = z.number().int().nonnegative().safe()
 const integrationRecordSchema = z
-  .object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional(), sessionId: z.string().min(1).max(128).optional() })
+  .object({
+    at: rebaseTimestampSchema,
+    tipChangeId: z.string().min(1).max(128).optional(),
+    baseChangeId: z.string().min(1).max(128).optional(),
+    sessionId: z.string().min(1).max(128).optional(),
+  })
   .strict()
 const rebaseMetadataEntrySchema = integrationRecordSchema.extend({ history: z.array(integrationRecordSchema).optional() }).strict()
 const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
@@ -387,6 +399,18 @@ export const createThreads = (options: {
     const result = await execute(args, cwd, signal)
     if (result.exitCode !== 0) throw new ThreadError('jj-failed', `jj ${args.join(' ').slice(0, 120)}: ${result.stderr.trim().slice(0, 400)}`)
     return completeStdout(result)
+  }
+
+  const changeIdForCommit = async (commitId: string, cwd: string, signal?: AbortSignal): Promise<string> => {
+    const changeId = (await jj(['log', '--no-graph', '-r', commitIdRevset(commitId), '-T', 'change_id'], cwd, signal)).trim()
+    if (changeId.length === 0) throw new ThreadError('jj-failed', 'Could not resolve the persistent JJ change ID.')
+    return changeId
+  }
+
+  const changeIdForRevision = async (revision: string, cwd: string, signal?: AbortSignal): Promise<string> => {
+    const changeId = (await jj(['log', '--no-graph', '-r', revision, '-T', 'change_id'], cwd, signal)).trim()
+    if (changeId.length === 0) throw new ThreadError('jj-failed', 'Could not resolve the persistent JJ change ID.')
+    return changeId
   }
 
   const revisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal, maxRevisions?: number): Promise<readonly ThreadRevision[]> =>
@@ -731,17 +755,29 @@ export const createThreads = (options: {
   const integrationHistory = (metadata: RebaseMetadataEntry | undefined): readonly IntegrationRecord[] => {
     if (metadata === undefined) return []
     if (metadata.history !== undefined) return metadata.history
-    return [metadata.tipChangeId === undefined ? { at: metadata.at } : { at: metadata.at, tipChangeId: metadata.tipChangeId }]
+    return [
+      {
+        at: metadata.at,
+        ...(metadata.tipChangeId === undefined ? undefined : { tipChangeId: metadata.tipChangeId }),
+        ...(metadata.baseChangeId === undefined ? undefined : { baseChangeId: metadata.baseChangeId }),
+        ...(metadata.sessionId === undefined ? undefined : { sessionId: metadata.sessionId }),
+      },
+    ]
   }
-  const writeRebaseMetadata = async (repoRoot: string, name: string, tipChangeId: string | undefined, sessionId: string | undefined): Promise<number> => {
+  const writeRebaseMetadata = async (
+    repoRoot: string,
+    name: string,
+    input: { readonly tipChangeId: string | undefined; readonly baseChangeId: string | undefined; readonly sessionId: string | undefined },
+  ): Promise<number> => {
     const at = Date.now()
     const directory = options.threadsDirectory(repoRoot)
     await mkdir(directory, { recursive: true })
     const path = timestampFile(repoRoot)
     const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
     const record: IntegrationRecord = { at }
-    if (tipChangeId !== undefined) record.tipChangeId = tipChangeId
-    if (sessionId !== undefined) record.sessionId = sessionId
+    if (input.tipChangeId !== undefined) record.tipChangeId = input.tipChangeId
+    if (input.baseChangeId !== undefined) record.baseChangeId = input.baseChangeId
+    if (input.sessionId !== undefined) record.sessionId = input.sessionId
     const existing = await readRebaseMetadata(repoRoot)
     const history = [...integrationHistory(existing[name]), record].slice(-MAX_INTEGRATION_HISTORY)
     const metadata = { ...existing, [name]: { ...record, history } }
@@ -795,6 +831,21 @@ export const createThreads = (options: {
     }
     await Promise.all(Array.from({ length: Math.min(STATUS_READ_CONCURRENCY, names.length) }, () => worker()))
     return statuses.filter((status): status is ThreadStatus => status !== undefined)
+  }
+
+  const reviewHistory = async (input: {
+    readonly repoRoot: string
+    readonly name: string
+  }): Promise<{ readonly repoRoot: string; readonly name: string; readonly integrations: IntegrationRecord[] }> => {
+    if (!THREAD_WORKSPACE_NAME.test(input.name) || !isAbsolute(input.repoRoot)) {
+      throw new ThreadError('not-a-thread', 'The path is not a managed thread workspace location.')
+    }
+    const repoRoot = resolve(input.repoRoot)
+    if ((await jj(['--ignore-working-copy', 'root'], repoRoot)).trim() !== repoRoot) {
+      throw new ThreadError('not-a-repository', 'The owning project is no longer a JJ repository.')
+    }
+    const metadata = await readRebaseMetadata(repoRoot)
+    return { repoRoot, name: input.name, integrations: [...integrationHistory(metadata[input.name])] }
   }
 
   const status = async (repoRoot: string, name: string): Promise<ThreadStatus> => {
@@ -1318,7 +1369,9 @@ export const createThreads = (options: {
           if (!workingCopyEmpty && (await ensureAuthorized().catch(() => false))) {
             await jj(['new', commitIdRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).catch(() => undefined)
           }
-          await writeRebaseMetadata(thread.repoRoot, thread.threadName, candidateRevision.changeId, input.sessionId).catch(() => undefined)
+          const baseChangeId = await changeIdForCommit(attemptSnapshot.bookmarkCommitId, cwd, input.signal).catch(() => undefined)
+          const tipChangeId = await changeIdForCommit(candidateRevision.commitId, cwd, input.signal).catch(() => undefined)
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head: candidateRevision }
         }
         if (input.signal?.aborted) return { status: 'verification-cancelled' }
@@ -1356,9 +1409,11 @@ export const createThreads = (options: {
       await input.validate?.()
       const cwd = thread.workspaceRoot
       const bookmark = input.bookmark ?? options.bookmark()
+      let baseChangeId: string | undefined
 
       for (let attempt = 1; ; attempt++) {
         input.onProgress?.('rebasing')
+        baseChangeId = await changeIdForRevision(bookmark, cwd, input.signal).catch(() => undefined)
         await jj(['rebase', '-b', '@', '-d', bookmark, '--skip-emptied'], cwd, input.signal)
         const postRebase = await landRevisions(
           `((${bookmark}..@) ~ empty()) | (((${bookmark}..@) & empty()) ~ @ ~ merges() ~ working_copies()) | (@ & empty())`,
@@ -1395,7 +1450,8 @@ export const createThreads = (options: {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, input.signal)
           const head = rebased[0]
           if (head === undefined) throw new ThreadError('jj-failed', 'The rebased revisions have no bookmark head.')
-          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head.changeId, input.sessionId).catch(() => undefined)
+          const tipChangeId = await changeIdForCommit(head.commitId, cwd, input.signal).catch(() => undefined)
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
@@ -1718,6 +1774,7 @@ export const createThreads = (options: {
     locate,
     list,
     status,
+    reviewHistory,
     provision,
     prewarm,
     branchPoint,

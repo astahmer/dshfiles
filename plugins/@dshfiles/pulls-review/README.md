@@ -14,13 +14,17 @@ Open the reusable **pulls.review: Reviews** view from navigation or the Workbenc
 
 ## What it does
 
-Choose a registered project or an existing JJ thread workspace from the
+Choose any registered project or existing JJ thread workspace from the
 searchable project picker. Workspaces have their own scope instead of crowding
 projects. You can also browse to a folder. If a selected workspace has
 disappeared, choose another project or workspace without leaving the review.
 Optionally enter a base bookmark (the Host otherwise chooses `main`, `master` or
-`trunk`). Changes are read as `jj diff --from <base> --to @`. The Host reads that
-patch and groups it with
+`trunk`). Live workspaces are read as `jj diff --from <base> --to @`. Landed
+threads also retain an exact range of persistent JJ change IDs, so the range
+can still be reviewed from the owning repository after the thread workspace is
+removed. Use `jj_thread_review_history` to get the saved base/head IDs and call
+`pulls_review` with `path` set to the repository root plus `fromChangeId` and
+`toChangeId`. The Host reads that patch and groups it with
 [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
 rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
@@ -58,7 +62,7 @@ Docs (1) · +2 −0 · Documentation updates.
 ```
 
 Agents get the same through the `pulls_review` tool (`path`, optional `base`),
-so an agent can inspect a workspace's change shape before reading it.
+so an agent can inspect a workspace's change shape before reading it. For a removed workspace, first read its exact landed range with `jj_thread_review_history`, then pass `path`, `fromChangeId` and `toChangeId` to `pulls_review`. Older records without a saved base cannot be reconstructed safely.
 
 ## Why the rules rather than the site
 
@@ -71,10 +75,10 @@ package gets the real grouping without that coupling. See
 
 ## Host API
 
-`pullsReviewApi.review({ path, base? })` returns one of:
+`pullsReviewApi.review({ path, base?, fromChangeId?, toChangeId? })` returns one of:
 
 - `{ status: 'ok', path, base, head, range, patch, truncated, fileCount, additions, deletions, files, scopes }`
-  — `base` defaults to the first of `main`, `master`, `trunk` that resolves.
+  — `base` defaults to the first of `main`, `master`, `trunk` that resolves. Exact reviews require both persistent change IDs and use the owning repository root as `path`; the Host verifies both revisions resolve before reading their diff.
   `truncated` says the patch hit the 1.2 M-character cap **or** that the file
   lists were clipped to 4000 entries; totals stay exact either way.
 - `{ status: 'failed', path, reason, message }` with `reason` one of

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
@@ -1571,6 +1571,15 @@ const api = jjIntegrationApi.host({
   queueLand: ({ input }) => queueIntegration({ path: input.path, sessionId: input.sessionId }),
   cancelQueuedLand: ({ input }) => cancelQueuedIntegration(input.path),
   integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
+  reviewHistory: async ({ input }) => {
+    if (!isAbsolute(input.path)) throw new PluginApiError('The removed thread workspace path must be absolute.', { code: 'not-a-thread' })
+    const workspacePath = resolve(input.path)
+    const name = basename(workspacePath)
+    const threadDirectory = dirname(workspacePath)
+    const project = registryOf().list().find(workspace => resolve(threadsDirectory(workspace.path)) === threadDirectory)
+    if (project === undefined) throw new PluginApiError('The owning project for this removed thread workspace is not registered.', { code: 'not-a-thread' })
+    return requireThreads().reviewHistory({ repoRoot: project.path, name })
+  },
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
     const found = await findThread({

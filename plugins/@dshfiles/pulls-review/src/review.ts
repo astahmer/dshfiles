@@ -52,26 +52,40 @@ export interface ReviewWorkspaceInput {
   readonly run: JjRun
   readonly path: string
   readonly base?: string | undefined
+  readonly fromChangeId?: string | undefined
+  readonly toChangeId?: string | undefined
   readonly signal?: AbortSignal | undefined
 }
 
 /** The argv the Host builds for a review; exported so a test can drive the same one. */
 const revisionArgs = (revision: string): readonly string[] => ['log', '-r', revision, '--no-graph', '-T', REVISION_TEMPLATE]
 
-const diffArgs = (base: string): readonly string[] => ['diff', '--git', '--from', base, '--to', HEAD_REVISION]
+const changeIdRevset = (changeId: string): string => `change_id(${JSON.stringify(changeId)})`
+
+const diffArgs = (base: string, head = HEAD_REVISION): readonly string[] => ['diff', '--git', '--from', base, '--to', head]
 
 /** Read one thread workspace's changes since its base bookmark and group them. */
 const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResult> => {
-  if (!(await isDirectory(input.path))) return failure(input.path, 'workspace-missing', 'That thread workspace is no longer on disk.')
+  const exactRange = input.fromChangeId !== undefined && input.toChangeId !== undefined
+  if ((input.fromChangeId === undefined) !== (input.toChangeId === undefined)) {
+    return failure(input.path, 'jj-failed', 'Both saved change IDs are required for an exact review range.')
+  }
+  if (!exactRange && !(await isDirectory(input.path))) return failure(input.path, 'workspace-missing', 'That thread workspace is no longer on disk.')
   try {
-    const base = await resolveBase(input.run, { path: input.path, requested: input.base, signal: input.signal })
+    const base = exactRange
+      ? changeIdRevset(input.fromChangeId ?? '')
+      : await resolveBase(input.run, { path: input.path, requested: input.base, signal: input.signal })
     if (base === undefined) {
       return failure(input.path, 'no-base', `No base bookmark found; expected one of ${BASE_CANDIDATES.join(', ')}.`)
     }
+    if (exactRange && !(await resolves(input.run, { path: input.path, revision: base, signal: input.signal }))) {
+      return failure(input.path, 'no-base', 'The saved base change ID no longer resolves in this repository.')
+    }
+    const headRevision = exactRange ? changeIdRevset(input.toChangeId ?? '') : HEAD_REVISION
     const head = (
       await input.run({
         path: input.path,
-        args: revisionArgs(HEAD_REVISION),
+        args: revisionArgs(headRevision),
         signal: input.signal,
         outputLimit: 4_096,
       })
@@ -79,17 +93,20 @@ const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResul
     if (head.length === 0) return failure(input.path, 'jj-failed', 'The working-copy revision could not be read.')
     const diff = await input.run({
       path: input.path,
-      args: diffArgs(base),
+      args: diffArgs(base, headRevision),
       signal: input.signal,
       outputLimit: MAX_PATCH_CHARS,
     })
-    const grouped = await groupPatch({ patch: diff.stdout, title: `${base}..${HEAD_REVISION}` })
+    const baseLabel = exactRange ? input.fromChangeId ?? '' : base
+    const headLabel = exactRange ? input.toChangeId ?? '' : HEAD_REVISION
+    const range = `${baseLabel}..${headLabel}`
+    const grouped = await groupPatch({ patch: diff.stdout, title: range })
     return {
       status: 'ok',
       path: input.path,
-      base,
+      base: baseLabel,
       head,
-      range: `${base}..${HEAD_REVISION}`,
+      range,
       patch: diff.stdout,
       truncated: diff.truncated || grouped.clipped,
       fileCount: grouped.fileCount,

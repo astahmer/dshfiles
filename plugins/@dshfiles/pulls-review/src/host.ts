@@ -54,7 +54,15 @@ export default definePlugin({
 
     const registration = api.rpc.register(
       pullsReviewApi.host({
-        review: ({ input, signal }) => ReviewWorkspaceModel.review({ run, path: input.path, base: input.base, signal }),
+        review: ({ input, signal }) =>
+          ReviewWorkspaceModel.review({
+            run,
+            path: input.path,
+            base: input.base,
+            fromChangeId: input.fromChangeId,
+            toChangeId: input.toChangeId,
+            signal,
+          }),
         summarize: async ({ input, signal }): Promise<SummarizeResult> => {
           const llm = ctx.get('llm')
           if (llm === undefined) return { status: 'failed', reason: 'llm-unavailable', message: 'The Host has no language-model service to summarize with.' }
@@ -100,18 +108,27 @@ export default definePlugin({
       defineTool({
         name: 'pulls_review',
         description:
-          "Read a workspace's changes (a jj diff against a base bookmark) and return the review scopes pulls.review groups them into, with per-scope file and line counts.",
+          "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return pulls.review scopes with per-scope file and line counts.",
         parameters: {
           path: { type: 'string', required: true, description: 'Absolute path of the workspace to review.' },
           base: { type: 'string', description: 'Base bookmark or revision; defaults to the first of main, master or trunk.' },
+          fromChangeId: { type: 'string', description: 'Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.' },
+          toChangeId: { type: 'string', description: 'Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.' },
         },
         output: {
           schema: { type: 'string' },
           render: (_args, value) => [{ type: 'text', text: value }],
         },
-        async execute(input: { readonly path: string; readonly base?: string }, execution) {
+        async execute(input: { readonly path: string; readonly base?: string; readonly fromChangeId?: string; readonly toChangeId?: string }, execution) {
           execution.signal.throwIfAborted()
-          const result = await ReviewWorkspaceModel.review({ run, path: input.path, base: input.base, signal: execution.signal })
+          const result = await ReviewWorkspaceModel.review({
+            run,
+            path: input.path,
+            base: input.base,
+            fromChangeId: input.fromChangeId,
+            toChangeId: input.toChangeId,
+            signal: execution.signal,
+          })
           if (result.status === 'failed') throw new Error(result.message)
           if (result.fileCount === 0) return `pulls.review · ${result.range} — no changes yet.`
           return renderScopeReport(result)

@@ -354,6 +354,35 @@ export const jjIntegrationApi = defineApi({
       output: z.object({ progress: integrationProgressSchema.nullable() }).strict(),
       description: 'Read the current phase of a UI-triggered thread integration operation.',
     }),
+    reviewHistory: method({
+      input: z.object({ path: z.string().min(1) }).strict(),
+      output: z
+        .object({
+          repoRoot: z.string().min(1),
+          name: threadWorkspaceName,
+          integrations: z.array(
+            z
+              .object({
+                at: z.number().int().nonnegative(),
+                tipChangeId: z.string().min(1).max(128).optional(),
+                baseChangeId: z.string().min(1).max(128).optional(),
+                sessionId: z.string().min(1).max(128).optional(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+      description: 'Read the persistent review ranges recorded when this thread landed, even after its workspace folder was removed.',
+      tool: {
+        name: 'jj_thread_review_history',
+        readOnly: true,
+        render: output =>
+          output.integrations
+            .filter(record => record.baseChangeId !== undefined && record.tipChangeId !== undefined)
+            .map(record => `${record.baseChangeId}..${record.tipChangeId} · ${new Date(record.at).toISOString()}`)
+            .join('\\n') || 'No exact saved review ranges. Older integrations may lack a stored base change ID.',
+      },
+    }),
     threadStatus: method({
       input: threadPathInput,
       output: z.object({ bookmark: z.string(), thread: jjThreadSchema.nullable() }).strict(),

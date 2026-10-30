@@ -70,6 +70,9 @@ describe('reviewWorkspace', () => {
 
     const unknown = await ReviewWorkspaceModel.review({ run: fakeRun({ revisions: ['@'] }), path: workspace, base: 'nope' })
     expect(unknown).toMatchObject({ status: 'failed', reason: 'no-base' })
+
+    const incompleteRange = await ReviewWorkspaceModel.review({ run: fakeRun({ revisions: ['main', '@'] }), path: workspace, fromChangeId: 'saved-base' })
+    expect(incompleteRange).toMatchObject({ status: 'failed', reason: 'jj-failed' })
   })
 
   it('reports a missing base, a missing workspace and a missing jj without leaking command output', async () => {
