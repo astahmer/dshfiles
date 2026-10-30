@@ -154,8 +154,8 @@ with the search, so it neither attributes nor rules out Host scheduling delay du
 still a pre-deployment baseline, not evidence about the current JJ changes.
 
 The current workspace now adds count-only spans for caller-project resolution, finder record preparation, session
-listing, title reads, per-session project resolution, content search, and memory search. They add no query text or session IDs and are covered by a
-`recordSpans()` test. This is diagnostic instrumentation, not a latency fix; the new spans will appear only after the
+listing, title reads, per-session project resolution (including the number of distinct non-empty working directories),
+content search, and memory search. They add no query text, session IDs, or paths and are covered by a `recordSpans()` test. This is diagnostic instrumentation, not a latency fix; the new spans will appear only after the
 Host change is integrated and the user restarts the live process.
 
 ## First open of a thread (2026-10-20)

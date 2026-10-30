@@ -615,8 +615,16 @@ export const createMemoryRuntime = (options: {
         'thread finder resolve projects',
         { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } },
         async phase => {
+          const uniqueCwds = new Set<string>()
+          for (const session of sessions) {
+            const cwd = session.header.cwd
+            if (cwd !== undefined && cwd.length > 0) uniqueCwds.add(cwd)
+          }
           const result = await Promise.all(sessions.map(session => projectOf(session.header)))
-          phase.setAttribute('dshx.memory.finder.project_count', result.length)
+          phase.setAttributes({
+            'dshx.memory.finder.project_resolution_count': result.length,
+            'dshx.memory.finder.unique_cwd_count': uniqueCwds.size,
+          })
           return result
         },
       )

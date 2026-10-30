@@ -489,21 +489,27 @@ describe('memory runtime', () => {
     using recorder = recordSpans()
     const { logs, runtime, caller, titles, content } = setup()
     const thread = halyardThread('session-33333333-0000-4000-8000-000000000000')
+    const secondThread = createThread({ id: 'session-44444444-0000-4000-8000-000000000000', cwd: root })
     logs.set(thread.header.id, thread.log())
+    logs.set(secondThread.header.id, secondThread.log())
     titles.set(thread.header.id, 'Synthetic finder title')
+    titles.set(secondThread.header.id, 'Second fixture title')
     content.hits = [{ sessionId: thread.header.id, snippet: 'bounded sample' }]
 
     const page = await runtime.findThreads(caller('session-reader'), { query: 'synthetic' })
 
     expect(page.hits.map(hit => hit.sessionId)).toEqual([thread.header.id])
     expect(recorder.span('thread finder resolve caller project').attributes['dshx.memory.finder.caller_project_resolved']).toBe(true)
-    expect(recorder.span('thread finder prepare records').attributes['dshx.memory.finder.record_count']).toBe(1)
-    expect(recorder.span('thread finder list sessions').attributes['dshx.memory.finder.session_count']).toBe(1)
+    expect(recorder.span('thread finder prepare records').attributes['dshx.memory.finder.record_count']).toBe(2)
+    expect(recorder.span('thread finder list sessions').attributes['dshx.memory.finder.session_count']).toBe(2)
     expect(recorder.span('thread finder read titles').attributes).toMatchObject({
-      'dshx.memory.finder.title_count': 1,
+      'dshx.memory.finder.title_count': 2,
       'dshx.memory.finder.title_read_failed': false,
     })
-    expect(recorder.span('thread finder resolve projects').attributes['dshx.memory.finder.project_count']).toBe(1)
+    expect(recorder.span('thread finder resolve projects').attributes).toMatchObject({
+      'dshx.memory.finder.project_resolution_count': 2,
+      'dshx.memory.finder.unique_cwd_count': 1,
+    })
     expect(recorder.span('thread finder content search').attributes).toMatchObject({
       'dshx.memory.finder.content_hits': 1,
       'dshx.memory.finder.content_attempts': 1,
@@ -522,6 +528,7 @@ describe('memory runtime', () => {
     ].map(name => JSON.stringify(recorder.span(name).attributes))
     expect(attributes.join(' ')).not.toContain('synthetic')
     expect(attributes.join(' ')).not.toContain(thread.header.id)
+    expect(attributes.join(' ')).not.toContain(secondThread.header.id)
     expect(attributes.join(' ')).not.toContain(root)
   })
 
