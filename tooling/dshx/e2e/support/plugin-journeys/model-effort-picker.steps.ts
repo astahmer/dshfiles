@@ -51,7 +51,7 @@ When('the composer model picker is searched for an unavailable model', async ({ 
 
   const popoverBounds = await page.getByRole('dialog').boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
-  expect(popoverBounds.width).toBeLessThanOrEqual(430)
+  expect(popoverBounds.width).toBeLessThanOrEqual(850)
   const effort = reasoningEffort(page)
   await expect(effort).toContainText('Select a model to see its reasoning controls.')
   await expect(effort.getByRole('slider')).toHaveCount(0)
@@ -221,7 +221,7 @@ When('a supported legacy Codex model is selected without validating a new connec
 
   const popoverBounds = await dialog.boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
-  expect(popoverBounds.width).toBeLessThanOrEqual(430)
+  expect(popoverBounds.width).toBeLessThanOrEqual(850)
   const effort = reasoningEffort(page)
   const providerDefault = effort.getByRole('button', { name: 'Use provider default', exact: true })
   await expect(providerDefault).toBeVisible()

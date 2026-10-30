@@ -37,13 +37,10 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
 
   return (
     <section
-      className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-t dshx:border-border dshx:px-3 dshx:py-3"
+      className="dshx:mt-3 dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-2.5"
       data-model-fast-mode
     >
-      <div className="dshx:min-w-0 dshx:flex-1">
-        <p className="dshx:text-sm dshx:font-semibold">Fast mode</p>
-        <p className="dshx:text-xs dshx:text-muted-foreground">Faster processing; the provider may charge more.</p>
-      </div>
+      <p className="dshx:text-sm dshx:font-semibold">Fast mode</p>
       <Switch
         aria-label="Fast mode; may cost more"
         checked={status.enabled}

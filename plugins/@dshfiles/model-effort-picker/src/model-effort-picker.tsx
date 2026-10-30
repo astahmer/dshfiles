@@ -177,204 +177,216 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="dshx-root dshx:max-h-[min(44rem,var(--radix-popover-content-available-height))] dshx:w-[min(26rem,calc(100vw-1rem))] dshx:overflow-y-auto dshx:p-0"
+          className="dshx-root dshx:@container dshx:w-[min(52rem,calc(100vw-1rem))] dshx:overflow-hidden dshx:p-0"
           side="top"
           sideOffset={8}
         >
-          <div className="dshx:space-y-2 dshx:p-3">
-            <label className="dshx:relative dshx:block">
-              <SearchIcon
-                aria-hidden="true"
-                className="dshx:absolute dshx:left-2.5 dshx:top-1/2 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
-              />
-              <Input
-                aria-label="Search models and providers"
-                autoComplete="off"
-                autoFocus
-                className="dshx:pl-9"
-                onChange={event => setQuery(event.currentTarget.value)}
-                onKeyDown={event => {
-                  if (event.key !== 'ArrowDown') return
-                  event.preventDefault()
-                  modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
-                }}
-                placeholder="Search models or providers…"
-                ref={searchInputRef}
-                value={query}
-              />
-            </label>
-
-            {selectedModel !== undefined && selectedGroup !== undefined && (
-              <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:px-1 dshx:text-xs dshx:text-muted-foreground" data-model-picker-current>
-                <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-primary" />
-                <span className="dshx:shrink-0">Using</span>
-                <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">
-                  {selectedGroup.name} / {ModelPickerModel.displayName({ group: selectedGroup, model: selectedModel })}
-                </span>
-              </p>
-            )}
-
-            <ScrollArea className="dshx:h-52 dshx:max-h-[36vh] dshx:min-h-24">
-              <div aria-label="Models grouped by provider" className="dshx:space-y-2 dshx:p-2" ref={modelListRef} role="list">
-                {filteredGroups.map(group => (
-                  <section aria-label={group.name} className="dshx:space-y-1" key={group.id}>
-                    <div className="dshx:px-2 dshx:py-1 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
-                      {group.name}
-                    </div>
-                    {group.models.map(model => {
-                      const active = current?.provider === group.id && current.model === model.id
-                      return (
-                        <Button
-                          aria-pressed={active}
-                          className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:text-left', active && 'dshx:bg-accent')}
-                          data-model-picker-option
-                          disabled={busy}
-                          key={`${group.id}:${model.id}`}
-                          onClick={() => void submitSelection(ModelPickerModel.selectionForModel(group, model, current))}
-                          onKeyDown={event => {
-                            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                            event.preventDefault()
-                            const options = Array.from(
-                              modelListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)') ?? [],
-                            )
-                            const optionIndex = options.indexOf(event.currentTarget)
-                            const nextOption = options[optionIndex + (event.key === 'ArrowDown' ? 1 : -1)]
-                            if (nextOption !== undefined) nextOption.focus()
-                            else if (event.key === 'ArrowUp' && optionIndex === 0) searchInputRef.current?.focus()
-                          }}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{ModelPickerModel.displayName({ group, model })}</span>
-                          <span className="dshx:max-w-28 dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{model.id}</span>
-                          {active && <CheckIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-primary" />}
-                        </Button>
-                      )
-                    })}
-                  </section>
-                ))}
-                {filteredGroups.length === 0 && (
-                  <p className="dshx:px-3 dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
-                    {state.status === 'loading' ? 'Loading model catalog…' : 'No matching models.'}
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-
-            {(selectionError ?? state.error) !== null && (
-              <div
-                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-md dshx:border dshx:border-destructive/30 dshx:bg-destructive/10 dshx:px-3 dshx:py-2"
-                role="alert"
-              >
-                <p className="dshx:min-w-0 dshx:text-xs dshx:text-destructive">{selectionError ?? state.error}</p>
-                {state.error !== null && (
-                  <Button onClick={load} size="xs" variant="outline">
-                    Retry
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {state.failures.length > 0 && (
-              <p className="dshx:text-xs dshx:text-muted-foreground">
-                {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
-                {state.failures.map(failure => failure.name).join(', ')}
-              </p>
-            )}
-          </div>
-
-          <section aria-label="Reasoning effort" className="dshx:space-y-2 dshx:border-t dshx:border-border dshx:px-3 dshx:py-3">
-            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
-              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                <p className="dshx:text-sm dshx:font-semibold">Reasoning effort</p>
-                <Badge variant="secondary">{effortLabel}</Badge>
-              </div>
-              {selectedModel !== undefined && current !== null && (
-                <Button
-                  aria-pressed={current.reasoningEffort === undefined}
-                  disabled={busy}
-                  onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, undefined))}
-                  size="xs"
-                  variant="ghost"
-                >
-                  <RotateCcwIcon aria-hidden="true" />
-                  Use provider default
-                </Button>
+          <div className="dshx:grid dshx:max-h-[min(44rem,var(--radix-popover-content-available-height))] dshx:grid-cols-[minmax(15rem,0.85fr)_minmax(20rem,1.15fr)] dshx:divide-x dshx:divide-border dshx:@max-pane-compact:grid-cols-1">
+            <section
+              aria-label="Choose a model"
+              className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:p-3 dshx:@max-pane-compact:border-b dshx:@max-pane-compact:border-border"
+            >
+              <label className="dshx:relative dshx:block dshx:shrink-0">
+                <SearchIcon
+                  aria-hidden="true"
+                  className="dshx:absolute dshx:left-2.5 dshx:top-1/2 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+                />
+                <Input
+                  aria-label="Search models and providers"
+                  autoComplete="off"
+                  autoFocus
+                  className="dshx:pl-9"
+                  onChange={event => setQuery(event.currentTarget.value)}
+                  onKeyDown={event => {
+                    if (event.key !== 'ArrowDown') return
+                    event.preventDefault()
+                    modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
+                  }}
+                  placeholder="Search models…"
+                  ref={searchInputRef}
+                  value={query}
+                />
+              </label>
+              <ScrollArea className="dshx:min-h-0 dshx:flex-1 dshx:@max-pane-compact:max-h-52">
+                <div aria-label="Models grouped by provider" className="dshx:space-y-3 dshx:pr-2" ref={modelListRef} role="list">
+                  {filteredGroups.map(group => (
+                    <section aria-label={group.name} className="dshx:space-y-1" key={group.id}>
+                      <div className="dshx:px-2 dshx:py-1 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+                        {group.name}
+                      </div>
+                      {group.models.map(model => {
+                        const active = current?.provider === group.id && current.model === model.id
+                        return (
+                          <Button
+                            aria-pressed={active}
+                            className={cn(
+                              'dshx:h-9 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-2 dshx:text-left',
+                              active && 'dshx:border-primary/40 dshx:bg-accent dshx:text-accent-foreground',
+                            )}
+                            data-model-picker-option
+                            disabled={busy}
+                            key={`${group.id}:${model.id}`}
+                            onClick={() => void submitSelection(ModelPickerModel.selectionForModel(group, model, current))}
+                            onKeyDown={event => {
+                              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                              event.preventDefault()
+                              const options = Array.from(
+                                modelListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)') ?? [],
+                              )
+                              const optionIndex = options.indexOf(event.currentTarget)
+                              const nextOption = options[optionIndex + (event.key === 'ArrowDown' ? 1 : -1)]
+                              if (nextOption !== undefined) nextOption.focus()
+                              else if (event.key === 'ArrowUp' && optionIndex === 0) searchInputRef.current?.focus()
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs">{ModelPickerModel.displayName({ group, model })}</span>
+                            {active && <CheckIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-primary" />}
+                          </Button>
+                        )
+                      })}
+                    </section>
+                  ))}
+                  {filteredGroups.length === 0 && (
+                    <p className="dshx:px-3 dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
+                      {state.status === 'loading' ? 'Loading model catalog…' : 'No matching models.'}
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+              {state.failures.length > 0 && (
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
+                  {state.failures.map(failure => failure.name).join(', ')}
+                </p>
               )}
-            </div>
+            </section>
 
-            {selectedModel === undefined || current === null ? (
-              <p className="dshx:text-xs dshx:text-muted-foreground">Select a model to see its reasoning controls.</p>
-            ) : efforts.length === 0 ? (
-              <p className="dshx:text-xs dshx:text-muted-foreground">This model does not advertise reasoning levels.</p>
-            ) : (
-              <div className="dshx:space-y-2">
-                {efforts.length > 1 && (
-                  <div className="dshx:relative dshx:py-1">
-                    <Slider
-                      aria-label="Reasoning effort"
-                      className="dshx:py-1 dshx:[&_[data-slot=slider-track]]:h-3 dshx:[&_[data-slot=slider-track]]:bg-border dshx:[&_[data-slot=slider-range]]:bg-info dshx:[&_[data-slot=slider-thumb]]:z-[2] dshx:[&_[data-slot=slider-thumb]]:size-6 dshx:[&_[data-slot=slider-thumb]]:border-2 dshx:[&_[data-slot=slider-thumb]]:border-info dshx:[&_[data-slot=slider-thumb]]:bg-background dshx:[&_[data-slot=slider-thumb]]:shadow-md"
-                      data-model-effort-slider
+            <div className="dshx:min-h-0 dshx:overflow-y-auto dshx:p-3">
+              {selectedModel !== undefined && selectedGroup !== undefined ? (
+                <div className="dshx:mb-3 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:bg-muted/50 dshx:px-3 dshx:py-2.5">
+                  <CheckIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-primary" />
+                  <div className="dshx:min-w-0 dshx:flex-1">
+                    <p className="dshx:truncate dshx:text-sm dshx:font-semibold" data-model-picker-current>
+                      {ModelPickerModel.displayName({ group: selectedGroup, model: selectedModel })}
+                    </p>
+                    <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{selectedGroup.name}</p>
+                  </div>
+                  <Badge variant="secondary">{effortLabel}</Badge>
+                </div>
+              ) : (
+                <p className="dshx:mb-3 dshx:rounded-lg dshx:bg-muted/50 dshx:px-3 dshx:py-2.5 dshx:text-sm dshx:text-muted-foreground">No model selected.</p>
+              )}
+
+              {(selectionError ?? state.error) !== null && (
+                <div
+                  className="dshx:mb-3 dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-md dshx:border dshx:border-destructive/30 dshx:bg-destructive/10 dshx:px-3 dshx:py-2"
+                  role="alert"
+                >
+                  <p className="dshx:min-w-0 dshx:text-xs dshx:text-destructive">{selectionError ?? state.error}</p>
+                  {state.error !== null && (
+                    <Button onClick={load} size="xs" variant="outline">
+                      Retry
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <section aria-label="Reasoning effort" className="dshx:space-y-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-3">
+                <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
+                  <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                    <p className="dshx:text-sm dshx:font-semibold">Reasoning effort</p>
+                    <Badge variant="secondary">{effortLabel}</Badge>
+                  </div>
+                  {selectedModel !== undefined && current !== null && (
+                    <Button
+                      aria-pressed={current.reasoningEffort === undefined}
                       disabled={busy}
-                      max={efforts.length - 1}
-                      min={0}
-                      onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
-                      onValueCommit={(values: number[]) => {
-                        const effort = efforts[values[0] ?? 0]
-                        if (effort !== undefined) void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))
-                      }}
-                      step={1}
-                      value={[sliderIndex]}
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="dshx:pointer-events-none dshx:absolute dshx:inset-x-3 dshx:top-1/2 dshx:z-[1] dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:justify-between"
-                      data-model-effort-slider-markers
+                      onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, undefined))}
+                      size="xs"
+                      variant="ghost"
                     >
-                      {efforts.map((effort, index) => (
-                        <span
-                          className={cn('dshx:size-1 dshx:rounded-full', index <= sliderIndex ? 'dshx:bg-background/70' : 'dshx:bg-muted-foreground/50')}
-                          data-model-effort-marker
-                          key={effort.id}
+                      <RotateCcwIcon aria-hidden="true" />
+                      Use provider default
+                    </Button>
+                  )}
+                </div>
+
+                {selectedModel === undefined || current === null ? (
+                  <p className="dshx:text-xs dshx:text-muted-foreground">Select a model to see its reasoning controls.</p>
+                ) : efforts.length === 0 ? (
+                  <p className="dshx:text-xs dshx:text-muted-foreground">This model does not advertise reasoning levels.</p>
+                ) : (
+                  <div className="dshx:space-y-2">
+                    {efforts.length > 1 && (
+                      <div className="dshx:relative dshx:py-1">
+                        <Slider
+                          aria-label="Reasoning effort"
+                          className="dshx:py-1 dshx:[&_[data-slot=slider-track]]:h-3 dshx:[&_[data-slot=slider-track]]:bg-border dshx:[&_[data-slot=slider-range]]:bg-info dshx:[&_[data-slot=slider-thumb]]:z-[2] dshx:[&_[data-slot=slider-thumb]]:size-6 dshx:[&_[data-slot=slider-thumb]]:border-2 dshx:[&_[data-slot=slider-thumb]]:border-info dshx:[&_[data-slot=slider-thumb]]:bg-background dshx:[&_[data-slot=slider-thumb]]:shadow-md"
+                          data-model-effort-slider
+                          disabled={busy}
+                          max={efforts.length - 1}
+                          min={0}
+                          onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
+                          onValueCommit={(values: number[]) => {
+                            const effort = efforts[values[0] ?? 0]
+                            if (effort !== undefined) void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))
+                          }}
+                          step={1}
+                          value={[sliderIndex]}
                         />
+                        <div
+                          aria-hidden="true"
+                          className="dshx:pointer-events-none dshx:absolute dshx:inset-x-3 dshx:top-1/2 dshx:z-[1] dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:justify-between"
+                          data-model-effort-slider-markers
+                        >
+                          {efforts.map((effort, index) => (
+                            <span
+                              className={cn('dshx:size-1 dshx:rounded-full', index <= sliderIndex ? 'dshx:bg-background/70' : 'dshx:bg-muted-foreground/50')}
+                              data-model-effort-marker
+                              key={effort.id}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="dshx:flex dshx:justify-between dshx:gap-2" data-model-effort-options>
+                      {efforts.map((effort, index) => (
+                        <button
+                          aria-pressed={index === selectedEffortIndex}
+                          className={cn(
+                            'dshx:rounded-sm dshx:px-1 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:transition-colors dshx:hover:text-foreground dshx:focus-visible:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                            index === selectedEffortIndex && 'dshx:font-semibold dshx:text-foreground',
+                          )}
+                          data-model-effort-option
+                          disabled={busy}
+                          key={effort.id}
+                          onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))}
+                          type="button"
+                        >
+                          {effort.name}
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
-                <div className="dshx:flex dshx:justify-between dshx:gap-2" data-model-effort-options>
-                  {efforts.map((effort, index) => (
-                    <button
-                      aria-pressed={index === selectedEffortIndex}
-                      className={cn(
-                        'dshx:rounded-sm dshx:px-1 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:transition-colors dshx:hover:text-foreground dshx:focus-visible:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                        index === selectedEffortIndex && 'dshx:font-semibold dshx:text-foreground',
-                      )}
-                      data-model-effort-option
-                      disabled={busy}
-                      key={effort.id}
-                      onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))}
-                      type="button"
-                    >
-                      {effort.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-          {current !== null && (
-            <FastModeSection
-              disabled={busy}
-              key={`${sessionId}:${current.provider}:${current.model}`}
-              onEnabledChange={enabled =>
-                setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ sessionId, provider: current.provider, model: current.model }) })
-              }
-              model={current.model}
-              provider={current.provider}
-              sessionId={sessionId}
-            />
-          )}
-          <FallbacksSection busy={busy} current={current} groups={state.groups} sessionId={sessionId} />
+              </section>
+              {current !== null && (
+                <FastModeSection
+                  disabled={busy}
+                  key={`${sessionId}:${current.provider}:${current.model}`}
+                  onEnabledChange={enabled =>
+                    setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ sessionId, provider: current.provider, model: current.model }) })
+                  }
+                  model={current.model}
+                  provider={current.provider}
+                  sessionId={sessionId}
+                />
+              )}
+              <FallbacksSection busy={busy} current={current} groups={state.groups} sessionId={sessionId} />
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
       {nextAccount !== undefined && (
