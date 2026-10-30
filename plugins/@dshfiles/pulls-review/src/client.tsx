@@ -1,10 +1,11 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { Changes, defineClientPlugin, hostStorage } from '@dshfiles/dshx/client'
 import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
+import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PullsReviewPanel } from './panel.js'
 import { PageReviewContextModel } from './review-page-context.js'
@@ -17,10 +18,11 @@ export default defineClientPlugin({
   id: 'dshfiles-pulls-review',
   name: 'pulls.review',
   uses: ['ui'],
-  inject: ['layout', 'sidebarRight', 'sessions', 'workspaces'],
+  inject: ['layout', 'sidebarRight', 'sessions', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(api) {
     const ctx = api.raw.ctx
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
+    const workspacePicker = createWorkspacePickerPorts(ctx.remote)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
     const reviewed = hostStorage(api).store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
     void reviewed.ready
@@ -40,7 +42,7 @@ export default defineClientPlugin({
     })
     api.ui.register({ name: 'main', key: PANEL_ID }, () => (
       <PluginQueryProvider>
-        <PullsReviewPanel focus={focus} sessions={ctx.sessions} workspaces={ctx.workspaces} reviewed={reviewed} />
+        <PullsReviewPanel focus={focus} sessions={ctx.sessions} workspacePicker={workspacePicker} reviewed={reviewed} />
       </PluginQueryProvider>
     ))
   },

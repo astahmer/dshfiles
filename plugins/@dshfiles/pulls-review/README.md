@@ -6,13 +6,21 @@ with per-file review progress — inside DSH.
 
 ![pulls.review groups changed files by scope and tracks review progress](docs/screenshots/thread-review-scopes.png)
 
+The searchable project picker keeps existing thread workspaces in their own scope:
+
+![Project and workspace picker](docs/screenshots/project-workspace-picker.png)
+
 Open the reusable **pulls.review: Reviews** view from navigation or the Workbench chooser.
 
 ## What it does
 
-Choose any registered project or workspace in the panel, and optionally enter
-a base bookmark (the Host otherwise chooses `main`, `master` or `trunk`). Changes
-are read as `jj diff --from <base> --to @`. The Host reads that patch and groups it with
+Choose a registered project or an existing JJ thread workspace from the
+searchable project picker. Workspaces have their own scope instead of crowding
+projects. You can also browse to a folder. If a selected workspace has
+disappeared, choose another project or workspace without leaving the review.
+Optionally enter a base bookmark (the Host otherwise chooses `main`, `master` or
+`trunk`). Changes are read as `jj diff --from <base> --to @`. The Host reads that
+patch and groups it with
 [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
 rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /

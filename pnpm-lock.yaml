@@ -4399,9 +4399,15 @@ importers:
 
   plugins/@dshfiles/pulls-review:
     dependencies:
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/project-folder-picker':
+        specifier: workspace:*
+        version: link:../project-folder-picker
       '@pulls.review/core':
         specifier: 0.3.3
         version: 0.3.3(@modelcontextprotocol/sdk@1.32.2(zod@4.4.3))(typescript@7.0.2)(ws@8.22.0)(zod@4.4.3)
@@ -4415,12 +4421,12 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(b5e0406802d407b14a88581c2895028f)
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(d4330438b0f00034da71ed09823d4cc1)
-      '@deepseek-ai/dsh-api-workspace-controller':
-        specifier: 'catalog:'
-        version: 0.2.1-rc.2(423b0975ded0003cb2a5408fd1fd6375)
       '@deepseek-ai/dsh-client-connection':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))

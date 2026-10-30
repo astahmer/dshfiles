@@ -5,10 +5,10 @@
     {
       "id": "thread-review-scopes",
       "title": "Review project and workspace changes by scope",
-      "summary": "Choose a registered project or workspace and optional base bookmark, read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
+      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
       "surfaces": ["client", "host"],
       "configuration": [],
-      "states": ["choose-project", "choose-workspace", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
+      "states": ["choose-project", "choose-workspace", "workspace-missing-recovery", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
@@ -32,7 +32,18 @@
         "expect text \"main..@\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
-        "expect text \"Docs\""
+        "expect text \"Docs\"",
+        "click button \"Choose project or workspace\"",
+        "expect dialog \"Choose project or workspace\"",
+        "click button \"Filter by scope\"",
+        "click menuitemradio \"Workspaces\"",
+        "expect option \"thread-*\"",
+        "click option \"thread-*\"",
+        "expect text \"thread-*\"",
+        "click button \"Choose project or workspace\"",
+        "click button \"Filter by scope\"",
+        "click menuitemradio \"Workspaces\"",
+        "expect option \"thread-*\""
       ],
       "verification": [
         {

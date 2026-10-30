@@ -1,19 +1,19 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { useApi, useSubscribable, type HostStore } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
-import { Check, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { Check, ChevronDown, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { pullsReviewApi } from './api.js'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { ReviewedMarksModel, type ReviewedMarks } from './reviewed.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import type { SessionFocus } from './session-focus.js'
@@ -21,7 +21,7 @@ import type { SessionFocus } from './session-focus.js'
 export interface PullsReviewPanelProps {
   readonly sessions: ISessions
   readonly focus: SessionFocus
-  readonly workspaces: IWorkspaces
+  readonly workspacePicker: WorkspacePickerPorts
   /** Kept on the Host, so marks made in one browser show in every other. */
   readonly reviewed: HostStore<ReviewedMarks>
 }
@@ -44,6 +44,7 @@ const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }):
 
 export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const api = useApi(pullsReviewApi)
+  const jjApi = useApi(jjIntegrationApi)
   const reviewedStore = props.reviewed
   const reviewed = useSubscribable(reviewedStore)
 
@@ -55,20 +56,36 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const subscribeSessions = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const readCwd = useCallback(() => (sessionId === undefined ? undefined : props.sessions.list.getSnapshot().byId[sessionId]?.cwd), [props.sessions, sessionId])
   const cwd = useSyncExternalStore(subscribeSessions, readCwd, noBody)
-  const subscribeWorkspaces = useCallback((listener: () => void) => props.workspaces.list.subscribe(listener), [props.workspaces])
-  const registeredWorkspaces = useSyncExternalStore(
-    subscribeWorkspaces,
-    () => props.workspaces.list.getSnapshot().items,
-    () => [],
-  )
   const [selectedPath, setSelectedPath] = useState(() => pageReview?.workspacePath ?? '')
   const [baseRef, setBaseRef] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const projectsQuery = useQuery({
+    queryKey: ['pulls-review', 'projects'],
+    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => jjApi.projects({}, { signal: hostSignal }) }),
+    staleTime: 60_000,
+  })
   useEffect(() => {
     if (pageReview === undefined) return
     setSelectedPath(pageReview.workspacePath ?? '')
   }, [pageReview])
   const reviewPath = selectedPath || pageReview?.workspacePath || cwd || ''
   const reviewSessionId = pageReview?.sessionId ?? sessionId
+  const pickerProjects: RegisteredProject[] = [
+    ...(projectsQuery.data?.projects ?? []).map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
+    ...(projectsQuery.data?.workspaces ?? []).map(workspace => ({
+      workspaceId: workspace.workspaceId,
+      title: workspace.title,
+      canonicalPath: workspace.path,
+      isJjWorkspace: true,
+    })),
+  ]
+  const selectedProject = pickerProjects.find(project => project.canonicalPath === reviewPath)
+  const pickerLabel =
+    selectedProject === undefined
+      ? reviewPath === ''
+        ? 'Choose project or workspace'
+        : `Other folder · ${reviewPath}`
+      : `${selectedProject.title} · ${selectedProject.canonicalPath}`
 
   const query = useQuery({
     queryKey: ['pulls-review', reviewPath, baseRef],
@@ -186,19 +203,33 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     <section className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:p-4">
       <header className="dshx:flex dshx:flex-col dshx:gap-2">
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <Select value={reviewPath} onValueChange={setSelectedPath}>
-            <SelectTrigger aria-label="Project or workspace" className="dshx:min-w-48 dshx:max-w-full" size="sm">
-              <SelectValue placeholder="Project or workspace" />
-            </SelectTrigger>
-            <SelectContent className="dshx-root">
-              {cwd ? <SelectItem value={cwd}>Current thread · {cwd}</SelectItem> : null}
-              {registeredWorkspaces.map(workspace => (
-                <SelectItem key={workspace.workspaceId} value={workspace.path}>
-                  {workspace.title} · {workspace.path}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            aria-label="Choose project or workspace"
+            className="dshx:min-w-48 dshx:max-w-full dshx:justify-between dshx:font-normal"
+            onClick={() => setPickerOpen(true)}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <span className="dshx:min-w-0 dshx:truncate">{pickerLabel}</span>
+            <ChevronDown aria-hidden className="dshx:size-4 dshx:shrink-0" />
+          </Button>
+          {pickerOpen ? (
+            <ProjectFolderPicker
+              directoryPicker={props.workspacePicker.directoryPicker}
+              disabled={projectsQuery.isLoading}
+              heading="Choose project or workspace"
+              loading={projectsQuery.isLoading}
+              onClose={() => setPickerOpen(false)}
+              onRegisterWorkspace={props.workspacePicker.registerWorkspace}
+              onSelect={(selection: ProjectFolderSelection) => {
+                setSelectedPath(selection.canonicalPath)
+                setPickerOpen(false)
+              }}
+              projects={pickerProjects}
+              showNativePicker={false}
+            />
+          ) : null}
           <Input
             aria-label="Base branch or bookmark"
             placeholder="Base branch (default)"

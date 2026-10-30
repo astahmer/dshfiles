@@ -21,10 +21,18 @@ When('the pulls.review panel is opened from the sidebar', async ({ page }: { pag
 
 Then('the pulls.review panel reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
   await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
-    const projectSelector = page.getByRole('combobox', { name: 'Project or workspace', exact: true })
-    await expect(projectSelector).toBeVisible()
-    await projectSelector.click()
-    await page.getByRole('option', { name: /Current thread/ }).click()
+    const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
+    await expect(projectPicker).toBeVisible()
+    await projectPicker.click()
+    const pickerDialog = page.getByRole('dialog')
+    await expect(pickerDialog).toBeVisible()
+    await pickerDialog.getByRole('button', { name: 'Filter by scope', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: 'Workspaces', exact: true }).click()
+    const workspaceOption = pickerDialog.getByRole('option').first()
+    await expect(workspaceOption).toBeVisible()
+    await workspaceOption.click()
+    await expect(pickerDialog).toBeHidden()
+    await expect(projectPicker).toContainText(/thread-/)
     const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
     await expect(baseSelector).toBeVisible()
     await baseSelector.fill(base)
