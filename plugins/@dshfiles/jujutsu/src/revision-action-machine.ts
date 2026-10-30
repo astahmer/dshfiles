@@ -4,6 +4,8 @@ import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 
 export type ActionPreview = z.infer<typeof previewSchema>
 
+export const STALE_REVISION_ERROR = 'Revision is no longer visible. Refresh and try again.'
+
 interface ConfirmResult {
   readonly message: string
   readonly output: string
@@ -55,6 +57,7 @@ type RevisionActionEvent =
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' }
   | { readonly type: 'dismissError' }
+  | { readonly type: 'repository.refresh' }
   | { readonly type: 'reset' }
 
 // A Host from before PluginApiError (until the user restarts DSH) sends this generic failure; name the action instead.
@@ -110,6 +113,9 @@ export const revisionActionMachine = setup({
   initial: 'idle',
   on: {
     dismissError: { actions: assign({ error: null }) },
+    'repository.refresh': {
+      actions: assign(({ context }) => (context.error === STALE_REVISION_ERROR ? { error: null } : {})),
+    },
     reset: { target: '.idle', actions: assign({ ...idleContext, result: null, error: null }) },
     reject: { actions: assign(({ event }) => ({ error: event.error })) },
   },

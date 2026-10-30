@@ -78,7 +78,7 @@ import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
-import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
+import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin, STALE_REVISION_ERROR } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
 import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
 import { openGraphRepository } from './repository-opening.js'
@@ -1083,11 +1083,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         fullPage={diffTabOpen}
       />
     )
-  const refreshRepository = (): void => {
+  const refreshRepository = useCallback(() => {
     if (repoId === null) return
+    if (actionSnapshot.context.error === STALE_REVISION_ERROR) sendAction({ type: 'repository.refresh' })
     setGraphGeneration(current => current + 1)
     void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
-  }
+  }, [actionSnapshot.context.error, path, queryClient, repoId, sendAction])
+
+  useEffect(() => {
+    if (actionSnapshot.context.error === STALE_REVISION_ERROR) refreshRepository()
+  }, [actionSnapshot.context.error, refreshRepository])
 
   const openFullDiff = (revision: Revision, focusPath: string | null): void => {
     setFullDiff({ commitId: revision.commitId, title: firstLine(revision.description) + ' · ' + revision.shortestChangeId, focusPath })

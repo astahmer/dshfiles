@@ -62,13 +62,21 @@
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
+        "click button \"Filter by scope\"",
+        "click menuitemradio \"Workspaces\"",
+        "expect text \"JJ workspace\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
         "expect button \"Sample project*\"",
         "expect checkbox \"Hide immutable\"",
         "click checkbox \"Hide immutable\"",
-        "expect checkbox \"Hide immutable\""
+        "expect checkbox \"Hide immutable\"",
+        "expect text \"(no description)\"",
+        "click button \"Choose repository\"",
+        "click button \"Filter by scope\"",
+        "click menuitemradio \"Workspaces\"",
+        "expect text \"JJ workspace\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
