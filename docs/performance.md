@@ -142,6 +142,17 @@ remains slow after deployment, use its trace to choose the next optimization rat
 The remaining validation is the same live search after integration and a user-initiated Host restart; neither was
 performed here.
 
+### Live recheck (2026-10-31; before deployment)
+
+On the current Host (PID 61372), a real palette content query returned its first result in 9.53 s (12 results). The
+`@dshfiles/memory/findThreads` span lasted 8.885 s; its only child was an SSH command lasting 636 ms. The remaining
+8.25 s has no phase-level spans, so this still identifies the slow work unit but not its internal cost. The pending
+CPU-profile permission and deployment decision remain necessary before a live after-measurement.
+
+A separate 60 s Host-lag probe reported p99 25 ms, max 483 ms, and one stall above 250 ms. It was not simultaneous
+with the search, so it neither attributes nor rules out Host scheduling delay during the 9.53 s interaction. This is
+still a pre-deployment baseline, not evidence about the current JJ changes.
+
 ## First open of a thread (2026-10-20)
 
 Opening a cold thread used to resume its Agent right after the snapshot went out: agent restore, `dsh-context` and
