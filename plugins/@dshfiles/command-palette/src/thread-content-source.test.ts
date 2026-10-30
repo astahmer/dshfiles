@@ -57,6 +57,30 @@ describe('the palette thread-content source', () => {
     ])
   })
 
+  it('excludes subagent hits from palette content results', async () => {
+    const source = search({
+      apis: [memoryApi],
+      finder: async () => ({
+        hits: [
+          { sessionId: 'parent', snippet: 'top-level hit', title: 'Parent', parentSessionId: null, live: true, persisted: true },
+          { sessionId: 'child', snippet: 'subagent hit', title: 'Child', parentSessionId: 'parent' },
+        ],
+      }),
+    })
+    expect(await source('query', signal)).toEqual([
+      {
+        sessionId: 'parent',
+        snippet: 'top-level hit',
+        title: 'Parent',
+        project: undefined,
+        cwd: undefined,
+        updatedAt: undefined,
+        live: true,
+        persisted: true,
+      },
+    ])
+  })
+
   it('discovers the API once and keeps using it', async () => {
     const listApis = vi.fn(async () => [memoryApi])
     const callFinder = vi.fn(async () => ({ hits: [] }))

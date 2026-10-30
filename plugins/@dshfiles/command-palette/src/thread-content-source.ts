@@ -8,6 +8,9 @@ export type ThreadContentHit = {
   readonly project?: string | undefined
   readonly cwd?: string | undefined
   readonly updatedAt?: number | undefined
+  readonly live?: boolean | undefined
+  readonly persisted?: boolean | undefined
+  readonly parentSessionId?: string | null | undefined
 }
 
 type RegistryApiView = {
@@ -43,6 +46,9 @@ const finderPage = z.object({
       project: z.string().optional(),
       cwd: z.string().nullable().optional(),
       updatedAt: z.number().optional(),
+      live: z.boolean().optional(),
+      persisted: z.boolean().optional(),
+      parentSessionId: z.string().nullable().optional(),
     }),
   ),
 })
@@ -68,14 +74,22 @@ export const createThreadContentSearch = (deps: ThreadContentSearchDeps) => {
         .then(value => finderPage.safeParse(value))
         .catch(() => undefined)
       if (answer?.success === true)
-        return answer.data.hits.map(hit => ({
-          sessionId: hit.sessionId,
-          snippet: hit.snippet,
-          title: hit.title,
-          project: hit.project,
-          cwd: hit.cwd ?? undefined,
-          updatedAt: hit.updatedAt,
-        }))
+        return answer.data.hits.flatMap(hit =>
+          hit.parentSessionId
+            ? []
+            : [
+                {
+                  sessionId: hit.sessionId,
+                  snippet: hit.snippet,
+                  title: hit.title,
+                  project: hit.project,
+                  cwd: hit.cwd ?? undefined,
+                  updatedAt: hit.updatedAt,
+                  live: hit.live,
+                  persisted: hit.persisted,
+                },
+              ],
+        )
     }
     return deps.native(query, signal)
   }

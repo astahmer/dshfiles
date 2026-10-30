@@ -21,7 +21,8 @@
         "A thread title or project match is omitted from results.",
         "A child session or subagent appears in the Threads list.",
         "A file basename match is buried below unrelated path matches.",
-        "A persisted user message does not return from thread-content search."
+        "A persisted user message does not return from thread-content search.",
+        "Thread-content results include subagents, duplicate the title, or hide project, date, and status metadata."
       ],
       "externalDependencies": [],
       "verification": [
@@ -75,6 +76,18 @@
           "id": "command-palette.threads-project-scope",
           "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
           "testName": "lists only the current project on Threads and every project on Everything"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.content-search-excludes-subagents",
+          "file": "plugins/@dshfiles/command-palette/src/thread-content-source.test.ts",
+          "testName": "excludes subagent hits from palette content results"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.content-search-metadata",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "shows content-hit metadata without repeating a title used as the snippet prefix"
         }
       ],
       "telemetry": [

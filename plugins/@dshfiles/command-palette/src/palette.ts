@@ -52,6 +52,8 @@ export interface ContentHit {
   readonly project?: string
   readonly cwd?: string
   readonly updatedAt?: number
+  readonly live?: boolean
+  readonly persisted?: boolean
 }
 
 export interface ThreadCandidate {
@@ -60,6 +62,7 @@ export interface ThreadCandidate {
   readonly project: string
   readonly cwd: string
   readonly updatedAt: number
+  readonly running?: boolean
 }
 
 const WORD_BOUNDARY = /[\s\-_/.·:]/

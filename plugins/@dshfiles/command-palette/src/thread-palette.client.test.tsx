@@ -54,6 +54,10 @@ const copy: ThreadPaletteCopy = {
   noEditorFile: 'No editor file.',
   contentSearching: 'Searching thread content…',
   contentUnavailable: 'Thread content is unavailable.',
+  contentStatusRunning: 'Running',
+  contentStatusFinished: 'Finished',
+  contentStatusLive: 'Live',
+  contentStatusSaved: 'Saved',
   actionFailed: 'Action failed.',
   ask: 'Ask DSH',
   askPlaceholder: 'Ask DSH anything…',
@@ -349,6 +353,42 @@ describe('Threads tab project scope', () => {
     view.rerender(palette(2))
     await screen.findByRole('option', { name: /fresh marker/ })
     expect(searchContent).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows content-hit metadata without repeating a title used as the snippet prefix', async () => {
+    const thread = {
+      id: 'session-result',
+      title: 'Title from the thread',
+      project: '/work/dshfiles',
+      cwd: '/work/dshfiles',
+      updatedAt: Date.UTC(2026, 9, 25),
+      running: true,
+    }
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[thread]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={async () => [{ sessionId: thread.id, snippet: 'Title from the thread — useful excerpt' }]}
+        onBacklogCapture={vi.fn()}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#excerpt' } })
+
+    const result = await screen.findByRole('option', { name: /dshfiles.*2026-10-25.*Running.*useful excerpt/ })
+
+    expect(result.textContent?.match(/Title from the thread/gu)).toHaveLength(1)
+    expect(result.textContent).toContain('dshfiles')
+    expect(result.textContent).toContain('2026-10-25')
+    expect(result.textContent).toContain('Running')
+    expect(result.textContent).toContain('useful excerpt')
   })
 
   it('lists only the current project on Threads and every project on Everything', async () => {

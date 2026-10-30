@@ -68,6 +68,10 @@ export interface ThreadPaletteCopy {
   readonly noEditorFile: string
   readonly contentSearching: string
   readonly contentUnavailable: string
+  readonly contentStatusRunning: string
+  readonly contentStatusFinished: string
+  readonly contentStatusLive: string
+  readonly contentStatusSaved: string
   readonly actionFailed: string
   /** Ask DSH: the entry point shown on an empty palette, its input, and its result row. */
   readonly ask: string
@@ -104,7 +108,13 @@ type PaletteRow =
   | { readonly kind: 'thread'; readonly thread: ThreadCandidate }
   | { readonly kind: 'destination'; readonly destination: PaletteActionOption }
   | { readonly kind: 'file'; readonly path: string }
-  | { readonly kind: 'content'; readonly thread: ThreadCandidate; readonly snippet: string }
+  | {
+      readonly kind: 'content'
+      readonly thread: ThreadCandidate
+      readonly snippet: string
+      readonly live?: boolean | undefined
+      readonly persisted?: boolean | undefined
+    }
   | { readonly kind: 'line'; readonly line: number }
   | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
   | { readonly kind: 'ask'; readonly question: string }
@@ -114,6 +124,24 @@ const RESULT_LIMIT = 50
 const COMMAND_LIMIT = 30
 const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
+
+const withoutRepeatedTitle = (snippet: string, title: string): string => {
+  const trimmed = snippet.trim()
+  const normalizedTitle = title.trim().toLocaleLowerCase()
+  const normalizedSnippet = trimmed.toLocaleLowerCase()
+  if (normalizedTitle.length === 0 || !normalizedSnippet.startsWith(normalizedTitle)) return trimmed
+  const next = trimmed[title.trim().length] ?? ''
+  if (next.length > 0 && !/[\s—–:-]/u.test(next)) return trimmed
+  return trimmed
+    .slice(title.trim().length)
+    .replace(/^[\s—–:-]+/u, '')
+    .trim()
+}
+
+const projectLabel = (project: string): string => project.split(/[\\/]/u).filter(Boolean).at(-1) ?? project
+
+const contentDate = (timestamp: number | undefined): string | undefined =>
+  timestamp === undefined || !Number.isFinite(timestamp) ? undefined : new Date(timestamp).toISOString().slice(0, 10)
 
 const escapeLabelFor = (input: { readonly ask: boolean; readonly subview: boolean; readonly hasQuery: boolean; readonly copy: ThreadPaletteCopy }): string => {
   if (input.ask) return input.hasQuery ? input.copy.clear : input.copy.askExit
@@ -265,7 +293,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         (hit.title === undefined
           ? undefined
           : { id: hit.sessionId, title: hit.title, project: hit.project ?? '', cwd: hit.cwd ?? '', updatedAt: hit.updatedAt ?? 0 })
-      return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
+      return thread === undefined ? [] : [{ thread, snippet: hit.snippet, live: hit.live, persisted: hit.persisted }]
     })
   }, [content.hits, props.threads, view])
   const line = view === 'line' ? PaletteRules.parseLineNumber(deferredQuery) : null
@@ -638,12 +666,36 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               <CommandGroup heading={props.copy.viewContent}>
                 {contentRows.map(hit => {
                   const row: PaletteRow = { kind: 'content', ...hit }
+                  const snippet = withoutRepeatedTitle(hit.snippet, hit.thread.title)
+                  const date = contentDate(hit.thread.updatedAt)
+                  const status =
+                    hit.thread.running === true
+                      ? props.copy.contentStatusRunning
+                      : hit.thread.running === false
+                        ? props.copy.contentStatusFinished
+                        : hit.live === true
+                          ? props.copy.contentStatusLive
+                          : hit.persisted === true
+                            ? props.copy.contentStatusSaved
+                            : undefined
+                  const project = hit.thread.project.length === 0 ? props.copy.unassigned : projectLabel(hit.thread.project)
                   return (
                     <CommandItem key={hit.thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
                       <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
-                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
-                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{hit.snippet}</span>
+                        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground">
+                          <Badge variant="secondary" className="dshx:max-w-32 dshx:truncate">
+                            {project}
+                          </Badge>
+                          {date === undefined ? null : <span className="dshx:shrink-0">{date}</span>}
+                          {status === undefined ? null : (
+                            <Badge variant="outline" className="dshx:shrink-0">
+                              {status}
+                            </Badge>
+                          )}
+                        </span>
+                        {snippet.length === 0 ? null : <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{snippet}</span>}
                       </span>
                       {shortcut(row)}
                     </CommandItem>

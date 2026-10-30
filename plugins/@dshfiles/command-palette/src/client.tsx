@@ -164,7 +164,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
         return [
           {
-            thread: { id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt },
+            thread: { id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt, running: session.running },
             repository: path === undefined ? undefined : EntityLabels.repositoryPath(path),
           },
         ]
@@ -260,6 +260,10 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         askFailed: props.translate('commandPaletteAskFailed'),
         contentSearching: props.translate('commandPaletteContentSearching'),
         contentUnavailable: props.translate('commandPaletteContentUnavailable'),
+        contentStatusRunning: props.translate('commandPaletteContentStatusRunning'),
+        contentStatusFinished: props.translate('commandPaletteContentStatusFinished'),
+        contentStatusLive: props.translate('commandPaletteContentStatusLive'),
+        contentStatusSaved: props.translate('commandPaletteContentStatusSaved'),
         actionFailed: props.translate('commandPaletteActionFailed'),
       }}
       searchContent={props.searchContent}
