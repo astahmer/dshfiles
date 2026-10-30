@@ -47,7 +47,9 @@ export const InlineWorkspaceRemoval = (props: {
   const workspaces = useQuery({
     queryKey: workspacesKey(props.repoRoot),
     queryFn: ({ signal }) => jujutsu.workspaces({ repoId: props.repoId }, { signal }),
+    refetchOnMount: 'always',
     retry: false,
+    staleTime: 0,
   })
   const path = workspaces.data?.workspaces.find(workspace => workspace.name === props.name)?.path
   const threadQuery = useQuery({
@@ -57,7 +59,7 @@ export const InlineWorkspaceRemoval = (props: {
     retry: false,
   })
   const thread = threadQuery.data?.thread ?? null
-  const missing = isWorkspaceMissing({ fetching: workspaces.isFetching, found: path !== undefined })
+  const missing = isWorkspaceMissing({ fetching: workspaces.isFetching, found: path !== undefined, failed: workspaces.isError })
   useEffect(() => {
     if (!missing) return
     void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(props.repoRoot) })
