@@ -649,8 +649,8 @@
         "expect option \"sample*\"",
         "press Enter",
         "expect button \"Sample project*\"",
-        "rightclick title \"Workspace thread-*\"",
-        "click menuitem \"Remove workspace\u2026\"",
+        "rightclick text \"Seeded work to rebase\"",
+        "click menuitem \"Remove workspace thread-*\"",
         "expect group \"Confirm removing workspace*\""
       ],
       "surfaces": ["client", "host", "integration"],
