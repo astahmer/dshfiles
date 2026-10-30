@@ -13,6 +13,7 @@ import { cleanupPreviewLoadingLabel } from './workspace-cleanup-preview.js'
 import { WorkspaceCleanupSummary } from './workspace-cleanup-summary.js'
 
 const AGE_CHOICES = [
+  { hours: 0, label: 'All' },
   { hours: 1, label: '1h' },
   { hours: 6, label: '6h' },
   { hours: 24, label: '24h' },

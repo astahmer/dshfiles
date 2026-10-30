@@ -391,6 +391,16 @@ Then('the cleanup dialog shows age presets without removing anything', async ({ 
   const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
   await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'true')
   await expect(dialog.getByRole('radio', { name: '7d', exact: true })).toBeVisible()
+  await expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 })
+  const allAgesPreview = page.waitForResponse(response => {
+    const body = response.request().postData() ?? ''
+    return response.request().method() === 'POST' && /"olderThanHours"\s*:\s*0(?:\D|$)/.test(body) && /"apply"\s*:\s*false/.test(body)
+  })
+  await dialog.getByRole('radio', { name: 'All', exact: true }).click()
+  await expect(dialog.getByRole('radio', { name: 'All', exact: true })).toHaveAttribute('aria-checked', 'true')
+  expect((await allAgesPreview).ok()).toBe(true)
+  await dialog.getByRole('radio', { name: '6h', exact: true }).click()
+  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'true')
   await recordAssertion(page, 'jujutsu-cleanup-age-preset-preview-does-not-remove-items', async () =>
     expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )

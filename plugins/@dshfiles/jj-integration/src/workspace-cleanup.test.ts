@@ -50,6 +50,31 @@ describe('WorkspaceCleanupModel.decide', () => {
     })
   })
 
+  it('includes recently integrated workspaces at zero age without bypassing safety checks', () => {
+    const recent = idleThread({ rebasedAt: now - 5 * 60_000, usedAt: [now - 5 * 60_000] })
+    const input = {
+      thread: recent,
+      archived: new Set<string>(),
+      activity: new Map([['session-a', { running: false, pendingUserQuestion: false }]]),
+      now,
+      olderThanMs: 0,
+      kinds: ['integrated'] as const,
+    }
+    expect(WorkspaceCleanupModel.decide({ ...input, olderThanMs: HOUR })).toMatchObject({ action: 'skip', reason: 'too-recent' })
+    expect(WorkspaceCleanupModel.decide(input)).toMatchObject({ action: 'remove', kind: 'integrated' })
+    expect(WorkspaceCleanupModel.decide({ ...input, thread: { ...recent, unlandedCount: 1 } })).toMatchObject({ action: 'skip', reason: 'has-work' })
+    expect(WorkspaceCleanupModel.decide({ ...input, thread: { ...recent, integrationQueued: true } })).toMatchObject({ action: 'skip', reason: 'queued' })
+    expect(WorkspaceCleanupModel.decide({ ...input, activity: new Map([['session-a', { running: true, pendingUserQuestion: false }]]) })).toMatchObject({
+      action: 'skip',
+      reason: 'busy',
+    })
+    expect(WorkspaceCleanupModel.decide({ ...input, activity: new Map([['session-a', { running: false, pendingUserQuestion: true }]]) })).toMatchObject({
+      action: 'skip',
+      reason: 'busy',
+    })
+    expect(WorkspaceCleanupModel.decide({ ...input, activity: undefined })).toMatchObject({ action: 'skip', reason: 'activity-unknown' })
+  })
+
   it('keeps unlanded work whatever its age', () => {
     expect(decide(idleThread({ unlandedCount: 1, usedAt: [0] }))).toMatchObject({ action: 'skip', reason: 'has-work' })
   })
