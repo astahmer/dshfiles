@@ -74,6 +74,12 @@
           "testName": "loads the default without a Host projection and stages model plus effort without an RPC"
         },
         {
+          "kind": "unit-test",
+          "id": "model-selection.command-inject-boundary",
+          "file": "plugins/@dshfiles/model-selection/tests/plugin-injection.test.ts",
+          "testName": "deactivates its client boundary when handoff compaction is unavailable"
+        },
+        {
           "kind": "gherkin",
           "id": "model-selection.pretyping-draft-choices",
           "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"

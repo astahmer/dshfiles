@@ -105,7 +105,7 @@ function selectionOf(state: ModelDirectoryState, id: string): ModelSelection | u
 const NS = 'model'
 
 /** Required services: the contribution registry, the seat's slot registry, locale, and the service's own faces. */
-export const inject = ['commandUi', 'locale', 'sessions', 'sessionDrafts', 'slots', 'remote', 'remote.session']
+export { inject } from './inject.ts'
 
 /**
  * Client plugin body: mount ModelDirectoryResolver, register the `model` dictionaries,

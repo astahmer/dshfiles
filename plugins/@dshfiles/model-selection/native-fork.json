@@ -25,5 +25,6 @@
       "local": "locale"
     }
   ],
+  "added": ["src/native/inject.ts"],
   "delta": ["src/native/directory.ts", "src/native/service.ts", "src/native/index.ts"]
 }
