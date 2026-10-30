@@ -51,7 +51,7 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
+      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": [
@@ -63,13 +63,16 @@
         "local-files-scanned",
         "local-files-selected",
         "hidden",
-        "reordered"
+        "reordered",
+        "remote-link-opened",
+        "remote-link-copied"
       ],
       "failureModes": [
         "A partial or duplicate order is refused and the stored order stays.",
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker.",
         "A local file-copy failure leaves the cloned repository registered and reports that the selected files were not copied.",
-        "Ignored files are not scanned unless explicitly requested; candidates are never selected automatically, and credential-like paths are blocked."
+        "Ignored files are not scanned unless explicitly requested; candidates are never selected automatically, and credential-like paths are blocked.",
+        "Remote host links use a temporary SSH tunnel and expire when their view lease closes."
       ],
       "externalDependencies": [],
       "reach": [
@@ -77,6 +80,7 @@
         "click button \"Multi-host: Hosts\"",
         "expect heading \"Hosts\"",
         "expect text \"3 registered*\"",
+        "expect button \"Open host\"",
         "click button \"Clone project\"",
         "expect textbox \"Git repository URL\"",
         "fill textbox \"Git repository URL\" \"git@github.com:owner/repo.git\"",
@@ -85,7 +89,9 @@
         "press Tab",
         "press Space",
         "expect checkbox \"Also scan ignored files\"",
-        "expect text \"Files are never selected automatically. Credential-like names are blocked; review each other file.\""
+        "expect text \"Files are never selected automatically. Credential-like names are blocked; review each other file.\"",
+        "click button \"Cancel\"",
+        "expect heading \"Hosts\""
       ],
       "verification": [
         {

@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -7,6 +8,8 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CopyIcon,
+  ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
   GripVerticalIcon,
@@ -99,6 +102,7 @@ const HostRow = (props: {
   const queryClient = useQueryClient()
   const state = hostState(runtime)
   const [confirming, setConfirming] = useState(false)
+  const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
     mutationFn: async () => {
       if (runtime === undefined) throw new Error('This host has no runtime.')
@@ -106,6 +110,23 @@ const HostRow = (props: {
       if (!result.ok) throw failure(result)
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.all }),
+  })
+  const remoteView = useMutation({
+    mutationFn: async ({ action, tab }: { readonly action: 'copy' | 'open'; readonly tab?: Window }) => {
+      if (runtime === undefined) throw new Error('This host has no runtime.')
+      if (action === 'open' && tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
+      const view = await api.runtimeOpenView({ runtimeId: runtime.id })
+      if (action === 'open') {
+        const targetTab = tab
+        if (targetTab === undefined) throw new Error('Allow pop-ups to open the remote host.')
+        targetTab.opener = null
+        targetTab.location.href = view.launchUrl
+        return 'opened'
+      }
+      if (!(await writeClipboard(view.launchUrl))) throw new Error('Could not copy the remote host link.')
+      return 'copied'
+    },
+    onError: (_error, variables) => variables.tab?.close(),
   })
   return (
     <li
@@ -170,6 +191,13 @@ const HostRow = (props: {
         </div>
         {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
         {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
+        {remoteView.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(remoteView.error, 'Remote host link failed.')}</span> : null}
+        {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
+        {remoteView.data === 'copied' ? (
+          <span role="status" className="dshx:text-xs dshx:text-success">
+            Remote host link copied.
+          </span>
+        ) : null}
       </div>
       <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:ml-0 dshx:@max-pane-compact:basis-full">
         <Button
@@ -206,6 +234,34 @@ const HostRow = (props: {
         </Button>
         {host.connector.kind === 'ssh' ? (
           <>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={runtime === undefined || remoteView.isPending}
+              onClick={() => {
+                setPopupBlocked(false)
+                const tab = window.open('about:blank', '_blank')
+                if (tab === null) {
+                  setPopupBlocked(true)
+                  return
+                }
+                remoteView.mutate({ action: 'open', tab })
+              }}
+            >
+              <ExternalLinkIcon className="dshx:size-3.5" />
+              Open host
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="dshx:size-7"
+              aria-label={`Copy ${host.name} link`}
+              title="Copy remote host link"
+              disabled={runtime === undefined || remoteView.isPending}
+              onClick={() => remoteView.mutate({ action: 'copy' })}
+            >
+              <CopyIcon className="dshx:size-3.5" />
+            </Button>
             <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
               <PlusIcon className="dshx:size-3.5" />
               Add folder
