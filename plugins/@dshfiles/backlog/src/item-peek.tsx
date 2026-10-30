@@ -30,12 +30,12 @@ import {
   MessageSquareIcon,
   MessagesSquareIcon,
   Minimize2Icon,
-  MoreHorizontalIcon,
   PencilIcon,
   PinIcon,
   PlusIcon,
   QuoteIcon,
   SparklesIcon,
+  Trash2Icon,
   WandSparklesIcon,
   XIcon,
   type LucideIcon,
@@ -543,7 +543,7 @@ const Conversation = (props: {
     else runs.push({ kind: 'changes', events: [event] })
   }
   return (
-    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-4">
+    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
       <span aria-hidden className="dshx:absolute dshx:inset-y-2 dshx:left-[9px] dshx:w-px dshx:bg-border" />
       {runs.map((run, index) => {
         if (run.kind === 'comment') {
@@ -557,7 +557,7 @@ const Conversation = (props: {
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
-                <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
+                <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-1.5 dshx:text-[13px]">
                   {isEditing ? (
                     <ReplyEditor
                       key={commentId}
@@ -579,41 +579,40 @@ const Conversation = (props: {
                     />
                   ) : (
                     <>
-                      <Markdown text={run.event.detail} />
+                      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-2">
+                        <Markdown text={run.event.detail} />
+                        {canEdit ? (
+                          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:pointer-events-none dshx:opacity-0 dshx:transition-opacity dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Edit reply"
+                              className="dshx:text-muted-foreground"
+                              onClick={() => {
+                                setCommentFailure(null)
+                                setEditingComment(commentId ?? null)
+                              }}
+                            >
+                              <PencilIcon aria-hidden className="dshx:size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Delete reply"
+                              className="dshx:text-muted-foreground dshx:hover:text-destructive"
+                              onClick={() => {
+                                if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                                void actions.deleteComment
+                                  .mutateAsync({ id: props.itemId, commentId })
+                                  .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                              }}
+                            >
+                              <Trash2Icon aria-hidden className="dshx:size-4" />
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
                       <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
-                      {canEdit ? (
-                        <div className="dshx:flex dshx:justify-end dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-within:opacity-100">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm" aria-label="Reply actions" className="dshx:text-muted-foreground">
-                                <MoreHorizontalIcon aria-hidden className="dshx:size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="dshx-root dshx:min-w-36">
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setCommentFailure(null)
-                                  setEditingComment(commentId ?? null)
-                                }}
-                              >
-                                <PencilIcon aria-hidden className="dshx:size-3.5" /> Edit reply
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="dshx:text-destructive dshx:focus:text-destructive"
-                                onSelect={() => {
-                                  if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
-                                  void actions.deleteComment
-                                    .mutateAsync({ id: props.itemId, commentId })
-                                    .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
-                                }}
-                              >
-                                Delete reply
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ) : null}
                     </>
                   )}
                   {commentFailure === null ? null : (

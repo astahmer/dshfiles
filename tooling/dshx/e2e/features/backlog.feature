@@ -357,7 +357,7 @@ Feature: Backlog
     Then the item activity shows the comment
 
   @scenario:backlog.reply-edit-delete-keyboard
-  Scenario: Edit and delete a user reply, using keyboard access
+  Scenario: Edit and delete a user reply with hover actions and keyboard access
     Given the isolated plugin profile "@dshfiles/backlog" is booted
     When the Backlog panel is opened
     And "Reply with an image" is captured
