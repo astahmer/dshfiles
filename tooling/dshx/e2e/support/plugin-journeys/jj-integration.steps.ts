@@ -245,6 +245,33 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
   await expect(projectButton(page)).toHaveText('repo')
 })
 
+When('the project is removed from the New thread picker', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await projectButton(page).click()
+  const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  const remove = picker.getByRole('button', { name: 'Remove repo from known projects', exact: true })
+  await expect(remove).toBeVisible()
+  await expect(picker.getByRole('button', { name: 'Remove No folder from known projects', exact: true })).toHaveCount(0)
+  await remove.click()
+  const confirmation = page.getByRole('alertdialog')
+  await expect(confirmation).toContainText('The folder and its files stay on disk.')
+  await confirmation.getByRole('button', { name: 'Remove project', exact: true }).click({ noWaitAfter: true })
+  await expect(remove).toHaveCount(0)
+  expect(existsSync(repository.repositoryPath)).toBe(true)
+})
+
+Then('the project is no longer listed and its files remain on disk', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-project-registration-removed-files-kept', async () => {
+    const repository = repositoryFor(page)
+    await expect(
+      page.getByRole('dialog', { name: 'Choose a project', exact: true }).getByRole('button', { name: 'Remove repo from known projects', exact: true }),
+    ).toHaveCount(0)
+    expect(existsSync(repository.repositoryPath)).toBe(true)
+    expect(existsSync(join(repository.repositoryPath, '.jj'))).toBe(true)
+  })
+  await page.keyboard.press('Escape')
+})
+
 When('a disposable jj checkout based on {string} is chosen as the New thread project', async ({ page }: { page: Page }, bookmark: string) => {
   const repository = await createRepository(page)
   // Keep main behind a distinct, nonempty feature revision, and leave the project checkout on its child.

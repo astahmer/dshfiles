@@ -28,3 +28,10 @@ Feature: Workspace folder picker
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
     When the header workspace Add workspace action is opened
     Then a new project can be created and registered as a workspace
+
+  @scenario:workspace-folder-picker.remove-known-project
+  Scenario: Remove a project from the New thread picker without deleting its folder
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the project is removed from the New thread picker
+    Then the project is no longer listed and its files remain on disk

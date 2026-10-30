@@ -2,6 +2,7 @@ import { homedir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { DirectoryPickerError } from '@deepseek-ai/dsh-host-directory-picker'
 import BrowseDirectoryPicker from '@deepseek-ai/dsh-host-directory-picker-browse'
 import { PluginApiError } from '@dshfiles/dshx/api'
@@ -88,6 +89,11 @@ const createHost = () => {
     cloneJobs: async () => ({ jobs: cloneJobs.list() }),
     cancelClone: async request => cloneJobs.cancel(request.input.jobId),
     createProject: request => createProject(deps, request.input),
+    removeProject: async request => {
+      const workspaceId = WorkspaceId(request.input.workspaceId)
+      await requireContext().workspaceController.delete({ workspaceId })
+      return { workspaceId, removed: true as const }
+    },
   })
 
   return defineHost({

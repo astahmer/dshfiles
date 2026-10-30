@@ -122,6 +122,12 @@ export const projectLifecycleApi = defineApi({
         render: created => `Created ${created.path}${created.gitHubRepository === null ? '' : ` · ${created.gitHubRepository}`}`,
       },
     }),
+    removeProject: method({
+      input: z.object({ workspaceId: z.string().min(1).max(256) }).strict(),
+      output: z.object({ workspaceId: z.string(), removed: z.literal(true) }).strict(),
+      description:
+        'Remove one project from the registered project list without deleting its folder or files. Its threads lose their project grouping. Call only when the user asked to remove that project.',
+    }),
   },
 })
 

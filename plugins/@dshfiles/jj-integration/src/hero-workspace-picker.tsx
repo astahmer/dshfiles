@@ -11,6 +11,7 @@ import {
 } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap } from '@dshfiles/multi-host/destination'
 import { useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
@@ -48,6 +49,7 @@ export const HeroWorkspacePicker = (
   )
   const api = useApi(jjIntegrationApi)
   const browserApi = useApi(workspaceFolderBrowserApi)
+  const lifecycleApi = useApi(projectLifecycleApi)
   const directoryPicker: DirectoryPickerPort = {
     pick: signal => props.ports.directoryPicker.pick(signal),
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
@@ -102,7 +104,7 @@ export const HeroWorkspacePicker = (
   // The Host lists both by last use; its own "No folder" registration is the entry offered first here.
   const hostProjects = (projects.data?.projects ?? []).filter(project => !project.path.endsWith(NO_FOLDER_PATH_SUFFIX))
   const registered: RegisteredProject[] = [
-    { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder' },
+    { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder', removable: false },
     ...hostProjects.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
     ...(projects.data?.workspaces ?? []).map(workspace => ({
       workspaceId: workspace.workspaceId,
@@ -129,6 +131,7 @@ export const HeroWorkspacePicker = (
           ? (await api.noFolder({})).workspaceId
           : selection.workspaceId
         : (await props.ports.registerWorkspace(selection.canonicalPath)).workspaceId
+    if (selection.kind === 'directory') await projects.refetch()
     await workspaceListed({ workspaces: props.services.workspaces, workspaceId })
     // SAFETY: the id comes from the Host's workspace registry.
     props.onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
@@ -142,7 +145,15 @@ export const HeroWorkspacePicker = (
         recentFolders={recentFolders}
         pinnedWorkspaceIds={pinnedWorkspaceIds}
         directoryPicker={directoryPicker}
-        onRegisterWorkspace={props.ports.registerWorkspace}
+        onRegisterWorkspace={async path => {
+          const project = await props.ports.registerWorkspace(path)
+          await projects.refetch()
+          return project
+        }}
+        onRemoveProject={async project => {
+          await lifecycleApi.removeProject({ workspaceId: project.workspaceId })
+          await projects.refetch()
+        }}
         onSelect={selection => void choose(selection).catch(() => props.onClose())}
         onClose={props.onClose}
         showNativePicker={false}

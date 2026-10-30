@@ -14,8 +14,9 @@ owner's existing registration callback.
 
 The chooser intentionally does not show registered projects or the
 "Register project" action: this entry point adds a workspace rather than
-choosing one that already exists. The existing workspace-selection UI remains
-unchanged.
+choosing one that already exists. The New-thread project picker also lets you
+remove a project registration after confirmation; its folder and files stay on
+disk, while its threads lose their project grouping.
 
 ## Clone a repository
 

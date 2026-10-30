@@ -1,4 +1,14 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
@@ -11,10 +21,10 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { ProjectFolderPickerModel, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -22,6 +32,7 @@ export interface RegisteredProject {
   readonly title: string
   readonly canonicalPath: string
   readonly isJjWorkspace?: boolean
+  readonly removable?: boolean
 }
 
 export interface DirectoryListing {
@@ -46,6 +57,7 @@ export interface ProjectFolderPickerProps {
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly onRegisterWorkspace: (absolutePath: string) => Promise<RegisteredProject>
+  readonly onRemoveProject?: (project: RegisteredProject) => Promise<void>
   /** Receives an absolute path before Host canonicalization; the caller must validate it before use. */
   readonly onUseAbsolutePath?: (absolutePath: string) => void
   readonly onSelect: (selection: ProjectFolderSelection) => void
@@ -118,6 +130,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [newDirectoryName, setNewDirectoryName] = useState('')
+  const [projectToRemove, setProjectToRemove] = useState<RegisteredProject | null>(null)
   const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => ProjectFolderPickerModel.initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
@@ -162,14 +175,27 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     },
   })
   const registerMutation = useMutation({ mutationFn: (path: string) => props.onRegisterWorkspace(path) })
+  const removeMutation = useMutation({
+    mutationFn: async (project: RegisteredProject) => {
+      if (props.onRemoveProject === undefined) return
+      await props.onRemoveProject(project)
+    },
+  })
   const createMutation = useMutation({
     mutationFn: (variables: { readonly parent: string; readonly name: string }) => props.directoryPicker.createDirectory(variables.parent, variables.name),
   })
-  const busy = props.disabled === true || listingQuery.isFetching || pickMutation.isPending || registerMutation.isPending || createMutation.isPending
+  const busy =
+    props.disabled === true ||
+    listingQuery.isFetching ||
+    pickMutation.isPending ||
+    registerMutation.isPending ||
+    createMutation.isPending ||
+    removeMutation.isPending
   let error: string | null = null
   if (pickMutation.isError) error = 'The folder picker is unavailable on this Host.'
   else if (registerMutation.isError) error = 'This folder could not be registered as a project.'
   else if (createMutation.isError) error = 'This folder could not be created.'
+  else if (removeMutation.isError) error = 'This project could not be removed from the registered projects.'
   else if (listingQuery.isError) error = canUseTypedPath ? 'Folder browsing failed. You can still use this absolute path.' : 'This folder could not be opened.'
 
   useEffect(() => () => pickRequest.current?.abort(), [])
@@ -296,228 +322,275 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const title = props.heading ?? (props.mode === 'directories' ? 'Choose a folder' : 'Choose a project or folder')
 
   return (
-    <Dialog
-      onOpenChange={(open: boolean) => {
-        if (!open) props.onClose()
-      }}
-      open
-    >
-      <DialogContent
-        className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
-        onOpenAutoFocus={(event: { preventDefault: () => void }) => {
-          event.preventDefault()
-          searchInput.current?.focus()
+    <>
+      <Dialog
+        onOpenChange={(open: boolean) => {
+          if (!open) props.onClose()
         }}
-        showCloseButton={false}
+        open
       >
-        <DialogTitle className="dshx:sr-only">{title}</DialogTitle>
-        <DialogDescription className="dshx:sr-only">
-          {props.mode === 'directories'
-            ? 'Browse folders, or type a path to open a unique folder match automatically.'
-            : 'Search registered projects, or type an absolute or ~/ path to browse folders; a unique match opens automatically.'}
-        </DialogDescription>
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
-          <div className="dshx:relative dshx:flex-1">
-            <SearchIcon
-              aria-hidden
-              className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
-            />
-            <Input
-              aria-label={props.mode === 'directories' ? 'Enter a folder path' : 'Search projects or enter a folder path'}
-              autoComplete="off"
-              className="dshx:h-9 dshx:pl-8"
-              onChange={event => {
-                const nextQuery = event.currentTarget.value
-                const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home)
-                setQuery(nextQuery)
-                if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) {
-                  if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
-                    setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
+        <DialogContent
+          className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+          onOpenAutoFocus={(event: { preventDefault: () => void }) => {
+            event.preventDefault()
+            searchInput.current?.focus()
+          }}
+          showCloseButton={false}
+        >
+          <DialogTitle className="dshx:sr-only">{title}</DialogTitle>
+          <DialogDescription className="dshx:sr-only">
+            {props.mode === 'directories'
+              ? 'Browse folders, or type a path to open a unique folder match automatically.'
+              : 'Search registered projects, or type an absolute or ~/ path to browse folders; a unique match opens automatically.'}
+          </DialogDescription>
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
+            <div className="dshx:relative dshx:flex-1">
+              <SearchIcon
+                aria-hidden
+                className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+              />
+              <Input
+                aria-label={props.mode === 'directories' ? 'Enter a folder path' : 'Search projects or enter a folder path'}
+                autoComplete="off"
+                className="dshx:h-9 dshx:pl-8"
+                onChange={event => {
+                  const nextQuery = event.currentTarget.value
+                  const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home)
+                  setQuery(nextQuery)
+                  if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) {
+                    if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
+                      setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
+                    }
+                  } else if (nextQuery.trim().startsWith('/')) {
+                    if (
+                      listing === null ||
+                      (nextPath !== null &&
+                        ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.home) &&
+                        !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path))
+                    ) {
+                      setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
+                    }
+                  } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) {
+                    setBrowseTarget(null)
                   }
-                } else if (nextQuery.trim().startsWith('/')) {
-                  if (
-                    listing === null ||
-                    (nextPath !== null &&
-                      ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.home) &&
-                      !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path))
-                  ) {
-                    setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
-                  }
-                } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) {
-                  setBrowseTarget(null)
-                }
-                pickMutation.reset()
-                registerMutation.reset()
-                createMutation.reset()
-              }}
-              onKeyDown={onKeyDown}
-              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Type a folder path…' : 'Search projects or type a path to browse folders…')}
-              ref={searchInput}
-              value={query}
-            />
-          </div>
-          {!pathMode && tabs.length > 2 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button aria-label="Filter by scope" className="dshx:shrink-0" size="sm" type="button" variant="outline">
-                  {tabLabels[tab]}
-                  <ChevronDownIcon aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="dshx-root">
-                <DropdownMenuRadioGroup
-                  onValueChange={(value: string) => {
-                    if (ProjectFolderPickerModel.isPickerTab(value)) setTab(value)
-                  }}
-                  value={tab}
-                >
-                  {tabs.map(pickerTab => (
-                    <DropdownMenuRadioItem key={pickerTab} value={pickerTab}>
-                      {tabLabels[pickerTab]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {props.showNativePicker !== false && (
-            <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
-              <FolderOpenIcon aria-hidden />
-              Browse…
-            </Button>
-          )}
-          {props.headerActions}
-        </div>
-        {pathMode ? (
-          <>
-            {listing !== null && (
-              <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>
+                  pickMutation.reset()
+                  registerMutation.reset()
+                  createMutation.reset()
+                }}
+                onKeyDown={onKeyDown}
+                placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Type a folder path…' : 'Search projects or type a path to browse folders…')}
+                ref={searchInput}
+                value={query}
+              />
+            </div>
+            {!pathMode && tabs.length > 2 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button aria-label="Filter by scope" className="dshx:shrink-0" size="sm" type="button" variant="outline">
+                    {tabLabels[tab]}
+                    <ChevronDownIcon aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="dshx-root">
+                  <DropdownMenuRadioGroup
+                    onValueChange={(value: string) => {
+                      if (ProjectFolderPickerModel.isPickerTab(value)) setTab(value)
+                    }}
+                    value={tab}
+                  >
+                    {tabs.map(pickerTab => (
+                      <DropdownMenuRadioItem key={pickerTab} value={pickerTab}>
+                        {tabLabels[pickerTab]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
-              {folderEntries.map((entry, index) => (
-                <button
-                  aria-selected={index === selectedIndex}
-                  className={optionClassName(index === selectedIndex)}
-                  key={entry.path}
-                  onClick={() => browse(entry.path)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  role="option"
-                  type="button"
-                >
-                  <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                    <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
-                    <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
-                  </span>
-                  {entry.hidden && <Badge variant="muted">Hidden</Badge>}
-                </button>
-              ))}
-              {listing === null && <p className={emptyClassName}>Type an absolute or ~/ folder path to browse.</p>}
-              {listing !== null && folderEntries.length === 0 && (
-                <p className={emptyClassName}>{matchingFolderPaths === null ? 'No folders here.' : 'No matching folders in this listing.'}</p>
+            {props.showNativePicker !== false && (
+              <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
+                <FolderOpenIcon aria-hidden />
+                Browse…
+              </Button>
+            )}
+            {props.headerActions}
+          </div>
+          {pathMode ? (
+            <>
+              {listing !== null && (
+                <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>
               )}
-            </div>
-            {canUseTypedPath && (
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
-                <Button
-                  disabled={props.disabled === true || pickMutation.isPending || registerMutation.isPending || createMutation.isPending}
-                  onClick={() => useTypedPath()}
-                  size="sm"
-                  type="button"
-                  variant={props.mode === 'directories' ? 'default' : 'outline'}
-                >
-                  {props.mode === 'directories' ? 'Use this folder' : 'Register project'}
-                </Button>
-              </div>
-            )}
-            {showListingActions && (
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
-                <Button disabled={busy} onClick={() => props.onSelect(ProjectFolderPickerModel.folderSelection(listing.path))} size="sm" type="button">
-                  Select this folder
-                </Button>
-                {props.mode !== 'directories' && (
-                  <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
-                    Register project
-                  </Button>
+              <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
+                {folderEntries.map((entry, index) => (
+                  <button
+                    aria-selected={index === selectedIndex}
+                    className={optionClassName(index === selectedIndex)}
+                    key={entry.path}
+                    onClick={() => browse(entry.path)}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    role="option"
+                    type="button"
+                  >
+                    <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+                    <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                      <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
+                      <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
+                    </span>
+                    {entry.hidden && <Badge variant="muted">Hidden</Badge>}
+                  </button>
+                ))}
+                {listing === null && <p className={emptyClassName}>Type an absolute or ~/ folder path to browse.</p>}
+                {listing !== null && folderEntries.length === 0 && (
+                  <p className={emptyClassName}>{matchingFolderPaths === null ? 'No folders here.' : 'No matching folders in this listing.'}</p>
                 )}
-                <form
-                  className="dshx:flex dshx:min-w-60 dshx:flex-1 dshx:items-center dshx:gap-2"
-                  onSubmit={event => {
-                    event.preventDefault()
-                    createFolder()
-                  }}
-                >
-                  <Input
-                    aria-label="New folder name"
-                    className="dshx:h-7 dshx:flex-1"
-                    onChange={event => setNewDirectoryName(event.currentTarget.value)}
-                    placeholder="New folder name"
-                    value={newDirectoryName}
-                  />
-                  <Button disabled={busy || newDirectoryName.trim().length === 0} size="sm" type="submit" variant="outline">
-                    Create folder
-                  </Button>
-                </form>
-                {listing.truncated && <Badge variant="warning">Folder list is truncated.</Badge>}
               </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div aria-busy={props.loading === true} aria-label={tabLabels[tab]} className={cn(listClassName, 'dshx:pt-2')} role="listbox">
-              {sections.map(section => (
-                <div aria-label={tab === 'all' ? sectionLabels[section.id] : undefined} className="dshx:contents" key={section.id} role="group">
-                  {tab === 'all' && sections.length > 1 && section.id !== 'pinned' && (
-                    <p aria-hidden className="dshx:px-2 dshx:pt-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-                      {sectionLabels[section.id]}
-                    </p>
-                  )}
-                  {section.entries.map(entry => {
-                    const index = entryIndices.get(entry) ?? 0
-                    return (
-                      <PickerEntryRow
-                        active={index === selectedIndex}
-                        entry={entry}
-                        index={index}
-                        key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
-                        machineName={props.machineName}
-                        onHover={() => setSelectedIndex(index)}
-                        onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
-                      />
-                    )
-                  })}
+              {canUseTypedPath && (
+                <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
+                  <Button
+                    disabled={props.disabled === true || pickMutation.isPending || registerMutation.isPending || createMutation.isPending}
+                    onClick={() => useTypedPath()}
+                    size="sm"
+                    type="button"
+                    variant={props.mode === 'directories' ? 'default' : 'outline'}
+                  >
+                    {props.mode === 'directories' ? 'Use this folder' : 'Register project'}
+                  </Button>
                 </div>
-              ))}
-              {entries.length === 0 && <p className={emptyClassName}>{props.loading === true ? 'Loading projects…' : emptyLabels[tab]}</p>}
+              )}
+              {showListingActions && (
+                <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
+                  <Button disabled={busy} onClick={() => props.onSelect(ProjectFolderPickerModel.folderSelection(listing.path))} size="sm" type="button">
+                    Select this folder
+                  </Button>
+                  {props.mode !== 'directories' && (
+                    <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
+                      Register project
+                    </Button>
+                  )}
+                  <form
+                    className="dshx:flex dshx:min-w-60 dshx:flex-1 dshx:items-center dshx:gap-2"
+                    onSubmit={event => {
+                      event.preventDefault()
+                      createFolder()
+                    }}
+                  >
+                    <Input
+                      aria-label="New folder name"
+                      className="dshx:h-7 dshx:flex-1"
+                      onChange={event => setNewDirectoryName(event.currentTarget.value)}
+                      placeholder="New folder name"
+                      value={newDirectoryName}
+                    />
+                    <Button disabled={busy || newDirectoryName.trim().length === 0} size="sm" type="submit" variant="outline">
+                      Create folder
+                    </Button>
+                  </form>
+                  {listing.truncated && <Badge variant="warning">Folder list is truncated.</Badge>}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div aria-busy={props.loading === true} aria-label={tabLabels[tab]} className={cn(listClassName, 'dshx:pt-2')} role="listbox">
+                {sections.map(section => (
+                  <div aria-label={tab === 'all' ? sectionLabels[section.id] : undefined} className="dshx:contents" key={section.id} role="group">
+                    {tab === 'all' && sections.length > 1 && section.id !== 'pinned' && (
+                      <p aria-hidden className="dshx:px-2 dshx:pt-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                        {sectionLabels[section.id]}
+                      </p>
+                    )}
+                    {section.entries.map(entry => {
+                      const index = entryIndices.get(entry) ?? 0
+                      return (
+                        <PickerEntryRow
+                          active={index === selectedIndex}
+                          entry={entry}
+                          index={index}
+                          key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
+                          machineName={props.machineName}
+                          onHover={() => setSelectedIndex(index)}
+                          onRemove={
+                            props.onRemoveProject === undefined ||
+                            entry.kind !== 'project' ||
+                            entry.project.isJjWorkspace === true ||
+                            entry.project.removable === false
+                              ? undefined
+                              : () => setProjectToRemove(entry.project)
+                          }
+                          onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
+                        />
+                      )
+                    })}
+                  </div>
+                ))}
+                {entries.length === 0 && <p className={emptyClassName}>{props.loading === true ? 'Loading projects…' : emptyLabels[tab]}</p>}
+              </div>
+            </>
+          )}
+          {error !== null && (
+            <div className="dshx:px-2 dshx:pb-2">
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             </div>
-          </>
-        )}
-        {error !== null && (
-          <div className="dshx:px-2 dshx:pb-2">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </div>
-        )}
-        <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-            <KbdGroup>
-              <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd>
-            </KbdGroup>
-            Navigate
-          </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-            <Kbd>Enter</Kbd>
-            Select / open
-          </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-            <Kbd>Esc</Kbd>
-            Close
-          </span>
-        </footer>
-      </DialogContent>
-    </Dialog>
+          )}
+          <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
+            <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <KbdGroup>
+                <Kbd>↑</Kbd>
+                <Kbd>↓</Kbd>
+              </KbdGroup>
+              Navigate
+            </span>
+            <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <Kbd>Enter</Kbd>
+              Select / open
+            </span>
+            <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <Kbd>Esc</Kbd>
+              Close
+            </span>
+          </footer>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        onOpenChange={(open: boolean) => {
+          if (!open && !removeMutation.isPending) {
+            setProjectToRemove(null)
+            removeMutation.reset()
+          }
+        }}
+        open={projectToRemove !== null}
+      >
+        <AlertDialogContent className="dshx-root" size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {projectToRemove?.title} from known projects?</AlertDialogTitle>
+            <AlertDialogDescription>The folder and its files stay on disk. Threads in this project lose their project grouping.</AlertDialogDescription>
+            {removeMutation.isError && (
+              <Alert variant="destructive">
+                <AlertDescription>This project could not be removed. Try again.</AlertDescription>
+              </Alert>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeMutation.isPending || projectToRemove === null}
+              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                event.preventDefault()
+                if (projectToRemove === null) return
+                removeMutation.mutate(projectToRemove, {
+                  onSuccess: () => setProjectToRemove(null),
+                })
+              }}
+              variant="destructive"
+            >
+              Remove project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -528,54 +601,72 @@ interface PickerEntryRowProps {
   readonly machineName: string | undefined
   readonly onHover: () => void
   readonly onSelect: () => void
+  readonly onRemove: (() => void) | undefined
 }
 
 const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
   const title = props.entry.kind === 'project' ? props.entry.project.title : (props.entry.path.split('/').filter(Boolean).at(-1) ?? props.entry.path)
   const path = props.entry.kind === 'project' ? props.entry.project.canonicalPath : props.entry.path
   return (
-    <button
-      aria-selected={props.active}
-      className={optionClassName(props.active)}
-      onClick={props.onSelect}
-      onMouseEnter={props.onHover}
-      role="option"
-      type="button"
-    >
-      {props.entry.kind === 'project' ? (
-        <span
-          aria-hidden
-          className={cn(
-            'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
-            projectGlyphTone(title),
-          )}
+    <div aria-label={title} className="dshx:flex dshx:items-center dshx:gap-1" role="group">
+      <button
+        aria-selected={props.active}
+        className={optionClassName(props.active)}
+        onClick={props.onSelect}
+        onMouseEnter={props.onHover}
+        role="option"
+        type="button"
+      >
+        {props.entry.kind === 'project' ? (
+          <span
+            aria-hidden
+            className={cn(
+              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+              projectGlyphTone(title),
+            )}
+          >
+            {title.slice(0, 2).toLocaleUpperCase()}
+          </span>
+        ) : (
+          <span
+            aria-hidden
+            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
+          >
+            <HistoryIcon className="dshx:size-3.5" />
+          </span>
+        )}
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+            {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
+          </span>
+          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+            {props.machineName === undefined ? null : `${props.machineName} · `}
+            <span className="dshx:font-mono">{path}</span>
+          </span>
+        </span>
+        {props.index < 9 && (
+          <KbdGroup>
+            <Kbd>⌘</Kbd>
+            <Kbd>{props.index + 1}</Kbd>
+          </KbdGroup>
+        )}
+      </button>
+      {props.onRemove !== undefined && (
+        <Button
+          aria-label={`Remove ${title} from known projects`}
+          className="dshx:size-8 dshx:shrink-0 dshx:px-0"
+          onClick={event => {
+            event.stopPropagation()
+            props.onRemove?.()
+          }}
+          size="icon"
+          type="button"
+          variant="ghost"
         >
-          {title.slice(0, 2).toLocaleUpperCase()}
-        </span>
-      ) : (
-        <span
-          aria-hidden
-          className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
-        >
-          <HistoryIcon className="dshx:size-3.5" />
-        </span>
+          <XIcon aria-hidden className="dshx:size-4" />
+        </Button>
       )}
-      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
-          {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
-        </span>
-        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-          {props.machineName === undefined ? null : `${props.machineName} · `}
-          <span className="dshx:font-mono">{path}</span>
-        </span>
-      </span>
-      {props.index < 9 && (
-        <KbdGroup>
-          <Kbd>⌘</Kbd>
-          <Kbd>{props.index + 1}</Kbd>
-        </KbdGroup>
-      )}
-    </button>
+    </div>
   )
 }

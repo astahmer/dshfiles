@@ -62,6 +62,7 @@
     "@deepseek-ai/dsh-host-directory-picker-browse": "0.2.1-rc.2",
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
+    "@deepseek-ai/dsh-workspace": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
@@ -84,7 +85,8 @@
     "@deepseek-ai/dsh-host-directory-picker": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-host-directory-picker-browse": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-subprocess": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "dsh": {
     "bundle": {

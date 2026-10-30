@@ -17,8 +17,10 @@ port, and a workspace registration callback.
 ```
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
-`initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`, and
-`onUseAbsolutePath`. The default
+`initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`,
+`onUseAbsolutePath`, and `onRemoveProject`. When supplied, each registered
+project has a separate remove control. It asks for confirmation before calling
+`onRemoveProject`; consumers decide how to unregister the project. The default
 `projects` mode shows registered projects and switches to browsing when the
 query starts with `/` or `~/`. A unique matching folder opens as the path is
 typed; ambiguous matches remain available for keyboard selection, and truncated
@@ -43,7 +45,8 @@ any other one yields a `directory` selection, and a JJ workspace is never a rece
 **No folder**). `initialTab` overrides the default.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
-`canonicalPath`. Selection is a discriminated union:
+`canonicalPath`; `removable: false` hides the remove control for special entries.
+Selection is a discriminated union:
 
 - `{ kind: 'workspace', workspaceId, canonicalPath, title }`
 - `{ kind: 'directory', canonicalPath, title }`
