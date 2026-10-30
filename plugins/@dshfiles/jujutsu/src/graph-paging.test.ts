@@ -6,9 +6,10 @@ const viewport = { scrollTop: 0, scrollHeight: 2400, clientHeight: 900 }
 const deepHistory = { scrollTop: 0, scrollHeight: 40_000, clientHeight: 900 }
 
 test('discards cached pages and delayed responses from before a repository refresh', () => {
-  const current = { repoId: 'repo', query: '', generation: 2 }
+  const current = { repoId: 'repo', query: '', generation: 'manual:refreshed-at-2' }
   assert.equal(GraphPagingModel.samePageSet(current, current), true)
-  assert.equal(GraphPagingModel.samePageSet({ ...current, generation: 1 }, current), false)
+  assert.equal(GraphPagingModel.samePageSet({ ...current, generation: 'manual:refreshed-at-1' }, current), false)
+  assert.equal(GraphPagingModel.samePageSet({ ...current, generation: 'manual:refreshed-at-3' }, current), false)
   assert.equal(GraphPagingModel.samePageSet({ ...current, repoId: 'other' }, current), false)
   assert.equal(GraphPagingModel.samePageSet({ ...current, query: 'wip' }, current), false)
 })

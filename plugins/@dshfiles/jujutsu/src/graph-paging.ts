@@ -2,7 +2,7 @@
 const MINIMUM_LOOKAHEAD = 2400
 const LOOKAHEAD_VIEWPORTS = 8
 
-type GraphPageScope = { readonly repoId: string | null; readonly query: string; readonly generation: number }
+type GraphPageScope = { readonly repoId: string | null; readonly query: string; readonly generation: string }
 
 export class GraphPagingModel {
   /** Cached pages and delayed responses belong only to the exact repository/search/refresh snapshot that requested them. */

@@ -451,6 +451,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     },
   })
 
+  const graphGenerationRef = useRef('')
+  const [graphGeneration, setGraphGeneration] = useState(0)
   const stateQuery = useQuery({
     queryKey: jujutsuQueryKeys.state(path, REVISION_PAGE_SIZE),
     queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: REVISION_PAGE_SIZE }, { signal })),
@@ -459,6 +461,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     ...autoRefresh.queryOptions,
   })
   const state = stateQuery.data
+  const graphSnapshotGeneration = `${graphGeneration}:${stateQuery.dataUpdatedAt}`
+  graphGenerationRef.current = graphSnapshotGeneration
   const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {
     if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
@@ -472,18 +476,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
   const debouncedSearchRef = useRef(debouncedSearch)
   debouncedSearchRef.current = debouncedSearch
-  const graphGenerationRef = useRef(0)
-  const [graphGeneration, setGraphGeneration] = useState(0)
   const [graphPageState, setGraphPageState] = useState<{
     readonly repoId: string | null
     readonly query: string
-    readonly generation: number
+    readonly generation: string
     readonly revisions: readonly Revision[]
     readonly hasMore: boolean
     readonly failedCursor: string | null
-  }>({ repoId: null, query: '', generation: 0, revisions: [], hasMore: false, failedCursor: null })
+  }>({ repoId: null, query: '', generation: '', revisions: [], hasMore: false, failedCursor: null })
   const graphPageMutation = useMutation({
-    mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly generation: number; readonly excludeCommitIds: readonly string[] }) =>
+    mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly generation: string; readonly excludeCommitIds: readonly string[] }) =>
       throwReadFailure(await api.graphPage({ repoId: input.repoId, query: input.query, excludeCommitIds: [...input.excludeCommitIds] }, {})),
     onSuccess: (page, input) => {
       if (!GraphPagingModel.samePageSet(input, { repoId, query: debouncedSearchRef.current, generation: graphGenerationRef.current })) return
@@ -519,15 +521,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setGraphPageState({
       repoId,
       query: debouncedSearch,
-      generation: graphGeneration,
+      generation: graphSnapshotGeneration,
       revisions: [],
       hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false),
       failedCursor: null,
     })
-    if (repoId !== null && debouncedSearch.length > 0) requestGraphPage({ repoId, query: debouncedSearch, generation: graphGeneration, excludeCommitIds: [] })
-  }, [repoId, debouncedSearch, graphGeneration, state?.graphHasMore, requestGraphPage])
+    if (repoId !== null && debouncedSearch.length > 0)
+      requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds: [] })
+  }, [repoId, debouncedSearch, graphSnapshotGeneration, state?.graphHasMore, requestGraphPage])
 
-  const graphPageIsCurrent = GraphPagingModel.samePageSet(graphPageState, { repoId, query: debouncedSearch, generation: graphGeneration })
+  const graphPageIsCurrent = GraphPagingModel.samePageSet(graphPageState, { repoId, query: debouncedSearch, generation: graphSnapshotGeneration })
   const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
   // Older history arrives page by page, and those rows are selectable too: selection resolves against every loaded
   // revision, not just the first page the repository query returned.
@@ -791,7 +794,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     ]
     const cursor = GraphPagingModel.cursor(excludeCommitIds)
     if (!GraphPagingModel.canRequestPage({ hasMore: graphHasMore, pending: graphPagePending, cursor, failedCursor: graphPageFailedCursor })) return
-    requestGraphPage({ repoId, query: debouncedSearch, generation: graphGeneration, excludeCommitIds })
+    requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds })
   }, [
     repoId,
     graphOnScreen,
@@ -800,7 +803,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     graphPagePending,
     graphPageFailedCursor,
     debouncedSearch,
-    graphGeneration,
+    graphSnapshotGeneration,
     state?.revisions,
     graphPageRevisions,
     requestGraphPage,
@@ -1082,8 +1085,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     )
   const refreshRepository = (): void => {
     if (repoId === null) return
-    graphGenerationRef.current += 1
-    setGraphGeneration(graphGenerationRef.current)
+    setGraphGeneration(current => current + 1)
     void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
   }
 
