@@ -2,6 +2,10 @@ import type { InputState } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 export type ComposerReferenceHandoff = Pick<InputState, 'draft' | 'occurrences'>
 
+// The native picker starts a blank Session in the destination; in a fresh checkout of a large repository with no spare
+// waiting for that branch, that first Session can take well past 15 seconds.
+const ARRIVAL_TIMEOUT_MS = 120_000
+
 export const createComposerWorkspaceNavigation = (input: {
   readonly selectedWorkspace: () => string | undefined
   readonly subscribe: (listener: () => void) => () => void
@@ -34,7 +38,7 @@ export const createComposerWorkspaceNavigation = (input: {
     // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot the initiating composer; navigation remounts and replaces its binding.
     const select = pick
     if (select === undefined) return Promise.reject(new Error('The new-thread composer is no longer mounted.'))
-    const lifetime = AbortSignal.any([signal, AbortSignal.timeout(15_000)])
+    const lifetime = AbortSignal.any([signal, AbortSignal.timeout(ARRIVAL_TIMEOUT_MS)])
     return new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         unsubscribe()
