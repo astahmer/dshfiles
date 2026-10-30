@@ -11,6 +11,7 @@ import {
   MAX_PENDING_SIDEBAR_NOTICES,
   scheduleSuccessNoticeDismissal,
   SidebarNotificationDismissButton,
+  SidebarNoticeAlert,
   SidebarNoticeMessage,
   sidebarNoticeQueueReducer,
   SUCCESS_NOTICE_DURATION_MS,
@@ -48,6 +49,25 @@ test('notification close button calls the dismiss action', () => {
   )
 
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }))
+  assert.equal(dismissals, 1)
+})
+
+test('persistent route warnings can be dismissed', () => {
+  let dismissals = 0
+  render(
+    <SidebarNoticeAlert
+      notice={{ tone: 'warning', message: 'This thread link does not exist on this DSH Host.' }}
+      className="notice"
+      transient={false}
+      notification={false}
+      dismissLabel="Dismiss alert"
+      onDismiss={() => {
+        dismissals += 1
+      }}
+    />,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss alert' }))
   assert.equal(dismissals, 1)
 })
 

@@ -1,6 +1,7 @@
-import { AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 export interface SidebarNotice {
   readonly tone: 'danger' | 'warning' | 'success'
@@ -98,6 +99,40 @@ export const SidebarNotificationDismissButton = (props: { readonly label: string
   <Button size="icon-xs" type="button" variant="ghost" aria-label={props.label} onClick={props.onDismiss}>
     <XIcon />
   </Button>
+)
+
+export const SidebarNoticeAlert = (props: {
+  readonly notice: SidebarNotice
+  readonly className: string
+  readonly transient: boolean
+  readonly notification: boolean
+  readonly dismissLabel: string
+  readonly onDismiss: () => void
+}): JSX.Element => (
+  <Alert
+    variant={props.notice.tone === 'danger' ? 'destructive' : props.notice.tone}
+    className={cn(
+      props.className,
+      props.transient &&
+        'dshx:flex dshx:w-fit dshx:max-w-full dshx:pointer-events-auto dshx:items-center dshx:gap-2 dshx:border-border dshx:bg-card dshx:text-card-foreground dshx:shadow-lg',
+    )}
+  >
+    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+      {props.transient ? (
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground" title={props.notice.message}>
+          {props.notice.message}
+        </span>
+      ) : (
+        <SidebarNoticeMessage message={props.notice.message} />
+      )}
+      {props.notice.actionLabel !== undefined && props.notice.onAction !== undefined ? (
+        <Button size="xs" variant="outline" onClick={props.notice.onAction}>
+          {props.notice.actionLabel}
+        </Button>
+      ) : null}
+      {props.notification || !props.transient ? <SidebarNotificationDismissButton label={props.dismissLabel} onDismiss={props.onDismiss} /> : null}
+    </div>
+  </Alert>
 )
 
 export const scheduleSuccessNoticeDismissal = (

@@ -138,7 +138,7 @@ import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   scheduleSuccessNoticeDismissal,
-  SidebarNotificationDismissButton,
+  SidebarNoticeAlert,
   SidebarNoticeMessage,
   sidebarNoticeQueueReducer,
   type SidebarNotice,
@@ -4208,32 +4208,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))
   const noticeAlert =
     notice === null ? null : (
-      <Alert
-        variant={notice.tone === 'danger' ? 'destructive' : notice.tone}
-        className={cn(
-          noticeClass,
-          isTransientNotice &&
-            'dshx:flex dshx:w-fit dshx:max-w-full dshx:pointer-events-auto dshx:items-center dshx:gap-2 dshx:border-border dshx:bg-card dshx:text-card-foreground dshx:shadow-lg',
-        )}
-      >
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          {isTransientNotice ? (
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground" title={notice.message}>
-              {notice.message}
-            </span>
-          ) : (
-            <SidebarNoticeMessage message={notice.message} />
-          )}
-          {notice.actionLabel !== undefined && notice.onAction !== undefined ? (
-            <Button size="xs" variant="outline" onClick={notice.onAction}>
-              {notice.actionLabel}
-            </Button>
-          ) : null}
-          {isThreadNotification ? (
-            <SidebarNotificationDismissButton label={props.tSidebar('threadSidebarDismissNotification')} onDismiss={() => setNotice(null)} />
-          ) : null}
-        </div>
-      </Alert>
+      <SidebarNoticeAlert
+        notice={notice}
+        className={noticeClass}
+        transient={isTransientNotice}
+        notification={isThreadNotification}
+        dismissLabel={props.tSidebar(isThreadNotification ? 'threadSidebarDismissNotification' : 'threadSidebarDismissAlert')}
+        onDismiss={() => setNotice(null)}
+      />
     )
 
   return (
