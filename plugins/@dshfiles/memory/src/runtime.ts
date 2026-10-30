@@ -4,6 +4,7 @@ import { basename } from 'node:path'
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError } from '@dshfiles/dshx/api'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import { Utf8 } from '@dshfiles/optmem-core'
 import type { JevUsageRecord } from '@dshfiles/usage/api'
 
@@ -576,38 +577,68 @@ export const createMemoryRuntime = (options: {
   /** Folded session titles are read for the newest sessions only: older ones still match by digest title, identifier, or indexed message. */
   const titleReadLimit = 80
 
-  const threadRecords = async (signal?: AbortSignal): Promise<readonly ThreadFinderRecord[]> => {
-    const sessions = await services.listSessions()
-    const titled = await services
-      .readSessionTitles(
-        sessions.slice(0, titleReadLimit).map(session => session.header.id),
-        signal,
+  const threadRecords = async (signal?: AbortSignal): Promise<readonly ThreadFinderRecord[]> =>
+    withSpan('thread finder prepare records', { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }, async span => {
+      const sessions = await withSpan(
+        'thread finder list sessions',
+        { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } },
+        async phase => {
+          const result = await services.listSessions()
+          phase.setAttribute('dshx.memory.finder.session_count', result.length)
+          return result
+        },
       )
-      .catch(() => {
-        signal?.throwIfAborted()
-        return []
-      })
-    const titles = new Map(titled.map(entry => [entry.sessionId, entry]))
-    // Project resolution is a per-cwd lookup that may await a Host call; resolve the distinct ones together, in order.
-    const projects = await Promise.all(sessions.map(session => projectOf(session.header)))
-    const records: ThreadFinderRecord[] = []
-    for (const [index, session] of sessions.entries()) {
-      const digest = store.thread(session.header.id)
-      const title = titles.get(session.header.id)
-      records.push({
-        sessionId: session.header.id,
-        title: title?.title ?? digest?.title ?? '',
-        createdAt: session.header.createdAt,
-        updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
-        cwd: session.header.cwd ?? null,
-        project: projects[index] ?? 'unknown',
-        live: session.live,
-        persisted: session.persisted,
-        parentSessionId: session.header.parentSession ?? null,
-      })
-    }
-    return records
-  }
+      const titled = await withSpan(
+        'thread finder read titles',
+        { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } },
+        async phase => {
+          let failed = false
+          const result = await services
+            .readSessionTitles(
+              sessions.slice(0, titleReadLimit).map(session => session.header.id),
+              signal,
+            )
+            .catch(() => {
+              signal?.throwIfAborted()
+              failed = true
+              return []
+            })
+          phase.setAttributes({
+            'dshx.memory.finder.title_count': result.length,
+            'dshx.memory.finder.title_read_failed': failed,
+          })
+          return result
+        },
+      )
+      const titles = new Map(titled.map(entry => [entry.sessionId, entry]))
+      const projects = await withSpan(
+        'thread finder resolve projects',
+        { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } },
+        async phase => {
+          const result = await Promise.all(sessions.map(session => projectOf(session.header)))
+          phase.setAttribute('dshx.memory.finder.project_count', result.length)
+          return result
+        },
+      )
+      const records: ThreadFinderRecord[] = []
+      for (const [index, session] of sessions.entries()) {
+        const digest = store.thread(session.header.id)
+        const title = titles.get(session.header.id)
+        records.push({
+          sessionId: session.header.id,
+          title: title?.title ?? digest?.title ?? '',
+          createdAt: session.header.createdAt,
+          updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
+          cwd: session.header.cwd ?? null,
+          project: projects[index] ?? 'unknown',
+          live: session.live,
+          persisted: session.persisted,
+          parentSessionId: session.header.parentSession ?? null,
+        })
+      }
+      span.setAttribute('dshx.memory.finder.record_count', records.length)
+      return records
+    })
 
   const finderMemoryHits = async (
     request: { readonly query: string; readonly limit: number; readonly projects: readonly string[] },
@@ -733,7 +764,15 @@ export const createMemoryRuntime = (options: {
     },
     signal?: AbortSignal,
   ): Promise<ThreadFinderPage & { readonly project: string }> => {
-    const own = await projectOf(caller.session.header)
+    const own = await withSpan(
+      'thread finder resolve caller project',
+      { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } },
+      async phase => {
+        const project = await projectOf(caller.session.header)
+        phase.setAttribute('dshx.memory.finder.caller_project_resolved', true)
+        return project
+      },
+    )
     const clientCaller = isClientCaller(caller)
     const finder = await finderFor(own, signal)
     const page = await withFinderErrors(() =>

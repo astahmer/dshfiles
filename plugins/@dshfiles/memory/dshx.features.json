@@ -315,6 +315,48 @@
         {
           "kind": "automatic",
           "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder resolve caller project",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder prepare records",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder list sessions",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder read titles",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder resolve projects",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder content search",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
+        },
+        {
+          "kind": "custom",
+          "span": "thread finder memory search",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "records finder phase spans without queries or session identifiers"
         }
       ]
     },

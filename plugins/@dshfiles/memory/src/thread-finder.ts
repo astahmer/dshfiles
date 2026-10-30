@@ -1,4 +1,5 @@
 import { decodeJson } from '@dshfiles/dshx/json'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import { Utf8 } from '@dshfiles/optmem-core'
 import { z } from 'zod'
 
@@ -468,8 +469,20 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     // Content search and memory retrieval are independent: start both, then merge in this fixed order so the ranking
     // stays deterministic. `Promise.all` attaches its handlers to both, so a rejected source is not an unhandled one.
     const [content, memoryHits] = await Promise.all([
-      contentSearch(text, contentLimit),
-      deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }, deps.signal),
+      withSpan('thread finder content search', { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }, async span => {
+        const result = await contentSearch(text, contentLimit)
+        span.setAttributes({
+          'dshx.memory.finder.content_hits': result.hits.length,
+          'dshx.memory.finder.content_attempts': result.attempts,
+          'dshx.memory.finder.content_degraded': result.failure !== null,
+        })
+        return result
+      }),
+      withSpan('thread finder memory search', { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }, async span => {
+        const hits = await deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }, deps.signal)
+        span.setAttribute('dshx.memory.finder.memory_hits', hits.length)
+        return hits
+      }),
     ])
     if (content.failure === null) sources.add('session-content')
     const contentRank = new Map(content.hits.map((hit, index) => [hit.sessionId, index]))

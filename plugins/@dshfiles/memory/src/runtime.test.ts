@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { recordSpans } from '@dshfiles/dshx/tracing'
+
 import { projectPathFor } from './project-path.ts'
 import { createMemoryRuntime, type Caller, type SessionLog } from './runtime.ts'
 import type { MemoryEmbedder } from './embedder.ts'
@@ -481,6 +483,46 @@ describe('memory runtime', () => {
     expect(page.hits[0]?.sources).toContain('session-content')
     expect(page.degraded).toEqual([])
     expect(store.usage().tools.map(entry => entry.tool)).toContain('find_threads')
+  })
+
+  it('records finder phase spans without queries or session identifiers', async () => {
+    using recorder = recordSpans()
+    const { logs, runtime, caller, titles, content } = setup()
+    const thread = halyardThread('session-33333333-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    titles.set(thread.header.id, 'Synthetic finder title')
+    content.hits = [{ sessionId: thread.header.id, snippet: 'bounded sample' }]
+
+    const page = await runtime.findThreads(caller('session-reader'), { query: 'synthetic' })
+
+    expect(page.hits.map(hit => hit.sessionId)).toEqual([thread.header.id])
+    expect(recorder.span('thread finder resolve caller project').attributes['dshx.memory.finder.caller_project_resolved']).toBe(true)
+    expect(recorder.span('thread finder prepare records').attributes['dshx.memory.finder.record_count']).toBe(1)
+    expect(recorder.span('thread finder list sessions').attributes['dshx.memory.finder.session_count']).toBe(1)
+    expect(recorder.span('thread finder read titles').attributes).toMatchObject({
+      'dshx.memory.finder.title_count': 1,
+      'dshx.memory.finder.title_read_failed': false,
+    })
+    expect(recorder.span('thread finder resolve projects').attributes['dshx.memory.finder.project_count']).toBe(1)
+    expect(recorder.span('thread finder content search').attributes).toMatchObject({
+      'dshx.memory.finder.content_hits': 1,
+      'dshx.memory.finder.content_attempts': 1,
+      'dshx.memory.finder.content_degraded': false,
+    })
+    expect(recorder.span('thread finder memory search').attributes['dshx.memory.finder.memory_hits']).toBe(0)
+
+    const attributes = [
+      'thread finder resolve caller project',
+      'thread finder prepare records',
+      'thread finder list sessions',
+      'thread finder read titles',
+      'thread finder resolve projects',
+      'thread finder content search',
+      'thread finder memory search',
+    ].map(name => JSON.stringify(recorder.span(name).attributes))
+    expect(attributes.join(' ')).not.toContain('synthetic')
+    expect(attributes.join(' ')).not.toContain(thread.header.id)
+    expect(attributes.join(' ')).not.toContain(root)
   })
 
   it('cancels title loading when a caller aborts thread search', async () => {
