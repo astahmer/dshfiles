@@ -20,6 +20,7 @@ import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-pa
 import { GraphPage } from './graph-page.js'
 import { matchesRevisionSearch } from './graph.js'
 import { ensureJujutsuRepository } from './repository-init.js'
+import { missingMutationRevisionIds } from './mutation-revisions.js'
 
 const MAX_OUTPUT = 1_160_000
 const MAX_STDERR = 64_000
@@ -450,6 +451,31 @@ const findRevision = (revisions: readonly Revision[], commitId: string): Revisio
   return row
 }
 
+const mutationRevisions = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  action: Mutation,
+  revisions: readonly Revision[],
+  signal: AbortSignal | undefined,
+): Promise<readonly Revision[]> => {
+  const missingIds = missingMutationRevisionIds(action, revisions)
+  if (missingIds.length === 0) return revisions
+  if (!missingIds.every(JujutsuMutationModel.isCommitId)) throw new Error('Invalid revision id.')
+  const result = await runAt(
+    ctx,
+    repo.root,
+    repo.identity,
+    [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', GraphPage.commitIdsRevset(missingIds), '--template', REVISION_TEMPLATE],
+    signal,
+  )
+  if (result.truncated) throw new Error('Revision lookup exceeded the bounded output limit.')
+  const loaded = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const evolution = await readEvolvedCommitIds(ctx, repo, loaded, signal)
+  const merged = [...revisions, ...loaded.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) }))]
+  for (const commitId of missingIds) findRevision(merged, commitId)
+  return merged
+}
+
 const mutationPreview = (action: Mutation, revisions: readonly Revision[], selectedPaths: readonly string[], workspacePath?: string) => {
   switch (action.kind) {
     case 'describe': {
@@ -694,6 +720,7 @@ const prepareMutation = async (
     workspaceRoot = target.path
     workspacePath = target.path
   }
+  const revisions = await mutationRevisions(ctx, repo, preparedAction, current.state.revisions, signal)
   const pathsRevision =
     preparedAction.kind === 'split' || preparedAction.kind === 'restore'
       ? preparedAction.commitId
@@ -701,7 +728,8 @@ const prepareMutation = async (
         ? preparedAction.sourceId
         : undefined
   const paths = pathsRevision === undefined ? current.state.changedPaths : await RevisionReads.paths(repoRun(ctx, repo, signal), pathsRevision)
-  const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
+  const preview = mutationPreview(preparedAction, revisions, paths, workspacePath)
+
   const argv = JujutsuMutationModel.buildMutationArgv(preparedAction)
   let detail = preview.detail
   if (preparedAction.kind === 'fetch' || preparedAction.kind === 'push') {

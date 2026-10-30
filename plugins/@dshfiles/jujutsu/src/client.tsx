@@ -56,6 +56,7 @@ import {
   SearchIcon,
   Settings2Icon,
   UserIcon,
+  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
@@ -2107,6 +2108,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                     <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
                       <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+                      {actionSnapshot.context.error === message && (
+                        <Button aria-label="Dismiss alert" onClick={() => sendAction({ type: 'dismissError' })} size="icon-xs" type="button" variant="ghost">
+                          <XIcon />
+                        </Button>
+                      )}
                       {repositoryError && (
                         <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
                           Choose another repository

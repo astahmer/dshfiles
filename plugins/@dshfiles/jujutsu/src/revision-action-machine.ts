@@ -54,6 +54,7 @@ type RevisionActionEvent =
   | { readonly type: 'reject'; readonly error: string }
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' }
+  | { readonly type: 'dismissError' }
   | { readonly type: 'reset' }
 
 // A Host from before PluginApiError (until the user restarts DSH) sends this generic failure; name the action instead.
@@ -108,6 +109,7 @@ export const revisionActionMachine = setup({
   context: ({ input }) => ({ client: input.client, repoId: null, result: null, error: null, ...idleContext }),
   initial: 'idle',
   on: {
+    dismissError: { actions: assign({ error: null }) },
     reset: { target: '.idle', actions: assign({ ...idleContext, result: null, error: null }) },
     reject: { actions: assign(({ event }) => ({ error: event.error })) },
   },

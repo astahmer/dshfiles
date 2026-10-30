@@ -131,6 +131,19 @@ describe('revisionActionMachine', () => {
     expect(settled).toEqual([])
   })
 
+  it('dismisses an action failure without changing the idle state', async () => {
+    const { actor } = startActions({
+      prepare: async () => {
+        throw new Error('Revision is no longer visible. Refresh and try again.')
+      },
+    })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
+    await waitFor(actor, snapshot => snapshot.context.error !== null)
+    actor.send({ type: 'dismissError' })
+    expect(actor.getSnapshot().value).toBe('idle')
+    expect(actor.getSnapshot().context.error).toBeNull()
+  })
+
   it('reports a failed confirm and still refreshes', async () => {
     const { actor, settled } = startActions({
       confirm: async () => {
