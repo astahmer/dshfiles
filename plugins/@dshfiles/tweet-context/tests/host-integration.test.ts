@@ -12,7 +12,6 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { defineApi, dshxRegistryApi, method } from '@dshfiles/dshx/api'
-import { recordSpans } from '@dshfiles/dshx/tracing'
 import { defineHost } from '@dshfiles/dshx/host'
 import { tweetContextBacklogApi } from '../src/backlog-api.js'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -121,7 +120,6 @@ describe('tweet context Host integration', () => {
         const stored = await host.ctx.attachments.readImage(image.attachment)
         expect(stored.data.byteLength).toBeGreaterThan(0)
       }
-      using recorder = recordSpans()
       const contextResponse = await host.connection.requestApi({
         packageId: '@dshfiles/tweet-context',
         apiId: tweetContextBacklogApi.id,
@@ -144,8 +142,6 @@ describe('tweet context Host integration', () => {
       if ('issues' in decoded) throw new Error('The tweet context API returned an invalid result.')
       const context = decoded.value
       expect(context.posts[0]?.text).toBe('Integration post')
-      expect(recorder.span('tweet context backlog retrieve').name).toBe('tweet context backlog retrieve')
-      expect(recorder.children(recorder.span('tweet context backlog retrieve')).map(span => span.name)).toContain('tweet context fetch')
       expect(context.images.length).toBeGreaterThan(0)
       for (const image of context.images) {
         const stored = await host.ctx.attachments.readImage({

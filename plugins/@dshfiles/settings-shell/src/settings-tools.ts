@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
 import type { settingsPatchSchema } from './shell-api.js'
@@ -63,16 +63,6 @@ const MAX_NAMES_IN_ERROR = 8
 const MAX_MESSAGE = 300
 const MAX_LISTED_ENTRIES = 50
 
-class SettingsNamespaceUnknown extends Schema.TaggedError<SettingsNamespaceUnknown>()('SettingsNamespaceUnknown', {
-  message: Schema.String,
-}) {}
-
-class SettingsReadOnly extends Schema.TaggedError<SettingsReadOnly>()('SettingsReadOnly', { message: Schema.String }) {}
-
-class SettingsConflict extends Schema.TaggedError<SettingsConflict>()('SettingsConflict', { message: Schema.String }) {}
-
-class SettingsRejected extends Schema.TaggedError<SettingsRejected>()('SettingsRejected', { message: Schema.String }) {}
-
 const failureSchema = z.looseObject({ code: z.string().optional(), message: z.string().optional() })
 
 const failureCode = (error: unknown): string | undefined => {
@@ -92,101 +82,100 @@ const jsonBytes = (text: string): number => new TextEncoder().encode(text).lengt
 export const createSettingsTools = (input: { readonly settings: () => SettingsSurface; readonly searchEntries: SearchEntriesStore }) => {
   const settings = input.settings
   const searchEntries = input.searchEntries
-  const requireNamespace = (surface: SettingsSurface, namespace: string): Effect.Effect<SettingsRow, SettingsNamespaceUnknown> => {
+  const requireNamespace = (surface: SettingsSurface, namespace: string): SettingsRow => {
     const found = surface.describe({ redactSecrets: true }).find(descriptor => descriptor.ns === namespace)
-    if (found !== undefined) return Effect.succeed(found)
+    if (found !== undefined) return found
     const known = surface
       .describe({ redactSecrets: true })
       .slice(0, MAX_NAMES_IN_ERROR)
       .map(descriptor => descriptor.ns)
-    return Effect.fail(
-      new SettingsNamespaceUnknown({
-        message:
-          known.length === 0
-            ? `No settings namespace named ${namespace}; this profile serves none.`
-            : `No settings namespace named ${namespace}. Known namespaces include ${known.join(', ')}.`,
-      }),
+    throw new PluginApiError(
+      known.length === 0
+        ? `No settings namespace named ${namespace}; this profile serves none.`
+        : `No settings namespace named ${namespace}. Known namespaces include ${known.join(', ')}.`,
+      { code: 'settings-namespace-unknown' },
     )
   }
 
-  const requireWritable = (surface: SettingsSurface): Effect.Effect<void, SettingsReadOnly> =>
-    surface.writable ? Effect.void : Effect.fail(new SettingsReadOnly({ message: 'The active profile does not accept settings edits.' }))
-
-  const writeFailure = (error: unknown, namespace: string): SettingsConflict | SettingsRejected => {
-    if (failureCode(error) === 'SETTINGS_CONFLICT') {
-      return new SettingsConflict({ message: `${namespace} changed since it was read; read it again with settings_list and retry.` })
+  const requireWritable = (surface: SettingsSurface): void => {
+    if (!surface.writable) {
+      throw new PluginApiError('The active profile does not accept settings edits.', { code: 'settings-read-only' })
     }
-    return new SettingsRejected({ message: failureMessage(error, `Could not write settings namespace ${namespace}.`) })
+  }
+
+  const writeFailure = (error: unknown, namespace: string): PluginApiError => {
+    if (failureCode(error) === 'SETTINGS_CONFLICT') {
+      return new PluginApiError(`${namespace} changed since it was read; read it again with settings_list and retry.`, {
+        code: 'settings-conflict',
+      })
+    }
+    return new PluginApiError(failureMessage(error, `Could not write settings namespace ${namespace}.`), {
+      code: 'settings-rejected',
+    })
   }
 
   return {
-    list: Effect.fn('settings list read')(({ input }: { readonly input: SettingsListInput }) =>
-      Effect.gen(function* () {
-        const surface = settings()
-        const query = input.query?.trim().toLowerCase()
-        const descriptors = surface.describe({ redactSecrets: true })
-        const namespaces = descriptors
-          .filter(descriptor =>
-            input.namespace === undefined
-              ? query === undefined || query.length === 0 || descriptor.ns.toLowerCase().includes(query)
-              : descriptor.ns === input.namespace,
-          )
-          .map((descriptor): SettingsNamespaceRow => {
-            const row: SettingsNamespaceRow = {
-              namespace: descriptor.ns,
-              revision: descriptor.revision,
-              autoGenerate: descriptor.autoGenerate,
-              secretFields: descriptor.secrets?.length ?? 0,
-            }
-            if (input.namespace === undefined) return row
-            const text = JSON.stringify(descriptor.value)
-            if (text === undefined) return row
-            if (jsonBytes(text) > MAX_VALUE_BYTES) return { ...row, valueTooLarge: true }
-            return { ...row, value: text }
-          })
-        if (input.namespace !== undefined && namespaces.length === 0) yield* requireNamespace(surface, input.namespace)
-        if (input.namespace !== undefined || query === undefined || query.length === 0) return { writable: surface.writable, namespaces }
-        const entries = SettingsSearch.matchEntries({ query, entries: searchEntries.read() }).slice(0, MAX_LISTED_ENTRIES)
-        if (entries.length === 0) return { writable: surface.writable, namespaces }
-        return { writable: surface.writable, namespaces, entries }
-      }),
-    ),
-
-    publishSearchEntries: Effect.fn('settings search entries publish')(({ input }: { readonly input: { readonly entries: readonly SectionEntryRow[] } }) =>
-      Effect.sync(() => {
-        searchEntries.replace(input.entries)
-        return { count: input.entries.length }
-      }),
-    ),
-
-    set: Effect.fn('settings set')(({ input }: { readonly input: SettingsSetInput }) =>
-      Effect.gen(function* () {
-        const surface = settings()
-        yield* requireWritable(surface)
-        const descriptor = yield* requireNamespace(surface, input.namespace)
-        yield* Effect.tryPromise({
-          try: () => surface.update(input.namespace, input.patch, descriptor.revision),
-          catch: error => writeFailure(error, input.namespace),
+    list: ({ input }: { readonly input: SettingsListInput }) => {
+      const surface = settings()
+      const query = input.query?.trim().toLowerCase()
+      const descriptors = surface.describe({ redactSecrets: true })
+      const namespaces = descriptors
+        .filter(descriptor =>
+          input.namespace === undefined
+            ? query === undefined || query.length === 0 || descriptor.ns.toLowerCase().includes(query)
+            : descriptor.ns === input.namespace,
+        )
+        .map((descriptor): SettingsNamespaceRow => {
+          const row: SettingsNamespaceRow = {
+            namespace: descriptor.ns,
+            revision: descriptor.revision,
+            autoGenerate: descriptor.autoGenerate,
+            secretFields: descriptor.secrets?.length ?? 0,
+          }
+          if (input.namespace === undefined) return row
+          const text = JSON.stringify(descriptor.value)
+          if (text === undefined) return row
+          if (jsonBytes(text) > MAX_VALUE_BYTES) return { ...row, valueTooLarge: true }
+          return { ...row, value: text }
         })
-        return {
-          namespace: input.namespace,
-          applied: Object.keys(input.patch).sort(),
-          revision: descriptor.revision,
-        }
-      }),
-    ),
+      if (input.namespace !== undefined && namespaces.length === 0) requireNamespace(surface, input.namespace)
+      if (input.namespace !== undefined || query === undefined || query.length === 0) return { writable: surface.writable, namespaces }
+      const entries = SettingsSearch.matchEntries({ query, entries: searchEntries.read() }).slice(0, MAX_LISTED_ENTRIES)
+      if (entries.length === 0) return { writable: surface.writable, namespaces }
+      return { writable: surface.writable, namespaces, entries }
+    },
 
-    unset: Effect.fn('settings unset')(({ input }: { readonly input: SettingsUnsetInput }) =>
-      Effect.gen(function* () {
-        const surface = settings()
-        yield* requireWritable(surface)
-        const descriptor = yield* requireNamespace(surface, input.namespace)
-        yield* Effect.tryPromise({
-          try: () => surface.mutate(input.namespace, [{ op: 'unset', path: input.path }], descriptor.revision),
-          catch: error => writeFailure(error, input.namespace),
-        })
-        return { namespace: input.namespace, path: [...input.path] }
-      }),
-    ),
+    publishSearchEntries: ({ input }: { readonly input: { readonly entries: readonly SectionEntryRow[] } }) => {
+      searchEntries.replace(input.entries)
+      return { count: input.entries.length }
+    },
+
+    set: async ({ input }: { readonly input: SettingsSetInput }) => {
+      const surface = settings()
+      requireWritable(surface)
+      const descriptor = requireNamespace(surface, input.namespace)
+      try {
+        await surface.update(input.namespace, input.patch, descriptor.revision)
+      } catch (error) {
+        throw writeFailure(error, input.namespace)
+      }
+      return {
+        namespace: input.namespace,
+        applied: Object.keys(input.patch).sort(),
+        revision: descriptor.revision,
+      }
+    },
+
+    unset: async ({ input }: { readonly input: SettingsUnsetInput }) => {
+      const surface = settings()
+      requireWritable(surface)
+      const descriptor = requireNamespace(surface, input.namespace)
+      try {
+        await surface.mutate(input.namespace, [{ op: 'unset', path: input.path }], descriptor.revision)
+      } catch (error) {
+        throw writeFailure(error, input.namespace)
+      }
+      return { namespace: input.namespace, path: [...input.path] }
+    },
   }
 }

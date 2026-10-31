@@ -2,8 +2,6 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
-import { Effect } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineCommand, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
@@ -170,32 +168,7 @@ const dependencies: ThreadActionDeps = {
 /** The thread and project lifecycle tools, wired to the live Host services on each call. */
 const actions = createThreadActions(dependencies)
 
-const effectAction = <Arguments, Result>(name: string, action: (input: Arguments) => Promise<Result>) =>
-  Effect.fn(name)((input: Arguments) => Effect.tryPromise({ try: () => action(input), catch: error => error }))
-
-export const threadActionsHost = DshxEffect.host(threadActionsApi, {
-  list: effectAction('thread actions list', actions.list),
-  archive: effectAction('thread actions archive', actions.archive),
-  unarchive: effectAction('thread actions unarchive', actions.unarchive),
-  settle: effectAction('thread actions settle', actions.settle),
-  unsettle: effectAction('thread actions unsettle', actions.unsettle),
-  pin: effectAction('thread actions pin', actions.pin),
-  unpin: effectAction('thread actions unpin', actions.unpin),
-  rename: effectAction('thread actions rename', actions.rename),
-  fork: effectAction('thread actions fork', actions.fork),
-  continueIn: effectAction('thread actions continue in project', actions.continueIn),
-  create: effectAction('thread actions create', actions.create),
-  prompt: effectAction('thread actions prompt', actions.prompt),
-  stop: effectAction('thread actions stop', actions.stop),
-  selectModel: effectAction('thread actions select model', actions.selectModel),
-  references: effectAction('thread actions references read', actions.references),
-  projectList: effectAction('thread actions project list', actions.projectList),
-  projectRegister: effectAction('thread actions project register', actions.projectRegister),
-  projectRename: effectAction('thread actions project rename', actions.projectRename),
-  projectDelete: effectAction('thread actions project delete', actions.projectDelete),
-  projectReorder: effectAction('thread actions project reorder', actions.projectReorder),
-  move: effectAction('thread actions move', actions.move),
-})
+export const threadActionsHost = threadActionsApi.host(actions)
 
 const settleCommand = defineCommand({
   name: 'settle',

@@ -2,8 +2,6 @@ import { createRequire } from 'node:module'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Context } from '@deepseek-ai/cordis'
-import { Context as EffectContext, Effect, Layer } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { decodeJson } from '@dshfiles/dshx/json'
@@ -36,24 +34,7 @@ const searchEntries: SearchEntriesStore = {
   },
 }
 
-class SettingsShellRuntime extends EffectContext.Service<
-  SettingsShellRuntime,
-  {
-    readonly settings: () => SettingsSurface
-    readonly documentPath: () => string | undefined
-    readonly searchEntries: SearchEntriesStore
-  }
->()('dshfiles/settings-shell/SettingsShellRuntime') {}
-
-const settingsShellLayer = (ctx: Context) =>
-  Layer.succeed(SettingsShellRuntime, {
-    settings: () => requireSettings(ctx),
-    documentPath: () => {
-      const provider = settingsProviderSchema.safeParse(ctx.get('settings'))
-      return provider.success ? provider.data.documentPath : undefined
-    },
-    searchEntries,
-  })
+const settingsTools = (ctx: Context) => createSettingsTools({ settings: () => requireSettings(ctx), searchEntries })
 
 /** A native package's version as the running `dsh` resolves it, read from beside its entry script; null when unreadable. */
 const installedVersion = (packageName: string): string | null => {
@@ -94,74 +75,42 @@ const dshReleaseStatus = async (signal: AbortSignal): Promise<DshReleaseStatus> 
   }
 }
 
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: settingsShellLayer,
-  setup: (ctx: Context) =>
-    Effect.sync(() => {
-      for (const ported of [PORTED_FROM, WELCOME_PORTED_FROM]) {
-        const installed = installedVersion(ported.packageName)
-        if (installed === null || installed === ported.version) continue
-        ctx
-          .logger('dshfiles-settings-shell')
-          .warn(
-            'settings-shell: ported from %s@%s but DSH ships %s; refresh plugins/@dshfiles/settings-shell/src/native from the new package',
-            ported.packageName,
-            ported.version,
-            installed,
-          )
-      }
-    }),
-})
-
-const api = hostApi(settingsShellApi, {
-  documentPath: Effect.fn('settings document path read')(() =>
-    Effect.gen(function* () {
-      const runtime = yield* SettingsShellRuntime
-      return yield* Effect.sync(() => {
-        const path = runtime.documentPath()
-        if (path === undefined) return { path: null, exists: false }
+export default defineHost({
+  name: '@dshfiles/settings-shell',
+  settings: [settingsShellSettings],
+  apis: [
+    settingsShellApi.host({
+      documentPath: async ({ ctx }) => {
+        const provider = settingsProviderSchema.safeParse(ctx.get('settings'))
+        if (!provider.success) return { path: null, exists: false }
+        const path = provider.data.documentPath
         // The desktop opener verifies paths against their real location (macOS temp homes sit behind /var → /private/var).
         if (!existsSync(path)) return { path, exists: false }
         return { path: realpathSync(path), exists: true }
-      })
+      },
+      upstream: async () => {
+        const installed = installedUpstreamVersion()
+        return { portedFrom: PORTED_FROM.version, installed, stale: installed !== null && installed !== PORTED_FROM.version }
+      },
+      releaseStatus: ({ signal }) => dshReleaseStatus(signal),
+      list: context => settingsTools(context.ctx).list(context),
+      set: context => settingsTools(context.ctx).set(context),
+      unset: context => settingsTools(context.ctx).unset(context),
+      publishSearchEntries: context => settingsTools(context.ctx).publishSearchEntries(context),
     }),
-  ),
-  upstream: Effect.fn('settings upstream version read')(() =>
-    Effect.sync(() => {
-      const installed = installedUpstreamVersion()
-      return { portedFrom: PORTED_FROM.version, installed, stale: installed !== null && installed !== PORTED_FROM.version }
-    }),
-  ),
-  releaseStatus: Effect.fn('dsh release status read')(({ signal }) => Effect.tryPromise({ try: () => dshReleaseStatus(signal), catch: error => error })),
-  list: Effect.fn('settings namespace list')(({ input }) =>
-    Effect.gen(function* () {
-      const runtime = yield* SettingsShellRuntime
-      return yield* createSettingsTools(runtime).list({ input })
-    }),
-  ),
-  set: Effect.fn('settings namespace set')(({ input }) =>
-    Effect.gen(function* () {
-      const runtime = yield* SettingsShellRuntime
-      return yield* createSettingsTools(runtime).set({ input })
-    }),
-  ),
-  unset: Effect.fn('settings namespace unset')(({ input }) =>
-    Effect.gen(function* () {
-      const runtime = yield* SettingsShellRuntime
-      return yield* createSettingsTools(runtime).unset({ input })
-    }),
-  ),
-  publishSearchEntries: Effect.fn('settings search entries publish')(({ input }) =>
-    Effect.gen(function* () {
-      const runtime = yield* SettingsShellRuntime
-      return yield* createSettingsTools(runtime).publishSearchEntries({ input })
-    }),
-  ),
-})
-
-export default defineHost({
-  ...effectPlugin,
-  name: '@dshfiles/settings-shell',
-  settings: [settingsShellSettings],
-  apis: [api],
+  ],
+  setup(ctx) {
+    for (const ported of [PORTED_FROM, WELCOME_PORTED_FROM]) {
+      const installed = installedVersion(ported.packageName)
+      if (installed === null || installed === ported.version) continue
+      ctx
+        .logger('dshfiles-settings-shell')
+        .warn(
+          'settings-shell: ported from %s@%s but DSH ships %s; refresh plugins/@dshfiles/settings-shell/src/native from the new package',
+          ported.packageName,
+          ported.version,
+          installed,
+        )
+    }
+  },
 })

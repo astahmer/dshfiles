@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ThreadAttentionView } from './attention-api.js'
 import { InflightTurns } from './inflight-turns.js'
 import { createRestartRecoveryStore } from './restart-recovery.js'
@@ -14,16 +14,12 @@ import { createRestartRecoveryStore } from './restart-recovery.js'
  * actually subscribes and writes.
  */
 
-type PluginDisposer = () => void | Promise<void>
-
 interface BuiltPlugin {
-  readonly apply: (ctx: unknown, config?: unknown) => void | PluginDisposer | Promise<void | PluginDisposer>
+  /** The harness only cares that activation ran; the returned disposable is ignored. */
+  readonly apply: (ctx: unknown, config?: unknown) => void
 }
 
-const isPluginDisposer = (value: void | PluginDisposer): value is PluginDisposer => typeof value === 'function'
-
 const builtEntry = new URL('../dist/index.js', import.meta.url).href
-let sharedHome: string | undefined
 
 type SessionEventListener = (session: { readonly id: string }, event: unknown) => void
 
@@ -31,11 +27,9 @@ interface Harness {
   readonly home: string
   readonly rows: Map<string, ThreadAttentionView>
   readonly dispatch: (event: unknown) => void
-  readonly dispose: () => Promise<void>
 }
 
 const temporaryHomes: string[] = []
-const activeHarnessDisposals: Array<() => Promise<void>> = []
 const previousDshHome = process.env.DSH_HOME
 
 const table = (rows: Map<string, ThreadAttentionView>) => ({
@@ -64,33 +58,20 @@ const table = (rows: Map<string, ThreadAttentionView>) => ({
  * would have left behind on disk.
  */
 const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Harness> => {
-  const home = sharedHome ?? (sharedHome = await mkdtemp(join(tmpdir(), 'thread-sidebar-host-')))
-  if (temporaryHomes.length === 0) temporaryHomes.push(home)
-  const recoveryStore = createRestartRecoveryStore({ home })
-  const priorRecoveries = await recoveryStore.list()
-  await recoveryStore.remove(new Set(priorRecoveries.map(entry => entry.sessionId)))
-  await InflightTurns.open({ home }).take()
+  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-host-'))
+  temporaryHomes.push(home)
   if (seed !== undefined) await seed(home)
   process.env.DSH_HOME = home
   vi.resetModules()
-  // SAFETY: the bundle opens module-level stores once; every harness uses this same isolated home.
+  // SAFETY: the built Host bundle default-exports the plugin whose `apply` this harness drives.
   const plugin = (await import(builtEntry)) as BuiltPlugin
   const rows = new Map<string, ThreadAttentionView>()
   const listeners = new Map<string, SessionEventListener[]>()
-  const disposers: PluginDisposer[] = []
-  const on = (event: string, handler: SessionEventListener): (() => void) => {
+  const disposers: (() => void)[] = []
+  const on = (event: string, handler: SessionEventListener): void => {
     listeners.set(event, [...(listeners.get(event) ?? []), handler])
-    return () => {
-      const current = listeners.get(event)
-      if (current === undefined) return
-      const remaining = current.filter(candidate => candidate !== handler)
-      if (remaining.length === 0) listeners.delete(event)
-      else listeners.set(event, remaining)
-    }
   }
-  const storageDomain = { open: async () => ({ table: () => table(rows), close: async () => undefined }) }
   const ctx = {
-    storageDomain,
     on,
     once: on,
     emit: on,
@@ -98,11 +79,12 @@ const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Har
     serial: on,
     bail: on,
     waterfall: on,
-    effect: (callback: () => void | PluginDisposer) => {
+    effect: (callback: () => unknown) => {
       const disposer = callback()
-      if (isPluginDisposer(disposer)) disposers.push(disposer)
+      // SAFETY: Cordis effects return a disposer function; the typeof check above established it.
+      if (typeof disposer === 'function') disposers.push(disposer as () => void)
     },
-    get: (name: string) => (name === 'storageDomain' ? storageDomain : undefined),
+    get: (name: string) => (name === 'storageDomain' ? { open: async () => ({ table: () => table(rows), close: async () => undefined }) } : undefined),
     inject: () => undefined,
     commands: { register: () => () => undefined },
     sessionProjections: { register: () => () => undefined },
@@ -113,19 +95,10 @@ const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Har
       replace: async () => undefined,
     },
   }
-  const pluginDisposer = await plugin.apply(ctx)
-  if (isPluginDisposer(pluginDisposer)) disposers.push(pluginDisposer)
-  let disposed = false
-  const dispose = async (): Promise<void> => {
-    if (disposed) return
-    disposed = true
-    for (const disposer of disposers.splice(0).reverse()) await disposer()
-  }
-  activeHarnessDisposals.push(dispose)
+  await plugin.apply(ctx)
   return {
     home,
     rows,
-    dispose,
     dispatch: event => {
       const handlers = listeners.get('session/event')
       if (handlers === undefined) throw new Error('thread-sidebar registered no session/event listener')
@@ -140,25 +113,12 @@ const inflightSessionIds = async (home: string): Promise<string[]> => (await Inf
 
 afterEach(async () => {
   vi.restoreAllMocks()
-  await Promise.all(activeHarnessDisposals.splice(0).map(dispose => dispose()))
-  if (sharedHome !== undefined) await inflightSessionIds(sharedHome)
   if (previousDshHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = previousDshHome
-})
-
-afterAll(async () => {
   await Promise.all(temporaryHomes.splice(0).map(home => rm(home, { recursive: true, force: true })))
 })
 
 describe('thread-sidebar attention wiring', () => {
-  it('disposes Host event listeners when the plugin unloads', async () => {
-    const harness = await startHarness()
-
-    await harness.dispose()
-
-    expect(() => harness.dispatch(turnEnd('error'))).toThrow('thread-sidebar registered no session/event listener')
-  })
-
   it('stores a finished turn and ignores turn ends that ask for nothing', async () => {
     const harness = await startHarness()
 

@@ -9,8 +9,6 @@ import { execFile } from 'node:child_process'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
-import { Effect } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
@@ -26,7 +24,6 @@ import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { createPluginUpdateWatch, staleClientEntries, type ClientEntryRevision } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
-import { RestartEffects, RestartRuntime } from './restart-effect.js'
 import { InflightTurns } from './inflight-turns.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
@@ -43,7 +40,7 @@ const inflightTurns = InflightTurns.open()
 const restartController = (ctx: Context) =>
   createRestartController(ctx, {
     recordRunningSessions: async () => {
-      const persistence = ctx.sessionPersistence
+      const persistence = ctx.get('sessionPersistence')
       if (persistence === undefined) throw new Error('Session persistence is unavailable.')
       await persistence.flush()
       await restartRecoveryStore.record(activeRestartSessionIds(ctx.agents.list()), 'restart')
@@ -51,45 +48,13 @@ const restartController = (ctx: Context) =>
     onExitFailure: () => console.error('thread-sidebar: managed restart was canceled because running-thread recovery could not be saved'),
   })
 
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: RestartEffects.layer,
-  setup: (ctx: Context) =>
-    Effect.gen(function* () {
-      const runtime = yield* RestartRuntime
-      yield* Effect.sync(() => setupHost(ctx))
-      const bootedAt = Date.now()
-      const promoted = yield* Effect.sync(() => InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => []))
-      yield* RestartEffects.restartWhenIdleLoop(runtime, {
-        drainLimitMs: DRAIN_LIMIT_MS,
-        now: Date.now,
-        pollIntervalMs: DRAIN_POLL_MS,
-        reportFailure: error =>
-          ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error)),
-        restart: async () => {
-          await restartController(ctx).request()
-        },
-        runningTurns: () => runningTurns(ctx),
-      }).pipe(Effect.forkScoped)
-      yield* RestartEffects.resumeAfterBoot({
-        delayMs: AUTO_RESUME_DELAY_MS,
-        promote: Effect.tryPromise({ try: () => promoted, catch: () => undefined }).pipe(
-          Effect.catch(() => Effect.succeed([])),
-          Effect.asVoid,
-        ),
-        resume: Effect.tryPromise({ try: () => resumeAfterBoot(ctx, bootedAt), catch: () => undefined }).pipe(Effect.catch(() => Effect.void)),
-      }).pipe(Effect.forkScoped)
-    }),
-})
-
-const sessionArchiveApi = hostApi(threadSidebarSessionArchiveApi, {
-  status: Effect.fn('thread-sidebar archived sessions read')(({ ctx, input }) =>
-    Effect.sync(() => {
-      const requestedSessionIds = new Set(input.sessionIds)
-      return {
-        archivedSessionIds: ctx.workspaceRegistry.archivedSessionIds.filter(sessionId => requestedSessionIds.has(sessionId)),
-      }
-    }),
-  ),
+const sessionArchiveApi = threadSidebarSessionArchiveApi.host({
+  status: ({ ctx, input }) => {
+    const requestedSessionIds = new Set(input.sessionIds)
+    return {
+      archivedSessionIds: ctx.workspaceRegistry.archivedSessionIds.filter(sessionId => requestedSessionIds.has(sessionId)),
+    }
+  },
 })
 
 /** How often a pending restart looks for running turns, and how long it waits before restarting anyway. */
@@ -101,40 +66,58 @@ const DRAIN_LIMIT_MS = 30 * 60_000
  * queued follow-up that starts right after a turn ends is not cut off; past the limit it restarts anyway, and the
  * managed restart records whatever still runs so it resumes after boot.
  */
+let pendingRestart: { readonly since: number; readonly timer: NodeJS.Timeout } | undefined
+
 const runningTurns = (ctx: Context): number => activeRestartSessionIds(ctx.agents.list()).length
 
-const restartApi = hostApi(threadSidebarRestartApi, {
-  availability: Effect.fn('thread-sidebar restart availability')(({ ctx }) =>
-    Effect.gen(function* () {
-      const runtime = yield* RestartRuntime
-      const pending = yield* RestartEffects.readPendingRestart(runtime)
-      return {
-        available: restartController(ctx).available,
-        pending: pending === undefined ? null : { since: pending.since, running: runningTurns(ctx) },
-      }
-    }),
-  ),
-  requestRestartWhenIdle: Effect.fn('thread-sidebar restart when idle')(({ ctx }) =>
-    Effect.gen(function* () {
-      const runtime = yield* RestartRuntime
-      if (!restartController(ctx).available) throw new Error('This DSH process is not running under the managed restart launcher.')
-      yield* RestartEffects.queueRestartWhenIdle(runtime, Date.now())
-      return { accepted: true as const }
-    }),
-  ),
-  cancelPendingRestart: Effect.fn('thread-sidebar pending restart cancel')(() =>
-    Effect.gen(function* () {
-      const runtime = yield* RestartRuntime
-      return { canceled: yield* RestartEffects.cancelRestartWhenIdle(runtime) }
-    }),
-  ),
-  launchUrl: Effect.fn('thread-sidebar launch URL read')(() => Effect.tryPromise({ try: async () => ({ url: await readLaunchUrl() }), catch: error => error })),
-  requestRestart: Effect.fn('thread-sidebar restart request')(({ ctx }) =>
-    Effect.tryPromise({
-      try: () => restartController(ctx).request(),
-      catch: () => new Error('Could not schedule a safe DSH restart.'),
-    }),
-  ),
+const restartWhenIdle = (ctx: Context): void => {
+  if (pendingRestart !== undefined) return
+  const since = Date.now()
+  let idlePolls = 0
+  const reportFailure = (error: unknown): void => {
+    ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error))
+  }
+  const timer = setInterval(() => {
+    try {
+      idlePolls = runningTurns(ctx) === 0 ? idlePolls + 1 : 0
+      if (idlePolls < 2 && Date.now() - since < DRAIN_LIMIT_MS) return
+      clearInterval(timer)
+      pendingRestart = undefined
+      void restartController(ctx).request().catch(reportFailure)
+    } catch (error) {
+      clearInterval(timer)
+      pendingRestart = undefined
+      reportFailure(error)
+    }
+  }, DRAIN_POLL_MS)
+  timer.unref()
+  pendingRestart = { since, timer }
+}
+
+const restartApi = threadSidebarRestartApi.host({
+  availability: ({ ctx }) => ({
+    available: restartController(ctx).available,
+    pending: pendingRestart === undefined ? null : { since: pendingRestart.since, running: runningTurns(ctx) },
+  }),
+  requestRestartWhenIdle: ({ ctx }) => {
+    if (!restartController(ctx).available) throw new Error('This DSH process is not running under the managed restart launcher.')
+    restartWhenIdle(ctx)
+    return { accepted: true as const }
+  },
+  cancelPendingRestart: () => {
+    if (pendingRestart === undefined) return { canceled: false }
+    clearInterval(pendingRestart.timer)
+    pendingRestart = undefined
+    return { canceled: true }
+  },
+  launchUrl: async () => ({ url: await readLaunchUrl() }),
+  requestRestart: async ({ ctx }) => {
+    try {
+      return await restartController(ctx).request()
+    } catch {
+      throw new Error('Could not schedule a safe DSH restart.')
+    }
+  },
 })
 
 const resumePrompt = [
@@ -156,7 +139,7 @@ const resumeRecovery = async (ctx: Context, sessionId: string): Promise<boolean>
     return true
   }
 
-  const controller = ctx.sessionController
+  const controller = ctx.get('sessionController')
   if (controller === undefined) throw new Error('Session resume is unavailable.')
   await controller.prompt(
     {
@@ -187,33 +170,21 @@ const resumeAfterBoot = async (ctx: Context, bootedAt: number): Promise<void> =>
   }
 }
 
-const recoveryApi = hostApi(threadSidebarRecoveryApi, {
-  pending: Effect.fn('thread-sidebar recoveries read')(({ ctx }) =>
-    Effect.tryPromise({
-      try: async () => {
-        await restartRecoveryStore.remove(new Set(activeRestartSessionIds(ctx.agents.list())))
-        const entries = await restartRecoveryStore.list()
-        return {
-          sessionIds: entries.map(entry => entry.sessionId),
-          entries: entries.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt })),
-        }
-      },
-      catch: error => error,
-    }),
-  ),
-  resume: Effect.fn('thread-sidebar recovery resume')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => ({ accepted: await resumeRecovery(ctx, input.sessionId) }), catch: error => error }),
-  ),
-  dismiss: Effect.fn('thread-sidebar recovery dismiss')(({ input }) =>
-    Effect.tryPromise({
-      try: async () => {
-        const exists = (await restartRecoveryStore.list()).some(entry => entry.sessionId === input.sessionId)
-        await restartRecoveryStore.dismiss(input.sessionId)
-        return { dismissed: exists }
-      },
-      catch: error => error,
-    }),
-  ),
+const recoveryApi = threadSidebarRecoveryApi.host({
+  pending: async ({ ctx }) => {
+    await restartRecoveryStore.remove(new Set(activeRestartSessionIds(ctx.agents.list())))
+    const entries = await restartRecoveryStore.list()
+    return {
+      sessionIds: entries.map(entry => entry.sessionId),
+      entries: entries.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt })),
+    }
+  },
+  resume: async ({ ctx, input }) => ({ accepted: await resumeRecovery(ctx, input.sessionId) }),
+  dismiss: async ({ input }) => {
+    const exists = (await restartRecoveryStore.list()).some(entry => entry.sessionId === input.sessionId)
+    await restartRecoveryStore.dismiss(input.sessionId)
+    return { dismissed: exists }
+  },
 })
 
 const execFileAsync = promisify(execFile)
@@ -235,44 +206,33 @@ const readMachineName = async (): Promise<string> => {
 }
 
 let machineName: Promise<string> | undefined
-const machineApi = hostApi(threadSidebarMachineApi, {
-  name: Effect.fn('thread-sidebar machine name read')(() =>
-    Effect.tryPromise({ try: async () => ({ name: await (machineName ??= readMachineName()) }), catch: error => error }),
-  ),
+const machineApi = threadSidebarMachineApi.host({
+  name: async () => ({ name: await (machineName ??= readMachineName()) }),
 })
 
 let pluginUpdates: ReturnType<typeof createPluginUpdateWatch> | undefined
 /** The client bundles the Host currently serves, read from the composition every page boots from. */
 let servedClientRevisions: (() => readonly ClientEntryRevision[]) | undefined
-const pluginUpdatesApi = hostApi(threadSidebarPluginUpdatesApi, {
-  pending: Effect.fn('thread-sidebar plugin updates read')(() =>
-    Effect.tryPromise({ try: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }), catch: error => error }),
-  ),
-  clientUpdates: Effect.fn('thread-sidebar client updates read')(({ input }) =>
-    Effect.sync(() => staleClientEntries({ page: input.revisions, served: servedClientRevisions?.() ?? [] })),
-  ),
+const pluginUpdatesApi = threadSidebarPluginUpdatesApi.host({
+  pending: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }),
+  clientUpdates: async ({ input }) => staleClientEntries({ page: input.revisions, served: servedClientRevisions?.() ?? [] }),
 })
 
 /**
  * One `sessionController.list` answers every requested Session at once. Observing each Session
  * separately re-read its log, which cost seconds per poll and pinned a browser connection with it.
  */
-const pendingQuestionsApi = hostApi(threadSidebarPendingQuestionsApi, {
-  active: Effect.fn('thread-sidebar active questions read')(({ ctx, input, signal }) =>
-    Effect.tryPromise({
-      try: async () => {
-        if (input.sessionIds.length === 0) return { sessionIds: [] }
-        const candidates = new Set<string>(input.sessionIds)
-        const listed = await ctx.sessionController.list({}, signal)
-        return {
-          sessionIds: listed.items
-            .filter(item => candidates.has(item.sessionId) && (item.projections?.values.userQuestions?.active.length ?? 0) > 0)
-            .map(item => item.sessionId),
-        }
-      },
-      catch: error => error,
-    }),
-  ),
+const pendingQuestionsApi = threadSidebarPendingQuestionsApi.host({
+  active: async ({ ctx, input, signal }) => {
+    if (input.sessionIds.length === 0) return { sessionIds: [] }
+    const candidates = new Set<string>(input.sessionIds)
+    const listed = await ctx.sessionController.list({}, signal)
+    return {
+      sessionIds: listed.items
+        .filter(item => candidates.has(item.sessionId) && (item.projections?.values.userQuestions?.active.length ?? 0) > 0)
+        .map(item => item.sessionId),
+    }
+  },
 })
 
 const autoSettleSources = (ctx: Context): AutoSettleSources => ({
@@ -316,11 +276,9 @@ const requireAutoSettleScanner = (): AutoSettleScanner => {
   return autoSettleScanner
 }
 
-const autoSettleApi = hostApi(threadSidebarAutoSettleApi, {
-  status: Effect.fn('thread-sidebar auto-settle status read')(() => Effect.sync(() => requireAutoSettleScanner().status())),
-  requestSettle: Effect.fn('thread-sidebar auto-settle request')(({ input }) =>
-    Effect.tryPromise({ try: () => requireAutoSettleScanner().requestSettle(input), catch: error => error }),
-  ),
+const autoSettleApi = threadSidebarAutoSettleApi.host({
+  status: () => requireAutoSettleScanner().status(),
+  requestSettle: ({ input }) => requireAutoSettleScanner().requestSettle(input),
 })
 
 // The slice of `@deepseek-ai/dsh-client-modules`' ClientModuleRegistry this plugin reads; older Hosts lack members.
@@ -330,79 +288,7 @@ interface ClientModuleRegistrySurface {
   readonly onGraphChanged?: (listener: () => void) => () => void
 }
 
-const setupHost = (ctx: Context): void => {
-  setThreadActionsContext(ctx)
-  ctx.sessionProjections.register(threadSidebarModelRouteProjection)
-  ctx.effect(() => {
-    const opening = attentionFor(ctx)
-    void opening.catch(() => undefined)
-    const stop = ctx.on('session/event', (session, event) => {
-      const reason = ThreadAttentionStoreModel.finishReasonFromEvent(event)
-      if (reason === null) return
-      void opening.then(store => store.recordFinish({ sessionId: String(session.id), seq: event.seq, time: event.time, reason })).catch(() => undefined)
-    })
-    return async () => {
-      stop()
-      await closeAttention()
-    }
-  }, 'thread-sidebar: thread attention store')
-  ctx.effect(() => {
-    const scanner = createAutoSettleScanner({
-      clock: { now: Date.now, schedule: (run, delayMs) => scheduleOutsideReload(ctx, run, delayMs) },
-      sources: autoSettleSources(ctx),
-    })
-    autoSettleScanner = scanner
-    const stopListening = AutoSettleSettings.onChanged(scanner.settingsChanged)
-    scanner.start()
-    return () => {
-      stopListening()
-      scanner.stop()
-      if (autoSettleScanner === scanner) autoSettleScanner = undefined
-    }
-  }, 'thread-sidebar: auto-settle scan')
-  ctx.effect(() => {
-    const stop = ctx.on('session/event', (session, event) => {
-      const boundary = InflightTurns.boundaryFromEvent(event)
-      if (boundary === null) return
-      const sessionId = String(session.id)
-      if (boundary === 'start') {
-        void inflightTurns.start(sessionId).catch(() => undefined)
-        return
-      }
-      if (boundary === 'shutdown') return
-      void inflightTurns
-        .end(sessionId)
-        .then(wasOpen => (wasOpen && boundary === 'interrupted' ? restartRecoveryStore.record([sessionId], 'interrupted') : undefined))
-        .catch(() => undefined)
-    })
-    return stop
-  }, 'thread-sidebar: interrupted-turn tracking')
-  ctx.inject(['clientModules'], scoped => {
-    const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
-    if (registry?.graph === undefined || registry.clientPath === undefined) return
-    const entries = (): readonly { readonly id: string; readonly rev?: string | undefined }[] =>
-      graphIdsSchema.catch({ entries: [] }).parse(registry.graph?.()).entries
-    const served = (): readonly ClientEntryRevision[] => entries().flatMap(entry => (entry.rev === undefined ? [] : [{ id: entry.id, rev: entry.rev }]))
-    const watch = createPluginUpdateWatch({
-      ids: () => entries().map(entry => entry.id),
-      clientPath: id => registry.clientPath?.(id),
-    })
-    watch.remember()
-    scoped.effect(() => {
-      pluginUpdates = watch
-      servedClientRevisions = served
-      const stopWatching = registry.onGraphChanged?.(() => watch.remember())
-      return () => {
-        stopWatching?.()
-        if (pluginUpdates === watch) pluginUpdates = undefined
-        if (servedClientRevisions === served) servedClientRevisions = undefined
-      }
-    }, 'thread-sidebar: plugin update watch')
-  })
-}
-
 export default defineHost({
-  ...effectPlugin,
   name: '@dshfiles/thread-sidebar',
   commands: threadActionCommands,
   settings: [threadSidebarHostSettings],
@@ -446,4 +332,94 @@ export default defineHost({
   }),
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
+  setup: ctx => {
+    setThreadActionsContext(ctx)
+    ctx.sessionProjections.register(threadSidebarModelRouteProjection)
+    // One durable attention record per session, written where the turn actually ends, so every browser,
+    // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
+    ctx.effect(() => {
+      const opening = attentionFor(ctx)
+      void opening.catch(() => undefined)
+      const stop = ctx.on('session/event', (session, event) => {
+        const reason = ThreadAttentionStoreModel.finishReasonFromEvent(event)
+        if (reason === null) return
+        void opening.then(store => store.recordFinish({ sessionId: String(session.id), seq: event.seq, time: event.time, reason })).catch(() => undefined)
+      })
+      return async () => {
+        stop()
+        await closeAttention()
+      }
+    }, 'thread-sidebar: thread attention store')
+    // Auto-settle runs here, not in a browser tab, so idle and rebased threads settle with no page open.
+    ctx.effect(() => {
+      const scanner = createAutoSettleScanner({
+        // Armed during activation, so each tick leaves the reload transaction before it writes the settled status.
+        clock: { now: Date.now, schedule: (run, delayMs) => scheduleOutsideReload(ctx, run, delayMs) },
+        sources: autoSettleSources(ctx),
+      })
+      autoSettleScanner = scanner
+      const stopListening = AutoSettleSettings.onChanged(scanner.settingsChanged)
+      scanner.start()
+      return () => {
+        stopListening()
+        scanner.stop()
+        if (autoSettleScanner === scanner) autoSettleScanner = undefined
+      }
+    }, 'thread-sidebar: auto-settle scan')
+    // A turn that was still open when the previous Host process stopped never wrote its own recovery
+    // record: the crash leaves the marker behind instead, and this process turns it into a visible row.
+    ctx.effect(() => {
+      const bootedAt = Date.now()
+      const promoted = InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => [])
+      const resumeTimer = setTimeout(() => {
+        void promoted.then(() => resumeAfterBoot(ctx, bootedAt)).catch(() => undefined)
+      }, AUTO_RESUME_DELAY_MS)
+      resumeTimer.unref()
+      const stop = ctx.on('session/event', (session, event) => {
+        const boundary = InflightTurns.boundaryFromEvent(event)
+        if (boundary === null) return
+        const sessionId = String(session.id)
+        if (boundary === 'start') {
+          void inflightTurns.start(sessionId).catch(() => undefined)
+          return
+        }
+        // A turn this Host's own shutdown cut off keeps its marker: the next process promotes it into a resume row,
+        // which a write racing the five-second shutdown could not guarantee.
+        if (boundary === 'shutdown') return
+        // Crash recovery appends an `interrupted` turn end the moment the thread is next loaded, which
+        // can land before this process promotes the markers it inherited. Take the marker here so that
+        // turn still becomes a resume row instead of being dropped before `promote` can read it.
+        void inflightTurns
+          .end(sessionId)
+          .then(wasOpen => (wasOpen && boundary === 'interrupted' ? restartRecoveryStore.record([sessionId], 'interrupted') : undefined))
+          .catch(() => undefined)
+      })
+      return () => {
+        clearTimeout(resumeTimer)
+        stop()
+      }
+    }, 'thread-sidebar: interrupted-turn tracking')
+    ctx.inject(['clientModules'], scoped => {
+      const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
+      if (registry?.graph === undefined || registry.clientPath === undefined) return
+      const entries = (): readonly { readonly id: string; readonly rev?: string | undefined }[] =>
+        graphIdsSchema.catch({ entries: [] }).parse(registry.graph?.()).entries
+      const served = (): readonly ClientEntryRevision[] => entries().flatMap(entry => (entry.rev === undefined ? [] : [{ id: entry.id, rev: entry.rev }]))
+      const watch = createPluginUpdateWatch({
+        ids: () => entries().map(entry => entry.id),
+        clientPath: id => registry.clientPath?.(id),
+      })
+      watch.remember()
+      scoped.effect(() => {
+        pluginUpdates = watch
+        servedClientRevisions = served
+        const stopWatching = registry.onGraphChanged?.(() => watch.remember())
+        return () => {
+          stopWatching?.()
+          if (pluginUpdates === watch) pluginUpdates = undefined
+          if (servedClientRevisions === served) servedClientRevisions = undefined
+        }
+      }, 'thread-sidebar: plugin update watch')
+    })
+  },
 })

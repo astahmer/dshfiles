@@ -96,8 +96,7 @@ Then('the RAM sidebar entry shows the detached memory', async ({ page }: { page:
     const badge = ramEntry(page).locator('[data-memory-badge-detached-bytes]')
     await expect.poll(async () => Number(await badge.getAttribute('data-memory-badge-detached-bytes')), { timeout: 30_000 }).toBeGreaterThan(0)
     await expect(badge).toHaveAttribute('data-memory-badge-pressure', /^(normal|warning|critical|unknown)$/)
-    await badge.hover()
-    await expect(page.getByRole('tooltip')).toContainText(/detached/)
+    await expect(badge).toHaveAttribute('title', /detached/)
   })
 })
 

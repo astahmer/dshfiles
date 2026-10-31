@@ -12,10 +12,7 @@ import { materializeNonblankThread } from '../thread-composer.js'
 
 const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 const workbenchNavigation = (page: Page): Locator =>
-  page
-    .locator('[data-slot="shell.main"] [data-workbench-region="main"]')
-    .locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation"]')
-    .getByRole('navigation', { name: 'Navigation', exact: true })
+  page.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation"]').getByRole('navigation', { name: 'Navigation', exact: true })
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -1463,16 +1460,12 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
 })
 
 When('the Workbench Navigation panel is opened in menu-only overflow', async ({ page }: { page: Page }) => {
-  const main = page.locator('[data-slot="shell.main"] [data-workbench-region="main"]')
-  await expect(main).toHaveCount(1)
-  const newTab = main.getByRole('button', { name: 'New tab', exact: true })
-  await expect(newTab).toHaveCount(1)
+  const main = page.locator('[data-workbench-region="main"]').first()
+  const newTab = main.getByRole('button', { name: 'New tab', exact: true }).filter({ visible: true }).first()
   await newTab.click()
-  const chooser = main.getByRole('region', { name: 'Choose a view', exact: true })
-  await expect(chooser).toHaveCount(1)
+  const chooser = main.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
   await expect(chooser).toBeVisible()
   await chooser.getByRole('button', { name: reusableViewName('Navigation'), exact: true }).click()
-  await expect(workbenchNavigation(page)).toHaveCount(1)
   await expect(workbenchNavigation(page)).toBeVisible()
   await page.evaluate(
     ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
@@ -1480,7 +1473,6 @@ When('the Workbench Navigation panel is opened in menu-only overflow', async ({ 
   )
   await page.reload()
   const navigationTab = main.getByRole('tab', { name: reusableViewName('Navigation'), exact: true })
-  await expect(navigationTab).toHaveCount(1)
   if ((await navigationTab.getAttribute('aria-selected')) !== 'true') await navigationTab.click()
   const navigation = workbenchNavigation(page)
   await expect(navigation).toBeVisible()

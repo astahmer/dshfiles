@@ -9,7 +9,7 @@ When('{string} is commented on the open item', async ({ page }: { page: Page }, 
   const comment = peek(page).getByRole('textbox', { name: 'Comment', exact: true })
   await comment.fill(text)
   await peek(page).getByRole('button', { name: 'Reply', exact: true }).click()
-  await expect(comment).toHaveText('')
+  await expect(comment).toHaveValue('')
 })
 
 Then('the agent thread {string} opens with its instructions for {string}', async ({ page }: { page: Page }, title: string, task: string) => {
@@ -167,7 +167,7 @@ When('the agent suggestion {string} is picked', async ({ page }: { page: Page },
 })
 
 Then('the comment box reads {string}', async ({ page }: { page: Page }, text: string) => {
-  await expect(commentBox(page)).toHaveText(text)
+  await expect(commentBox(page)).toHaveValue(text)
 })
 
 Then('no agent suggestion is offered', async ({ page }: { page: Page }) => {

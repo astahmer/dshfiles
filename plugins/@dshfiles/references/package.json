@@ -24,7 +24,6 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
-    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

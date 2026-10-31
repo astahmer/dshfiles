@@ -1,16 +1,4 @@
-import { Effect, Schema } from 'effect'
-import { exactStruct, publicSchema } from './schema.js'
-
-type Mutable<Value> = Value extends readonly (infer Entry)[]
-  ? Mutable<Entry>[]
-  : Value extends object
-    ? { -readonly [Key in keyof Value]: Mutable<Value[Key]> }
-    : Value
-
-const boundedString = (maximum: number) => Schema.String.check(Schema.isMaxLength(maximum))
-const nonnegativeNumber = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
-const nonnegativeInteger = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0))
+import { z } from 'zod'
 
 export const processCategoryValues = ['dev-server', 'tests', 'build', 'dsh', 'services', 'other'] as const
 export type ProcessCategory = (typeof processCategoryValues)[number]
@@ -29,118 +17,108 @@ export type MemoryPressure = (typeof memoryPressureValues)[number]
 const processOriginValues = ['job', 'host', 'detached'] as const
 export type ProcessOrigin = (typeof processOriginValues)[number]
 
-const processTreeSchema = exactStruct({
-  pid: positiveInteger,
-  startedAt: nonnegativeInteger,
-  name: boundedString(120),
-  command: boundedString(400),
-  cwd: boundedString(1024),
-  bytes: nonnegativeNumber,
-  processCount: positiveInteger,
-  origin: Schema.Literals(processOriginValues),
-  category: Schema.Literals(processCategoryValues),
-  jobId: Schema.NullOr(boundedString(128)),
-  sessionId: Schema.NullOr(boundedString(128)),
-  ownerRunning: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))).annotate({
-    description: 'A live job whose owning Session is mid-turn; a bulk stop leaves it to that thread’s own Stop.',
-  }),
+const processTreeSchema = z.object({
+  pid: z.number().int().positive(),
+  startedAt: z.number().int().nonnegative(),
+  name: z.string().max(120),
+  command: z.string().max(400),
+  cwd: z.string().max(1024),
+  bytes: z.number().nonnegative(),
+  processCount: z.number().int().positive(),
+  origin: z.enum(processOriginValues),
+  category: z.enum(processCategoryValues),
+  jobId: z.string().max(128).nullable(),
+  sessionId: z.string().max(128).nullable(),
+  ownerRunning: z.boolean().default(false).describe('A live job whose owning Session is mid-turn; a bulk stop leaves it to that thread’s own Stop.'),
 })
-export type ProcessTree = Mutable<Schema.Schema.Type<typeof processTreeSchema>>
+export type ProcessTree = z.infer<typeof processTreeSchema>
 
-const workspaceThreadSchema = exactStruct({
-  sessionId: boundedString(128),
-  title: Schema.NullOr(boundedString(300)),
-  createdAt: Schema.NullOr(Schema.Finite).pipe(Schema.optionalKey),
-  running: Schema.Boolean,
-  updatedAt: Schema.NullOr(Schema.Finite),
+const workspaceThreadSchema = z.object({
+  sessionId: z.string().max(128),
+  title: z.string().max(300).nullable(),
+  createdAt: z.number().nullable().optional(),
+  running: z.boolean(),
+  updatedAt: z.number().nullable(),
 })
-export type WorkspaceThread = Mutable<Schema.Schema.Type<typeof workspaceThreadSchema>>
+export type WorkspaceThread = z.infer<typeof workspaceThreadSchema>
 
 /** `project` is a registered workspace; `workspace` a thread or jj sibling checkout of one; `elsewhere` collects Host children outside every workspace. */
 const workspaceGroupKindValues = ['project', 'workspace', 'elsewhere'] as const
 
-const workspaceGroupSchema = exactStruct({
-  key: boundedString(1024),
-  title: boundedString(300),
-  path: boundedString(1024),
-  kind: Schema.Literals(workspaceGroupKindValues),
-  project: Schema.NullOr(boundedString(300)),
-  bytes: nonnegativeNumber,
-  detachedBytes: nonnegativeNumber,
-  detachedCount: nonnegativeInteger,
-  threadCount: nonnegativeInteger,
-  threads: Schema.mutable(Schema.Array(workspaceThreadSchema)).check(Schema.isMaxLength(20)),
-  trees: Schema.mutable(Schema.Array(processTreeSchema)).check(Schema.isMaxLength(200)),
+const workspaceGroupSchema = z.object({
+  key: z.string().max(1024),
+  title: z.string().max(300),
+  path: z.string().max(1024),
+  kind: z.enum(workspaceGroupKindValues),
+  project: z.string().max(300).nullable(),
+  bytes: z.number().nonnegative(),
+  detachedBytes: z.number().nonnegative(),
+  detachedCount: z.number().int().nonnegative(),
+  threadCount: z.number().int().nonnegative(),
+  threads: z.array(workspaceThreadSchema).max(20),
+  trees: z.array(processTreeSchema).max(200),
 })
-export type WorkspaceGroup = Mutable<Schema.Schema.Type<typeof workspaceGroupSchema>>
+export type WorkspaceGroup = z.infer<typeof workspaceGroupSchema>
 
-const nodeProcessSampleSchema = exactStruct({
-  pid: positiveInteger,
-  rssBytes: nonnegativeNumber,
+const nodeProcessSampleSchema = z.object({
+  pid: z.number().int().positive(),
+  rssBytes: z.number().nonnegative(),
 })
-export type NodeProcessSample = Mutable<Schema.Schema.Type<typeof nodeProcessSampleSchema>>
+export type NodeProcessSample = z.infer<typeof nodeProcessSampleSchema>
 
-const nodeProcessOriginSchema = exactStruct({
-  name: boundedString(120),
-  source: Schema.NullOr(boundedString(120)),
-  cwd: Schema.NullOr(boundedString(1024)),
-  processCount: nonnegativeInteger,
-  rssBytes: nonnegativeNumber,
-  samples: Schema.mutable(Schema.Array(nodeProcessSampleSchema)).check(Schema.isMaxLength(5)),
+const nodeProcessOriginSchema = z.object({
+  name: z.string().max(120),
+  source: z.string().max(120).nullable(),
+  cwd: z.string().max(1024).nullable(),
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  samples: z.array(nodeProcessSampleSchema).max(5),
 })
-export type NodeProcessOrigin = Mutable<Schema.Schema.Type<typeof nodeProcessOriginSchema>>
+export type NodeProcessOrigin = z.infer<typeof nodeProcessOriginSchema>
 
-const nodeProcessSummarySchema = exactStruct({
-  processCount: nonnegativeInteger,
-  rssBytes: nonnegativeNumber,
-  truncated: Schema.Boolean,
-  origins: Schema.mutable(Schema.Array(nodeProcessOriginSchema)).check(Schema.isMaxLength(100)),
+const nodeProcessSummarySchema = z.object({
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  truncated: z.boolean(),
+  origins: z.array(nodeProcessOriginSchema).max(100),
 })
-export type NodeProcessSummary = Mutable<Schema.Schema.Type<typeof nodeProcessSummarySchema>>
+export type NodeProcessSummary = z.infer<typeof nodeProcessSummarySchema>
 
-const categoryBytesSchema = Schema.Record(Schema.Literals(processCategoryValues), nonnegativeNumber).check(
-  Schema.makeFilter(value =>
-    Object.keys(value).every(key => processCategoryValues.some(category => category === key))
-      ? undefined
-      : 'Category bytes cannot contain unknown process categories.',
-  ),
-)
-
-export const memorySnapshotSchema = publicSchema(exactStruct({
-  takenAt: Schema.Finite,
-  supported: Schema.Boolean,
-  pressure: Schema.Literals(memoryPressureValues),
-  systemBytes: nonnegativeNumber,
-  hostBytes: nonnegativeNumber,
-  trackedBytes: nonnegativeNumber,
-  detachedBytes: nonnegativeNumber,
-  detachedCount: nonnegativeInteger,
-  categoryBytes: categoryBytesSchema,
-  groups: Schema.mutable(Schema.Array(workspaceGroupSchema)).check(Schema.isMaxLength(200)),
-  nodeProcesses: Schema.optionalKey(nodeProcessSummarySchema),
-}))
-export type MemorySnapshot = Mutable<Schema.Schema.Type<typeof memorySnapshotSchema>>
-
-export const pressureSnapshotSchema = publicSchema(exactStruct({
-  takenAt: Schema.Finite,
-  supported: Schema.Boolean,
-  pressure: Schema.Literals(memoryPressureValues),
-  systemBytes: nonnegativeNumber,
-}))
-export type PressureSnapshot = Mutable<Schema.Schema.Type<typeof pressureSnapshotSchema>>
-
-export const stopTargetSchema = exactStruct({
-  pid: positiveInteger.annotate({ description: 'Root pid of a process tree from the snapshot.' }),
-  startedAt: nonnegativeInteger.annotate({
-    description: 'The tree’s startedAt from the snapshot; a recycled pid with another start time is refused.',
-  }),
+export const memorySnapshotSchema = z.object({
+  takenAt: z.number(),
+  supported: z.boolean(),
+  pressure: z.enum(memoryPressureValues),
+  systemBytes: z.number().nonnegative(),
+  hostBytes: z.number().nonnegative(),
+  trackedBytes: z.number().nonnegative(),
+  detachedBytes: z.number().nonnegative(),
+  detachedCount: z.number().int().nonnegative(),
+  categoryBytes: z.record(z.enum(processCategoryValues), z.number().nonnegative()),
+  groups: z.array(workspaceGroupSchema).max(200),
+  nodeProcesses: nodeProcessSummarySchema.optional(),
 })
-export type StopTarget = Mutable<Schema.Schema.Type<typeof stopTargetSchema>>
+export type MemorySnapshot = z.infer<typeof memorySnapshotSchema>
 
-export const stopResultSchema = publicSchema(exactStruct({
-  stopped: nonnegativeInteger,
-  viaJob: nonnegativeInteger,
-  missing: nonnegativeInteger,
-  refused: nonnegativeInteger,
-}))
-export type StopResult = Mutable<Schema.Schema.Type<typeof stopResultSchema>>
+export const pressureSnapshotSchema = z.object({
+  takenAt: z.number(),
+  supported: z.boolean(),
+  pressure: z.enum(memoryPressureValues),
+  systemBytes: z.number().nonnegative(),
+})
+export type PressureSnapshot = z.infer<typeof pressureSnapshotSchema>
+
+export const stopTargetSchema = z
+  .object({
+    pid: z.number().int().positive().describe('Root pid of a process tree from the snapshot.'),
+    startedAt: z.number().int().nonnegative().describe('The tree’s startedAt from the snapshot; a recycled pid with another start time is refused.'),
+  })
+  .strict()
+export type StopTarget = z.infer<typeof stopTargetSchema>
+
+export const stopResultSchema = z.object({
+  stopped: z.number().int().nonnegative(),
+  viaJob: z.number().int().nonnegative(),
+  missing: z.number().int().nonnegative(),
+  refused: z.number().int().nonnegative(),
+})
+export type StopResult = z.infer<typeof stopResultSchema>

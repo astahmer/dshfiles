@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { describe, expect, test } from 'vitest'
 import type { SectionEntryRow } from './settings-search.js'
 import { createSettingsTools, type SettingsRow, type SettingsSurface, type SettingsUnsetOp } from './settings-tools.js'
@@ -23,44 +23,48 @@ const noEntries = { read: () => [], replace: () => {} }
 const tools = (surface: SettingsSurface) => createSettingsTools({ settings: () => surface, searchEntries: noEntries })
 
 describe('settings tools: list', () => {
-  test('lists namespaces without their values and adds one on request', async () => {
+  test('lists namespaces without their values and adds one on request', () => {
     const surface = createSurface()
 
-    const all = await Effect.runPromise(tools(surface).list({ input: {} }))
+    const all = tools(surface).list({ input: {} })
     expect(all.writable).toBe(true)
     expect(all.namespaces).toEqual([
       { namespace: 'agent-loop', revision: 7, autoGenerate: true, secretFields: 0 },
       { namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0 },
     ])
 
-    const one = await Effect.runPromise(tools(surface).list({ input: { namespace: 'ui-theme' } }))
+    const one = tools(surface).list({ input: { namespace: 'ui-theme' } })
     expect(one.namespaces).toEqual([{ namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0, value: '{"mode":"dark"}' }])
   })
 
-  test('filters by query and refuses an unknown namespace by name', async () => {
+  test('filters by query and refuses an unknown namespace by name', () => {
     const surface = createSurface()
-    expect((await Effect.runPromise(tools(surface).list({ input: { query: 'THEME' } }))).namespaces.map(entry => entry.namespace)).toEqual(['ui-theme'])
-    await expect(Effect.runPromise(tools(surface).list({ input: { namespace: 'nope' } }))).rejects.toThrow(/Known namespaces include agent-loop, ui-theme/)
+    expect(
+      tools(surface)
+        .list({ input: { query: 'THEME' } })
+        .namespaces.map(entry => entry.namespace),
+    ).toEqual(['ui-theme'])
+    expect(() => tools(surface).list({ input: { namespace: 'nope' } })).toThrow(/Known namespaces include agent-loop, ui-theme/)
   })
 
-  test('searches the section entries the browser last published, only for a query', async () => {
+  test('searches the section entries the browser last published, only for a query', () => {
     let published: readonly SectionEntryRow[] = []
     const searchEntries = { read: () => published, replace: (entries: readonly SectionEntryRow[]) => (published = entries) }
     const withEntries = createSettingsTools({ settings: () => createSurface(), searchEntries })
     const developerTools = { sectionId: 'general', sectionLabel: 'General', id: 'developer-tools', title: 'Show coding view', keywords: 'devtools' }
-    expect(await Effect.runPromise(withEntries.publishSearchEntries({ input: { entries: [developerTools] } }))).toEqual({ count: 1 })
-    expect(await Effect.runPromise(withEntries.list({ input: { query: 'DEVTOOLS' } }))).toEqual({ writable: true, namespaces: [], entries: [developerTools] })
-    expect((await Effect.runPromise(withEntries.list({ input: {} }))).entries).toBeUndefined()
-    expect((await Effect.runPromise(withEntries.list({ input: { query: 'theme' } }))).entries).toBeUndefined()
-    await Effect.runPromise(withEntries.publishSearchEntries({ input: { entries: [] } }))
-    expect((await Effect.runPromise(withEntries.list({ input: { query: 'devtools' } }))).entries).toBeUndefined()
+    expect(withEntries.publishSearchEntries({ input: { entries: [developerTools] } })).toEqual({ count: 1 })
+    expect(withEntries.list({ input: { query: 'DEVTOOLS' } })).toEqual({ writable: true, namespaces: [], entries: [developerTools] })
+    expect(withEntries.list({ input: {} }).entries).toBeUndefined()
+    expect(withEntries.list({ input: { query: 'theme' } }).entries).toBeUndefined()
+    withEntries.publishSearchEntries({ input: { entries: [] } })
+    expect(withEntries.list({ input: { query: 'devtools' } }).entries).toBeUndefined()
   })
 
-  test('omits a value too large for the model and reports it', async () => {
+  test('omits a value too large for the model and reports it', () => {
     const surface = createSurface({
       describe: () => [row('ai-accounts', { blob: 'x'.repeat(70 * 1024) })],
     })
-    expect((await Effect.runPromise(tools(surface).list({ input: { namespace: 'ai-accounts' } }))).namespaces[0]).toEqual({
+    expect(tools(surface).list({ input: { namespace: 'ai-accounts' } }).namespaces[0]).toEqual({
       namespace: 'ai-accounts',
       revision: 4,
       autoGenerate: true,
@@ -79,7 +83,7 @@ describe('settings tools: write', () => {
       },
     })
 
-    expect(await Effect.runPromise(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 } } }))).toEqual({
+    expect(await tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 } } })).toEqual({
       namespace: 'agent-loop',
       applied: ['maxRounds', 'stalledRounds'],
       revision: 7,
@@ -95,7 +99,7 @@ describe('settings tools: write', () => {
       },
     })
 
-    expect(await Effect.runPromise(tools(surface).unset({ input: { namespace: 'ui-theme', path: ['mode'] } }))).toEqual({
+    expect(await tools(surface).unset({ input: { namespace: 'ui-theme', path: ['mode'] } })).toEqual({
       namespace: 'ui-theme',
       path: ['mode'],
     })
@@ -104,25 +108,23 @@ describe('settings tools: write', () => {
 
   test('refuses to write when the profile is read-only', async () => {
     const surface = createSurface({ writable: false })
-    await expect(Effect.runPromise(tools(surface).set({ input: { namespace: 'ui-theme', patch: { mode: 'light' } } }))).rejects.toMatchObject({
-      _tag: 'SettingsReadOnly',
-    })
+    await expect(tools(surface).set({ input: { namespace: 'ui-theme', patch: { mode: 'light' } } })).rejects.toSatisfy(
+      error => error instanceof PluginApiError && error.code === 'settings-read-only',
+    )
   })
 
   test('turns a lost revision race into a readable conflict', async () => {
     const conflict = Object.assign(new Error('agent-loop changed'), { code: 'SETTINGS_CONFLICT' })
     const surface = createSurface({ update: async () => Promise.reject(conflict) })
-    await expect(Effect.runPromise(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 2 } } }))).rejects.toMatchObject({
-      _tag: 'SettingsConflict',
-    })
+    await expect(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 2 } } })).rejects.toSatisfy(
+      error => error instanceof PluginApiError && error.code === 'settings-conflict',
+    )
   })
 
   test('passes a schema rejection through as the Host message', async () => {
     const rejected = Object.assign(new Error('maxRounds: expected a number'), { code: 'EINVALID' })
     const surface = createSurface({ update: async () => Promise.reject(rejected) })
-    await expect(Effect.runPromise(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 'many' } } }))).rejects.toThrow(
-      'maxRounds: expected a number',
-    )
+    await expect(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 'many' } } })).rejects.toThrow('maxRounds: expected a number')
   })
 })
 

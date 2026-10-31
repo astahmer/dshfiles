@@ -1,13 +1,9 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
-import { Effect, Schema } from 'effect'
+import { z } from 'zod'
 
-const manifestSchema = Schema.Struct({ name: Schema.String, version: Schema.String })
-
-export class PackageVersionsReadError extends Schema.TaggedError<PackageVersionsReadError>()('PackageVersionsReadError', {
-  message: Schema.String,
-}) {}
+const manifestSchema = z.object({ name: z.string(), version: z.string() })
 
 /** `@scope/name/client` → `@scope/name`; `name/sub` → `name`. */
 export const packageNameOf = (moduleName: string): string => {
@@ -27,18 +23,10 @@ export const readPackageVersions = (input: { readonly packages: readonly string[
     for (const directory of searchPaths) {
       const path = join(directory, name, 'package.json')
       if (!existsSync(path)) continue
-      const manifest = load(path)
-      if (Schema.is(manifestSchema)(manifest) && manifest.name === name) return manifest.version
+      const manifest = manifestSchema.safeParse(load(path))
+      if (manifest.success && manifest.data.name === name) return manifest.data.version
     }
     return null
   }
   return Object.fromEntries([...new Set(input.packages.map(packageNameOf))].map(name => [name, versionOf(name)]))
 }
-
-export const readPackageVersionsEffect = Effect.fn('agent toolkit versions')(
-  (input: { readonly packages: readonly string[]; readonly bases: () => Promise<readonly string[]> }) =>
-    Effect.tryPromise({
-      try: async () => readPackageVersions({ packages: input.packages, bases: await input.bases() }),
-      catch: () => new PackageVersionsReadError({ message: 'Could not read installed package versions.' }),
-    }),
-)

@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -8,7 +9,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
-import { KIND_LABEL, STATE_LABEL } from './account-labels.js'
+import { KIND_GROUPS, KIND_LABEL, STATE_LABEL } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
@@ -109,7 +110,7 @@ const QuickEditor = (props: { readonly profile: AccountProfile; readonly saveDra
  * page's footer seat: one row per account with its sign-in state, the picker
  * switch, and an in-place editor for the fields that make it work.
  */
-export const ModelsPageAccounts = (props: { readonly onAddAccount: () => void }): JSX.Element | null => {
+export const ModelsPageAccounts = (): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
   const preferences = usePreferences()
   const queryClient = useQueryClient()
@@ -129,6 +130,14 @@ export const ModelsPageAccounts = (props: { readonly onAddAccount: () => void })
 
   if (!preferences.modelsPageAccounts) return null
 
+  const create = (kind: AccountDraft['kind']): void => {
+    const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
+    void saveMutation
+      .mutateAsync(next)
+      .then(() => setExpanded(next.instanceId))
+      .catch((cause: unknown) => setNotice(`Could not add the account: ${String(cause)}`))
+  }
+
   return (
     <TooltipProvider delayDuration={500}>
       <section aria-label="AI Accounts" className="dshx-root dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-2">
@@ -137,10 +146,22 @@ export const ModelsPageAccounts = (props: { readonly onAddAccount: () => void })
             <h3 className="dshx:text-sm dshx:font-semibold">AI Accounts</h3>
             <p className="dshx:text-xs dshx:text-muted-foreground">Subscription accounts, each its own route in the model picker.</p>
           </div>
-          <Button onClick={props.onAddAccount} size="sm" type="button" variant="outline">
-            <PlusIcon />
-            Add account
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" type="button" variant="outline">
+                <PlusIcon />
+                Add account
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="dshx-root dshx:w-48">
+              {KIND_GROUPS.map(kind => (
+                <DropdownMenuItem key={kind} onSelect={() => create(kind)}>
+                  <ProviderGlyph kind={kind} />
+                  {KIND_LABEL[kind]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         {shownNotice === null ? null : <p className="dshx:text-xs dshx:text-destructive">{shownNotice}</p>}
         <ul className="dshx:flex dshx:flex-col dshx:gap-1.5">

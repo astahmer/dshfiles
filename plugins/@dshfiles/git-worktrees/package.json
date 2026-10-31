@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@dshfiles/vcs-provider-port": "workspace:*",
-    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

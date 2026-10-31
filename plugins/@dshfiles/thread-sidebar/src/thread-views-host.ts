@@ -1,5 +1,3 @@
-import { Effect } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import { z } from 'zod'
 import {
   threadViewsApi,
@@ -127,24 +125,12 @@ const controller = (settings: ThreadViewsSettingsPort) => {
   return current
 }
 
-export const threadViewsHost = DshxEffect.host(threadViewsApi, {
-  list: Effect.fn('thread views list')(({ ctx }) => Effect.tryPromise({ try: async () => await controller(ctx.settings).list(), catch: error => error })),
-  get: Effect.fn('thread view get')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).get(input), catch: error => error }),
-  ),
-  create: Effect.fn('thread view create')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).create(input), catch: error => error }),
-  ),
-  update: Effect.fn('thread view update')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).update(input), catch: error => error }),
-  ),
-  delete: Effect.fn('thread view delete')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).delete(input), catch: error => error }),
-  ),
-  move: Effect.fn('thread view move')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).move(input), catch: error => error }),
-  ),
-  select: Effect.fn('thread view select')(({ ctx, input }) =>
-    Effect.tryPromise({ try: async () => await controller(ctx.settings).select(input), catch: error => error }),
-  ),
+export const threadViewsHost = threadViewsApi.host({
+  list: ({ ctx }) => controller(ctx.settings).list(),
+  get: ({ ctx, input }) => controller(ctx.settings).get(input),
+  create: ({ ctx, input }) => controller(ctx.settings).create(input),
+  update: ({ ctx, input }) => controller(ctx.settings).update(input),
+  delete: ({ ctx, input }) => controller(ctx.settings).delete(input),
+  move: ({ ctx, input }) => controller(ctx.settings).move(input),
+  select: ({ ctx, input }) => controller(ctx.settings).select(input),
 })
