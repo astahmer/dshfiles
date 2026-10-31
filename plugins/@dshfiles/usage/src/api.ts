@@ -1,19 +1,19 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { UsageFoldModel } from './fold.js'
+import { REQUEST_PURPOSES, REQUEST_STATUSES } from './fold-contracts.js'
 import { jevUsageOutcomeSchema, jevUsageQuerySchema, jevUsageRecordSchema, jevUsageSourceSchema, jevUsageViewSchema } from './jev-usage.js'
 import { otlpMetricsRequestSchema } from './otel-metrics.js'
 
 export { JEV_INPUT_USD_PER_MILLION } from './jev-usage.js'
 export type { JevUsageBreakdown, JevUsageQuery, JevUsageRecord, JevUsageView } from './jev-usage.js'
 
-export const purposeSchema = z.enum(UsageFoldModel.REQUEST_PURPOSES)
-export const statusSchema = z.enum(UsageFoldModel.REQUEST_STATUSES)
+export const purposeSchema = z.enum(REQUEST_PURPOSES)
+export const statusSchema = z.enum(REQUEST_STATUSES)
 
 const rangeShape = {
   from: z.number().int().min(0).describe('Range start, Unix milliseconds.'),
   to: z.number().int().min(0).describe('Range end, Unix milliseconds.'),
-  purposes: z.array(purposeSchema).max(UsageFoldModel.REQUEST_PURPOSES.length).optional(),
+  purposes: z.array(purposeSchema).max(REQUEST_PURPOSES.length).optional(),
   provider: z.string().min(1).max(256).optional().describe('Exact, case-sensitive recorded provider route id (including the account instance id).'),
 }
 

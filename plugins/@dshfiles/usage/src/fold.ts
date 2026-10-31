@@ -1,8 +1,9 @@
 import type { RegistryToolSource } from '@dshfiles/dshx/api'
-import { decodeJson, decodeJsonSafe, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { Result, Schema } from 'effect'
 import type { LogRecord } from './session-log.js'
-import { identifyCommand, shellToolArgumentsSchema, type ShellToolArguments } from './command-identifiers.js'
+import { identifyCommand, isOptionalShellToolArguments, type ShellToolArguments } from './command-identifiers.js'
+import { REQUEST_PURPOSES, REQUEST_STATUSES } from './fold-contracts.js'
 
 /**
  * Turns one session log into model requests. Every request is keyed by the
@@ -23,8 +24,8 @@ import { identifyCommand, shellToolArgumentsSchema, type ShellToolArguments } fr
  *   `session/title`; the log keeps no usage for it.
  */
 
-export type RequestPurpose = (typeof UsageFoldModel.REQUEST_PURPOSES)[number]
-export type RequestStatus = (typeof UsageFoldModel.REQUEST_STATUSES)[number]
+export type RequestPurpose = (typeof REQUEST_PURPOSES)[number]
+export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
 export interface TokenUsage {
   /** Prompt tokens billed at the input rate (not read from or written to the cache). */
@@ -92,13 +93,17 @@ export interface ToolExecutionRow {
 const stepKey = (turn: number, step: number): string => `${String(turn)}:${String(step)}`
 const MAX_OPEN_TOOL_CALLS = 2_000
 
-const toolResultSchema = z.object({
-  message: z.object({
-    toolCallId: z.string().min(1).max(256),
-    isError: z.boolean().optional(),
-    content: z.array(z.object({ text: z.string().optional() })).optional(),
+const toolResultSchema = Schema.Struct({
+  message: Schema.Struct({
+    toolCallId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    isError: Schema.optional(Schema.Boolean),
+    content: Schema.optional(Schema.Array(Schema.Struct({ text: Schema.optional(Schema.String) }))),
   }),
 })
+
+const skillSchema = Schema.StructWithRest(Schema.Struct({ name: Schema.String.check(Schema.isPattern(/^[\w.-]{1,80}$/)) }), [
+  Schema.Record(Schema.String.check(Schema.isPattern(/^(?!name$)[\s\S]*$/)), Schema.Never),
+])
 
 /** Characters of text a tool returned. Image and binary parts carry no `text` and are not counted. */
 const resultCharsOf = (content: readonly { readonly text?: string | undefined }[] | undefined): number => {
@@ -107,47 +112,74 @@ const resultCharsOf = (content: readonly { readonly text?: string | undefined }[
   return total
 }
 
-const requestRowValueSchema = z.union([z.looseObject({}), z.array(z.unknown())])
-
-const foldStateSchema = z.object({
-  session: z
-    .object({
-      id: z.string(),
-      cwd: z.string().nullable(),
-      parentSession: z.string().nullable(),
-      subagent: z.boolean(),
-      createdAt: z.number().nullable(),
-      title: z.string().nullable(),
-    })
-    .nullable(),
-  route: z.object({ provider: z.string(), model: z.string() }).nullable(),
-  stepStarts: z.record(z.string(), z.number()),
-  settledSteps: z.array(z.string()),
-  silentSteps: z.array(z.object({ turn: z.number(), step: z.number(), seq: z.number(), startedAt: z.number(), endedAt: z.number() })),
-  compactionStarts: z.record(z.string(), z.number()),
-  pendingTitle: z.object({ seq: z.number(), startedAt: z.number(), provider: z.string(), model: z.string() }).nullable(),
-  /** Attempts that ended without a finish chunk: a retry or the turn's end says whether they failed or were aborted. */
-  openAttempts: z.array(z.object({ key: z.string(), row: z.custom<RequestRow>(value => requestRowValueSchema.safeParse(value).success) })),
-  openTools: z
-    .array(
-      z.object({
-        callId: z.string(),
-        seq: z.number(),
-        turn: z.number().nullable(),
-        step: z.number().nullable(),
-        name: z.string(),
-        category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
-        owner: z.string().nullable(),
-        normalizedCommand: z.string().max(80).nullable(),
-        testRunner: z.string().max(80).nullable(),
-        startedAt: z.number(),
-      }),
-    )
-    .max(MAX_OPEN_TOOL_CALLS),
-  activeTurn: z.number().nullable(),
+const nullableNumber = Schema.NullOr(Schema.Number)
+const nullableString = Schema.NullOr(Schema.String)
+const requestRowSchema = Schema.Struct({
+  id: Schema.String,
+  sessionId: Schema.String,
+  seq: nullableNumber,
+  messageId: nullableString,
+  turn: nullableNumber,
+  step: nullableNumber,
+  purpose: Schema.Literals(['agent', 'subagent', 'compaction', 'title', 'memory', 'other']),
+  source: Schema.Literals(['log', 'live']),
+  provider: Schema.String,
+  model: Schema.String,
+  startedAt: Schema.Number,
+  endedAt: nullableNumber,
+  ttftMs: nullableNumber,
+  usage: Schema.NullOr(
+    Schema.Struct({ input: Schema.Number, cacheRead: Schema.Number, cacheWrite: Schema.Number, output: Schema.Number, reasoning: Schema.Number }),
+  ),
+  status: Schema.Literals(['ok', 'aborted', 'failed']),
+  stopReason: nullableString,
+  errorCode: nullableString,
 })
 
-export type FoldState = z.infer<typeof foldStateSchema>
+const foldStateSchema = Schema.Struct({
+  session: Schema.NullOr(
+    Schema.Struct({
+      id: Schema.String,
+      cwd: nullableString,
+      parentSession: nullableString,
+      subagent: Schema.Boolean,
+      createdAt: nullableNumber,
+      title: nullableString,
+    }),
+  ),
+  route: Schema.NullOr(Schema.Struct({ provider: Schema.String, model: Schema.String })),
+  stepStarts: Schema.Record(Schema.String, Schema.Number),
+  settledSteps: Schema.mutable(Schema.Array(Schema.String)),
+  silentSteps: Schema.mutable(
+    Schema.Array(Schema.Struct({ turn: Schema.Number, step: Schema.Number, seq: Schema.Number, startedAt: Schema.Number, endedAt: Schema.Number })),
+  ),
+  compactionStarts: Schema.Record(Schema.String, Schema.Number),
+  pendingTitle: Schema.NullOr(Schema.Struct({ seq: Schema.Number, startedAt: Schema.Number, provider: Schema.String, model: Schema.String })),
+  openAttempts: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, row: requestRowSchema }))),
+  openTools: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        callId: Schema.String,
+        seq: Schema.Number,
+        turn: nullableNumber,
+        step: nullableNumber,
+        name: Schema.String,
+        category: Schema.Literals(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+        owner: nullableString,
+        normalizedCommand: Schema.NullOr(Schema.String.check(Schema.isMaxLength(80))),
+        testRunner: Schema.NullOr(Schema.String.check(Schema.isMaxLength(80))),
+        startedAt: Schema.Number,
+      }),
+    ).check(Schema.isMaxLength(MAX_OPEN_TOOL_CALLS)),
+  ),
+  activeTurn: nullableNumber,
+})
+
+export type FoldState = Schema.Schema.Type<typeof foldStateSchema>
+type Mutable<T> = T extends readonly (infer Item)[] ? Mutable<Item>[] : T extends object ? { -readonly [Key in keyof T]: Mutable<T[Key]> } : T
+
+const safeParse = <A, E>(result: Result.Result<A, E>) =>
+  Result.isSuccess(result) ? { success: true as const, data: result.success } : { success: false as const, error: result.failure }
 
 interface FoldRecordsResult {
   readonly state: FoldState
@@ -155,63 +187,72 @@ interface FoldRecordsResult {
   readonly tools: ToolExecutionRow[]
 }
 
-const headerSchema = z.object({
-  id: z.string(),
-  createdAt: z.number().optional(),
-  cwd: z.string().optional(),
-  parentSession: z.string().optional(),
-  origin: z.string().optional(),
+const headerSchema = Schema.Struct({
+  id: Schema.String,
+  createdAt: Schema.optional(Schema.Number),
+  cwd: Schema.optional(Schema.String),
+  parentSession: Schema.optional(Schema.String),
+  origin: Schema.optional(Schema.String),
 })
-const routeSchema = z.object({ provider: z.string(), model: z.string() })
-const requestHeaderSchema = z.object({ header: z.object({ config: routeSchema }) })
-const turnStepSchema = z.object({ turn: z.number(), step: z.number() })
-const usageSchema = z.object({
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number().optional(),
-  cacheWriteTokens: z.number().optional(),
-  reasoningTokens: z.number().optional(),
+const routeSchema = Schema.Struct({ provider: Schema.String, model: Schema.String })
+const requestHeaderSchema = Schema.Struct({ header: Schema.Struct({ config: routeSchema }) })
+const turnStepSchema = Schema.Struct({ turn: Schema.Number, step: Schema.Number })
+const usageSchema = Schema.Struct({
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cacheReadTokens: Schema.optional(Schema.Number),
+  cacheWriteTokens: Schema.optional(Schema.Number),
+  reasoningTokens: Schema.optional(Schema.Number),
 })
-const streamEntrySchema = z.object({
-  type: z.string(),
-  time: z.number().optional(),
-  chunk: z
-    .object({
-      type: z.string(),
-      usage: usageSchema.optional(),
-      reason: z.object({ kind: z.string(), failure: z.object({ code: z.string().optional() }).optional() }).optional(),
-    })
-    .optional(),
+const streamEntrySchema = Schema.Struct({
+  type: Schema.String,
+  time: Schema.optional(Schema.Number),
+  chunk: Schema.optional(
+    Schema.Struct({
+      type: Schema.String,
+      usage: Schema.optional(usageSchema),
+      reason: Schema.optional(Schema.Struct({ kind: Schema.String, failure: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String) })) })),
+    }),
+  ),
 })
-const assistantSchema = z.object({
-  turn: z.number(),
-  step: z.number(),
-  usage: usageSchema.optional(),
-  stream: z.array(z.unknown()).optional(),
-  message: z
-    .object({
-      id: z.string().optional(),
-      source: z
-        .object({
-          provider: z.string().optional(),
-          model: z.string().optional(),
-          replayState: z.object({ response: z.object({ stopReason: z.string().optional() }).optional() }).optional(),
-        })
-        .optional(),
-    })
-    .optional(),
+const assistantSchema = Schema.Struct({
+  turn: Schema.Number,
+  step: Schema.Number,
+  usage: Schema.optional(usageSchema),
+  stream: Schema.optional(Schema.Array(Schema.Unknown)),
+  message: Schema.optional(
+    Schema.Struct({
+      id: Schema.optional(Schema.String),
+      source: Schema.optional(
+        Schema.Struct({
+          provider: Schema.optional(Schema.String),
+          model: Schema.optional(Schema.String),
+          replayState: Schema.optional(Schema.Struct({ response: Schema.optional(Schema.Struct({ stopReason: Schema.optional(Schema.String) })) })),
+        }),
+      ),
+    }),
+  ),
 })
-const turnEndSchema = z.object({
-  turn: z.number(),
-  reason: z.object({ kind: z.string(), error: z.object({ code: z.string().optional() }).optional() }).optional(),
+const turnEndSchema = Schema.Struct({
+  turn: Schema.Number,
+  reason: Schema.optional(Schema.Struct({ kind: Schema.String, error: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String) })) })),
 })
-const retrySchema = z.object({ turn: z.number(), step: z.number(), failure: z.object({ code: z.string().optional() }).optional() })
-const compactionStartSchema = z.object({ compactionId: z.string() })
-const compactionSummarySchema = z.object({ compactionId: z.string(), provider: z.string(), model: z.string(), usage: usageSchema.optional() })
-const titleRequestSchema = z.object({ route: routeSchema })
-const titleSchema = z.object({ title: z.string(), source: z.object({ kind: z.string() }).optional() })
+const retrySchema = Schema.Struct({
+  turn: Schema.Number,
+  step: Schema.Number,
+  failure: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String) })),
+})
+const compactionStartSchema = Schema.Struct({ compactionId: Schema.String })
+const compactionSummarySchema = Schema.Struct({
+  compactionId: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  usage: Schema.optional(usageSchema),
+})
+const titleRequestSchema = Schema.Struct({ route: routeSchema })
+const titleSchema = Schema.Struct({ title: Schema.String, source: Schema.optional(Schema.Struct({ kind: Schema.String })) })
 
-const toUsage = (sample: z.infer<typeof usageSchema>): TokenUsage => ({
+const toUsage = (sample: Schema.Schema.Type<typeof usageSchema>): TokenUsage => ({
   input: sample.inputTokens,
   cacheRead: sample.cacheReadTokens ?? 0,
   cacheWrite: sample.cacheWriteTokens ?? 0,
@@ -229,8 +270,8 @@ const STOP_REASON_BY_FINISH = new Map<string, string>([
 const ABORTED_TURN_REASONS = new Set(['aborted', 'interrupted'])
 
 export class UsageFoldModel {
-  static readonly REQUEST_PURPOSES = ['agent', 'subagent', 'compaction', 'title', 'memory', 'other'] as const
-  static readonly REQUEST_STATUSES = ['ok', 'aborted', 'failed'] as const
+  static readonly REQUEST_PURPOSES = REQUEST_PURPOSES
+  static readonly REQUEST_STATUSES = REQUEST_STATUSES
 
   static readonly initialFoldState = (): FoldState => ({
     session: null,
@@ -248,7 +289,7 @@ export class UsageFoldModel {
   /** A stored state that no longer decodes restarts the fold from the file's first byte. */
   static readonly decodeFoldState = (raw: string): FoldState | undefined => {
     try {
-      const parsed = decodeJsonSafe(foldStateSchema, raw)
+      const parsed = safeParse(Schema.decodeUnknownResult(foldStateSchema)(decodeJson(jsonValueSchema, raw)))
       return parsed.success ? parsed.data : undefined
     } catch {
       return undefined
@@ -261,7 +302,18 @@ export class UsageFoldModel {
     readonly sessionId: string
     readonly toolSources?: ReadonlyMap<string, ToolSourceMetadata>
   }): FoldRecordsResult => {
-    const state: FoldState = structuredClone(input.state)
+    const state: Mutable<FoldState> = {
+      session: input.state.session === null ? null : { ...input.state.session },
+      route: input.state.route === null ? null : { ...input.state.route },
+      stepStarts: { ...input.state.stepStarts },
+      settledSteps: [...input.state.settledSteps],
+      silentSteps: input.state.silentSteps.map(step => ({ ...step })),
+      compactionStarts: { ...input.state.compactionStarts },
+      pendingTitle: input.state.pendingTitle === null ? null : { ...input.state.pendingTitle },
+      openAttempts: input.state.openAttempts.map(attempt => ({ key: attempt.key, row: structuredClone(attempt.row) })),
+      openTools: input.state.openTools.map(call => ({ ...call })),
+      activeTurn: input.state.activeTurn,
+    }
     const rows: RequestRow[] = []
     const tools: ToolExecutionRow[] = []
     const sessionId = (): string => state.session?.id ?? input.sessionId
@@ -272,7 +324,7 @@ export class UsageFoldModel {
     ): Pick<ToolExecutionRow, 'name' | 'category' | 'owner'> & { readonly normalizedCommand: string | null; readonly testRunner: string | null } => {
       const identifiers = identifyCommand({ toolName: name, arguments: args })
       if (/^(?:functions\.)?(?:skill|load_skill|read_skill)$/.test(name)) {
-        const skillArguments = z.string().max(4_096).safeParse(args)
+        const skillArguments = safeParse(Schema.decodeUnknownResult(Schema.String.check(Schema.isMaxLength(4_096)))(args))
         if (skillArguments.success) {
           let parsedArguments: JsonValue | undefined
           try {
@@ -280,10 +332,7 @@ export class UsageFoldModel {
           } catch {
             parsedArguments = undefined
           }
-          const skill = z
-            .object({ name: z.string().regex(/^[\w.-]{1,80}$/) })
-            .strict()
-            .safeParse(parsedArguments)
+          const skill = safeParse(Schema.decodeUnknownResult(skillSchema)(parsedArguments))
           if (skill.success) return { name: skill.data.name, category: 'skill', owner: null, ...identifiers }
         }
         return { name: 'skill', category: 'skill', owner: null, ...identifiers }
@@ -344,15 +393,17 @@ export class UsageFoldModel {
       const seq = typeof record.seq === 'number' ? record.seq : null
       switch (record.type) {
         case 'tool/call': {
-          const parsed = z
-            .object({
-              callId: z.string().min(1).max(256),
-              name: z.string().min(1).max(256),
-              arguments: z.string().max(4_096).optional(),
-              turn: z.number().optional(),
-              step: z.number().optional(),
-            })
-            .safeParse(record.data)
+          const parsed = safeParse(
+            Schema.decodeUnknownResult(
+              Schema.Struct({
+                callId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+                name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+                arguments: Schema.optional(Schema.String.check(Schema.isMaxLength(4_096))),
+                turn: Schema.optional(Schema.Number),
+                step: Schema.optional(Schema.Number),
+              }),
+            )(record.data),
+          )
           if (!parsed.success || seq === null || time === null) break
           trackOpenTool({
             callId: parsed.data.callId,
@@ -365,7 +416,7 @@ export class UsageFoldModel {
           break
         }
         case 'tool/result': {
-          const parsed = toolResultSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(toolResultSchema)(record.data))
           if (!parsed.success || seq === null || time === null) break
           const index = state.openTools.findIndex(call => call.callId === parsed.data.message.toolCallId)
           if (index < 0) break
@@ -390,23 +441,36 @@ export class UsageFoldModel {
           break
         }
         case 'tool/ptc-dispatch-start': {
-          const parsed = z
-            .object({ subCallId: z.string().min(1).max(256), name: z.string().min(1).max(256), arguments: z.unknown().optional() })
-            .safeParse(record.data)
+          const parsed = safeParse(
+            Schema.decodeUnknownResult(
+              Schema.Struct({
+                subCallId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+                name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+                arguments: Schema.optional(Schema.Unknown),
+              }),
+            )(record.data),
+          )
           if (!parsed.success || seq === null || time === null) break
-          const commandArguments = shellToolArgumentsSchema.optional().safeParse(parsed.data.arguments)
+          const commandArguments = isOptionalShellToolArguments(parsed.data.arguments) ? parsed.data.arguments : undefined
           trackOpenTool({
             callId: parsed.data.subCallId,
             seq,
             turn: state.activeTurn,
             step: null,
-            ...classifyTool(parsed.data.name, commandArguments.success ? commandArguments.data : undefined),
+            ...classifyTool(parsed.data.name, commandArguments),
             startedAt: time,
           })
           break
         }
         case 'tool/ptc-dispatch': {
-          const parsed = z.object({ subCallId: z.string().min(1).max(256), isError: z.boolean().optional() }).safeParse(record.data)
+          const parsed = safeParse(
+            Schema.decodeUnknownResult(
+              Schema.Struct({
+                subCallId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+                isError: Schema.optional(Schema.Boolean),
+              }),
+            )(record.data),
+          )
           if (!parsed.success || seq === null || time === null) break
           const index = state.openTools.findIndex(call => call.callId === parsed.data.subCallId)
           if (index < 0) break
@@ -430,7 +494,7 @@ export class UsageFoldModel {
           break
         }
         case 'session': {
-          const header = headerSchema.safeParse(record)
+          const header = safeParse(Schema.decodeUnknownResult(headerSchema)(record))
           if (!header.success) break
           state.session = {
             id: header.data.id,
@@ -443,18 +507,18 @@ export class UsageFoldModel {
           break
         }
         case 'request/header': {
-          const parsed = requestHeaderSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(requestHeaderSchema)(record.data))
           if (parsed.success) state.route = { provider: parsed.data.header.config.provider, model: parsed.data.header.config.model }
           break
         }
         case 'request/context':
         case 'model/selection': {
-          const parsed = routeSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(routeSchema)(record.data))
           if (parsed.success) state.route = { provider: parsed.data.provider, model: parsed.data.model }
           break
         }
         case 'step/start': {
-          const parsed = turnStepSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(turnStepSchema)(record.data))
           if (parsed.success && time !== null) {
             state.stepStarts[stepKey(parsed.data.turn, parsed.data.step)] = time
             state.activeTurn = parsed.data.turn
@@ -463,7 +527,7 @@ export class UsageFoldModel {
         }
         case 'assistant/message':
         case 'assistant/attempt': {
-          const parsed = assistantSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(assistantSchema)(record.data))
           if (!parsed.success || seq === null) break
           const data = parsed.data
           const key = stepKey(data.turn, data.step)
@@ -471,7 +535,7 @@ export class UsageFoldModel {
           let firstChunkAt: number | null = null
           let finish: { readonly kind: string; readonly code: string | null; readonly at: number | null } | null = null
           for (const raw of data.stream ?? []) {
-            const entry = streamEntrySchema.safeParse(raw)
+            const entry = safeParse(Schema.decodeUnknownResult(streamEntrySchema)(raw))
             if (!entry.success) continue
             const at = entry.data.time ?? null
             const chunk = entry.data.chunk
@@ -510,7 +574,7 @@ export class UsageFoldModel {
           break
         }
         case 'llm/retry': {
-          const parsed = retrySchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(retrySchema)(record.data))
           if (!parsed.success) break
           const key = stepKey(parsed.data.turn, parsed.data.step)
           const code = parsed.data.failure?.code ?? null
@@ -519,7 +583,7 @@ export class UsageFoldModel {
           break
         }
         case 'step/end': {
-          const parsed = turnStepSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(turnStepSchema)(record.data))
           if (!parsed.success || seq === null || time === null) break
           const key = stepKey(parsed.data.turn, parsed.data.step)
           const startedAt = state.stepStarts[key]
@@ -528,7 +592,7 @@ export class UsageFoldModel {
           break
         }
         case 'turn/end': {
-          const parsed = turnEndSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(turnEndSchema)(record.data))
           if (!parsed.success) break
           const reason = parsed.data.reason?.kind ?? null
           if (state.activeTurn === parsed.data.turn) state.activeTurn = null
@@ -592,12 +656,12 @@ export class UsageFoldModel {
           break
         }
         case 'compaction/start': {
-          const parsed = compactionStartSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(compactionStartSchema)(record.data))
           if (parsed.success && time !== null) state.compactionStarts[parsed.data.compactionId] = time
           break
         }
         case 'compaction/summary': {
-          const parsed = compactionSummarySchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(compactionSummarySchema)(record.data))
           if (!parsed.success || seq === null) break
           const startedAt = state.compactionStarts[parsed.data.compactionId] ?? time ?? 0
           delete state.compactionStarts[parsed.data.compactionId]
@@ -623,14 +687,14 @@ export class UsageFoldModel {
           break
         }
         case 'session/title-llm-request': {
-          const parsed = titleRequestSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(titleRequestSchema)(record.data))
           if (!parsed.success || seq === null || time === null) break
           state.pendingTitle = { seq, startedAt: time, provider: parsed.data.route.provider, model: parsed.data.route.model }
           rows.push(titleRow(sessionId(), state.pendingTitle, null))
           break
         }
         case 'session/title': {
-          const parsed = titleSchema.safeParse(record.data)
+          const parsed = safeParse(Schema.decodeUnknownResult(titleSchema)(record.data))
           if (!parsed.success) break
           if (state.session !== null) state.session = { ...state.session, title: parsed.data.title }
           if (parsed.data.source?.kind === 'provider' && state.pendingTitle !== null && time !== null) {

@@ -1,9 +1,9 @@
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Effect, Schema } from 'effect'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { once } from 'node:events'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { OtlpMetricsExporter } from './otel-exporter.js'
 import { otlpMetricsRequestSchema, type OtlpMetricsRequest } from './otel-metrics.js'
 import { openUsageStore, type UsageStore } from './store.js'
@@ -46,7 +46,7 @@ const startCollector = async (
     server.closeAllConnections()
     server.close()
   })
-  const address = z.object({ port: z.number().int() }).parse(server.address())
+  const address = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number.check(Schema.isInt()) }))(server.address())
   return { received, url: `http://127.0.0.1:${String(address.port)}/v1/metrics` }
 }
 
@@ -315,5 +315,57 @@ describe('OtlpMetricsExporter.start', () => {
     await exporter.stop()
     expect(Date.now() - stoppedAt).toBeLessThan(1_000)
     expect(exporter.state().exports).toBe(0)
+  })
+})
+
+describe('OtlpMetricsExporter.effect', () => {
+  it('interrupts an in-flight collector request with its owning scope', async () => {
+    const store = openStore()
+    recordJev(store, 1)
+    let resolveStarted: (signal: AbortSignal) => void = () => undefined
+    const started = new Promise<AbortSignal>(resolve => {
+      resolveStarted = resolve
+    })
+    vi.stubGlobal('fetch', async (_input: string | URL | Request, init?: RequestInit) => {
+      if (!(init?.signal instanceof AbortSignal)) throw new Error('Exporter fetch must have an interrupt signal.')
+      resolveStarted(init.signal)
+      return new Promise<Response>(() => undefined)
+    })
+    cleanups.push(() => {
+      vi.unstubAllGlobals()
+    })
+    const controller = new AbortController()
+    const pending = Effect.runPromiseExit(
+      OtlpMetricsExporter.effect({
+        timing: { intervalMs: 1, timeoutMs: 60_000 },
+        destination: () => ({ url: 'http://collector.invalid/v1/metrics', headers: {} }),
+        collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
+      }),
+      { signal: controller.signal },
+    )
+    const signal = await started
+    controller.abort()
+    await pending
+    expect(signal.aborted).toBe(true)
+  })
+
+  it('retains the custom export span through the Effect loop', async () => {
+    const collector = await startCollector()
+    const store = openStore()
+    recordJev(store, 1)
+    using recorder = recordSpans()
+    const controller = new AbortController()
+    const pending = Effect.runPromiseExit(
+      OtlpMetricsExporter.effect({
+        timing: { intervalMs: 10, timeoutMs: 1_000 },
+        destination: () => ({ url: collector.url, headers: {} }),
+        collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
+      }),
+      { signal: controller.signal },
+    )
+    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    controller.abort()
+    await pending
+    expect(recorder.span('usage metrics export').attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
   })
 })

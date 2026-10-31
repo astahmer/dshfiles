@@ -1,9 +1,11 @@
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const argumentsSchema = z.object({ command: z.string().max(4_096) })
-export const shellToolArgumentsSchema = z.union([z.string().max(4_096), argumentsSchema])
-export type ShellToolArguments = z.infer<typeof shellToolArgumentsSchema>
+const argumentsSchema = Schema.Struct({ command: Schema.String.check(Schema.isMaxLength(4_096)) })
+export const shellToolArgumentsSchema = Schema.Union([Schema.String.check(Schema.isMaxLength(4_096)), argumentsSchema])
+export type ShellToolArguments = Schema.Schema.Type<typeof shellToolArgumentsSchema>
+const optionalShellToolArgumentsSchema = Schema.optional(shellToolArgumentsSchema)
+export const isOptionalShellToolArguments = (value: unknown): value is ShellToolArguments | undefined => Schema.is(optionalShellToolArgumentsSchema)(value)
 const safeIdentifier = /^[a-zA-Z0-9][\w.+:-]{0,39}$/
 const subcommandTools = new Set(['cargo', 'dshx', 'git', 'go', 'jj', 'nix', 'vitest', 'jest', 'playwright'])
 const shellTool = /^(?:functions\.)?(?:bash|pwsh|powershell|exec_command|shell\.run)$/
@@ -95,18 +97,16 @@ const testRunnerIdentifier = (normalizedCommand: string | null): string | null =
 
 export const identifyCommand = (input: { readonly toolName: string; readonly arguments: ShellToolArguments | undefined }): CommandIdentifiers => {
   if (!shellTool.test(input.toolName)) return { normalizedCommand: null, testRunner: null }
-  const serialized = z.string().max(4_096).safeParse(input.arguments)
   let decoded: unknown = input.arguments
-  if (serialized.success) {
+  if (Schema.is(Schema.String.check(Schema.isMaxLength(4_096)))(input.arguments)) {
     try {
-      decoded = decodeJson(jsonValueSchema, serialized.data)
+      decoded = decodeJson(jsonValueSchema, input.arguments)
     } catch {
       return { normalizedCommand: null, testRunner: null }
     }
   }
-  const parsed = argumentsSchema.safeParse(decoded)
-  if (!parsed.success) return { normalizedCommand: null, testRunner: null }
-  const command = commandIdentifier(parsed.data.command)
+  if (!Schema.is(argumentsSchema)(decoded)) return { normalizedCommand: null, testRunner: null }
+  const command = commandIdentifier(decoded.command)
   return {
     normalizedCommand: command,
     testRunner: testRunnerIdentifier(command),
