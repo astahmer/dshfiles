@@ -1,0 +1,329 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - button "Collapse sidebar" [ref=e9] [cursor=pointer]:
+          - generic [ref=e10]:
+            - img
+        - img [ref=e13]
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - button "Back" [disabled]:
+              - img
+            - button "Forward" [disabled]:
+              - img
+            - button "Recent history" [disabled]:
+              - img
+          - button "Open command palette" [ref=e36] [cursor=pointer]:
+            - img
+          - button "Sidebar settings" [ref=e37] [cursor=pointer]:
+            - img
+      - generic [ref=e39]:
+        - navigation "Sidebar navigation" [ref=e41]:
+          - generic [ref=e42]:
+            - toolbar "Sidebar navigation" [ref=e43]:
+              - button "New thread" [ref=e44] [cursor=pointer]:
+                - generic [ref=e45]:
+                  - img
+              - button "Search threads" [ref=e46] [cursor=pointer]:
+                - generic [ref=e47]:
+                  - img
+              - button "Plugins" [ref=e48] [cursor=pointer]:
+                - generic [ref=e49]:
+                  - img
+              - 'button "AI Accounts: Accounts" [ref=e50] [cursor=pointer]':
+                - generic [ref=e51]:
+                  - img
+              - 'button "AI Accounts: Usage history" [ref=e52] [cursor=pointer]':
+                - generic [ref=e53]:
+                  - img
+              - 'button "Thread Sidebar: Board" [ref=e54] [cursor=pointer]':
+                - generic [ref=e55]:
+                  - img
+              - 'button "AI Accounts: Quota forecast" [ref=e56] [cursor=pointer]':
+                - generic [ref=e57]:
+                  - img
+              - 'button "JJ Integration: Thread integration" [ref=e58] [cursor=pointer]':
+                - generic [ref=e59]:
+                  - img
+              - 'button "Multi-host: Hosts" [ref=e60] [cursor=pointer]':
+                - generic [ref=e61]:
+                  - img
+              - button "Automation tasks" [ref=e62] [cursor=pointer]:
+                - generic [ref=e63]:
+                  - img
+            - button "More sidebar destinations" [ref=e64] [cursor=pointer]:
+              - img
+        - separator "Resize navigation and threads" [ref=e65]
+        - region "Threads" [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - combobox "Project filter" [ref=e71] [cursor=pointer]:
+                - generic [ref=e72]: All projects
+                - img [ref=e74]
+              - button "Thread list settings" [ref=e76] [cursor=pointer]:
+                - img
+            - group "Thread list view" [ref=e77]:
+              - button "All threads" [pressed] [ref=e78] [cursor=pointer]:
+                - generic [ref=e79]: All threads
+              - button "Working (0)" [ref=e80] [cursor=pointer]:
+                - generic [ref=e81]: Working
+                - generic [ref=e82]: (0)
+              - button "Done" [ref=e83] [cursor=pointer]:
+                - generic [ref=e84]: Done
+            - generic [ref=e85]:
+              - 'button "Group: Project" [ref=e86] [cursor=pointer]':
+                - generic [ref=e87]: "Group: Project"
+              - 'button "Filter: None" [ref=e88] [cursor=pointer]':
+                - generic [ref=e89]: "Filter: None"
+          - generic [ref=e91]:
+            - region "Alpha project" [ref=e92]:
+              - generic [ref=e93]:
+                - button "Alpha project (2)" [expanded] [ref=e94] [cursor=pointer]:
+                  - generic [ref=e95]: Alpha project
+                  - generic [ref=e96]: (2)
+                  - img [ref=e99]
+                - button "New chat in Alpha project" [ref=e101] [cursor=pointer]:
+                  - img
+              - article [ref=e102]:
+                - generic [ref=e103]:
+                  - button "New chat now Alpha project MacBook Pro de Alexandre" [ref=e104] [cursor=pointer]:
+                    - generic [ref=e105]:
+                      - generic [ref=e107]: New chat
+                      - generic [ref=e108]: now
+                    - generic [ref=e109]:
+                      - generic [ref=e110]: Alpha project
+                      - generic [ref=e111]:
+                        - img [ref=e112]
+                        - generic [ref=e114]: MacBook Pro de Alexandre
+                  - generic:
+                    - generic:
+                      - button "Open in side panel":
+                        - img
+                    - generic:
+                      - button "Pin":
+                        - img
+                    - generic:
+                      - button "Park":
+                        - img
+                    - generic:
+                      - button "Mute thread":
+                        - img
+                    - generic:
+                      - button "Archive":
+                        - img
+                    - generic:
+                      - button "Settle":
+                        - img
+              - article [ref=e115]:
+                - generic [ref=e116]:
+                  - button "Alpha project conversation now Alpha project MacBook Pro de Alexandre" [ref=e117] [cursor=pointer]:
+                    - generic [ref=e118]:
+                      - generic [ref=e120]: Alpha project conversation
+                      - generic [ref=e121]: now
+                    - generic [ref=e122]:
+                      - generic [ref=e123]: Alpha project
+                      - generic [ref=e124]:
+                        - img [ref=e125]
+                        - generic [ref=e127]: MacBook Pro de Alexandre
+                  - generic:
+                    - generic:
+                      - button "Open in side panel":
+                        - img
+                    - generic:
+                      - button "Pin":
+                        - img
+                    - generic:
+                      - button "Park":
+                        - img
+                    - generic:
+                      - button "Mute thread":
+                        - img
+                    - generic:
+                      - button "Archive":
+                        - img
+                    - generic:
+                      - button "Settle":
+                        - img
+            - region "Beta project" [ref=e128]:
+              - generic [ref=e129]:
+                - button "Beta project (1)" [expanded] [ref=e130] [cursor=pointer]:
+                  - generic [ref=e131]: Beta project
+                  - generic [ref=e132]: (1)
+                  - img [ref=e135]
+                - button "New chat in Beta project" [ref=e137] [cursor=pointer]:
+                  - img
+              - article [ref=e138]:
+                - generic [ref=e139]:
+                  - button "Beta project conversation now Beta project MacBook Pro de Alexandre" [ref=e140] [cursor=pointer]:
+                    - generic [ref=e141]:
+                      - generic [ref=e143]: Beta project conversation
+                      - generic [ref=e144]: now
+                    - generic [ref=e145]:
+                      - generic [ref=e146]: Beta project
+                      - generic [ref=e147]:
+                        - img [ref=e148]
+                        - generic [ref=e150]: MacBook Pro de Alexandre
+                  - generic:
+                    - generic:
+                      - button "Open in side panel":
+                        - img
+                    - generic:
+                      - button "Pin":
+                        - img
+                    - generic:
+                      - button "Park":
+                        - img
+                    - generic:
+                      - button "Mute thread":
+                        - img
+                    - generic:
+                      - button "Archive":
+                        - img
+                    - generic:
+                      - button "Settle":
+                        - img
+      - group "AI accounts usage" [ref=e153]:
+        - button "AI accounts usage" [ref=e154] [cursor=pointer]:
+          - img [ref=e155]
+          - generic [ref=e157]: Usage
+        - button "Add AI account" [ref=e158] [cursor=pointer]:
+          - img [ref=e159]
+        - button "AI account settings" [ref=e160] [cursor=pointer]:
+          - img [ref=e161]
+      - contentinfo [ref=e164]:
+        - generic [ref=e167]:
+          - button "Account menu" [ref=e171] [cursor=pointer]:
+            - img [ref=e172]
+            - generic [ref=e176]: More
+          - button "Reconnecting, reconnect now" [ref=e177] [cursor=pointer]:
+            - img [ref=e179]
+            - generic [ref=e183]:
+              - text: Reconnecting
+              - generic [ref=e184]: ...
+        - button "More" [ref=e185] [cursor=pointer]:
+          - img
+    - generic [ref=e189]:
+      - banner [ref=e191]:
+        - button "Open right sidebar" [ref=e196] [cursor=pointer]:
+          - img [ref=e197]
+      - generic [ref=e204]:
+        - generic [ref=e207]:
+          - img [ref=e210]
+          - generic [ref=e212]:
+            - generic [ref=e213]: Into the Unknown
+            - generic [ref=e214]: Preview
+        - generic [ref=e215]:
+          - button "Choose workspace" [ref=e216] [cursor=pointer]:
+            - img [ref=e217]
+            - generic [ref=e221]: Alpha project
+            - img [ref=e222]
+          - generic "New thread destination" [ref=e225]:
+            - button "Run on Local" [ref=e227] [cursor=pointer]:
+              - img
+              - text: Local
+              - img
+          - button "Standard mode" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+            - generic [ref=e236]: Standard mode
+            - img [ref=e237]
+        - generic [ref=e241]:
+          - generic [ref=e243]:
+            - textbox "Describe what you want to build, / commands, @ files or sessions" [ref=e244]
+            - generic: Describe what you want to build, / commands, @ files or sessions
+          - generic [ref=e245]:
+            - button "Add files or run commands" [ref=e247] [cursor=pointer]:
+              - img [ref=e248]
+            - generic [ref=e249]:
+              - button "deepseek-flash, reasoning Default" [expanded] [ref=e253] [cursor=pointer]:
+                - img
+                - generic [ref=e254]:
+                  - generic [ref=e255]: deepseek-flash
+                  - generic [ref=e256]: ·
+                  - generic [ref=e257]: Default
+                - img
+              - button "Send message" [disabled] [ref=e258]:
+                - img [ref=e259]
+  - dialog [ref=e266]:
+    - region "Choose a model" [ref=e268]:
+      - generic [ref=e269]:
+        - img [ref=e270]
+        - textbox "Search models and accounts" [active] [ref=e273]:
+          - /placeholder: Search models…
+      - list "Models and accounts" [ref=e277]:
+        - generic [ref=e278]:
+          - button "GPT-5.3 Codex Spark" [ref=e279] [cursor=pointer]:
+            - generic [ref=e280]: ◎
+            - generic [ref=e281]: GPT-5.3 Codex Spark
+          - generic "codex" [ref=e282]
+          - 'button "Reasoning effort: Off" [ref=e283] [cursor=pointer]'
+          - button "Details for codex/GPT-5.3 Codex Spark" [ref=e291] [cursor=pointer]:
+            - img [ref=e292]
+        - generic [ref=e294]:
+          - button "GPT-5.5" [ref=e295] [cursor=pointer]:
+            - generic [ref=e296]: ◎
+            - generic [ref=e297]: GPT-5.5
+          - generic "codex" [ref=e298]
+          - 'button "Reasoning effort: Off" [ref=e299] [cursor=pointer]'
+          - button "Details for codex/GPT-5.5" [ref=e307] [cursor=pointer]:
+            - img [ref=e308]
+        - generic [ref=e310]:
+          - button "GPT-5.6 Luna" [ref=e311] [cursor=pointer]:
+            - generic [ref=e312]: ◎
+            - generic [ref=e313]: GPT-5.6 Luna
+          - generic "codex" [ref=e314]
+          - 'button "Reasoning effort: Off" [ref=e315] [cursor=pointer]'
+          - button "Details for codex/GPT-5.6 Luna" [ref=e324] [cursor=pointer]:
+            - img [ref=e325]
+        - generic [ref=e327]:
+          - button "GPT-5.6 Sol" [ref=e328] [cursor=pointer]:
+            - generic [ref=e329]: ◎
+            - generic [ref=e330]: GPT-5.6 Sol
+          - generic "codex" [ref=e331]
+          - 'button "Reasoning effort: Off" [ref=e332] [cursor=pointer]'
+          - button "Details for codex/GPT-5.6 Sol" [ref=e341] [cursor=pointer]:
+            - img [ref=e342]
+        - generic [ref=e344]:
+          - button "GPT-5.6 Terra" [ref=e345] [cursor=pointer]:
+            - generic [ref=e346]: ◎
+            - generic [ref=e347]: GPT-5.6 Terra
+          - generic "codex" [ref=e348]
+          - 'button "Reasoning effort: Off" [ref=e349] [cursor=pointer]'
+          - button "Details for codex/GPT-5.6 Terra" [ref=e358] [cursor=pointer]:
+            - img [ref=e359]
+        - generic [ref=e361]:
+          - button "GPT-6 Astra" [ref=e362] [cursor=pointer]:
+            - generic [ref=e363]: ◎
+            - generic [ref=e364]: GPT-6 Astra
+          - generic "codex" [ref=e365]
+          - 'button "Reasoning effort: Minimal" [ref=e366] [cursor=pointer]'
+          - button "Details for codex/GPT-6 Astra" [ref=e374] [cursor=pointer]:
+            - img [ref=e375]
+        - generic [ref=e377]:
+          - button "GPT-6 Luna" [ref=e378] [cursor=pointer]:
+            - generic [ref=e379]: ◎
+            - generic [ref=e380]: GPT-6 Luna
+          - generic "codex" [ref=e381]
+          - 'button "Reasoning effort: Off" [ref=e382] [cursor=pointer]'
+          - button "Details for codex/GPT-6 Luna" [ref=e391] [cursor=pointer]:
+            - img [ref=e392]
+        - generic [ref=e394]:
+          - button "GPT-6 Sol" [ref=e395] [cursor=pointer]:
+            - generic [ref=e396]: ◎
+            - generic [ref=e397]: GPT-6 Sol
+          - generic "codex" [ref=e398]
+          - 'button "Reasoning effort: Off" [ref=e399] [cursor=pointer]'
+          - button "Details for codex/GPT-6 Sol" [ref=e408] [cursor=pointer]:
+            - img [ref=e409]
+        - generic [ref=e411]:
+          - button "GPT-6.1 Sol" [ref=e412] [cursor=pointer]:
+            - generic [ref=e413]: ◎
+            - generic [ref=e414]: GPT-6.1 Sol
+          - generic "codex" [ref=e415]
+          - 'button "Reasoning effort: Minimal" [ref=e416] [cursor=pointer]'
+          - button "Details for codex/GPT-6.1 Sol" [ref=e424] [cursor=pointer]:
+            - img [ref=e425]
+```

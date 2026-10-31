@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-storage-domain'
+import { Effect } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { threadSidebarAttentionApi } from './attention-api.js'
 import { createAttentionStore, threadAttentionDomain, type AttentionStore } from './attention-store.js'
 
@@ -17,7 +19,7 @@ interface OpenedAttention {
 let opening: Promise<OpenedAttention> | undefined
 
 const openAttention = async (ctx: Context): Promise<OpenedAttention> => {
-  const storage = ctx.get('storageDomain')
+  const storage = ctx.storageDomain
   if (storage === undefined) throw new Error('Thread attention storage is unavailable.')
   const domain = await storage.open(threadAttentionDomain)
   return { store: createAttentionStore({ table: domain.table('sessions') }), close: () => domain.close() }
@@ -47,12 +49,26 @@ export const closeAttention = async (): Promise<void> => {
   await opened.close()
 }
 
-export const threadAttentionApiHost = threadSidebarAttentionApi.host({
-  state: async ({ ctx }) => (await attentionFor(ctx)).snapshot(),
-  acknowledge: async ({ ctx, input }) => (await attentionFor(ctx)).acknowledge(input),
-  clearUnread: async ({ ctx, input }) => (await attentionFor(ctx)).clearUnread(input),
-  clearUnreadMany: async ({ ctx, input }) => (await attentionFor(ctx)).clearUnreadMany(input.entries),
-  markUnread: async ({ ctx, input }) => (await attentionFor(ctx)).markUnread(input),
-  markUnreadMany: async ({ ctx, input }) => (await attentionFor(ctx)).markUnreadMany(input.sessionIds),
-  migrate: async ({ ctx, input }) => (await attentionFor(ctx)).migrate(input.entries),
+export const threadAttentionApiHost = DshxEffect.host(threadSidebarAttentionApi, {
+  state: Effect.fn('thread-sidebar attention state read')(({ ctx }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).snapshot(), catch: error => error }),
+  ),
+  acknowledge: Effect.fn('thread-sidebar attention acknowledge')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).acknowledge(input), catch: error => error }),
+  ),
+  clearUnread: Effect.fn('thread-sidebar attention unread clear')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).clearUnread(input), catch: error => error }),
+  ),
+  clearUnreadMany: Effect.fn('thread-sidebar attention unread clear batch')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).clearUnreadMany(input.entries), catch: error => error }),
+  ),
+  markUnread: Effect.fn('thread-sidebar attention unread mark')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).markUnread(input), catch: error => error }),
+  ),
+  markUnreadMany: Effect.fn('thread-sidebar attention unread mark batch')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).markUnreadMany(input.sessionIds), catch: error => error }),
+  ),
+  migrate: Effect.fn('thread-sidebar attention migration')(({ ctx, input }) =>
+    Effect.tryPromise({ try: async () => (await attentionFor(ctx)).migrate(input.entries), catch: error => error }),
+  ),
 })

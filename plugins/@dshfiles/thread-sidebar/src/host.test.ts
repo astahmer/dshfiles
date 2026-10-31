@@ -71,7 +71,9 @@ const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Har
   const on = (event: string, handler: SessionEventListener): void => {
     listeners.set(event, [...(listeners.get(event) ?? []), handler])
   }
+  const storageDomain = { open: async () => ({ table: () => table(rows), close: async () => undefined }) }
   const ctx = {
+    storageDomain,
     on,
     once: on,
     emit: on,
@@ -84,7 +86,7 @@ const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Har
       // SAFETY: Cordis effects return a disposer function; the typeof check above established it.
       if (typeof disposer === 'function') disposers.push(disposer as () => void)
     },
-    get: (name: string) => (name === 'storageDomain' ? { open: async () => ({ table: () => table(rows), close: async () => undefined }) } : undefined),
+    get: (name: string) => (name === 'storageDomain' ? storageDomain : undefined),
     inject: () => undefined,
     commands: { register: () => () => undefined },
     sessionProjections: { register: () => () => undefined },
