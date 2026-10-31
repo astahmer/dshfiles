@@ -30,6 +30,7 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:",
     "oauth4webapi": "3.8.8",
     "zod": "catalog:"
   },
