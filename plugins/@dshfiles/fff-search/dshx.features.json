@@ -6,6 +6,12 @@
       "id": "resident-grep-glob",
       "title": "Answer agent grep and glob from a resident fff index",
       "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a worker thread.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call grep {\\\"pattern\\\":\\\"Scratch project\\\",\\\"path\\\":\\\"README.md\\\"}]][[call glob {\\\"pattern\\\":\\\"README.md\\\",\\\"path\\\":\\\".\\\"}]]\"",
+        "press Enter",
+        "expect text \"Tool finished.\""
+      ],
       "surfaces": ["host", "tool"],
       "configuration": [],
       "states": ["indexing", "warm", "idle-dropped", "worker-restarted"],
@@ -85,9 +91,14 @@
           "testName": "expands a tilde path to the home directory"
         },
         {
+          "kind": "gherkin",
+          "id": "fff-search.agent-grep-glob",
+          "featureFile": "tooling/dshx/e2e/features/fff-search.feature"
+        },
+        {
           "kind": "not-applicable",
           "id": "fff-search.no-browser-surface",
-          "reason": "grep and glob are agent tools with no browser UI of their own; the search behaviour runs against a real fff index in tests/fff-search.test.ts."
+          "reason": "The plugin owns no browser screen; fff-search.agent-grep-glob exercises its Agent-only tools through the running DSH chat."
         }
       ],
       "telemetry": [
