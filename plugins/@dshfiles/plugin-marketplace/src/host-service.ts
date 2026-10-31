@@ -10,12 +10,18 @@ import { z } from 'zod'
 import type { MarketplaceInstallOutput, MarketplaceListInput, MarketplaceListOutput } from './api.js'
 import { DEFAULT_HUB_BASE_URL, normalizeHubBaseUrl } from './settings.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { Effect, Schema } from 'effect'
 
 const PAGE_SIZE = 24
 const HUB_TIMEOUT_MS = 15_000
 const MAX_LEGACY_SCAN_PAGES = 100
 const INSTALL_TIMEOUT_MS = 5 * 60_000
 const HOST_LOG_PREFIX = '[dshx-plugin-marketplace]'
+
+export class MarketplaceOperationError extends Schema.TaggedError<MarketplaceOperationError>()('MarketplaceOperationError', {
+  operation: Schema.Union([Schema.Literal('list'), Schema.Literal('install')]),
+  message: Schema.String,
+}) {}
 
 class HubHttpError extends Error {
   constructor(
@@ -443,6 +449,20 @@ export class MarketplaceHostService {
       return fetchJson(this.dependencies, hubUrl(baseUrl, `/api/plugins/${encodedSlug}`, query), signal)
     }
   }
+
+  readonly listEffect = Effect.fn('marketplace list')((input: MarketplaceListInput, ctx: Context, signal: AbortSignal) =>
+    Effect.tryPromise({
+      try: () => this.list(input, ctx, signal),
+      catch: error => new MarketplaceOperationError({ operation: 'list', message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
+
+  readonly installEffect = Effect.fn('marketplace install')((slug: string, ctx: Context, signal: AbortSignal) =>
+    Effect.tryPromise({
+      try: () => this.install(slug, ctx, signal),
+      catch: error => new MarketplaceOperationError({ operation: 'install', message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
 
   async list(input: MarketplaceListInput, ctx: Context, signal: AbortSignal): Promise<MarketplaceListOutput> {
     try {
