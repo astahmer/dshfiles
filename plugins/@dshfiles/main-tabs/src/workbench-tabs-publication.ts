@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
-import type { WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabsSnapshot } from './workbench-tabs.js'
+import { DEFAULT_CLOSE_BUTTON_POSITION, type WorkbenchTabsActions, type WorkbenchTabsProvider, type WorkbenchTabsSnapshot } from './workbench-tabs.js'
 
 /** The producer's content snapshot is compared only by identity, never serialized or inspected here. */
 type StartContentVersion =
@@ -19,7 +19,13 @@ export const createWorkbenchTabsPublication = (
   presentation: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'> = {},
   currentSessionId?: () => string | undefined,
 ) => {
-  let snapshot: WorkbenchTabsSnapshot = { enabled: false, scopeKey: 'project:none', activeTabId: null, tabs: [] }
+  let snapshot: WorkbenchTabsSnapshot = {
+    enabled: false,
+    closeButtonPosition: DEFAULT_CLOSE_BUTTON_POSITION,
+    scopeKey: 'project:none',
+    activeTabId: null,
+    tabs: [],
+  }
   let fingerprint = JSON.stringify(snapshot)
   let start: () => ReactNode = () => null
   // Opaque referential identity: legacy Symbols and memoized content snapshots both invalidate Start.

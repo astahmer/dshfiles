@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { MainTabsTranslate } from './locales.js'
 import { OPEN_THREAD_ASIDE_EVENT } from './thread-aside.js'
 import { PANEL_ASIDE_EVENT } from './panel-aside.js'
 import { THREAD_MENTION_INSERT_EVENT, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { TabStrip, type TabView } from './tab-strip.js'
+import type { CloseButtonPosition } from '@dshfiles/workbench/tabs'
 import { SETTLE_THREAD_EVENT } from './settle-request.js'
 import type { TabsEvent } from './tabs-machine.js'
 
@@ -15,6 +16,7 @@ const labels = {
   settleThread: 'Settle thread',
   threadStatus: 'Change status',
   copy: 'Copy',
+  close: 'Close tab',
   closeTab: 'Close tab',
   copyThreadId: 'Copy thread ID',
   copyThreadLink: 'Copy thread link',
@@ -113,7 +115,18 @@ const mount = (
   send: (event: TabsEvent) => void = () => {},
   renameThread: (sessionId: string, title: string) => Promise<void> = async () => {},
   tabViews: readonly TabView[] = tabs,
-) => render(<TabStrip tabs={tabViews} send={send} t={t} newTabKeys="" renameThread={renameThread} />)
+  closeButtonPosition?: CloseButtonPosition,
+) =>
+  render(
+    <TabStrip
+      tabs={tabViews}
+      send={send}
+      t={t}
+      newTabKeys=""
+      renameThread={renameThread}
+      {...(closeButtonPosition === undefined ? {} : { closeButtonPosition })}
+    />,
+  )
 
 const settleRequests: { readonly detail: unknown; readonly cancelable: boolean }[] = []
 const onSettleRequest = (event: Event): void => {
@@ -133,10 +146,41 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('places the close button on either side of the title and preserves close behavior', () => {
+    const send = vi.fn()
+    mount(send)
+    const defaultTab = screen.getByRole('tab', { name: 'Thread, Working' })
+    const defaultClose = within(defaultTab).getByRole('button', { name: 'Close tab' })
+    const defaultTitle = within(defaultTab).getByText('Thread')
+    expect(defaultClose.compareDocumentPosition(defaultTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(defaultClose)
+    expect(send).toHaveBeenNthCalledWith(1, { type: 'tab.close', tabId: 'thread:thread-1' })
+
+    cleanup()
+    mount(send, async () => {}, tabs, 'right')
+    const rightTab = screen.getByRole('tab', { name: 'Thread, Working' })
+    const rightClose = within(rightTab).getByRole('button', { name: 'Close tab' })
+    const rightTitle = within(rightTab).getByText('Thread')
+    expect(rightTitle.compareDocumentPosition(rightClose) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(rightClose)
+    fireEvent(rightTab, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+    expect(send).toHaveBeenNthCalledWith(2, { type: 'tab.close', tabId: 'thread:thread-1' })
+    expect(send).toHaveBeenNthCalledWith(3, { type: 'tab.close', tabId: 'thread:thread-1' })
+
+    cleanup()
+    const pinnedTabs = tabs.map(tab => ({ ...tab, pinned: true }))
+    mount(send, async () => {}, pinnedTabs)
+    expect(within(screen.getByRole('tab', { name: 'Thread, Working' })).queryByRole('button', { name: 'Close tab' })).toBeNull()
+  })
+
   it('lets long tab titles shrink inside the capped tab width', () => {
     const longTitle = 'A conversation title that is much wider than the tab strip should allow'
     const longTabs = tabs.map(tab => (tab.id === 'thread:thread-1' ? { ...tab, title: longTitle } : tab))
-    mount(() => {}, async () => {}, longTabs)
+    mount(
+      () => {},
+      async () => {},
+      longTabs,
+    )
 
     const title = screen.getByText(longTitle)
 
