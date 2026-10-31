@@ -6605,6 +6605,9 @@ importers:
 
   plugins/@dshfiles/tweet-context:
     dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3

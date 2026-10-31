@@ -34,6 +34,7 @@
     "test:e2e:smoke": "node ../../../tooling/dshx/scripts/run-e2e.mjs --smoke"
   },
   "dependencies": {
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
