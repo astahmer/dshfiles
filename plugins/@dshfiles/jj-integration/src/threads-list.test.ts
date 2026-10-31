@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { JjFilesystem } from './jj-filesystem.js'
 import { createThreads, type JjExecutor, type JjResult } from './threads.js'
 
 const ok = (stdout: string): JjResult => ({ exitCode: 0, stdout, stdoutLossy: false, stderr: '' })
@@ -34,7 +35,13 @@ const threadsFor = (names: readonly string[]) => {
     return ok('')
   }
   return {
-    threads: createThreads({ executor, bookmark: () => 'main', threadsDirectory: repoRoot => join(repoRoot, 'threads') }),
+    threads: createThreads({
+      filesystem: JjFilesystem,
+      executor,
+      bookmark: () => 'main',
+      threadsDirectory: repoRoot => join(repoRoot, 'threads'),
+      gitWorktree: async () => undefined,
+    }),
     maximumConcurrent: () => maximumConcurrent,
     logReads: () => logReads,
   }

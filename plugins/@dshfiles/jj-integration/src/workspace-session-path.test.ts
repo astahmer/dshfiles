@@ -2,6 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { JjFilesystem } from './jj-filesystem.js'
 import { WorkspaceSessionPath } from './workspace-session-path.js'
 
 let root: string | undefined
@@ -14,11 +15,11 @@ afterEach(() => {
 
 describe('WorkspaceSessionPath.includes', () => {
   it('matches only absolute cwd paths at or below the workspace root', () => {
-    expect(WorkspaceSessionPath.includes({ workspacePath: '/work/checkout', sessionCwd: '/work/checkout' })).toBe(true)
-    expect(WorkspaceSessionPath.includes({ workspacePath: '/work/checkout', sessionCwd: '/work/checkout/src' })).toBe(true)
-    expect(WorkspaceSessionPath.includes({ workspacePath: '/work/checkout', sessionCwd: '/work/checkout-copy' })).toBe(false)
-    expect(WorkspaceSessionPath.includes({ workspacePath: '/work/checkout', sessionCwd: 'src' })).toBe(false)
-    expect(WorkspaceSessionPath.includes({ workspacePath: '/work/checkout', sessionCwd: undefined })).toBe(false)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout' })).toBe(true)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout/src' })).toBe(true)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout-copy' })).toBe(false)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: 'src' })).toBe(false)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: undefined })).toBe(false)
   })
 
   it('resolves symlinked session cwd paths into the actual workspace', () => {
@@ -28,6 +29,6 @@ describe('WorkspaceSessionPath.includes', () => {
     mkdirSync(workspacePath)
     symlinkSync(workspacePath, aliasPath, 'dir')
 
-    expect(WorkspaceSessionPath.includes({ workspacePath, sessionCwd: aliasPath })).toBe(true)
+    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath, sessionCwd: aliasPath })).toBe(true)
   })
 })

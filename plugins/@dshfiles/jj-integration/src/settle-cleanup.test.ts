@@ -1,7 +1,7 @@
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import { createCleanupJobRunner } from './cleanup-jobs.js'
-import { SettleCleanupModel, settledStatusSchema } from './settle-cleanup.js'
+import { SettleCleanupModel, parseSettledStatus } from './settle-cleanup.js'
 import { defaultJjIntegrationSettings } from './settings.js'
 
 const repository = {
@@ -22,9 +22,9 @@ describe('SettleCleanupModel', () => {
   })
 
   it('reads settled ids from the thread-sidebar document and tolerates other shapes', () => {
-    expect(settledStatusSchema.parse({ settledSessionIds: ['a'], other: 1 }).settledSessionIds).toEqual(['a'])
-    expect(settledStatusSchema.parse(undefined).settledSessionIds).toEqual([])
-    expect(settledStatusSchema.parse({ settledSessionIds: 'nope' }).settledSessionIds).toEqual([])
+    expect(parseSettledStatus({ settledSessionIds: ['a'], other: 1 }).settledSessionIds).toEqual(['a'])
+    expect(parseSettledStatus(undefined).settledSessionIds).toEqual([])
+    expect(parseSettledStatus({ settledSessionIds: 'nope' }).settledSessionIds).toEqual([])
   })
 
   it('reports only ids that were not settled before', () => {

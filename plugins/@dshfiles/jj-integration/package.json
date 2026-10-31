@@ -42,6 +42,7 @@
     "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

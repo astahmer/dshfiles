@@ -1,16 +1,13 @@
-import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { Schema } from 'effect'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { promisify } from 'node:util'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
-import { z } from 'zod'
 import { JsonText } from './json-text.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { JjReadCache } from './jj-read-cache.js'
+import { JjFilesystem } from './jj-filesystem.js'
 
 export interface JjResult {
   readonly exitCode: number
@@ -160,7 +157,6 @@ const MAX_PATCH_TARGET_REVISIONS = 1_024
 const MAX_PATCH_BODY_BYTES = 65_536
 const LAND_ATTEMPTS = 3
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
-const execFileAsync = promisify(execFile)
 const pathIsWithin = (parent: string, candidate: string): boolean => {
   const relativePath = relative(parent, candidate)
   return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith(`..${sep}`) && !relativePath.startsWith(sep))
@@ -184,22 +180,27 @@ const PATCH_FINGERPRINT = `if(stringify(diff.git(3)).contains("Binary files") ||
 const PATCH_CANDIDATE_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\t" ++ if(diff.files().len() > ${MAX_PATCH_FILES}, "[]", json(diff.files().map(|file| file.path()))) ++ "\\n"`
 const PATCH_TARGET_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\n"`
 const PATCH_BODY_TEMPLATE = 'commit_id ++ "\\t" ++ json(stringify(diff.git(3))) ++ "\\n"'
-const rebaseTimestampSchema = z.number().int().nonnegative().safe()
-const integrationRecordSchema = z
-  .object({
-    at: rebaseTimestampSchema,
-    tipChangeId: z.string().min(1).max(128).optional(),
-    baseChangeId: z.string().min(1).max(128).optional(),
-    sessionId: z.string().min(1).max(128).optional(),
-  })
-  .strict()
-const rebaseMetadataEntrySchema = integrationRecordSchema.extend({ history: z.array(integrationRecordSchema).optional() }).strict()
-const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
-const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
+const rebaseTimestampSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER))
+const metadataIdentifierSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+const integrationRecordSchema = Schema.Struct({
+  at: rebaseTimestampSchema,
+  tipChangeId: Schema.optional(metadataIdentifierSchema),
+  baseChangeId: Schema.optional(metadataIdentifierSchema),
+  sessionId: Schema.optional(metadataIdentifierSchema),
+})
+const rebaseMetadataEntrySchema = Schema.Struct({
+  at: rebaseTimestampSchema,
+  tipChangeId: Schema.optional(metadataIdentifierSchema),
+  baseChangeId: Schema.optional(metadataIdentifierSchema),
+  sessionId: Schema.optional(metadataIdentifierSchema),
+  history: Schema.optional(Schema.Array(integrationRecordSchema)),
+})
+const rebaseMetadataValueSchema = Schema.Union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
+const rebaseMetadataSchema = Schema.Record(Schema.String, rebaseMetadataValueSchema)
 /** Base revset → name of the unclaimed thread workspace made ahead for it. */
-const sparesSchema = z.record(z.string(), z.string().regex(THREAD_WORKSPACE_NAME))
-type RebaseMetadataEntry = z.infer<typeof rebaseMetadataEntrySchema>
-type IntegrationRecord = z.infer<typeof integrationRecordSchema>
+const sparesSchema = Schema.Record(Schema.String, Schema.String.check(Schema.isPattern(THREAD_WORKSPACE_NAME)))
+type RebaseMetadataEntry = Schema.Schema.Type<typeof rebaseMetadataEntrySchema>
+type IntegrationRecord = Schema.Schema.Type<typeof integrationRecordSchema>
 /** A thread lands again and again while it keeps working; the oldest landings stop mattering long before this many. */
 const MAX_INTEGRATION_HISTORY = 50
 
@@ -275,7 +276,7 @@ const parsePatchCandidateRecords = (stdout: string): readonly PatchCandidate[] |
   const records: PatchCandidate[] = []
   for (const line of stdout.split('\n').filter(line => line.length > 0)) {
     const [commitId = '', parentCountText = '', conflictText = '', fingerprint = '', pathsText = '', ...extra] = line.split('\t')
-    const paths = JsonText.decode(z.array(z.string()), pathsText)
+    const paths = JsonText.decodeEffect(Schema.Array(Schema.String), pathsText)
     const parentCount = Number(parentCountText)
     if (
       extra.length > 0 ||
@@ -317,7 +318,7 @@ const parsePatchBodies = (stdout: string): ReadonlyMap<string, string> | undefin
     const separator = line.indexOf('\t')
     if (separator < 1) return undefined
     const commitId = line.slice(0, separator)
-    const body = JsonText.decode(z.string(), line.slice(separator + 1))
+    const body = JsonText.decodeEffect(Schema.String, line.slice(separator + 1))
     if (!isCommitId(commitId) || bodies.has(commitId) || body?.success !== true) return undefined
     bodies.set(commitId, body.data)
   }
@@ -358,18 +359,20 @@ const patchGuardOutcome = (
 }
 
 /** `<root>/.jj/repo` is the store in the owning checkout and a pointer file in every other workspace. */
-const storeRootOf = (workspaceRoot: string): string | undefined => {
+const storeRootOf = (workspaceRoot: string, filesystem: typeof JjFilesystem): string | undefined => {
   const marker = join(workspaceRoot, '.jj', 'repo')
-  if (!existsSync(marker)) return undefined
-  if (statSync(marker).isDirectory()) return workspaceRoot
-  const store = resolve(dirname(marker), readFileSync(marker, 'utf8').trim())
+  if (!filesystem.existsSync(marker)) return undefined
+  if (filesystem.statSync(marker).isDirectory()) return workspaceRoot
+  const store = resolve(dirname(marker), filesystem.readFileSync(marker, 'utf8').trim())
   return dirname(dirname(store))
 }
 
 export const createThreads = (options: {
+  readonly filesystem: typeof JjFilesystem
   readonly executor: JjExecutor
   readonly bookmark: () => string
   readonly threadsDirectory: (repoRoot: string) => string
+  readonly gitWorktree: (repoRoot: string, args: readonly string[]) => Promise<void>
 }) => {
   const locks = new Map<string, Promise<unknown>>()
   /** Every mutation of one store runs in order, so two rebases never race to move the same bookmark. */
@@ -382,7 +385,7 @@ export const createThreads = (options: {
     return next
   }
 
-  const viewReads = new JjReadCache<JjResult>()
+  const viewReads = new JjReadCache<JjResult>(options.filesystem)
   const execute = (args: readonly string[], cwd: string, signal?: AbortSignal): Promise<JjResult> =>
     JjReadCache.isViewRead(args)
       ? // Shared by every caller of the same read, so no single caller's signal may abort it.
@@ -646,7 +649,7 @@ export const createThreads = (options: {
     const result = await execute(['--ignore-working-copy', 'root'], path, signal)
     if (result.exitCode !== 0) throw new ThreadError('not-a-repository', `${path} is not inside a jj repository.`)
     const workspaceRoot = completeStdout(result).trim()
-    const repoRoot = storeRootOf(workspaceRoot) ?? workspaceRoot
+    const repoRoot = storeRootOf(workspaceRoot, options.filesystem) ?? workspaceRoot
     const isThread = workspaceRoot !== repoRoot && dirname(workspaceRoot) === options.threadsDirectory(repoRoot)
     return { repoRoot, workspaceRoot, threadName: isThread ? basename(workspaceRoot) : undefined }
   }
@@ -750,7 +753,9 @@ export const createThreads = (options: {
   const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
   const readRebaseMetadata = async (repoRoot: string): Promise<Readonly<Record<string, RebaseMetadataEntry>>> => {
     try {
-      const parsed = JsonText.decode(rebaseMetadataSchema, await readFile(timestampFile(repoRoot), 'utf8'))
+      const parsed = JsonText.decodeEffect(rebaseMetadataSchema, await options.filesystem.readFile(timestampFile(repoRoot), 'utf8'), {
+        onExcessProperty: 'error',
+      })
       if (parsed?.success !== true) return {}
       return Object.fromEntries(
         Object.entries(parsed.data)
@@ -781,18 +786,20 @@ export const createThreads = (options: {
   ): Promise<number> => {
     const at = Date.now()
     const directory = options.threadsDirectory(repoRoot)
-    await mkdir(directory, { recursive: true })
+    await options.filesystem.mkdir(directory, { recursive: true })
     const path = timestampFile(repoRoot)
     const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
-    const record: IntegrationRecord = { at }
-    if (input.tipChangeId !== undefined) record.tipChangeId = input.tipChangeId
-    if (input.baseChangeId !== undefined) record.baseChangeId = input.baseChangeId
-    if (input.sessionId !== undefined) record.sessionId = input.sessionId
+    const record: IntegrationRecord = {
+      at,
+      ...(input.tipChangeId !== undefined && { tipChangeId: input.tipChangeId }),
+      ...(input.baseChangeId !== undefined && { baseChangeId: input.baseChangeId }),
+      ...(input.sessionId !== undefined && { sessionId: input.sessionId }),
+    }
     const existing = await readRebaseMetadata(repoRoot)
     const history = [...integrationHistory(existing[name]), record].slice(-MAX_INTEGRATION_HISTORY)
     const metadata = { ...existing, [name]: { ...record, history } }
-    await writeFile(temporaryPath, JSON.stringify(metadata), 'utf8')
-    await rename(temporaryPath, path)
+    await options.filesystem.writeFile(temporaryPath, JSON.stringify(metadata), 'utf8')
+    await options.filesystem.rename(temporaryPath, path)
     return at
   }
   const withRebaseMetadata = (status: ThreadStatus, metadata: RebaseMetadataEntry | undefined): ThreadStatus => {
@@ -822,7 +829,7 @@ export const createThreads = (options: {
         const name = names[index]
         if (name === undefined) return
         const path = join(directory, name)
-        const present = existsSync(join(path, '.jj'))
+        const present = options.filesystem.existsSync(join(path, '.jj'))
         if (!present && !name.startsWith('thread-')) continue
         const unlanded = await revisions(unlandedRevset(name, target), repoRoot, true)
         const behind = await revisions(behindRevset(`${name}@`, target), repoRoot, true, undefined, MAX_BEHIND_REVISIONS + 1)
@@ -872,7 +879,7 @@ export const createThreads = (options: {
       name,
       path,
       repoRoot,
-      missing: !existsSync(join(path, '.jj')),
+      missing: !options.filesystem.existsSync(join(path, '.jj')),
       unlanded,
       behind: behind.length > 0,
       behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
@@ -892,10 +899,10 @@ export const createThreads = (options: {
    * until repaired. Both fixes are best effort: a non-colocated repository has nothing to fix.
    */
   const gitWorktrees = async (repoRoot: string, args: readonly string[]): Promise<void> => {
-    if (!existsSync(join(repoRoot, '.git'))) return
+    if (!options.filesystem.existsSync(join(repoRoot, '.git'))) return
     const argv = ['-C', repoRoot, 'worktree', ...args]
     await withSpan('git worktree', { kind: 'client', attributes: commandAttributes({ executable: 'git', args: argv, valueFlags: ['-C'] }) }, () =>
-      execFileAsync('git', argv),
+      options.gitWorktree(repoRoot, args),
     ).catch(() => undefined)
   }
 
@@ -905,16 +912,16 @@ export const createThreads = (options: {
   // A spare exists in `jj workspace list` before its record is written; until then it is still not a thread.
   const sparesBeingAdded = new Set<string>()
   const readSpares = async (repoRoot: string): Promise<Readonly<Record<string, string>>> => {
-    const parsed = JsonText.decode(sparesSchema, await readFile(sparesFile(repoRoot), 'utf8').catch(() => '{}'))
+    const parsed = JsonText.decodeEffect(sparesSchema, await options.filesystem.readFile(sparesFile(repoRoot), 'utf8').catch(() => '{}'))
     return parsed?.success === true ? parsed.data : {}
   }
   const updateSpares = (repoRoot: string, change: (spares: Readonly<Record<string, string>>) => Readonly<Record<string, string>>): Promise<void> => {
     const next = (spareWrites.get(repoRoot) ?? Promise.resolve()).then(async () => {
       const path = sparesFile(repoRoot)
       const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
-      await mkdir(dirname(path), { recursive: true })
-      await writeFile(temporaryPath, JSON.stringify(change(await readSpares(repoRoot))), 'utf8')
-      await rename(temporaryPath, path)
+      await options.filesystem.mkdir(dirname(path), { recursive: true })
+      await options.filesystem.writeFile(temporaryPath, JSON.stringify(change(await readSpares(repoRoot))), 'utf8')
+      await options.filesystem.rename(temporaryPath, path)
     })
     spareWrites.set(
       repoRoot,
@@ -923,7 +930,7 @@ export const createThreads = (options: {
     return next
   }
   const usableSpare = (repoRoot: string, name: string | undefined): string | undefined =>
-    name !== undefined && existsSync(join(options.threadsDirectory(repoRoot), name, '.jj')) ? name : undefined
+    name !== undefined && options.filesystem.existsSync(join(options.threadsDirectory(repoRoot), name, '.jj')) ? name : undefined
 
   /** Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. */
   const prewarm = (repoRoot: string, base?: string): void => {
@@ -936,7 +943,7 @@ export const createThreads = (options: {
       const directory = options.threadsDirectory(repoRoot)
       sparesBeingAdded.add(name)
       try {
-        await mkdir(directory, { recursive: true })
+        await options.filesystem.mkdir(directory, { recursive: true })
         await jj(['workspace', 'add', join(directory, name), '--name', name, '-r', target], repoRoot)
         await updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
       } finally {
@@ -952,7 +959,7 @@ export const createThreads = (options: {
 
   /** Neither a folder nor a jj workspace may already carry the name: reusing either would put two threads in one checkout. */
   const isFreeThreadName = async (repoRoot: string, name: string): Promise<boolean> => {
-    if (existsSync(join(options.threadsDirectory(repoRoot), name))) return false
+    if (options.filesystem.existsSync(join(options.threadsDirectory(repoRoot), name))) return false
     const names = await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)
     return !names.split('\n').includes(name)
   }
@@ -977,7 +984,7 @@ export const createThreads = (options: {
         const name = requestedName !== undefined && (await isFreeThreadName(repoRoot, requestedName)) ? requestedName : spare
         const path = join(directory, name)
         if (name !== spare) {
-          await rename(join(directory, spare), path)
+          await options.filesystem.rename(join(directory, spare), path)
           await gitWorktrees(repoRoot, ['repair', path])
           await jj(['workspace', 'rename', name], path)
         }
@@ -987,7 +994,7 @@ export const createThreads = (options: {
       }
       const name = await freeThreadName(repoRoot, requestedName)
       const path = join(directory, name)
-      await mkdir(directory, { recursive: true })
+      await options.filesystem.mkdir(directory, { recursive: true })
       // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
       await jj(['workspace', 'add', path, '--name', name, '-r', target], repoRoot)
       // A spare waits for the next thread from a bookmark; a thread branched from one exact revision gets none.
@@ -1010,7 +1017,7 @@ export const createThreads = (options: {
    */
   const restore = (repoRoot: string, path: string): Promise<void> =>
     serialized(repoRoot, async () => {
-      if (existsSync(join(path, '.jj'))) return
+      if (options.filesystem.existsSync(join(path, '.jj'))) return
       const name = basename(path)
       if (!THREAD_WORKSPACE_NAME.test(name) || dirname(path) !== options.threadsDirectory(repoRoot)) {
         throw new ThreadError('not-a-thread', `${path} is not a managed thread workspace.`)
@@ -1035,7 +1042,7 @@ export const createThreads = (options: {
           const [commitId = '', parents = '', disposition] = line.split('\t')
           return { commitId, parentIds: parents.split(',').filter(isCommitId), kept: disposition === 'kept' }
         })
-      await mkdir(dirname(path), { recursive: true })
+      await options.filesystem.mkdir(dirname(path), { recursive: true })
       await gitWorktrees(repoRoot, ['prune'])
       if (workingCopy === undefined) {
         await jj(['workspace', 'add', path, '--name', name, '-r', options.bookmark()], repoRoot)
@@ -1488,14 +1495,14 @@ export const createThreads = (options: {
       const directory = options.threadsDirectory(repoRoot)
       const workspaceRoot = join(directory, threadName)
       // Snapshot first so edits still on disk count as work.
-      if (existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
+      if (options.filesystem.existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
       const target = await targetRevset(repoRoot)
       const work = await revisions(unlandedRevset(threadName, target), repoRoot, true)
       if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work }
       const owned = await revisions(`(::${threadName}@ ~ ::${target}) ~ ::(working_copies() ~ ${threadName}@)`, repoRoot, true)
       await jj(['--ignore-working-copy', 'workspace', 'forget', threadName], repoRoot)
       if (owned.length > 0) await jj(['--ignore-working-copy', 'abandon', ...owned.map(revision => revision.commitId)], repoRoot)
-      await rm(workspaceRoot, { recursive: true, force: true })
+      await options.filesystem.rm(workspaceRoot, { recursive: true, force: true })
       return { status: 'discarded' }
     })
 
@@ -1517,7 +1524,7 @@ export const createThreads = (options: {
         try {
           if (name.includes('/') || name.startsWith('.')) throw new ThreadError('unsafe-path', `Refusing to discard workspace ${name}.`)
           const workspaceRoot = join(options.threadsDirectory(input.repoRoot), name)
-          if (existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
+          if (options.filesystem.existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
           const work = await revisions(unlandedRevset(name, target), input.repoRoot, true)
           if (work.length > 0 && !input.force) {
             results.push({ name, status: 'has-work', revisions: work, error: null })
@@ -1541,7 +1548,7 @@ export const createThreads = (options: {
       }
       for (const candidate of candidates) {
         try {
-          await rm(candidate.workspaceRoot, { recursive: true, force: true })
+          await options.filesystem.rm(candidate.workspaceRoot, { recursive: true, force: true })
           results.push({ name: candidate.name, status: 'discarded', revisions: [], error: null })
         } catch (error) {
           results.push({ name: candidate.name, status: 'error', revisions: [], error: error instanceof Error ? error.message : String(error) })
@@ -1557,20 +1564,15 @@ export const createThreads = (options: {
       .map(line => {
         const separator = line.indexOf('\t')
         if (separator < 1) throw new ThreadError('jj-failed', 'JJ returned an invalid workspace row; refusing secondary cleanup.')
-        return {
-          name: z
-            .string()
-            .min(1)
-            .parse(JSON.parse(line.slice(0, separator))),
-          path: z
-            .string()
-            .min(1)
-            .nullable()
-            .parse(JSON.parse(line.slice(separator + 1))),
+        const name = JsonText.decodeEffect(Schema.String.check(Schema.isMinLength(1)), line.slice(0, separator))
+        const path = JsonText.decodeEffect(Schema.NullOr(Schema.String.check(Schema.isMinLength(1))), line.slice(separator + 1))
+        if (name?.success !== true || path?.success !== true) {
+          throw new ThreadError('jj-failed', 'JJ returned an invalid workspace row; refusing secondary cleanup.')
         }
+        return { name: name.data, path: path.data }
       })
       .filter((record): record is { readonly name: string; readonly path: string } => record.path !== null)
-    const realRepoRoot = realpathSync(repoRoot)
+    const realRepoRoot = options.filesystem.realpathSync(repoRoot)
     const threadDirectory = resolve(options.threadsDirectory(repoRoot))
     const out: SecondaryWorkspaceStatus[] = []
     for (const record of rootRecords) {
@@ -1582,14 +1584,14 @@ export const createThreads = (options: {
         rootRecords.some(other => other.name !== record.name && pathIsWithin(reportedRoot, resolve(other.path)))
       )
         continue
-      if (!existsSync(reportedRoot)) {
+      if (!options.filesystem.existsSync(reportedRoot)) {
         const unlanded = await revisions(`(::${record.name}@ ~ ::${bookmarkRevset(options.bookmark())}) ~ empty()`, realRepoRoot, true)
         out.push({ name: record.name, path: reportedRoot, repoRoot: realRepoRoot, missing: true, unlanded, workingCopyState: 'missing' })
         continue
       }
-      if (!existsSync(join(reportedRoot, '.jj'))) continue
-      const actualRoot = realpathSync(reportedRoot)
-      if (actualRoot !== reportedRoot || storeRootOf(actualRoot) !== realRepoRoot) continue
+      if (!options.filesystem.existsSync(join(reportedRoot, '.jj'))) continue
+      const actualRoot = options.filesystem.realpathSync(reportedRoot)
+      if (actualRoot !== reportedRoot || storeRootOf(actualRoot, options.filesystem) !== realRepoRoot) continue
       const readWorkingCopyId = async (): Promise<string | undefined> => {
         const result = await execute(['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'commit_id'], actualRoot)
         if (result.exitCode !== 0 || result.stdoutLossy) return undefined
@@ -1642,7 +1644,7 @@ export const createThreads = (options: {
             continue
           }
           await jj(['--ignore-working-copy', 'workspace', 'forget', expected.name], input.repoRoot)
-          if (!current.missing) await rm(current.path, { recursive: true, force: false })
+          if (!current.missing) await options.filesystem.rm(current.path, { recursive: true, force: false })
           results.push({ name: expected.name, path: expected.path, status: 'discarded', message: null })
         } catch (error) {
           results.push({ name: expected.name, path: expected.path, status: 'error', message: error instanceof Error ? error.message : String(error) })
@@ -1701,7 +1703,7 @@ export const createThreads = (options: {
     const roots = new Set(listed.map(([, root = '']) => root))
     return async path => {
       if (names.has(basename(path)) || roots.has(path)) return true
-      if (!existsSync(join(path, '.jj'))) return false
+      if (!options.filesystem.existsSync(join(path, '.jj'))) return false
       return (await execute(['--ignore-working-copy', 'workspace', 'root'], path)).exitCode === 0
     }
   }
@@ -1709,12 +1711,12 @@ export const createThreads = (options: {
   /** Entries of the threads directory that no jj workspace owns: folders of forgotten workspaces, stray logs, recovery copies. */
   const untrackedEntries = async (repoRoot: string): Promise<readonly UntrackedEntry[]> => {
     const directory = options.threadsDirectory(repoRoot)
-    const [isOwned, entries] = await Promise.all([ownedByWorkspace(repoRoot), readdir(directory, { withFileTypes: true }).catch(() => [])])
+    const [isOwned, entries] = await Promise.all([ownedByWorkspace(repoRoot), options.filesystem.readdir(directory, { withFileTypes: true }).catch(() => [])])
     const untracked: UntrackedEntry[] = []
     for (const entry of entries) {
       const path = join(directory, entry.name)
       if (entry.name.startsWith('.') || (await isOwned(path))) continue
-      const modifiedAt = await lstat(path).then(
+      const modifiedAt = await options.filesystem.lstat(path).then(
         stats => stats.mtimeMs,
         () => undefined,
       )
@@ -1728,7 +1730,7 @@ export const createThreads = (options: {
       if (input.name.includes('/') || input.name.startsWith('.')) throw new ThreadError('unsafe-path', `Refusing to remove ${input.name}.`)
       const path = join(options.threadsDirectory(input.repoRoot), input.name)
       if (await (await ownedByWorkspace(input.repoRoot))(path)) throw new ThreadError('unsafe-path', `${input.name} belongs to a jj workspace now.`)
-      await rm(path, { recursive: true, force: true })
+      await options.filesystem.rm(path, { recursive: true, force: true })
       await gitWorktrees(input.repoRoot, ['prune'])
     })
 
@@ -1756,14 +1758,14 @@ export const createThreads = (options: {
       jj(['--ignore-working-copy', '--at-operation', operationId, ...args], thread.workspaceRoot)
     const workspaceNames = (await readAtOperation(['workspace', 'list', '-T', 'name ++ "\\n"'])).split('\n')
     const hasDefaultWorkspace = workspaceNames.includes('default')
-    const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
-    const defaultCommitId = hasDefaultWorkspace
-      ? commitIdSchema.safeParse((await readAtOperation(['log', '--no-graph', '-r', 'default@', '-T', 'commit_id.short(64)'])).trim())
-      : undefined
-    if (defaultCommitId !== undefined && !defaultCommitId.success) {
-      throw new ThreadError('jj-failed', 'Could not resolve the default workspace revision.')
+    const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u))
+    let defaultCommitId: string | undefined
+    if (hasDefaultWorkspace) {
+      const candidate = (await readAtOperation(['log', '--no-graph', '-r', 'default@', '-T', 'commit_id.short(64)'])).trim()
+      if (!Schema.is(commitIdSchema)(candidate)) throw new ThreadError('jj-failed', 'Could not resolve the default workspace revision.')
+      defaultCommitId = candidate
     }
-    const defaultWorkspaceLabel = defaultCommitId === undefined ? '""' : `if(commit_id.short(64) == "${defaultCommitId.data}", "default@", "")`
+    const defaultWorkspaceLabel = defaultCommitId === undefined ? '""' : `if(commit_id.short(64) == "${defaultCommitId}", "default@", "")`
     const bookmark = options.bookmark()
     const bookmarkLiteral = JSON.stringify(bookmark)
     const threadRevisionLimit = 16
@@ -1772,9 +1774,9 @@ export const createThreads = (options: {
     )
       .split('\n')
       .filter(line => line.length > 0)
-    const threadRevisionIds = z.array(commitIdSchema).max(threadRevisionLimit).safeParse(threadRevisionLines)
-    if (!threadRevisionIds.success) throw new ThreadError('jj-failed', 'Could not read thread revision IDs for the graph.')
-    const revset = ['@', ...threadRevisionIds.data, bookmark, `present(${bookmark}@origin)`, ...(hasDefaultWorkspace ? ['default@'] : [])].join(' | ')
+    const threadRevisionIdsSchema = Schema.Array(commitIdSchema).check(Schema.isMaxLength(threadRevisionLimit))
+    if (!Schema.is(threadRevisionIdsSchema)(threadRevisionLines)) throw new ThreadError('jj-failed', 'Could not read thread revision IDs for the graph.')
+    const revset = ['@', ...threadRevisionLines, bookmark, `present(${bookmark}@origin)`, ...(hasDefaultWorkspace ? ['default@'] : [])].join(' | ')
     const template = [
       'change_id.short(8)',
       '" "',

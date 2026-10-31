@@ -467,8 +467,8 @@ Then('the thread header names the shared project checkout', async ({ page }: { p
 })
 
 When('the current thread workspace chip is hovered', async ({ page }: { page: Page }) => {
-  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: `Current thread workspace: ${provisionedThreadName(page)}`, exact: true }).hover()
+  await expect(page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true })).toBeHidden()
 })
 
 Then('the revision graph preview shows the thread and configured landmarks', async ({ page }: { page: Page }) => {
