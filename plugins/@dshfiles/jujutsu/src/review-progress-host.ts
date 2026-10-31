@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Effect } from 'effect'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { jujutsuReviewProgressApi } from './review-progress-api.js'
 import { ReviewProgressStoreModel, reviewProgressDomain, type ReviewProgressStore } from './review-progress-store.js'
@@ -46,7 +48,17 @@ export const closeReviewProgress = async (): Promise<void> => {
   await opened.close()
 }
 
-export const jujutsuReviewProgressApiHost = jujutsuReviewProgressApi.host({
-  state: async ({ ctx }) => (await reviewProgressFor(ctx)).snapshot(),
-  toggle: async ({ ctx, input }) => (await reviewProgressFor(ctx)).toggle(input),
+export const jujutsuReviewProgressApiHost = DshxEffect.host(jujutsuReviewProgressApi, {
+  state: Effect.fn('jujutsu review progress state')(function* ({ ctx }) {
+    return yield* Effect.tryPromise({
+      try: () => reviewProgressFor(ctx).then(store => store.snapshot()),
+      catch: error => error,
+    })
+  }),
+  toggle: Effect.fn('jujutsu review progress toggle')(function* ({ ctx, input }) {
+    return yield* Effect.tryPromise({
+      try: () => reviewProgressFor(ctx).then(store => store.toggle(input)),
+      catch: error => error,
+    })
+  }),
 })

@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Effect } from 'effect'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -223,21 +225,24 @@ export class ComposerContextHost {
 
 const composerContextHost = (directRun: RunJj) => {
   const run = composerReads(directRun)
-  return composerContextApi.host({
-    context: async args => readComposerContext(args, run),
-    diff: async ({ input, ctx, signal }) => {
-      try {
-        const root = await workspaceRoot(ctx, run, input.cwd, signal)
-        if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
-        const patch = await run(ctx, root, ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
-        return {
-          patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-          truncated: patch.truncated,
-          files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
-        }
-      } catch (error) {
-        throw RevisionReads.publicError(error)
-      }
-    },
+  return DshxEffect.host(composerContextApi, {
+    context: Effect.fn('jujutsu composer context')(function* (args) {
+      return yield* Effect.tryPromise({ try: () => readComposerContext(args, run), catch: error => error })
+    }),
+    diff: Effect.fn('jujutsu composer diff')(function* ({ input, ctx, signal }) {
+      return yield* Effect.tryPromise({
+        try: async () => {
+          const root = await workspaceRoot(ctx, run, input.cwd, signal)
+          if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
+          const patch = await run(ctx, root, ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
+          return {
+            patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+            truncated: patch.truncated,
+            files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
+          }
+        },
+        catch: error => RevisionReads.publicError(error),
+      })
+    }),
   })
 }
