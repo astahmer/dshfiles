@@ -1905,7 +1905,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       ref={autoRefresh.ref}
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground"
     >
-      <TooltipProvider>
+      <TooltipProvider delayDuration={500}>
         <Tabs
           className="dshx:min-h-0 dshx:flex-1 dshx:gap-0"
           onValueChange={value => {
