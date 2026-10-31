@@ -28,6 +28,11 @@
           "testName": "folds a Session title once until that Session appends an event"
         },
         {
+          "kind": "gherkin",
+          "id": "session-search.index-lifecycle",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
           "kind": "not-applicable",
           "id": "session-search.no-browser-surface",
           "reason": "The bundle replaces a Host service backend and renders no UI of its own; the palette and memory finder that call it are verified by their own catalogs, and the cached reads are unit-tested in src/engine-listing.test.ts and src/engine-titles.test.ts."
