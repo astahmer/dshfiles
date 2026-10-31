@@ -1,9 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
+import { type ApiCaller, PluginApiError } from '@dshfiles/dshx/api'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
-import { z } from 'zod'
 import { editorApi, MAX_SAVE_BYTES } from './api.js'
 import { editorSettings } from './settings.js'
 import { WorkspaceWriteError, writeWorkspaceFile } from './write-file.js'
@@ -12,27 +13,58 @@ interface StoredSessions {
   stat(sessionId: SessionId): Promise<{ readonly header?: { readonly cwd?: string } } | undefined>
 }
 
+interface LiveSessions {
+  get(sessionId: SessionId): { readonly header?: { readonly cwd?: string } } | undefined
+}
+
 /**
  * The Host `ctx.sessions` is the session store, but the Client `ISessions` face claims the same
  * `Context.sessions` name and wins the declaration merge, so the store shape is decoded here. `z.custom` keeps the
  * store's own reference: `z.object` would hand back a copy whose `get` runs without the store as `this`.
  */
-const liveSessionsSchema = z.custom<{ get(sessionId: SessionId): { readonly header?: { readonly cwd?: string } } | undefined }>(
-  value => typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function',
+const liveSessionsSchema = Schema.declare<LiveSessions>(
+  (value): value is LiveSessions =>
+    typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function',
 )
 
-/** The same resolution `workspaceFiles` uses: the live session header first, then the persisted one. */
-const sessionRoot = async (ctx: Context, sessionId: string): Promise<string> => {
-  // SAFETY: an unknown id only misses both lookups below, which refuses the save.
-  const id = sessionId as SessionId
-  const liveSessions = liveSessionsSchema.safeParse(ctx.sessions)
-  const live = liveSessions.success ? liveSessions.data.get(id)?.header?.cwd : undefined
-  if (live !== undefined) return live
-  const persistence: StoredSessions | undefined = ctx.get('sessionPersistence')
-  const stored = (await persistence?.stat(id))?.header?.cwd
-  if (stored === undefined) throw new Error('This session has no workspace directory to save into.')
-  return stored
-}
+class SessionWorkspaceMissing extends Schema.TaggedError<SessionWorkspaceMissing>()('SessionWorkspaceMissing', {
+  message: Schema.String,
+}) {}
+
+class EditorWorkspaceWriteFailure extends Schema.TaggedError<EditorWorkspaceWriteFailure>()('EditorWorkspaceWriteFailure', {
+  code: Schema.String,
+  message: Schema.String,
+}) {}
+
+class EditorHostServices extends EffectContext.Service<EditorHostServices, {
+  readonly sessionRoot: (sessionId: string) => Effect.Effect<string, unknown>
+}>()('dshfiles/editor/EditorHostServices') {}
+
+const editorPlugin = DshxEffect.plugin({
+  layer: (ctx: Context) => {
+    const sessions: unknown = ctx.sessions
+    const liveSessions = Schema.is(liveSessionsSchema)(sessions) ? sessions : undefined
+    const persistence: StoredSessions | undefined = ctx.get('sessionPersistence')
+    return Layer.succeed(EditorHostServices, {
+      sessionRoot: Effect.fn('editor resolve workspace')((sessionId: string) =>
+        Effect.gen(function* () {
+          // SAFETY: an unknown id only misses both lookups below, which refuses the save.
+          const id = sessionId as SessionId
+          const live = liveSessions?.get(id)?.header?.cwd
+          if (live !== undefined) return live
+          let storedRoot: string | undefined
+          if (persistence !== undefined) {
+            const stored = yield* Effect.tryPromise({ try: () => persistence.stat(id), catch: error => error })
+            storedRoot = stored?.header?.cwd
+          }
+          if (storedRoot === undefined) return yield* Effect.fail(new SessionWorkspaceMissing({ message: 'This session has no workspace directory to save into.' }))
+          return storedRoot
+        }),
+      ),
+    })
+  },
+  setup: () => Effect.void,
+})
 
 /** The session a save targets: the named one, else the calling Agent's own session. */
 const targetSessionId = (requested: string | undefined, caller: ApiCaller): string => {
@@ -41,30 +73,39 @@ const targetSessionId = (requested: string | undefined, caller: ApiCaller): stri
   throw new PluginApiError('Pass sessionId: this tool cannot tell which thread workspace to save into.')
 }
 
-const editorHostApi = editorApi.host({
-  write: async ({ input, ctx, caller }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    try {
-      return await writeWorkspaceFile({
-        root: await sessionRoot(ctx, sessionId),
-        path: input.path,
-        text: input.text,
-        expectedSha256: input.expectedSha256,
-        overwrite: input.overwrite,
-        maxBytes: MAX_SAVE_BYTES,
+const editorHostApi = editorPlugin.hostApi(editorApi, {
+  write: Effect.fn('editor write')(({ input, caller }) =>
+    Effect.gen(function* () {
+      const sessionId = targetSessionId(input.sessionId, caller)
+      const host = yield* EditorHostServices
+      const root = yield* host.sessionRoot(sessionId)
+      return yield* Effect.tryPromise({
+        try: () => writeWorkspaceFile({
+          root,
+          path: input.path,
+          text: input.text,
+          expectedSha256: input.expectedSha256,
+          overwrite: input.overwrite ?? false,
+          maxBytes: MAX_SAVE_BYTES,
+        }),
+        catch: error => error instanceof WorkspaceWriteError
+          ? new EditorWorkspaceWriteFailure({ code: error.code, message: error.message })
+          : error,
       })
-    } catch (error) {
-      if (error instanceof WorkspaceWriteError) throw new PluginApiError(error.message, { code: error.code, cause: error })
-      if (error instanceof Error && error.message.startsWith('This session')) throw new PluginApiError(error.message, { cause: error })
-      // dshx logs an unexpected failure with its cause and sends the browser only a generic message, so Node fs paths stay on the Host.
-      throw error
-    }
-  },
+    }).pipe(
+      Effect.mapError(error => {
+        if (error instanceof SessionWorkspaceMissing) return new PluginApiError(error.message, { cause: error })
+        if (error instanceof EditorWorkspaceWriteFailure) return new PluginApiError(error.message, { code: error.code, cause: error })
+        return error
+      }),
+    ),
+  ),
 })
 
 export default defineHost({
   name: '@dshfiles/editor',
-  inject: ['sessions'],
+  inject: ['sessions', 'sessionPersistence'],
   apis: [editorHostApi],
   settings: [editorSettings],
+  setup: editorPlugin.setup,
 })
