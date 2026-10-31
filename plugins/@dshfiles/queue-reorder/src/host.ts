@@ -1,10 +1,13 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { LlmError, type FileBlock } from '@deepseek-ai/dsh-llm'
+import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
 import { MAX_QUEUE_FILE_BYTES, queueApi } from './api.js'
 import { queueReorderSettings } from './settings.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { QueueOrderModel, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
+import { QueueOrderModel, QueueItemMissingError, type QueueMoveRequest } from './queue-order.js'
 import '@deepseek-ai/dsh-agent'
 
 /**
@@ -21,35 +24,6 @@ import '@deepseek-ai/dsh-agent'
  * button and the agent can never disagree.
  */
 
-const liveAgent = (ctx: Context, sessionId: string) => {
-  const agents = ctx.get('agents')
-  if (agents === undefined) throw new LlmError('agents service unavailable', 'MISSING_SERVICE')
-  return agents.get(SessionId(sessionId))
-}
-
-/** Move one pending item by exactly one position. */
-const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Promise<QueuePosition> => {
-  if (!QueueOrderModel.isDirection(request.direction)) {
-    throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
-  }
-  const agent = liveAgent(ctx, request.sessionId)
-  if (agent === undefined) {
-    throw new LlmError(`Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`, 'NOT_FOUND')
-  }
-  try {
-    return QueueOrderModel.moveWithinInbox(agent.inbox, request)
-  } catch (error) {
-    if (error instanceof QueueItemMissingError) throw new LlmError(error.message, 'NOT_FOUND')
-    throw error
-  }
-}
-
-/** Pending ids per list, for rendering which affordances are available. */
-const describeQueueOrder = (ctx: Context, sessionId: string) => {
-  const agent = liveAgent(ctx, sessionId)
-  return agent === undefined ? [] : QueueOrderModel.describeInbox(agent.inbox)
-}
-
 type FileAttachmentRef = FileBlock['attachment']
 
 interface FileReader {
@@ -59,16 +33,55 @@ interface FileReader {
 const isFileReader = (value: unknown): value is FileReader =>
   typeof value === 'object' && value !== null && 'readFileStream' in value && typeof value.readFileStream === 'function'
 
-/**
- * File references this Host has already confirmed in a session's queue. Editing removes the message from the queue,
- * and Cancel still needs its files, so a reference stays readable for that session once it was seen there.
- */
-const confirmedFiles = new Map<string, Map<string, FileAttachmentRef>>()
+class QueueReorderRuntime extends EffectContext.Service<
+  QueueReorderRuntime,
+  { readonly agents: AgentRegistry | undefined; readonly attachments: FileReader | undefined }
+>()('dshfiles/queue-reorder/QueueReorderRuntime') {}
 
-const queuedFileRef = (ctx: Context, sessionId: string, attachmentId: string): FileAttachmentRef | undefined => {
+class QueueReorderFailure extends Schema.TaggedError<QueueReorderFailure>()('QueueReorderFailure', {
+  message: Schema.String,
+  code: Schema.Literals(['MISSING_SERVICE', 'INVALID_ARGUMENT', 'NOT_FOUND']),
+}) {}
+
+const queueFailure = (message: string, code: QueueReorderFailure['code']): QueueReorderFailure => new QueueReorderFailure({ message, code })
+const preserveLlmError = <A, E extends Error, R>(effect: Effect.Effect<A, E | QueueReorderFailure, R>) =>
+  effect.pipe(Effect.mapError(failure => (failure instanceof QueueReorderFailure ? new LlmError(failure.message, failure.code) : failure)))
+
+const confirmedFiles = new Map<string, Map<string, FileAttachmentRef>>()
+const queueLayers = new WeakMap<CordisContext, Layer.Layer<QueueReorderRuntime>>()
+
+const liveAgent = Effect.fn('queue-reorder agent lookup')(function* (sessionId: string) {
+  const runtime = yield* QueueReorderRuntime
+  if (runtime.agents === undefined) return yield* Effect.fail(queueFailure('agents service unavailable', 'MISSING_SERVICE'))
+  return runtime.agents.get(SessionId(sessionId))
+})
+
+const moveQueueItem = Effect.fn('queue-reorder item move')(function* (request: QueueMoveRequest) {
+  if (!QueueOrderModel.isDirection(request.direction)) {
+    return yield* Effect.fail(queueFailure('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT'))
+  }
+  const agent = yield* liveAgent(request.sessionId)
+  if (agent === undefined) {
+    return yield* Effect.fail(queueFailure(`Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`, 'NOT_FOUND'))
+  }
+  return yield* Effect.try({
+    try: () => QueueOrderModel.moveWithinInbox(agent.inbox, request),
+    catch: error => {
+      if (error instanceof QueueItemMissingError) return queueFailure(error.message, 'NOT_FOUND')
+      throw error
+    },
+  })
+})
+
+const describeQueueOrder = Effect.fn('queue-reorder order describe')(function* (sessionId: string) {
+  const agent = yield* liveAgent(sessionId)
+  return agent === undefined ? [] : QueueOrderModel.describeInbox(agent.inbox)
+})
+
+const queuedFileRef = Effect.fn('queue-reorder file reference resolve')(function* (sessionId: string, attachmentId: string) {
   const confirmed = confirmedFiles.get(sessionId)?.get(attachmentId)
   if (confirmed !== undefined) return confirmed
-  const agent = liveAgent(ctx, sessionId)
+  const agent = yield* liveAgent(sessionId)
   if (agent === undefined) return undefined
   for (const message of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
     for (const block of message.content) {
@@ -80,27 +93,65 @@ const queuedFileRef = (ctx: Context, sessionId: string, attachmentId: string): F
     }
   }
   return undefined
+})
+
+const readQueuedFileEffect = Effect.fn('queue-reorder file read')(function* (request: { readonly sessionId: string; readonly attachmentId: string }) {
+  const ref = yield* queuedFileRef(request.sessionId, request.attachmentId)
+  if (ref === undefined) return yield* Effect.fail(queueFailure('That file is not attached to a message queued in this session.', 'NOT_FOUND'))
+  if (ref.bytes > MAX_QUEUE_FILE_BYTES) return yield* Effect.fail(queueFailure('That file is too large to edit in the composer.', 'INVALID_ARGUMENT'))
+  const runtime = yield* QueueReorderRuntime
+  const attachments = runtime.attachments
+  if (attachments === undefined) return yield* Effect.fail(queueFailure('attachments service unavailable', 'MISSING_SERVICE'))
+  return yield* Effect.tryPromise({
+    try: async abortSignal => {
+      const chunks: Uint8Array[] = []
+      let total = 0
+      for await (const chunk of attachments.readFileStream(ref, abortSignal)) {
+        total += chunk.byteLength
+        if (total > MAX_QUEUE_FILE_BYTES) throw queueFailure('That file is too large to edit in the composer.', 'INVALID_ARGUMENT')
+        chunks.push(chunk)
+      }
+      return { name: ref.name, data: Buffer.concat(chunks).toString('base64') }
+    },
+    catch: error => {
+      if (error instanceof QueueReorderFailure) return error
+      throw error
+    },
+  })
+})
+
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: (ctx: CordisContext) => {
+    const attachments = ctx.get('attachments')
+    const layer = Layer.succeed(QueueReorderRuntime, {
+      agents: ctx.get('agents'),
+      attachments: isFileReader(attachments) ? attachments : undefined,
+    })
+    queueLayers.set(ctx, layer)
+    return layer
+  },
+  setup: (ctx: CordisContext) =>
+    Effect.sync(() => {
+      hostContext = ctx
+      ctx.provide('queueOrder', {
+        move: (request: QueueMoveRequest) => runQueueEffect(preserveLlmError(moveQueueItem(request)), ctx),
+        describe: (sessionId: string) => runQueueEffect(describeQueueOrder(sessionId), ctx),
+      })
+    }),
+})
+
+const runQueueEffect = <A, E>(effect: Effect.Effect<A, E, QueueReorderRuntime>, ctx: CordisContext, signal?: AbortSignal): Promise<A> => {
+  const layer = queueLayers.get(ctx)
+  if (layer === undefined) return Promise.reject(new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE'))
+  const runnable = Effect.provide(effect, Layer.merge(layer, DshxEffect.tracerLayer))
+  if (signal === undefined) return Effect.runPromise(runnable)
+  return Effect.runPromise(runnable, { signal })
 }
 
-/** Bytes of one file attached to a queued message, so the composer can hold it while the message is edited. */
-export const readQueuedFile = async (ctx: Context, request: { readonly sessionId: string; readonly attachmentId: string }) => {
-  const ref = queuedFileRef(ctx, request.sessionId, request.attachmentId)
-  if (ref === undefined) throw new LlmError('That file is not attached to a message queued in this session.', 'NOT_FOUND')
-  if (ref.bytes > MAX_QUEUE_FILE_BYTES) throw new LlmError('That file is too large to edit in the composer.', 'INVALID_ARGUMENT')
-  const store = ctx.get('attachments')
-  if (!isFileReader(store)) throw new LlmError('attachments service unavailable', 'MISSING_SERVICE')
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for await (const chunk of store.readFileStream(ref)) {
-    total += chunk.byteLength
-    if (total > MAX_QUEUE_FILE_BYTES) throw new LlmError('That file is too large to edit in the composer.', 'INVALID_ARGUMENT')
-    chunks.push(chunk)
-  }
-  return { name: ref.name, data: Buffer.concat(chunks).toString('base64') }
-}
+const readQueuedFilePromise = (ctx: CordisContext, request: { readonly sessionId: string; readonly attachmentId: string }, signal?: AbortSignal) =>
+  runQueueEffect(preserveLlmError(readQueuedFileEffect(request)), ctx, signal)
 
-/** The context this plugin activated on, captured once at setup. */
-let hostContext: Context | undefined
+let hostContext: CordisContext | undefined
 
 const moveTool = defineTool({
   name: 'queue_move',
@@ -138,44 +189,23 @@ const moveTool = defineTool({
     }
     const direction = args.direction
     if (!QueueOrderModel.isDirection(direction)) throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
-    return moveQueueItem(hostContext, { sessionId: args.sessionId, itemId: args.itemId, direction })
+    return runQueueEffect(preserveLlmError(moveQueueItem({ sessionId: args.sessionId, itemId: args.itemId, direction })), hostContext)
   },
 })
 
-const queueHostApi = queueApi.host({
-  move: async ({ input }) => {
-    if (hostContext === undefined) {
-      throw new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE')
-    }
-    return moveQueueItem(hostContext, {
-      sessionId: input.sessionId,
-      itemId: input.itemId,
-      direction: input.direction,
-    })
-  },
-  describe: async ({ input }) => {
-    if (hostContext === undefined) return []
-    return describeQueueOrder(hostContext, input.sessionId)
-  },
-  readFile: async ({ input }) => {
-    if (hostContext === undefined) {
-      throw new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE')
-    }
-    return readQueuedFile(hostContext, { sessionId: input.sessionId, attachmentId: input.attachment.attachmentId })
-  },
+const queueHostApi = hostApi(queueApi, {
+  move: ({ input }) => preserveLlmError(moveQueueItem(input)),
+  describe: ({ input }) => describeQueueOrder(input.sessionId),
+  readFile: ({ input }) => preserveLlmError(readQueuedFileEffect({ sessionId: input.sessionId, attachmentId: input.attachment.attachmentId })),
 })
+
+export const readQueuedFile = readQueuedFilePromise
 
 export default defineHost({
+  ...effectPlugin,
   name: 'llm-queue-reorder',
   apis: [queueHostApi],
   inject: ['agents'],
   tools: [moveTool],
   settings: [queueReorderSettings],
-  setup: (ctx: Context) => {
-    hostContext = ctx
-    ctx.provide('queueOrder', {
-      move: (request: QueueMoveRequest) => moveQueueItem(ctx, request),
-      describe: (sessionId: string) => describeQueueOrder(ctx, sessionId),
-    })
-  },
 })
