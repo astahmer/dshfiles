@@ -6,7 +6,6 @@ import { AccountDraftModel } from './account-draft.js'
 import { AccountWriteQueue } from './account-write-queue.js'
 import type { AccountRemovalTarget } from './account-remove-machine.js'
 import { useAutoSaver } from './auto-save.js'
-import { connectHintFor } from './account-labels.js'
 import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
@@ -296,20 +295,6 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     await removeMutation.mutateAsync(target)
   }
 
-  /**
-   * One click, one account. The user signs in afterwards; the panel polls the
-   * identity and the card lights up when Codex writes the file.
-   */
-  const createAccount = async (kind: AccountProfile['kind']) => {
-    const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
-    try {
-      await saveMutation.mutateAsync({ draft: next, renamesSelection: false })
-      setNotice(`Added ${next.displayName}. ${connectHintFor(kind)}`)
-    } catch (error) {
-      setNotice(`Could not add the account: ${String(error)}`)
-    }
-  }
-
   const copy = async (text: string, message: string) => {
     setNotice((await writeClipboard(text)) ? message : `Copy this into a terminal: ${text}`)
   }
@@ -373,7 +358,6 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     moveAccount,
     toggleEnabled,
     remove,
-    createAccount,
     copy,
     copyPath,
     preferences,
