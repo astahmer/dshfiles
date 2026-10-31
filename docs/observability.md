@@ -118,6 +118,12 @@ no-op.
   code. To add a span of your own, see
   [Add tracing to a plugin](../tooling/dshx/docs/guides/tracing.md#add-tracing-to-a-plugin).
 
+### Effect tracing bridge
+
+The optional `@dshfiles/dshx/effect` API installs a custom Effect `Tracer` that delegates spans to dshx's existing tracer, recorder, and exporter. It is a context bridge, not another exporter: Effect spans remain children of active `api-dispatch` and `agent-tool` spans, while Promise spans opened inside an Effect fiber inherit the active Effect span. The focused bridge test proves both directions with `recordSpans()`; the scratch-turn trace remains the deployment-level check. Do not add `@effect/opentelemetry` to a plugin runtime: that would export duplicate spans and lose this parentage.
+
+Span attributes still follow the existing metadata-only contract. Map primitive identity/count values and bounded failure types; never record arguments, results, error messages, secrets, or prompt content.
+
 ### The telemetry contract (checked)
 
 Span coverage is a contract, checked like Gherkin coverage: `features:check`

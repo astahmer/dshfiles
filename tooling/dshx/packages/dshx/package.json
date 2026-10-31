@@ -109,6 +109,10 @@
     "./effect": {
       "types": "./dist/effect/index.d.ts",
       "default": "./dist/effect/index.js"
+    },
+    "./effect/services": {
+      "types": "./dist/effect/services.d.ts",
+      "default": "./dist/effect/services.js"
     }
   },
   "scripts": {
@@ -140,6 +144,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@deepseek-ai/cordis": "catalog:",
+    "@dshfiles/credential-port": "workspace:*",
     "@deepseek-ai/cordis-plugin-include": "catalog:",
     "@deepseek-ai/cordis-plugin-loader": "catalog:",
     "@deepseek-ai/dsh-agent": "catalog:",
@@ -209,12 +214,24 @@
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.1-rc.2 <0.3.0-0",
+    "@dshfiles/credential-port": ">=0.1.0 <0.2.0",
     "effect": ">=4.1.0 <5",
     "playwright": ">=1.56.0 <2",
     "react": ">=18 <20",
     "react-dom": ">=18 <20"
   },
   "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-storage-domain": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-subprocess": {
+      "optional": true
+    },
+    "@dshfiles/credential-port": {
+      "optional": true
+    },
     "@deepseek-ai/dsh-api-session-controller": {
       "optional": true
     },

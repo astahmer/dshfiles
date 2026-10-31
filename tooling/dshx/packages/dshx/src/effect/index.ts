@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Stream } from 'effect'
-import { z } from 'zod'
+import { effectClient, type EffectApiClient } from './client.js'
 import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
 import { registerEffectApiSchemaConverter } from '../api/schema.js'
@@ -9,10 +9,7 @@ import { HostApiEventsModel } from '../api/host-events.js'
 import type {
   AnyApiEventDefinition,
   AnyApiMethodDefinition,
-  ApiCallOptions,
   ApiClient,
-  ApiClientInput,
-  ApiClientOutput,
   ApiContract,
   ApiEventClientPayload,
   ApiEventHostPayload,
@@ -23,14 +20,8 @@ import type {
 } from '../api/types.js'
 
 /** A failed dshx API call, with the same fields as the thrown `ApiError` so it can be matched by `_tag` and `kind`. */
-export class ApiCallError extends Schema.TaggedError<ApiCallError>()('ApiCallError', {
-  message: Schema.String,
-  kind: Schema.Literals(['transport', 'remote', 'contract', 'aborted', 'unavailable']),
-  apiId: Schema.String,
-  method: Schema.String,
-  retryable: Schema.Boolean,
-  remoteCode: Schema.optional(Schema.String),
-}) {}
+export { ApiCallError } from './client.js'
+export type { EffectApiClient } from './client.js'
 
 /** The Host refused to publish an event: the contract declares no such event, its payload failed the schema, or the API is not served. */
 export class PublishEventError extends Schema.TaggedError<PublishEventError>()('PublishEventError', {
@@ -82,16 +73,6 @@ registerEffectApiSchemaConverter(schema => {
     },
   }
 })
-
-type EffectApiClient<Methods extends Record<string, AnyApiMethodDefinition>> = {
-  readonly [K in keyof Methods]: ApiClientInput<Methods[K]> extends void
-    ? (input?: undefined) => Effect.Effect<ApiClientOutput<Methods[K]>, ApiCallError>
-    : (input: ApiClientInput<Methods[K]>) => Effect.Effect<ApiClientOutput<Methods[K]>, ApiCallError>
-}
-
-/** A dshx client method as the wrapper calls it: input first, then the call options carrying the abort signal. */
-type ClientMethod = (input: unknown, options: ApiCallOptions) => Promise<unknown>
-const clientMethodSchema = z.custom<ClientMethod>(value => typeof value === 'function', 'API client has no such method.')
 
 const taggedFailure = Schema.Struct({ _tag: Schema.String, message: Schema.optional(Schema.String) })
 const isTaggedFailure = Schema.is(taggedFailure)
@@ -172,7 +153,7 @@ const setup =
   }
 
 const plugin = <Config, E, R>(options: {
-  readonly layer: Layer.Layer<R, E, never>
+  readonly layer: Layer.Layer<R, E, never> | ((ctx: Context, config: Config) => Layer.Layer<R, E, never>)
   readonly setup: (ctx: Context, config: Config) => Effect.Effect<void, E, R | Scope.Scope>
 }) => ({
   hostApi: <const Methods extends Record<string, AnyApiMethodDefinition>>(
@@ -180,7 +161,8 @@ const plugin = <Config, E, R>(options: {
     handlers: EffectHandlers<Methods, R>,
   ): ApiHostRegistration<Methods> => registerEffectHost(contract, handlers, ctx => pluginRuntimes.get(ctx), true),
   setup: async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
-    const runtime = ManagedRuntime.make(Layer.merge(options.layer, tracerLayer))
+    const layer = typeof options.layer === 'function' ? options.layer(ctx, config) : options.layer
+    const runtime = ManagedRuntime.make(Layer.merge(layer, tracerLayer))
     const scope = Effect.runSync(Scope.make())
     // SAFETY: the runtime is stored only for runtime lookup; the handler adapter supplies its effect environment at execution.
     pluginRuntimes.set(ctx, runtime as AnyManagedRuntime)
@@ -201,31 +183,6 @@ const plugin = <Config, E, R>(options: {
     }
   },
 })
-
-/** The same client, each method returning an Effect that fails with `ApiCallError`; interrupting it aborts the call. */
-const client = <const Methods extends Record<string, AnyApiMethodDefinition>>(
-  api: ApiClient<Methods, Record<string, AnyApiEventDefinition>>,
-): EffectApiClient<Methods> => {
-  const methods = new Map(Object.entries(api))
-  const call = (name: string, input: unknown) =>
-    Effect.tryPromise({
-      try: signal => clientMethodSchema.parse(methods.get(name))(input, { signal }),
-      catch: error =>
-        ApiProtocolModel.isApiError(error)
-          ? new ApiCallError({
-              message: error.message,
-              kind: error.kind,
-              apiId: error.apiId,
-              method: error.method,
-              retryable: error.retryable,
-              ...(error.remoteCode !== undefined && { remoteCode: error.remoteCode }),
-            })
-          : new ApiCallError({ message: String(error), kind: 'transport', apiId: '', method: name, retryable: true }),
-    })
-  const effects = Object.fromEntries([...methods.keys()].filter(name => name !== 'safe').map(name => [name, (input?: unknown) => call(name, input)]))
-  // SAFETY: every method of the wrapped client is mapped above to an Effect of the same input and output.
-  return effects as EffectApiClient<Methods>
-}
 
 /** A browser Stream of one API event; the subscription opens on first pull and closes when the Stream ends or is interrupted. */
 const events = <
@@ -263,7 +220,7 @@ export class DshxEffect {
   static readonly host = host
   static readonly setup = setup
   static readonly plugin = plugin
-  static readonly client = client
+  static readonly client = effectClient
   static readonly events = events
   static readonly publish = publish
   static readonly tracerLayer = tracerLayer

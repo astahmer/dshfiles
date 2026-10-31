@@ -3,54 +3,71 @@
 Move the owned dshfiles code (dshx SDK + owned plugin Host halves, optionally browser logic) onto Effect. DSH core
 (Cordis services, hooks, agent tools) stays Promise-based: Effect lives inside our code, adapters sit at the edge.
 
-**Resume here:** Phase 0 not started. First task: 0.1 (version pin + reference refresh).
+**Resume here:** Foundation is in progress. Phase 0 decisions, the 4.1.0 pin/reference, the Effect tracer bridge, focused lint rule and initial Phase 1 runtime/schema APIs are implemented. Finish Phase 1's Host service Layers, full built-bundle tool-schema snapshot harness, `effect-host` scaffold, and exact byte comparison before integrating this foundation. Do not start plugin migrations until then.
 
 ## Progress
 
-| Phase | Title                                 | State       | Wall time (6–8 agents) | Gate                                               |
-| ----- | ------------------------------------- | ----------- | ---------------------- | -------------------------------------------------- |
-| 0     | Decisions, conventions, tracer bridge | not started | 1 day                  | ADR table below signed off; bridge span test green |
-| 1     | dshx Effect-native API                | not started | 2–3 days               | dshx tests + tool-schema snapshot byte-identical   |
-| 2     | zod → Schema codemod                  | not started | 2–3 days (overlaps 3)  | per-plugin JSON-schema parity, zero diff           |
-| 3     | Host halves, waves A–D                | not started | 6–8 days               | per-plugin checklist all ticked                    |
-| 4     | Shared ports                          | not started | 1 day (with wave A)    | consumers typecheck + journeys                     |
-| 5     | Browser logic (optional)              | not started | 5–7 days               | journeys + switch-probe budgets unchanged          |
-| 6     | Stabilization, perf, live restart     | not started | 2–3 days               | full e2e, perf table, one user-approved restart    |
-|       | **Host + dshx + Schema (0–4, 6)**     |             | **~2 weeks**           |                                                    |
-|       | **Incl. browser side (0–6)**          |             | **~3 weeks**           | bound by verification + machine load, not typing   |
+| Phase | Title                                 | State       | Wall time (6–8 agents) | Gate                                                               |
+| ----- | ------------------------------------- | ----------- | ---------------------- | ------------------------------------------------------------------ |
+| 0     | Decisions, conventions, tracer bridge | complete    | 1 day                  | ADR promoted; bridge parentage and lint fixtures green             |
+| 1     | dshx Effect-native API                | in progress | 2–3 days               | Host service Layers, scaffold, full schema snapshot byte-identical |
+| 2     | zod → Schema codemod                  | not started | 2–3 days (overlaps 3)  | per-plugin JSON-schema parity, zero diff                           |
+| 3     | Host halves, waves A–D                | not started | 6–8 days               | per-plugin checklist all ticked                                    |
+| 4     | Shared ports                          | not started | 1 day (with wave A)    | consumers typecheck + journeys                                     |
+| 5     | Browser logic (optional)              | not started | 5–7 days               | journeys + switch-probe budgets unchanged                          |
+| 6     | Stabilization, perf, live restart     | not started | 2–3 days               | full e2e, perf table, one user-approved restart                    |
+|       | **Host + dshx + Schema (0–4, 6)**     |             | **~2 weeks**           |                                                                    |
+|       | **Incl. browser side (0–6)**          |             | **~3 weeks**           | bound by verification + machine load, not typing                   |
 
 ## Measured baseline (2026-10-29, `jj:main` 3c49886b)
 
-| Fact                                                                             | Count                                                                              |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| TS source / test lines                                                           | 315k / 82k                                                                         |
-| Plugins under `plugins/@dshfiles/*` / with Host half                             | 82 / 81 (66 declare `host:` in `dshx.config.ts`)                                   |
-| Plugin source lines: total / native forks / in scope                             | 273k / 67k / 206k                                                                  |
-| dshx SDK (`tooling/dshx`)                                                        | 42k lines; 70 files import zod                                                     |
-| Files using async/Promise                                                        | 656                                                                                |
-| Files importing zod (repo) / zod call sites in plugins                           | 402 / ~3.1k                                                                        |
-| Files importing `effect`                                                         | 1 (`tooling/dshx/packages/dshx/src/effect/index.ts`, 185 lines, unused by plugins) |
-| API contracts (`defineApi`/`defineContract`)                                     | 68                                                                                 |
-| Agent tool bindings (`tool: {`) / `defineTool(`                                  | 290 / 54                                                                           |
-| `withSpan`/`traced` call sites / `recordSpans` test files                        | 55 / 42                                                                            |
-| Browser: `.tsx` files / TanStack Query files / stored-value files / xstate files | 454 / 122 / 42 / 4                                                                 |
-| Unit test files / e2e feature files (`tooling/dshx/e2e/features`)                | 815 / 84                                                                           |
+| Fact                                                                             | Count                                                                                |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| TS source / test lines                                                           | 315k / 82k                                                                           |
+| Plugins under `plugins/@dshfiles/*` / with Host half                             | 82 / 81 (66 declare `host:` in `dshx.config.ts`)                                     |
+| Plugin source lines: total / native forks / in scope                             | 273k / 67k / 206k                                                                    |
+| dshx SDK (`tooling/dshx`)                                                        | 42k lines; 70 files import zod                                                       |
+| Files using async/Promise                                                        | 656                                                                                  |
+| Files importing zod (repo) / zod call sites in plugins                           | 402 / ~3.1k                                                                          |
+| Files importing `effect`                                                         | 1 (`tooling/dshx/packages/dshx/src/effect/index.ts`, 185 lines, unused by plugins)   |
+| API contracts (`defineApi`/`defineContract`)                                     | 68                                                                                   |
+| Historical repository-wide source occurrences: `tool: {` / `defineTool(`         | 290 / 54 (not runtime schema counts; the sum 344 is not a schema target)             |
+| Measured pre-Effect Host schema snapshot (57 collected bundles)                  | 446 API methods; 307 tool-marked bindings; 75 API schemas; 24 direct tools; 99 total |
+| `withSpan`/`traced` call sites / `recordSpans` test files                        | 55 / 42                                                                              |
+| Browser: `.tsx` files / TanStack Query files / stored-value files / xstate files | 454 / 122 / 42 / 4                                                                   |
+| Unit test files / e2e feature files (`tooling/dshx/e2e/features`)                | 815 / 84                                                                             |
+
+The historical `290 / 54` row is a repository-wide source inventory, not a
+promise of 344 runtime schemas. The parity collector builds the 57 owned Host
+bundles in [`tool-schemas.json`](../../tooling/dshx/e2e/fixtures/tool-schemas.json),
+excluding the 13 native-fork/client-only packages listed above; that fixture
+records the exact included package set. It captures actual `ToolRuntime.schemas()`
+output: 75 API-generated schemas plus 24 declared tools. The 307 tool-marked API
+methods are registration metadata, not 307 emitted schemas. The current and
+pre-Effect snapshots match exactly for this planned owned-Host scope. The 30
+`defineTool(` source call sites not represented in the 24 declared tools are
+outside this collector's emitted set: eight are defined in eligible bundle
+helpers/setup (`apply-patch`, `fff-search` ×2, `html-render` ×3,
+`pulls-review`, `tool-search`), two are in `goal-stall-guard` which has no
+`dshx.config.ts`, three are in excluded `goal-tool`, seven occur in plugin
+integration/benchmark tests, and ten occur in dshx templates/tests. These source
+sites are not synthesized into the snapshot.
 
 ## Versions and API names (verified)
 
-| Item                 | Value                                                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Pinned `effect`      | `4.0.4` (`pnpm-workspace.yaml` catalog); dshx peer `>=4.0.4 <5`                                                                                        |
-| Latest on npm        | `effect@4.1.0`; `@effect/platform-node`, `@effect/vitest`, `@effect/atom-react`, `@effect/opentelemetry` 4.1.0 (peer `^4.1.0`)                         |
-| Reference repo       | `~/.references/effect` is at `4.0.0-rc.111` — **older than the pin**; refresh before reading APIs                                                      |
-| Errors               | `Schema.TaggedError<Self>()('Tag', fields)`                                                                                                            |
-| Functions / spans    | `Effect.fn('name')(function* …)` (traced), `Effect.fnUntraced`, `Effect.withSpan`, `Effect.withSpanScoped`                                             |
-| Services             | `Context.Service` (class-style service key), `Context.Reference`; `Layer`, `ManagedRuntime`, `Scope`                                                   |
-| Interop              | `Effect.tryPromise({ try: signal => …, catch })`, `Effect.runPromiseExit(e, { signal })`                                                               |
-| Schema ↔ standards   | `Schema.toStandardSchemaV1`, `Schema.toStandardJSONSchemaV1`, `Schema.toJsonSchemaDocument`, module `JsonSchema`                                       |
-| Platform (v4 merged) | `effect/FileSystem`, `effect/Path`, `effect/unstable/process` (`ChildProcess`), `effect/unstable/http`, `effect/unstable/observability` (`OtlpTracer`) |
-| Tracer hook          | `Tracer.make({ span, context })`, `Tracer.externalSpan`, `Tracer.ParentSpanKey`                                                                        |
-| React state          | `@effect/atom-react` over `effect/unstable/reactivity` (`Atom.make`, `Atom.runtime`, `Atom.fn`, `Atom.family`, `AsyncResult`)                          |
+| Item                 | Value                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pinned `effect`      | `4.1.0` (`pnpm-workspace.yaml` catalog); dshx peer `>=4.1.0 <5`; `@effect/vitest@4.1.0` is pinned for Effect tests                                       |
+| Latest on npm        | `effect@4.1.0`; aligned `@effect/*` packages are exact-pinned at `4.1.0` when adopted                                                                    |
+| Reference repo       | `~/.references/effect-4.1.0` is a detached worktree at `effect@4.1.0`; the pre-existing mutable `~/.references/effect` and its local edit were preserved |
+| Errors               | `Schema.TaggedError<Self>()('Tag', fields)`                                                                                                              |
+| Functions / spans    | `Effect.fn('name')(function* …)` (traced), `Effect.fnUntraced`, `Effect.withSpan`, `Effect.withSpanScoped`                                               |
+| Services             | `Context.Service` (class-style service key), `Context.Reference`; `Layer`, `ManagedRuntime`, `Scope`                                                     |
+| Interop              | `Effect.tryPromise({ try: signal => …, catch })`, `Effect.runPromiseExit(e, { signal })`                                                                 |
+| Schema ↔ standards   | `Schema.toStandardSchemaV1`, `Schema.toStandardJSONSchemaV1`, `Schema.toJsonSchemaDocument`, module `JsonSchema`                                         |
+| Platform (v4 merged) | `effect/FileSystem`, `effect/Path`, `effect/unstable/process` (`ChildProcess`), `effect/unstable/http`, `effect/unstable/observability` (`OtlpTracer`)   |
+| Tracer hook          | `Tracer.make({ span, context })`, `Tracer.externalSpan`, `Tracer.ParentSpanKey`                                                                          |
+| React state          | `@effect/atom-react` over `effect/unstable/reactivity` (`Atom.make`, `Atom.runtime`, `Atom.fn`, `Atom.family`, `AsyncResult`)                            |
 
 ## Scope
 
@@ -111,17 +128,17 @@ dshx `withSpan` inside Effect).
 Scope: `tooling/dshx/packages/dshx/src/{effect,api,host,platform,communication,tracing}` (~11k lines). Extend the
 existing `@dshfiles/dshx/effect` export (`DshxEffect.host/setup/client/events/publish`).
 
-| #   | Deliverable                                                                                                                                                                   | Notes                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 1.1 | `DshxEffect.plugin({ layer, setup })`: plugin lifetime = `Scope`, runtime = `ManagedRuntime` of `layer`                                                                       | replaces ad-hoc `ctx.on('dispose')`; reload closes Scope         |
-| 1.2 | Host services as Layers: `PluginStorage`, `SecretValues`, `Subprocess` (`ChildProcess`), `HostApiClient`, `Communication`, `Settings` (read)                                  | thin wrappers over existing dshx Promise modules                 |
-| 1.3 | `DshxEffect.host` uses the plugin runtime by default; handler type `Effect<Out, TaggedError, Services>`                                                                       | typed failure union surfaces in contract docs                    |
-| 1.4 | `defineApi` accepts Effect Schema directly (wrap with `Schema.toStandardSchemaV1` + `toStandardJSONSchemaV1` internally)                                                      | no call-site wrapping                                            |
-| 1.5 | Tool schema parity harness: `dshx inspect tool-schemas --json` dumps `toToolSchema(publishedJsonSchema(...))` for all 290 bindings + 54 `defineTool`s from built Host bundles | committed snapshot `tooling/dshx/e2e/fixtures/tool-schemas.json` |
-| 1.6 | Tracer bridge (0.3) shipped as `DshxEffect.tracerLayer`                                                                                                                       | default in 1.1                                                   |
-| 1.7 | Streams: `events`/`publish` + `Stream` → Host event publication with backpressure                                                                                             |                                                                  |
-| 1.8 | Promise API unchanged; Effect API is opt-in import                                                                                                                            | Promise adapters stay the public baseline                        |
-| 1.9 | Docs: `tooling/dshx/docs/sdk/effect.md`, scaffold template `--template effect-host`                                                                                           |                                                                  |
+| #   | Deliverable                                                                                                                                                                                                | Notes                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1 | `DshxEffect.plugin({ layer, setup })`: plugin lifetime = `Scope`, runtime = `ManagedRuntime` of `layer`                                                                                                    | replaces ad-hoc `ctx.on('dispose')`; reload closes Scope                                                                          |
+| 1.2 | Host services as Layers: `PluginStorage`, `SecretValues`, `Subprocess` (`ChildProcess`), `HostApiClient`, `Communication`, `Settings` (read)                                                               | thin wrappers over existing dshx Promise modules                                                                                  |
+| 1.3 | `DshxEffect.host` uses the plugin runtime by default; handler type `Effect<Out, TaggedError, Services>`                                                                                                    | typed failure union surfaces in contract docs                                                                                     |
+| 1.4 | `defineApi` accepts Effect Schema directly (wrap with `Schema.toStandardSchemaV1` + `toStandardJSONSchemaV1` internally)                                                                                   | no call-site wrapping                                                                                                             |
+| 1.5 | Tool schema parity harness: collect actual `ToolRuntime.schemas()` from the 57 eligible built Host bundles; compare the 99 emitted schemas against the pre-Effect baseline (75 API-generated, 24 declared) | committed snapshot `tooling/dshx/e2e/fixtures/tool-schemas.json`; 290 / 54 remain source-occurrence counts, not the schema target |
+| 1.6 | Tracer bridge (0.3) shipped as `DshxEffect.tracerLayer`                                                                                                                                                    | default in 1.1                                                                                                                    |
+| 1.7 | Streams: `events`/`publish` + `Stream` → Host event publication with backpressure                                                                                                                          |                                                                                                                                   |
+| 1.8 | Promise API unchanged; Effect API is opt-in import                                                                                                                                                         | Promise adapters stay the public baseline                                                                                         |
+| 1.9 | Docs: `tooling/dshx/docs/sdk/effect.md`, scaffold template `--template effect-host`                                                                                                                        |                                                                                                                                   |
 
 Verification: `pnpm --dir tooling/dshx/packages/dshx test -- --run`, typecheck; tool-schema snapshot byte-identical vs
 pre-change dump; one pilot plugin boots in `bootPluginProfile`.

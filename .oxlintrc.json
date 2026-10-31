@@ -8,6 +8,10 @@
     {
       "name": "ui-guidance",
       "specifier": "./tooling/antislop/repo-rules/no-native-title.mjs"
+    },
+    {
+      "name": "effect-antislop",
+      "specifier": "./tooling/antislop/effect/oxlint/index.mjs"
     }
   ],
   "categories": {
@@ -40,6 +44,16 @@
           "**/test/**",
           "**/tests/**",
           "**/testing/**"
+        ]
+      }
+    ],
+    "effect-antislop/no-domain-effect-run": [
+      "error",
+      {
+        "domainPaths": ["tooling/dshx/packages/dshx/src/effect"],
+        "excludePaths": [
+          "tooling/dshx/packages/dshx/src/effect/index.ts",
+          "tooling/dshx/packages/dshx/src/effect/tracer.ts"
         ]
       }
     ],
