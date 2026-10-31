@@ -1435,9 +1435,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
-      zod:
+      effect:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.1.0
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4

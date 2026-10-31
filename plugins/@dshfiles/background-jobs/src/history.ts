@@ -1,9 +1,8 @@
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { readLogFrom } from '@dshfiles/usage/session-log'
-import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { boundedLabel } from './bounds.js'
 import { historyJobSchema, jobSessionSchema, jobStateSchema, type HistoryJob, type JobIndexing, type JobSession } from './types.js'
 
@@ -18,26 +17,43 @@ const DEFAULT_MAX_JOBS = 20_000
 const DEFAULT_FILES_PER_PASS = 40
 const DEFAULT_BUDGET_MS = 2_000
 
-const headerSchema = z.object({ id: z.string().min(1), cwd: z.string().min(1).optional() })
-const titleSchema = z.object({ title: z.string().min(1) })
-const registeredSchema = z.object({
-  jobId: z.string().min(1),
-  owner: z.string().min(1).optional(),
-  kind: z.string().min(1),
-  label: z.string(),
-  startedAt: z.number().int().nonnegative(),
+const nonemptyString = Schema.String.check(Schema.isMinLength(1))
+const nonnegativeInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const headerSchema = Schema.Struct({ id: nonemptyString, cwd: Schema.optional(nonemptyString) })
+const titleSchema = Schema.Struct({ title: nonemptyString })
+const registeredSchema = Schema.Struct({
+  jobId: nonemptyString,
+  owner: Schema.optional(nonemptyString),
+  kind: nonemptyString,
+  label: Schema.String,
+  startedAt: nonnegativeInteger,
 })
-const settledSchema = z.object({
-  jobId: z.string().min(1),
-  owner: z.string().min(1).optional(),
-  kind: z.string().min(1),
-  label: z.string(),
-  startedAt: z.number().int().nonnegative(),
-  finishedAt: z.number().int().nonnegative(),
-  status: z.enum(['completed', 'killed', 'failed']),
-  cause: z.string().min(1),
-  detail: z.string().optional(),
+const settledSchema = Schema.Struct({
+  jobId: nonemptyString,
+  owner: Schema.optional(nonemptyString),
+  kind: nonemptyString,
+  label: Schema.String,
+  startedAt: nonnegativeInteger,
+  finishedAt: nonnegativeInteger,
+  status: Schema.Literals(['completed', 'killed', 'failed']),
+  cause: nonemptyString,
+  detail: Schema.optional(Schema.String),
 })
+type DecodeResult<Value> = { readonly success: true; readonly data: Value } | { readonly success: false }
+const decodeJsonSafe = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): DecodeResult<S['Type']> => {
+  try {
+    return { success: true, data: Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(JSON.parse(text)) }
+  } catch {
+    return { success: false }
+  }
+}
+const decodeRecord = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | null => {
+  try {
+    return Schema.decodeUnknownSync(schema)(value)
+  } catch {
+    return null
+  }
+}
 
 interface LogFile {
   readonly path: string
@@ -195,38 +211,38 @@ export class HistoryIndex implements JobHistorySource {
   }): void {
     const { record, fallbackSession } = input
     if (record.type === 'session') {
-      const parsed = headerSchema.safeParse(record.data)
-      if (!parsed.success) return
-      const previous = this.sessions.get(parsed.data.id)
-      this.sessions.set(parsed.data.id, {
-        id: parsed.data.id,
+      const parsed = decodeRecord(headerSchema, record.data)
+      if (parsed === null) return
+      const previous = this.sessions.get(parsed.id)
+      this.sessions.set(parsed.id, {
+        id: parsed.id,
         title: previous?.title ?? null,
-        cwd: parsed.data.cwd ?? previous?.cwd ?? null,
+        cwd: parsed.cwd ?? previous?.cwd ?? null,
         project: fallbackSession.project ?? previous?.project ?? null,
       })
       return
     }
     if (record.type === 'session/title') {
-      const parsed = titleSchema.safeParse(record.data)
-      if (!parsed.success) return
+      const parsed = decodeRecord(titleSchema, record.data)
+      if (parsed === null) return
       const previous = this.sessions.get(fallbackSession.id)
       this.sessions.set(fallbackSession.id, {
         id: fallbackSession.id,
-        title: parsed.data.title.slice(0, 300),
+        title: parsed.title.slice(0, 300),
         cwd: previous?.cwd ?? null,
         project: previous?.project ?? fallbackSession.project,
       })
       return
     }
     if (record.type === 'job/registered') {
-      const parsed = registeredSchema.safeParse(record.data)
-      if (!parsed.success) return
-      this.jobs.set(parsed.data.jobId, {
-        id: parsed.data.jobId,
-        kind: parsed.data.kind,
-        label: boundedLabel(parsed.data.label),
-        owner: parsed.data.owner ?? null,
-        startedAt: parsed.data.startedAt,
+      const parsed = decodeRecord(registeredSchema, record.data)
+      if (parsed === null) return
+      this.jobs.set(parsed.jobId, {
+        id: parsed.jobId,
+        kind: parsed.kind,
+        label: boundedLabel(parsed.label),
+        owner: parsed.owner ?? null,
+        startedAt: parsed.startedAt,
         settled: false,
         status: null,
         cause: null,
@@ -237,20 +253,20 @@ export class HistoryIndex implements JobHistorySource {
       return
     }
     if (record.type !== 'job/settled') return
-    const parsed = settledSchema.safeParse(record.data)
-    if (!parsed.success) return
-    const previous = this.jobs.get(parsed.data.jobId)
-    this.jobs.set(parsed.data.jobId, {
-      id: parsed.data.jobId,
-      kind: parsed.data.kind,
-      label: boundedLabel(parsed.data.label ?? previous?.label ?? ''),
-      owner: parsed.data.owner ?? previous?.owner ?? null,
-      startedAt: parsed.data.startedAt,
+    const parsed = decodeRecord(settledSchema, record.data)
+    if (parsed === null) return
+    const previous = this.jobs.get(parsed.jobId)
+    this.jobs.set(parsed.jobId, {
+      id: parsed.jobId,
+      kind: parsed.kind,
+      label: boundedLabel(parsed.label ?? previous?.label ?? ''),
+      owner: parsed.owner ?? previous?.owner ?? null,
+      startedAt: parsed.startedAt,
       settled: true,
-      status: parsed.data.status,
-      cause: parsed.data.cause,
-      detail: parsed.data.detail ?? null,
-      finishedAt: parsed.data.finishedAt,
+      status: parsed.status,
+      cause: parsed.cause,
+      detail: parsed.detail ?? null,
+      finishedAt: parsed.finishedAt,
     })
     this.trim()
   }
@@ -262,13 +278,17 @@ export class HistoryIndex implements JobHistorySource {
   }
 
   private async persist(): Promise<void> {
-    const state = {
-      schemaVersion: 1 as const,
+    const state = Schema.decodeUnknownSync(jobStateSchema, { onExcessProperty: 'error' })({
+      schemaVersion: 1,
       offsets: Object.fromEntries(this.offsets),
-      jobs: Object.fromEntries([...this.jobs.entries()].map(([id, job]) => [id, historyJobSchema.parse(job)])),
-      sessions: Object.fromEntries([...this.sessions.entries()].map(([id, session]) => [id, jobSessionSchema.parse(session)])),
+      jobs: Object.fromEntries(
+        [...this.jobs.entries()].map(([id, job]) => [id, Schema.decodeUnknownSync(historyJobSchema, { onExcessProperty: 'error' })(job)]),
+      ),
+      sessions: Object.fromEntries(
+        [...this.sessions.entries()].map(([id, session]) => [id, Schema.decodeUnknownSync(jobSessionSchema, { onExcessProperty: 'error' })(session)]),
+      ),
       startedAt: this.startedAt,
-    }
+    })
     await mkdir(dirname(this.options.statePath), { recursive: true })
     const temporary = `${this.options.statePath}.${String(process.pid)}.tmp`
     await writeFile(temporary, JSON.stringify(state), { mode: 0o600 })
