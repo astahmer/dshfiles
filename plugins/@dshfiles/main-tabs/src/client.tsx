@@ -27,7 +27,7 @@ import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent } from './tabs-machine.js'
-import type { HostTarget } from '@dshfiles/workbench/tabs'
+import { DEFAULT_CLOSE_BUTTON_POSITION, type HostTarget } from '@dshfiles/workbench/tabs'
 import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, StripMount } from './strip-mount.js'
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
 import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
@@ -347,6 +347,7 @@ export default defineClient({
         { name: 'shell.overlay', id: 'dshfiles-main-tabs', order: 10, locale: MAIN_TABS_LOCALE_NAMESPACE },
         decorate(props => {
           const settings = useSettings(mainTabsSettings)
+          const closeButtonPosition = settings.value?.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
           const savedPreferences: TabPreferences | null =
             settings.value !== undefined ? settings.value : settings.status === 'loading' && settings.error === null ? null : DEFAULT_TAB_PREFERENCES
           const mode = useSyncExternalStore(subscribeMainSurface, mainSurfaceMode)
@@ -522,7 +523,13 @@ export default defineClient({
 
           useLayoutEffect(() => {
             publication.update(
-              { enabled: snapshot.matches('on'), scopeKey: snapshot.context.scopeKey, activeTabId: set?.activeTabId ?? null, tabs },
+              {
+                enabled: snapshot.matches('on'),
+                closeButtonPosition,
+                scopeKey: snapshot.context.scopeKey,
+                activeTabId: set?.activeTabId ?? null,
+                tabs,
+              },
               () => <StartPage sections={startSections()} t={props.t} />,
               startContentVersion,
             )
@@ -537,6 +544,7 @@ export default defineClient({
                 t={props.t}
                 newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''}
                 renameThread={renameThread}
+                closeButtonPosition={closeButtonPosition}
               />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </>,

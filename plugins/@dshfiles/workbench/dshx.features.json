@@ -364,9 +364,18 @@
     {
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears.",
-      "reach": ["seed tool-call-thread", "expect button \"New tab\""],
-      "surfaces": ["client", "integration", "storage"],
+      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears.",
+      "reach": [
+        "seed tool-call-thread",
+        "expect button \"New tab\"",
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "click button \"Main tabs\"",
+        "expect radio \"left\"",
+        "click radio \"right\"",
+        "expect radio \"right\""
+      ],
+      "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [],
       "states": ["preview", "kept", "pinned", "unread", "closed"],
       "failureModes": ["The renderer must not become a second navigation actor or remount a thread whenever status changes."],

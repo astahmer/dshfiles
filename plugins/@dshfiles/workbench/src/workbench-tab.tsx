@@ -4,7 +4,7 @@ import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-titl
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { workbenchTabs } from './tabs.js'
+import { DEFAULT_CLOSE_BUTTON_POSITION, workbenchTabs } from './tabs.js'
 import type { WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
@@ -62,6 +62,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const sourceId = NewViewTabs.sourceId(props.params, props.api.id)
     const definition = useSyncExternalStore(registry.subscribe, () => registry.get(sourceId))
     const tab = snapshot.tabs.find(candidate => candidate.id === definition?.tabId)
+    const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
@@ -74,6 +75,20 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
       if (panel !== undefined) props.containerApi.removePanel(panel)
     }
     const close = (): void => closePanel(props.api.id, props.params)
+    const closeButton = !tab?.pinned ? (
+      <button
+        type="button"
+        aria-label={channel.label?.('closeTab', title) || `Close ${title}`}
+        className="dshx:flex dshx:size-5 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded dshx:hover:bg-accent"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          close()
+        }}
+      >
+        <XIcon size={12} />
+      </button>
+    ) : null
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -108,6 +123,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 className={tab.status === 'running' ? 'dshx:animate-pulse dshx:bg-info' : tab.status === 'needsYou' ? 'dshx:bg-warning' : 'dshx:bg-primary'}
               />
             )}
+            {closeButtonPosition === 'left' ? closeButton : null}
             {renaming && tab?.kind === 'thread' ? (
               <InlineTitleEditor
                 value={tab.title}
@@ -131,20 +147,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 {notice}
               </span>
             )}
-            {!tab?.pinned && (
-              <button
-                type="button"
-                aria-label={channel.label?.('closeTab', title) || `Close ${title}`}
-                className="dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:hover:bg-accent"
-                onPointerDown={event => event.stopPropagation()}
-                onClick={event => {
-                  event.stopPropagation()
-                  close()
-                }}
-              >
-                <XIcon size={12} />
-              </button>
-            )}
+            {closeButtonPosition === 'right' ? closeButton : null}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>

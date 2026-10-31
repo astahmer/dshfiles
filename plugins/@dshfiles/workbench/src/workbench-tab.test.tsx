@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { WorkbenchTabsProvider } from './tabs.js'
 import { ContextMenuItem } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { createWorkbenchPanelRegistry, type WorkbenchPanelDefinition } from './registry.js'
-import { connectWorkbenchTabs, type WorkbenchTab, type WorkbenchTabsActions, type WorkbenchTabsSnapshot } from './tabs.js'
+import { connectWorkbenchTabs, type CloseButtonPosition, type WorkbenchTab, type WorkbenchTabsActions, type WorkbenchTabsSnapshot } from './tabs.js'
 import { createWorkbenchTab, WorkbenchNewTabButton } from './workbench-tab.js'
 import { TabRows } from './tab-row-visibility.js'
 
@@ -28,6 +28,7 @@ const fixture = (
     readonly enabled?: boolean
     readonly pinned?: boolean
     readonly semantic?: boolean
+    readonly closeButtonPosition?: CloseButtonPosition
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
   } = {},
 ) => {
@@ -43,7 +44,13 @@ const fixture = (
     available: true,
     status: 'running',
   }
-  let snapshot: WorkbenchTabsSnapshot = { enabled: options.enabled ?? true, scopeKey: 'project:test', activeTabId: initial.id, tabs: [initial] }
+  let snapshot: WorkbenchTabsSnapshot = {
+    enabled: options.enabled ?? true,
+    scopeKey: 'project:test',
+    activeTabId: initial.id,
+    tabs: [initial],
+  }
+  if (options.closeButtonPosition !== undefined) snapshot = { ...snapshot, closeButtonPosition: options.closeButtonPosition }
   const listeners = new Set<() => void>()
   const actions: WorkbenchTabsActions = {
     activate: vi.fn(),
@@ -102,6 +109,21 @@ const fixture = (
 }
 
 describe('workbench semantic tab chrome', () => {
+  it('defaults missing close-button metadata to the left of the Workbench tab title', () => {
+    const tab = fixture()
+    const closeButton = screen.getByRole('button', { name: 'Close Thread A' })
+    const title = screen.getByText('Thread A')
+    expect(closeButton.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(tab.actions.close).not.toHaveBeenCalled()
+  })
+
+  it('places the Workbench close button after the title when configured right', () => {
+    fixture({ closeButtonPosition: 'right' })
+    const closeButton = screen.getByRole('button', { name: 'Close Thread A' })
+    const title = screen.getByText('Thread A')
+    expect(title.compareDocumentPosition(closeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('closes through the semantic owner without closing its already-retired Dockview presentation again', () => {
     const tab = fixture()
     act(() => tab.api.addPanel({ id: 'survivor', component: 'body' }))
@@ -313,7 +335,7 @@ describe('workbench semantic tab chrome', () => {
   })
 
   it('hides the close cross for pinned tabs while preserving context and middle-click close semantics', () => {
-    const tab = fixture({ pinned: true })
+    const tab = fixture({ pinned: true, closeButtonPosition: 'right' })
     expect(screen.getByLabelText('Pinned')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Close Thread A' })).toBeNull()
     tab.menu()

@@ -106,6 +106,20 @@ describe('workbench tabs semantics bridge', () => {
     tabs.actor.stop()
   })
 
+  it('publishes the close-button position as Workbench presentation metadata', () => {
+    const tabs = start()
+    const snapshot: WorkbenchTabsSnapshot = {
+      enabled: true,
+      closeButtonPosition: 'right',
+      scopeKey: 'project:test',
+      activeTabId: null,
+      tabs: [],
+    }
+    tabs.publication.update(snapshot, () => null)
+    expect(tabs.publication.provider.getSnapshot().closeButtonPosition).toBe('right')
+    tabs.actor.stop()
+  })
+
   it('starts a New thread through the page channel and keeps the stale host thread from reclaiming the tab', () => {
     const tabs = start()
     const disconnect = connectWorkbenchTabs(tabs.publication.provider)

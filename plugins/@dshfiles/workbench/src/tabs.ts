@@ -9,6 +9,10 @@ export type TabTarget = HostTarget | { readonly kind: 'start' }
 
 export type TabStatus = 'running' | 'needsYou' | 'unread'
 
+export const CLOSE_BUTTON_POSITIONS = ['left', 'right'] as const
+export type CloseButtonPosition = (typeof CLOSE_BUTTON_POSITIONS)[number]
+export const DEFAULT_CLOSE_BUTTON_POSITION: CloseButtonPosition = 'left'
+
 interface TabViewBase {
   readonly id: string
   readonly title: string
@@ -29,6 +33,8 @@ export type WorkbenchTab = TabView & { readonly target: TabTarget }
 
 export interface WorkbenchTabsSnapshot {
   readonly enabled: boolean
+  /** Missing on older providers; Workbench treats it as left. */
+  readonly closeButtonPosition?: CloseButtonPosition
   /** The actor's current project/global set, not a second Dockview-owned tab set. */
   readonly scopeKey: string
   readonly activeTabId: string | null
@@ -66,7 +72,13 @@ export interface WorkbenchTabsProvider {
   readonly label?: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string) => string
 }
 
-const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = { enabled: false, scopeKey: 'project:none', activeTabId: null, tabs: [] }
+const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = {
+  enabled: false,
+  closeButtonPosition: DEFAULT_CLOSE_BUTTON_POSITION,
+  scopeKey: 'project:none',
+  activeTabId: null,
+  tabs: [],
+}
 
 /** @internal The page channel owns no actor, persistence, navigation or computed tab metadata. */
 const createWorkbenchTabsChannel = () => {
