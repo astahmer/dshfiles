@@ -1,7 +1,8 @@
 import { WebError, type WebSearchRequest, type WebSearchResult, type WebSearchSource } from '@deepseek-ai/dsh-web'
+import { Effect } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
-import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 
 const BRAVE_SEARCH_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search'
 const SEARCH_TIMEOUT_MS = 15_000
@@ -88,51 +89,59 @@ export class BraveSearchModel {
 
   /** One Brave Web Search call; the seam enforces `maxResults` on the way back, so this asks for the configured count. */
   static search(request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal): Promise<WebSearchResult> {
-    return withSpan(
-      'brave search',
-      { kind: 'client', attributes: pluginAttributes({ plugin: 'web-search-brave', attributes: { count: options.count, safesearch: options.safesearch } }) },
-      async span => {
-        const result = await BraveSearchModel.searchUntraced(request, options, signal)
-        span.setAttribute('dshx.web-search-brave.results', result.sources.length)
-        return result
-      },
-    )
+    return Effect.runPromise(Effect.provide(BraveSearchModel.searchEffect(request, options, signal), DshxEffect.tracerLayer))
   }
 
-  private static async searchUntraced(request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal): Promise<WebSearchResult> {
-    const url = new URL(BRAVE_SEARCH_ENDPOINT)
-    url.searchParams.set('q', request.query)
-    url.searchParams.set('count', String(options.count))
-    url.searchParams.set('safesearch', options.safesearch)
-    url.searchParams.set('extra_snippets', 'true')
-    const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS)
-    let response: Response
-    try {
-      response = await (options.fetch ?? fetch)(url, {
-        headers: {
-          accept: 'application/json',
-          'accept-encoding': 'gzip',
-          'x-subscription-token': options.apiKey,
-        },
-        signal: signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
+  private static searchEffect = Effect.fn('brave search')(function* (request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal) {
+    yield* Effect.annotateCurrentSpan({
+      'dshx.web-search-brave.count': options.count,
+      'dshx.web-search-brave.safesearch': options.safesearch,
+    })
+    const result = yield* Effect.withSpan(BraveSearchModel.searchRequest(request, options, signal), 'brave request', { kind: 'client' })
+    yield* Effect.annotateCurrentSpan('dshx.web-search-brave.results', result.sources.length)
+    return result
+  })
+
+  private static searchRequest = (request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal) =>
+    Effect.gen(function* () {
+      const url = new URL(BRAVE_SEARCH_ENDPOINT)
+      url.searchParams.set('q', request.query)
+      url.searchParams.set('count', String(options.count))
+      url.searchParams.set('safesearch', options.safesearch)
+      url.searchParams.set('extra_snippets', 'true')
+      const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS)
+      const response = yield* Effect.tryPromise({
+        try: effectSignal =>
+          (options.fetch ?? fetch)(url, {
+            headers: {
+              accept: 'application/json',
+              'accept-encoding': 'gzip',
+              'x-subscription-token': options.apiKey,
+            },
+            signal: signal === undefined ? AbortSignal.any([timeout, effectSignal]) : AbortSignal.any([signal, timeout, effectSignal]),
+          }),
+        catch: cause =>
+          signal?.aborted === true
+            ? new WebError('Brave search aborted.', 'WEB_ABORTED', { cause })
+            : new WebError(`Brave search request failed: ${cause instanceof Error ? cause.message : String(cause)}`, 'WEB_PROVIDER_ERROR', { cause }),
       })
-    } catch (cause) {
-      if (signal?.aborted === true) throw new WebError('Brave search aborted.', 'WEB_ABORTED', { cause })
-      throw new WebError(`Brave search request failed: ${cause instanceof Error ? cause.message : String(cause)}`, 'WEB_PROVIDER_ERROR', { cause })
-    }
-    if (!response.ok) {
-      const body = await response.text().catch(() => '')
-      const detail = body.trim().slice(0, 200)
-      const hint =
-        response.status === 401 || response.status === 403
-          ? ' The Brave API key was rejected; check the Secret Catalog alias.'
-          : response.status === 429
-            ? ' Brave rate limit reached.'
-            : ''
-      throw new WebError(`Brave search returned HTTP ${String(response.status)}${detail === '' ? '' : `: ${detail}`}${hint}`, 'WEB_PROVIDER_ERROR')
-    }
-    const sources = BraveSearchModel.toSources(BraveSearchModel.parseResponse(await response.text()))
-    if (sources.length === 0) throw new WebError('Brave search returned no results.', 'WEB_PROVIDER_ERROR')
-    return { sources, truncated: false }
-  }
+      if (!response.ok) {
+        const body = yield* Effect.tryPromise({ try: () => response.text().catch(() => ''), catch: error => error })
+        const detail = body.trim().slice(0, 200)
+        const hint =
+          response.status === 401 || response.status === 403
+            ? ' The Brave API key was rejected; check the Secret Catalog alias.'
+            : response.status === 429
+              ? ' Brave rate limit reached.'
+              : ''
+        return yield* Effect.fail(
+          new WebError(`Brave search returned HTTP ${String(response.status)}${detail === '' ? '' : `: ${detail}`}${hint}`, 'WEB_PROVIDER_ERROR'),
+        )
+      }
+      const text = yield* Effect.tryPromise({ try: () => response.text(), catch: error => error })
+      const parsed = yield* Effect.try({ try: () => BraveSearchModel.parseResponse(text), catch: error => error })
+      const sources = BraveSearchModel.toSources(parsed)
+      if (sources.length === 0) return yield* Effect.fail(new WebError('Brave search returned no results.', 'WEB_PROVIDER_ERROR'))
+      return { sources, truncated: false }
+    })
 }
