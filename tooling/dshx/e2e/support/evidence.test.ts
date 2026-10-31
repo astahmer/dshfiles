@@ -102,3 +102,42 @@ it('skips oversized attachments and prunes older runs to the configured retentio
   assert.equal(retained.includes(basename(paths[1] ?? '')), true)
   assert.equal(retained.includes(basename(paths[2] ?? '')), true)
 })
+
+it('stores full-suite manifests above 512 KiB and rejects over-limit manifests', async () => {
+  const root = await newRoot()
+  const baseManifest = manifest('55555555-5555-4555-8555-555555555555', 'passed')
+  const firstTest = baseManifest.tests[0]
+  if (firstTest === undefined) throw new Error('fixture manifest contains no test')
+
+  const manifestWithLongStep = (options: { readonly runId: string; readonly titleBytes: number }): EvidenceManifest => ({
+    ...baseManifest,
+    runId: options.runId,
+    tests: [
+      {
+        ...firstTest,
+        steps: [
+          {
+            sequence: 1,
+            parentSequence: null,
+            title: 'x'.repeat(options.titleBytes),
+            category: 'action',
+            outcome: 'passed',
+            offsetMs: 0,
+            durationMs: 1,
+          },
+        ],
+      },
+    ],
+  })
+
+  const retained = await persistEvidenceRun(root, manifestWithLongStep({ runId: '55555555-5555-4555-8555-555555555555', titleBytes: 700 * 1024 }), [])
+  const retainedManifest = await readFile(join(retained.directory, 'manifest.json'), 'utf8')
+  const retainedBytes = Buffer.byteLength(retainedManifest, 'utf8')
+  assert.ok(retainedBytes > 512 * 1024)
+  assert.ok(retainedBytes <= EVIDENCE_POLICY.maxManifestBytes)
+
+  await assert.rejects(
+    persistEvidenceRun(root, manifestWithLongStep({ runId: '66666666-6666-4666-8666-666666666666', titleBytes: 1024 * 1024 }), []),
+    /evidence manifest exceeds the configured size limit/,
+  )
+})
