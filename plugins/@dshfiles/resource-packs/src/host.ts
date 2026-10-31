@@ -1,38 +1,46 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { Context as EffectContext, Effect, Layer } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { resourcePacksApi } from './api.js'
 import { ResourceStore } from './store.js'
-import { ResourceValidation } from './validation.js'
+
+class ResourcePacksRuntime extends EffectContext.Service<ResourcePacksRuntime, { readonly store: ResourceStore }>()('@dshfiles/resource-packs/Runtime') {}
 
 /** Each mount owns its handle. A shared definition may safely run in independent Hosts. */
 export function createResourcePacksHost(path?: string) {
-  const stores = new WeakMap<Context, ResourceStore>()
-  const store = (ctx: Context): ResourceStore => stores.get(ctx) ?? ResourceValidation.refuse('not-ready', 'The resource metadata store is not active.')
+  const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+    layer: () =>
+      Layer.effect(
+        ResourcePacksRuntime,
+        Effect.acquireRelease(
+          Effect.sync(() => ({ store: new ResourceStore(path) })),
+          ({ store }) => Effect.sync(() => store.close()),
+        ),
+      ),
+    setup: () => Effect.void,
+  })
+
+  const api = hostApi(resourcePacksApi, {
+    catalog: Effect.fn('resource packs catalog read')(() => ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.catalog()))),
+    list: Effect.fn('resource packs list')(({ input }) => ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.list(input)))),
+    get: Effect.fn('resource packs get')(({ input }) => ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.get(input)))),
+    registerPack: Effect.fn('resource packs register pack')(({ input, caller }) =>
+      ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.registerPack(input, caller))),
+    ),
+    registerResource: Effect.fn('resource packs register resource')(({ input, caller }) =>
+      ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.registerResource(input, caller))),
+    ),
+    attach: Effect.fn('resource packs attach')(({ input, caller }) => ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.attach(input, caller)))),
+    setValues: Effect.fn('resource packs set values')(({ input, caller }) =>
+      ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.setValues(input, caller))),
+    ),
+    detach: Effect.fn('resource packs detach')(({ input, caller }) => ResourcePacksRuntime.use(({ store }) => Effect.sync(() => store.detach(input, caller)))),
+  })
+
   return defineHost({
+    ...effectPlugin,
     name: '@dshfiles/resource-packs',
-    apis: [
-      resourcePacksApi.host({
-        catalog: ({ ctx }) => store(ctx).catalog(),
-        list: ({ ctx, input }) => store(ctx).list(input),
-        get: ({ ctx, input }) => store(ctx).get(input),
-        registerPack: ({ ctx, input, caller }) => store(ctx).registerPack(input, caller),
-        registerResource: ({ ctx, input, caller }) => store(ctx).registerResource(input, caller),
-        attach: ({ ctx, input, caller }) => store(ctx).attach(input, caller),
-        setValues: ({ ctx, input, caller }) => store(ctx).setValues(input, caller),
-        detach: ({ ctx, input, caller }) => store(ctx).detach(input, caller),
-      }),
-    ],
-    setup(ctx) {
-      const instance = new ResourceStore(path)
-      stores.set(ctx, instance)
-      ctx.effect(
-        () => () => {
-          stores.delete(ctx)
-          instance.close()
-        },
-        'resource-packs SQLite handle',
-      )
-    },
+    apis: [api],
   })
 }
 
