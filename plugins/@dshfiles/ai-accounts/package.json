@@ -65,6 +65,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "effect": "catalog:",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",

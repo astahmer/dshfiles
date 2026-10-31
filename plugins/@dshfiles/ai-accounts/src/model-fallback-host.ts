@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-storage-domain'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
+import { effectHandler } from './host-effect.js'
 import { DEFAULT_DISTRIBUTION } from './account-pool.js'
 import { aiAccountsModelFallbackApi, type ModelFallbackSnapshot } from './model-fallback-api.js'
 import { createModelFallbackStore, modelFallbackDomain, type ModelFallbackStore } from './model-fallback-store.js'
@@ -55,21 +57,21 @@ const snapshot = async (ctx: Context, sessionId: string | undefined): Promise<Mo
   return { ...base, active: runtime.modelFallbackRouter.active(sessionId) ?? null }
 }
 
-export const modelFallbackHostApi = aiAccountsModelFallbackApi.host({
-  state: ({ ctx, input }) => snapshot(ctx, input.sessionId),
-  setChain: async ({ ctx, input }) => {
+export const modelFallbackHostApi = DshxEffect.host(aiAccountsModelFallbackApi, {
+  state: effectHandler(aiAccountsModelFallbackApi, 'state', ({ ctx, input }) => snapshot(ctx, input.sessionId)),
+  setChain: effectHandler(aiAccountsModelFallbackApi, 'setChain', async ({ ctx, input }) => {
     await (await modelFallbacksFor(ctx)).setChain({ sessionId: input.sessionId, chain: input.chain })
     return snapshot(ctx, input.sessionId)
-  },
-  setReturnPolicy: async ({ ctx, input }) => {
+  }),
+  setReturnPolicy: effectHandler(aiAccountsModelFallbackApi, 'setReturnPolicy', async ({ ctx, input }) => {
     await (await modelFallbacksFor(ctx)).setReturnPolicy(input.returnPolicy)
     return snapshot(ctx, undefined)
-  },
-  returnToSelection: async ({ ctx, input }) => {
+  }),
+  returnToSelection: effectHandler(aiAccountsModelFallbackApi, 'returnToSelection', async ({ ctx, input }) => {
     await modelFallbacksFor(ctx)
     const selection = accountRuntime(ctx)?.modelFallbackRouter?.returnToSelection(input.sessionId)
     if (selection !== undefined)
       await ctx.get('sessionController')?.selectModel({ sessionId: SessionId(input.sessionId), ...ModelFallbackModel.selectionFor(selection) })
     return snapshot(ctx, input.sessionId)
-  },
+  }),
 })
