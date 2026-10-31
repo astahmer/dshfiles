@@ -1,8 +1,10 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-tools'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { z } from 'zod'
 import { Policies, type PolicyRule } from './policies.js'
 import { policiesSettings } from './settings.js'
@@ -17,6 +19,27 @@ const rules = (): readonly PolicyRule[] => {
   } catch {
     return []
   }
+}
+
+class PoliciesToolsUnavailable extends Schema.TaggedError<PoliciesToolsUnavailable>()('PoliciesToolsUnavailable', {
+  message: Schema.String,
+}) {}
+
+class PoliciesRuntime extends Context.Service<
+  PoliciesRuntime,
+  {
+    readonly rules: () => readonly PolicyRule[]
+    readonly installGuard: (guard: (execution: { readonly name: string; readonly arguments: unknown }) => string | undefined) => () => void
+  }
+>()('@dshfiles/policies/Runtime') {}
+
+const policiesLayer = (ctx: CordisContext) => {
+  const tools = ctx.get('tools')
+  if (tools === undefined) throw new PoliciesToolsUnavailable({ message: 'The tools service is unavailable.' })
+  return Layer.succeed(PoliciesRuntime, {
+    rules,
+    installGuard: guard => tools.guard(guard),
+  })
 }
 
 const policiesApi = defineApi({
@@ -49,15 +72,32 @@ const policiesApi = defineApi({
   },
 })
 
-const api = policiesApi.host({
-  list: () => ({ rules: [...rules()] }),
-  check: ({ input }) => {
-    const reason = Policies.guard(rules)({ name: input.tool, arguments: input.arguments })
-    return { denied: reason !== undefined, reason: reason ?? null }
-  },
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: policiesLayer,
+  setup: () =>
+    Effect.gen(function* () {
+      const runtime = yield* PoliciesRuntime
+      yield* Effect.acquireRelease(
+        Effect.sync(() => runtime.installGuard(Policies.guard(runtime.rules))),
+        dispose => Effect.sync(dispose),
+      )
+    }),
+})
+
+const api = hostApi(policiesApi, {
+  list: Effect.fn('policies list')(() => PoliciesRuntime.use(runtime => Effect.sync(() => ({ rules: [...runtime.rules()] })))),
+  check: Effect.fn('policies check')(({ input }) =>
+    PoliciesRuntime.use(runtime =>
+      Effect.sync(() => {
+        const reason = Policies.guard(runtime.rules)({ name: input.tool, arguments: input.arguments })
+        return { denied: reason !== undefined, reason: reason ?? null }
+      }),
+    ),
+  ),
 })
 
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/policies',
   inject: ['tools'],
   settings: [
@@ -71,7 +111,4 @@ export default defineHost({
     }),
   ],
   apis: [api],
-  setup: (ctx: Context) => {
-    ctx.effect(() => ctx.tools.guard(Policies.guard(rules)), 'policies: tool guard')
-  },
 })
