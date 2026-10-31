@@ -40,9 +40,9 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     const run = vi.fn(async (_request: SecretCliRequest) => JSON.stringify([{ alias: 'SYNTHETIC' }]))
     const operations = createSecretCatalogOperations(run)
     expect(await operations.list(null)).toMatchObject([{ scope: 'global', alias: 'SYNTHETIC' }])
-    expect(run).toHaveBeenLastCalledWith({ args: ['print', 'global', '--json'], cwd: null, captureStdout: true })
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ args: ['print', 'global', '--json'], cwd: null, captureStdout: true }))
     expect(await operations.list('/tmp/demo')).toHaveLength(1)
-    expect(run).toHaveBeenLastCalledWith({ args: ['print', '--all', '--json'], cwd: '/tmp/demo', captureStdout: true })
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ args: ['print', '--all', '--json'], cwd: '/tmp/demo', captureStdout: true }))
   })
 
   it('shares one CLI read among concurrent lists and drops it once a write starts', async () => {
@@ -71,6 +71,56 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect((await afterWrite)[0]?.alias).toBe('SYNTHETIC_2')
     expect(await operations.list(null)).toHaveLength(1)
     expect(printed).toBe(3)
+  })
+
+  it('cancels one list subscriber without cancelling another shared read', async () => {
+    let resolveRead: (value: string) => void = () => undefined
+    const read = new Promise<string>(resolve => {
+      resolveRead = resolve
+    })
+    const cliSignals: AbortSignal[] = []
+    const run = vi.fn((request: SecretCliRequest) => {
+      if (request.signal !== undefined) cliSignals.push(request.signal)
+      return read
+    })
+    const operations = createSecretCatalogOperations(run)
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const firstReason = new Error('first caller cancelled')
+    const first = operations.list('/tmp/demo', firstController.signal)
+    const second = operations.list('/tmp/demo', secondController.signal)
+
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    firstController.abort(firstReason)
+    await expect(first).rejects.toBe(firstReason)
+    expect(cliSignals[0]?.aborted).toBe(false)
+    resolveRead('[]')
+    await expect(second).resolves.toEqual([])
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts and evicts a shared list after its last caller cancels', async () => {
+    let callCount = 0
+    const cliSignals: AbortSignal[] = []
+    const run = vi.fn((request: SecretCliRequest): Promise<string> => {
+      callCount += 1
+      if (callCount > 1) return Promise.resolve('[]')
+      const signal = request.signal
+      if (signal === undefined) return Promise.reject(new Error('The shared list omitted its cancellation signal.'))
+      cliSignals.push(signal)
+      return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+    })
+    const operations = createSecretCatalogOperations(run)
+    const controller = new AbortController()
+    const reason = new Error('last caller cancelled')
+    const pending = operations.list('/tmp/demo', controller.signal)
+
+    await vi.waitFor(() => expect(cliSignals).toHaveLength(1))
+    controller.abort(reason)
+    await expect(pending).rejects.toBe(reason)
+    expect(cliSignals[0]?.aborted).toBe(true)
+    await expect(operations.list('/tmp/demo')).resolves.toEqual([])
+    expect(callCount).toBe(2)
   })
 
   it('refuses metadata a CLI would read as another flag, before running anything', async () => {
@@ -144,7 +194,7 @@ describe('Secret Catalog metadata and exact alias actions', () => {
       value: null,
       name: 'Synthetic item',
     })
-    expect(run.mock.calls).toEqual([
+    expect(run.mock.calls).toMatchObject([
       [{ args: ['print', '--all', '--json'], cwd: '/tmp/project', captureStdout: true }],
       [{ args: ['set', 'SYNTHETIC_NEW', '--env', 'prod', '--name', 'Synthetic item', '--generate'], cwd: '/tmp/project', captureStdout: false }],
     ])
@@ -161,7 +211,7 @@ describe('Secret Catalog metadata and exact alias actions', () => {
       valueMode: 'generate',
       value: null,
     })
-    expect(run.mock.calls).toEqual([
+    expect(run.mock.calls).toMatchObject([
       [{ args: ['print', 'global', '--json'], cwd: null, captureStdout: true }],
       [{ args: ['set', 'SYNTHETIC_GLOBAL', '--env', 'staging', '--global', '--generate'], cwd: null, captureStdout: false }],
     ])
@@ -178,7 +228,7 @@ describe('Secret Catalog metadata and exact alias actions', () => {
       valueMode: 'manual',
       value: 'synthetic-input-value',
     })
-    expect(run.mock.calls).toEqual([
+    expect(run.mock.calls).toMatchObject([
       [{ args: ['print', '--all', '--json'], cwd: '/tmp/project', captureStdout: true }],
       [
         {

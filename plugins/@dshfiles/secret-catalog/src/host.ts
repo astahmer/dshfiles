@@ -67,7 +67,7 @@ const catalogHostApi = catalogPlugin.hostApi(secretCatalogApi, {
   list: ({ input }) =>
     Effect.gen(function* () {
       const active = yield* SecretCatalogHost
-      return yield* secretCatalogQuery(_signal => active.operations.list(input.cwd).then(rows => [...rows]))
+      return yield* secretCatalogQuery(signal => active.operations.list(input.cwd, signal).then(rows => [...rows]))
     }),
   reveal: ({ input }) =>
     Effect.gen(function* () {
@@ -118,7 +118,7 @@ const setupHostApi = catalogPlugin.hostApi(secretSetupApi, {
   list: ({ input }) =>
     Effect.gen(function* () {
       const active = yield* SecretCatalogHost
-      return yield* secretCatalogQuery(_signal => active.operations.list(input.cwd).then(rows => [...rows]))
+      return yield* secretCatalogQuery(signal => active.operations.list(input.cwd, signal).then(rows => [...rows]))
     }),
   create: ({ input }) =>
     Effect.gen(function* () {

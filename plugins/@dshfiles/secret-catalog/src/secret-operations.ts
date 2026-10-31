@@ -43,7 +43,7 @@ const withoutTerminalNewline = (value: string): string => {
 }
 
 export interface SecretCatalogOperations {
-  readonly list: (cwd: string | null) => Promise<readonly SecretMetadata[]>
+  readonly list: (cwd: string | null, signal?: AbortSignal) => Promise<readonly SecretMetadata[]>
   readonly reveal: (alias: string, scope: SecretScope, cwd: string | null, environment?: string, signal?: AbortSignal) => Promise<string>
   readonly copy: (alias: string, scope: SecretScope, cwd: string | null, environment?: string, signal?: AbortSignal) => Promise<{ readonly copied: true }>
   readonly create: (input: SecretCreateInput, signal?: AbortSignal) => Promise<{ readonly created: true }>
@@ -113,7 +113,13 @@ export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCa
   const validatedAlias = (inputAlias: string): string => Schema.decodeUnknownSync(secretAliasSchemaEffectForCatalog)(inputAlias)
   // Panel, picker, setup offer and reference checks list the same folder at once; one CLI process serves them all.
   // A write drops the shared read, so a list asked for after a write never sees the config from before it.
-  const pendingLists = new Map<string, Promise<readonly SecretMetadata[]>>()
+  type PendingList = {
+    readonly promise: Promise<readonly SecretMetadata[]>
+    readonly controller: AbortController
+    consumers: number
+    settled: boolean
+  }
+  const pendingLists = new Map<string, PendingList>()
   const run: SecretCliRunner = async request => {
     if (readOnlyCommands.has(request.args[0] ?? '')) return runCli(request)
     pendingLists.clear()
@@ -125,21 +131,59 @@ export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCa
   }
   const withSignal = (request: Omit<SecretCliRequest, 'signal'>, signal?: AbortSignal): SecretCliRequest =>
     signal === undefined ? request : { ...request, signal }
-  const list = async (cwd: string | null): Promise<readonly SecretMetadata[]> => {
+  const subscribeToList = (key: string, pending: PendingList, signal?: AbortSignal): Promise<readonly SecretMetadata[]> => {
+    pending.consumers += 1
+    return new Promise((resolve, reject) => {
+      let subscribed = true
+      const release = (cancelIfUnused: boolean): void => {
+        if (!subscribed) return
+        subscribed = false
+        signal?.removeEventListener('abort', onAbort)
+        pending.consumers -= 1
+        if (cancelIfUnused && pending.consumers === 0 && !pending.settled) {
+          if (pendingLists.get(key) === pending) pendingLists.delete(key)
+          pending.controller.abort(signal?.reason)
+        }
+      }
+      const onAbort = (): void => {
+        release(true)
+        reject(signal?.reason ?? new DOMException('The operation was aborted.', 'AbortError'))
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      pending.promise.then(
+        value => {
+          release(false)
+          resolve(value)
+        },
+        error => {
+          release(false)
+          reject(error)
+        },
+      )
+      if (signal?.aborted === true) onAbort()
+    })
+  }
+  const list = async (cwd: string | null, signal?: AbortSignal): Promise<readonly SecretMetadata[]> => {
+    signal?.throwIfAborted()
     const canonicalCwd = validateCwd(cwd)
     const key = canonicalCwd ?? ''
-    const pending = pendingLists.get(key)
-    if (pending !== undefined) return pending
-    const args = canonicalCwd === null ? ['print', 'global', '--json'] : ['print', '--all', '--json']
-    const read = run({ args, cwd: canonicalCwd, captureStdout: true }).then(stdout =>
-      parseSecretPrintMetadata(stdout, canonicalCwd === null ? 'global' : 'unknown'),
-    )
-    pendingLists.set(key, read)
-    const forget = (): void => {
-      if (pendingLists.get(key) === read) pendingLists.delete(key)
+    let pending = pendingLists.get(key)
+    if (pending === undefined) {
+      const controller = new AbortController()
+      const args = canonicalCwd === null ? ['print', 'global', '--json'] : ['print', '--all', '--json']
+      const promise = run({ args, cwd: canonicalCwd, captureStdout: true, signal: controller.signal }).then(stdout =>
+        parseSecretPrintMetadata(stdout, canonicalCwd === null ? 'global' : 'unknown'),
+      )
+      const created: PendingList = { promise, controller, consumers: 0, settled: false }
+      pending = created
+      pendingLists.set(key, created)
+      const settled = (): void => {
+        created.settled = true
+        if (pendingLists.get(key) === created) pendingLists.delete(key)
+      }
+      promise.then(settled, settled)
     }
-    read.then(forget, forget)
-    return read
+    return subscribeToList(key, pending, signal)
   }
 
   const getArguments = (alias: string, scope: SecretScope, cwd: string | null, environment?: string): string[] => {
@@ -169,7 +213,7 @@ export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCa
         throw new SecretCatalogOperationError({ message: 'A non-empty value is required for a manual secret.' })
       if (input.valueMode === 'generate' && input.value !== null)
         throw new SecretCatalogOperationError({ message: 'Generated secrets cannot include a submitted value.' })
-      const existingRows = await list(cwd)
+      const existingRows = await list(cwd, signal)
       if (existingRows.some(row => row.alias === alias && row.environment === environment)) {
         throw new SecretCatalogOperationError({ message: 'An alias with this name already exists in the current environment.' })
       }
@@ -188,7 +232,7 @@ export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCa
       const alias = renamed && input.newAlias !== undefined ? validatedAlias(input.newAlias) : currentAlias
       if (metadata.length === 0 && input.value === null && !renamed) throw new SecretCatalogOperationError({ message: 'No secret changes were provided.' })
       if (renamed) {
-        const existingRows = await list(cwd)
+        const existingRows = await list(cwd, signal)
         if (existingRows.some(row => row.alias === alias)) throw new SecretCatalogOperationError({ message: 'An alias with this name already exists.' })
         await run(withSignal({ args: ['mv', currentAlias, alias, ...scopeArguments(input.scope, cwd)], cwd, captureStdout: false }, signal))
       }

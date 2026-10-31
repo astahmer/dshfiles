@@ -47,7 +47,7 @@ describe('Secret Catalog create-and-bind flow', () => {
 
     expect(result).toEqual({ status: 'bound', reference: 'secret:SYNTHETIC_TOKEN@staging' })
     expect(references).toEqual(['secret:SYNTHETIC_TOKEN@staging'])
-    expect(requests).toEqual([
+    expect(requests).toMatchObject([
       { args: ['print', '--all', '--json'], cwd: '/tmp/synthetic-project', captureStdout: true },
       {
         args: ['set', 'SYNTHETIC_TOKEN', '--env', 'staging'],

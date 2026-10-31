@@ -52,6 +52,38 @@ describe('secret reference status', () => {
     expect(status).toMatchObject({ state: 'alias-missing', reference: 'secret:DSH_JEV_BACKLOG', alias: 'DSH_JEV_BACKLOG', environment: 'prod' })
   })
 
+  it('passes cancellation through primary and elsewhere list reads', async () => {
+    const controller = new AbortController()
+    const reason = new Error('reference check cancelled')
+    const calls: Array<{ readonly cwd: string | null; readonly signal: AbortSignal | undefined }> = []
+    const operations: Pick<SecretCatalogOperations, 'list' | 'reveal'> = {
+      list: async (cwd, signal) => {
+        calls.push({ cwd, signal })
+        if (cwd !== null) {
+          controller.abort(reason)
+          throw reason
+        }
+        return []
+      },
+      reveal: async () => '',
+    }
+
+    await expect(
+      checkSecretReference({
+        operations,
+        referenceText: 'secret:DSH_JEV_BACKLOG',
+        cwd: null,
+        probeFolders: ['/work/one'],
+        inspectGlobalConfig: plainGlobalConfig,
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(reason)
+    expect(calls).toEqual([
+      { cwd: null, signal: controller.signal },
+      { cwd: '/work/one', signal: controller.signal },
+    ])
+  })
+
   it('says the alias is missing from every scope, or names the project that holds it', async () => {
     const everywhere = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [] }), ['/work/one'])
     expect(everywhere).toMatchObject({ state: 'alias-missing', elsewhere: [], writeScope: 'global' })

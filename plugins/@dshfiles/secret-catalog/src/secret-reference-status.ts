@@ -12,10 +12,17 @@ const elsewhereIn = async (input: {
   readonly operations: Pick<SecretCatalogOperations, 'list'>
   readonly alias: string
   readonly folders: readonly string[]
+  readonly signal?: AbortSignal | undefined
 }): Promise<readonly SecretReferenceElsewhere[]> => {
   const found = await Promise.all(
     input.folders.slice(0, MAX_PROBED_FOLDERS).map(async folder => {
-      const rows: readonly SecretMetadata[] = await input.operations.list(folder).catch(() => [])
+      let rows: readonly SecretMetadata[]
+      try {
+        rows = await input.operations.list(folder, input.signal)
+      } catch (error) {
+        if (input.signal?.aborted === true) throw error
+        return []
+      }
       return rows.flatMap(row => {
         const scope = secretScopeSchema.safeParse(row.scope)
         return row.alias === input.alias && scope.success && scope.data !== 'global' ? [{ scope: scope.data, folder, environment: row.environment }] : []
@@ -60,8 +67,9 @@ export const checkSecretReference = async (input: {
 
   let rows: readonly SecretMetadata[]
   try {
-    rows = await input.operations.list(input.cwd)
+    rows = await input.operations.list(input.cwd, input.signal)
   } catch (error) {
+    if (input.signal?.aborted === true) throw error
     return { ...named, state: cliState(error) }
   }
   const sameAlias = rows.filter(row => row.alias === reference.alias)
@@ -70,7 +78,7 @@ export const checkSecretReference = async (input: {
   const scopes = [...new Set(matches.map(row => row.scope))].sort()
   if (sameAlias.length === 0) {
     const folders = (input.probeFolders ?? []).filter(folder => folder !== input.cwd)
-    const elsewhere = await elsewhereIn({ operations: input.operations, alias: reference.alias, folders })
+    const elsewhere = await elsewhereIn({ operations: input.operations, alias: reference.alias, folders, signal: input.signal })
     return { ...named, state: 'alias-missing', elsewhere: [...elsewhere] }
   }
   if (matches.length === 0) {
@@ -87,6 +95,7 @@ export const checkSecretReference = async (input: {
   try {
     value = await input.operations.reveal(reference.alias, scope.data, input.cwd, reference.environment, input.signal)
   } catch (error) {
+    if (input.signal?.aborted === true) throw error
     const state = cliState(error)
     return { ...found, state: state === 'cli-failed' ? 'value-unreadable' : state }
   }
