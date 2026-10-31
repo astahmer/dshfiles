@@ -180,10 +180,10 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
 Detect the checkout's actual VCS metadata before choosing commands. The upstream
 setup uses [Jujutsu](https://jj-vcs.github.io) colocated with Git, but this fork
 may be cloned as Git-only. Without `.jj`, use a separate named Git worktree and
-normal Git commands; do not initialize JJ to satisfy these instructions. The
-JJ-specific rules below apply only in a JJ checkout. Never rewrite or switch
-another agent's worktree, and preserve dirty files. See
-[the fork workflow](docs/fork-maintenance.md).
+normal Git commands; do not initialize JJ to satisfy these instructions. The JJ-specific rules below apply only in a JJ checkout. Do not rewrite or
+switch another agent's worktree by default; preserve dirty files. A direct human
+request may explicitly authorize a scoped history rewrite across those
+workspaces. See [the fork workflow](docs/fork-maintenance.md).
 
 Work lands on `main`; never push with either Git or JJ without authorization.
 
@@ -196,11 +196,14 @@ Work lands on `main`; never push with either Git or JJ without authorization.
   body that says why. Do not add `Co-Authored-By` trailers or local DSH agent
   handles to commit metadata; they are not GitHub collaborators. `jj describe
 -m …`, then `jj new` before the next change.
-- Never rewrite a revision another workspace holds as its `@` (describe,
-  squash, rebase, abandon): it leaves a divergent copy of the change. Touch
-  only revisions you created, and not ones another workspace is built on:
-  amending an ancestor rebases that workspace and leaves it stale. Add a new
-  revision instead.
+- Before history edits, inspect JJ workspace ownership and check `jj status` in
+  every affected workspace. Do not rewrite another workspace's `@` or its
+  ancestors by default. A direct human request to consolidate that history is a
+  scoped exception: inspect affected thread state, snapshot before each risky
+  step, preserve dirty and unlanded work, and rebase rather than abandon it. If
+  an owner reports interference, pause that lane and coordinate before
+  continuing. Authorization to rewrite does not imply authorization to discard
+  work or push.
 - `jj workspace add` without `--ignore-working-copy`: with it, jj registers
   the workspace but never checks its files out.
 - To move a checkout that may hold someone's uncommitted edits (e.g.
