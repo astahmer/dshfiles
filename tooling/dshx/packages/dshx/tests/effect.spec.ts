@@ -73,6 +73,19 @@ describe('@dshfiles/dshx/effect', () => {
     await host.dispose()
   })
 
+  it('retains concrete Zod and Effect schema types on API declarations', async () => {
+    const zodInput = notesApi.methods.get.input
+    const zodOutput = notesApi.methods.get.output
+    if (zodInput === undefined || zodOutput === undefined) throw new Error('Zod API declarations need their schemas')
+
+    expect(await zodInput['~standard'].validate({ id: 'a' })).toEqual({ value: { id: 'a' } })
+    expect(await zodOutput['~standard'].validate({ id: 'a', text: 'note' })).toEqual({ value: { id: 'a', text: 'note' } })
+
+    const effectInput = effectSchemaApi.methods.lookup.input
+    if (effectInput === undefined) throw new Error('Effect API declarations need their input schema')
+    expect(Schema.isSchema(effectInput)).toBe(true)
+  })
+
   it('accepts Effect Schema directly and preserves the existing tool JSON Schema projection', async () => {
     const host = await createTestHost()
     await host.mount(
@@ -86,12 +99,11 @@ describe('@dshfiles/dshx/effect', () => {
       { packageId: '@test/effect-schema' },
     )
 
-    const effectToolSchema = host.tools.schemas()
+    const effectToolSchema = host.tools
+      .schemas()
       .filter(schema => schema.name === 'effect_schema_lookup')
       .map(schema => ({ name: schema.name, parameters: schema.parameters }))
-    expect(Buffer.from(JSON.stringify(effectToolSchema))).toEqual(
-      readFileSync(new URL('./fixtures/effect-api-tool-schema.json', import.meta.url)),
-    )
+    expect(Buffer.from(JSON.stringify(effectToolSchema))).toEqual(readFileSync(new URL('./fixtures/effect-api-tool-schema.json', import.meta.url)))
     expect(effectToolSchema[0]?.parameters).toEqual(toToolSchema(publishedJsonSchema(z.object({ id: z.string() }), 'input')))
     await expect(createHostApiClient(host.ctx, effectSchemaApi, '@test/caller').lookup({ id: 'a' })).resolves.toEqual({ id: 'a', text: 'value' })
     await host.dispose()
@@ -174,20 +186,25 @@ describe('@dshfiles/dshx/effect', () => {
     const log: string[] = []
     const { hostApi, ...plugin } = DshxEffect.plugin({
       layer: Layer.succeed(Greeting, { prefix: 'Hello' }),
-      setup: () => Effect.gen(function*() {
-        yield* Greeting
-        yield* Effect.acquireRelease(Effect.sync(() => log.push('acquired')), () => Effect.sync(() => log.push('released')))
-      }),
+      setup: () =>
+        Effect.gen(function* () {
+          yield* Greeting
+          yield* Effect.acquireRelease(
+            Effect.sync(() => log.push('acquired')),
+            () => Effect.sync(() => log.push('released')),
+          )
+        }),
     })
     const mounted = await host.mount(
       defineHost({
         ...plugin,
         apis: [
           hostApi(greetApi, {
-            hello: ({ input }) => Effect.gen(function*() {
-              const greeting = yield* Greeting
-              return `${greeting.prefix} ${input.name}`
-            }),
+            hello: ({ input }) =>
+              Effect.gen(function* () {
+                const greeting = yield* Greeting
+                return `${greeting.prefix} ${input.name}`
+              }),
           }),
         ],
       }),

@@ -29,9 +29,18 @@ type MethodFromSchemas<InputSchema, OutputSchema> = ApiMethodDefinition<
   InputSchema extends ApiSchema ? ApiSchemaOutput<InputSchema> : void,
   OutputSchema extends ApiSchema ? ApiSchemaInput<OutputSchema> : unknown,
   OutputSchema extends ApiSchema ? ApiSchemaOutput<OutputSchema> : unknown
->
+> &
+  (InputSchema extends ApiSchema ? { readonly input?: InputSchema } : {}) &
+  (OutputSchema extends ApiSchema ? { readonly output?: OutputSchema } : {})
 
 function method<I = void, O = unknown>(): ApiMethodDefinition<I, I, O, O>
+function method(options: {
+  readonly input?: never
+  readonly output?: never
+  readonly description?: string
+  readonly readOnly?: boolean
+  readonly tool?: ApiToolExposure
+}): ApiMethodDefinition<void, void, unknown, unknown>
 function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
   readonly input?: InputSchema
   readonly output?: OutputSchema
@@ -44,7 +53,10 @@ function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
 }
 
 /** Declare an event the Host publishes; `schema` checks the payload on the Host and again in the browser. */
-const event = <const Schema extends ApiSchema>(options: { readonly schema: Schema; readonly description?: string }): ApiEventDefinition<ApiSchemaInput<Schema>, ApiSchemaOutput<Schema>> => ({
+const event = <const Schema extends ApiSchema>(options: {
+  readonly schema: Schema
+  readonly description?: string
+}): ApiEventDefinition<ApiSchemaInput<Schema>, ApiSchemaOutput<Schema>> => ({
   ...options,
 })
 
@@ -83,7 +95,9 @@ function defineApi<
     try {
       resolveApiSchema(declared.schema)
     } catch {
-      throw new Error(`API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} needs a Standard Schema or Effect Schema; declare it with event({ schema }).`)
+      throw new Error(
+        `API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} needs a Standard Schema or Effect Schema; declare it with event({ schema }).`,
+      )
     }
   }
   if (!Number.isInteger(definition.version) || definition.version < 1) {
