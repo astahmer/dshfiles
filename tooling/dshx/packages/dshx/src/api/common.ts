@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ApiError, ApiErrorKind } from './types.js'
+import { resolveApiSchema } from './schema.js'
 
 const MAX_JSON_BYTES = 1024 * 1024
 export const API_ERROR = Symbol('dshx.api-error')
@@ -162,14 +163,12 @@ export class ApiProtocolModel {
 
   static async validate(schema: unknown, value: unknown): Promise<unknown> {
     if (schema === undefined) return value
-    const validator = (
-      schema as {
-        '~standard'?: {
-          validate?: (input: unknown) => unknown | Promise<unknown>
-        }
-      }
-    )['~standard']?.validate
-    if (typeof validator !== 'function') throw new ContractViolation('API schema does not implement Standard Schema validate().')
+    let validator: (input: unknown) => unknown | Promise<unknown>
+    try {
+      validator = resolveApiSchema(schema)['~standard'].validate
+    } catch {
+      throw new ContractViolation('API schema does not implement Standard Schema validate().')
+    }
     const result = await validator(value)
     if (result === undefined || typeof result !== 'object' || result === null) {
       throw new ContractViolation('API schema returned an invalid Standard Schema result.')

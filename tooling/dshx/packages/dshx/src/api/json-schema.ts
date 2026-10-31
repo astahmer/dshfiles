@@ -1,11 +1,18 @@
 import type { JsonSchemaNode, JsonSchemaType } from '@deepseek-ai/dsh-tools'
-import type { StandardJSONSchemaV1 } from '@standard-schema/spec'
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec'
 import type { ApiSchema, PublishedJsonSchema } from './types.js'
+import { resolveApiSchema } from './schema.js'
 
 /** The Standard JSON Schema a contract schema publishes (zod >= 4.2 does), or undefined when it publishes none or cannot represent itself. */
 export function publishedJsonSchema(schema: ApiSchema | undefined, io: 'input' | 'output'): PublishedJsonSchema | undefined {
-  const standard = schema?.['~standard']
-  if (standard === undefined || !('jsonSchema' in standard)) return undefined
+  if (schema === undefined) return undefined
+  let standard: StandardSchemaV1['~standard']
+  try {
+    standard = resolveApiSchema(schema)['~standard']
+  } catch {
+    return undefined
+  }
+  if (!('jsonSchema' in standard)) return undefined
   // SAFETY: a `~standard.jsonSchema` member is the Standard JSON Schema extension; a vendor that only shares the
   // name fails the call below, which the catch turns into "publishes nothing".
   const converter = (standard as StandardJSONSchemaV1.Props).jsonSchema

@@ -1,12 +1,16 @@
 import { Context as Services, Effect, Exit, Fiber, Layer, ManagedRuntime, Schema, Stream } from 'effect'
+import { it as effectIt } from '@effect/vitest'
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { defineApi, event, method } from '../src/api/index.js'
+import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
 import { ApiProtocolModel } from '../src/api/common.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { DshxEffect } from '../src/effect/index.js'
 import { createHostApiClient, defineHost } from '../src/host/index.js'
 import { createTestHost } from '../src/testing/index.js'
+import { recordSpans, withSpan } from '../src/tracing/index.js'
 
 class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { message: Schema.String }) {}
 
@@ -24,6 +28,20 @@ const notesApi = defineApi({
 })
 
 const greetApi = defineApi({ id: 'greet', version: 1, owner: '@test/greet', methods: { hello: method<{ readonly name: string }, string>() } })
+
+const effectSchemaApi = defineApi({
+  id: 'effect-schema',
+  version: 1,
+  owner: '@test/effect-schema',
+  methods: {
+    lookup: method({
+      input: Schema.Struct({ id: Schema.String }),
+      output: Schema.Struct({ id: Schema.String, text: Schema.String }),
+      description: 'Look up one record.',
+      tool: { name: 'effect_schema_lookup', readOnly: true },
+    }),
+  },
+})
 
 describe('@dshfiles/dshx/effect', () => {
   afterEach(() => {
@@ -52,6 +70,30 @@ describe('@dshfiles/dshx/effect', () => {
     expect(await Effect.runPromise(effectNotes.get({ id: 'a' }))).toEqual({ id: 'a', text: 'first' })
     const failure = await Effect.runPromise(Effect.flip(effectNotes.get({ id: 'b' })))
     expect(failure).toMatchObject({ _tag: 'ApiCallError', kind: 'remote', remoteCode: 'not-found', apiId: 'notes', method: 'get' })
+    await host.dispose()
+  })
+
+  it('accepts Effect Schema directly and preserves the existing tool JSON Schema projection', async () => {
+    const host = await createTestHost()
+    await host.mount(
+      defineHost({
+        apis: [
+          DshxEffect.host(effectSchemaApi, {
+            lookup: ({ input }) => Effect.succeed({ id: input.id, text: 'value' }),
+          }),
+        ],
+      }),
+      { packageId: '@test/effect-schema' },
+    )
+
+    const effectToolSchema = host.tools.schemas()
+      .filter(schema => schema.name === 'effect_schema_lookup')
+      .map(schema => ({ name: schema.name, parameters: schema.parameters }))
+    expect(Buffer.from(JSON.stringify(effectToolSchema))).toEqual(
+      readFileSync(new URL('./fixtures/effect-api-tool-schema.json', import.meta.url)),
+    )
+    expect(effectToolSchema[0]?.parameters).toEqual(toToolSchema(publishedJsonSchema(z.object({ id: z.string() }), 'input')))
+    await expect(createHostApiClient(host.ctx, effectSchemaApi, '@test/caller').lookup({ id: 'a' })).resolves.toEqual({ id: 'a', text: 'value' })
     await host.dispose()
   })
 
@@ -106,6 +148,55 @@ describe('@dshfiles/dshx/effect', () => {
     )
     await expect(createHostApiClient(host.ctx, greetApi, '@test/caller').hello({ name: 'Ada' })).resolves.toBe('Hello Ada')
     await runtime.dispose()
+    await host.dispose()
+  })
+
+  effectIt.effect('bridges spans and parentage in both directions with the dshx tracer', () => {
+    const recorder = recordSpans()
+    const bridged = Effect.promise(async () => {
+      await withSpan('promise parent', async () => Effect.runPromise(Effect.void.pipe(Effect.withSpan('effect child'), Effect.provide(DshxEffect.tracerLayer))))
+      await Effect.runPromise(
+        Effect.sync(() => withSpan('promise child', async () => undefined)).pipe(Effect.withSpan('effect parent'), Effect.provide(DshxEffect.tracerLayer)),
+      )
+
+      const promiseParent = recorder.span('promise parent')
+      const effectChild = recorder.span('effect child')
+      const effectParent = recorder.span('effect parent')
+      const promiseChild = recorder.span('promise child')
+      expect(recorder.children(promiseParent)).toContain(effectChild)
+      expect(recorder.children(effectParent)).toContain(promiseChild)
+    })
+    return bridged.pipe(Effect.ensuring(Effect.sync(() => recorder.stop())))
+  })
+
+  it('uses one layered ManagedRuntime for the plugin lifetime and Host handlers', async () => {
+    const host = await createTestHost()
+    const log: string[] = []
+    const { hostApi, ...plugin } = DshxEffect.plugin({
+      layer: Layer.succeed(Greeting, { prefix: 'Hello' }),
+      setup: () => Effect.gen(function*() {
+        yield* Greeting
+        yield* Effect.acquireRelease(Effect.sync(() => log.push('acquired')), () => Effect.sync(() => log.push('released')))
+      }),
+    })
+    const mounted = await host.mount(
+      defineHost({
+        ...plugin,
+        apis: [
+          hostApi(greetApi, {
+            hello: ({ input }) => Effect.gen(function*() {
+              const greeting = yield* Greeting
+              return `${greeting.prefix} ${input.name}`
+            }),
+          }),
+        ],
+      }),
+      { packageId: '@test/greet' },
+    )
+    expect(log).toEqual(['acquired'])
+    await expect(createHostApiClient(host.ctx, greetApi, '@test/caller').hello({ name: 'Ada' })).resolves.toBe('Hello Ada')
+    await mounted.dispose()
+    expect(log).toEqual(['acquired', 'released'])
     await host.dispose()
   })
 

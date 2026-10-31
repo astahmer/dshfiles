@@ -20,6 +20,7 @@ import { ApiDefinitionModel } from './define.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
+import { resolveApiSchema } from './schema.js'
 import { HostApiEventsModel } from './host-events.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
@@ -220,7 +221,7 @@ const agentCaller = (agent: ToolAgent): ApiCaller => {
 
 /** A `z.void()`-style input has no JSON Schema; it is a no-argument tool when it accepts `undefined` synchronously. */
 const acceptsNoInput = (schema: ApiSchema): boolean => {
-  const result = schema['~standard'].validate(undefined)
+  const result = resolveApiSchema(schema)['~standard'].validate(undefined)
   return !(result instanceof Promise) && result.issues === undefined
 }
 

@@ -1,8 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { Cause, Effect, Exit, Queue, Schema, Scope, Stream } from 'effect'
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Stream } from 'effect'
 import { z } from 'zod'
-import type { ManagedRuntime } from 'effect'
+import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
+import { registerEffectApiSchemaConverter } from '../api/schema.js'
 import { ApiProtocolModel, PluginApiError } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
@@ -46,6 +47,42 @@ type HostOptions<R> = [R] extends [never]
   ? [options?: { readonly runtime?: ManagedRuntime.ManagedRuntime<R, unknown> }]
   : [options: { readonly runtime: ManagedRuntime.ManagedRuntime<R, unknown> }]
 
+type AnyManagedRuntime = ManagedRuntime.ManagedRuntime<never, unknown>
+const pluginRuntimes = new WeakMap<Context, AnyManagedRuntime>()
+
+const omitDefaultAdditionalProperties = <T>(document: T): T => {
+  const copy = structuredClone(document)
+  const visit = (value: unknown): void => {
+    if (typeof value !== 'object' || value === null) return
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry)
+      return
+    }
+    // SAFETY: the object was validated as a non-null, non-array JSON Schema record above.
+    const record = value as Record<string, unknown>
+    if (record.additionalProperties === true) delete record.additionalProperties
+    for (const entry of Object.values(record)) visit(entry)
+  }
+  visit(copy)
+  return copy
+}
+
+registerEffectApiSchemaConverter(schema => {
+  if (!Schema.isSchema(schema)) throw new TypeError('The Effect Schema adapter received a non-Effect schema.')
+  const standard = Schema.toStandardSchemaV1(schema)
+  const jsonSchema = Schema.toStandardJSONSchemaV1(schema)['~standard'].jsonSchema
+  return {
+    ...standard,
+    '~standard': {
+      ...standard['~standard'],
+      jsonSchema: {
+        input: (options: Parameters<typeof jsonSchema.input>[0]) => omitDefaultAdditionalProperties(jsonSchema.input(options)),
+        output: (options: Parameters<typeof jsonSchema.output>[0]) => omitDefaultAdditionalProperties(jsonSchema.output(options)),
+      },
+    },
+  }
+})
+
 type EffectApiClient<Methods extends Record<string, AnyApiMethodDefinition>> = {
   readonly [K in keyof Methods]: ApiClientInput<Methods[K]> extends void
     ? (input?: undefined) => Effect.Effect<ApiClientOutput<Methods[K]>, ApiCallError>
@@ -82,26 +119,41 @@ const settle = <A, E>(exit: Exit.Exit<A, E>): A => {
 }
 
 /** Serve a contract from handlers that return Effects; the call's AbortSignal interrupts the handler fiber. */
-const host = <const Methods extends Record<string, AnyApiMethodDefinition>, R = never>(
+const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDefinition>, R>(
   contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
   handlers: EffectHandlers<Methods, R>,
-  ...[options]: HostOptions<R>
+  runtimeForContext: (ctx: Context) => AnyManagedRuntime | undefined,
+  requirePluginRuntime: boolean,
 ): ApiHostRegistration<Methods> => {
-  const runtime: ManagedRuntime.ManagedRuntime<R, unknown> | undefined = options?.runtime
-  const run = (effect: Effect.Effect<unknown, unknown, R>, signal: AbortSignal) =>
-    runtime === undefined
-      ? // SAFETY: HostOptions makes `runtime` required whenever the handlers need services, so without one R is never.
-        Effect.runPromiseExit(effect as Effect.Effect<unknown, unknown>, { signal })
-      : runtime.runPromiseExit(effect, { signal })
+  const run = (effect: Effect.Effect<unknown, unknown, R>, signal: AbortSignal, ctx: Context) => {
+    const runtime = runtimeForContext(ctx)
+    if (runtime === undefined) {
+      if (requirePluginRuntime) throw new Error('DshxEffect.plugin runtime is not active for this Host context.')
+      // SAFETY: the public host helper allows a missing runtime only when R is never.
+      return Effect.runPromiseExit(provideDshxTracer(effect as Effect.Effect<unknown, unknown>), { signal })
+    }
+    // SAFETY: explicit runtimes and DshxEffect.plugin runtimes provide the handler's declared environment.
+    return runtime.runPromiseExit(effect as Effect.Effect<unknown, unknown>, { signal })
+  }
   const promised = Object.fromEntries(
     Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers).map(([name, handler]) => [
       name,
-      async (context: ApiHandlerContext<never>) => settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal)),
+      async (context: ApiHandlerContext<never>) => settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx)),
     ]),
   )
   // SAFETY: every method key of `handlers` (typed against the contract's methods) maps to a Promise handler of the same input and output.
   return contract.host(promised as Parameters<ApiContract<Methods>['host']>[0])
 }
+
+const host = <const Methods extends Record<string, AnyApiMethodDefinition>, R = never>(
+  contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
+  handlers: EffectHandlers<Methods, R>,
+  ...[options]: HostOptions<R>
+): ApiHostRegistration<Methods> =>
+  registerEffectHost(contract, handlers, ctx => {
+    // SAFETY: explicit runtimes match R; context runtimes are created by DshxEffect.plugin for the same plugin instance.
+    return options?.runtime as AnyManagedRuntime | undefined ?? pluginRuntimes.get(ctx)
+  }, false)
 
 /**
  * A Host `setup` whose plugin lifetime is an Effect Scope: resources acquired with `Effect.acquireRelease`,
@@ -111,13 +163,44 @@ const setup =
   <Config, E>(program: (ctx: Context, config: Config) => Effect.Effect<void, E, Scope.Scope>) =>
   async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
     const scope = Effect.runSync(Scope.make())
-    const started = await Effect.runPromiseExit(Effect.withSpan(Scope.provide(scope)(program(ctx, config)), 'dshx-effect setup'))
+    const started = await Effect.runPromiseExit(provideDshxTracer(Effect.withSpan(Scope.provide(scope)(program(ctx, config)), 'dshx-effect setup')))
     if (Exit.isFailure(started)) {
       await Effect.runPromise(Scope.close(scope, started))
       throw Cause.squash(started.cause)
     }
     return () => Effect.runPromise(Scope.close(scope, Exit.void))
   }
+
+const plugin = <Config, E, R>(options: {
+  readonly layer: Layer.Layer<R, E, never>
+  readonly setup: (ctx: Context, config: Config) => Effect.Effect<void, E, R | Scope.Scope>
+}) => ({
+  hostApi: <const Methods extends Record<string, AnyApiMethodDefinition>>(
+    contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
+    handlers: EffectHandlers<Methods, R>,
+  ): ApiHostRegistration<Methods> => registerEffectHost(contract, handlers, ctx => pluginRuntimes.get(ctx), true),
+  setup: async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
+    const runtime = ManagedRuntime.make(Layer.merge(options.layer, tracerLayer))
+    const scope = Effect.runSync(Scope.make())
+    // SAFETY: the runtime is stored only for runtime lookup; the handler adapter supplies its effect environment at execution.
+    pluginRuntimes.set(ctx, runtime as AnyManagedRuntime)
+    const started = await runtime.runPromiseExit(Scope.provide(scope)(options.setup(ctx, config)))
+    if (Exit.isFailure(started)) {
+      pluginRuntimes.delete(ctx)
+      await runtime.runPromise(Scope.close(scope, started))
+      await runtime.dispose()
+      throw Cause.squash(started.cause)
+    }
+    return async () => {
+      pluginRuntimes.delete(ctx)
+      try {
+        await runtime.runPromise(Scope.close(scope, Exit.void))
+      } finally {
+        await runtime.dispose()
+      }
+    }
+  },
+})
 
 /** The same client, each method returning an Effect that fails with `ApiCallError`; interrupting it aborts the call. */
 const client = <const Methods extends Record<string, AnyApiMethodDefinition>>(
@@ -179,7 +262,9 @@ const publish = <const Events extends Record<string, AnyApiEventDefinition>, K e
 export class DshxEffect {
   static readonly host = host
   static readonly setup = setup
+  static readonly plugin = plugin
   static readonly client = client
   static readonly events = events
   static readonly publish = publish
+  static readonly tracerLayer = tracerLayer
 }
