@@ -75,8 +75,10 @@ Then("workspace diagnostics show the active Agent's workspace subscription", asy
   }).toPass({ timeout: 45_000 })
   await recordAssertion(page, 'communication-workspace-subscription-health', async () => {
     await expect(page.getByText('Idle · completion unknown', { exact: true })).toBeVisible()
-    await expect(page.getByText('Subscribed', { exact: true })).toBeVisible()
-    await expect(page.getByTitle(/^workspace\/[a-f0-9]{24}$/).first()).toBeVisible()
+    const workspaceTopicTrigger = page.getByText('Subscribed', { exact: true }).locator('..').locator('[data-slot="tooltip-trigger"]')
+    await expect(workspaceTopicTrigger).toBeVisible()
+    await workspaceTopicTrigger.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(/^workspace\/[a-f0-9]{24}$/)
     await expect(page.getByText(/missing a workspace subscription/)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Unsubscribe', exact: true })).toBeVisible()
     await expect(page.getByText('Completed', { exact: true })).toHaveCount(0)
