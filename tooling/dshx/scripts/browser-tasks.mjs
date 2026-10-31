@@ -422,6 +422,7 @@ export const resolveBrowserSelection = async input => {
   if (input.names.length === 0) return { filters, buildTargets: undefined }
 
   const targets = new Set(['@dshfiles/dshx'])
+  if (input.mode !== 'boot') targets.add('@dshfiles/editor')
   for (const name of input.names) {
     const selected = packageFor(name)
     for (const dependency of closures.get(selected) ?? [selected]) targets.add(dependency)

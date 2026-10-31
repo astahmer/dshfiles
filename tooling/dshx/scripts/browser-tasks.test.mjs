@@ -172,15 +172,19 @@ test('a dist digest moves with the runtime JavaScript, never with source maps or
   assert.notEqual(await runtimeDistDigest(dist), built)
 })
 
-test('a scoped browser run builds and digests only its own boot closure', async () => {
+test('a scoped browser run builds its boot closure and the shared web-profile editor', async () => {
   const scoped = await resolveBrowserSelection({ names: ['agent-communication'], mode: 'e2e' })
   assert.deepEqual(scoped.filters, ['--filter=@dshfiles/agent-communication'])
   assert.ok(scoped.buildTargets !== undefined)
   assert.ok(scoped.buildTargets.includes('@dshfiles/agent-communication'))
   assert.ok(scoped.buildTargets.includes('@dshfiles/dshx'))
+  assert.ok(scoped.buildTargets.includes('@dshfiles/editor'))
   assert.ok(!scoped.buildTargets.includes('@dshfiles/jujutsu'))
   assert.ok(!scoped.buildTargets.includes('@dshfiles/ai-accounts'))
   assert.ok(scoped.buildTargets.length < 20)
+
+  const smoke = await resolveBrowserSelection({ names: ['thread-sidebar'], mode: 'smoke' })
+  assert.ok(smoke.buildTargets?.includes('@dshfiles/editor'))
 })
 
 test('a feature file name resolves to the owner package, a boot run to the named bundle', async () => {
