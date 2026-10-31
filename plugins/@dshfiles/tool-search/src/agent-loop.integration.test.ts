@@ -112,7 +112,7 @@ const runScenario = async (progressive: boolean): Promise<ScenarioResult> => {
 
     if (progressive) {
       if (toolSearch.setup === undefined) throw new Error('Tool-search Host setup is missing')
-      await ctx.plugin({ ...toolSearch, apply: toolSearch.setup })
+      await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, {})
     }
 
     const adapter = new ScriptedToolSearchAdapter(ctx, progressive)

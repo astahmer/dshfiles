@@ -1,0 +1,63 @@
+{
+  "name": "tool_search",
+  "description": "Search tools that are not currently visible. Describe the capability you need or name a tool exactly. Matching tools are loaded for the next model request; call them only after this result returns.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Capability or exact tool name to find (maximum 512 characters)."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum matches to load, from 1 to 5."
+      }
+    },
+    "required": [
+      "query"
+    ]
+  },
+  "output": {
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "loaded",
+                  "already_loaded",
+                  "unavailable"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "status"
+            ]
+          }
+        },
+        "remainingDeferred": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query",
+        "tools",
+        "remainingDeferred"
+      ]
+    }
+  }
+}

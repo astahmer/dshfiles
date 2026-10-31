@@ -276,6 +276,7 @@ export const planBrowserTasks = async () => {
   const fixtureInputsByFeature = new Map([
     ['multi-host', ['scripts/profile-sync.ts']],
     ['ai-accounts', ['plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts']],
+    ['tool-search', ['plugins/@dshfiles/tool-search/scripts/verify-scratch.mjs', 'plugins/@dshfiles/tool-search/src/agent-loop.integration.test.ts']],
   ])
   const owners = new Map()
   const featureNames = (await readdir(resolve(workspaceRoot, featuresDir))).filter(name => name.endsWith('.feature')).sort()

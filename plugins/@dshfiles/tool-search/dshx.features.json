@@ -59,15 +59,44 @@
           "testName": "rejects nested Code Mode search and unload removes only its own scope contributions"
         },
         {
+          "kind": "unit-test",
+          "id": "tool-search.effect-span",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "records an Effect span when a tool search runs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.tagged-query-failure",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "returns a tagged failure for invalid search input"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.schema-parity",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "keeps the tool schema byte-identical"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-search.scratch-agent-loop",
+          "featureFile": "tooling/dshx/e2e/features/tool-search.feature"
+        },
+        {
           "kind": "not-applicable",
           "id": "tool-search.no-browser-surface",
-          "reason": "Progressive disclosure only changes which tools an Agent's provider requests carry; the bundle renders no browser UI, so a Gherkin browser scenario has nothing to observe. Ranking, per-agent disclosure, restore after reload and the Code Mode guard are covered by src/search.test.ts and src/host.test.ts."
+          "reason": "Agent-scoped tool visibility has no browser surface; the scratch Host and AgentLoop journey plus Host tests exercise registration and disclosure behavior."
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "tool search disclose",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "records an Effect span when a tool search runs"
         }
       ]
     }
