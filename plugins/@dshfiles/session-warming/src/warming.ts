@@ -1,5 +1,5 @@
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { withSpan } from '@dshfiles/dshx/tracing'
+import { Context, Effect, Fiber, Layer, Queue, Result, Schedule, Schema, type Scope } from 'effect'
 import { z } from 'zod'
 
 export interface WarmingSettings {
@@ -36,12 +36,11 @@ export type WarmingSessionStatus = z.infer<typeof sessionStatusSchema>
 const HOUR_MS = 60 * 60_000
 
 interface Tracked<Request> {
-  /** Dropped once warming stops, so an idle thread's whole conversation is not held for a timer that will not fire. */
   request: Request | null
   readonly provider: string
   readonly model: string
   warmups: number
-  timer: ReturnType<typeof setTimeout> | undefined
+  fiber: Fiber.Fiber<void, never> | undefined
   nextAt: number | null
   lastWarmedAt: number | null
   last: WarmResult | null
@@ -49,22 +48,32 @@ interface Tracked<Request> {
   error: string | null
 }
 
-/**
- * Per-thread warm-up timers. A thread's last loop request is re-sent `intervalMinutes` after its turn ended, then
- * again on the same interval, until it used `maxWarmupsPerIdle`, the rolling hourly budget across threads is spent,
- * a warm-up fails, or a new turn starts (which resets its count).
- */
-export class SessionWarming {
+export class WarmFailure extends Schema.TaggedError<WarmFailure>()('WarmFailure', { message: Schema.String }) {}
+
+interface WarmingRuntime {
+  readonly requests: Queue.Queue<
+    | { readonly kind: 'request'; readonly sessionId: string; readonly request: GenerateOptions }
+    | { readonly kind: 'turn-start' | 'turn-end' | 'forget'; readonly sessionId: string }
+  >
+  readonly handle: (
+    event:
+      | { readonly kind: 'request'; readonly sessionId: string; readonly request: GenerateOptions }
+      | { readonly kind: 'turn-start' | 'turn-end' | 'forget'; readonly sessionId: string },
+  ) => Effect.Effect<void, never, Scope.Scope>
+  readonly status: () => Effect.Effect<{ readonly enabled: boolean; readonly sessions: WarmingSessionStatus[]; readonly warmupsLastHour: number }>
+}
+
+export class SessionWarming extends Context.Service<SessionWarming, WarmingRuntime>()('dshfiles/session-warming/Runtime') {
   static readonly sessionStatusSchema = sessionStatusSchema
 
-  /** One billed request: the thread's exact last prefix with a single output token, so the provider refreshes its cache. */
-  static warm(llm: { stream(options: GenerateOptions): AsyncIterable<StreamChunk> }, request: GenerateOptions): Promise<WarmResult> {
-    return withSpan(
-      'session-warming warm',
-      { kind: 'client', attributes: { 'gen_ai.provider.name': request.provider, 'gen_ai.request.model': request.model } },
-      async span => {
+  static readonly warm = Effect.fn('session-warming warm')(function* (input: {
+    readonly llm: { stream(options: GenerateOptions): AsyncIterable<StreamChunk> }
+    readonly request: GenerateOptions
+  }) {
+    return yield* Effect.tryPromise({
+      try: async () => {
         let result: WarmResult = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
-        for await (const chunk of llm.stream({ ...request, maxTokens: 1, signal: AbortSignal.timeout(60_000) })) {
+        for await (const chunk of input.llm.stream({ ...input.request, maxTokens: 1, signal: AbortSignal.timeout(60_000) })) {
           if (chunk.type !== 'usage') continue
           result = {
             inputTokens: chunk.usage.inputTokens,
@@ -73,137 +82,153 @@ export class SessionWarming {
             cacheWriteTokens: chunk.usage.cacheWriteTokens ?? 0,
           }
         }
-        span.setAttributes({ 'gen_ai.usage.input_tokens': result.inputTokens, 'session_warming.cache_read_tokens': result.cacheReadTokens })
         return result
       },
+      catch: error => new WarmFailure({ message: error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400) }),
+    }).pipe(
+      Effect.tap(result =>
+        Effect.annotateCurrentSpan({
+          'gen_ai.provider.name': input.request.provider,
+          'gen_ai.request.model': input.request.model,
+          'session_warming.cache_read_tokens': result.cacheReadTokens,
+        }),
+      ),
     )
-  }
+  })
 
-  static scheduler<Request extends { readonly provider: string; readonly model: string }>(input: {
+  static layer(input: {
     readonly settings: () => WarmingSettings
-    readonly warm: (request: Request, sessionId: string) => Promise<WarmResult>
-    readonly now?: () => number
-  }) {
-    const now = input.now ?? Date.now
-    const sessions = new Map<string, Tracked<Request>>()
-    const recent: number[] = []
+    readonly llm: { stream(options: GenerateOptions): AsyncIterable<StreamChunk> }
+  }): Layer.Layer<SessionWarming> {
+    return Layer.effect(
+      SessionWarming,
+      Effect.gen(function* () {
+        const requests = yield* Queue.unbounded<Parameters<WarmingRuntime['handle']>[0]>()
+        const sessions = new Map<string, Tracked<GenerateOptions>>()
+        const recent: number[] = []
+        const now = Date.now
 
-    const stop = (tracked: Tracked<Request>, reason: NonNullable<WarmingSessionStatus['stopped']>): void => {
-      tracked.stopped = reason
-      tracked.request = null
-    }
-
-    const clear = (tracked: Tracked<Request>): void => {
-      if (tracked.timer !== undefined) clearTimeout(tracked.timer)
-      tracked.timer = undefined
-      tracked.nextAt = null
-    }
-
-    const schedule = (sessionId: string, tracked: Tracked<Request>): void => {
-      clear(tracked)
-      if (tracked.request === null) return
-      const settings = input.settings()
-      if (!settings.enabled || (settings.providers.length > 0 && !settings.providers.includes(tracked.provider))) {
-        stop(tracked, 'disabled')
-        return
-      }
-      if (tracked.warmups >= settings.maxWarmupsPerIdle) {
-        stop(tracked, 'idle-limit')
-        return
-      }
-      const delay = settings.intervalMinutes * 60_000
-      tracked.nextAt = now() + delay
-      tracked.timer = setTimeout(() => void fire(sessionId, tracked), delay)
-    }
-
-    const fire = async (sessionId: string, tracked: Tracked<Request>): Promise<void> => {
-      tracked.timer = undefined
-      tracked.nextAt = null
-      if (sessions.get(sessionId) !== tracked) return
-      const settings = input.settings()
-      if (!settings.enabled) {
-        stop(tracked, 'disabled')
-        return
-      }
-      while (recent.length > 0 && (recent[0] ?? 0) <= now() - HOUR_MS) recent.shift()
-      if (recent.length >= settings.maxWarmupsPerHour) {
-        stop(tracked, 'hourly-limit')
-        return
-      }
-      recent.push(now())
-      const request = tracked.request
-      if (request === null) return
-      tracked.warmups += 1
-      try {
-        tracked.last = await input.warm(request, sessionId)
-        tracked.lastWarmedAt = now()
-        tracked.error = null
-      } catch (error) {
-        stop(tracked, 'failed')
-        tracked.error = error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400)
-        return
-      }
-      if (sessions.get(sessionId) === tracked && tracked.timer === undefined) schedule(sessionId, tracked)
-    }
-
-    return {
-      /** The latest loop request of a thread: the exact prefix a warm-up re-sends. */
-      recordRequest: (sessionId: string, request: Request): void => {
-        const tracked = sessions.get(sessionId)
-        if (tracked !== undefined && tracked.provider === request.provider && tracked.model === request.model) {
-          tracked.request = request
-          tracked.stopped = null
-          return
+        const cancel = (tracked: Tracked<GenerateOptions>) =>
+          Effect.gen(function* () {
+            if (tracked.fiber !== undefined) yield* Fiber.interrupt(tracked.fiber)
+            tracked.fiber = undefined
+            tracked.nextAt = null
+          })
+        const stop = (tracked: Tracked<GenerateOptions>, reason: NonNullable<WarmingSessionStatus['stopped']>) => {
+          tracked.stopped = reason
+          tracked.request = null
         }
-        if (tracked !== undefined) clear(tracked)
-        sessions.set(sessionId, {
-          request,
-          provider: request.provider,
-          model: request.model,
-          warmups: 0,
-          timer: undefined,
-          nextAt: null,
-          lastWarmedAt: null,
-          last: null,
-          stopped: null,
-          error: null,
+        const schedule = (sessionId: string, tracked: Tracked<GenerateOptions>): Effect.Effect<void, never, Scope.Scope> =>
+          Effect.gen(function* () {
+            yield* cancel(tracked)
+            if (tracked.request === null) return
+            const settings = input.settings()
+            if (!settings.enabled || (settings.providers.length > 0 && !settings.providers.includes(tracked.provider))) {
+              stop(tracked, 'disabled')
+              return
+            }
+            if (tracked.warmups >= settings.maxWarmupsPerIdle) {
+              stop(tracked, 'idle-limit')
+              return
+            }
+            const delayMs = settings.intervalMinutes * 60_000
+            tracked.nextAt = now() + delayMs
+            tracked.fiber = yield* Effect.forkScoped(
+              Effect.repeat(Effect.sleep(`${delayMs} millis`).pipe(Effect.andThen(fire(sessionId, tracked))), Schedule.recurs(0)).pipe(Effect.asVoid),
+            )
+          })
+        const fire = (sessionId: string, tracked: Tracked<GenerateOptions>): Effect.Effect<void, never, Scope.Scope> =>
+          Effect.gen(function* () {
+            tracked.fiber = undefined
+            tracked.nextAt = null
+            if (sessions.get(sessionId) !== tracked) return
+            const settings = input.settings()
+            if (!settings.enabled) {
+              stop(tracked, 'disabled')
+              return
+            }
+            while (recent.length > 0 && (recent[0] ?? 0) <= now() - HOUR_MS) recent.shift()
+            if (recent.length >= settings.maxWarmupsPerHour) {
+              stop(tracked, 'hourly-limit')
+              return
+            }
+            recent.push(now())
+            const request = tracked.request
+            if (request === null) return
+            tracked.warmups += 1
+            const warmed = yield* Effect.result(SessionWarming.warm({ llm: input.llm, request }))
+            if (Result.isFailure(warmed)) {
+              stop(tracked, 'failed')
+              tracked.error = warmed.failure.message
+              return
+            }
+            tracked.last = warmed.success
+            tracked.lastWarmedAt = now()
+            tracked.error = null
+            if (sessions.get(sessionId) === tracked && tracked.fiber === undefined) yield* schedule(sessionId, tracked)
+          })
+        const handle = Effect.fn('session-warming handle event')(function* (event: Parameters<WarmingRuntime['handle']>[0]) {
+          if (event.kind === 'request') {
+            const tracked = sessions.get(event.sessionId)
+            if (tracked !== undefined && tracked.provider === event.request.provider && tracked.model === event.request.model) {
+              tracked.request = event.request
+              tracked.stopped = null
+              return
+            }
+            if (tracked !== undefined) yield* cancel(tracked)
+            sessions.set(event.sessionId, {
+              request: event.request,
+              provider: event.request.provider,
+              model: event.request.model,
+              warmups: 0,
+              fiber: undefined,
+              nextAt: null,
+              lastWarmedAt: null,
+              last: null,
+              stopped: null,
+              error: null,
+            })
+            return
+          }
+          const tracked = sessions.get(event.sessionId)
+          if (event.kind === 'forget') {
+            if (tracked !== undefined) yield* cancel(tracked)
+            sessions.delete(event.sessionId)
+            return
+          }
+          if (tracked === undefined) return
+          if (event.kind === 'turn-start') {
+            yield* cancel(tracked)
+            tracked.warmups = 0
+            tracked.stopped = null
+            tracked.error = null
+            return
+          }
+          yield* schedule(event.sessionId, tracked)
         })
-      },
-      turnStarted: (sessionId: string): void => {
-        const tracked = sessions.get(sessionId)
-        if (tracked === undefined) return
-        clear(tracked)
-        tracked.warmups = 0
-        tracked.stopped = null
-        tracked.error = null
-      },
-      turnEnded: (sessionId: string): void => {
-        const tracked = sessions.get(sessionId)
-        if (tracked !== undefined) schedule(sessionId, tracked)
-      },
-      forget: (sessionId: string): void => {
-        const tracked = sessions.get(sessionId)
-        if (tracked !== undefined) clear(tracked)
-        sessions.delete(sessionId)
-      },
-      dispose: (): void => {
-        for (const tracked of sessions.values()) clear(tracked)
-        sessions.clear()
-      },
-      status: (): { readonly sessions: WarmingSessionStatus[]; readonly warmupsLastHour: number } => ({
-        sessions: [...sessions.entries()].map(([sessionId, tracked]) => ({
-          sessionId,
-          provider: tracked.provider,
-          model: tracked.model,
-          warmups: tracked.warmups,
-          nextAt: tracked.nextAt,
-          lastWarmedAt: tracked.lastWarmedAt,
-          last: tracked.last,
-          stopped: tracked.stopped,
-          error: tracked.error,
-        })),
-        warmupsLastHour: recent.filter(at => at > now() - HOUR_MS).length,
+        const status = Effect.fn('session-warming status')(() =>
+          Effect.sync(() => {
+            const settings = input.settings()
+            return {
+              enabled: settings.enabled,
+              sessions: [...sessions.entries()].map(([sessionId, tracked]) => ({
+                sessionId,
+                provider: tracked.provider,
+                model: tracked.model,
+                warmups: tracked.warmups,
+                nextAt: tracked.nextAt,
+                lastWarmedAt: tracked.lastWarmedAt,
+                last: tracked.last,
+                stopped: tracked.stopped,
+                error: tracked.error,
+              })),
+              warmupsLastHour: recent.filter(at => at > now() - HOUR_MS).length,
+            }
+          }),
+        )
+        yield* Effect.forkScoped(Effect.forever(Queue.take(requests).pipe(Effect.flatMap(handle))))
+        return { requests, handle, status }
       }),
-    }
+    )
   }
 }
