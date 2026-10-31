@@ -18,6 +18,7 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { z } from 'zod'
 
 /**
@@ -60,6 +61,38 @@ export interface SessionSourceRegistry {
   ownerOf(sessionId: string): MirroredSessionSource | undefined
   /** The claiming source, asking every source's cheap `owns` when nothing is cached. */
   resolveOwner(sessionId: SessionId): Promise<MirroredSessionSource | undefined>
+}
+
+export class SessionSourceRegistryError extends Schema.TaggedError<SessionSourceRegistryError>()('SessionSourceRegistryError', {
+  operation: Schema.Literals(['resolve-owner']),
+}) {}
+
+export class SessionSources extends Context.Service<
+  SessionSources,
+  {
+    register(source: MirroredSessionSource): Effect.Effect<() => void>
+    sources(): Effect.Effect<readonly MirroredSessionSource[]>
+    claim(source: MirroredSessionSource, sessionIds: readonly SessionId[]): Effect.Effect<void>
+    ownerOf(sessionId: string): Effect.Effect<MirroredSessionSource | undefined>
+    resolveOwner(sessionId: SessionId): Effect.Effect<MirroredSessionSource | undefined, SessionSourceRegistryError>
+  }
+>()('@dshfiles/session-source-port/SessionSources') {
+  static layer(registry: SessionSourceRegistry) {
+    return Layer.succeed(
+      SessionSources,
+      SessionSources.of({
+        register: source => Effect.sync(() => registry.register(source)),
+        sources: () => Effect.sync(() => registry.sources()),
+        claim: (source, sessionIds) => Effect.sync(() => registry.claim(source, sessionIds)),
+        ownerOf: sessionId => Effect.sync(() => registry.ownerOf(sessionId)),
+        resolveOwner: sessionId =>
+          Effect.tryPromise({
+            try: () => registry.resolveOwner(sessionId),
+            catch: () => new SessionSourceRegistryError({ operation: 'resolve-owner' }),
+          }),
+      }),
+    )
+  }
 }
 
 /**

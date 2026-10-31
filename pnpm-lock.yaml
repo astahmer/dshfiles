@@ -5315,6 +5315,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
