@@ -1,72 +1,59 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { promptStashApi } from './library-api.js'
 import { PromptStashModel, promptStashDomain, type PromptStashStore } from './store.js'
 
-interface OpenedStash {
-  readonly store: PromptStashStore
-  readonly close: () => Promise<void>
-}
+class PromptStashStorageError extends Schema.TaggedError<PromptStashStorageError>()('PromptStashStorageError', {
+  message: Schema.String,
+}) {}
 
-/**
- * One store per Host process, not per Cordis context: the API handlers and the
- * setup effect receive different contexts, and a second store would keep its own
- * record maps and clobber the other's durable rows.
- */
-let opening: Promise<OpenedStash> | undefined
+class PromptStashRuntime extends EffectContext.Service<PromptStashRuntime, { readonly store: PromptStashStore }>()(
+  'dshfiles/prompt-stash/PromptStashRuntime',
+) {}
 
-const openStash = async (ctx: Context): Promise<OpenedStash> => {
-  const storage = ctx.get('storageDomain')
-  if (storage === undefined) throw new Error('Prompt stash storage is unavailable.')
-  const domain = await storage.open(promptStashDomain)
-  return {
-    store: PromptStashModel.createStore({ prompts: domain.table('prompts') }),
-    close: () => domain.close(),
-  }
-}
+const storageFailure = (): PromptStashStorageError => new PromptStashStorageError({ message: 'Prompt stash storage operation failed.' })
 
-const stashFor = (ctx: Context): Promise<PromptStashStore> => {
-  if (opening === undefined) {
-    const started = openStash(ctx)
-    opening = started
-    void started.catch(() => {
-      if (opening === started) opening = undefined
-    })
-  }
-  return opening.then(opened => opened.store)
-}
-
-const closeStash = async (): Promise<void> => {
-  if (opening === undefined) return
-  const opened = await opening.then(
-    value => value,
-    () => undefined,
+const promptStashLayer = (ctx: Context) =>
+  Layer.effect(
+    PromptStashRuntime,
+    Effect.acquireRelease(
+      Effect.tryPromise({
+        try: async () => {
+          const storage = ctx.get('storageDomain')
+          if (storage === undefined) throw storageFailure()
+          const domain = await storage.open(promptStashDomain)
+          return {
+            store: PromptStashModel.createStore({ prompts: domain.table('prompts') }),
+            close: () => domain.close(),
+          }
+        },
+        catch: () => storageFailure(),
+      }),
+      opened => Effect.promise(() => opened.store.flush()).pipe(Effect.ensuring(Effect.promise(() => opened.close()))),
+    ).pipe(Effect.map(opened => ({ store: opened.store }))),
   )
-  // Cleared before the store is released, so the next reader opens a fresh one.
-  opening = undefined
-  if (opened === undefined) return
-  await opened.store.flush()
-  await opened.close()
-}
 
-const promptStashApiHost = promptStashApi.host({
-  state: async ({ ctx }) => (await stashFor(ctx)).snapshot(),
-  save: async ({ ctx, input }) => (await stashFor(ctx)).save(input),
-  remove: async ({ ctx, input }) => (await stashFor(ctx)).remove(input),
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: promptStashLayer,
+  setup: () => Effect.void,
+})
+
+const promptStashApiHost = hostApi(promptStashApi, {
+  state: Effect.fn('prompt stash state read')(() => PromptStashRuntime.use(runtime => Effect.sync(() => runtime.store.snapshot()))),
+  save: Effect.fn('prompt stash prompt save')(({ input }) =>
+    PromptStashRuntime.use(runtime => Effect.tryPromise({ try: () => runtime.store.save(input), catch: () => storageFailure() })),
+  ),
+  remove: Effect.fn('prompt stash prompt remove')(({ input }) =>
+    PromptStashRuntime.use(runtime => Effect.tryPromise({ try: () => runtime.store.remove(input), catch: () => storageFailure() })),
+  ),
 })
 
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/prompt-stash',
   inject: ['storageDomain'],
   apis: [promptStashApiHost],
-  setup: ctx => {
-    ctx.effect(() => {
-      const started = stashFor(ctx)
-      void started.catch(() => undefined)
-      return async () => {
-        await closeStash()
-      }
-    }, 'prompt-stash: prompt stash store')
-  },
 })

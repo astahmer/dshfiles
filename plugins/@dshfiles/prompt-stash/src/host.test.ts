@@ -12,7 +12,7 @@ import { promptStashMutationSchema, promptStashStateSchema } from './library-api
  */
 
 interface BuiltPlugin {
-  readonly apply: (ctx: Context) => Promise<void> | void
+  readonly apply: (ctx: Context) => Promise<void | (() => void | Promise<void>)> | void | (() => void | Promise<void>)
 }
 
 const builtEntry = new URL('../dist/index.js', import.meta.url).href
@@ -68,7 +68,7 @@ const startHarness = async () => {
   const plugin: BuiltPlugin = await import(builtEntry)
   const prompts = new Map<string, SavedPrompt>()
   const routes = new Map<string, FetchRoute>()
-  const disposers: (() => void)[] = []
+  const disposers: (() => void | Promise<void>)[] = []
   const opened: DomainSpec[] = []
   let closed = 0
 
@@ -102,8 +102,8 @@ const startHarness = async () => {
     serial: () => undefined,
     bail: () => undefined,
     waterfall: () => undefined,
-    effect: (callback: () => (() => void) | undefined) => {
-      const disposer = callback()
+    effect: async (callback: () => (() => void | Promise<void>) | undefined | Promise<(() => void | Promise<void>) | undefined>) => {
+      const disposer = await callback()
       if (disposer !== undefined) disposers.push(disposer)
     },
     get: (name: string) => {
@@ -128,7 +128,8 @@ const startHarness = async () => {
   }
   // SAFETY: the built Host bundle reads only the Cordis members this stub supplies.
   const asHostContext = (value: typeof context): Context => value as unknown as Context
-  await plugin.apply(asHostContext(context))
+  const applyResult = await plugin.apply(asHostContext(context))
+  if (typeof applyResult === 'function') disposers.push(applyResult)
 
   const call = async <Output>(request: { readonly method: string; readonly schema: z.ZodType<Output>; readonly input?: object }): Promise<Output> => {
     const route = [...routes.values()].find(candidate => candidate.path.endsWith(`/${request.method}`))
