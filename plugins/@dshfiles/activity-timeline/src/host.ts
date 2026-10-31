@@ -1,5 +1,7 @@
-import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
+import { Effect } from 'effect'
 import { z } from 'zod'
 import {
   backlogActivity,
@@ -11,8 +13,15 @@ import {
   workspaceActivity,
 } from './adapters.js'
 import { activityTimelineApi } from './api.js'
-import { backlogActivitySchema, activityLevelSchema, verificationReceiptEventSchema } from './types.js'
-import { createActivityTimelineService, type ActivityTimelineService } from './service.js'
+import { backlogActivitySchema, activityLevelSchema, verificationReceiptEventSchema, type ActivityIngest } from './types.js'
+import {
+  ActivityTimeline,
+  activityTimelineAttention,
+  activityTimelineEvent,
+  activityTimelinePage,
+  activityTimelineRelated,
+  activityTimelineStats,
+} from './activity-timeline-effect.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -22,19 +31,78 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-let service: ActivityTimelineService | undefined
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: ActivityTimeline.layer(),
+  setup: (context: CordisContext) =>
+    Effect.gen(function* () {
+      const active = yield* ActivityTimeline
+      const recordActivity = (produce: () => ActivityIngest): void => {
+        try {
+          void active.enqueue(produce()).catch(error => {
+            context.logger.warn('activity-timeline: ignored an invalid event: %s', describeError(error))
+          })
+        } catch (error) {
+          context.logger.warn('activity-timeline: ignored an invalid event: %s', describeError(error))
+        }
+      }
+      context.on('agent/created', ({ agent }) => {
+        recordActivity(() => sessionActivity({ kind: 'created', at: Date.now(), sessionId: agent.id }))
+        return undefined
+      })
+      context.on('agent/disposed', ({ agent }) => {
+        recordActivity(() => sessionActivity({ kind: 'disposed', at: Date.now(), sessionId: agent.id }))
+        return undefined
+      })
+      context.on('agent/status', ({ agent, status }) => {
+        recordActivity(() => sessionActivity({ kind: 'status', at: Date.now(), sessionId: agent.id, status }))
+        return undefined
+      })
+      context.on('agent/error', ({ agent, error }) => {
+        recordActivity(() => sessionActivity({ kind: 'error', at: Date.now(), sessionId: agent.id, detail: describeError(error) }))
+        return undefined
+      })
+      context.on('agent/inbox/inserted', ({ agent }) => {
+        recordActivity(() => sessionActivity({ kind: 'input', at: Date.now(), sessionId: agent.id }))
+        return undefined
+      })
+      context.on('dshfiles/activity/source-ready', payload => {
+        if (!projectChecksReadySchema.safeParse(payload).success) return undefined
+        context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
+        return undefined
+      })
+      context.on('dshfiles/activity/event', payload => {
+        const parsed = activityEventPayloadSchema.safeParse(payload)
+        if (!parsed.success) return undefined
+        if (parsed.data.kind === 'verification-receipt') {
+          const receipt = parsed.data.value
+          recordActivity(() => verificationReceiptActivity(receipt))
+          return undefined
+        }
+        if (parsed.data.kind === 'communication-activity')
+          recordActivity(() => communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
+        if (parsed.data.kind === 'communication-message') recordActivity(() => communicationMessageSafe(parsed.data.value))
+        if (parsed.data.kind === 'integration') recordActivity(() => integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
+        if (parsed.data.kind === 'backlog') {
+          const backlogEntry = parsed.data.value
+          recordActivity(() => backlogActivity(backlogEntry))
+          return undefined
+        }
+        if (parsed.data.kind === 'workspace') {
+          const workspaceEntry = parsed.data.value
+          recordActivity(() => workspaceActivity(workspaceEntry))
+        }
+        return undefined
+      })
+      context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
+    }),
+})
 
-const requireService = (): ActivityTimelineService => {
-  if (service === undefined) throw new Error('Activity timeline Host is not active.')
-  return service
-}
-
-const api = activityTimelineApi.host({
-  page: ({ input }) => requireService().page(input),
-  attention: async ({ input }) => ({ events: [...(await requireService().attention(input.limit ?? 20))] }),
-  stats: () => requireService().stats(),
-  event: ({ input }) => requireService().event(input.eventId),
-  related: async ({ input }) => ({ events: [...(await requireService().related(input.eventId, input.limit ?? 50))] }),
+const api = hostApi(activityTimelineApi, {
+  page: ({ input }) => activityTimelinePage(input),
+  attention: ({ input }) => Effect.map(activityTimelineAttention(input.limit ?? 20), events => ({ events: [...events] })),
+  stats: () => activityTimelineStats(),
+  event: ({ input }) => activityTimelineEvent(input.eventId),
+  related: ({ input }) => Effect.map(activityTimelineRelated(input.eventId, input.limit ?? 50), events => ({ events: [...events] })),
 })
 
 const BACKFILL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -68,84 +136,7 @@ const projectChecksReadySchema = z.object({ source: z.literal('project-checks-re
 
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 2000)
 
-const setupHost = (context: Context): Effect<void> => {
-  const active = createActivityTimelineService()
-  service = active
-  const recordActivity = (produce: () => Parameters<ActivityTimelineService['enqueue']>[0]): void => {
-    try {
-      void active.enqueue(produce()).catch(error => {
-        context.logger.warn('activity-timeline: ignored an invalid event: %s', describeError(error))
-      })
-    } catch (error) {
-      context.logger.warn('activity-timeline: ignored an invalid event: %s', describeError(error))
-    }
-  }
-  context.on('agent/created', ({ agent }) => {
-    recordActivity(() => sessionActivity({ kind: 'created', at: Date.now(), sessionId: agent.id }))
-    return undefined
-  })
-  context.on('agent/disposed', ({ agent }) => {
-    recordActivity(() => sessionActivity({ kind: 'disposed', at: Date.now(), sessionId: agent.id }))
-    return undefined
-  })
-  context.on('agent/status', ({ agent, status }) => {
-    recordActivity(() => sessionActivity({ kind: 'status', at: Date.now(), sessionId: agent.id, status }))
-    return undefined
-  })
-  context.on('agent/error', ({ agent, error }) => {
-    recordActivity(() => sessionActivity({ kind: 'error', at: Date.now(), sessionId: agent.id, detail: describeError(error) }))
-    return undefined
-  })
-  context.on('agent/inbox/inserted', ({ agent }) => {
-    recordActivity(() => sessionActivity({ kind: 'input', at: Date.now(), sessionId: agent.id }))
-    return undefined
-  })
-  context.on('dshfiles/activity/source-ready', payload => {
-    if (!projectChecksReadySchema.safeParse(payload).success) return undefined
-    context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
-    return undefined
-  })
-  context.on('dshfiles/activity/event', payload => {
-    const parsed = activityEventPayloadSchema.safeParse(payload)
-    if (!parsed.success) return undefined
-    if (parsed.data.kind === 'verification-receipt') {
-      const receipt = parsed.data.value
-      recordActivity(() => verificationReceiptActivity(receipt))
-      return undefined
-    }
-    if (parsed.data.kind === 'communication-activity')
-      recordActivity(() => communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
-    if (parsed.data.kind === 'communication-message') recordActivity(() => communicationMessageSafe(parsed.data.value))
-    if (parsed.data.kind === 'integration') recordActivity(() => integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
-    if (parsed.data.kind === 'backlog') {
-      const backlogEntry = parsed.data.value
-      recordActivity(() => backlogActivity(backlogEntry))
-      return undefined
-    }
-    if (parsed.data.kind === 'workspace') {
-      const workspaceEntry = parsed.data.value
-      recordActivity(() => workspaceActivity(workspaceEntry))
-    }
-    return undefined
-  })
-  return {
-    async *[Symbol.asyncIterator]() {
-      try {
-        context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
-        yield async () => {
-          if (service === active) service = undefined
-          // Store what this service already accepted before its owner goes away.
-          await active.drain()
-        }
-      } catch (error) {
-        if (service === active) service = undefined
-        throw error
-      }
-    },
-  }
-}
-
-const communicationMessageSafe = (value: unknown): Parameters<ActivityTimelineService['ingest']>[0] => {
+const communicationMessageSafe = (value: unknown): ActivityIngest => {
   const parsed = z
     .object({
       at: z.number().int().nonnegative(),
@@ -163,10 +154,10 @@ const communicationMessageSafe = (value: unknown): Parameters<ActivityTimelineSe
 }
 
 const host = defineHost({
+  ...effectPlugin,
   name: 'activity-timeline',
   inject: ['agents'],
   apis: [api],
-  setup: setupHost,
 })
 
 export default host
