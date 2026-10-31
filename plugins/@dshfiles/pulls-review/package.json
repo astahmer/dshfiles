@@ -38,6 +38,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@pulls.review/core": "0.3.3",
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -103,6 +103,12 @@
           "span": "jj <subcommand>",
           "file": "plugins/@dshfiles/pulls-review/src/jj.test.ts",
           "testName": "records a jj diff span with flag names only"
+        },
+        {
+          "kind": "custom",
+          "span": "pulls-review review",
+          "file": "plugins/@dshfiles/pulls-review/src/effect-span.test.ts",
+          "testName": "records review and summary spans through the dshx tracer bridge"
         }
       ]
     },
@@ -172,6 +178,12 @@
         {
           "kind": "automatic",
           "source": "model-stream"
+        },
+        {
+          "kind": "custom",
+          "span": "pulls-review summarize",
+          "file": "plugins/@dshfiles/pulls-review/src/effect-span.test.ts",
+          "testName": "records review and summary spans through the dshx tracer bridge"
         }
       ]
     },
