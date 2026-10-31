@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

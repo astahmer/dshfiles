@@ -354,6 +354,12 @@
           "span": "chat <model>",
           "file": "plugins/@dshfiles/agent-telemetry/src/cost.test.ts",
           "testName": "puts dshx.cost.usd on every priced chat span and their sum on the turn span"
+        },
+        {
+          "kind": "custom",
+          "span": "agent telemetry pricing reload",
+          "file": "plugins/@dshfiles/agent-telemetry/src/telemetry-effect.test.ts",
+          "testName": "records a reload span through the dshx tracer bridge"
         }
       ]
     }
