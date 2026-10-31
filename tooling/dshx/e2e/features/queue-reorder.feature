@@ -7,7 +7,7 @@ Feature: Queued message dock
   @scenario:queue-reorder.drag-target
   @scenario:queue-reorder.message-preview
   Scenario: Reorder queued messages with buttons and drag, then run them in that order
-    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is kept busy by a held turn
     And the messages "first queued", "second queued" and a long third one are queued
@@ -23,7 +23,7 @@ Feature: Queued message dock
 
   @scenario:queue-reorder.busy-locks
   Scenario: Edit a queued message in the composer and cancel it back into place
-    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is kept busy by a held turn
     And the messages "first queued", "second queued" and a long third one are queued
@@ -32,7 +32,7 @@ Feature: Queued message dock
 
   @scenario:queue-reorder.dock-preferences
   Scenario: Dock preferences collapse the queue and shorten previews
-    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
     When queued messages are set to start collapsed with 40-character previews
     And a Command Code account backed by a local fake provider is added
     And a thread on the fake model is kept busy by a held turn
@@ -41,7 +41,7 @@ Feature: Queued message dock
 
   @scenario:queue-reorder.move-to-thread
   Scenario: Move queued messages with their attachments to a busy thread's queue and an idle thread's composer
-    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is kept busy by a held turn
     And "carry this" is queued with an image and a file, then "stay here" with an image
@@ -56,7 +56,7 @@ Feature: Queued message dock
 
   @scenario:queue-reorder.attachment-previews
   Scenario: Queued messages preview their images and files until the setting turns previews off
-    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is kept busy by a held turn
     And "carry this" is queued with an image and a file, then "stay here" with an image
