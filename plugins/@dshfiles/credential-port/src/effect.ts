@@ -69,7 +69,7 @@ export class SecretReferenceResolverService extends Context.Service<
       if (reference === null && input.referenceText.trim() !== '') return Effect.fail(new InvalidSecretReferenceError())
       if (reference !== null && values === undefined) return Effect.fail(new SecretCatalogUnavailableError())
       return Effect.tryPromise({
-        try: () => PromiseSecretReferenceResolver.resolveWithLabel({ ...input, values }),
+        try: signal => PromiseSecretReferenceResolver.resolveWithLabel({ ...input, values, signal }),
         catch: () => new SecretCatalogResolutionError(),
       })
     }

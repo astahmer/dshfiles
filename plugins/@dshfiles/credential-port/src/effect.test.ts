@@ -1,5 +1,6 @@
 import { it } from '@effect/vitest'
-import { Effect, Result, Schema } from 'effect'
+import { Duration, Effect, Exit, Fiber, Result, Schema } from 'effect'
+import { TestClock } from 'effect/testing'
 import { describe, expect } from 'vitest'
 import { parseSecretReference } from './secret-reference.js'
 import {
@@ -62,13 +63,41 @@ describe('SecretReferenceResolverService', () => {
       Effect.provide(
         SecretReferenceResolverService.layer({
           resolve: async input => {
-            expect(input).toEqual({ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null })
+            expect(input).toMatchObject({ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null })
+            expect(input.signal).toBeInstanceOf(AbortSignal)
             return 'catalog-value'
           },
         }),
       ),
     ),
   )
+
+  it.effect('interrupts catalog resolution when its request is cancelled', () => {
+    let resolutionSignal: AbortSignal | undefined
+
+    return Effect.gen(function* () {
+      const resolver = yield* SecretReferenceResolverService
+      const fiber = yield* Effect.forkScoped(
+        Effect.timeout(resolver.resolve({ referenceText: 'secret:API_KEY', environmentValue: undefined }), Duration.millis(20)),
+      )
+      yield* TestClock.adjust(Duration.millis(20))
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(resolutionSignal?.aborted).toBe(true)
+    }).pipe(
+      Effect.provide(
+        SecretReferenceResolverService.layer({
+          resolve: input => {
+            const signal = input.signal
+            resolutionSignal = signal
+            if (signal === undefined) return Promise.reject(new Error('The resolver omitted its cancellation signal.'))
+            return new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+          },
+        }),
+      ),
+    )
+  })
 
   it.effect('reports invalid, unavailable, and failed catalog resolutions with TaggedErrors', () =>
     Effect.gen(function* () {

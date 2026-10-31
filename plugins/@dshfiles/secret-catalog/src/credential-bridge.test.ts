@@ -78,6 +78,39 @@ describe('Secret Catalog credential bridge', () => {
     expect(JSON.stringify(options)).not.toContain('synthetic-secret')
   })
 
+  it('aborts its CLI list when a bridge caller cancels', async () => {
+    const controller = new AbortController()
+    const reason = new Error('bridge request cancelled')
+    let subprocessSignal: AbortSignal | undefined
+    const operations = createSecretCatalogOperations(async (request: SecretCliRequest) => {
+      subprocessSignal = request.signal
+      const signal = request.signal
+      if (signal === undefined) throw new Error('The CLI request omitted its signal.')
+      return new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+    })
+    const bridge = createSecretCatalogCredentialBridge({ operations, getCredentials: () => undefined })
+    const pending = bridge.listKeys(null, controller.signal)
+
+    controller.abort(reason)
+    await expect(pending).rejects.toBe(reason)
+    expect(subprocessSignal?.aborted).toBe(true)
+  })
+
+  it('passes cancellation through key import list and reveal operations', async () => {
+    const { operations, requests } = testOperations()
+    const controller = new AbortController()
+    const credentials = { describe: async () => ({ configured: false, writable: true }), set: async () => {} }
+    const bridge = createSecretCatalogCredentialBridge({ operations, getCredentials: () => credentials })
+
+    await bridge.importKey(
+      { alias: 'OPENCODE_GO_KEY', environment: 'prod', scope: 'global', cwd: null, targetRef: 'OPENCODEX_OPENCODE_GO_API_KEY' },
+      controller.signal,
+    )
+
+    expect(requests[0]?.signal).toBeDefined()
+    expect(requests[1]?.signal).toBe(controller.signal)
+  })
+
   it('stores a selected secret in the write-only credential provider', async () => {
     const { operations, requests } = testOperations()
     const writes: Array<{ readonly ref: string; readonly value: string }> = []

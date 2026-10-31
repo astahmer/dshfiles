@@ -73,6 +73,7 @@ export interface SecretReferenceResolution {
   readonly cwd: string | null
   /** Bind a metadata selection to this exact scope; owners advertising supportsExpectedScope enforce it before reveal. */
   readonly expectedScope?: SecretScope
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -101,6 +102,7 @@ export class SecretReferenceResolver {
     readonly referenceText: string
     readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
     readonly environmentValue: string | undefined
+    readonly signal?: AbortSignal
   }): Promise<string | undefined> {
     return (await SecretReferenceResolver.resolveWithLabel({ ...input, environmentVariableName: 'environment' }))?.value
   }
@@ -110,11 +112,19 @@ export class SecretReferenceResolver {
     readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
     readonly environmentValue: string | undefined
     readonly environmentVariableName: string
+    readonly signal?: AbortSignal
   }): Promise<ResolvedSecretCredential | undefined> {
     const reference = parseSecretReference(input.referenceText)
     if (reference !== null) {
       if (input.values === undefined) throw new Error('The Secret Catalog plugin is not loaded, so the bound secret reference cannot be resolved.')
-      return { value: await input.values.resolve({ reference, cwd: null }), label: formatSecretReference(reference) }
+      return {
+        value: await input.values.resolve({
+          reference,
+          cwd: null,
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
+        }),
+        label: formatSecretReference(reference),
+      }
     }
     if (input.referenceText.trim() !== '') throw new Error('The bound key is not a secret:ALIAS or secret:ALIAS@env reference.')
     if (input.environmentValue === undefined || input.environmentValue === '') return undefined

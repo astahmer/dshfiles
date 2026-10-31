@@ -53,6 +53,20 @@ describe('SecretReferenceResolver', () => {
     expect(calls).toEqual([{ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null }])
   })
 
+  it('forwards request cancellation to the value port', async () => {
+    const calls: SecretReferenceResolution[] = []
+    const controller = new AbortController()
+
+    await SecretReferenceResolver.resolve({
+      referenceText: 'secret:API_KEY',
+      values: resolving('resolved-secret', calls),
+      environmentValue: undefined,
+      signal: controller.signal,
+    })
+
+    expect(calls).toEqual([{ reference: { alias: 'API_KEY', environment: 'prod' }, cwd: null, signal: controller.signal }])
+  })
+
   it('returns safe labels with the resolved credential, never with the value in the label', async () => {
     const referenceCalls: SecretReferenceResolution[] = []
     await expect(

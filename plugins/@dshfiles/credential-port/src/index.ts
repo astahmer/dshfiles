@@ -36,15 +36,18 @@ export interface SecretCatalogKeyOption {
 }
 
 export interface SecretCatalogCredentialBridge {
-  listKeys(cwd: string | null): Promise<readonly SecretCatalogKeyOption[]>
-  importKey(input: {
-    readonly alias: string
-    readonly environment: string
-    readonly scope: SecretScope
-    readonly cwd: string | null
-    readonly targetRef: string
-    readonly replaceExisting?: boolean | undefined
-  }): Promise<void>
+  listKeys(cwd: string | null, signal?: AbortSignal): Promise<readonly SecretCatalogKeyOption[]>
+  importKey(
+    input: {
+      readonly alias: string
+      readonly environment: string
+      readonly scope: SecretScope
+      readonly cwd: string | null
+      readonly targetRef: string
+      readonly replaceExisting?: boolean | undefined
+    },
+    signal?: AbortSignal,
+  ): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {
