@@ -28,6 +28,7 @@ describe('project-checks tool exposure', () => {
   test('retry requires an explicit acknowledgement that effects may repeat', async () => {
     const schema = projectChecksApi.methods.retryTask.input
     if (schema === undefined) throw new Error('retryTask must declare an input schema')
+    if (!('~standard' in schema)) throw new Error('retryTask input must use a Standard Schema validator')
     const validate = async (value: { readonly taskId: string; readonly confirmPossibleDuplicate?: true }) => await schema['~standard'].validate(value)
     expect('issues' in (await validate({ taskId: 'a'.repeat(64) }))).toBe(true)
     expect('issues' in (await validate({ taskId: 'a'.repeat(64), confirmPossibleDuplicate: true }))).toBe(false)
@@ -48,6 +49,7 @@ describe('project-checks tool exposure', () => {
   test('sessionId is optional so a tool defaults to the calling thread', async () => {
     const schema = projectChecksApi.methods.actions.input
     if (schema === undefined) throw new Error('actions must declare an input schema')
+    if (!('~standard' in schema)) throw new Error('actions input must use a Standard Schema validator')
     const validate = async (value: { readonly sessionId?: string | undefined }) => await schema['~standard'].validate(value)
     expect('issues' in (await validate({}))).toBe(false)
     expect('issues' in (await validate({ sessionId: 'session-a' }))).toBe(false)
