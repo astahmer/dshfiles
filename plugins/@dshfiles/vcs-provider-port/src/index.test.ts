@@ -1,7 +1,9 @@
 import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
+import { Effect } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
 import { VcsProviders } from './index.js'
+import { VcsProviderService } from './effect.js'
 
 const provider = (input: { readonly owner: string; readonly vcs: string; readonly priority: number; readonly claims: (path: string) => boolean }) =>
   defineHost({
@@ -46,5 +48,22 @@ describe('VcsProviders.resolve', () => {
 
     await host.mount(provider({ owner: '@test/jj', vcs: 'jj', priority: 100, claims: () => false }), { packageId: '@test/jj' })
     expect(await VcsProviders.resolve(host.ctx, { path: '/anywhere', callerPackageId: '@test/caller' })).toBeUndefined()
+  })
+
+  test('provides the same provider resolution through the Effect service', async () => {
+    host = await createTestHost()
+    await host.mount(provider({ owner: '@test/git', vcs: 'git', priority: 10, claims: () => true }), { packageId: '@test/git' })
+
+    const service = Effect.gen(function* () {
+      const providers = yield* VcsProviderService
+      const owners = yield* providers.owners()
+      const match = yield* providers.resolve({ path: '/repo', callerPackageId: '@test/caller' })
+      return { owners, match }
+    }).pipe(Effect.provide(VcsProviderService.layer(host.ctx)))
+    const result = await Effect.runPromise(service)
+
+    expect(result.owners).toEqual(['@test/git'])
+    expect(result.match?.owner).toBe('@test/git')
+    expect(result.match?.match).toEqual({ vcs: 'git', priority: 10, repoRoot: '/repo', workspaceRoot: '/repo', isolated: false })
   })
 })

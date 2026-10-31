@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { defineApi, method, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { createHostApiClient, listApis } from '@dshfiles/dshx/host'
 import { z } from 'zod'
@@ -67,7 +67,7 @@ export class VcsProviders {
     return contract
   }
 
-  static owners(ctx: Context): string[] {
+  static owners(ctx: CordisContext): string[] {
     return listApis(ctx)
       .filter(api => api.id === VcsProviders.apiId)
       .map(api => api.owner)
@@ -75,7 +75,7 @@ export class VcsProviders {
 
   /** The provider with the highest priority that claims the path; a provider whose detect fails is skipped. */
   static async resolve(
-    ctx: Context,
+    ctx: CordisContext,
     input: { readonly path: string; readonly callerPackageId: string; readonly signal?: AbortSignal },
   ): Promise<{ readonly owner: string; readonly match: VcsMatch; readonly client: ApiClient<VcsProviderMethods> } | undefined> {
     const answers = await Promise.all(

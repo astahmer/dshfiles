@@ -3,6 +3,12 @@
 The Host port through which version-control plugins give DSH thread isolation and file snapshots, so a caller
 never names jj or git. It lives in its own package because providers and callers both import it.
 
+## Runtime distribution
+
+`build` emits ESM and declarations into `dist/`. The root Promise API and opt-in Effect service export built JavaScript
+at runtime while TypeScript consumers use source declarations. `test` builds first, runs the port tests, and checks
+both public exports with ordinary Node.
+
 A provider is a dshx API with the shared id `vcs-provider` and the provider's own package as `owner`:
 
 | Method      | What                                                                                                     |
@@ -24,6 +30,12 @@ if (provider !== undefined) await provider.client.provision({ workspaceId, isola
 `resolve` asks every served provider and keeps the highest `priority` that claims the path; a provider whose
 `detect` fails is skipped, and a path nobody claims resolves to `undefined` (keep the project checkout).
 
+Effect callers can import `VcsProviderService` from `@dshfiles/vcs-provider-port/effect` and use
+`VcsProviderService.layer(ctx)`. Its `owners` and `resolve` operations are typed Effects; failures are represented
+by `VcsProviderOwnersError` and `VcsProviderResolveError`. Keeping this API on its own subpath lets Promise-only
+Host bundles avoid a runtime Effect dependency. A Host that imports this subpath must make `effect` available to its
+runtime bundle. The root `VcsProviders` Promise API remains unchanged.
+
 | Provider                                                  | VCS | Priority | Isolation                                    |
 | --------------------------------------------------------- | --- | -------- | -------------------------------------------- |
 | [`@dshfiles/jj-integration`](../jj-integration/README.md) | jj  | 100      | `thread-xxxxxx` jj workspace beside the repo |
@@ -31,3 +43,9 @@ if (provider !== undefined) await provider.client.provision({ workspaceId, isola
 
 Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).
 Bundle the port in the Host entry (`host.bundleDependencies`).
+
+```sh
+pnpm --dir plugins/@dshfiles/vcs-provider-port build
+pnpm --dir plugins/@dshfiles/vcs-provider-port test
+pnpm --dir plugins/@dshfiles/vcs-provider-port typecheck
+```
