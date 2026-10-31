@@ -1,4 +1,5 @@
 import type { PendingUserQuestion } from '@deepseek-ai/dsh-user-questions'
+import { Effect, Schema } from 'effect'
 import type { QuestionWaitRecord } from './question-wait-projection.js'
 
 /** One Session a question scan may read, with the availability flags its projection needs. */
@@ -100,27 +101,9 @@ export interface SessionQuestionScanResult {
   readonly projectionUnavailable: number
 }
 
-/** Bounded fan-out: a worker reserves its slot before awaiting, so no more than `concurrency` loads run at once. */
-const mapWithBoundedConcurrency = async <Item, Value>(input: {
-  readonly items: readonly Item[]
-  readonly concurrency: number
-  readonly project: (item: Item) => Promise<Value>
-}): Promise<Value[]> => {
-  const results = new Array<Value>(input.items.length)
-  let nextIndex = 0
-  const worker = async (): Promise<void> => {
-    while (nextIndex < input.items.length) {
-      // oxlint-disable-next-line antislop/no-passthrough-variable -- Reserve the work slot before awaiting; other workers advance nextIndex.
-      const index = nextIndex
-      nextIndex += 1
-      const item = input.items[index]
-      if (item === undefined) continue
-      results[index] = await input.project(item)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(input.concurrency, input.items.length) }, () => worker()))
-  return results
-}
+class SessionQuestionScanError extends Schema.TaggedError<SessionQuestionScanError>()('SessionQuestionScanError', {
+  message: Schema.String,
+}) {}
 
 export class QuestionScan {
   static readonly createReads = createSessionQuestionReads
@@ -164,41 +147,48 @@ export class QuestionScan {
    * answers `projectionUnavailable` for a Session it could not read; those reads
    * are never cached, so the next scan tries again.
    */
-  static scan = async (input: {
-    readonly targets: readonly SessionQuestionTarget[]
-    readonly concurrency: number
-    readonly cache?: SessionQuestionFactsCache
-    /** Shares concurrent reads of the same Session availability scope across callers. */
-    readonly reads?: SessionQuestionReads
-    readonly signal?: AbortSignal | undefined
-    readonly now: number
-    readonly load: (target: SessionQuestionTarget, signal: AbortSignal | undefined) => Promise<SessionQuestionLoad>
-  }): Promise<SessionQuestionScanResult> => {
-    const reads = await mapWithBoundedConcurrency({
-      items: input.targets,
-      concurrency: input.concurrency,
-      project: async (target): Promise<SessionQuestionRead> => {
-        const cached = input.cache?.read(target, input.now)
-        if (cached !== undefined) return { target, facts: cached, projectionUnavailable: false, reused: true }
-        const loaded =
-          input.reads === undefined
-            ? await input.load(target, input.signal)
-            : await input.reads.read({
-                // Availability flags change what the read answers, so they are part of the shared scope.
-                key: `${target.sessionId}:${String(target.sessionLive)}:${String(target.sessionPersisted)}:${String(target.targetIsLiveRoot)}`,
-                start: signal => input.load(target, signal),
-                ...(input.signal !== undefined && { callerSignal: input.signal }),
-              })
-        if (loaded.facts === undefined) return { target, facts: undefined, projectionUnavailable: loaded.projectionUnavailable, reused: false }
-        input.cache?.store(target, loaded.facts, input.now)
-        return { target, facts: loaded.facts, projectionUnavailable: loaded.projectionUnavailable, reused: false }
-      },
-    })
-    return {
-      reads,
-      scanned: reads.length,
-      reused: reads.filter(read => read.reused).length,
-      projectionUnavailable: reads.filter(read => read.projectionUnavailable).length,
-    }
-  }
+  static scan = Effect.fn('question scan')(
+    (input: {
+      readonly targets: readonly SessionQuestionTarget[]
+      readonly concurrency: number
+      readonly cache?: SessionQuestionFactsCache
+      /** Shares concurrent reads of the same Session availability scope across callers. */
+      readonly reads?: SessionQuestionReads
+      readonly signal?: AbortSignal | undefined
+      readonly now: number
+      readonly load: (target: SessionQuestionTarget, signal: AbortSignal | undefined) => Promise<SessionQuestionLoad>
+    }) =>
+      Effect.forEach(
+        input.targets,
+        (target): Effect.Effect<SessionQuestionRead, SessionQuestionScanError> => {
+          const cached = input.cache?.read(target, input.now)
+          if (cached !== undefined) return Effect.succeed({ target, facts: cached, projectionUnavailable: false, reused: true } satisfies SessionQuestionRead)
+          const loadedEffect: Effect.Effect<SessionQuestionLoad, SessionQuestionScanError> = Effect.tryPromise({
+            try: signal =>
+              input.reads === undefined
+                ? input.load(target, input.signal ?? signal)
+                : input.reads.read({
+                    // Availability flags change what the read answers, so they are part of the shared scope.
+                    key: `${target.sessionId}:${String(target.sessionLive)}:${String(target.sessionPersisted)}:${String(target.targetIsLiveRoot)}`,
+                    start: readSignal => input.load(target, readSignal),
+                    callerSignal: input.signal ?? signal,
+                  }),
+            catch: error => new SessionQuestionScanError({ message: error instanceof Error ? error.message : String(error) }),
+          })
+          return Effect.map(loadedEffect, loaded => {
+            if (loaded.facts === undefined) return { target, facts: undefined, projectionUnavailable: loaded.projectionUnavailable, reused: false }
+            input.cache?.store(target, loaded.facts, input.now)
+            return { target, facts: loaded.facts, projectionUnavailable: loaded.projectionUnavailable, reused: false }
+          })
+        },
+        { concurrency: input.concurrency },
+      ).pipe(
+        Effect.map(reads => ({
+          reads,
+          scanned: reads.length,
+          reused: reads.filter(read => read.reused).length,
+          projectionUnavailable: reads.filter(read => read.projectionUnavailable).length,
+        })),
+      ),
+  )
 }

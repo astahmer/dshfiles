@@ -1,9 +1,11 @@
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
@@ -12,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-user-questions'
+import { Effect, Schema } from 'effect'
 import { z } from 'zod'
 import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionOutcome, type ParentQuestionService } from './service.js'
 import { writeDeferredQuestionFile } from './deferred-question.js'
@@ -46,6 +49,30 @@ interface ParentQuestionHostServices {
 }
 
 let activeHostServices: ParentQuestionHostServices | undefined
+
+class AgentQuestionToolError extends Schema.TaggedError<AgentQuestionToolError>()('AgentQuestionToolError', {
+  message: Schema.String,
+}) {}
+
+const effectTool = (tool: ToolDefinition): ToolDefinition => ({
+  ...tool,
+  execute: (args, execution) =>
+    Effect.runPromise(
+      Effect.provide(
+        Effect.fn(`agent-questions ${tool.name}`)(() =>
+          Effect.tryPromise({
+            try: () => tool.execute(args, execution),
+            catch: error => new AgentQuestionToolError({ message: error instanceof Error ? error.message : String(error) }),
+          }),
+        )(),
+        DshxEffect.tracerLayer,
+      ),
+      { signal: execution.signal },
+    ),
+})
+
+const runHostEffect = <Value, Failure>(effect: Effect.Effect<Value, Failure>, signal?: AbortSignal): Promise<Value> =>
+  Effect.runPromise(Effect.provide(effect, DshxEffect.tracerLayer), signal === undefined ? {} : { signal })
 
 const requireHostServices = (): ParentQuestionHostServices => {
   if (activeHostServices === undefined) throw new Error('Agent Questions Host is not active.')
@@ -296,12 +323,15 @@ const askParentQuestionTool = defineTool({
     const input = askParentQuestionInputSchema.parse(args)
     let outcome: ParentQuestionOutcome
     if ('questionId' in input) {
-      outcome = await ParentQuestionToolFlow.reattach({
-        service,
-        agent,
-        questionId: input.questionId,
-        signal: execution.signal,
-      })
+      outcome = await runHostEffect(
+        ParentQuestionToolFlow.reattach({
+          service,
+          agent,
+          questionId: input.questionId,
+          signal: execution.signal,
+        }),
+        execution.signal,
+      )
     } else {
       const questionRequest = {
         service,
@@ -314,7 +344,10 @@ const askParentQuestionTool = defineTool({
         timeoutMs: input.timeoutMs ?? 180_000,
         signal: execution.signal,
       }
-      outcome = await ParentQuestionToolFlow.ask(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context })
+      outcome = await runHostEffect(
+        ParentQuestionToolFlow.ask(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context }),
+        execution.signal,
+      )
     }
     switch (outcome.kind) {
       case 'answered':
@@ -324,7 +357,7 @@ const askParentQuestionTool = defineTool({
       case 'deferred': {
         const workspacePath = agent.session.header.cwd
         if (workspacePath === undefined) throw new Error('Cannot defer a parent question without a child workspace path.')
-        const filePath = await writeDeferredQuestionFile({ workspacePath, question: outcome })
+        const filePath = await runHostEffect(writeDeferredQuestionFile({ workspacePath, question: outcome }), execution.signal)
         const persisted = await service.recordDeferredFile({ agent, questionId: outcome.questionId, filePath })
         if (persisted.kind !== 'deferred') {
           throw new Error(`Deferred parent question ${outcome.questionId} changed before its file path was recorded.`)
@@ -360,12 +393,15 @@ const answerParentQuestionTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Parent answers require an active parent Agent.')
-    const outcome = await ParentQuestionToolFlow.answer({
-      service: requireHostServices().parentQuestions,
-      agent,
-      questionId: args.questionId,
-      answer: args.answer,
-    })
+    const outcome = await runHostEffect(
+      ParentQuestionToolFlow.answer({
+        service: requireHostServices().parentQuestions,
+        agent,
+        questionId: args.questionId,
+        answer: args.answer,
+      }),
+      execution.signal,
+    )
     if (outcome.kind !== 'answered') {
       return `Parent question ${outcome.questionId} is ${outcome.kind}; no answer was delivered.`
     }
@@ -402,15 +438,18 @@ const listThreadQuestionsTool = defineTool({
     const targets = callerIsRoot
       ? await threadQuestionTargets({ context, liveRoots, sessionId: input.sessionId, includeStopped, signal: execution.signal })
       : []
-    const scan = await QuestionScan.scan({
-      targets,
-      concurrency: QUESTION_SCAN_CONCURRENCY,
-      cache: questionFactsCache,
-      reads: questionFactsReads,
-      signal: execution.signal,
-      now: observedAt,
-      load: (target, signal) => readNativeQuestionFacts({ context, target, signal: signal ?? execution.signal }),
-    })
+    const scan = await runHostEffect(
+      QuestionScan.scan({
+        targets,
+        concurrency: QUESTION_SCAN_CONCURRENCY,
+        cache: questionFactsCache,
+        reads: questionFactsReads,
+        signal: execution.signal,
+        now: observedAt,
+        load: (target, signal) => readNativeQuestionFacts({ context, target, signal: signal ?? execution.signal }),
+      }),
+      execution.signal,
+    )
     const nativeQuestions = scan.reads.flatMap(read => {
       const facts = read.facts
       if (facts === undefined) return []
@@ -542,7 +581,7 @@ const submitMarkdownFeedbackTool = defineTool({
     const input = submitMarkdownFeedbackInputSchema.parse(args)
     const workspacePath = agent.session.header.cwd
     if (workspacePath === undefined) throw new Error('Markdown feedback requires a child workspace path.')
-    const anchor = await captureMarkdownAnchor({ workspacePath, ...input })
+    const anchor = await runHostEffect(captureMarkdownAnchor({ workspacePath, ...input }), execution.signal)
     const record = await requireHostServices().parentFeedback.submit({
       agent,
       operationId: execution.callId,
@@ -695,7 +734,7 @@ const setupHost = (context: Context): void => {
           }
         }
         if (workspacePath === undefined) return null
-        return currentMarkdownRevision({ workspacePath, path })
+        return runHostEffect(currentMarkdownRevision({ workspacePath, path }))
       },
       sendToParent: async ({ childSessionId, parentSessionId, record, signal }) => {
         const child: Agent | undefined = context.agents.get(SessionId(childSessionId))
@@ -730,18 +769,20 @@ const setupHost = (context: Context): void => {
   )
 }
 
+const setupHostEffect = DshxEffect.setup((context: Context) => Effect.sync(() => setupHost(context)))
+
 export default defineHost({
   name: 'agent-questions',
   inject: ['agents', 'sessions', 'sessionProjections', 'sessionQuery', 'subagents', 'storageDomain', 'userQuestions'],
   tools: [
-    askParentQuestionTool,
-    answerParentQuestionTool,
-    listThreadQuestionsTool,
-    answerThreadQuestionTool,
-    submitMarkdownFeedbackTool,
-    resolveParentFeedbackTool,
-    getParentFeedbackTool,
-    cancelParentFeedbackTool,
+    effectTool(askParentQuestionTool),
+    effectTool(answerParentQuestionTool),
+    effectTool(listThreadQuestionsTool),
+    effectTool(answerThreadQuestionTool),
+    effectTool(submitMarkdownFeedbackTool),
+    effectTool(resolveParentFeedbackTool),
+    effectTool(getParentFeedbackTool),
+    effectTool(cancelParentFeedbackTool),
   ],
-  setup: setupHost,
+  setup: setupHostEffect,
 })

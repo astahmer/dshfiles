@@ -1,4 +1,5 @@
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import { Effect } from 'effect'
 import {
   QuestionScan,
   type SessionQuestionFacts,
@@ -38,7 +39,8 @@ const scan = (input: {
     now: input.now ?? 0,
     load: input.load,
   }
-  return input.cache === undefined ? QuestionScan.scan(request) : QuestionScan.scan({ ...request, cache: input.cache })
+  const effect = input.cache === undefined ? QuestionScan.scan(request) : QuestionScan.scan({ ...request, cache: input.cache })
+  return Effect.runPromise(effect)
 }
 
 describe('session question scans', () => {

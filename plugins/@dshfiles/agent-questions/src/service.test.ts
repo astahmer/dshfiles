@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
 import type { ParentQuestionExpiryBehavior, ParentQuestionRecord, ParentQuestionTable } from './store.js'
@@ -276,7 +277,7 @@ describe('parent question Host contract', () => {
     const table = createMemoryTable()
     const firstService = makeService(table)
     const input = requestInput({})
-    const waiting = ParentQuestionToolFlow.ask({ service: firstService, ...input })
+    const waiting = Effect.runPromise(ParentQuestionToolFlow.ask({ service: firstService, ...input }))
     await new Promise(resolve => setTimeout(resolve, 0))
 
     await firstService.close()
@@ -286,18 +287,22 @@ describe('parent question Host contract', () => {
     expect(Array.from(table.entries()).map(([, record]) => record.status)).toEqual(['pending'])
 
     const restartedService = makeService(table)
-    const answer = await ParentQuestionToolFlow.answer({
-      service: restartedService,
-      agent: root,
-      questionId: interrupted.questionId,
-      answer: 'The durable wait can reattach after Host recreation.',
-    })
-    const recovered = await ParentQuestionToolFlow.reattach({
-      service: restartedService,
-      agent: firstChild,
-      questionId: interrupted.questionId,
-      signal: new AbortController().signal,
-    })
+    const answer = await Effect.runPromise(
+      ParentQuestionToolFlow.answer({
+        service: restartedService,
+        agent: root,
+        questionId: interrupted.questionId,
+        answer: 'The durable wait can reattach after Host recreation.',
+      }),
+    )
+    const recovered = await Effect.runPromise(
+      ParentQuestionToolFlow.reattach({
+        service: restartedService,
+        agent: firstChild,
+        questionId: interrupted.questionId,
+        signal: new AbortController().signal,
+      }),
+    )
 
     expect(answer.kind).toBe('answered')
     expect(recovered).toEqual({

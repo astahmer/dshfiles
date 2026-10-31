@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { link, lstat, mkdir, open, realpath, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { deferredFilePathSchema } from './store.js'
+import { Effect, Schema } from 'effect'
 import type { ParentQuestionOutcome } from './service.js'
 
 type DeferredParentQuestion = Extract<ParentQuestionOutcome, { readonly kind: 'deferred' }>
@@ -159,7 +160,7 @@ const writeCandidate = async (input: {
   return undefined
 }
 
-export const writeDeferredQuestionFile = async (input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }): Promise<string> => {
+const writeDeferredQuestionFilePromise = async (input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }): Promise<string> => {
   const directory = await ensureQuestionDirectory(input.workspacePath)
   const contents = markdownFor(input.question)
   const requestedFilename =
@@ -185,3 +186,14 @@ export const writeDeferredQuestionFile = async (input: { readonly workspacePath:
   if (collisionSafe !== undefined) return deferredFilePathSchema.parse(`questions/${collisionSafe}`)
   throw new Error('A deferred-question filename collision could not be resolved safely.')
 }
+
+class DeferredQuestionFileError extends Schema.TaggedError<DeferredQuestionFileError>()('DeferredQuestionFileError', {
+  message: Schema.String,
+}) {}
+
+export const writeDeferredQuestionFile = Effect.fn('question defer')((input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }) =>
+  Effect.tryPromise({
+    try: () => writeDeferredQuestionFilePromise(input),
+    catch: error => new DeferredQuestionFileError({ message: error instanceof Error ? error.message : String(error) }),
+  }),
+)

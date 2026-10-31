@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { Effect, Schema } from 'effect'
 import { constants } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
@@ -79,7 +80,7 @@ const readBoundedMarkdown = async ({ workspacePath, path }: ReadMarkdownDocument
   }
 }
 
-export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput): Promise<MarkdownFeedbackAnchor> => {
+const captureMarkdownAnchorPromise = async (input: CaptureMarkdownAnchorInput): Promise<MarkdownFeedbackAnchor> => {
   const path = workspaceMarkdownPathSchema.parse(input.path)
   if (
     !Number.isSafeInteger(input.startLine) ||
@@ -107,10 +108,28 @@ export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput): 
   }
 }
 
-export const currentMarkdownRevision = async (input: ReadMarkdownDocumentInput): Promise<string | null> => {
+const currentMarkdownRevisionPromise = async (input: ReadMarkdownDocumentInput): Promise<string | null> => {
   try {
     return (await readBoundedMarkdown(input)).revision
   } catch {
     return null
   }
 }
+
+class MarkdownTargetError extends Schema.TaggedError<MarkdownTargetError>()('MarkdownTargetError', {
+  message: Schema.String,
+}) {}
+
+export const captureMarkdownAnchor = Effect.fn('feedback anchor capture')((input: CaptureMarkdownAnchorInput) =>
+  Effect.tryPromise({
+    try: () => captureMarkdownAnchorPromise(input),
+    catch: error => new MarkdownTargetError({ message: error instanceof Error ? error.message : String(error) }),
+  }),
+)
+
+export const currentMarkdownRevision = Effect.fn('feedback markdown revision')((input: ReadMarkdownDocumentInput) =>
+  Effect.tryPromise({
+    try: () => currentMarkdownRevisionPromise(input),
+    catch: () => new MarkdownTargetError({ message: 'Markdown revision could not be read.' }),
+  }).pipe(Effect.catchTag('MarkdownTargetError', () => Effect.succeed(null))),
+)

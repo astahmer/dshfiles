@@ -5,6 +5,12 @@
       "id": "parent-child-question",
       "title": "Ask and answer a child-agent question",
       "summary": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
+      "reach": [
+        "click button \"Agent Toolkit: Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"ask_parent_question\""
+      ],
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
       "states": ["pending", "answered", "cancelled", "expired", "interrupted"],
@@ -57,6 +63,12 @@
       "id": "question-expiry",
       "title": "Resolve question expiry safely",
       "summary": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
+      "reach": [
+        "click button \"Agent Toolkit: Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"ask_parent_question\""
+      ],
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
       "states": ["recommended-expiry", "deferred", "cancelled", "expired"],
@@ -104,6 +116,12 @@
       "id": "revision-pinned-feedback",
       "title": "Submit and resolve anchored Markdown feedback",
       "summary": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
+      "reach": [
+        "click button \"Agent Toolkit: Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"submit_markdown_feedback\""
+      ],
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
       "states": ["submitted", "accepted", "rejected", "deferred", "stale"],
@@ -165,6 +183,12 @@
       "id": "bounded-batch-resolution",
       "title": "Resolve feedback in bounded batches",
       "summary": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
+      "reach": [
+        "click button \"Agent Toolkit: Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"resolve_parent_feedback\""
+      ],
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
       "states": ["batch-accepted", "batch-rejected", "partially-stale"],
@@ -220,6 +244,12 @@
       "id": "cross-thread-question-inbox",
       "title": "List and answer thread questions",
       "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
+      "reach": [
+        "click button \"Agent Toolkit: Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"list_thread_questions\""
+      ],
       "surfaces": ["tool", "host"],
       "configuration": [],
       "states": ["native-open", "native-continued", "child-pending", "answer-queued", "expired", "unavailable"],
