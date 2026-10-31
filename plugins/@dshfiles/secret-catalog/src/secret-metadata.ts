@@ -1,29 +1,29 @@
+import { Schema } from 'effect'
 import { z } from 'zod'
 
-const secretPrintRowSchema = z
-  .object({
-    alias: z.string().min(1).max(256),
-    scope: z.string().max(64).optional(),
-    env: z.string().max(256).optional(),
-    environment: z.string().max(256).optional(),
-    environmentName: z.string().max(256).optional(),
-    envKey: z.string().max(256).optional(),
-    env_key: z.string().max(256).optional(),
-    dotenvKey: z.string().max(256).optional(),
-    dotenv_key: z.string().max(256).optional(),
-    item: z.string().max(512).optional(),
-    field: z.string().max(256).optional(),
-    source: z.string().max(2048).optional(),
-    service: z.string().max(512).optional(),
-    description: z.string().max(1024).optional(),
-  })
-  .strip()
-
-const secretPrintRowsSchema = z.union([
-  z.array(secretPrintRowSchema).max(5000),
-  z.object({ rows: z.array(secretPrintRowSchema).max(5000) }).strip(),
-  z.object({ items: z.array(secretPrintRowSchema).max(5000) }).strip(),
-  z.object({ aliases: z.array(secretPrintRowSchema).max(5000) }).strip(),
+const boundedString = (maxLength: number) => Schema.String.check(Schema.isMaxLength(maxLength))
+const secretPrintRowSchema = Schema.Struct({
+  alias: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  scope: boundedString(64).pipe(Schema.optional),
+  env: boundedString(256).pipe(Schema.optional),
+  environment: boundedString(256).pipe(Schema.optional),
+  environmentName: boundedString(256).pipe(Schema.optional),
+  envKey: boundedString(256).pipe(Schema.optional),
+  env_key: boundedString(256).pipe(Schema.optional),
+  dotenvKey: boundedString(256).pipe(Schema.optional),
+  dotenv_key: boundedString(256).pipe(Schema.optional),
+  item: boundedString(512).pipe(Schema.optional),
+  field: boundedString(256).pipe(Schema.optional),
+  source: boundedString(2048).pipe(Schema.optional),
+  service: boundedString(512).pipe(Schema.optional),
+  description: boundedString(1024).pipe(Schema.optional),
+})
+const secretPrintRowsArraySchema = Schema.Array(secretPrintRowSchema).check(Schema.isMaxLength(5000))
+const secretPrintRowsSchema = Schema.Union([
+  secretPrintRowsArraySchema,
+  Schema.Struct({ rows: secretPrintRowsArraySchema }),
+  Schema.Struct({ items: secretPrintRowsArraySchema }),
+  Schema.Struct({ aliases: secretPrintRowsArraySchema }),
 ])
 
 export const secretMetadataSchema = z.object({
@@ -40,17 +40,17 @@ export const secretMetadataSchema = z.object({
 
 export type SecretMetadata = z.infer<typeof secretMetadataSchema>
 
-const rowsFromOutput = (output: unknown): z.infer<typeof secretPrintRowSchema>[] => {
-  const rows = secretPrintRowsSchema.parse(output)
-  if (Array.isArray(rows)) return rows
-  if ('rows' in rows) return rows.rows
-  if ('items' in rows) return rows.items
-  return rows.aliases
+const rowsFromValidatedOutput = (output: typeof secretPrintRowsSchema.Type) => {
+  if (Schema.is(secretPrintRowsArraySchema)(output)) return output
+  if ('rows' in output) return output.rows
+  if ('items' in output) return output.items
+  return output.aliases
 }
 
 export const parseSecretPrintMetadata = (jsonText: string, defaultScope = 'unknown'): SecretMetadata[] => {
   const decoded: unknown = JSON.parse(jsonText)
-  return rowsFromOutput(decoded).map(row => {
+  const rows = rowsFromValidatedOutput(Schema.decodeUnknownSync(secretPrintRowsSchema)(decoded))
+  return rows.map(row => {
     const environment = row.environment ?? row.environmentName ?? row.env ?? 'prod'
     const variableName = row.envKey ?? row.env_key ?? row.dotenvKey ?? row.dotenv_key ?? row.alias
     const item = row.item ?? ''

@@ -192,6 +192,27 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect(run.mock.calls.flatMap(([request]) => request.args)).not.toContain('synthetic-input-value')
   })
 
+  it('tags missing manual values and unchanged updates as domain failures', async () => {
+    const run = vi.fn(async (_request: SecretCliRequest) => '')
+    const operations = createSecretCatalogOperations(run)
+
+    await expect(
+      operations.create({
+        alias: 'SYNTHETIC_MISSING_VALUE',
+        scope: 'project',
+        cwd: '/tmp/project',
+        environment: 'prod',
+        valueMode: 'manual',
+        value: null,
+      }),
+    ).rejects.toMatchObject({ _tag: 'SecretCatalogOperationError', message: 'A non-empty value is required for a manual secret.' })
+    await expect(operations.update({ alias: 'SYNTHETIC_UNCHANGED', scope: 'global', cwd: null, environment: 'prod', value: null })).rejects.toMatchObject({
+      _tag: 'SecretCatalogOperationError',
+      message: 'No secret changes were provided.',
+    })
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('refuses to add an alias already present in the current environment', async () => {
     const run = vi.fn(async (_request: SecretCliRequest) => JSON.stringify([{ alias: 'SYNTHETIC_EXISTING', scope: 'global', env: 'prod' }]))
     const operations = createSecretCatalogOperations(run)
@@ -204,7 +225,7 @@ describe('Secret Catalog metadata and exact alias actions', () => {
         valueMode: 'generate',
         value: null,
       }),
-    ).rejects.toThrow('already exists')
+    ).rejects.toMatchObject({ _tag: 'SecretCatalogOperationError', message: 'An alias with this name already exists in the current environment.' })
     expect(run).toHaveBeenCalledTimes(1)
   })
 
@@ -283,7 +304,7 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     const operations = createSecretCatalogOperations(run)
     await expect(
       operations.update({ alias: 'SYNTHETIC_OLD', newAlias: 'SYNTHETIC_TAKEN', scope: 'global', cwd: null, environment: 'prod', value: null }),
-    ).rejects.toThrow('already exists')
+    ).rejects.toMatchObject({ _tag: 'SecretCatalogOperationError', message: 'An alias with this name already exists.' })
     expect(run).toHaveBeenCalledTimes(1)
   })
 

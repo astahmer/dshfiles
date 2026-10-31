@@ -37,6 +37,7 @@ export const checkSecretReference = async (input: {
   readonly cwd: string | null
   readonly probeFolders?: readonly string[]
   readonly inspectGlobalConfig: () => Promise<SecretGlobalConfig>
+  readonly signal?: AbortSignal
 }): Promise<SecretReferenceStatus> => {
   const writeScope: SecretScope = input.cwd === null ? 'global' : 'project'
   const globalConfig = await input.inspectGlobalConfig().catch((): SecretGlobalConfig => ({ path: null, linkedTo: null }))
@@ -84,7 +85,7 @@ export const checkSecretReference = async (input: {
   const found = { ...named, scope: scope.data, writeScope: scope.data, environments, scopes }
   let value: string
   try {
-    value = await input.operations.reveal(reference.alias, scope.data, input.cwd, reference.environment)
+    value = await input.operations.reveal(reference.alias, scope.data, input.cwd, reference.environment, input.signal)
   } catch (error) {
     const state = cliState(error)
     return { ...found, state: state === 'cli-failed' ? 'value-unreadable' : state }

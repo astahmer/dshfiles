@@ -1,6 +1,9 @@
 import { Readable, Writable } from 'node:stream'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { it as itEffect } from '@effect/vitest'
+import { Duration, Effect, Exit, Fiber } from 'effect'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { runSecretCli, SecretCliError } from './secret-cli-runner.js'
 
@@ -12,7 +15,13 @@ interface Harness {
 }
 
 const harness = (
-  options: { readonly exitCode?: number | null; readonly lossy?: boolean; readonly output?: string; readonly stdinClosed?: boolean } = {},
+  options: {
+    readonly exitCode?: number | null
+    readonly lossy?: boolean
+    readonly output?: string
+    readonly stdinClosed?: boolean
+    readonly waitUntilAbort?: boolean
+  } = {},
 ): Harness => {
   let spec: SubprocessSpawnSpec | undefined
   let input = ''
@@ -26,6 +35,7 @@ const harness = (
       done()
     },
   })
+  let finish: ((outcome: Awaited<SubprocessHandle['done']>) => void) | undefined
   const handle: SubprocessHandle = {
     stdin,
     stdout: Readable.from(['synthetic-private-mutation-output']),
@@ -36,7 +46,12 @@ const harness = (
         readFrom: vi.fn(() => ({ text: options.output ?? '', nextOffset: (options.output ?? '').length, lossy: options.lossy ?? false })),
       },
     },
-    done: Promise.resolve({ exitCode: options.exitCode ?? 0, signal: null }),
+    done:
+      options.waitUntilAbort === true
+        ? new Promise(resolve => {
+            finish = resolve
+          })
+        : Promise.resolve({ exitCode: options.exitCode ?? 0, signal: null }),
     terminate: vi.fn(),
     waitForExit: vi.fn(async () => true),
   }
@@ -44,6 +59,7 @@ const harness = (
     resolveExecutable: vi.fn(async () => '/nix/store/secret-cli/bin/secret'),
     spawn: vi.fn(next => {
       spec = next
+      if (options.waitUntilAbort === true) next.signal?.addEventListener('abort', () => finish?.({ exitCode: null, signal: 'SIGTERM' }), { once: true })
       return handle
     }),
   }
@@ -248,6 +264,27 @@ describe('managed secret CLI runner', () => {
     expect(span.attributes['error.type']).toBe('SecretCliError:cli-failed')
     expect(JSON.stringify({ attributes: span.attributes, status: span.status })).not.toMatch(/SYNTHETIC_TOKEN|synthetic-|dev"/)
   })
+
+  itEffect.effect('interrupts the managed process when the host request is cancelled', () =>
+    Effect.gen(function* () {
+      const test = harness({ waitUntilAbort: true })
+      const fiber = yield* Effect.forkScoped(
+        Effect.timeout(
+          Effect.tryPromise({
+            try: signal => runSecretCli(test.runtime, { args: ['get', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: true, signal }, {}),
+            catch: error => error,
+          }),
+          Duration.millis(20),
+        ),
+      )
+      yield* TestClock.adjust(Duration.millis(20))
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(test.spec()?.signal?.aborted).toBe(true)
+      expect(test.handle.terminate).toHaveBeenCalledOnce()
+    }),
+  )
 
   it('records a secret <verb> span with flag names only, never the alias or the value', async () => {
     using recorder = recordSpans()
