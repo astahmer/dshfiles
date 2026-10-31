@@ -1,3 +1,4 @@
+import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
@@ -5,8 +6,11 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
+import { Effect, Layer, Schema } from 'effect'
 import { z } from 'zod'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
+import type { ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import {
   fileUploadValueSchema,
   jjRepositoriesSchema,
@@ -565,7 +569,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
   return { hosts: entries, selected: ResourceSnapshotModel.selectAutoHost(entries) }
 }
 
-const multiHostHandlers = multiHostApi.host({
+const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
   resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
   resourcePool: async () => readResourcePool(),
@@ -1375,7 +1379,94 @@ const multiHostHandlers = multiHostApi.host({
     }
     return { removed }
   },
+}
+
+class MultiHostHandlerError extends Schema.TaggedError<MultiHostHandlerError>()('MultiHostHandlerError', {
+  operation: Schema.String,
+  code: Schema.String,
+  message: Schema.String,
+}) {}
+
+type MultiHostMethods = typeof multiHostApi.methods
+type MultiHostEffectHandlers = {
+  readonly [Name in keyof MultiHostMethods]: (
+    context: ApiHandlerContext<ApiHostInput<MultiHostMethods[Name]>>,
+  ) => Effect.Effect<ApiHostOutput<MultiHostMethods[Name]>, MultiHostHandlerError>
+}
+
+type MultiHostPromiseHandlers = {
+  readonly [Name in keyof MultiHostMethods]: (
+    context: ApiHandlerContext<ApiHostInput<MultiHostMethods[Name]>>,
+  ) => ApiHostOutput<MultiHostMethods[Name]> | Promise<ApiHostOutput<MultiHostMethods[Name]>>
+}
+
+const effectHandler = <Input, Output>(operation: string, handler: (context: ApiHandlerContext<Input>) => Output | Promise<Output>) =>
+  Effect.fn(`multi-host ${operation}`)((context: ApiHandlerContext<Input>) =>
+    Effect.tryPromise({
+      try: signal => Promise.resolve(handler({ ...context, signal })),
+      catch: cause => {
+        const failure = safeFailure(cause)
+        return new MultiHostHandlerError({ operation, ...failure })
+      },
+    }),
+  )
+
+const effectHandlers = {
+  identity: effectHandler('identity', multiHostPromiseHandlers.identity),
+  resourceSnapshot: effectHandler('resourceSnapshot', multiHostPromiseHandlers.resourceSnapshot),
+  resourcePool: effectHandler('resourcePool', multiHostPromiseHandlers.resourcePool),
+  list: effectHandler('list', multiHostPromiseHandlers.list),
+  remoteExec: effectHandler('remoteExec', multiHostPromiseHandlers.remoteExec),
+  doctor: effectHandler('doctor', multiHostPromiseHandlers.doctor),
+  provision: effectHandler('provision', multiHostPromiseHandlers.provision),
+  remoteRuntimeStatus: effectHandler('remoteRuntimeStatus', multiHostPromiseHandlers.remoteRuntimeStatus),
+  runtimeControl: effectHandler('runtimeControl', multiHostPromiseHandlers.runtimeControl),
+  runtimeLogs: effectHandler('runtimeLogs', multiHostPromiseHandlers.runtimeLogs),
+  checkoutSync: effectHandler('checkoutSync', multiHostPromiseHandlers.checkoutSync),
+  sshConfigHosts: effectHandler('sshConfigHosts', multiHostPromiseHandlers.sshConfigHosts),
+  discoverHomes: effectHandler('discoverHomes', multiHostPromiseHandlers.discoverHomes),
+  testConnection: effectHandler('testConnection', multiHostPromiseHandlers.testConnection),
+  saveSshHost: effectHandler('saveSshHost', multiHostPromiseHandlers.saveSshHost),
+  hostUpsert: effectHandler('hostUpsert', multiHostPromiseHandlers.hostUpsert),
+  hostSetHidden: effectHandler('hostSetHidden', multiHostPromiseHandlers.hostSetHidden),
+  hostReorder: effectHandler('hostReorder', multiHostPromiseHandlers.hostReorder),
+  hostRemove: effectHandler('hostRemove', multiHostPromiseHandlers.hostRemove),
+  runtimeUpsert: effectHandler('runtimeUpsert', multiHostPromiseHandlers.runtimeUpsert),
+  runtimeStatus: effectHandler('runtimeStatus', multiHostPromiseHandlers.runtimeStatus),
+  runtimePing: effectHandler('runtimePing', multiHostPromiseHandlers.runtimePing),
+  runtimeReconnect: effectHandler('runtimeReconnect', multiHostPromiseHandlers.runtimeReconnect),
+  listDirectory: effectHandler('listDirectory', multiHostPromiseHandlers.listDirectory),
+  createDirectory: effectHandler('createDirectory', multiHostPromiseHandlers.createDirectory),
+  runtimeBrowse: effectHandler('runtimeBrowse', multiHostPromiseHandlers.runtimeBrowse),
+  runtimeOpenFolder: effectHandler('runtimeOpenFolder', multiHostPromiseHandlers.runtimeOpenFolder),
+  localProjectFiles: effectHandler('localProjectFiles', multiHostPromiseHandlers.localProjectFiles),
+  runtimeCloneProject: effectHandler('runtimeCloneProject', multiHostPromiseHandlers.runtimeCloneProject),
+  runtimeCreateDirectory: effectHandler('runtimeCreateDirectory', multiHostPromiseHandlers.runtimeCreateDirectory),
+  runtimePluginCall: effectHandler('runtimePluginCall', multiHostPromiseHandlers.runtimePluginCall),
+  threadCreate: effectHandler('threadCreate', multiHostPromiseHandlers.threadCreate),
+  threadStart: effectHandler('threadStart', multiHostPromiseHandlers.threadStart),
+  runtimeModels: effectHandler('runtimeModels', multiHostPromiseHandlers.runtimeModels),
+  sessionRuntime: effectHandler('sessionRuntime', multiHostPromiseHandlers.sessionRuntime),
+  sessionJjRepositories: effectHandler('sessionJjRepositories', multiHostPromiseHandlers.sessionJjRepositories),
+  runtimeFileReferences: effectHandler('runtimeFileReferences', multiHostPromiseHandlers.runtimeFileReferences),
+  sessionUploadFile: effectHandler('sessionUploadFile', multiHostPromiseHandlers.sessionUploadFile),
+  threadTranscript: effectHandler('threadTranscript', multiHostPromiseHandlers.threadTranscript),
+  threadList: effectHandler('threadList', multiHostPromiseHandlers.threadList),
+  threadForget: effectHandler('threadForget', multiHostPromiseHandlers.threadForget),
+  threadReply: effectHandler('threadReply', multiHostPromiseHandlers.threadReply),
+  threadStop: effectHandler('threadStop', multiHostPromiseHandlers.threadStop),
+  runtimeCall: effectHandler('runtimeCall', multiHostPromiseHandlers.runtimeCall),
+  sessionCursor: effectHandler('sessionCursor', multiHostPromiseHandlers.sessionCursor),
+  runtimeOpenView: effectHandler('runtimeOpenView', multiHostPromiseHandlers.runtimeOpenView),
+  runtimeCloseView: effectHandler('runtimeCloseView', multiHostPromiseHandlers.runtimeCloseView),
+  runtimeRemove: effectHandler('runtimeRemove', multiHostPromiseHandlers.runtimeRemove),
+} satisfies MultiHostEffectHandlers
+
+const effectPlugin = DshxEffect.plugin({
+  layer: Layer.empty,
+  setup: (ctx: Context, config: z.infer<typeof configSchema>) => Effect.sync(() => setupHost(ctx, config)),
 })
+const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
 
 // The members of the Host Loader and Connection services this plugin calls; a Host without them publishes no launch URL.
 interface LoaderSurface {
@@ -1390,69 +1481,71 @@ export default defineHost({
   name: '@dshfiles/multi-host',
   Config: configSchema,
   apis: [multiHostHandlers],
-  setup(ctx, config) {
-    configuredProfile = configSchema.parse(config ?? {}).profile
-    // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
-    ctx.inject(['connection', 'webServer'], scoped => {
-      let launchPath: string | undefined
-      let disposed = false
-      scoped.effect(() => {
-        void (async () => {
-          const loader: LoaderSurface | undefined = scoped.get('loader')
-          await loader?.await?.()
-          const webServer = webServerSchema.safeParse(scoped.get('webServer'))
-          const connection: ConnectionSurface | undefined = scoped.get('connection')
-          const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
-          if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-          const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
-          launchPath = written
-          // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
-          process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
-        })().catch(() => undefined)
-        return () => {
-          disposed = true
-          if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
-        }
-      }, 'multi-host: launch file')
-    })
-    // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
-    // Session it does not hold, and every endpoint forwards to the runtime that owns it.
-    ctx.inject(['sessionSources'], scoped => {
-      activeSessionSources.add(scoped.sessionSources)
-      const unregister = scoped.sessionSources.register(
-        createRemoteSessionSource({
-          runtimes: {
-            list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
-            recordedSessions: async () =>
-              (await RemoteThreadStore.list()).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId, cwd: thread.cwd })),
-            acquire: runtimeId => pool.acquire(runtimeId),
-            run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
-          },
-        }),
-      )
-      const unregisterReferenceMiddleware = registerRemoteReferenceMiddleware({
-        ctx,
-        recordedThreads: () => RemoteThreadStore.list(),
-        sessionSources: () => [...activeSessionSources],
-        follow: async ({ runtimeId, sessionId, maxMessages, signal }) => {
-          const frames = await withRuntime(
-            runtimeId,
-            gateway =>
-              gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
-            { mutation: false },
-          )
-          return frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
-        },
-      })
-      scoped.effect(() => () => {
-        unregisterReferenceMiddleware()
-        unregister()
-        activeSessionSources.delete(scoped.sessionSources)
-      })
-    })
-    ctx.effect(() => async () => {
-      for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
-      await pool.close()
-    })
-  },
+  setup: effectPlugin.setup,
 })
+
+function setupHost(ctx: Context, config: z.infer<typeof configSchema>): void {
+  configuredProfile = configSchema.parse(config ?? {}).profile
+  // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
+  ctx.inject(['connection', 'webServer'], scoped => {
+    let launchPath: string | undefined
+    let disposed = false
+    scoped.effect(() => {
+      void (async () => {
+        const loader: LoaderSurface | undefined = scoped.get('loader')
+        await loader?.await?.()
+        const webServer = webServerSchema.safeParse(scoped.get('webServer'))
+        const connection: ConnectionSurface | undefined = scoped.get('connection')
+        const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
+        if (disposed || !webServer.success || typeof launchUrl !== 'string') return
+        const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+        launchPath = written
+        // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
+        process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
+      })().catch(() => undefined)
+      return () => {
+        disposed = true
+        if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
+      }
+    }, 'multi-host: launch file')
+  })
+  // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
+  // Session it does not hold, and every endpoint forwards to the runtime that owns it.
+  ctx.inject(['sessionSources'], scoped => {
+    activeSessionSources.add(scoped.sessionSources)
+    const unregister = scoped.sessionSources.register(
+      createRemoteSessionSource({
+        runtimes: {
+          list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
+          recordedSessions: async () =>
+            (await RemoteThreadStore.list()).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId, cwd: thread.cwd })),
+          acquire: runtimeId => pool.acquire(runtimeId),
+          run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
+        },
+      }),
+    )
+    const unregisterReferenceMiddleware = registerRemoteReferenceMiddleware({
+      ctx,
+      recordedThreads: () => RemoteThreadStore.list(),
+      sessionSources: () => [...activeSessionSources],
+      follow: async ({ runtimeId, sessionId, maxMessages, signal }) => {
+        const frames = await withRuntime(
+          runtimeId,
+          gateway =>
+            gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
+          { mutation: false },
+        )
+        return frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+      },
+    })
+    scoped.effect(() => () => {
+      unregisterReferenceMiddleware()
+      unregister()
+      activeSessionSources.delete(scoped.sessionSources)
+    })
+  })
+  ctx.effect(() => async () => {
+    for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
+    await pool.close()
+  })
+}

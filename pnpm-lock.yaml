@@ -3814,6 +3814,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       ws:
         specifier: 'catalog:'
         version: 8.21.3

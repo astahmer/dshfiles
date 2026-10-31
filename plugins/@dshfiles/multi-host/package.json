@@ -35,6 +35,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"
   },
