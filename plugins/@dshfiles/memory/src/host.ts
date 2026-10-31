@@ -10,11 +10,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { createRouteResolver, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
-import type { ApiCaller } from '@dshfiles/dshx/api'
+import { PluginApiError, type ApiCaller, type ApiHandlerContext } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost, isApiServed } from '@dshfiles/dshx/host'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
+import { Context as EffectContext, Duration, Effect, Layer, Schedule, Schema } from 'effect'
 import { z } from 'zod'
 
 import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
@@ -86,20 +88,7 @@ const agentScopes = new Map<string, Promise<string | null>>()
  * A subagent's parent: the live Agent registry first (no I/O), then its Session log, which is the only source once the
  * parent went cold. Cached with the scope, so a thread pays this at most once.
  */
-const parentOf = async (ctx: Context, sessionId: string): Promise<string | undefined> => {
-  const live = ctx
-    .get('agents')
-    ?.list()
-    .find(agent => agent.id === sessionId)
-  if (live !== undefined) return live.session.header.parentSession
-  const log = await ctx
-    .get('sessionQuery')
-    ?.readSession(SessionId(sessionId))
-    .catch(() => undefined)
-  return log?.session.parentSession
-}
-
-const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> => {
+const agentScopeOf = (ctx: Context, sessionId: string, parentOf: (sessionId: string) => Promise<string | undefined>): Promise<string | null> => {
   const cached = agentScopes.get(sessionId)
   if (cached !== undefined) return cached
   const pending = (async () => {
@@ -114,7 +103,7 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
           const agent = result.ok ? result.value.agent : null
           return agent === null ? null : { memoryScope: agent.memoryScope }
         },
-        parentOf: id => parentOf(ctx, id),
+        parentOf,
       },
     })
   })().catch(() => null)
@@ -124,10 +113,20 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
 
 const hostServices = (ctx: Context): MemoryServices => {
   const jevUsageClient = createHostApiClient(ctx, usageApi, '@dshfiles/memory')
+  const agents = ctx.get('agents')
+  const sessionQueryService = ctx.get('sessionQuery')
+  const llm = ctx.get('llm')
+  const sessionController = ctx.get('sessionController')
+  const secretCatalogValues = ctx.get('secretCatalogValues')
   const sessionQuery = () => {
-    const service = ctx.get('sessionQuery')
-    if (!service) throw new Error('the DSH sessionQuery service is unavailable')
-    return service
+    if (!sessionQueryService) throw new Error('the DSH sessionQuery service is unavailable')
+    return sessionQueryService
+  }
+  const parentOf = async (sessionId: string): Promise<string | undefined> => {
+    const live = agents?.list().find(agent => agent.id === sessionId)
+    if (live !== undefined) return live.session.header.parentSession
+    const log = await sessionQueryService?.readSession(SessionId(sessionId)).catch(() => undefined)
+    return log?.session.parentSession
   }
   const sessionList = new MemorySessionList({
     listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live, persisted: record.persisted })),
@@ -148,22 +147,13 @@ const hostServices = (ctx: Context): MemoryServices => {
     },
     catalog: () => ({
       sessionProvider: async conversationId => {
-        const log = await ctx
-          .get('sessionQuery')
-          ?.readSession(SessionId(conversationId))
-          .catch(() => undefined)
+        const log = await sessionQueryService?.readSession(SessionId(conversationId)).catch(() => undefined)
         const header = log?.events.findLast(event => event.type === 'request/header')
         return header?.type === 'request/header' ? header.data.header.config.provider : undefined
       },
       // Cheap models match the provider id or its kind prefix (`opencode-go-pi` → `opencode-go`); AI Accounts' file is not read.
       providerKind: async () => undefined,
-      models: async provider =>
-        (
-          (await ctx
-            .get('llm')
-            ?.listModels(provider)
-            .catch(() => [])) ?? []
-        ).map(model => model.id),
+      models: async provider => ((await llm?.listModels(provider).catch(() => [])) ?? []).map(model => model.id),
     }),
   })
   return {
@@ -171,7 +161,7 @@ const hostServices = (ctx: Context): MemoryServices => {
       await projectNormalization
       return projectPathFor(cwd)
     },
-    agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId),
+    agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId, parentOf),
     listSessions: () => sessionList.listSessions(),
     readSessionTitles: async (sessionIds, signal) => {
       if (sessionIds.length === 0) return []
@@ -180,13 +170,10 @@ const hostServices = (ctx: Context): MemoryServices => {
       // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
       const timeout = AbortSignal.timeout(10_000)
       const readSignal = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
-      const listed = await ctx
-        .get('sessionController')
-        ?.list(sessionTitleListRequest, readSignal)
-        .catch(() => {
-          signal?.throwIfAborted()
-          return undefined
-        })
+      const listed = await sessionController?.list(sessionTitleListRequest, readSignal).catch(() => {
+        signal?.throwIfAborted()
+        return undefined
+      })
       const fromList = new Map<string, SessionTitleRead>()
       for (const item of listed?.items ?? []) {
         const title = listedTitleSchema.safeParse(item.projections?.values.title)
@@ -213,7 +200,6 @@ const hostServices = (ctx: Context): MemoryServices => {
       return { header: log.session, inheritedEventCount: log.inheritedEventCount, events: log.events }
     },
     summarize: async request => {
-      const llm = ctx.get('llm')
       if (!llm) throw new Error('the DSH llm service is unavailable')
       const state = await routes.resolve(request.conversationId)
       if (state.kind !== 'ready') throw new Error(state.kind === 'unavailable' ? state.reason : 'no route resolved')
@@ -271,7 +257,7 @@ const hostServices = (ctx: Context): MemoryServices => {
     jevCredential: async () =>
       SecretReferenceResolver.resolveWithLabel({
         referenceText: currentSettings().jevSecret,
-        values: ctx.get('secretCatalogValues'),
+        values: secretCatalogValues,
         environmentValue: process.env[TYPESAFE_ENV_KEY],
         environmentVariableName: TYPESAFE_ENV_KEY,
       }),
@@ -541,11 +527,25 @@ const instant = (value: string | undefined, endOfDay: boolean): number | undefin
   return dateOnly && endOfDay ? parsed + dayMs - 1 : parsed
 }
 
-const workspaceScriptsHost = workspaceScriptsApi.host({
-  scripts: async ({ input }) => workspaceScriptsFor(input.cwd),
-})
+class MemoryOperationError extends Schema.TaggedError<MemoryOperationError>()('MemoryOperationError', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
 
-const panelApi = memoryApi.host({
+const memoryOperationError = (operation: string, error: unknown) =>
+  error instanceof PluginApiError ? error : new MemoryOperationError({ operation, message: error instanceof Error ? error.message : String(error) })
+
+const liftHandler = <Input, Output>(operation: string, handler: (context: ApiHandlerContext<Input>) => Output | Promise<Output>) =>
+  Effect.fn(`memory ${operation}`)((context: ApiHandlerContext<Input>) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(handler(context)),
+      catch: error => memoryOperationError(operation, error),
+    }),
+  )
+
+const workspaceScriptsHandler: Parameters<typeof workspaceScriptsApi.host>[0]['scripts'] = async ({ input }) => workspaceScriptsFor(input.cwd)
+
+const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
   findThreads: ({ input, caller, signal }) =>
     withMemory(active =>
@@ -740,7 +740,7 @@ const panelApi = memoryApi.host({
   },
   threadDetail: ({ input }) => withMemory(active => active.threadDetail(input.id)),
   redigest: ({ input }) => withRuntime(active => active.digest(input.id)).then(result => ({ outcome: result.summary })),
-})
+}
 
 const normalizeProjectPaths = async (opened: MemoryStore) => {
   const mappings: { from: string; to: string }[] = []
@@ -759,7 +759,7 @@ const normalizeProjectPaths = async (opened: MemoryStore) => {
   }
 }
 
-const setup = (ctx: Context): void => {
+const setup = (ctx: Context, services: MemoryServices): void => {
   const logger = ctx.logger('memory')
   let opened: MemoryStore
   try {
@@ -785,7 +785,7 @@ const setup = (ctx: Context): void => {
     })
     .catch(() => logger.warn('memory: JJ workspace memory backfill failed; remaining entries stay separate'))
   projectNormalization = normalization
-  const active = createMemoryRuntime({ services: hostServices(ctx), store: opened, settings: currentSettings, logger })
+  const active = createMemoryRuntime({ services, store: opened, settings: currentSettings, logger })
   runtime = active
 
   ctx.on('session/event', (session, event) => active.onSessionEvent(session, event))
@@ -798,7 +798,7 @@ const setup = (ctx: Context): void => {
     if (!agent) return assembled
     try {
       const text = await active.startBlock(agent, async () => {
-        const log = await ctx.get('sessionQuery')?.readSession(agent.session.id)
+        const log = await services.readSession(agent.session.id)
         const first = log?.events.find(event => event.type === 'user/message' && event.data.source.kind === 'user')
         return first?.type === 'user/message' ? textOf(first.data.content) : undefined
       })
@@ -815,43 +815,102 @@ const setup = (ctx: Context): void => {
       return assembled
     }
   })
-
-  ctx.effect(() => {
-    const maintain = (): void => {
-      try {
-        const pruned = opened.prune(currentSettings().retentionDays)
-        if (pruned.threads + pruned.messages > 0)
-          logger.info('memory: retention dropped %d digest(s) and %d indexed message(s)', pruned.threads, pruned.messages)
-      } catch (error) {
-        logger.warn('memory: retention pass failed: %s', error instanceof Error ? error.message : String(error))
-      }
-    }
-    // Catch-up waits for boot to settle, then digests a bounded batch of sessions never seen before.
-    const catchUp = setTimeout(() => {
-      maintain()
-      void active
-        .catchUp(25)
-        .then(count => count > 0 && logger.info('memory: caught up %d earlier session(s)', count))
-        .catch((error: unknown) => logger.warn('memory: catch-up failed: %s', error instanceof Error ? error.message : String(error)))
-    }, 30_000)
-    const daily = setInterval(maintain, dayMs)
-    return () => {
-      clearTimeout(catchUp)
-      clearInterval(daily)
-      active.stop()
-      if (runtime === active) runtime = undefined
-      if (store === opened) store = undefined
-      if (projectNormalization === normalization) projectNormalization = Promise.resolve()
-      void normalization
-        .finally(() => opened.close())
-        .catch((error: unknown) => logger.warn('memory: closing the store failed: %s', error instanceof Error ? error.message : String(error)))
-    }
-  }, 'memory runtime')
 }
 
+class MemoryHostServices extends EffectContext.Service<MemoryHostServices, MemoryServices>()('dshfiles/memory/MemoryHostServices') {}
+
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: (ctx: Context) => Layer.succeed(MemoryHostServices, hostServices(ctx)),
+  setup: Effect.fn('memory setup')(function* (ctx: Context) {
+    const services = yield* MemoryHostServices
+    yield* Effect.sync(() => setup(ctx, services))
+    const initialized = (() => {
+      if (runtime === undefined || store === undefined) return null
+      return Object.freeze({ runtime, store, projectNormalization })
+    })()
+    if (initialized === null) return
+    const logger = ctx.logger('memory')
+    const maintain = Effect.try({
+      try: () => {
+        const pruned = initialized.store.prune(currentSettings().retentionDays)
+        if (pruned.threads + pruned.messages > 0)
+          logger.info('memory: retention dropped %d digest(s) and %d indexed message(s)', pruned.threads, pruned.messages)
+      },
+      catch: error => memoryOperationError('retention pass', error),
+    }).pipe(Effect.catchTag('MemoryOperationError', error => Effect.sync(() => logger.warn('memory: %s failed: %s', error.operation, error.message))))
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(async () => {
+        initialized.runtime?.stop()
+        if (runtime === initialized.runtime) runtime = undefined
+        if (store === initialized.store) store = undefined
+        if (projectNormalization === initialized.projectNormalization) projectNormalization = Promise.resolve()
+        await initialized.projectNormalization
+          .finally(() => initialized.store?.close())
+          .catch(error => {
+            logger.warn('memory: closing the store failed: %s', error instanceof Error ? error.message : String(error))
+          })
+      }),
+    )
+    yield* Effect.forkScoped(
+      Effect.sleep(Duration.seconds(30)).pipe(
+        Effect.andThen(maintain),
+        Effect.andThen(
+          Effect.tryPromise({
+            try: () => initialized.runtime?.catchUp(25) ?? Promise.resolve(0),
+            catch: error => memoryOperationError('catch-up', error),
+          }).pipe(
+            Effect.catchTag('MemoryOperationError', error =>
+              Effect.sync(() => logger.warn('memory: %s failed: %s', error.operation, error.message)).pipe(Effect.as(0)),
+            ),
+            Effect.tap(count =>
+              Effect.sync(() => {
+                if (count > 0) logger.info('memory: caught up %d earlier session(s)', count)
+              }),
+            ),
+          ),
+        ),
+      ),
+    )
+    yield* Effect.forkScoped(Effect.repeat(Effect.sleep(Duration.millis(dayMs)).pipe(Effect.andThen(maintain)), Schedule.forever))
+  }),
+})
+
+const workspaceScriptsHost = hostApi(workspaceScriptsApi, {
+  scripts: liftHandler('workspace scripts', workspaceScriptsHandler),
+})
+
+const panelApi = hostApi(memoryApi, {
+  search: liftHandler('search', panelHandlers.search),
+  findThreads: liftHandler('find threads', panelHandlers.findThreads),
+  relatedThreads: liftHandler('related threads', panelHandlers.relatedThreads),
+  read: liftHandler('read', panelHandlers.read),
+  preview: liftHandler('preview', panelHandlers.preview),
+  note: liftHandler('note', panelHandlers.note),
+  usage: liftHandler('usage', panelHandlers.usage),
+  usageSummary: liftHandler('usage summary', panelHandlers.usageSummary),
+  projects: liftHandler('projects', panelHandlers.projects),
+  startBlock: liftHandler('start block', panelHandlers.startBlock),
+  notes: liftHandler('notes', panelHandlers.notes),
+  panelNotes: liftHandler('panel notes', panelHandlers.panelNotes),
+  reviewNotes: liftHandler('review notes', panelHandlers.reviewNotes),
+  noteCounts: liftHandler('note counts', panelHandlers.noteCounts),
+  createNote: liftHandler('create note', panelHandlers.createNote),
+  noteHistory: liftHandler('note history', panelHandlers.noteHistory),
+  panelNoteHistory: liftHandler('panel note history', panelHandlers.panelNoteHistory),
+  editNote: liftHandler('edit note', panelHandlers.editNote),
+  forgetNote: liftHandler('forget note', panelHandlers.forgetNote),
+  archiveNote: liftHandler('archive note', panelHandlers.archiveNote),
+  restoreNote: liftHandler('restore note', panelHandlers.restoreNote),
+  citations: liftHandler('citations', panelHandlers.citations),
+  rateCitation: liftHandler('rate citation', panelHandlers.rateCitation),
+  threads: liftHandler('threads', panelHandlers.threads),
+  threadDetail: liftHandler('thread detail', panelHandlers.threadDetail),
+  redigest: liftHandler('redigest', panelHandlers.redigest),
+})
+
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/memory',
   settings: [ownedSettings],
   apis: [panelApi, workspaceScriptsHost],
-  setup,
 })
