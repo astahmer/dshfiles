@@ -1,9 +1,31 @@
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { FallbackRoute } from '@dshfiles/ai-accounts/model-fallback-api'
+import type { BrandKey } from './brand-marks.js'
 
 type ModelGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = ModelGroup['models'][number]
+
+/** Tokens that name a model family; a model id or name carries at least one of them. */
+const BRAND_TOKENS: readonly { readonly brand: BrandKey; readonly tokens: readonly string[] }[] = [
+  { brand: 'openai', tokens: ['gpt', 'chatgpt', 'openai', 'codex'] },
+  { brand: 'claude', tokens: ['claude', 'anthropic', 'haiku', 'sonnet', 'opus'] },
+  { brand: 'google', tokens: ['gemini', 'google', 'gemma'] },
+  { brand: 'deepseek', tokens: ['deepseek'] },
+  { brand: 'meta', tokens: ['llama', 'meta'] },
+  { brand: 'qwen', tokens: ['qwen'] },
+  { brand: 'ling', tokens: ['ling', 'inclusionai'] },
+  { brand: 'kimi', tokens: ['kimi', 'moonshot'] },
+  { brand: 'mistral', tokens: ['mistral', 'devstral', 'codestral', 'magistral'] },
+  { brand: 'grok', tokens: ['grok', 'xai'] },
+  { brand: 'copilot', tokens: ['copilot'] },
+  { brand: 'zhipu', tokens: ['glm', 'zhipu', 'chatglm'] },
+]
+
+const brandOfToken = (token: string): BrandKey | undefined => {
+  if (/^o[1-9]$/u.test(token)) return 'openai'
+  return BRAND_TOKENS.find(entry => entry.tokens.some(candidate => token === candidate || token.startsWith(candidate)))?.brand
+}
 
 /** A fallback rung named for display: catalog names when the catalog still lists the route, its ids otherwise. */
 interface FallbackLabel {
@@ -107,6 +129,15 @@ export class ModelPickerModel {
     return { group, selection: reasoningEffort === undefined ? route : { ...route, reasoningEffort } }
   }
 
+  /** The family mark a row leads with, read from the model id and name rather than the account that serves it. */
+  static brandFor = ({ model }: { readonly model: Pick<CatalogModel, 'id' | 'name'> }): BrandKey | undefined => {
+    for (const token of `${model.id} ${model.name}`.toLowerCase().split(/[^a-z0-9]+/u)) {
+      const brand = token.length === 0 ? undefined : brandOfToken(token)
+      if (brand !== undefined) return brand
+    }
+    return undefined
+  }
+
   /** The current selection as a fallback rung, keeping its explicit effort only. */
   static fallbackFor = (current: ModelSelection): FallbackRoute =>
     current.reasoningEffort === undefined
@@ -131,7 +162,11 @@ export class ModelPickerModel {
   static fallbackLabel = (groups: readonly ModelGroup[], route: FallbackRoute): FallbackLabel => {
     const group = groups.find(candidate => candidate.id === route.provider)
     const model = group?.models.find(candidate => candidate.id === route.model)
-    const label: FallbackLabel = { provider: group?.name ?? route.provider, model: model?.name ?? route.model, effort: undefined }
+    const label: FallbackLabel = {
+      provider: group?.name ?? route.provider,
+      model: group === undefined || model === undefined ? route.model : ModelPickerModel.displayName({ group, model }),
+      effort: undefined,
+    }
     const effort = route.reasoningEffort
     if (effort === undefined) return label
     return { ...label, effort: model?.reasoning?.efforts.find(entry => entry.id === effort)?.name ?? effort }
