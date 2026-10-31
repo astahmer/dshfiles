@@ -25,7 +25,7 @@ const isInside = (parent: string, child: string): boolean => {
 }
 
 const readBoundedMarkdown = async ({ workspacePath, path }: ReadMarkdownDocumentInput) => {
-  const safePath = workspaceMarkdownPathSchema.parse(path)
+  const safePath = Schema.decodeUnknownSync(workspaceMarkdownPathSchema)(path)
   const root = await realpath(workspacePath)
   let candidate = root
   const segments = safePath.split('/')
@@ -81,7 +81,7 @@ const readBoundedMarkdown = async ({ workspacePath, path }: ReadMarkdownDocument
 }
 
 const captureMarkdownAnchorPromise = async (input: CaptureMarkdownAnchorInput): Promise<MarkdownFeedbackAnchor> => {
-  const path = workspaceMarkdownPathSchema.parse(input.path)
+  const path = Schema.decodeUnknownSync(workspaceMarkdownPathSchema)(input.path)
   if (
     !Number.isSafeInteger(input.startLine) ||
     !Number.isSafeInteger(input.endLine) ||

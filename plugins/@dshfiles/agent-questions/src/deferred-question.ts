@@ -164,14 +164,14 @@ const writeDeferredQuestionFilePromise = async (input: { readonly workspacePath:
   const directory = await ensureQuestionDirectory(input.workspacePath)
   const contents = markdownFor(input.question)
   const requestedFilename =
-    input.question.filePath === undefined ? filenameFor(input.question) : basename(deferredFilePathSchema.parse(input.question.filePath))
+    input.question.filePath === undefined ? filenameFor(input.question) : basename(Schema.decodeUnknownSync(deferredFilePathSchema)(input.question.filePath))
   const first = await writeCandidate({
     directory,
     filename: requestedFilename,
     contents,
     questionId: input.question.questionId,
   })
-  if (first !== undefined) return deferredFilePathSchema.parse(`questions/${first}`)
+  if (first !== undefined) return Schema.decodeUnknownSync(deferredFilePathSchema)(`questions/${first}`)
   if (input.question.filePath !== undefined) {
     throw new Error('The stored deferred-question path belongs to different content; refusing to overwrite it.')
   }
@@ -183,7 +183,7 @@ const writeDeferredQuestionFilePromise = async (input: { readonly workspacePath:
     contents,
     questionId: input.question.questionId,
   })
-  if (collisionSafe !== undefined) return deferredFilePathSchema.parse(`questions/${collisionSafe}`)
+  if (collisionSafe !== undefined) return Schema.decodeUnknownSync(deferredFilePathSchema)(`questions/${collisionSafe}`)
   throw new Error('A deferred-question filename collision could not be resolved safely.')
 }
 

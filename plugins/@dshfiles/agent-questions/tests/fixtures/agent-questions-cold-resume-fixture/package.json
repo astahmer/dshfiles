@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "main": "./index.js",
+  "dependencies": {
+    "effect": "4.1.0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

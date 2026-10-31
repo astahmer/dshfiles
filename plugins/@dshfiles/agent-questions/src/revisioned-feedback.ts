@@ -1,35 +1,41 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { z } from 'zod'
+import { Context, Effect, Schema } from 'effect'
+import { createKeyedEffectLock } from './keyed-effect-lock.js'
 import {
   feedbackResolutionReceiptSchema,
   markdownFeedbackAnchorSchema,
-  revisionedFeedbackRecordSchema,
+  revisionedFeedbackRecordEffectSchema,
   type MarkdownFeedbackAnchor,
   type RevisionedFeedbackRecord,
   type RevisionedFeedbackTable,
 } from './store.js'
 
-const requestInputSchema = z
-  .object({
-    operationId: z.string().trim().min(1).max(256),
-    anchor: markdownFeedbackAnchorSchema,
-    comment: z.string().trim().min(1).max(4_000),
-  })
-  .strict()
+const trimmedString = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] =>
+  Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
 
-const answerInputSchema = z
-  .object({
-    feedbackId: z.string().uuid(),
-    disposition: z.enum(['accepted', 'rejected', 'deferred']),
-    note: z.string().trim().min(1).max(4_000).optional(),
-  })
-  .strict()
+const requestInputSchema = Schema.Struct({
+  operationId: trimmedString(1, 256),
+  anchor: markdownFeedbackAnchorSchema,
+  comment: trimmedString(1, 4_000),
+})
 
-const answerBatchSchema = z
-  .array(answerInputSchema)
-  .min(1)
-  .max(20)
-  .refine(answers => new Set(answers.map(answer => answer.feedbackId)).size === answers.length)
+const answerInputSchema = Schema.Struct({
+  feedbackId: Schema.String.check(Schema.isUUID()),
+  disposition: Schema.Literals(['accepted', 'rejected', 'deferred']),
+  note: Schema.optionalKey(trimmedString(1, 4_000)),
+})
+
+type AnswerInput = typeof answerInputSchema.Type
+type AnswerEncoded = typeof answerInputSchema.Encoded
+
+const answerBatchSchema = Schema.Array(answerInputSchema).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(20),
+  Schema.makeFilter(answers =>
+    new Set(answers.map(answer => answer.feedbackId)).size === answers.length ? undefined : 'Feedback ids in the resolution batch must be unique.',
+  ),
+)
 
 const maximumStoredFeedback = 1_000
 const maximumPendingPerParent = 50
@@ -74,7 +80,7 @@ export interface ParentFeedbackService {
   }): Promise<RevisionedFeedbackRecord>
   answerMany(input: {
     readonly agent: ParentFeedbackAgent
-    readonly responses: readonly z.input<typeof answerInputSchema>[]
+    readonly responses: readonly AnswerEncoded[]
     readonly signal: AbortSignal
   }): Promise<readonly ParentFeedbackResolutionResult[]>
   read(input: { readonly agent: ParentFeedbackAgent; readonly feedbackId: string }): Promise<RevisionedFeedbackRecord>
@@ -82,31 +88,27 @@ export interface ParentFeedbackService {
   close(): Promise<void>
 }
 
+export interface ParentFeedbackServiceEffectApi {
+  submit(input: Parameters<ParentFeedbackService['submit']>[0]): Effect.Effect<RevisionedFeedbackRecord, ParentFeedbackServiceError>
+  answerMany(input: Parameters<ParentFeedbackService['answerMany']>[0]): Effect.Effect<readonly ParentFeedbackResolutionResult[], ParentFeedbackServiceError>
+  read(input: Parameters<ParentFeedbackService['read']>[0]): Effect.Effect<RevisionedFeedbackRecord, ParentFeedbackServiceError>
+  cancel(input: Parameters<ParentFeedbackService['cancel']>[0]): Effect.Effect<RevisionedFeedbackRecord, ParentFeedbackServiceError>
+  close(): Effect.Effect<void, ParentFeedbackServiceError>
+}
+
+export class ParentFeedbackServiceEffect extends Context.Service<ParentFeedbackServiceEffect, ParentFeedbackServiceEffectApi>()(
+  'agent-questions/ParentFeedbackService',
+) {}
+
+export class ParentFeedbackServiceError extends Schema.TaggedError<ParentFeedbackServiceError>()('ParentFeedbackServiceError', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
+
 const operationKeyFor = (parentSessionId: string, childSessionId: string, operationId: string): string =>
   createHash('sha256')
     .update(JSON.stringify([parentSessionId, childSessionId, operationId]))
     .digest('hex')
-
-const createDeferred = <Value>() => {
-  let resolvePromise: (value: Value | PromiseLike<Value>) => void = () => undefined
-  const promise = new Promise<Value>(resolve => {
-    resolvePromise = resolve
-  })
-  return { promise, resolve: resolvePromise }
-}
-
-const runWithLock = async <Value>(locks: Map<string, Promise<void>>, key: string, operation: () => Promise<Value>): Promise<Value> => {
-  const prior = locks.get(key)
-  const gate = createDeferred<void>()
-  locks.set(key, gate.promise)
-  await prior
-  try {
-    return await operation()
-  } finally {
-    gate.resolve()
-    if (locks.get(key) === gate.promise) locks.delete(key)
-  }
-}
 
 const findByFeedbackId = (
   table: RevisionedFeedbackTable,
@@ -118,7 +120,7 @@ const findByFeedbackId = (
   return undefined
 }
 
-const sameResolution = (record: RevisionedFeedbackRecord, answer: z.infer<typeof answerInputSchema>): boolean =>
+const sameResolution = (record: RevisionedFeedbackRecord, answer: AnswerInput): boolean =>
   record.resolutionReceipt?.disposition === answer.disposition && record.resolutionReceipt.note === answer.note
 
 export const createParentFeedbackService = (input: {
@@ -126,7 +128,7 @@ export const createParentFeedbackService = (input: {
   readonly runtime: ParentFeedbackRuntime
   readonly now?: () => number
 }): ParentFeedbackService => {
-  const operationLocks = new Map<string, Promise<void>>()
+  const operationLocks = createKeyedEffectLock()
   const now = input.now ?? Date.now
   let closed = false
 
@@ -186,10 +188,10 @@ export const createParentFeedbackService = (input: {
     assertOpen()
     const stale = await table.update(key, current => {
       if (current.feedbackId !== record.feedbackId || current.status !== 'resolved') return current
-      return revisionedFeedbackRecordSchema.parse({
+      return decodeStrict(revisionedFeedbackRecordEffectSchema, {
         ...current,
         status: 'stale',
-        resolutionReceipt: feedbackResolutionReceiptSchema.parse({
+        resolutionReceipt: decodeStrict(feedbackResolutionReceiptSchema, {
           ...current.resolutionReceipt,
           observedRevision,
           checkedAt: now(),
@@ -203,7 +205,7 @@ export const createParentFeedbackService = (input: {
   const resolveOne = async (resolution: {
     readonly table: RevisionedFeedbackTable
     readonly agent: ParentFeedbackAgent
-    readonly answer: z.infer<typeof answerInputSchema>
+    readonly answer: AnswerInput
     readonly signal: AbortSignal
   }): Promise<ParentFeedbackResolutionResult> => {
     assertOpen()
@@ -236,7 +238,7 @@ export const createParentFeedbackService = (input: {
       return { feedbackId: resolution.answer.feedbackId, status: 'rejected', notified: false }
     }
     const status = observedRevision === found.record.anchor.revision ? 'resolved' : 'stale'
-    const resolutionReceipt = feedbackResolutionReceiptSchema.parse({
+    const resolutionReceipt = decodeStrict(feedbackResolutionReceiptSchema, {
       disposition: resolution.answer.disposition,
       ...(resolution.answer.note !== undefined && { note: resolution.answer.note }),
       baseRevision: found.record.anchor.revision,
@@ -245,7 +247,7 @@ export const createParentFeedbackService = (input: {
     })
     const updated = await resolution.table.update(found.key, current => {
       if (current.feedbackId !== resolution.answer.feedbackId || current.status !== 'pending') return current
-      return revisionedFeedbackRecordSchema.parse({
+      return decodeStrict(revisionedFeedbackRecordEffectSchema, {
         ...current,
         status,
         resolutionReceipt,
@@ -276,83 +278,88 @@ export const createParentFeedbackService = (input: {
       assertOpen()
       const parentSessionId = assertLiveDirectChild(request.agent)
       request.signal.throwIfAborted()
-      const parsed = requestInputSchema.parse({
+      const parsed = decodeStrict(requestInputSchema, {
         operationId: request.operationId,
         anchor: request.anchor,
         comment: request.comment,
       })
       const key = operationKeyFor(parentSessionId, request.agent.id, parsed.operationId)
-      return runWithLock(operationLocks, key, async () => {
-        assertOpen()
-        if (assertLiveDirectChild(request.agent) !== parentSessionId) {
-          throw new Error('Feedback parent changed before submission.')
-        }
-        const table = await input.table()
-        let record = table.get(key)
-        if (record !== undefined) {
-          if (
-            record.parentSessionId !== parentSessionId ||
-            record.childSessionId !== request.agent.id ||
-            record.comment !== parsed.comment ||
-            JSON.stringify(record.anchor) !== JSON.stringify(parsed.anchor)
-          ) {
-            throw new Error('Feedback operation id was reused with different input.')
+      return operationLocks.run({
+        key,
+        operation: async () => {
+          assertOpen()
+          if (assertLiveDirectChild(request.agent) !== parentSessionId) {
+            throw new Error('Feedback parent changed before submission.')
+          }
+          const table = await input.table()
+          let record = table.get(key)
+          if (record !== undefined) {
+            if (
+              record.parentSessionId !== parentSessionId ||
+              record.childSessionId !== request.agent.id ||
+              record.comment !== parsed.comment ||
+              JSON.stringify(record.anchor) !== JSON.stringify(parsed.anchor)
+            ) {
+              throw new Error('Feedback operation id was reused with different input.')
+            }
+            return record
+          }
+
+          const observedRevision = await input.runtime.currentRevision({
+            childSessionId: request.agent.id,
+            path: parsed.anchor.path,
+          })
+          if (observedRevision !== parsed.anchor.revision) {
+            throw new Error('Markdown changed before feedback could be sent. Capture a new anchor and retry.')
+          }
+
+          await pruneTerminalFeedback(table)
+          const rows = Array.from(table.entries())
+          const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
+          if (pendingForParent >= maximumPendingPerParent) {
+            throw new Error('The parent has reached its pending feedback limit.')
+          }
+          if (table.size >= maximumStoredFeedback) throw new Error('The retained feedback limit has been reached.')
+
+          const timestamp = now()
+          record = decodeStrict(revisionedFeedbackRecordEffectSchema, {
+            feedbackId: randomUUID(),
+            parentSessionId,
+            childSessionId: request.agent.id,
+            operationId: parsed.operationId,
+            anchor: parsed.anchor,
+            comment: parsed.comment,
+            status: 'pending',
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          })
+          await table.put(key, record)
+          try {
+            const notificationMessageId = await input.runtime.sendToParent({
+              childSessionId: record.childSessionId,
+              parentSessionId: record.parentSessionId,
+              record,
+              signal: request.signal,
+            })
+            record = await table.update(key, current => {
+              if (current.feedbackId !== record?.feedbackId || current.status !== 'pending') return current
+              return decodeStrict(revisionedFeedbackRecordEffectSchema, {
+                ...current,
+                notificationMessageId,
+                updatedAt: now(),
+              })
+            })
+          } catch (error: unknown) {
+            const found = table.get(key)
+            if (found === undefined || found.feedbackId !== record.feedbackId) throw error
+            record = await table.update(key, current =>
+              current.status === 'pending'
+                ? decodeStrict(revisionedFeedbackRecordEffectSchema, { ...current, status: 'delivery-failed', updatedAt: now() })
+                : current,
+            )
           }
           return record
-        }
-
-        const observedRevision = await input.runtime.currentRevision({
-          childSessionId: request.agent.id,
-          path: parsed.anchor.path,
-        })
-        if (observedRevision !== parsed.anchor.revision) {
-          throw new Error('Markdown changed before feedback could be sent. Capture a new anchor and retry.')
-        }
-
-        await pruneTerminalFeedback(table)
-        const rows = Array.from(table.entries())
-        const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
-        if (pendingForParent >= maximumPendingPerParent) {
-          throw new Error('The parent has reached its pending feedback limit.')
-        }
-        if (table.size >= maximumStoredFeedback) throw new Error('The retained feedback limit has been reached.')
-
-        const timestamp = now()
-        record = revisionedFeedbackRecordSchema.parse({
-          feedbackId: randomUUID(),
-          parentSessionId,
-          childSessionId: request.agent.id,
-          operationId: parsed.operationId,
-          anchor: parsed.anchor,
-          comment: parsed.comment,
-          status: 'pending',
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-        await table.put(key, record)
-        try {
-          const notificationMessageId = await input.runtime.sendToParent({
-            childSessionId: record.childSessionId,
-            parentSessionId: record.parentSessionId,
-            record,
-            signal: request.signal,
-          })
-          record = await table.update(key, current => {
-            if (current.feedbackId !== record?.feedbackId || current.status !== 'pending') return current
-            return revisionedFeedbackRecordSchema.parse({
-              ...current,
-              notificationMessageId,
-              updatedAt: now(),
-            })
-          })
-        } catch (error: unknown) {
-          const found = table.get(key)
-          if (found === undefined || found.feedbackId !== record.feedbackId) throw error
-          record = await table.update(key, current =>
-            current.status === 'pending' ? revisionedFeedbackRecordSchema.parse({ ...current, status: 'delivery-failed', updatedAt: now() }) : current,
-          )
-        }
-        return record
+        },
       })
     },
     answerMany: async answerRequest => {
@@ -361,18 +368,20 @@ export const createParentFeedbackService = (input: {
         throw new Error('Feedback resolution requires the exact live parent Agent.')
       }
       answerRequest.signal.throwIfAborted()
-      const answers = answerBatchSchema.parse(answerRequest.responses)
+      const answers = decodeStrict(answerBatchSchema, answerRequest.responses)
       const table = await input.table()
       const results: ParentFeedbackResolutionResult[] = []
       for (const answer of answers) {
-        const result = await runWithLock(operationLocks, `feedback-resolution:${answer.feedbackId}`, () =>
-          resolveOne({
-            table,
-            agent: answerRequest.agent,
-            answer,
-            signal: answerRequest.signal,
-          }),
-        )
+        const result = await operationLocks.run({
+          key: `feedback-resolution:${answer.feedbackId}`,
+          operation: () =>
+            resolveOne({
+              table,
+              agent: answerRequest.agent,
+              answer,
+              signal: answerRequest.signal,
+            }),
+        })
         results.push(result)
       }
       return results
@@ -388,11 +397,33 @@ export const createParentFeedbackService = (input: {
       if (found.record.status !== 'pending') return found.record
       return found.table.update(found.key, current => {
         if (current.feedbackId !== cancelRequest.feedbackId || current.status !== 'pending') return current
-        return revisionedFeedbackRecordSchema.parse({ ...current, status: 'cancelled', updatedAt: now() })
+        return decodeStrict(revisionedFeedbackRecordEffectSchema, { ...current, status: 'cancelled', updatedAt: now() })
       })
     },
     close: async () => {
       closed = true
+      operationLocks.clear()
     },
+  }
+}
+
+export const createParentFeedbackEffectService = (input: {
+  readonly table: () => Promise<RevisionedFeedbackTable>
+  readonly runtime: ParentFeedbackRuntime
+  readonly now?: () => number
+}): ParentFeedbackServiceEffectApi => {
+  const service = createParentFeedbackService(input)
+  const call = <Value>(operation: string, run: () => Promise<Value>): Effect.Effect<Value, ParentFeedbackServiceError> =>
+    Effect.tryPromise({
+      try: run,
+      catch: error => new ParentFeedbackServiceError({ operation, message: error instanceof Error ? error.message : String(error) }),
+    })
+
+  return {
+    submit: Effect.fn('parent feedback submit')(request => call('submit', () => service.submit(request))),
+    answerMany: Effect.fn('parent feedback resolve batch')(request => call('answerMany', () => service.answerMany(request))),
+    read: Effect.fn('parent feedback read')(request => call('read', () => service.read(request))),
+    cancel: Effect.fn('parent feedback cancel')(request => call('cancel', () => service.cancel(request))),
+    close: Effect.fn('parent feedback close')(() => call('close', () => service.close())),
   }
 }

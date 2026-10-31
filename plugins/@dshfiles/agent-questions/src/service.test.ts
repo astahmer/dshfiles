@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
+import { createParentQuestionEffectService, createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
 import type { ParentQuestionExpiryBehavior, ParentQuestionRecord, ParentQuestionTable } from './store.js'
 import { ParentQuestionToolFlow } from './tool-flow.js'
 
@@ -56,6 +56,13 @@ const createRuntime = (): ParentQuestionRuntime => {
 
 const makeService = (table: ParentQuestionTable, now: () => number = Date.now) =>
   createParentQuestionService({
+    table: async () => table,
+    runtime: createRuntime(),
+    now,
+  })
+
+const makeEffectService = (table: ParentQuestionTable, now: () => number = Date.now) =>
+  createParentQuestionEffectService({
     table: async () => table,
     runtime: createRuntime(),
     now,
@@ -275,18 +282,18 @@ describe('parent question Host contract', () => {
 
   it('interrupts Host waiters without cancelling their durable question', async () => {
     const table = createMemoryTable()
-    const firstService = makeService(table)
+    const firstService = makeEffectService(table)
     const input = requestInput({})
     const waiting = Effect.runPromise(ParentQuestionToolFlow.ask({ service: firstService, ...input }))
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    await firstService.close()
+    await Effect.runPromise(firstService.close())
     const interrupted = await waiting
     expect(interrupted.kind).toBe('interrupted')
     if (interrupted.kind !== 'interrupted') throw new Error('Host shutdown must interrupt the parent question wait.')
     expect(Array.from(table.entries()).map(([, record]) => record.status)).toEqual(['pending'])
 
-    const restartedService = makeService(table)
+    const restartedService = makeEffectService(table)
     const answer = await Effect.runPromise(
       ParentQuestionToolFlow.answer({
         service: restartedService,
@@ -310,7 +317,7 @@ describe('parent question Host contract', () => {
       questionId: interrupted.questionId,
       answer: 'The durable wait can reattach after Host recreation.',
     })
-    await restartedService.close()
+    await Effect.runPromise(restartedService.close())
   })
 
   it('cancels the durable request when the child cancels its wait', async () => {
