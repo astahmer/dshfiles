@@ -1,8 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import { packageNameOf, readPackageVersions } from './package-versions.js'
+import { packageNameOf, readPackageVersions, readPackageVersionsEffect } from './package-versions.js'
 
 let root: string | undefined
 afterEach(() => {
@@ -27,6 +30,17 @@ describe('package versions', () => {
       '@deepseek-ai/dsh-tool-fs': '0.2.0-rc.2',
       missing: null,
     })
+  })
+
+  it('records package version reads through the dshx tracer bridge', async () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-toolkit-'))
+    const profile = join(root, 'profile')
+    writePackage(profile, '@dshfiles/btw', '0.1.0')
+    using recorder = recordSpans()
+    const read = readPackageVersionsEffect({ packages: ['@dshfiles/btw'], bases: () => Promise.resolve([profile]) })
+
+    await expect(Effect.runPromise(read.pipe(Effect.provide(DshxEffect.tracerLayer)))).resolves.toEqual({ '@dshfiles/btw': '0.1.0' })
+    expect(recorder.span('agent toolkit versions').status.code).toBe('unset')
   })
 
   it('names the package of a module specifier', () => {

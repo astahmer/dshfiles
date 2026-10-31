@@ -112,6 +112,12 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "agent toolkit versions",
+          "file": "plugins/@dshfiles/agent-toolkit/src/package-versions.test.ts",
+          "testName": "records package version reads through the dshx tracer bridge"
         }
       ]
     },
