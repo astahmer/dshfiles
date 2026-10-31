@@ -454,6 +454,8 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 
+const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })
+
 const statusApi = defineApi({
   id: 'status',
   version: 1,
@@ -467,7 +469,7 @@ const statusApi = defineApi({
 })
 
 export default defineHost({
-  ...DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void }),
+  setup,
   apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })],
 })
 `
