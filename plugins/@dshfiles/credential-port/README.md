@@ -15,7 +15,11 @@ A consumer treats a missing provider as "catalog unavailable" rather than failin
 
 This dependency-only library is not a Cordis bundle. `build` emits ordinary ESM and declarations into `dist/`; the runtime export uses JavaScript while TypeScript consumers retain the source contract. This lets unbundled Host consumers load the package without a TypeScript loader or bundler rewriting its `.js` sibling imports.
 
-`test` builds first, runs the existing schema/resolver tests and checks the public package with ordinary Node. The runtime regression uses synthetic references only; it performs no credential reads or provider calls. The reference schemas and resolver behavior are unchanged.
+`test` builds first, runs the existing schema/resolver tests and checks the public package with ordinary Node. The runtime regression uses synthetic references only; it performs no credential reads or provider calls. The Promise root export and its resolver behavior remain unchanged. Effect APIs are opt-in from `@dshfiles/credential-port/effect`, keeping the existing root import graph—including the Secret Catalog client—free of an Effect runtime import.
+
+## Effect API
+
+The `./effect` subpath provides Effect Schema validators for the existing alias, environment, scope, reference-text, and credential-label grammars, plus a canonicalizing credential-label schema and `SecretReferenceResolver` (`Context.Service`). Its Layer accepts the optional catalog resolver; reference failures and catalog failures have distinct TaggedErrors, while an absent key still uses the caller-supplied environment fallback. The Promise `SecretReferenceResolver` remains exported from the package root.
 
 ## Scripts
 

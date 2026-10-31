@@ -17,6 +17,10 @@
       "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./effect": {
+      "types": "./src/effect.ts",
+      "default": "./dist/effect.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -25,10 +29,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
+    "@effect/vitest": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
