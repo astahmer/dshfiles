@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
@@ -26,6 +26,7 @@ import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { createPluginUpdateWatch, staleClientEntries, type ClientEntryRevision } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
+import { RestartEffects, RestartRuntime } from './restart-effect.js'
 import { InflightTurns } from './inflight-turns.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
@@ -51,8 +52,33 @@ const restartController = (ctx: Context) =>
   })
 
 const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: Layer.empty,
-  setup: (ctx: Context) => Effect.sync(() => setupHost(ctx)),
+  layer: RestartEffects.layer,
+  setup: (ctx: Context) =>
+    Effect.gen(function* () {
+      const runtime = yield* RestartRuntime
+      yield* Effect.sync(() => setupHost(ctx))
+      const bootedAt = Date.now()
+      const promoted = yield* Effect.sync(() => InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => []))
+      yield* RestartEffects.restartWhenIdleLoop(runtime, {
+        drainLimitMs: DRAIN_LIMIT_MS,
+        now: Date.now,
+        pollIntervalMs: DRAIN_POLL_MS,
+        reportFailure: error =>
+          ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error)),
+        restart: async () => {
+          await restartController(ctx).request()
+        },
+        runningTurns: () => runningTurns(ctx),
+      }).pipe(Effect.forkScoped)
+      yield* RestartEffects.resumeAfterBoot({
+        delayMs: AUTO_RESUME_DELAY_MS,
+        promote: Effect.tryPromise({ try: () => promoted, catch: () => undefined }).pipe(
+          Effect.catch(() => Effect.succeed([])),
+          Effect.asVoid,
+        ),
+        resume: Effect.tryPromise({ try: () => resumeAfterBoot(ctx, bootedAt), catch: () => undefined }).pipe(Effect.catch(() => Effect.void)),
+      }).pipe(Effect.forkScoped)
+    }),
 })
 
 const sessionArchiveApi = hostApi(threadSidebarSessionArchiveApi, {
@@ -75,54 +101,31 @@ const DRAIN_LIMIT_MS = 30 * 60_000
  * queued follow-up that starts right after a turn ends is not cut off; past the limit it restarts anyway, and the
  * managed restart records whatever still runs so it resumes after boot.
  */
-let pendingRestart: { readonly since: number; readonly timer: NodeJS.Timeout } | undefined
-
 const runningTurns = (ctx: Context): number => activeRestartSessionIds(ctx.agents.list()).length
-
-const restartWhenIdle = (ctx: Context): void => {
-  if (pendingRestart !== undefined) return
-  const since = Date.now()
-  let idlePolls = 0
-  const reportFailure = (error: unknown): void => {
-    ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error))
-  }
-  const timer = setInterval(() => {
-    try {
-      idlePolls = runningTurns(ctx) === 0 ? idlePolls + 1 : 0
-      if (idlePolls < 2 && Date.now() - since < DRAIN_LIMIT_MS) return
-      clearInterval(timer)
-      pendingRestart = undefined
-      void restartController(ctx).request().catch(reportFailure)
-    } catch (error) {
-      clearInterval(timer)
-      pendingRestart = undefined
-      reportFailure(error)
-    }
-  }, DRAIN_POLL_MS)
-  timer.unref()
-  pendingRestart = { since, timer }
-}
 
 const restartApi = hostApi(threadSidebarRestartApi, {
   availability: Effect.fn('thread-sidebar restart availability')(({ ctx }) =>
-    Effect.sync(() => ({
-      available: restartController(ctx).available,
-      pending: pendingRestart === undefined ? null : { since: pendingRestart.since, running: runningTurns(ctx) },
-    })),
+    Effect.gen(function* () {
+      const runtime = yield* RestartRuntime
+      const pending = yield* RestartEffects.readPendingRestart(runtime)
+      return {
+        available: restartController(ctx).available,
+        pending: pending === undefined ? null : { since: pending.since, running: runningTurns(ctx) },
+      }
+    }),
   ),
   requestRestartWhenIdle: Effect.fn('thread-sidebar restart when idle')(({ ctx }) =>
-    Effect.sync(() => {
+    Effect.gen(function* () {
+      const runtime = yield* RestartRuntime
       if (!restartController(ctx).available) throw new Error('This DSH process is not running under the managed restart launcher.')
-      restartWhenIdle(ctx)
+      yield* RestartEffects.queueRestartWhenIdle(runtime, Date.now())
       return { accepted: true as const }
     }),
   ),
   cancelPendingRestart: Effect.fn('thread-sidebar pending restart cancel')(() =>
-    Effect.sync(() => {
-      if (pendingRestart === undefined) return { canceled: false }
-      clearInterval(pendingRestart.timer)
-      pendingRestart = undefined
-      return { canceled: true }
+    Effect.gen(function* () {
+      const runtime = yield* RestartRuntime
+      return { canceled: yield* RestartEffects.cancelRestartWhenIdle(runtime) }
     }),
   ),
   launchUrl: Effect.fn('thread-sidebar launch URL read')(() => Effect.tryPromise({ try: async () => ({ url: await readLaunchUrl() }), catch: error => error })),
@@ -358,12 +361,6 @@ const setupHost = (ctx: Context): void => {
     }
   }, 'thread-sidebar: auto-settle scan')
   ctx.effect(() => {
-    const bootedAt = Date.now()
-    const promoted = InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => [])
-    const resumeTimer = setTimeout(() => {
-      void promoted.then(() => resumeAfterBoot(ctx, bootedAt)).catch(() => undefined)
-    }, AUTO_RESUME_DELAY_MS)
-    resumeTimer.unref()
     const stop = ctx.on('session/event', (session, event) => {
       const boundary = InflightTurns.boundaryFromEvent(event)
       if (boundary === null) return
@@ -378,10 +375,7 @@ const setupHost = (ctx: Context): void => {
         .then(wasOpen => (wasOpen && boundary === 'interrupted' ? restartRecoveryStore.record([sessionId], 'interrupted') : undefined))
         .catch(() => undefined)
     })
-    return () => {
-      clearTimeout(resumeTimer)
-      stop()
-    }
+    return stop
   }, 'thread-sidebar: interrupted-turn tracking')
   ctx.inject(['clientModules'], scoped => {
     const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
