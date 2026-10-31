@@ -615,6 +615,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       write-file-atomic:
         specifier: 'catalog:'
         version: 7.0.0

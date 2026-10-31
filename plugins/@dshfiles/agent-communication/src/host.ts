@@ -1,6 +1,7 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
 import { agentsApi } from '@dshfiles/agents/contract'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { createHostApiClient, defineHost, definePromptContext, defineTool, isApiServed, type AssembleContext } from '@dshfiles/dshx/host'
 import {
   CommunicationError,
@@ -10,7 +11,8 @@ import {
   type CommunicationAgent,
   type CommunicationPrincipal,
 } from '@dshfiles/dshx/communication'
-import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
+import { Effect, Layer, Schedule, Schema } from 'effect'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
@@ -607,15 +609,42 @@ const collectUnreadCounts = async (input: {
   return counts
 }
 
-const api = agentCommunicationApi.host({
-  diagnostics: ({ input }) => communicationOperations.diagnostics(input.limit),
-  browseMessages: ({ input }) => communicationOperations.browseMessages(input),
-  postMessage: ({ input }) => communicationOperations.postMessage(input),
-  messageRecipients: ({ input }) => communicationOperations.messageRecipients(input.messageId),
-  revealMessageBody: ({ input }) => communicationOperations.revealMessageBody(input.messageId),
-  setSubscription: ({ input }) => communicationOperations.setSubscription(input),
-  unsubscribe: ({ input }) => communicationOperations.unsubscribe(input),
-  acknowledge: ({ input }) => communicationOperations.acknowledge(input),
+class CommunicationOperationError extends Schema.TaggedError<CommunicationOperationError>()('CommunicationOperationError', {
+  code: Schema.String,
+  message: Schema.String,
+}) {}
+
+const operationError = (error: unknown): CommunicationOperationError =>
+  new CommunicationOperationError({
+    code: error instanceof CommunicationError ? error.code : 'operation-failed',
+    message: error instanceof Error ? error.message : String(error),
+  })
+
+const api = DshxEffect.host(agentCommunicationApi, {
+  diagnostics: Effect.fn('agent communication diagnostics')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.diagnostics(input.limit), catch: operationError })
+  }),
+  browseMessages: Effect.fn('agent communication browse messages')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.browseMessages(input), catch: operationError })
+  }),
+  postMessage: Effect.fn('agent communication post message')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.postMessage(input), catch: operationError })
+  }),
+  messageRecipients: Effect.fn('agent communication message recipients')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.messageRecipients(input.messageId), catch: operationError })
+  }),
+  revealMessageBody: Effect.fn('agent communication reveal message body')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.revealMessageBody(input.messageId), catch: operationError })
+  }),
+  setSubscription: Effect.fn('agent communication set subscription')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.setSubscription(input), catch: operationError })
+  }),
+  unsubscribe: Effect.fn('agent communication unsubscribe')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.unsubscribe(input), catch: operationError })
+  }),
+  acknowledge: Effect.fn('agent communication acknowledge')(function* ({ input }) {
+    return yield* Effect.tryPromise({ try: () => communicationOperations.acknowledge(input), catch: operationError })
+  }),
 })
 
 type ToolActivityResult<Value> = { readonly outcome: 'success'; readonly value: Value } | { readonly outcome: 'failure'; readonly error: unknown }
@@ -672,7 +701,7 @@ const initializeAgent = (agent: Agent): Promise<void> =>
     onFailure: error => hostContext?.logger.warn('agent-communication: peer-message registration failed for %s; the Agent still starts: %o', agent.id, error),
   })
 
-const setupHost = (context: Context): Effect<void> => {
+const setupHostIterator = (context: Context) => {
   hostContext = context
   const service = createCommunicationService()
   communicationService = service
@@ -760,21 +789,18 @@ const setupHost = (context: Context): Effect<void> => {
         }
         for (const agent of context.agents.list()) await initializeAgent(agent)
         void refreshUnreadCounts()
-        const unreadTimer = setInterval(() => void refreshUnreadCounts(), UnreadNudgeRules.refreshIntervalMs)
-        let workspaceTopicCleanupTimer: ReturnType<typeof setInterval> | undefined
-        if (bridge !== undefined) {
-          // The bridge owner is the single Host process allowed to schedule maintenance for shared communication state.
-          runWorkspaceTopicCleanup()
-          workspaceTopicCleanupTimer = setInterval(runWorkspaceTopicCleanup, workspaceTopicCleanupIntervalMs)
-        }
-        yield async () => {
-          clearInterval(unreadTimer)
-          if (workspaceTopicCleanupTimer !== undefined) clearInterval(workspaceTopicCleanupTimer)
-          try {
-            if (bridge !== undefined) await bridge.close()
-          } finally {
-            clearHostContext()
-          }
+        const ownsBridge = bridge !== undefined
+        if (ownsBridge) runWorkspaceTopicCleanup()
+        yield {
+          ownsBridge,
+          runMaintenance: runWorkspaceTopicCleanup,
+          close: async () => {
+            try {
+              if (bridge !== undefined) await bridge.close()
+            } finally {
+              clearHostContext()
+            }
+          },
         }
       } catch (error) {
         try {
@@ -787,6 +813,32 @@ const setupHost = (context: Context): Effect<void> => {
     },
   }
 }
+
+const recurring = (run: () => Promise<void>, intervalMs: number) =>
+  Effect.repeat(Effect.tryPromise({ try: run, catch: () => undefined }), Schedule.spaced(`${intervalMs} millis`))
+
+const setupHost = Effect.fn('agent communication setup')(function* (context: Context) {
+  const setup = yield* Effect.acquireRelease(
+    Effect.tryPromise({
+      try: async () => {
+        const iterator = setupHostIterator(context)[Symbol.asyncIterator]()
+        const started = await iterator.next()
+        if (started.value === undefined) throw new Error('Agent communication Host setup yielded no finalizer.')
+        return { iterator, ...started.value }
+      },
+      catch: operationError,
+    }),
+    setup =>
+      Effect.promise(async () => {
+        await setup.iterator.return?.()
+        await setup.close()
+      }),
+  )
+  yield* Effect.forkScoped(recurring(refreshUnreadCounts, UnreadNudgeRules.refreshIntervalMs))
+  if (setup.ownsBridge) yield* Effect.forkScoped(recurring(() => Promise.resolve(setup.runMaintenance()), workspaceTopicCleanupIntervalMs))
+})
+
+const effectPlugin = DshxEffect.plugin({ layer: Layer.empty, setup: context => setupHost(context) })
 
 const host = defineHost({
   name: 'agent-communication',
@@ -805,7 +857,7 @@ const host = defineHost({
     inboxTool,
     acknowledgeTool,
   ],
-  setup: setupHost,
+  setup: effectPlugin.setup,
 })
 
 export default host
