@@ -2,11 +2,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { defineApi, method, PluginApiError } from '@dshfiles/dshx/api'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
+import { Effect, Layer } from 'effect'
 import { z } from 'zod'
 import { createGitWorktrees } from './git-worktrees.js'
 import { gitWorktreesSettings } from './settings.js'
@@ -15,7 +17,6 @@ type GitWorktreesSettings = SettingsValue<typeof gitWorktreesSettings.schema>
 
 const defaults: GitWorktreesSettings = gitWorktreesSettings.schema({})
 let settingsScope: SettingsScope<GitWorktreesSettings> | undefined
-let hostContext: Context | undefined
 
 const readSettings = (): GitWorktreesSettings => {
   try {
@@ -33,8 +34,8 @@ const worktrees = createGitWorktrees({
   },
 })
 
-const registry = () => {
-  const found = hostContext?.get('workspaceRegistry')
+const registry = (context: Context) => {
+  const found = context.get('workspaceRegistry')
   if (found === undefined) throw new PluginApiError('The DSH workspace registry is unavailable; restart DSH and retry.', { code: 'registry-missing' })
   return found
 }
@@ -68,42 +69,77 @@ const gitWorktreesApi = defineApi({
   },
 })
 
-const api = gitWorktreesApi.host({
-  worktrees: async ({ input }) => {
-    const location = await worktrees.locate(input.path)
-    return { worktrees: location === undefined ? [] : [...(await worktrees.worktrees(location.repoRoot))] }
-  },
-  remove: async ({ input }) => {
-    const registered = await registry().resolveByPath(input.path)
-    await worktrees.remove(input.path, input.force)
-    if (registered !== undefined) await registry().delete(registered.id)
-    return { removed: true }
-  },
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })
+
+const api = hostApi(gitWorktreesApi, {
+  worktrees: Effect.fn('git worktrees list')(({ input }) =>
+    Effect.tryPromise({
+      try: async () => {
+        const location = await worktrees.locate(input.path)
+        return { worktrees: location === undefined ? [] : [...(await worktrees.worktrees(location.repoRoot))] }
+      },
+      catch: error => error,
+    }),
+  ),
+  remove: Effect.fn('git worktree remove')(({ input, ctx }) =>
+    Effect.tryPromise({
+      try: async () => {
+        const workspaceRegistry = registry(ctx)
+        const registered = await workspaceRegistry.resolveByPath(input.path)
+        await worktrees.remove(input.path, input.force)
+        if (registered !== undefined) await workspaceRegistry.delete(registered.id)
+        return { removed: true as const }
+      },
+      catch: error => error,
+    }),
+  ),
 })
 
-const vcsProvider = VcsProviders.contract('@dshfiles/git-worktrees').host({
-  detect: async ({ input }) => {
-    const location = await worktrees.locate(input.path)
-    if (location === undefined) return { match: null }
-    return {
-      match: { vcs: 'git', priority: 10, repoRoot: location.repoRoot, workspaceRoot: location.workspaceRoot, isolated: location.threadName !== undefined },
-    }
-  },
-  provision: async ({ input }) => {
-    const source = registry().get(WorkspaceId(input.workspaceId))
-    if (source === undefined) throw new PluginApiError(`Unknown workspace ${input.workspaceId}; refresh and retry.`, { code: 'workspace-not-found' })
-    const location = await worktrees.locate(source.path)
-    if (location === undefined || !readSettings().isolate || input.isolate === false) return { workspaceId: source.id, isolated: false }
-    const project = await registry().resolveByPath(location.repoRoot)
-    const thread = await worktrees.provision(location.repoRoot, input.base)
-    const workspace = await registry().create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
-    return { workspaceId: workspace.id, isolated: true }
-  },
-  snapshot: async ({ input }) => ({ snapshot: await worktrees.snapshot(input.path) }),
-  restore: async ({ input }) => ({ previous: await worktrees.restore(input.path, input.snapshot) }),
+const vcsProvider = DshxEffect.host(VcsProviders.contract('@dshfiles/git-worktrees'), {
+  detect: Effect.fn('git worktree detect')(({ input }) =>
+    Effect.tryPromise({
+      try: async () => {
+        const location = await worktrees.locate(input.path)
+        if (location === undefined) return { match: null }
+        return {
+          match: {
+            vcs: 'git' as const,
+            priority: 10,
+            repoRoot: location.repoRoot,
+            workspaceRoot: location.workspaceRoot,
+            isolated: location.threadName !== undefined,
+          },
+        }
+      },
+      catch: error => error,
+    }),
+  ),
+  provision: Effect.fn('git worktree provision')(({ input, ctx }) =>
+    Effect.tryPromise({
+      try: async () => {
+        const workspaceRegistry = registry(ctx)
+        const source = workspaceRegistry.get(WorkspaceId(input.workspaceId))
+        if (source === undefined) throw new PluginApiError(`Unknown workspace ${input.workspaceId}; refresh and retry.`, { code: 'workspace-not-found' })
+        const location = await worktrees.locate(source.path)
+        if (location === undefined || !readSettings().isolate || input.isolate === false) return { workspaceId: source.id, isolated: false }
+        const project = await workspaceRegistry.resolveByPath(location.repoRoot)
+        const thread = await worktrees.provision(location.repoRoot, input.base)
+        const workspace = await workspaceRegistry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
+        return { workspaceId: workspace.id, isolated: true }
+      },
+      catch: error => error,
+    }),
+  ),
+  snapshot: Effect.fn('git worktree snapshot')(({ input }) =>
+    Effect.tryPromise({ try: async () => ({ snapshot: await worktrees.snapshot(input.path) }), catch: error => error }),
+  ),
+  restore: Effect.fn('git worktree restore')(({ input }) =>
+    Effect.tryPromise({ try: async () => ({ previous: await worktrees.restore(input.path, input.snapshot) }), catch: error => error }),
+  ),
 })
 
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/git-worktrees',
   settings: [
     gitWorktreesSettings.host({
@@ -116,7 +152,4 @@ export default defineHost({
     }),
   ],
   apis: [api, vcsProvider],
-  setup: context => {
-    hostContext = context
-  },
 })
