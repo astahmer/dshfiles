@@ -211,6 +211,7 @@ const failStep = (step: string, result: CommandResult): never => {
 export const createProject = (
   deps: ProjectLifecycleDeps,
   input: { readonly parentPath: string; readonly name: string; readonly createGitHubRepository: boolean },
+  requestSignal?: AbortSignal,
 ): Promise<CreatedProject> =>
   withSpan('project create', { attributes: { 'dshx.project.github': input.createGitHubRepository } }, async span => {
     const path = destination({ ...input, home: deps.home() })
@@ -222,7 +223,7 @@ export const createProject = (
           'Install the GitHub CLI (https://cli.github.com) and run `gh auth login`, or create the project without a GitHub repository.',
         )
       : undefined
-    const signal = AbortSignal.timeout(STEP_TIMEOUT_MS)
+    const signal = requestSignal === undefined ? AbortSignal.timeout(STEP_TIMEOUT_MS) : AbortSignal.any([requestSignal, AbortSignal.timeout(STEP_TIMEOUT_MS)])
     const run = async (step: string, argv: readonly string[]): Promise<CommandResult> => {
       const result = await deps.run({ argv, cwd: path, signal })
       return result.exitCode === 0 ? result : failStep(step, result)
