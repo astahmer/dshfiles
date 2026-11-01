@@ -1,42 +1,82 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { definePlugin } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { defineHost } from '@dshfiles/dshx/host'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
 import { injectAfterHead, SHARED_EVENT_SOURCE_WORKER, SHARED_EVENT_SOURCE_WORKER_PATH, sharedEventSourceScript } from './shim.js'
 
-const rowConfig = z.object({
-  /**
-   * Install the cross-tab EventSource proxy. Off restores one stream per tab,
-   * which is what a browser without SharedWorker already does.
-   */
-  enabled: z.boolean().default(true),
+const rowConfig = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
+}).pipe(Schema.withDecodingDefaultType(Effect.succeed({ enabled: true })))
+
+/** A missing row config still decodes to the enabled-by-default configuration. */
+const standardRowConfig = Schema.toStandardSchemaV1(rowConfig)
+export const Config = { '~standard': standardRowConfig['~standard'] }
+type SharedStreamsConfig = typeof rowConfig.Type
+
+class SharedStreamsSetupFailure extends Schema.TaggedError<SharedStreamsSetupFailure>()('SharedStreamsSetupFailure', {
+  message: Schema.String,
+}) {}
+
+class SharedStreamsHost extends EffectContext.Service<SharedStreamsHost, { readonly webServer: NonNullable<Context['webServer']> }>()(
+  '@dshfiles/shared-streams/Host',
+) {}
+
+const rootLayer = (ctx: Context) =>
+  Layer.effect(
+    SharedStreamsHost,
+    Effect.try({
+      try: () => {
+        const webServer = ctx.get('webServer')
+        if (webServer === undefined) throw new Error('The web server service is unavailable.')
+        return { webServer }
+      },
+      catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
+
+const setupSharedStreams = Effect.fn('shared streams setup')((config: SharedStreamsConfig) => {
+  if (!config.enabled) return Effect.void
+  return Effect.gen(function* () {
+    const runtime = yield* SharedStreamsHost
+    const markup = `<script>${sharedEventSourceScript()}</script>`
+    yield* Effect.acquireRelease(
+      Effect.try({
+        try: () => {
+          const unregisterRoute = runtime.webServer.register({
+            kind: 'exact',
+            path: `/${SHARED_EVENT_SOURCE_WORKER_PATH}`,
+            handler: (_request, response) => {
+              response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
+              response.end(SHARED_EVENT_SOURCE_WORKER)
+            },
+          })
+          const untapIndex = runtime.webServer.tapIndex(html => injectAfterHead(html, markup))
+          return () => {
+            unregisterRoute()
+            untapIndex()
+          }
+        },
+        catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
+      }),
+      cleanup => Effect.sync(cleanup),
+    )
+  })
 })
 
-/** A row with no `config` key arrives as `undefined`; fall back to the defaults instead of failing activation. */
-export const Config = z.union([rowConfig, z.undefined()]).transform(config => rowConfig.parse(config ?? {}))
+const effectPlugin = DshxEffect.plugin({ layer: rootLayer, setup: (_ctx: Context, config: SharedStreamsConfig) => setupSharedStreams(config) })
 
-export default definePlugin({
-  id: 'shared-streams',
+const setupHost = (ctx: Context, config: SharedStreamsConfig) =>
+  Effect.runPromise(
+    Effect.tryPromise({
+      try: () => effectPlugin.setup(ctx, config),
+      catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
+
+export default defineHost({
   name: '@dshfiles/shared-streams',
-  Config,
   inject: ['webServer'],
-  setup: api => {
-    const ctx: Context = api.raw.ctx
-    const { enabled } = Config.parse(api.config)
-    if (!enabled) return
-    const markup = `<script>${sharedEventSourceScript()}</script>`
-    ctx.effect(
-      () =>
-        ctx.webServer.register({
-          kind: 'exact',
-          path: `/${SHARED_EVENT_SOURCE_WORKER_PATH}`,
-          handler: (_request, response) => {
-            response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
-            response.end(SHARED_EVENT_SOURCE_WORKER)
-          },
-        }),
-      'shared-streams: worker route',
-    )
-    ctx.effect(() => ctx.webServer.tapIndex(html => injectAfterHead(html, markup)), 'shared-streams: index tap')
-  },
+  Config,
+  setup: setupHost,
 })
