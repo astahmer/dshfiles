@@ -1,4 +1,7 @@
 import { z } from 'zod'
+
+// Client-only form validation: `.required()`, `.extend()` and `.superRefine()` have no Effect JSON Schema
+// equivalent and none of it is published.
 import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
 import type { SecretScopeFilter } from './secret-catalog-model.js'
 import type { SecretMetadata } from './secret-metadata.js'

@@ -1,5 +1,4 @@
 import { Schema } from 'effect'
-import { z } from 'zod'
 
 const boundedString = (maxLength: number) => Schema.String.check(Schema.isMaxLength(maxLength))
 const secretPrintRowSchema = Schema.Struct({
@@ -26,19 +25,19 @@ const secretPrintRowsSchema = Schema.Union([
   Schema.Struct({ aliases: secretPrintRowsArraySchema }),
 ])
 
-export const secretMetadataSchema = z.object({
-  id: z.string(),
-  alias: z.string(),
-  scope: z.string(),
-  environment: z.string(),
-  variableName: z.string(),
-  item: z.string(),
-  field: z.string(),
-  service: z.string(),
-  description: z.string(),
+export const secretMetadataSchema = Schema.Struct({
+  id: Schema.String,
+  alias: Schema.String,
+  scope: Schema.String,
+  environment: Schema.String,
+  variableName: Schema.String,
+  item: Schema.String,
+  field: Schema.String,
+  service: Schema.String,
+  description: Schema.String,
 })
 
-export type SecretMetadata = z.infer<typeof secretMetadataSchema>
+export type SecretMetadata = typeof secretMetadataSchema.Type
 
 const rowsFromValidatedOutput = (output: typeof secretPrintRowsSchema.Type) => {
   if (Schema.is(secretPrintRowsArraySchema)(output)) return output
@@ -55,7 +54,7 @@ export const parseSecretPrintMetadata = (jsonText: string, defaultScope = 'unkno
     const variableName = row.envKey ?? row.env_key ?? row.dotenvKey ?? row.dotenv_key ?? row.alias
     const item = row.item ?? ''
     const field = row.field ?? ''
-    return secretMetadataSchema.parse({
+    return Schema.decodeUnknownSync(secretMetadataSchema)({
       id: JSON.stringify([row.scope ?? defaultScope, row.alias, environment, item, field]),
       alias: row.alias,
       scope: row.scope ?? defaultScope,

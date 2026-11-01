@@ -14,16 +14,20 @@ export const secretScopeSchemaEffectForCatalog = secretScopeSchemaEffect
 export const exactStructEffect = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
   Schema.Struct(fields).check(Schema.makeFilter(() => undefined, { toJsonSchema: () => ({ additionalProperties: false }) }))
 
-export const createMetadataSchemaEffect = exactStructEffect({
-  name: freeTextSchema(512).pipe(Schema.optional),
-  source: freeTextSchema(2048).pipe(Schema.optional),
-  tags: freeTextSchema(1024).pipe(Schema.optional),
-  type: freeTextSchema(64).pipe(Schema.optional),
-  field: freeTextSchema(256).pipe(Schema.optional),
-})
+export const createMetadataFields = {
+  name: freeTextSchema(512).pipe(Schema.optionalKey),
+  source: freeTextSchema(2048).pipe(Schema.optionalKey),
+  tags: freeTextSchema(1024).pipe(Schema.optionalKey),
+  type: freeTextSchema(64).pipe(Schema.optionalKey),
+  field: freeTextSchema(256).pipe(Schema.optionalKey),
+}
 
-export const updateMetadataSchemaEffect = exactStructEffect({
-  name: freeTextSchema(512).pipe(Schema.optional),
-  source: freeTextSchema(2048).pipe(Schema.optional),
-  tags: freeTextSchema(1024).pipe(Schema.optional),
-})
+export const updateMetadataFields = {
+  name: freeTextSchema(512).pipe(Schema.optionalKey),
+  source: freeTextSchema(2048).pipe(Schema.optionalKey),
+  tags: freeTextSchema(1024).pipe(Schema.optionalKey),
+}
+
+export const createMetadataSchemaEffect = exactStructEffect(createMetadataFields)
+
+export const updateMetadataSchemaEffect = exactStructEffect(updateMetadataFields)

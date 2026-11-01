@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+// Keep the client-side form grammar on zod: `z.string().min(1, { error, abort })` messages and the
+// `.extend()` tree feed the mutation form's `safeParse`, and the API publishes the Effect schemas instead.
+
 export const aliasSchema = z
   .string()
   .min(1, { error: 'Enter an alias.', abort: true })

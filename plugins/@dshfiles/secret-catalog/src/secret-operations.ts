@@ -59,11 +59,11 @@ export interface SecretCreateInput {
   readonly environment: string
   readonly valueMode: 'generate' | 'manual'
   readonly value: string | null
-  readonly name?: string | undefined
-  readonly source?: string | undefined
-  readonly tags?: string | undefined
-  readonly type?: string | undefined
-  readonly field?: string | undefined
+  readonly name?: string
+  readonly source?: string
+  readonly tags?: string
+  readonly type?: string
+  readonly field?: string
 }
 
 export interface SecretUpdateInput {
@@ -72,10 +72,16 @@ export interface SecretUpdateInput {
   readonly cwd: string | null
   readonly value: string | null
   readonly environment: string
-  readonly newAlias?: string | undefined
-  readonly name?: string | undefined
-  readonly source?: string | undefined
-  readonly tags?: string | undefined
+  readonly newAlias?: string
+  readonly name?: string
+  readonly source?: string
+  readonly tags?: string
+}
+
+const definedOnly = (metadata: Readonly<Record<string, string | undefined>>): Record<string, string> => {
+  const defined: Record<string, string> = {}
+  for (const [key, value] of Object.entries(metadata)) if (value !== undefined) defined[key] = value
+  return defined
 }
 
 const flagArguments = (metadata: Readonly<Record<string, string | undefined>>): string[] =>
@@ -83,11 +89,13 @@ const flagArguments = (metadata: Readonly<Record<string, string | undefined>>): 
 
 const createMetadataArguments = (input: Pick<SecretCreateInput, 'name' | 'source' | 'tags' | 'type' | 'field'>): string[] =>
   flagArguments(
-    Schema.decodeUnknownSync(createMetadataSchemaEffect)({ name: input.name, source: input.source, tags: input.tags, type: input.type, field: input.field }),
+    Schema.decodeUnknownSync(createMetadataSchemaEffect)(
+      definedOnly({ name: input.name, source: input.source, tags: input.tags, type: input.type, field: input.field }),
+    ),
   )
 
 const updateMetadataArguments = (input: Pick<SecretUpdateInput, 'name' | 'source' | 'tags'>): string[] =>
-  flagArguments(Schema.decodeUnknownSync(updateMetadataSchemaEffect)({ name: input.name, source: input.source, tags: input.tags }))
+  flagArguments(Schema.decodeUnknownSync(updateMetadataSchemaEffect)(definedOnly({ name: input.name, source: input.source, tags: input.tags })))
 
 const scopeArguments = (scope: SecretScope, cwd: string | null): string[] => {
   if (scope === 'global') return ['--global']

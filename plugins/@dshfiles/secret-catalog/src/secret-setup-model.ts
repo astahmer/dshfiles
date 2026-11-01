@@ -1,6 +1,8 @@
 import { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference, secretAliasSchema, secretEnvironmentSchema, secretScopeSchema } from '@dshfiles/credential-port'
 import type { SecretReference } from '@dshfiles/credential-port'
 import { z } from 'zod'
+
+// Client-only draft validation through `safeParse`; nothing here is published.
 import type { SecretMetadata } from './secret-metadata.js'
 import type { SecretCreateInput } from './secret-operations.js'
 
