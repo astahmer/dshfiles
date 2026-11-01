@@ -6,7 +6,8 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as Option from 'effect/Option'
 import { withoutUndefined } from './optional-fields.js'
 import {
   searchEventsResultSchema,
@@ -107,9 +108,9 @@ export class SearchWorkerClient {
   }
 
   #onMessage(raw: JsonValue): void {
-    const parsed = workerReplySchema.safeParse(raw)
-    if (!parsed.success) return
-    const reply = parsed.data
+    const parsed = Schema.decodeUnknownOption(workerReplySchema)(raw)
+    if (Option.isNone(parsed)) return
+    const reply = parsed.value
     if (!('id' in reply)) {
       this.#health = reply.health
       this.#options.onProgress?.(reply.health)
@@ -134,7 +135,7 @@ export class SearchWorkerClient {
     this.#worker = undefined
   }
 
-  #send<Result>(request: WorkerRequestInput, schema: z.ZodType<Result>): Promise<Result> {
+  #send<Result>(request: WorkerRequestInput, schema: Schema.ConstraintDecoder<Result>): Promise<Result> {
     const worker = this.#ensureWorker()
     const id = this.#nextId
     this.#nextId += 1
@@ -147,7 +148,7 @@ export class SearchWorkerClient {
       this.#pending.set(id, { resolve, reject, timer })
       worker.postMessage({ ...request, id })
     })
-    return answer.then(value => schema.parse(value))
+    return answer.then(value => Schema.decodeUnknownSync(schema)(value))
   }
 
   async searchSessions(request: SessionSearchRequest): Promise<SearchSessionsResult> {

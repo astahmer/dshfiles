@@ -6,6 +6,7 @@
 import { mkdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import * as Schema from 'effect/Schema'
 import { z } from 'zod'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, IndexHealth, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS meta (
 ) STRICT;
 `
 
+/** Stays on zod: a `.transform` publishes no JSON Schema, so Effect would emit the raw union instead. */
 const numberLike = z.union([z.number(), z.bigint()]).transform(Number)
 const nullableString = z.string().nullable()
 
@@ -160,7 +162,7 @@ const headerOf = (
   row: Pick<SessionRow, 'id' | 'version' | 'created_at' | 'cwd' | 'parent_session' | 'seed_length' | 'delegation_depth' | 'agent_preset'>,
 ): SessionHeaderRow =>
   withoutUndefined(
-    sessionHeaderSchema.parse({
+    Schema.decodeUnknownSync(sessionHeaderSchema)({
       version: row.version,
       id: row.id,
       createdAt: row.created_at,

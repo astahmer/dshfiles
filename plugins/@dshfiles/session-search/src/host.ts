@@ -16,6 +16,7 @@ import { withoutUndefined } from './optional-fields.js'
 import type { IndexHealth } from './protocol.js'
 import { SearchWorkerClient, type SearchWorkerError } from './worker-client.js'
 
+/** Stays on zod: the union-with-undefined plus transform has no byte-identical Effect emission. */
 const rowConfig = z.object({
   indexPath: z.string().min(1).optional(),
   windowBytes: z.number().int().positive().optional(),

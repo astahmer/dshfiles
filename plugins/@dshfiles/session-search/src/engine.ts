@@ -33,6 +33,7 @@ import { SearchWorkerClient } from './worker-client.js'
 /** Bounds how stale a listing may get when another process writes the same Session logs. */
 const LISTING_TTL_MS = 60_000
 
+/** Stays on zod: Effect's decoding default omits the `default` keyword, and `z.custom` publishes no JSON Schema. */
 const engineConfigSchema = z.object({
   client: z.custom<SearchWorkerClient>(value => value instanceof SearchWorkerClient, 'a session-search worker client'),
   defaultLimit: z.number().int().positive().default(20),

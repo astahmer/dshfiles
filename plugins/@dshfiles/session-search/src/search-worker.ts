@@ -6,22 +6,20 @@
  * search answerable while the corpus is still being indexed.
  */
 import { parentPort, workerData } from 'node:worker_threads'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as Option from 'effect/Option'
 import { SearchIndex } from './index-db.js'
 import { runIngestPass } from './ingest.js'
 import type { JsonValue } from './protocol.js'
 import { workerRequestSchema, type IndexHealth, type WorkerReply } from './protocol.js'
 
-const workerConfigSchema = z.object({
-  indexPath: z.string().min(1),
-  windowBytes: z
-    .number()
-    .int()
-    .positive()
-    // Each window is decoded, parsed and committed in one synchronous step that searches wait behind.
-    .default(2 * 1024 * 1024),
+const workerConfigSchema = Schema.Struct({
+  indexPath: Schema.String.check(Schema.isMinLength(1)),
+  // Each window is decoded, parsed and committed in one synchronous step that searches wait behind.
+  windowBytes: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
 })
-const config = workerConfigSchema.parse(workerData)
+const parsedConfig = Schema.decodeUnknownSync(workerConfigSchema)(workerData)
+const config = { indexPath: parsedConfig.indexPath, windowBytes: parsedConfig.windowBytes ?? 2 * 1024 * 1024 }
 
 const IDLE_SLEEP_MS = 5_000
 const BUSY_SLEEP_MS = 50
@@ -136,9 +134,9 @@ const respond = <Value>(id: number, operation: () => Value): void => {
 }
 
 parentPort?.on('message', raw => {
-  const parsed = workerRequestSchema.safeParse(raw)
-  if (!parsed.success) return
-  const request = parsed.data
+  const parsed = Schema.decodeUnknownOption(workerRequestSchema)(raw)
+  if (Option.isNone(parsed)) return
+  const request = parsed.value
   if (request.kind === 'close') {
     state.stopped = true
     state.index?.close()

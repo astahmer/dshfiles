@@ -1,0 +1,160 @@
+{
+  "id": "session-search",
+  "owner": "@dshfiles/session-search",
+  "version": 1,
+  "methods": [
+    {
+      "name": "health",
+      "description": "Read the owned session-search index health: indexed sessions and documents, index bytes, how many log sessions and bytes are still behind, whether an ingest pass is running, how long the last pass took, and the last error. `ownsService` is false when another plugin owns the sessionQuery service, in which case content search runs on that backend and these counters stay zero. Read-only.",
+      "tool": {
+        "name": "session_search_health",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "documents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "indexBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "behindSessions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "behindBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ingesting": {
+            "type": "boolean"
+          },
+          "lastIngestMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "slowestIngestMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lastSearchMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "slowestSearchMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lastError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ownsService": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessions",
+          "documents",
+          "indexBytes",
+          "behindSessions",
+          "behindBytes",
+          "ingesting",
+          "lastIngestMs",
+          "slowestIngestMs",
+          "lastSearchMs",
+          "slowestSearchMs",
+          "lastError",
+          "ownsService"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer"
+          },
+          "documents": {
+            "type": "integer"
+          },
+          "indexBytes": {
+            "type": "integer"
+          },
+          "behindSessions": {
+            "type": "integer"
+          },
+          "behindBytes": {
+            "type": "integer"
+          },
+          "ingesting": {
+            "type": "boolean"
+          },
+          "lastIngestMs": {
+            "type": "number"
+          },
+          "slowestIngestMs": {
+            "type": "number"
+          },
+          "lastSearchMs": {
+            "type": "number"
+          },
+          "slowestSearchMs": {
+            "type": "number"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "ownsService": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessions",
+          "documents",
+          "indexBytes",
+          "behindSessions",
+          "behindBytes",
+          "ingesting",
+          "lastIngestMs",
+          "slowestIngestMs",
+          "lastSearchMs",
+          "slowestSearchMs",
+          "lastError",
+          "ownsService"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
