@@ -4982,6 +4982,9 @@ importers:
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
