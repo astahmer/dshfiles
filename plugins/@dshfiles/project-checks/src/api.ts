@@ -1,6 +1,21 @@
 import { defineApi, method, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import {
+  actionsInputSchema,
+  cancelTaskInputSchema,
+  candidateVerificationResultSchema,
+  completionAuthorizationResultSchema,
+  hookEventsInputSchema,
+  hookEventsOutputSchema,
+  receiptsInputSchema,
+  retryTaskInputSchema,
+  runInputSchema,
+  tasksInputSchema,
+} from './api-effect-schemas.js'
 import { durableAttemptStatusSchema, durableTaskProgressSchema, durableTaskStatusSchema } from './durable-tasks.js'
+
+export { candidateVerificationResultSchema, completionAuthorizationResultSchema, hookEventSchema } from './api-effect-schemas.js'
+export type { CandidateVerificationResult, ProjectHookEvent } from './api-effect-schemas.js'
 
 const sessionIdSchema = z.string().min(1).max(128)
 const actionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
@@ -10,21 +25,12 @@ export const verifiedCompletionInputSchema = z
   .object({ sessionId: sessionIdSchema, turn: z.number().int().nonnegative().safe(), sourceRevision: revisionSchema })
   .strict()
 
-export const completionAuthorizationResultSchema = z.object({ status: z.enum(['authorized', 'unavailable']) }).strict()
-
 export const candidateVerificationInputSchema = z
   .object({
     sessionId: sessionIdSchema,
     turn: z.number().int().nonnegative().safe(),
     sourceRevision: revisionSchema,
     expectedRevision: revisionSchema,
-  })
-  .strict()
-
-export const candidateVerificationResultSchema = z
-  .object({
-    status: z.enum(['passed', 'failed', 'stale', 'cancelled', 'unavailable', 'attempt-limit']),
-    prompt: z.string().max(2_048).nullable(),
   })
   .strict()
 
@@ -137,19 +143,6 @@ export const durableTaskViewSchema = z
   })
   .strict()
 
-export const hookEventSchema = z.object({
-  seq: z.number().int().nonnegative(),
-  time: z.number().int().nonnegative(),
-  kind: z.enum(['invoked', 'result']),
-  turn: z.number().int().nonnegative(),
-  point: z.string().max(120),
-  dialect: z.enum(['claude-code', 'codex']).nullable(),
-  decision: z.string().max(40).nullable(),
-  exitCode: z.number().int().nullable(),
-  durationMs: z.number().nonnegative().nullable(),
-  stderrPresent: z.boolean(),
-})
-
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -159,28 +152,28 @@ export const projectChecksApi = defineApi({
   owner: '@dshfiles/project-checks',
   methods: {
     actions: method({
-      input: z.object({ sessionId: sessionIdSchema.optional() }),
+      input: actionsInputSchema,
       output: z.array(actionViewSchema).max(32),
       description:
         'The trusted project actions configured for a thread directory, with each action command line and where it applies. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_actions', readOnly: true, render: compactJson },
     }),
     receipts: method({
-      input: z.object({ sessionId: sessionIdSchema.optional() }),
+      input: receiptsInputSchema,
       output: z.array(receiptSchema).max(30),
       description:
         'Recent project-check receipts for a thread: what ran, its outcome, exit status, duration and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_receipts', readOnly: true, render: compactJson },
     }),
     hookEvents: method({
-      input: z.object({ sessionId: sessionIdSchema.optional() }),
-      output: z.array(hookEventSchema).max(12),
+      input: hookEventsInputSchema,
+      output: hookEventsOutputSchema,
       description:
         'The native hook invocations and results recorded for a thread, so a skipped or failing hook is visible. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_hook_events', readOnly: true, render: compactJson },
     }),
     run: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), actionId: actionIdSchema }),
+      input: runInputSchema,
       output: receiptSchema,
       description:
         'Run one configured project action and return the receipt. The action may execute on a configured peer host; the receipt records the executor and any local fallback. It must be configured and visible for the thread directory. Defaults to the calling thread. Call only when the user asked to run that check.',
@@ -194,22 +187,20 @@ export const projectChecksApi = defineApi({
       tool: { name: 'project_checks_dispatch', render: compactJson },
     }),
     tasks: method({
-      input: z.object({ sessionId: sessionIdSchema.optional() }).strict(),
+      input: tasksInputSchema,
       output: z.array(durableTaskViewSchema).max(100),
       description: 'List durable project-check tasks for a thread, including interrupted/unknown work. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_tasks', readOnly: true, render: compactJson },
     }),
     cancelTask: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), taskId: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
+      input: cancelTaskInputSchema,
       output: durableTaskViewSchema,
       description:
         'Cancel a queued/running durable project-check task. A running task remains cancellation-pending until its subprocess confirms termination. Call only when the user asked.',
       tool: { name: 'project_checks_cancel', render: compactJson },
     }),
     retryTask: method({
-      input: z
-        .object({ sessionId: sessionIdSchema.optional(), taskId: z.string().regex(/^[a-f0-9]{64}$/), confirmPossibleDuplicate: z.literal(true) })
-        .strict(),
+      input: retryTaskInputSchema,
       output: durableTaskViewSchema,
       description:
         'Retry a failed, cancelled, timed-out or unknown durable task. The required confirmation acknowledges that the previous attempt may have applied external effects. Call only when the user explicitly asks to retry.',
@@ -229,10 +220,8 @@ export const projectChecksApi = defineApi({
 })
 
 export type CandidateVerificationInput = z.infer<typeof candidateVerificationInputSchema>
-export type CandidateVerificationResult = z.infer<typeof candidateVerificationResultSchema>
 export type ProjectActionView = z.infer<typeof actionViewSchema>
 export type ProjectCheckReceipt = z.infer<typeof receiptSchema>
-export type ProjectHookEvent = z.infer<typeof hookEventSchema>
 export type ProjectChecksTaskView = z.infer<typeof durableTaskViewSchema>
 
 declare module '@deepseek-ai/dsh-llm' {

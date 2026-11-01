@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import {
   candidateVerificationInputSchema,
@@ -10,7 +11,7 @@ import {
 
 describe('Project Checks hook event contract', () => {
   it('accepts fractional durations recorded by the native Hook Protocol', () => {
-    const event = hookEventSchema.parse({
+    const event = Schema.decodeUnknownSync(hookEventSchema)({
       seq: 12,
       time: 1_234,
       kind: 'result',
@@ -48,8 +49,8 @@ describe('rebased candidate verification contract', () => {
     expect(
       candidateVerificationInputSchema.safeParse({ sessionId: 'session-1', turn: 2, sourceRevision: 'main', expectedRevision: 'b'.repeat(40) }).success,
     ).toBe(false)
-    expect(completionAuthorizationResultSchema.parse({ status: 'authorized' })).toEqual({ status: 'authorized' })
-    expect(candidateVerificationResultSchema.parse({ status: 'passed', prompt: null })).toEqual({ status: 'passed', prompt: null })
-    expect(candidateVerificationResultSchema.safeParse({ status: 'failed', prompt: 'x'.repeat(2_049) }).success).toBe(false)
+    expect(Schema.decodeUnknownSync(completionAuthorizationResultSchema)({ status: 'authorized' })).toEqual({ status: 'authorized' })
+    expect(Schema.decodeUnknownSync(candidateVerificationResultSchema)({ status: 'passed', prompt: null })).toEqual({ status: 'passed', prompt: null })
+    expect(Schema.is(candidateVerificationResultSchema)({ status: 'failed', prompt: 'x'.repeat(2_049) })).toBe(false)
   })
 })
