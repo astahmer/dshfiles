@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { masterFeatureIds, privacyFeatures, type PrivacyFeatureId } from './features.js'
@@ -6,6 +5,12 @@ import type { PrivacyControlsSnapshot, PrivacyFeatureState } from './api/privacy
 import { readManagedOverrides, withFeatureStates, type FeatureUpdate } from './profile-patch.js'
 
 const unavailableReason = 'This profile has no editable Cordis patch or Loader service.'
+
+export interface PrivacyControlsEnvironment {
+  readonly patchPath: string | undefined
+  readonly entries: () => readonly { readonly options: { readonly id: string }; readonly disabled: boolean }[] | undefined
+  readonly hmr: { readonly runExclusive: (apply: () => Promise<void>) => Promise<void> } | undefined
+}
 
 const readPatch = async (path: string): Promise<string> => {
   try {
@@ -51,14 +56,14 @@ const unavailableSnapshot = (reason: string): PrivacyControlsSnapshot => ({
   features: privacyFeatures.map(feature => unavailableFeature(feature, reason)),
 })
 
-const readPrivacyControls = async (ctx: Context): Promise<PrivacyControlsSnapshot> => {
-  const patchPath = ctx.get('profileContext')?.patchPath
-  const loader = ctx.get('loader')
-  if (patchPath === undefined || loader === undefined) return unavailableSnapshot(unavailableReason)
+const readPrivacyControls = async (environment: PrivacyControlsEnvironment): Promise<PrivacyControlsSnapshot> => {
+  const { patchPath, hmr } = environment
+  const loaderEntries = environment.entries()
+  if (patchPath === undefined || loaderEntries === undefined) return unavailableSnapshot(unavailableReason)
 
-  const [patchText, entries] = await Promise.all([readPatch(patchPath), Promise.resolve([...loader.entries()])])
+  const [patchText, entries] = await Promise.all([readPatch(patchPath), Promise.resolve(loaderEntries)])
   const managedOverrides = readManagedOverrides(patchText)
-  const liveReload = ctx.get('hmr') !== undefined
+  const liveReload = hmr !== undefined
   const features = privacyFeatures.map(feature => {
     const controlledRows = feature.rows.map(row => {
       const matches = entries.filter(entry => entry.options.id === row.patchId)
@@ -112,8 +117,8 @@ const validateDependencies = (snapshot: PrivacyControlsSnapshot, updates: readon
   }
 }
 
-const persistFeatureUpdates = async (ctx: Context, updates: readonly FeatureUpdate[]): Promise<PrivacyControlsSnapshot> => {
-  const snapshot = await readPrivacyControls(ctx)
+const persistFeatureUpdates = async (environment: PrivacyControlsEnvironment, updates: readonly FeatureUpdate[]): Promise<PrivacyControlsSnapshot> => {
+  const snapshot = await readPrivacyControls(environment)
   if (!snapshot.available) throw new Error(snapshot.reason ?? unavailableReason)
   for (const update of updates) {
     const state = stateOf(snapshot, update.feature)
@@ -127,25 +132,24 @@ const persistFeatureUpdates = async (ctx: Context, updates: readonly FeatureUpda
   })
   if (changedUpdates.length === 0) return snapshot
 
-  const patchPath = ctx.get('profileContext')?.patchPath
+  const patchPath = environment.patchPath
   if (patchPath === undefined) throw new Error(unavailableReason)
   const apply = async (): Promise<void> => {
     const text = await readPatch(patchPath)
     const next = withFeatureStates(text, changedUpdates)
     if (next !== text) await writePatch(patchPath, next)
   }
-  const hmr = ctx.get('hmr')
-  await (hmr === undefined ? apply() : hmr.runExclusive(apply))
-  return readPrivacyControls(ctx)
+  await (environment.hmr === undefined ? apply() : environment.hmr.runExclusive(apply))
+  return readPrivacyControls(environment)
 }
 
 const setPrivacyFeatureEnabled = async (
-  ctx: Context,
+  environment: PrivacyControlsEnvironment,
   input: { readonly feature: PrivacyFeatureId; readonly enabled: boolean },
-): Promise<PrivacyControlsSnapshot> => persistFeatureUpdates(ctx, [input])
+): Promise<PrivacyControlsSnapshot> => persistFeatureUpdates(environment, [input])
 
-const setAllPrivacyFeaturesEnabled = async (ctx: Context, enabled: boolean): Promise<PrivacyControlsSnapshot> => {
-  const snapshot = await readPrivacyControls(ctx)
+const setAllPrivacyFeaturesEnabled = async (environment: PrivacyControlsEnvironment, enabled: boolean): Promise<PrivacyControlsSnapshot> => {
+  const snapshot = await readPrivacyControls(environment)
   if (!snapshot.available) throw new Error(snapshot.reason ?? unavailableReason)
 
   const updates = masterFeatureIds.map(feature => ({ feature, enabled }))
@@ -155,12 +159,12 @@ const setAllPrivacyFeaturesEnabled = async (ctx: Context, enabled: boolean): Pro
       throw new Error(unavailableFeatureState.reason ?? 'All feedback and upload features must exist in this profile before enabling them together.')
     }
   }
-  return persistFeatureUpdates(ctx, enabled ? updates : updates.filter(update => stateOf(snapshot, update.feature).available))
+  return persistFeatureUpdates(environment, enabled ? updates : updates.filter(update => stateOf(snapshot, update.feature).available))
 }
 
-export const createPrivacyControlsService = (ctx: Context) => ({
-  read: (): Promise<PrivacyControlsSnapshot> => readPrivacyControls(ctx),
+export const createPrivacyControlsService = (environment: PrivacyControlsEnvironment) => ({
+  read: (): Promise<PrivacyControlsSnapshot> => readPrivacyControls(environment),
   setFeature: (input: { readonly feature: PrivacyFeatureId; readonly enabled: boolean }): Promise<PrivacyControlsSnapshot> =>
-    setPrivacyFeatureEnabled(ctx, input),
-  setAll: (enabled: boolean): Promise<PrivacyControlsSnapshot> => setAllPrivacyFeaturesEnabled(ctx, enabled),
+    setPrivacyFeatureEnabled(environment, input),
+  setAll: (enabled: boolean): Promise<PrivacyControlsSnapshot> => setAllPrivacyFeaturesEnabled(environment, enabled),
 })

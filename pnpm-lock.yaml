@@ -4270,6 +4270,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       yaml:
         specifier: 'catalog:'
         version: 2.9.0

@@ -1,7 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPrivacyControlsService } from '../src/controls.js'
 import { privacyFeatures } from '../src/features.js'
@@ -23,14 +22,7 @@ let directory = ''
 let patchPath = ''
 let rows: FakeRow[] = []
 
-const host = (): Context => {
-  const ctx = new Context()
-  ctx.provide('profileContext')
-  ctx.provide('loader')
-  ctx.set('profileContext', { patchPath })
-  ctx.set('loader', { entries: () => rows })
-  return ctx
-}
+const host = () => ({ patchPath, entries: () => rows, hmr: undefined })
 
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'privacy-controls-'))
