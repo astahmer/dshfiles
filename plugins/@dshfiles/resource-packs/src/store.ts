@@ -4,11 +4,12 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type { ApiCaller, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { resourcePacksApi } from './api.js'
 import {
   attachmentSchema,
   resourceEventSchema,
+  resourceLabelSchema,
   resourceRefSchema,
   resourceSchema,
   storedPackSchema,
@@ -21,18 +22,20 @@ import { ResourceValidation } from './validation.js'
 
 type Input<Method extends keyof typeof resourcePacksApi.methods> = ApiHostInput<(typeof resourcePacksApi.methods)[Method]>
 type ResourceCatalog = ApiHostOutput<typeof resourcePacksApi.methods.catalog>
-const jsonRow = z.object({ json: z.string() })
-const resourceRow = z.object({
-  id: z.string().uuid(),
-  provider: z.string(),
-  kind: z.string(),
-  native_id: z.string(),
-  label: z.string(),
-  revision: z.number().int().positive(),
-  created_at: z.number().int().nonnegative(),
-  updated_at: z.number().int().nonnegative(),
+const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const jsonRow = Schema.Struct({ json: Schema.String })
+const idRow = Schema.Struct({ id: Schema.String.check(Schema.isUUID()) })
+const resourceRow = Schema.Struct({
+  id: Schema.String.check(Schema.isUUID()),
+  provider: Schema.String,
+  kind: Schema.String,
+  native_id: Schema.String,
+  label: Schema.String,
+  revision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+  created_at: countInt,
+  updated_at: countInt,
 })
-const attachmentRow = z.object({ pack_id: z.string(), values_json: z.string(), attached: z.union([z.literal(0), z.literal(1)]) })
+const attachmentRow = Schema.Struct({ pack_id: Schema.String, values_json: Schema.String, attached: Schema.Literals([0, 1]) })
 
 /** Owns only the registry database, never a native resource or its contents. */
 export class ResourceStore {
@@ -80,7 +83,7 @@ export class ResourceStore {
 
   private migrate(): void {
     this.transaction(() => {
-      const { user_version: version } = z.object({ user_version: z.number().int().nonnegative() }).parse(this.db.prepare('PRAGMA user_version').get())
+      const { user_version: version } = Schema.decodeUnknownSync(Schema.Struct({ user_version: countInt }))(this.db.prepare('PRAGMA user_version').get())
       if (version > 1) ResourceValidation.refuse('unsupported-storage-version', 'This database was written by a newer resource-packs version.')
       if (version === 1) return
       this.db.exec(`
@@ -107,7 +110,7 @@ export class ResourceStore {
 
   // oxlint-disable-next-line antislop/no-unknown-parameters -- SQLite rows enter here and are parsed immediately with the persisted-row and pack schemas.
   private readPack(row: unknown): StoredPack {
-    const pack = storedPackSchema.parse(JSON.parse(jsonRow.parse(row).json))
+    const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })(JSON.parse(Schema.decodeUnknownSync(jsonRow)(row).json))
     ResourceValidation.parseDefinition(pack.definition)
     return pack
   }
@@ -139,12 +142,12 @@ export class ResourceStore {
         ResourceValidation.assertCompatible(previous.definition, definition)
       }
       const now = Date.now()
-      const pack = storedPackSchema.parse({ definition, owner, createdAt: previous?.createdAt ?? now, updatedAt: now })
+      const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })({ definition, owner, createdAt: previous?.createdAt ?? now, updatedAt: now })
       this.db.prepare('INSERT INTO packs(id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json').run(definition.id, JSON.stringify(pack))
       // Added null fields must not inflate an existing attached or detached resource beyond its budget.
       if (previous !== undefined && previous.definition.properties.length !== definition.properties.length) {
         for (const row of this.db.prepare('SELECT resource_id AS id FROM attachments WHERE pack_id = ?').all(definition.id)) {
-          this.resource(z.object({ id: z.string().uuid() }).parse(row).id)
+          this.resource(Schema.decodeUnknownSync(idRow)(row).id)
         }
       }
       return pack
@@ -154,21 +157,21 @@ export class ResourceStore {
   private resource(id: string): ResourceRecord {
     const row = this.db.prepare('SELECT * FROM resources WHERE id = ?').get(id)
     if (row === undefined) return ResourceValidation.refuse('unknown-resource', 'This resource is not registered.')
-    const data = resourceRow.parse(row)
+    const data = Schema.decodeUnknownSync(resourceRow)(row)
     const attachments = this.db
       .prepare('SELECT pack_id, values_json, attached FROM attachments WHERE resource_id = ? ORDER BY pack_id')
       .all(id)
       .map(row => {
-        const attachment = attachmentRow.parse(row)
+        const attachment = Schema.decodeUnknownSync(attachmentRow)(row)
         const pack = this.pack(attachment.pack_id)
         const values = ResourceValidation.parseValues(pack.definition, JSON.parse(attachment.values_json))
-        return attachmentSchema.parse({
+        return Schema.decodeUnknownSync(attachmentSchema, { onExcessProperty: 'error' })({
           packId: attachment.pack_id,
           attached: attachment.attached === 1,
           values: ResourceValidation.fillMissing(pack.definition, values),
         })
       })
-    const resource = resourceSchema.parse({
+    const resource = Schema.decodeUnknownSync(resourceSchema, { onExcessProperty: 'error' })({
       id: data.id,
       ref: { provider: data.provider, kind: data.kind, id: data.native_id },
       label: data.label,
@@ -187,7 +190,7 @@ export class ResourceStore {
       events: this.db
         .prepare('SELECT json FROM events WHERE resource_id = ? ORDER BY sequence DESC LIMIT 100')
         .all(input.resourceId)
-        .map(row => resourceEventSchema.parse(JSON.parse(jsonRow.parse(row).json))),
+        .map(row => Schema.decodeUnknownSync(resourceEventSchema, { onExcessProperty: 'error' })(JSON.parse(Schema.decodeUnknownSync(jsonRow)(row).json))),
     }))
   }
 
@@ -206,16 +209,16 @@ export class ResourceStore {
       input.packId ?? null,
     ]
     return this.transaction(() => {
-      const { total } = z
-        .object({ total: z.number().int().nonnegative() })
-        .parse(this.db.prepare(`SELECT count(*) AS total FROM resources r ${where}`).get(...parameters))
+      const { total } = Schema.decodeUnknownSync(Schema.Struct({ total: countInt }))(
+        this.db.prepare(`SELECT count(*) AS total FROM resources r ${where}`).get(...parameters),
+      )
       const ids = this.db.prepare(`SELECT r.id FROM resources r ${where} ORDER BY r.updated_at DESC, r.id LIMIT ?`).all(...parameters, input.limit ?? 200)
-      return { total, resources: ids.map(row => this.resource(z.object({ id: z.string().uuid() }).parse(row).id)) }
+      return { total, resources: ids.map(row => this.resource(Schema.decodeUnknownSync(idRow)(row).id)) }
     })
   }
 
   private event(resource: ResourceRecord, caller: ApiCaller, action: ResourceEvent['action'], packId: string | null): void {
-    const event = resourceEventSchema.parse({
+    const event = Schema.decodeUnknownSync(resourceEventSchema, { onExcessProperty: 'error' })({
       id: randomUUID(),
       resourceId: resource.id,
       revision: resource.revision,
@@ -228,13 +231,21 @@ export class ResourceStore {
   }
 
   registerResource(input: Input<'registerResource'>, caller: ApiCaller): ResourceRecord {
-    const ref = resourceRefSchema.parse(input.ref)
-    const label = resourceSchema.shape.label.parse(input.label)
+    const ref = Schema.decodeUnknownSync(resourceRefSchema, { onExcessProperty: 'error' })(input.ref)
+    const label = Schema.decodeUnknownSync(resourceLabelSchema)(input.label)
     return this.transaction(() => {
       const existing = this.db.prepare('SELECT id FROM resources WHERE provider = ? AND kind = ? AND native_id = ?').get(ref.provider, ref.kind, ref.id)
-      if (existing !== undefined) return this.resource(z.object({ id: z.string().uuid() }).parse(existing).id)
+      if (existing !== undefined) return this.resource(Schema.decodeUnknownSync(idRow)(existing).id)
       const now = Date.now()
-      const resource = resourceSchema.parse({ id: randomUUID(), ref, label, revision: 1, attachments: [], createdAt: now, updatedAt: now })
+      const resource = Schema.decodeUnknownSync(resourceSchema, { onExcessProperty: 'error' })({
+        id: randomUUID(),
+        ref,
+        label,
+        revision: 1,
+        attachments: [],
+        createdAt: now,
+        updatedAt: now,
+      })
       this.db
         .prepare('INSERT INTO resources(id, provider, kind, native_id, label, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
         .run(resource.id, ref.provider, ref.kind, ref.id, label, 1, now, now)

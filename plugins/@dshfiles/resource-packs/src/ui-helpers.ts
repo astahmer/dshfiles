@@ -1,7 +1,8 @@
 import type { ApiClient } from '@dshfiles/dshx/api'
+import { Schema } from 'effect'
 import type { resourcePacksApi } from './api.js'
 import {
-  propertyDefinitionSchema,
+  propertyTypes,
   resourceRefSchema,
   type PackDefinition,
   type PropertyDefinition,
@@ -13,10 +14,14 @@ import {
 
 export type ResourcePacksClient = Omit<ApiClient<typeof resourcePacksApi.methods>, 'safe'>
 
+const isResourceRef = (value: unknown): value is ResourceRef => Schema.is(resourceRefSchema)(value)
+
+const referenceListSchema = Schema.Array(resourceRefSchema).check(Schema.isMaxLength(100))
+
 /** Pure representation and draft rules for the schema-driven Resources UI. */
 export class ResourceUiModel {
   static readonly resourceKeys = ['resource-packs'] as const
-  static readonly propertyTypes = propertyDefinitionSchema.options.map(option => option.shape.type.value)
+  static readonly propertyTypes = propertyTypes
   static refKey(ref: ResourceRef): string {
     return JSON.stringify([ref.provider, ref.kind, ref.id])
   }
@@ -34,6 +39,12 @@ export class ResourceUiModel {
       .slice(0, 80)
   }
 
+  /** The references a property value holds, ignoring anything that is not a resource reference. */
+  static references(value: PropertyValue | undefined): readonly ResourceRef[] {
+    if (!Array.isArray(value)) return []
+    return value.filter((item: unknown): item is ResourceRef => isResourceRef(item))
+  }
+
   static displayValue(property: PropertyDefinition, value: PropertyValue | undefined, resources: readonly ResourceRecord[]): string {
     if (value === null || value === undefined) return '—'
     if (property.type === 'select' && typeof value === 'string')
@@ -42,13 +53,22 @@ export class ResourceUiModel {
       return (
         value
           .map(id =>
-            typeof id === 'string' ? (property.options.find(option => option.id === id)?.label ?? `Unknown option: ${id}`) : ResourceUiModel.refText(id),
+            typeof id === 'string'
+              ? (property.options.find(option => option.id === id)?.label ?? `Unknown option: ${id}`)
+              : isResourceRef(id)
+                ? ResourceUiModel.refText(id)
+                : String(id),
           )
           .join(', ') || '—'
       )
     if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-    if (Array.isArray(value)) return value.map(item => (typeof item === 'string' ? item : ResourceUiModel.referenceLabel(item, resources))).join(', ') || '—'
-    if (typeof value === 'object') return ResourceUiModel.referenceLabel(value, resources)
+    if (Array.isArray(value))
+      return (
+        value
+          .map((item: unknown) => (typeof item === 'string' ? item : isResourceRef(item) ? ResourceUiModel.referenceLabel(item, resources) : String(item)))
+          .join(', ') || '—'
+      )
+    if (isResourceRef(value)) return ResourceUiModel.referenceLabel(value, resources)
     return String(value)
   }
 
@@ -61,7 +81,7 @@ export class ResourceUiModel {
 
   /** Validate against the current definition, never infer a column or type from stored values. */
   static validatedValues(pack: PackDefinition, draft: PropertyValues): PropertyValues {
-    const values: PropertyValues = {}
+    const values: Record<string, PropertyValue> = {}
     for (const property of pack.properties) {
       if (property.readOnly) continue
       const raw = Object.hasOwn(draft, property.id) ? draft[property.id] : undefined
@@ -114,16 +134,14 @@ export class ResourceUiModel {
           values[property.id] = value
           break
         case 'reference': {
-          const parsed = resourceRefSchema.safeParse(value)
-          if (!parsed.success) fail()
-          else values[property.id] = parsed.data
+          if (!isResourceRef(value)) fail()
+          values[property.id] = value
           break
         }
         case 'references': {
-          if (!Array.isArray(value)) fail()
-          const parsed = resourceRefSchema.array().max(100).safeParse(value)
-          if (!parsed.success) fail()
-          else values[property.id] = parsed.data
+          const parsed = Schema.decodeUnknownResult(referenceListSchema)(value)
+          if (parsed._tag === 'Failure') fail()
+          else values[property.id] = parsed.success
           break
         }
       }

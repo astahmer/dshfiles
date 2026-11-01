@@ -6,13 +6,13 @@ import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { resourcePacksApi } from '../src/api.js'
 import { createResourcePacksHost } from '../src/host.js'
 import { packDefinitionSchema, resourceSchema, type ResourceRecord } from '../src/model.js'
 
 const owner = '@dshfiles/resource-packs'
-const definition = packDefinitionSchema.parse({
+const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
   id: 'contributor',
   version: 1,
   label: 'Contributor pack',
@@ -22,7 +22,7 @@ const definition = packDefinitionSchema.parse({
   ],
 })
 const ref = { provider: 'test', kind: 'record', id: 'Opaque/CaSe/%_?' }
-const resourceEnvelope = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: resourceSchema }) }) })
+const resourceEnvelope = Schema.Struct({ result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: resourceSchema }) }) })
 let directory: string
 let path: string
 let host: TestHost
@@ -83,7 +83,7 @@ describe('mounted Cordis Host / public resourcePacksApi', () => {
     const foreignApi = createHostApiClient(other.ctx, resourcePacksApi, '@test/other')
     await expect(foreignApi.setValues(input)).rejects.toMatchObject({ remoteCode: 'read-only' })
     await expect(foreignApi.registerPack({ definition })).rejects.toMatchObject({ remoteCode: 'owner-conflict' })
-    const changed = resourceEnvelope.parse(await request('setValues', { ...input, values: { note: 'GUI metadata' } })).result.value.output
+    const changed = Schema.decodeUnknownSync(resourceEnvelope)(await request('setValues', { ...input, values: { note: 'GUI metadata' } })).result.value.output
     await contributor.dispose()
     expect((await foreignApi.catalog()).packs.find(pack => pack.definition.id === definition.id)?.owner).toBe('@test/contributor')
     expect((await foreignApi.get({ resourceId: resource.id })).resource).toEqual(changed)
@@ -113,10 +113,10 @@ describe('mounted Cordis Host / public resourcePacksApi', () => {
     const registered = await tool('resource_packs_register_resource', { ref, label: 'Agent record' })
     expect(registered.isError).toBe(false)
     if (registered.isError) throw new Error('Registration failed')
-    const resource = resourceSchema.parse(registered.value)
+    const resource = Schema.decodeUnknownSync(resourceSchema)(registered.value)
     const attachedResult = await tool('resource_packs_attach', { resourceId: resource.id, expectedRevision: resource.revision, packId: 'tracking' })
     if (attachedResult.isError) throw new Error('Attachment failed')
-    const attached = resourceSchema.parse(attachedResult.value)
+    const attached = Schema.decodeUnknownSync(resourceSchema)(attachedResult.value)
     const input = { resourceId: resource.id, expectedRevision: attached.revision, packId: 'tracking' }
     for (const args of [input, { ...input, confirm: false }]) {
       expect(await request('detach', args)).toMatchObject({ result: { ok: false, error: { code: 'contract' } } })

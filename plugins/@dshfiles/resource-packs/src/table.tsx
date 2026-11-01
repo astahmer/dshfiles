@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Schema } from 'effect'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DataTable, createColumnHelper, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
 import { resourceRefSchema, type PackDefinition, type PropertyDefinition, type PropertyValue, type ResourceRecord, type ResourceRef } from './model.js'
@@ -25,15 +26,14 @@ function PropertyCell(props: {
   onOpenReference: (ref: ResourceRef) => void
 }): JSX.Element {
   if (props.property.type === 'reference') {
-    const reference = resourceRefSchema.safeParse(props.value)
-    if (reference.success) return <ReferenceCell reference={reference.data} resources={props.resources} onOpenReference={props.onOpenReference} />
+    if (Schema.is(resourceRefSchema)(props.value)) return <ReferenceCell reference={props.value} resources={props.resources} onOpenReference={props.onOpenReference} />
   }
   if (props.property.type === 'references') {
-    const references = resourceRefSchema.array().safeParse(props.value)
-    if (references.success && references.data.length > 0)
+    const references = ResourceUiModel.references(props.value)
+    if (references.length > 0)
       return (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-          {references.data.map((reference, index) => (
+          {references.map((reference, index) => (
             <ReferenceCell
               key={`${ResourceUiModel.refKey(reference)}:${index}`}
               reference={reference}
@@ -48,7 +48,7 @@ function PropertyCell(props: {
 }
 
 export function ResourceTable(props: {
-  resources: ResourceRecord[]
+  resources: readonly ResourceRecord[]
   pack: PackDefinition | undefined
   references: readonly ResourceRecord[]
   onEdit: (resource: ResourceRecord) => void

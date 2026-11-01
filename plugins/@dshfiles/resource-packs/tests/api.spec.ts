@@ -2,14 +2,16 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { resourcePacksApi } from '../src/api.js'
 import { createResourcePacksHost } from '../src/host.js'
 import { packDefinitionSchema, resourceSchema } from '../src/model.js'
-import { z } from 'zod'
 
-const resourceResponse = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: resourceSchema }) }) })
-const errorResponse = z.object({ result: z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }) })
+const resourceResponse = Schema.Struct({ result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: resourceSchema }) }) })
+const errorResponse = Schema.Struct({
+  result: Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String }) }),
+})
 let host: TestHost
 let directory: string
 beforeEach(async () => {
@@ -48,17 +50,18 @@ describe('authoritative API validation', () => {
       },
     ],
   ])('refuses invalid wire input without mutation: %s %j', async (method, input) => {
-    expect(errorResponse.parse(await call(method, input)).result.error.code).toBe('contract')
+    expect(Schema.decodeUnknownSync(errorResponse)(await call(method, input)).result.error.code).toBe('contract')
     expect(await call('list', {})).toMatchObject({ result: { ok: true, value: { output: { total: 0, resources: [] } } } })
     expect(await call('catalog', undefined)).toMatchObject({ result: { ok: true, value: { output: { packs: [{ definition: { id: 'tracking' } }] } } } })
   })
 
   it('returns bounded useful domain errors without echoing submitted values or opaque ids', async () => {
-    const registered = resourceResponse.parse(
+    const registered = Schema.decodeUnknownSync(resourceResponse)(
       await call('registerResource', { ref: { provider: 'native', kind: 'conversation', id: 'Native/SecretId' }, label: 'Explicit label' }),
     ).result.value.output
-    const attached = resourceResponse.parse(await call('attach', { resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' }))
-      .result.value.output
+    const attached = Schema.decodeUnknownSync(resourceResponse)(
+      await call('attach', { resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' }),
+    ).result.value.output
     const input = { resourceId: registered.id, expectedRevision: attached.revision, packId: 'tracking' }
     const before = await call('get', { resourceId: registered.id })
     for (const values of [
@@ -66,7 +69,7 @@ describe('authoritative API validation', () => {
       { absent: 'secret:DO_NOT_ECHO' },
       { related: { provider: 'native', kind: 'conversation', id: '', payload: 'secret:DO_NOT_ECHO' } },
     ]) {
-      const error = errorResponse.parse(await call('setValues', { ...input, values })).result.error
+      const error = Schema.decodeUnknownSync(errorResponse)(await call('setValues', { ...input, values })).result.error
       expect(error.code).not.toBe('internal')
       expect(error.message.length).toBeLessThanOrEqual(500)
       expect(error.message).not.toContain('DO_NOT_ECHO')
@@ -76,13 +79,13 @@ describe('authoritative API validation', () => {
   })
 
   it('computes user ownership for GUI registration and refuses builtin namespace takeover', async () => {
-    const definition = packDefinitionSchema.parse({
+    const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
       id: 'user-pack',
       version: 1,
       label: 'User pack',
       properties: [{ id: 'note', label: 'Note', type: 'text' }],
     })
     expect(await call('registerPack', { definition })).toMatchObject({ result: { ok: true, value: { output: { owner: 'user' } } } })
-    expect(errorResponse.parse(await call('registerPack', { definition: { ...definition, id: 'tracking' } })).result.error.code).toBe('owner-conflict')
+    expect(Schema.decodeUnknownSync(errorResponse)(await call('registerPack', { definition: { ...definition, id: 'tracking' } })).result.error.code).toBe('owner-conflict')
   })
 })
