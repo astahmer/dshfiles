@@ -1,5 +1,6 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import * as Schema from 'effect/Schema'
 import { threadWorkspaceName } from '@dshfiles/jj-integration/api'
 
 /**
@@ -34,7 +35,7 @@ const isThreadWorkspacePath = (path: string): boolean => {
   const segments = path.split('/')
   const name = segments.at(-1)
   const parent = segments.at(-2)
-  return name !== undefined && parent !== undefined && parent.endsWith(THREADS_DIRECTORY_SUFFIX) && threadWorkspaceName.safeParse(name).success
+  return name !== undefined && parent !== undefined && parent.endsWith(THREADS_DIRECTORY_SUFFIX) && Schema.is(threadWorkspaceName)(name)
 }
 
 export class DraftThreadsModel {
