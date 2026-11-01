@@ -12,6 +12,8 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WORKBENCH_MAIN_PANEL_ID, workbenchPanels } from '@dshfiles/workbench/registry'
 import { useEffect, useSyncExternalStore } from 'react'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { z } from 'zod'
 import { createEditorStore, type EditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
@@ -32,6 +34,7 @@ const FILE_LINK_ID = '@dshfiles/editor/file-link'
 const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 
+// `createStoredValue` (plugin-ui) takes a `ZodType` and reads `.safeParse`, so its schemas stay on zod.
 // Open requests arrive while no editor surface is mounted, so the settings are mirrored where the event handler reads them.
 const placement = createStoredValue({ key: 'dshfiles-editor:placement', schema: z.enum(['workbench', 'right-panel']), fallback: 'workbench' })
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.
@@ -39,6 +42,7 @@ const loadEngine = () => import('./monaco-engine.js').then(module => module.mona
 
 const noSession = (): undefined => undefined
 
+// zod's `record` emits `propertyNames`/`additionalProperties` where Effect adds none, and `z.custom` has no JSON Schema document.
 const sessionListSchema = z.object({ byId: z.record(z.string(), z.unknown()) })
 const sessionCwdSchema = z.object({ cwd: z.string().min(1) })
 
@@ -183,7 +187,8 @@ export default defineClient({
       const actions = tab.actions
       useEffect(() => {
         const parsed = OpenFileAddress.parse(address)
-        const line = fileLinkParamsSchema.safeParse(params).data?.line
+        const decodedLine = params === undefined ? Option.none() : Schema.decodeUnknownOption(fileLinkParamsSchema)(params)
+        const line = Option.getOrUndefined(decodedLine)?.line
         if (parsed !== undefined) {
           // SAFETY: the id comes from a Host-built address for this Client's Sessions.
           const sessionId = parsed.sessionId as SessionId
@@ -206,19 +211,19 @@ export default defineClient({
     ctx.effect(() => {
       const onOpenFile = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
-        const request = openFileRequestSchema.safeParse(event.detail)
-        if (request.success && openFile(request.data)) event.preventDefault()
+        const request = Schema.decodeUnknownOption(openFileRequestSchema)(event.detail)
+        if (Option.isSome(request) && openFile(request.value)) event.preventDefault()
       }
       const onGoToLine = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
-        const request = goToLineRequestSchema.safeParse(event.detail)
+        const request = Schema.decodeUnknownOption(goToLineRequestSchema)(event.detail)
         const sessionId = currentSession()
-        if (!request.success || sessionId === undefined) return
+        if (Option.isNone(request) || sessionId === undefined) return
         const state = store.getSnapshot()
         const active = state.documents.find(document => document.id === state.activeBySession[sessionId])
         if (active === undefined) return
         event.preventDefault()
-        store.open(sessionId, { path: active.path, line: request.data.line })
+        store.open(sessionId, { path: active.path, line: request.value.line })
         showEditor()
       }
       window.addEventListener(OPEN_FILE_EVENT, onOpenFile)

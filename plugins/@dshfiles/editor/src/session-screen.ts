@@ -1,11 +1,15 @@
 import type { SessionScreenService, Subscribable, WorkspaceEntry, WorkspaceFilesState, WorkspaceSearchHit } from '@dshfiles/dshx/client'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
-const listingSchema = z.object({
-  ok: z.literal(true),
-  value: z.object({ entries: z.array(z.object({ name: z.string(), type: z.enum(['file', 'directory', 'other']) })) }),
+export const listingSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  value: Schema.Struct({ entries: Schema.Array(Schema.Struct({ name: Schema.String, type: Schema.Literals(['file', 'directory', 'other']) })) }),
 })
-const searchSchema = z.object({ ok: z.literal(true), value: z.array(z.object({ path: z.string(), kind: z.enum(['file', 'directory']) })) })
+export const searchSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  value: Schema.Array(Schema.Struct({ path: Schema.String, kind: Schema.Literals(['file', 'directory']) })),
+})
 
 const NO_SESSION: WorkspaceFilesState = { status: 'no-session' }
 
@@ -67,9 +71,11 @@ export const createSessionScreen = <SessionId extends string>(input: {
       list: async request => {
         const sessionId = target(request.sessionId)
         if (sessionId === undefined) return undefined
-        const listing = listingSchema.safeParse(await input.list(sessionId, request.path === '' ? '.' : request.path, request.signal).catch(() => undefined))
-        if (!listing.success) return undefined
-        return listing.data.value.entries.map((entry): WorkspaceEntry => ({
+        const listing = Schema.decodeUnknownOption(listingSchema)(
+          await input.list(sessionId, request.path === '' ? '.' : request.path, request.signal).catch(() => undefined),
+        )
+        if (Option.isNone(listing)) return undefined
+        return listing.value.value.entries.map((entry): WorkspaceEntry => ({
           name: entry.name,
           path: request.path === '' ? entry.name : `${request.path}/${entry.name}`,
           type: entry.type,
@@ -78,8 +84,8 @@ export const createSessionScreen = <SessionId extends string>(input: {
       search: async request => {
         const sessionId = target(request.sessionId)
         if (sessionId === undefined) return []
-        const hits = searchSchema.safeParse(await input.search(sessionId, request.query, request.signal).catch(() => undefined))
-        return hits.success ? hits.data.value.map((hit): WorkspaceSearchHit => ({ path: hit.path, kind: hit.kind })) : []
+        const hits = Schema.decodeUnknownOption(searchSchema)(await input.search(sessionId, request.query, request.signal).catch(() => undefined))
+        return Option.isSome(hits) ? hits.value.value.map((hit): WorkspaceSearchHit => ({ path: hit.path, kind: hit.kind })) : []
       },
     },
   }

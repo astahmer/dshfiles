@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /**
  * Cross-plugin entry point: any plugin opens a file in the editor with
@@ -8,19 +8,22 @@ import { z } from 'zod'
  */
 export const OPEN_FILE_EVENT = 'dshfiles:open-file'
 
-export const openFileRequestSchema = z.object({
+const pathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096))
+const lineNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
+
+export const openFileRequestSchema = Schema.Struct({
   /** Absolute, or relative to `cwd` when given, else to the session workspace root. */
-  path: z.string().min(1).max(4096),
-  line: z.number().int().positive().optional(),
-  cwd: z.string().min(1).max(4096).optional(),
+  path: pathSchema,
+  line: Schema.optionalKey(lineNumberSchema),
+  cwd: Schema.optionalKey(pathSchema),
 })
 
 /** Moves the editor's active file of the session on screen to a line; handled (preventDefault) only when a file is open. */
 export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
-export const goToLineRequestSchema = z.object({ line: z.number().int().positive() })
+export const goToLineRequestSchema = Schema.Struct({ line: lineNumberSchema })
 
-export type OpenFileRequest = z.infer<typeof openFileRequestSchema>
+export type OpenFileRequest = Schema.Schema.Type<typeof openFileRequestSchema>
 
 const normalizeSegments = (path: string): string => {
   const absolute = path.startsWith('/')
@@ -78,7 +81,8 @@ const editorClaimsFileAddress = (address: string): boolean => {
   return !HOST_PREVIEW_EXTENSIONS.has(parsed.path.split('.').at(-1)?.toLowerCase() ?? '')
 }
 
-export const fileLinkParamsSchema = z.object({ line: z.number().int().positive().optional() }).optional()
+/** Callers decode absent params as absent; a nullable/optional Effect wrapper would add an `anyOf` null branch instead. */
+export const fileLinkParamsSchema = Schema.Struct({ line: Schema.optionalKey(lineNumberSchema) })
 
 export class OpenFileAddress {
   static readonly resolve = resolveRequestedPath
