@@ -206,3 +206,10 @@ it('generates outside any thread, decoding a JSON Schema reply', async () => {
   expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
   expect(model.requests[0]?.tools).toBeUndefined()
 })
+
+it('rejects a reply that does not match the requested JSON Schema', async () => {
+  const { sessions } = await fixture(['{"quantity":"many"}', '{"quantity":"many"}'])
+  await expect(
+    sessions.generate({ prompt: 'Count', jsonSchema: { type: 'object', properties: { quantity: { type: 'number' } }, required: ['quantity'] } }),
+  ).rejects.toMatchObject({ message: expect.stringContaining('did not match the requested shape') })
+})

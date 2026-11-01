@@ -7,10 +7,10 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { Effect } from 'effect'
+import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
+import { Effect, Schema } from 'effect'
 import { definePromptSection, generate, pluginStorage } from '@dshfiles/dshx/host'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
 import type { SessionRequestId } from './native/types.ts'
 import { recentTranscript } from './session-transcript.ts'
 import { sessionsApi } from './sessions-api.ts'
@@ -171,7 +171,24 @@ const readTitles = async (
   return titles
 }
 
-const sessionQueryNotFound = z.object({ code: z.literal('SESSION_QUERY_SESSION_NOT_FOUND') })
+const isSessionQueryNotFound = (error: unknown): boolean =>
+  Schema.decodeUnknownResult(Schema.Struct({ code: Schema.Literal('SESSION_QUERY_SESSION_NOT_FOUND') }))(error)._tag === 'Success'
+
+/** A caller's JSON Schema as the standard schema `generate` publishes and validates the reply with. */
+const standardSchemaOf = (jsonSchema: Record<string, Schema.Schema.Type<typeof Schema.Json>>) => {
+  assertSupportedJsonSchema(jsonSchema)
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'dsh',
+      validate: (value: unknown) => {
+        const violations = validateJsonSchemaValue(jsonSchema, value)
+        return violations.length === 0 ? { value } : { issues: violations.map(message => ({ message })) }
+      },
+      jsonSchema: { input: () => jsonSchema, output: () => jsonSchema },
+    },
+  }
+}
 
 const eventsOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId): Promise<readonly SessionEvent[]> => {
   const live = runtime.ctx.agents.get(id)
@@ -181,7 +198,7 @@ const eventsOf = async (runtime: typeof SessionControllerHostRuntime.Service, id
   try {
     return (await query.readSession(id)).events
   } catch (error) {
-    if (sessionQueryNotFound.safeParse(error).success) throw notFound()
+    if (isSessionQueryNotFound(error)) throw notFound()
     throw error
   }
 }
@@ -393,8 +410,8 @@ export const sessionsHost = sessionControllerHostApi(sessionsApi, {
           const result = await generate(runtime.ctx, base)
           return { text: result.text, provider: result.provider, model: result.model }
         }
-        const result = await generate(runtime.ctx, { ...base, schema: z.fromJSONSchema(input.jsonSchema) })
-        return { text: result.text, value: z.json().parse(result.value), provider: result.provider, model: result.model }
+        const result = await generate(runtime.ctx, { ...base, schema: standardSchemaOf(input.jsonSchema) })
+        return { text: result.text, value: Schema.decodeUnknownSync(Schema.Json)(result.value), provider: result.provider, model: result.model }
       }),
     ),
   ),

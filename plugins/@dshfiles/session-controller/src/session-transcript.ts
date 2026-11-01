@@ -1,11 +1,20 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 const MAX_TEXT = 8_000
 
-const textBlock = z.looseObject({ type: z.string(), text: z.string().optional() })
-const userMessage = z.looseObject({ content: z.array(textBlock).max(512).optional(), source: z.looseObject({ kind: z.string() }).optional() })
-const assistantMessage = z.looseObject({ message: z.looseObject({ content: z.array(textBlock).max(512).optional() }) })
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) })
+const userMessageSchema = Schema.Struct({
+  content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))),
+  source: Schema.optional(Schema.Struct({ kind: Schema.String })),
+})
+const assistantMessageSchema = Schema.Struct({
+  message: Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }),
+})
+
+type TextBlock = Schema.Schema.Type<typeof textBlockSchema>
+type UserMessage = Schema.Schema.Type<typeof userMessageSchema>
+type AssistantMessage = Schema.Schema.Type<typeof assistantMessageSchema>
 
 /** What a reader of the thread typed or was told; runtime context, reminders and other synthetic inputs stay out. */
 const SPOKEN_SOURCES = new Set(['user', 'dshfiles-plugin-message'])
@@ -16,7 +25,7 @@ export interface TranscriptEntry {
   readonly text: string
 }
 
-const textOf = (blocks: readonly z.infer<typeof textBlock>[] | undefined): string => {
+const textOf = (blocks: readonly TextBlock[] | undefined): string => {
   const joined = (blocks ?? [])
     .flatMap(block => (block.type === 'text' && block.text !== undefined ? [block.text] : []))
     .join('\n')
@@ -24,15 +33,20 @@ const textOf = (blocks: readonly z.infer<typeof textBlock>[] | undefined): strin
   return joined.length > MAX_TEXT ? `${joined.slice(0, MAX_TEXT)}…` : joined
 }
 
+const decode = <Value>(schema: Schema.ConstraintDecoder<Value>, data: unknown): Value | undefined => {
+  const result = Schema.decodeUnknownResult(schema)(data)
+  return result._tag === 'Success' ? result.success : undefined
+}
+
 const entryOf = (event: SessionEvent): TranscriptEntry | undefined => {
   if (event.type === 'user/message') {
-    const message = userMessage.safeParse(event.data).data
+    const message: UserMessage | undefined = decode(userMessageSchema, event.data)
     if (message === undefined || !SPOKEN_SOURCES.has(message.source?.kind ?? '')) return undefined
     const text = textOf(message.content)
     return text === '' ? undefined : { seq: event.seq, role: 'user', text }
   }
   if (event.type === 'assistant/message') {
-    const message = assistantMessage.safeParse(event.data).data
+    const message: AssistantMessage | undefined = decode(assistantMessageSchema, event.data)
     const text = message === undefined ? '' : textOf(message.message.content)
     return text === '' ? undefined : { seq: event.seq, role: 'assistant', text }
   }

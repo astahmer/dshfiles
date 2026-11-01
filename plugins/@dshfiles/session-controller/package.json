@@ -51,8 +51,7 @@
   },
   "dependencies": {
     "effect": "catalog:",
-    "mime-types": "3.0.2",
-    "zod": "4.4.3"
+    "mime-types": "3.0.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

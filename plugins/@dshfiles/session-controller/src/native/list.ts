@@ -4,13 +4,14 @@ import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -34,19 +35,24 @@ interface ProjectionRead {
   readonly metadata?: SessionListMetadata
 }
 
-const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
-  blank: z.boolean(),
-  lastPromptAt: z.number().nullable(),
-})
+/**
+ * `@deepseek-ai/dsh-session-projection` declares projection `stateSchema`/`viewSchema` as `ZodType`; the Effect schema
+ * stays the source of truth and `zodSchemaFromEffect` only carries it across that boundary.
+ */
+const sessionListMetadataEffectSchema = Schema.Struct({ blank: Schema.Boolean, lastPromptAt: Schema.NullOr(Schema.Number) })
+const sessionListMetadataSchema = zodSchemaFromEffect(sessionListMetadataEffectSchema)
 
-const imageLimitsSchema = z.object({
-  maxImageBytes: z.number().int().positive(),
-  maxImagesPerMessage: z.number().int().positive(),
-  maxMessageImageBytes: z.number().int().positive(),
-  maxImagePixels: z.number().int().positive(),
-  maxImageDimension: z.number().int().positive(),
-  mediaTypes: z.array(z.string()),
-}) as unknown as z.ZodType<ImageAttachmentLimits>
+const imageMediaTypes: readonly ImageMediaType[] = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+const imageLimitsEffectSchema = Schema.Struct({
+  maxImageBytes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  maxImagesPerMessage: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  maxMessageImageBytes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  maxImagePixels: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  maxImageDimension: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  mediaTypes: Schema.Array(Schema.Literals(imageMediaTypes)),
+})
+const imageLimitsSchema = zodSchemaFromEffect(imageLimitsEffectSchema)
+const imageLimitsStateSchema = zodSchemaFromEffect(Schema.Null)
 
 /**
  * Advance the Session-list metadata projection by one committed event.
@@ -135,7 +141,7 @@ export class ApiSessionList {
     ctx.inject(['attachments'], (attachmentCtx) => {
       ctx.sessionProjections.register<'imageLimits', null>({
         key: 'imageLimits',
-        stateSchema: z.null(),
+        stateSchema: imageLimitsStateSchema,
         init: () => null,
         apply: state => state,
         wire: {
