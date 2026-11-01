@@ -25,6 +25,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
+  "dependencies": {
+    "effect": "catalog:"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",

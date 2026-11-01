@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { LlmAdapter, LlmRuntime, createUserMessage, markAgentLoopRequest, type GenerateOptions, type Message, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { Effect, Exit, Scope } from 'effect'
 import { describe, expect, it } from 'vitest'
 import type { RequestMessagesPayload } from './contract.ts'
 import { installRequestMessages } from './polyfill.ts'
@@ -31,7 +32,11 @@ const startHost = async () => {
     payloads.push({ turn: payload.turn, step: payload.step, isFirstStepOfTurn: payload.isFirstStepOfTurn, messages: payload.messages })
     return (await next()).slice(-1)
   })
-  const install = () => ctx.plugin({ name: 'request-messages', inject: ['llm', 'agents'], apply: (scope: Context) => void installRequestMessages(scope) })
+  const install = async () => {
+    const scope = Effect.runSync(Scope.make())
+    const status = await Effect.runPromise(Scope.provide(scope)(installRequestMessages(ctx, ctx.llm, effect => Effect.runPromise(effect))))
+    return { status, dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)) }
+  }
   return { ctx, adapter, payloads, install }
 }
 
@@ -64,9 +69,20 @@ describe('agent/request-messages polyfill', () => {
     expect(payloads).toEqual([])
   })
 
+  it('sends derived messages when a request-messages listener fails', async () => {
+    const { ctx, adapter, install } = await startHost()
+    ctx.on('agent/request-messages', () => {
+      throw new Error('listener failed')
+    })
+    await install()
+    await drain(ctx.llm.stream(loopRequest()))
+    expect(adapter.seen).toEqual([['first turn', 'first answer', 'second turn']])
+  })
+
   it('restores the runtime when the last copy unloads', async () => {
     const { ctx, adapter, payloads, install } = await startHost()
     const fiber = await install()
+    expect(fiber.status).toEqual({ active: true })
     expect(Object.hasOwn(ctx.llm, 'adapterStream')).toBe(true)
     await fiber.dispose()
     expect(Object.hasOwn(ctx.llm, 'adapterStream')).toBe(false)
