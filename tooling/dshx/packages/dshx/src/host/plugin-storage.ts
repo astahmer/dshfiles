@@ -180,4 +180,19 @@ export class PluginStorageModel {
   static readonly registration = storageRegistration
   static readonly domainName = DOMAIN_NAME
   static readonly changeOf = changeOf
+  static readonly toStorageSchema = toStorageSchema
+}
+
+/**
+ * A storage-domain `valueSchema` backed by an Effect schema. The storage domain
+ * still validates with zod, so a plugin that migrated its own schemas to Effect
+ * passes them through this bridge instead of keeping a zod copy.
+ */
+function toStorageSchema<S extends Schema.ConstraintDecoder<unknown>>(schema: S): z.ZodType<S['Type']> {
+  return z.unknown().transform((value, context): S['Type'] => {
+    const decoded = Schema.decodeUnknownResult(schema)(value)
+    if (decoded._tag === 'Success') return decoded.success
+    context.addIssue({ code: 'custom', message: 'Invalid stored value.' })
+    return z.NEVER
+  })
 }

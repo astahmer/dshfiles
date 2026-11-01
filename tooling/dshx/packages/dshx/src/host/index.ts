@@ -17,6 +17,8 @@ export const listApis = HostApiClientModel.list
 export const publishApiEvent = HostApiEventsModel.publish
 /** Durable key-value storage for one plugin namespace, shared with its browser half through `hostStorage(api)`. */
 export const pluginStorage = PluginStorageModel.open
+/** Bridge an Effect schema into a `@deepseek-ai/dsh-storage-domain` table `valueSchema`. */
+export const toStorageSchema = PluginStorageModel.toStorageSchema
 export type { PluginStorage } from './plugin-storage.js'
 /** One model call outside any thread, with optional schema-checked JSON output. */
 export { generate } from './generate.js'

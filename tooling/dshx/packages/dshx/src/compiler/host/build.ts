@@ -146,6 +146,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const publishApiEvent = HostApiEventsModel.publish',
           `import { PluginStorageModel } from ${JSON.stringify(HOST_PLUGIN_STORAGE_PATH)}`,
           'export const pluginStorage = PluginStorageModel.open',
+          'export const toStorageSchema = PluginStorageModel.toStorageSchema',
           // A named function export, not a static class member, so a Host that never calls it drops its dsh-llm import.
           `export { generate } from ${JSON.stringify(HOST_GENERATE_PATH)}`,
           '',
