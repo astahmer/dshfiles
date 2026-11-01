@@ -5,18 +5,19 @@ import { PinnedToolCalls } from '@dshfiles/chat/pinned-tool-calls'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { useMemo } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { HtmlPageCard, HtmlPageFailed, HtmlPagePending } from './html-page-card.js'
-import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HtmlPageModel, htmlPageSchema, type HtmlPage } from './html-page.js'
+import type { HtmlPage } from './html-page.js'
+import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HtmlPageModel, htmlPageSchema } from './html-page.js'
 
 const REGISTRANT = '@dshfiles/html-render'
-const titleArgs = z.object({ title: z.string().optional(), path: z.string().optional() })
+const titleArgs = Schema.Struct({ title: Schema.optional(Schema.String), path: Schema.optional(Schema.String) })
 
-const decodeArgs = <T,>(schema: z.ZodType<T>, argsRaw: string | undefined): T | undefined => {
+const decodeArgs = <ArgsSchema extends Schema.ConstraintDecoder<unknown>>(schema: ArgsSchema, argsRaw: string | undefined): ArgsSchema['Type'] | undefined => {
   if (argsRaw === undefined) return undefined
   try {
     const decoded = decodeJsonSafe(schema, argsRaw)
-    return decoded.success ? decoded.data : undefined
+    return decoded._tag === 'Success' ? decoded.success : undefined
   } catch {
     return undefined
   }
@@ -31,10 +32,10 @@ const argsRawOf = (props: ToolCallViewProps): string | undefined => {
 /** The settled page: its persisted presentation metadata, else (html_render only) the recorded call arguments. */
 const settledPage = (props: ToolCallViewProps): HtmlPage | undefined => {
   if (props.phase !== 'result' || props.block.isError) return undefined
-  const meta = htmlPageSchema.safeParse(props.block.meta)
-  if (meta.success) return meta.data
+  const meta = Schema.decodeUnknownResult(htmlPageSchema)(props.block.meta)
+  if (meta._tag === 'Success') return meta.success
   if (props.toolName !== HTML_RENDER_TOOL) return undefined
-  const fromArgs = HtmlPageModel.parse(decodeArgs(z.unknown(), argsRawOf(props)))
+  const fromArgs = HtmlPageModel.parse(decodeArgs(Schema.Unknown, argsRawOf(props)))
   return fromArgs.ok ? fromArgs.page : undefined
 }
 

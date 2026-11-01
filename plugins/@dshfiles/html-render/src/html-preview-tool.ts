@@ -5,17 +5,24 @@ import type { FsTarget } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
 import { Effect, Schema } from 'effect'
-import { z } from 'zod'
-import { HTML_PREVIEW_TOOL, HtmlPageLimits, HtmlPageModel, htmlPageThemes } from './html-page.js'
+import { HTML_PREVIEW_TOOL, HtmlPageLimits, HtmlPageModel, decodeToolArguments, htmlPageThemes, trimmedText } from './html-page.js'
 import type { HtmlPageStore } from './html-page-store.js'
 import { RelativeAssets, type AssetReader } from './relative-assets.js'
 import type { HtmlRenderEffectRunner } from './effect-runner.js'
 
-const argsSchema = z.object({
-  path: z.string().trim().min(1, 'path is empty; pass an .html file relative to the thread workspace.').max(2048),
-  title: z.string().trim().min(1).max(HtmlPageLimits.maxTitleLength).optional(),
-  height: z.number().finite().optional(),
-  theme: z.enum(htmlPageThemes).optional(),
+const argsSchema = Schema.Struct({
+  path: trimmedText.check(
+    Schema.makeFilter(value => (value.length > 0 ? true : 'path is empty; pass an .html file relative to the thread workspace.')),
+    Schema.isMaxLength(2048),
+  ),
+  title: Schema.optional(
+    trimmedText.check(
+      Schema.makeFilter(value => (value.length > 0 ? true : 'title is empty; give the page a short name.')),
+      Schema.isMaxLength(HtmlPageLimits.maxTitleLength),
+    ),
+  ),
+  height: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  theme: Schema.optional(Schema.Literals(htmlPageThemes)),
 })
 
 const HTML_EXTENSIONS = /\.x?html?$/i
@@ -82,9 +89,9 @@ const showHtmlPreview = Effect.fn('html preview show')(function* (input: {
   return yield* Effect.tryPromise({
     try: async signal => {
       const ctx = input.input.ctx
-      const parsedArgs = argsSchema.safeParse(input.rawArgs)
-      if (!parsedArgs.success) return fail(parsedArgs.error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; '))
-      const args = parsedArgs.data
+      const parsedArgs = decodeToolArguments(argsSchema, input.rawArgs)
+      if (!parsedArgs.ok) return fail(parsedArgs.error)
+      const args = parsedArgs.value
       const agent = input.execution.agent ?? fail('html_preview runs only on behalf of an Agent.')
       const cwd = await ctx.workingDirectory.ensure(agent, signal)
       const workspacePath = agent.session.header.cwd ?? cwd

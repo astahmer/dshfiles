@@ -29,8 +29,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/preview": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

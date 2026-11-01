@@ -1,7 +1,7 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { HtmlPageLimits, htmlPageSchema } from './html-page.js'
+import { HtmlPageLimits, HtmlPageModel } from './html-page.js'
 import { createHtmlRenderHost, textOf } from './test-host.js'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -34,7 +34,7 @@ describe('html_preview tool', () => {
     )
     const result = await f.preview({ path: 'site/index.html', height: 10 })
     expect(result.isError).toBe(false)
-    const page = htmlPageSchema.parse(result.meta)
+    const page = HtmlPageModel.decode(result.meta)
     expect(page).toMatchObject({ title: 'index.html', height: HtmlPageLimits.minHeight, theme: 'auto' })
     expect(page.html).toContain('<style data-dsh-source="assets/style.css">h1{color:var(--dsh-accent)} /* <\\/style><script>x</script> */</style>')
     expect(page.html).toContain(`src="data:image/png;base64,${PIXEL_PNG.toString('base64')}"`)
@@ -63,7 +63,7 @@ describe('html_preview tool', () => {
 
     const page = await f.preview({ path: 'page.html' })
     expect(page.isError).toBe(false)
-    expect(htmlPageSchema.parse(page.meta).html).not.toContain('--secret')
+    expect(HtmlPageModel.decode(page.meta).html).not.toContain('--secret')
     expect(textOf(page.content)).toContain('../outside/secret.css: outside the thread workspace; linked.css: outside the thread workspace')
   })
 

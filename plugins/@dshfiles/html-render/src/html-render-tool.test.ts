@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HtmlPageLimits, HtmlPageModel, htmlPageSchema } from './html-page.js'
+import { HtmlPageLimits, HtmlPageModel } from './html-page.js'
 import { createHtmlRenderHost, textOf } from './test-host.js'
 
 const runTool = async (args: unknown) => {
@@ -16,7 +16,7 @@ describe('html_render tool', () => {
     const html = '<h1>Revenue</h1><script>document.body.dataset.ready = "1"</script>'
     const result = await runTool({ title: 'Revenue chart', html, height: 5000, theme: 'dark' })
     expect(result.isError).toBe(false)
-    expect(htmlPageSchema.parse(result.meta)).toEqual({ title: 'Revenue chart', html, height: HtmlPageLimits.maxHeight, theme: 'dark' })
+    expect(HtmlPageModel.decode(result.meta)).toEqual({ title: 'Revenue chart', html, height: HtmlPageLimits.maxHeight, theme: 'dark' })
     const text = textOf(result.content)
     expect(text).toContain('Published "Revenue chart"')
     expect(text).not.toContain('<h1>')
@@ -39,8 +39,8 @@ describe('HtmlPageModel.parse', () => {
     const parsed = HtmlPageModel.parse({ title: '', html: '', theme: 'sepia' })
     expect(parsed.ok).toBe(false)
     if (parsed.ok) return
-    expect(parsed.error).toContain('title: title is empty')
-    expect(parsed.error).toContain('html: html is empty')
+    expect(parsed.error).toContain('title is empty')
+    expect(parsed.error).toContain('html is empty')
     expect(parsed.error).toContain('theme:')
   })
 })

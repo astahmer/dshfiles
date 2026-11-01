@@ -6,8 +6,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineTool } from '@dshfiles/dshx/host'
 import { Effect, Schema } from 'effect'
 import { previewRenderApi } from '@dshfiles/preview/render-api'
-import { z } from 'zod'
-import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HTML_SCREENSHOT_TOOL, HtmlPageLimits } from './html-page.js'
+import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HTML_SCREENSHOT_TOOL, HtmlPageLimits, decodeToolArguments } from './html-page.js'
 import type { HtmlPageStore } from './html-page-store.js'
 import { SandboxedDocument } from './sandboxed-document.js'
 import type { HtmlRenderEffectRunner } from './effect-runner.js'
@@ -15,11 +14,11 @@ import type { HtmlRenderEffectRunner } from './effect-runner.js'
 const PACKAGE_ID = '@dshfiles/html-render'
 const DEFAULT_WIDTH = 800
 
-const argsSchema = z.object({
-  callId: z.string().min(1).max(200).optional(),
-  fullPage: z.boolean().optional(),
-  colorScheme: z.enum(['light', 'dark']).optional(),
-  width: z.number().int().min(320).max(1920).optional(),
+const argsSchema = Schema.Struct({
+  callId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+  fullPage: Schema.optional(Schema.Boolean),
+  colorScheme: Schema.optional(Schema.Literals(['light', 'dark'])),
+  width: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(320), Schema.isLessThanOrEqualTo(1920))),
 })
 
 const outputSchema = {
@@ -81,9 +80,9 @@ const captureHtmlScreenshot = Effect.fn('html page screenshot')(function* (input
 }) {
   return yield* Effect.tryPromise({
     try: async () => {
-      const parsed = argsSchema.safeParse(input.rawArgs)
-      if (!parsed.success) return fail(parsed.error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; '))
-      const args = parsed.data
+      const parsedArgs = decodeToolArguments(argsSchema, input.rawArgs)
+      if (!parsedArgs.ok) return fail(parsedArgs.error)
+      const args = parsedArgs.value
       const agent = input.execution.agent ?? fail(`${HTML_SCREENSHOT_TOOL} runs only on behalf of an Agent.`)
       const found =
         input.input.pages.find({ sessionId: agent.id, callId: args.callId }) ??
