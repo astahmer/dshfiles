@@ -1,8 +1,10 @@
 import { createAdaptorServer } from '@hono/node-server'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { withUnknownProperties } from '../schema.js'
 import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
-import { z } from 'zod'
 
 /**
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
@@ -31,13 +33,12 @@ const RUNTIME_CONTEXT_PREFIXES = ['Current runtime context.', 'Time sampled whil
 
 const isRuntimeContextMessage = (text: string): boolean => RUNTIME_CONTEXT_PREFIXES.some(prefix => text.startsWith(prefix))
 
-const messageTextSchema = z
-  .union([z.string(), z.array(z.object({ text: z.string().optional() }).passthrough()).transform(parts => parts.map(part => part.text ?? '').join(''))])
-  .nullish()
-  .transform(text => text ?? '')
+const streamDelaySchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(250))
 
-const chatRequestSchema = z.object({
-  messages: z.array(z.object({ role: z.string(), content: messageTextSchema }).passthrough()),
+const messagePartSchema = withUnknownProperties({ text: Schema.optional(Schema.String) })
+const messageContentSchema = Schema.Union([Schema.String, Schema.Array(messagePartSchema), Schema.Null, Schema.Undefined])
+const chatRequestSchema = Schema.Struct({
+  messages: Schema.Array(withUnknownProperties({ role: Schema.String, content: messageContentSchema })),
 })
 
 export interface FakeChatRequest {
@@ -124,10 +125,13 @@ const streamAnswer = (delta: ChatDelta, delayBetweenWordsMs = 0): ChatCompletion
 const responseAnswer = <Payload>(payload: Payload, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
 
 const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; readonly key: string; readonly body: unknown }): ChatCompletionResult => {
-  const parsed = chatRequestSchema.safeParse(input.body)
-  if (!parsed.success) return responseAnswer({ error: 'unexpected chat request' }, 400)
+  const parsed = Schema.decodeUnknownOption(chatRequestSchema)(input.body)
+  if (!Option.isSome(parsed)) return responseAnswer({ error: 'unexpected chat request' }, 400)
 
-  const messages = parsed.data.messages.map(message => ({ role: message.role, text: message.content }))
+  const messages = parsed.value.messages.map(message => ({
+    role: message.role,
+    text: typeof message.content === 'string' ? message.content : Array.isArray(message.content) ? message.content.map(part => part.text ?? '').join('') : '',
+  }))
   const kind = messages.some(message => message.text.startsWith(TITLE_INSTRUCTION)) ? 'title' : 'turn'
   input.state.requests.push({ key: input.key, kind, messages })
 
@@ -157,9 +161,9 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   const lastUser = messages.filter(message => message.role === 'user' && !isRuntimeContextMessage(message.text)).at(-1)
   const directiveText = directiveMessage?.text ?? lastUser?.text ?? last?.text ?? ''
   const streamDirective = /\[\[stream (\d+)\]\]/.exec(directiveText)
-  const parsedDelay = streamDirective === null ? null : z.number().int().min(1).max(250).safeParse(Number(streamDirective[1]))
-  if (parsedDelay !== null && !parsedDelay.success) return responseAnswer({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }, 400)
-  const streamDelayMs = parsedDelay?.success === true ? parsedDelay.data : 0
+  const parsedDelay = streamDirective === null ? null : Schema.decodeUnknownOption(streamDelaySchema)(Number(streamDirective[1]))
+  if (parsedDelay !== null && !Option.isSome(parsedDelay)) return responseAnswer({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }, 400)
+  const streamDelayMs = parsedDelay !== null && Option.isSome(parsedDelay) ? parsedDelay.value : 0
   if (last?.role === 'tool') return streamAnswer({ content: 'Tool finished.' })
   if (directiveText.includes('[[empty]]')) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
   if (directiveText.includes('[[hold]]')) return { kind: 'held' }
@@ -174,7 +178,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
       input.state.oneShotCalls.add(directive)
     }
     const rawArguments = match[3] ?? '{}'
-    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
+    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? Schema.decodeUnknownSync(Schema.String)(JSON.parse(`"${rawArguments}"`)) : rawArguments
     return [{ name: match[2] ?? '', argumentsJson }]
   })
   if (calls.length > 0) return streamAnswer(toolCalls(calls))

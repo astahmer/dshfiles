@@ -1,8 +1,9 @@
 import { homedir } from 'node:os'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 import { join } from 'node:path'
 import type { Writable } from 'node:stream'
 import { parseArgs } from 'node:util'
-import { z } from 'zod'
 import { ProfilePluginError, ProfilePlugins, type ProfilePluginDependencies, type ProfilePluginPlan } from '../profile/add-plugin.js'
 
 const SHARED_OPTIONS = `  --profile <name>      Target profile (default "probe"; "web" only when named explicitly).
@@ -53,14 +54,14 @@ Exit codes: 0 removed or not installed, 1 failed, 2 usage.`,
 
 type ProfilePluginCommand = keyof typeof HELP
 
-const valuesSchema = z.object({
-  profile: z.string().default('probe'),
-  option: z.array(z.string()).default([]),
-  home: z.string().optional(),
-  latest: z.boolean().default(false),
-  'dry-run': z.boolean().default(false),
-  json: z.boolean().default(false),
-  help: z.boolean().default(false),
+const valuesSchema = Schema.Struct({
+  profile: Schema.String.pipe(Schema.withDecodingDefaultType(Effect.succeed('probe'))),
+  option: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed([]))),
+  home: Schema.optional(Schema.String),
+  latest: Schema.Boolean.pipe(Schema.withDecodingDefaultType(Effect.succeed(false))),
+  'dry-run': Schema.Boolean.pipe(Schema.withDecodingDefaultType(Effect.succeed(false))),
+  json: Schema.Boolean.pipe(Schema.withDecodingDefaultType(Effect.succeed(false))),
+  help: Schema.Boolean.pipe(Schema.withDecodingDefaultType(Effect.succeed(false))),
 })
 
 const parseCommandLine = (command: ProfilePluginCommand, argv: readonly string[]) => {
@@ -78,7 +79,7 @@ const parseCommandLine = (command: ProfilePluginCommand, argv: readonly string[]
       ...(command === 'update' && { latest: { type: 'boolean' } }),
     },
   })
-  return { values: valuesSchema.parse(result.values), positionals: result.positionals }
+  return { values: Schema.decodeUnknownSync(valuesSchema)(result.values), positionals: result.positionals }
 }
 
 const humanReport = (plan: ProfilePluginPlan): string => {
@@ -144,7 +145,7 @@ export const runProfilePluginCli = async (
     return 0
   } catch (error) {
     if (error instanceof ProfilePluginError) return fail('failed', error.message, error.hint)
-    if (error instanceof z.ZodError) return fail('usage', z.prettifyError(error), `Run "dshx ${command} --help".`)
+    if (Schema.isSchemaError(error)) return fail('usage', error.message, `Run "dshx ${command} --help".`)
     return fail('failed', error instanceof Error ? error.message : String(error), 'Re-run with --json and read the error.')
   }
 }

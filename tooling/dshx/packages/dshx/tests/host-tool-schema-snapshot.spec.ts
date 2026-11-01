@@ -2,14 +2,16 @@ import { lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from
 import { dirname, join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createServer } from 'vite'
-import { buildHost } from '../src/compiler/host/build.js'
+import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
 const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 75, definedTools: 24, tools: 99 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
-const getObjectProperty = (value: unknown, key: string) => (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined)
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const getObjectProperty = (value: unknown, key: string) => (isObjectRecord(value) ? value[key] : undefined)
 
 const getArrayProperty = (value: unknown, key: string): readonly unknown[] => {
   const result = getObjectProperty(value, key)
@@ -127,6 +129,12 @@ const collectHostToolSchemas = async () => {
       const outputNodeModules = join(outputDir, 'node_modules')
       await linkNodeModules(join(root, 'node_modules'), outputNodeModules)
       await linkNodeModules(join(repositoryRoot, 'node_modules'), outputNodeModules)
+      const effectTarget = join(outputNodeModules, 'effect')
+      try {
+        await lstat(effectTarget)
+      } catch {
+        await symlink(resolve(process.cwd(), 'node_modules/effect'), effectTarget, 'dir')
+      }
       const dshfilesScope = join(outputNodeModules, '@dshfiles')
       await mkdir(dshfilesScope, { recursive: true })
       for (const workspacePackage of projects) {
@@ -137,7 +145,7 @@ const collectHostToolSchemas = async () => {
           await symlink(join(pluginRoot, workspacePackage.name), packageTarget, 'dir')
         }
       }
-      await buildHost({
+      let buildOptions: BuildHostOptions = {
         packageId: resolved.packageId,
         logicalName: resolved.name,
         root: resolved.root,
@@ -150,13 +158,14 @@ const collectHostToolSchemas = async () => {
         ),
         schemaSnapshot: true,
         schemaSnapshotAliases: aliases,
-        ...(resolved.hostVitePlugins === undefined ? {} : { vite: { plugins: resolved.hostVitePlugins } }),
-      })
+      }
+      if (resolved.hostVitePlugins !== undefined) buildOptions = { ...buildOptions, vite: { plugins: resolved.hostVitePlugins } }
+      await buildHost(buildOptions)
       const builtModule = await viteServer.ssrLoadModule(join(outputDir, 'index.js'))
-      const definition = Reflect.get(builtModule, '__dshxDefinition')
+      const definition = builtModule.__dshxDefinition
       const tools = getArrayProperty(definition, 'tools')
       const apis = getArrayProperty(definition, 'apis')
-      const bindingCounts = Reflect.get(builtModule, '__dshxApiBindingCounts')
+      const bindingCounts = builtModule.__dshxApiBindingCounts
       if (!Array.isArray(bindingCounts)) throw new Error(`Missing API binding counts for ${resolved.packageId}.`)
       for (const bindingCount of bindingCounts) {
         const methodCount = getObjectProperty(bindingCount, 'methodCount')
@@ -170,7 +179,7 @@ const collectHostToolSchemas = async () => {
       }
       definedTools += tools.length
       if (tools.length === 0 && apis.length === 0) continue
-      const plugin = Reflect.get(builtModule, '__dshxSchemaPlugin')
+      const plugin = builtModule.__dshxSchemaPlugin
       if (plugin === undefined) throw new Error(`Missing schema-only Host plugin export for ${resolved.packageId}.`)
       try {
         await host.ctx.plugin(plugin)
@@ -182,11 +191,10 @@ const collectHostToolSchemas = async () => {
     const schemas = host.tools.schemas()
     const apiToolSchemas = schemas.length - definedTools
     const tools = schemas
-      .map(schema => ({
-        name: schema.name,
-        ...(schema.description === undefined ? {} : { description: schema.description }),
-        parameters: schema.parameters,
-      }))
+      .map(schema => {
+        if (schema.description === undefined) return { name: schema.name, parameters: schema.parameters }
+        return { name: schema.name, description: schema.description, parameters: schema.parameters }
+      })
       .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
     return Buffer.from(
       `${JSON.stringify({ hostBundles, hostPackages: hostPackages.sort(), apiMethods, apiToolBindings, apiToolNameCount: apiToolNames.size, apiToolSchemas, definedTools, tools: tools.length, schemas: tools }, null, 2)}\n`,
@@ -194,8 +202,6 @@ const collectHostToolSchemas = async () => {
   } finally {
     await viteServer.close()
     await host.dispose()
-    const expectedScratchPrefix = join(repositoryRoot, '.dshx-host-tool-schemas-')
-    if (!scratchRoot.startsWith(expectedScratchPrefix)) throw new Error('Refusing to remove an unexpected snapshot scratch directory.')
     await rm(scratchRoot, { recursive: true, force: true })
   }
 }
@@ -212,6 +218,6 @@ describe('all Host tool schemas', () => {
 
     const recorded: unknown = JSON.parse(snapshot.toString())
     expect(recorded).toMatchObject(expectedCounts)
-    expect(snapshot).toEqual(await import('node:fs/promises').then(({ readFile }) => readFile(fixturePath)))
+    expect(snapshot.toString()).toBe(await readFile(fixturePath, 'utf8'))
   }, 300_000)
 })

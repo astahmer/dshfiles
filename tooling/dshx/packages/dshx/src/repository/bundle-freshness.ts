@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
+import { z } from 'zod'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { z } from 'zod'
 
 /**
  * Whether a plugin's bundles still match the sources their last build read. Kept free of relative imports so
@@ -9,9 +9,12 @@ import { z } from 'zod'
  * callers hand in their own JSON decode boundary.
  */
 
-type DecodeJson = <Schema extends z.ZodType>(schema: Schema, text: string) => z.output<Schema>
+type DecodeJson = <S extends z.ZodType>(schema: S, text: string) => z.output<S>
 
-const dependencyManifestSchema = z.object({ sources: z.array(z.string()), hashes: z.record(z.string(), z.string().nullable()).optional() })
+const dependencyManifestSchema = z.object({
+  sources: z.array(z.string()),
+  hashes: z.record(z.string(), z.string().nullable()).optional(),
+})
 const packageScriptsSchema = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
 
 export type BundleFreshnessReport =

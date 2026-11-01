@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { randomBytes } from 'node:crypto'
 import { chmod, copyFile, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
@@ -6,7 +8,6 @@ import { fileURLToPath } from 'node:url'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonValue } from '../json.js'
 import type { Page } from 'playwright'
-import { z } from 'zod'
 import type { DialogsService, ToastsService } from '../client/app-services.js'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
@@ -295,11 +296,13 @@ const restorePendingRestart = async (state: ScratchState, dryRun: boolean): Prom
   return hostEntry
 }
 
-const FAKE_PROVIDER_ACCOUNTS_FILE = z.object({
-  accounts: z.array(z.object({ instanceId: z.string(), displayName: z.string(), apiKeyEnv: z.string(), apiBaseUrl: z.string(), enabled: z.boolean() })),
+const FAKE_PROVIDER_ACCOUNTS_FILE = Schema.Struct({
+  accounts: Schema.Array(
+    Schema.Struct({ instanceId: Schema.String, displayName: Schema.String, apiKeyEnv: Schema.String, apiBaseUrl: Schema.String, enabled: Schema.Boolean }),
+  ),
 })
 
-type FakeProviderAccount = z.infer<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts'][number]
+type FakeProviderAccount = Schema.Schema.Type<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts'][number]
 
 /** What ai-accounts persisted for the fake route, read from its store in the scratch home: the panel's draft can differ. */
 const readFakeProviderAccount = async (home: string): Promise<FakeProviderAccount | undefined> => {
@@ -311,8 +314,8 @@ const readFakeProviderAccount = async (home: string): Promise<FakeProviderAccoun
   } catch {
     return undefined
   }
-  const parsed = FAKE_PROVIDER_ACCOUNTS_FILE.safeParse(json)
-  return parsed.success ? parsed.data.accounts.find(account => account.instanceId === FAKE_PROVIDER_ROUTE_SLUG) : undefined
+  const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(FAKE_PROVIDER_ACCOUNTS_FILE)(json))
+  return parsed?.accounts.find(account => account.instanceId === FAKE_PROVIDER_ROUTE_SLUG)
 }
 
 const waitForFakeProviderAccount = async (input: {
@@ -342,11 +345,21 @@ const startFakeProvider = async (
   timeoutMs: number,
 ): Promise<{ readonly baseUrl: string; readonly process: NonNullable<ScratchState['fakeProvider']> }> => {
   const readyFile = join(state.stateDir, 'fake-provider.ready')
-  const readBaseUrl = async () => z.url().safeParse((await readFile(readyFile, 'utf8').catch(() => '')).trim())
+  const urlStringSchema = Schema.String.check(
+    Schema.makeFilter(value => {
+      try {
+        new URL(value)
+        return true
+      } catch {
+        return false
+      }
+    }),
+  )
+  const readBaseUrl = async () => Option.getOrUndefined(Schema.decodeUnknownOption(urlStringSchema)((await readFile(readyFile, 'utf8').catch(() => '')).trim()))
   const current = (await ScratchStateRuntime.read(state.stateDir, state.name)).fakeProvider
   if (current !== undefined && ScratchStateRuntime.ownedProcessStatus(current) === 'running') {
     const ready = await readBaseUrl()
-    if (ready.success) return { baseUrl: ready.data, process: current }
+    if (ready !== undefined) return { baseUrl: ready, process: current }
   }
   await rm(readyFile, { force: true })
   const pid = ScratchStateRuntime.spawnDetached(process.execPath, [fakeProviderScript, readyFile], {
@@ -360,7 +373,7 @@ const startFakeProvider = async (
   while (Date.now() < deadline) {
     // The file holds one line once the server listens; a partial write fails the URL check and is read again.
     const ready = await readBaseUrl()
-    if (ready.success) return { baseUrl: ready.data, process: providerProcess }
+    if (ready !== undefined) return { baseUrl: ready, process: providerProcess }
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   throw new ScratchError('seed-failed', 'The fake model provider did not start.', `Read ${join(state.stateDir, 'fake-provider.log')}.`)

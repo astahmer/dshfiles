@@ -110,7 +110,10 @@ describe('dshx add <package>', () => {
 
   it('links and installs an owned bundle, and a second run changes nothing', async () => {
     const first = capture()
-    expect(await runCli(['add', '@dshfiles/goal-stall-guard', '--home', home, '--option', 'stallThreshold=5'], { io: first.io })).toBe(0)
+    expect(
+      await runCli(['add', '@dshfiles/goal-stall-guard', '--home', home, '--option', 'stallThreshold=5'], { io: first.io }),
+      `${first.output()}\n${first.errors()}`,
+    ).toBe(0)
     const installed = readProfile()
     expect(JSON.parse(installed.manifest)).toMatchObject({
       dependencies: { '@dshfiles/goal-stall-guard': expect.stringMatching(/^link:.*plugins\/@dshfiles\/goal-stall-guard$/) },

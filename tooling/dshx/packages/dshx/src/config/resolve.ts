@@ -1,7 +1,8 @@
 import { access, readFile, realpath } from 'node:fs/promises'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
-import { z } from 'zod'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from './vite-plugins.js'
 import type { JsonObject, JsonValue } from '../json.js'
@@ -15,15 +16,22 @@ const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
 const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
-const nonEmptyStringSchema = z.string().refine(value => value.trim() !== '')
-const packageRootSchema = z.string().regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/)
-const packageRootsSchema = z.array(packageRootSchema).refine(names => new Set(names).size === names.length && !names.includes('@deepseek-ai/cordis'))
-const sharedSupplierSchema = z.string().regex(/^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/)
-const providedModulesSchema = z
-  .array(z.string().refine(name => name.trim() === name && name !== '' && !name.startsWith('.') && !name.startsWith('@deepseek-ai/cordis')))
-  .min(1)
-  .refine(names => new Set(names).size === names.length)
-const manifestSchema = z.object({ name: nonEmptyStringSchema })
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(schema)(value))
+
+const nonEmptyStringSchema = Schema.String.check(Schema.makeFilter(value => value.trim() !== ''))
+const packageRootSchema = Schema.String.check(Schema.isPattern(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/))
+const packageRootsSchema = Schema.Array(packageRootSchema).check(
+  Schema.makeFilter(names => new Set(names).size === names.length && !names.includes('@deepseek-ai/cordis')),
+)
+const sharedSupplierSchema = Schema.String.check(Schema.isPattern(/^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/))
+const providedModulesSchema = Schema.Array(
+  Schema.String.check(Schema.makeFilter(name => name.trim() === name && name !== '' && !name.startsWith('.') && !name.startsWith('@deepseek-ai/cordis'))),
+).check(
+  Schema.isMinLength(1),
+  Schema.makeFilter(names => new Set(names).size === names.length),
+)
+const manifestSchema = Schema.Struct({ name: nonEmptyStringSchema })
 
 /** A project `package.json` whose `name` readManifest already validated. */
 interface ProjectManifest extends JsonObject {
@@ -75,15 +83,15 @@ async function readManifest(packageFile: string): Promise<ProjectManifest> {
   if (!isObject(value)) {
     throw new DshxError('DSHX4002', 'Project package.json must contain a JSON object.', { file: packageFile })
   }
-  const manifest = manifestSchema.safeParse(value)
-  if (!manifest.success) {
+  const manifest = decode(manifestSchema, value)
+  if (manifest === undefined) {
     throw new DshxError('DSHX4002', 'Project package.json must declare a non-empty string name.', {
       file: packageFile,
       hint: 'Use the installable package id, for example "@scope/my-plugin".',
     })
   }
   // Keep opaque metadata intact: Zod record/object outputs omit an own __proto__ key.
-  return { ...value, name: manifest.data.name }
+  return { ...value, name: manifest.name }
 }
 
 function rejectUnknownKeys(value: JsonObject, allowed: ReadonlySet<string>, label: string, file: string): void {
@@ -98,14 +106,14 @@ function rejectUnknownKeys(value: JsonObject, allowed: ReadonlySet<string>, labe
 
 function optionalNonEmptyString(value: JsonValue | undefined, field: string, file: string): string | undefined {
   if (value === undefined) return undefined
-  const parsed = nonEmptyStringSchema.safeParse(value)
-  if (!parsed.success) {
+  const parsed = decode(nonEmptyStringSchema, value)
+  if (parsed === undefined) {
     throw new DshxError('DSHX4004', `${field} must be a non-empty string.`, {
       file,
       hint: `Set ${field} to a non-empty string or remove it to use the default.`,
     })
   }
-  return parsed.data
+  return parsed
 }
 
 function optionalPackageNames(value: JsonValue | undefined, field: string, file: string): readonly string[] | undefined {
@@ -116,18 +124,18 @@ function optionalPackageNames(value: JsonValue | undefined, field: string, file:
       hint: 'List package roots such as "@scope/package"; subpaths and Cordis are not allowed.',
     })
   }
-  const names = packageRootsSchema.safeParse(value)
-  if (!names.success) {
+  const names = decode(packageRootsSchema, value)
+  if (names === undefined) {
     throw new DshxError('DSHX4004', `${field} must contain unique bare package roots and cannot bundle Cordis.`, {
       file,
       hint: 'Use unique package roots such as "@scope/package". DSHX keeps the Host Cordis identity external.',
     })
   }
-  return names.data
+  return names
 }
 
 function validateSharedRuntime(client: JsonObject, file: string): void {
-  if (client.shared !== undefined && !sharedSupplierSchema.safeParse(client.shared).success) {
+  if (client.shared !== undefined && decode(sharedSupplierSchema, client.shared) === undefined) {
     throw new DshxError('DSHX4004', 'client.shared must be the package id of a shared-runtime supplier.', {
       file,
       hint: 'Use client: { shared: "@scope/shared-runtime" }.',
@@ -141,7 +149,7 @@ function validateSharedRuntime(client: JsonObject, file: string): void {
     })
   }
   const provide = isObject(client.sharedRuntime) ? client.sharedRuntime.provide : undefined
-  if (!isObject(client.sharedRuntime) || !providedModulesSchema.safeParse(provide).success) {
+  if (!isObject(client.sharedRuntime) || decode(providedModulesSchema, provide) === undefined) {
     throw new DshxError('DSHX4004', 'client.sharedRuntime.provide must list unique bare module specifiers.', {
       file,
       hint: 'Use client: { sharedRuntime: { provide: ["zod", "@tanstack/react-query"] } }.',
@@ -236,19 +244,19 @@ function checkConfig(value: unknown, file: string): DshxConfig {
       })
     }
     rejectUnknownKeys(value.build, new Set(['sourcemap', 'declarations', 'minify']), 'build', file)
-    if (value.build.sourcemap !== undefined && !z.boolean().safeParse(value.build.sourcemap).success) {
+    if (value.build.sourcemap !== undefined && decode(Schema.Boolean, value.build.sourcemap) === undefined) {
       throw new DshxError('DSHX4004', 'build.sourcemap must be a boolean.', {
         file,
         hint: 'Set build.sourcemap to true or false.',
       })
     }
-    if (value.build.minify !== undefined && !z.boolean().safeParse(value.build.minify).success) {
+    if (value.build.minify !== undefined && decode(Schema.Boolean, value.build.minify) === undefined) {
       throw new DshxError('DSHX4004', 'build.minify must be a boolean.', {
         file,
         hint: 'Set build.minify to true or false.',
       })
     }
-    if (value.build.declarations !== undefined && !z.boolean().safeParse(value.build.declarations).success) {
+    if (value.build.declarations !== undefined && decode(Schema.Boolean, value.build.declarations) === undefined) {
       throw new DshxError('DSHX4004', 'build.declarations must be a boolean.', {
         file,
         hint: 'Set build.declarations to true or false.',
@@ -263,14 +271,14 @@ function checkConfig(value: unknown, file: string): DshxConfig {
       })
     }
     rejectUnknownKeys(value.compatibility, new Set(['allowUnsupported']), 'compatibility', file)
-    if (value.compatibility.allowUnsupported !== undefined && !z.boolean().safeParse(value.compatibility.allowUnsupported).success) {
+    if (value.compatibility.allowUnsupported !== undefined && decode(Schema.Boolean, value.compatibility.allowUnsupported) === undefined) {
       throw new DshxError('DSHX4004', 'compatibility.allowUnsupported must be a boolean.', {
         file,
         hint: 'Set compatibility.allowUnsupported to true or false.',
       })
     }
   }
-  if (value.modules !== undefined && !z.record(z.string(), nonEmptyStringSchema).safeParse(value.modules).success) {
+  if (value.modules !== undefined && decode(Schema.Record(Schema.String, nonEmptyStringSchema), value.modules) === undefined) {
     throw new DshxError('DSHX4007', 'Shared modules must map module names to non-empty source entries.', { file })
   }
   // SAFETY: every DSHX field has been validated above, including module entries. Native Vite plugin
@@ -377,7 +385,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
           hint: 'Use a lower-case name such as "contract"; "index", "client", "package" and "cordis" are reserved.',
         })
       }
-      if (!nonEmptyStringSchema.safeParse(entry).success) {
+      if (decode(nonEmptyStringSchema, entry) === undefined) {
         throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} needs a source entry.`, {
           ...(configFile !== undefined && { file: configFile }),
         })

@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
 
 /**
  * DSH's HMR service marks the async context of every reload, plugin activation included, so that a nested
@@ -9,12 +10,12 @@ import { z } from 'zod'
  * public way out, so this reads the service's marker store, the one it leaves itself for its own config watchers.
  * Forced by @dshfiles/thread-sidebar's Host auto-settle scan; see plans/dsh-host-gaps.md.
  */
-const hmrMarkerSchema = z.object({ executing: z.instanceof(AsyncLocalStorage) })
+const hmrMarkerSchema = Schema.Struct({ executing: Schema.instanceOf(AsyncLocalStorage) })
 
 /** Run `operation` outside any HMR reload transaction, so a timer armed in `setup` can write settings later. */
 const runOutsideReload = <T>(ctx: Context, operation: () => T): T => {
-  const parsed = hmrMarkerSchema.safeParse(ctx.get('hmr'))
-  return parsed.success ? parsed.data.executing.exit(operation) : operation()
+  const parsed = Schema.decodeUnknownOption(hmrMarkerSchema)(ctx.get('hmr'))
+  return Option.isSome(parsed) ? parsed.value.executing.exit(operation) : operation()
 }
 
 /** `setTimeout` whose callback runs outside the reload transaction that was active when it was armed. */

@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
 
 export class CheckoutSyncError extends Error {
@@ -38,15 +39,15 @@ const DSHX_WORKSPACE = 'tooling/dshx'
 const PROFILE_SEED = 'profiles/'
 const OUTPUT_TAIL = 4_000
 
-const manifestSchema = z.object({
-  name: z.string(),
-  scripts: z.record(z.string(), z.string()).optional(),
-  dependencies: z.record(z.string(), z.string()).optional(),
-  devDependencies: z.record(z.string(), z.string()).optional(),
-  dsh: z.object({ client: z.unknown().optional() }).optional(),
+const manifestSchema = Schema.Struct({
+  name: Schema.String,
+  scripts: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  dsh: Schema.optional(Schema.Struct({ client: Schema.optional(Schema.Unknown) })),
 })
-const sourceMapSchema = z.object({ sources: z.array(z.string()) })
-const dependencyManifestSchema = z.object({ version: z.literal(1), sources: z.array(z.string()) })
+const sourceMapSchema = Schema.Struct({ sources: Schema.Array(Schema.String) })
+const dependencyManifestSchema = Schema.Struct({ version: Schema.Literal(1), sources: Schema.Array(Schema.String) })
 
 interface PluginPackage {
   readonly name: string
@@ -77,14 +78,14 @@ const bundledSources = (root: string, directory: string, bundle: string): Readon
   const distDirectory = join(root, directory, 'dist')
   const manifestPath = join(distDirectory, `${bundle}.js.deps.json`)
   if (existsSync(manifestPath)) {
-    const manifest = dependencyManifestSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
-    if (manifest.success) return new Set(manifest.data.sources.map(source => relative(root, resolve(join(root, directory), source))))
+    const manifest = Schema.decodeUnknownOption(dependencyManifestSchema)(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
+    if (Option.isSome(manifest)) return new Set(manifest.value.sources.map(source => relative(root, resolve(join(root, directory), source))))
   }
   const mapPath = join(distDirectory, `${bundle}.js.map`)
   if (!existsSync(mapPath)) return new Set()
-  const parsed = sourceMapSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(mapPath, 'utf8')))
-  if (!parsed.success) return new Set()
-  return new Set(parsed.data.sources.map(source => relative(root, resolve(dirname(mapPath), source))))
+  const parsed = Schema.decodeUnknownOption(sourceMapSchema)(decodeJson(jsonValueSchema, readFileSync(mapPath, 'utf8')))
+  if (Option.isNone(parsed)) return new Set()
+  return new Set(parsed.value.sources.map(source => relative(root, resolve(dirname(mapPath), source))))
 }
 
 const readPluginPackages = (root: string): readonly PluginPackage[] => {
@@ -97,14 +98,15 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
       const directory = join(PLUGINS_DIRECTORY, scope.name, entry.name)
       const manifestPath = join(root, directory, 'package.json')
       if (!entry.isDirectory() || !existsSync(manifestPath)) continue
-      const manifest = manifestSchema.safeParse(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
-      if (!manifest.success || manifest.data.scripts?.build === undefined) continue
+      const manifest = Schema.decodeUnknownOption(manifestSchema)(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
+      if (Option.isNone(manifest) || manifest.value.scripts?.build === undefined) continue
+      const manifestValue = manifest.value
       const distDirectory = join(root, directory, 'dist')
-      const hasClientBundle = manifest.data.dsh?.client !== undefined
+      const hasClientBundle = manifestValue.dsh?.client !== undefined
       packages.push({
-        name: manifest.data.name,
+        name: manifestValue.name,
         directory,
-        workspaceDependencies: Object.entries({ ...manifest.data.dependencies, ...manifest.data.devDependencies })
+        workspaceDependencies: Object.entries({ ...manifestValue.dependencies, ...manifestValue.devDependencies })
           .filter(([, spec]) => spec.startsWith('workspace:'))
           .map(([name]) => name),
         hostSources: memoizedSources(() => bundledSources(root, directory, 'index')),

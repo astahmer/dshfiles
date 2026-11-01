@@ -1,21 +1,39 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import type * as z from 'zod'
 
 /**
  * The one place dshx turns JSON text into a value: every parse names its owning
  * schema and is validated here, so no call site parses text directly. Declared
  * as the JSON boundary in `scripts/lint-ratchet.ts`.
  */
-export const decodeJson = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> => schema.parse(JSON.parse(text))
+type EffectDecoder = Schema.ConstraintDecoder<unknown>
+type ZodDecoder = z.ZodType
+type JsonDecoder = EffectDecoder | ZodDecoder
 
-export const decodeJsonSafe = <Schema extends z.ZodType>(schema: Schema, text: string): z.ZodSafeParseResult<z.output<Schema>> =>
-  schema.safeParse(JSON.parse(text))
+type EffectDecodeResult<S extends EffectDecoder> = ReturnType<ReturnType<typeof Schema.decodeUnknownResult<S>>>
 
-export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+const isEffectDecoder = (schema: JsonDecoder): schema is EffectDecoder => Schema.isSchema(schema)
 
-export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
-)
+export function decodeJson<S extends EffectDecoder>(schema: S, text: string): S['Type']
+export function decodeJson<S extends ZodDecoder>(schema: S, text: string): z.output<S>
+export function decodeJson(schema: JsonDecoder, text: string) {
+  const value: unknown = JSON.parse(text)
+  if (isEffectDecoder(schema)) return Schema.decodeUnknownSync(schema)(value)
+  return schema.parse(value)
+}
 
-export type JsonObject = { readonly [key: string]: JsonValue }
+export function decodeJsonSafe<S extends EffectDecoder>(schema: S, text: string): EffectDecodeResult<S>
+export function decodeJsonSafe<S extends ZodDecoder>(schema: S, text: string): z.ZodSafeParseResult<z.output<S>>
+export function decodeJsonSafe(schema: JsonDecoder, text: string) {
+  const value: unknown = JSON.parse(text)
+  if (isEffectDecoder(schema)) return Schema.decodeUnknownResult(schema)(value)
+  return schema.safeParse(value)
+}
 
-export const jsonObjectSchema: z.ZodType<JsonObject> = z.record(z.string(), jsonValueSchema)
+export type JsonValue = Schema.Json
+
+export const jsonValueSchema: Schema.Codec<JsonValue> = Schema.Json
+
+export type JsonObject = Schema.JsonObject
+
+export const jsonObjectSchema: Schema.Codec<JsonObject> = Schema.JsonObject

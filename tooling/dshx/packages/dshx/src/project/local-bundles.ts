@@ -1,9 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import type { JsonValue } from '../json.js'
 import type { BootProfileBundle } from './boot-profile.js'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
@@ -13,27 +16,20 @@ import { ScratchProfileRuntime } from './scratch-profile.js'
 export const DSHFILES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
 const pluginsRoot = join(DSHFILES_ROOT, 'plugins/@dshfiles')
 
-const DependencyRecord = z.record(z.string(), z.string()).optional()
-const PackageManifest = z
-  .object({
-    name: z.string().min(1),
-    dsh: z.unknown().optional(),
-    dependencies: DependencyRecord,
-    devDependencies: DependencyRecord,
-    peerDependencies: DependencyRecord,
-  })
-  .passthrough()
+const DependencyRecord = Schema.optional(Schema.Record(Schema.String, Schema.String))
+const PackageManifest = withUnknownProperties({
+  name: Schema.String.check(Schema.isMinLength(1)),
+  dsh: Schema.optional(Schema.Unknown),
+  dependencies: DependencyRecord,
+  devDependencies: DependencyRecord,
+  peerDependencies: DependencyRecord,
+})
 
 /** The one bundle that compiles and injects the shared plugin-ui stylesheet. */
 export const SHARED_STYLES_BUNDLE_ID = '@dshfiles/ui-styles'
-const DshManifest = z
-  .object({
-    client: z
-      .object({ external: z.array(z.string()).default([]) })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough()
+const DshManifest = withUnknownProperties({
+  client: Schema.optional(withUnknownProperties({ external: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) })),
+})
 
 export interface LocalBootBundle extends BootProfileBundle {
   readonly hasClient: boolean
@@ -58,9 +54,9 @@ const listLocalBootBundles = async (options: { readonly pluginsRoot?: string } =
     } catch (error) {
       throw new Error(`Cannot read ${join(projectRoot, 'package.json')}: ${error instanceof Error ? error.message : String(error)}.`)
     }
-    const manifest = PackageManifest.parse(rawManifest)
+    const manifest = Schema.decodeUnknownSync(PackageManifest)(rawManifest)
     if (manifest.dsh === undefined) continue
-    const dsh = DshManifest.parse(manifest.dsh)
+    const dsh = Schema.decodeUnknownSync(DshManifest)(manifest.dsh)
     bundles.push({
       projectRoot,
       packageId: manifest.name,
@@ -155,7 +151,7 @@ export const buildPlugin = async (projectRoot: string, packageId: string): Promi
   }
 }
 
-const portAddressSchema = z.object({ port: z.number() })
+const portAddressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isFinite()) })
 
 /** Reserve a port by binding it and letting go, so the Host can take it. */
 export const findFreePort = async (): Promise<number> =>
@@ -163,13 +159,13 @@ export const findFreePort = async (): Promise<number> =>
     const server = createServer()
     server.on('error', reject)
     server.listen(0, '127.0.0.1', () => {
-      const address = portAddressSchema.safeParse(server.address())
-      if (!address.success) {
+      const address = Schema.decodeUnknownOption(portAddressSchema)(server.address())
+      if (!Option.isSome(address)) {
         server.close()
         reject(new Error('could not reserve a port'))
         return
       }
-      const { port } = address.data
+      const { port } = address.value
       server.close(() => resolvePort(port))
     })
   })

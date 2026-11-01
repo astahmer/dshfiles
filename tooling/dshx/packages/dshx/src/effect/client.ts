@@ -1,13 +1,6 @@
 import { Effect, Schema } from 'effect'
-import { z } from 'zod'
 import { ApiProtocolModel } from '../api/common.js'
-import type {
-  AnyApiEventDefinition,
-  AnyApiMethodDefinition,
-  ApiClient,
-  ApiClientInput,
-  ApiClientOutput,
-} from '../api/types.js'
+import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiClientInput, ApiClientOutput } from '../api/types.js'
 
 /** A failed dshx API call, with the same fields as the Promise API's ApiError. */
 export class ApiCallError extends Schema.TaggedError<ApiCallError>()('ApiCallError', {
@@ -20,7 +13,7 @@ export class ApiCallError extends Schema.TaggedError<ApiCallError>()('ApiCallErr
 }) {}
 
 type ClientMethod = (input: unknown, options: { readonly signal?: AbortSignal }) => Promise<unknown>
-const clientMethodSchema = z.custom<ClientMethod>(value => typeof value === 'function', 'API client has no such method.')
+const clientMethodSchema = Schema.declare<ClientMethod>((value): value is ClientMethod => typeof value === 'function', { title: 'API client method' })
 
 export type EffectApiClient<Methods extends Record<string, AnyApiMethodDefinition>> = {
   readonly [K in keyof Methods]: ApiClientInput<Methods[K]> extends void
@@ -36,7 +29,7 @@ export const effectClient = <const Methods extends Record<string, AnyApiMethodDe
   const call = (name: string, input: unknown) =>
     Effect.tryPromise({
       try: signal => {
-        return clientMethodSchema.parse(methods.get(name))(input, { signal })
+        return Schema.decodeUnknownSync(clientMethodSchema)(methods.get(name))(input, { signal })
       },
       catch: error =>
         ApiProtocolModel.isApiError(error)

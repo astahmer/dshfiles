@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
+import * as Schema from 'effect/Schema'
 import { isBuiltin } from 'node:module'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Plugin, Rollup } from 'vite'
-import { z } from 'zod'
 import { DshxError } from '../../diagnostics.js'
 import { decodeJsonSafe } from '../../json.js'
+import { withUnknownProperties } from '../../schema.js'
 import { containsPrivateDshxImport } from '../private-imports.js'
 
 // util-values (pure partial-JSON argument reader, no dependencies or globals) was added for @dshfiles/turn-summary.
@@ -39,7 +40,7 @@ function clientGuardPlugin(externals: ReadonlySet<string>, packageId: string, bu
   }
 }
 
-const namedManifestSchema = z.looseObject({ name: z.string() })
+const namedManifestSchema = withUnknownProperties({ name: Schema.String })
 
 const packageNameOf = (specifier: string): string =>
   specifier
@@ -75,7 +76,7 @@ function providedModuleGuardPlugin(options: {
       text => {
         try {
           const manifest = decodeJsonSafe(namedManifestSchema, text)
-          return manifest.success ? manifest.data.name : parentPackage(directory)
+          return manifest._tag === 'Success' ? manifest.success.name : parentPackage(directory)
         } catch {
           return parentPackage(directory)
         }

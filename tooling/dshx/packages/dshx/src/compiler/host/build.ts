@@ -215,12 +215,14 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       if (options.generation !== undefined) {
         return [
           ...createModule,
-          ...(options.schemaSnapshot ? [
-            'const dshxSchemaSource = source.default',
-            'export const __dshxDefinition = dshxSchemaSource',
-            'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
-            'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
-          ] : []),
+          ...(options.schemaSnapshot
+            ? [
+                'const dshxSchemaSource = source.default',
+                'export const __dshxDefinition = dshxSchemaSource',
+                'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
+                'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
+              ]
+            : []),
           `import { createHostGenerationPlugin } from ${JSON.stringify(HOST_GENERATION_PATH)}`,
           'export const implementation = plugin',
           'export const createGenerationManager = options => createHostGenerationPlugin({ ...options, metadata: pluginMetadata, implementation: plugin })',
@@ -233,12 +235,14 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       return [
         ...createModule,
-        ...(options.schemaSnapshot ? [
-          'const dshxSchemaSource = source.default',
-          'export const __dshxDefinition = dshxSchemaSource',
-          'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
-          'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
-        ] : []),
+        ...(options.schemaSnapshot
+          ? [
+              'const dshxSchemaSource = source.default',
+              'export const __dshxDefinition = dshxSchemaSource',
+              'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
+              'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
+            ]
+          : []),
         'export const name = plugin.name',
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
@@ -350,14 +354,13 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     exports: 'named',
   } as const
   const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
-  return {
+  const config: InlineConfig = {
     root: paths.root,
     configFile: false,
     publicDir: false,
     appType: 'custom',
     mode: watch ? 'development' : 'production',
     logLevel: 'error',
-    ...(options.schemaSnapshotAliases === undefined ? {} : { resolve: { alias: options.schemaSnapshotAliases } }),
     plugins: [
       hostEntryPlugin(paths, options),
       ...userPlugins,
@@ -407,6 +410,8 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       },
     },
   }
+  if (options.schemaSnapshotAliases !== undefined) config.resolve = { alias: [...options.schemaSnapshotAliases] }
+  return config
 }
 
 /** Start a Host watcher without awaiting a successful initial build. */

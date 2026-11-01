@@ -1,10 +1,11 @@
 import { watch, type FSWatcher } from 'node:fs'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context, Fiber, Inject } from '@deepseek-ai/cordis'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { z } from 'zod'
 import { HostRuntimeModel, type HostPluginMetadata } from './runtime.js'
 import { hostGenerationManifestSchema, HOST_GENERATION_DIRECTORY } from './generation-contract.js'
 
@@ -16,12 +17,16 @@ export interface HostGenerationImplementation {
   readonly apply: (ctx: Context, config?: unknown) => unknown
 }
 
-const generationModuleSchema = z.object({
-  implementation: z.object({
-    name: z.string().min(1),
-    inject: z.union([z.array(z.string()), z.record(z.string(), z.unknown())]).optional(),
-    Config: z.unknown().optional(),
-    apply: z.function({ input: z.tuple([z.unknown(), z.unknown().optional()]), output: z.unknown() }),
+const applySchema = Schema.declare<HostGenerationImplementation['apply']>(
+  (value): value is HostGenerationImplementation['apply'] => typeof value === 'function',
+)
+
+const generationModuleSchema = Schema.Struct({
+  implementation: Schema.Struct({
+    name: Schema.String.check(Schema.isMinLength(1)),
+    inject: Schema.optional(Schema.Union([Schema.Array(Schema.String), Schema.Record(Schema.String, Schema.Unknown)])),
+    Config: Schema.optional(Schema.Unknown),
+    apply: applySchema,
   }),
 })
 
@@ -113,12 +118,12 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
     }
 
     const decodeCandidate = (imported: unknown, generation: string): HostGenerationImplementation | undefined => {
-      const decodedModule = generationModuleSchema.safeParse(imported)
-      if (!decodedModule.success) {
+      const decodedModule = Schema.decodeUnknownOption(generationModuleSchema)(imported)
+      if (Option.isNone(decodedModule)) {
         logger.error('Invalid Host generation module (plugin=%s generation=%s)', options.metadata.packageId, generation)
         return undefined
       }
-      const candidate = decodedModule.data.implementation
+      const candidate = decodedModule.value.implementation
       if (candidate.name !== options.implementation.name) {
         contractChanged(generation, 'Loader name')
         return undefined
@@ -186,12 +191,12 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
         fail(options.generation, error)
         return
       }
-      const decodedManifest = hostGenerationManifestSchema.safeParse(JSON.parse(rawManifest) as unknown)
-      if (!decodedManifest.success) {
-        logger.error('Invalid Host generation manifest (plugin=%s): %s', options.metadata.packageId, decodedManifest.error.message.slice(0, 2_000))
+      const decodedManifest = Schema.decodeUnknownOption(hostGenerationManifestSchema, { onExcessProperty: 'error' })(JSON.parse(rawManifest))
+      if (Option.isNone(decodedManifest)) {
+        logger.error('Invalid Host generation manifest (plugin=%s)', options.metadata.packageId)
         return
       }
-      const manifest = decodedManifest.data
+      const manifest = decodedManifest.value
       // One attempt per revision: a failed generation must not loop until its content changes.
       if (manifest.generation === active?.id || attempted.has(manifest.generation)) return
       attempted.add(manifest.generation)

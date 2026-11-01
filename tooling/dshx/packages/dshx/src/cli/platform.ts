@@ -3,7 +3,8 @@ import { writeFile } from 'node:fs/promises'
 import type { Writable } from 'node:stream'
 import { promisify } from 'node:util'
 import semver from 'semver'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaIssue from 'effect/SchemaIssue'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonObject } from '../json.js'
 import type { CliArgs } from './args.js'
@@ -53,8 +54,15 @@ function commandName(args: CliArgs): string {
 }
 
 function safeMessage(error: unknown) {
-  if (error instanceof z.ZodError) {
-    return { code: 'invalid-response', message: `DSH returned data outside its API contract:\n${z.prettifyError(error)}` }
+  const issue =
+    error instanceof Error && SchemaIssue.isIssue(error.cause)
+      ? error.cause
+      : error instanceof Error && 'issue' in error && SchemaIssue.isIssue(error.issue)
+        ? error.issue
+        : undefined
+  if (issue !== undefined) {
+    const formatIssue = SchemaIssue.makeFormatterDefault()
+    return { code: 'invalid-response', message: `DSH returned data outside its API contract:\n${formatIssue(issue)}` }
   }
   const code = error instanceof DshPlatformError ? error.code : 'command-failed'
   const message = error instanceof Error ? error.message : 'The DSH operation failed.'
@@ -508,7 +516,7 @@ const selectRemoteRuntime = async (multiHost: MultiHost, selector: string): Prom
 const remoteSessionClient = (multiHost: MultiHost, runtimeId: string): DshPlatformClient =>
   createDshPlatformClientFromTransport({
     rpc: async (namespace, method, args, signal) => {
-      const request = nativeRpcRequestSchema.parse({ namespace, method, args })
+      const request = Schema.decodeUnknownSync(nativeRpcRequestSchema, { onExcessProperty: 'error' })({ namespace, method, args })
       const response = await multiHost.runtimeCall(runtimeId, request, signal)
       if (!response.ok) throw new DshPlatformError(response.code, response.message)
       return response.value

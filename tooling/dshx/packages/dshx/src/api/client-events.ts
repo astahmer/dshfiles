@@ -1,4 +1,5 @@
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiEventClientPayload, ApiEventStatus } from './types.js'
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel } from './runtime.js'
@@ -28,12 +29,12 @@ interface EventHub {
   readonly subscribers: Set<Subscriber>
 }
 
-const frameSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('catalog'), events: z.array(z.string()) }),
-  z.object({ type: z.literal('event'), key: z.string(), version: z.number(), data: z.unknown() }),
+const frameSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('catalog'), events: Schema.Array(Schema.String) }),
+  Schema.Struct({ type: Schema.Literal('event'), key: Schema.String, version: Schema.Number.check(Schema.isFinite()), data: Schema.Unknown }),
 ])
 
-type EventFrame = Extract<z.infer<typeof frameSchema>, { readonly type: 'event' }>
+type EventFrame = Extract<(typeof frameSchema)['Type'], { readonly type: 'event' }>
 
 const HUB_KEY = Symbol.for('@dshfiles/dshx.api-events.v1')
 
@@ -62,14 +63,14 @@ const receive = (hub: EventHub, raw: unknown): void => {
   } catch {
     return
   }
-  const frame = frameSchema.safeParse(parsed)
-  if (!frame.success) return
-  if (frame.data.type === 'catalog') {
-    hub.catalog = new Set(frame.data.events)
+  const frame = Schema.decodeUnknownOption(frameSchema)(parsed)
+  if (Option.isNone(frame)) return
+  if (frame.value.type === 'catalog') {
+    hub.catalog = new Set(frame.value.events)
     notifyStatus(hub)
     return
   }
-  const event = frame.data
+  const event = frame.value
   for (const subscriber of [...hub.subscribers]) if (subscriber.key === event.key) subscriber.deliver(event)
 }
 

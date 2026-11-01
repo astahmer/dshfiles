@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
 import { connectCommunicationClient, startHostCommunicationBridge } from '../src/communication/bridge.js'
@@ -52,7 +53,7 @@ describe('communication diagnostic CLI', () => {
         connect: options => connectCommunicationClient({ ...options, stateHome: root }),
       })
 
-      const envelope = communicationDiagnosticsSchema.parse(JSON.parse(output).data)
+      const envelope = Schema.decodeUnknownSync(communicationDiagnosticsSchema)(JSON.parse(output).data)
       expect(exitCode).toBe(0)
       expect(errorOutput).toBe('')
       expect(envelope).toMatchObject({ agentCount: 1, topicCount: 1, messageCount: 1, activity: { retainedCount: 1 } })

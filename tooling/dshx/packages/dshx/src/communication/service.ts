@@ -1,9 +1,10 @@
 import { chmod, lstat, mkdir, readFile } from 'node:fs/promises'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import writeFileAtomic from 'write-file-atomic'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import {
   communicationActivityEventSchema,
@@ -64,52 +65,53 @@ const MAX_TOPIC_SUBSCRIBERS = 512
 const MAX_ACKNOWLEDGEMENTS = 100_000
 const generatedWorkspaceTopicPattern = /^workspace\/[a-f0-9]{24}$/
 
-const topicSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .refine(value => {
+const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => {
+  const struct = Schema.Struct(fields)
+  return Schema.StructWithRest(struct, [
+    Schema.Record(Schema.String.check(Schema.makeFilter(key => !Object.prototype.hasOwnProperty.call(fields, key))), Schema.Never),
+  ])
+}
+
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(value)
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const topicSchema = boundedString(1, 128).check(
+  Schema.makeFilter(value => {
     if (value === 'inbox') return true
     const segments = value.split('/')
     return segments.every(segment => /^[a-z0-9][a-z0-9._-]{0,63}$/.test(segment) && segment !== '..')
-  }, 'Topic must use lowercase path segments; "inbox" is reserved for an agent private inbox.')
+  }),
+)
 
-const messageInputSchema = z
-  .object({
-    topic: topicSchema,
-    text: z.string().trim().min(1).max(12_000),
-    intent: communicationMessageIntentSchema.default('notice'),
-    priority: z.enum(['normal', 'urgent']).default('normal'),
-    correlationId: z.string().min(1).max(128).optional(),
-    dedupeKey: z.string().min(1).max(128).optional(),
-  })
-  .strict()
+const messageInputSchema = strictStruct({
+  topic: topicSchema,
+  text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(12_000)),
+  intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
+  priority: Schema.Literals(['normal', 'urgent']).pipe(Schema.withDecodingDefaultType(Effect.succeed('normal'))),
+  correlationId: Schema.optional(boundedString(1, 128)),
+  dedupeKey: Schema.optional(boundedString(1, 128)),
+})
 
-const directMessageInputSchema = z
-  .object({
-    toAgentId: z.string().min(1).max(256),
-    text: z.string().trim().min(1).max(12_000),
-    intent: communicationMessageIntentSchema.default('notice'),
-    priority: z.enum(['normal', 'urgent']).default('normal'),
-    correlationId: z.string().min(1).max(128).optional(),
-    dedupeKey: z.string().min(1).max(128).optional(),
-  })
-  .strict()
+const directMessageInputSchema = strictStruct({
+  toAgentId: boundedString(1, 256),
+  text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(12_000)),
+  intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
+  priority: Schema.Literals(['normal', 'urgent']).pipe(Schema.withDecodingDefaultType(Effect.succeed('normal'))),
+  correlationId: Schema.optional(boundedString(1, 128)),
+  dedupeKey: Schema.optional(boundedString(1, 128)),
+})
 
-const subscriptionInputSchema = z
-  .object({
-    topic: topicSchema,
-    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]).default('passive'),
-    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64).default([]),
-  })
-  .strict()
+const subscriptionInputSchema = strictStruct({
+  topic: topicSchema,
+  delivery: Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema]).pipe(Schema.withDecodingDefaultType(Effect.succeed('passive'))),
+  allowSteerFrom: Schema.Array(boundedString(1, 256))
+    .check(Schema.isMaxLength(64))
+    .pipe(Schema.withDecodingDefaultType(Effect.succeed([]))),
+})
 
-const pruneWorkspaceTopicsInputSchema = z
-  .object({
-    activeTopics: z.array(topicSchema).max(MAX_SUBSCRIPTIONS),
-    inactiveBefore: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  })
-  .strict()
+const pruneWorkspaceTopicsInputSchema = strictStruct({
+  activeTopics: Schema.Array(topicSchema).check(Schema.isMaxLength(MAX_SUBSCRIPTIONS)),
+  inactiveBefore: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
+})
 
 export interface CommunicationServiceOptions {
   readonly statePath?: string
@@ -172,7 +174,7 @@ export interface CommunicationActivityInput {
   readonly errorCode?: string | null
 }
 
-const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [
+const persistedCommunicationStateSchema = Schema.Union([
   communicationStateV1Schema,
   communicationStateV2Schema,
   communicationStateV3Schema,
@@ -225,17 +227,22 @@ const cleanState = (state: CommunicationState, now: number): CommunicationState 
 }
 
 const assertTopic = (topic: string, privateAllowed = false): string => {
-  const parsed = topicSchema.safeParse(topic)
-  if (!parsed.success || (!privateAllowed && parsed.data === 'inbox')) {
+  let parsed: string
+  try {
+    parsed = decode(topicSchema, topic)
+  } catch {
     throw new CommunicationError('invalid-topic', privateAllowed ? 'Invalid communication topic.' : 'The private inbox cannot be published to.')
   }
-  return parsed.data
+  if (!privateAllowed && parsed === 'inbox') {
+    throw new CommunicationError('invalid-topic', 'The private inbox cannot be published to.')
+  }
+  return parsed
 }
 
 const messageId = (): string => randomUUID()
 
 const migrateLegacyState = (state: CommunicationStateV1 | CommunicationStateV2 | CommunicationStateV3): CommunicationState =>
-  communicationStateSchema.parse({
+  decode(communicationStateSchema, {
     schemaVersion: 4,
     messages: state.messages.map(message => ({
       ...message,
@@ -269,7 +276,7 @@ const topicsForState = (state: CommunicationState): readonly CommunicationTopic[
     counts.set(subscription.topic, subscribers)
   }
   return [...counts.entries()]
-    .map(([topic, subscribers]) => communicationTopicSchema.parse({ topic, subscribers: subscribers.size }))
+    .map(([topic, subscribers]) => decode(communicationTopicSchema, { topic, subscribers: subscribers.size }))
     .sort((left, right) => left.topic.localeCompare(right.topic))
 }
 
@@ -330,7 +337,7 @@ export class CommunicationService {
   }
 
   async pruneInactiveWorkspaceTopics(input: PruneInactiveWorkspaceTopicsInput): Promise<number> {
-    const parsed = pruneWorkspaceTopicsInputSchema.parse(input)
+    const parsed = decode(pruneWorkspaceTopicsInputSchema, input)
     const activeTopics = new Set(parsed.activeTopics)
     return this.#updateState(state => {
       const lastActivityByTopic = new Map<string, number>()
@@ -402,17 +409,16 @@ export class CommunicationService {
   }
 
   async browseMessages(input: CommunicationBrowseInput = {}): Promise<CommunicationMessagePage> {
-    const parsed = z
-      .object({
-        topic: topicSchema.optional(),
-        agentId: z.string().min(1).max(256).optional(),
-        search: z.string().trim().min(1).max(120).optional(),
-        beforeId: z.string().uuid().optional(),
-        limit: z.number().int().min(1).max(100).default(50),
-      })
-      .strict()
-      .refine(value => value.topic === undefined || value.agentId === undefined, 'Choose a topic or direct Agent, not both.')
-      .parse(input)
+    const browseMessagesInputSchema = strictStruct({
+      topic: Schema.optional(topicSchema),
+      agentId: Schema.optional(boundedString(1, 256)),
+      search: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120))),
+      beforeId: Schema.optional(Schema.String.check(Schema.isUUID())),
+      limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)).pipe(
+        Schema.withDecodingDefaultType(Effect.succeed(50)),
+      ),
+    }).check(Schema.makeFilter(value => value.topic === undefined || value.agentId === undefined))
+    const parsed = decode(browseMessagesInputSchema, input)
     if (parsed.topic !== undefined) assertTopic(parsed.topic)
 
     const state = await this.#readState()
@@ -437,7 +443,7 @@ export class CommunicationService {
     }
     const startIndex = Math.max(0, endIndex - parsed.limit)
     const items = matches.slice(startIndex, endIndex)
-    return communicationMessagePageSchema.parse({
+    return decode(communicationMessagePageSchema, {
       items,
       nextCursor: startIndex > 0 ? (items[0]?.id ?? null) : null,
       totalMatching: matches.length,
@@ -456,7 +462,7 @@ export class CommunicationService {
   async recordActivities(inputs: readonly CommunicationActivityInput[]): Promise<void> {
     if (inputs.length === 0) return
     const events: CommunicationActivityEvent[] = inputs.map(input =>
-      communicationActivityEventSchema.parse({
+      decode(communicationActivityEventSchema, {
         id: randomUUID(),
         principal: input.principal,
         operation: input.operation,
@@ -529,7 +535,7 @@ export class CommunicationService {
     }
 
     const state = await this.#readState()
-    const agents = z.array(communicationAgentSchema).parse(input.agents)
+    const agents = decode(Schema.Array(communicationAgentSchema), input.agents)
     const topics = topicsForState(state)
     const acknowledgements = new Map(state.acknowledgements.map(entry => [`${entry.messageId}:${principalKey(entry.principal)}`, entry.acknowledgedAt]))
     let pendingMessageCount = 0
@@ -550,7 +556,7 @@ export class CommunicationService {
       .reverse()
       .map(message => {
         const pendingRecipients = message.recipients.filter(recipient => !acknowledgements.has(`${message.id}:${principalKey(recipient.principal)}`))
-        return communicationDiagnosticMessageSchema.parse({
+        return decode(communicationDiagnosticMessageSchema, {
           id: message.id,
           topic: message.topic,
           sender: message.sender,
@@ -565,7 +571,7 @@ export class CommunicationService {
       .sort((left, right) => left.topic.localeCompare(right.topic) || principalKey(left.principal).localeCompare(principalKey(right.principal)))
       .slice(0, limit)
       .map(subscription =>
-        communicationDiagnosticSubscriptionSchema.parse({
+        decode(communicationDiagnosticSubscriptionSchema, {
           principal: subscription.principal,
           topic: subscription.topic,
           delivery: subscription.delivery,
@@ -573,11 +579,11 @@ export class CommunicationService {
         }),
       )
 
-    return communicationDiagnosticsSchema.parse({
+    return decode(communicationDiagnosticsSchema, {
       generatedAt: this.#now(),
       agentCount: agents.length,
       agents: agents.slice(0, limit).map(agent =>
-        communicationDiagnosticAgentSchema.parse({
+        decode(communicationDiagnosticAgentSchema, {
           id: agent.id,
           status: agent.status,
           workspaceTopic: agent.workspaceTopic ?? null,
@@ -613,11 +619,11 @@ export class CommunicationService {
     const acknowledgements = new Map(
       state.acknowledgements.filter(entry => entry.messageId === message.id).map(entry => [principalKey(entry.principal), entry.acknowledgedAt]),
     )
-    return communicationMessageRecipientsSchema.parse({
+    return decode(communicationMessageRecipientsSchema, {
       messageId: message.id,
       recipientCount: message.recipients.length,
       recipients: message.recipients.map(recipient =>
-        communicationDiagnosticRecipientSchema.parse({
+        decode(communicationDiagnosticRecipientSchema, {
           principal: recipient.principal,
           delivery: recipient.delivery,
           readAt: recipient.readAt,
@@ -629,7 +635,7 @@ export class CommunicationService {
 
   async revealMessageBody(messageIdInput: string): Promise<CommunicationMessageBody> {
     const { message } = await this.#readMessage(messageIdInput)
-    return communicationMessageBodySchema.parse({ messageId: message.id, text: message.text })
+    return decode(communicationMessageBodySchema, { messageId: message.id, text: message.text })
   }
 
   async subscribe(
@@ -640,15 +646,15 @@ export class CommunicationService {
       readonly allowSteerFrom?: readonly string[]
     },
   ): Promise<CommunicationSubscription> {
-    const principal = communicationPrincipalSchema.parse(principalInput)
-    const parsed = subscriptionInputSchema.parse({ ...input, allowSteerFrom: input.allowSteerFrom ?? [] })
+    const principal = decode(communicationPrincipalSchema, principalInput)
+    const parsed = decode(subscriptionInputSchema, { ...input, allowSteerFrom: input.allowSteerFrom ?? [] })
     if (parsed.topic === 'inbox' && principal.kind !== 'agent') {
       throw new CommunicationError('invalid-topic', 'Only a DSH Agent can subscribe to its private inbox.')
     }
     const now = this.#now()
     // The private inbox is implicit: direct messages name their recipient, so subscribing registers nothing.
     if (parsed.topic === 'inbox') {
-      return communicationSubscriptionSchema.parse({ principal, topic: parsed.topic, delivery: 'passive', createdAt: now })
+      return decode(communicationSubscriptionSchema, { principal, topic: parsed.topic, delivery: 'passive', createdAt: now })
     }
     return this.#writeSubscription({ principal, topic: parsed.topic, createdAt: now, evictStalest: false })
   }
@@ -657,7 +663,7 @@ export class CommunicationService {
     principalInput: CommunicationPrincipal,
     input: { readonly topic: string; readonly delivery: CommunicationDelivery },
   ): Promise<CommunicationSubscription | undefined> {
-    const principal = communicationPrincipalSchema.parse(principalInput)
+    const principal = decode(communicationPrincipalSchema, principalInput)
     const key = principalKey(principal)
     const topic = assertTopic(input.topic, true)
     const state = await this.#readState()
@@ -676,7 +682,7 @@ export class CommunicationService {
     readonly evictStalest: boolean
   }): Promise<CommunicationSubscription> {
     const key = principalKey(input.principal)
-    const subscription = communicationSubscriptionSchema.parse({
+    const subscription = decode(communicationSubscriptionSchema, {
       principal: input.principal,
       topic: input.topic,
       delivery: 'passive',
@@ -733,7 +739,7 @@ export class CommunicationService {
    * @returns one reading per input principal, duplicates included.
    */
   async unreadCounts(principalsInput: readonly CommunicationPrincipal[]): Promise<readonly CommunicationUnreadCount[]> {
-    const principals = principalsInput.map(principal => communicationPrincipalSchema.parse(principal))
+    const principals = principalsInput.map(principal => decode(communicationPrincipalSchema, principal))
     if (principals.length === 0) return []
     const state = await this.#readState()
     const wanted = new Map<string, { readonly principal: CommunicationPrincipal; count: number; readonly acknowledged: Set<string> }>()
@@ -762,7 +768,7 @@ export class CommunicationService {
   }
 
   async unsubscribe(principalInput: CommunicationPrincipal, topicInput: string): Promise<{ readonly removed: boolean }> {
-    const principal = communicationPrincipalSchema.parse(principalInput)
+    const principal = decode(communicationPrincipalSchema, principalInput)
     const topic = assertTopic(topicInput, true)
     if (topic === 'inbox') {
       throw new CommunicationError('private-inbox-always-available', 'The private inbox is always available and never triggers an Agent turn.')
@@ -782,8 +788,8 @@ export class CommunicationService {
   }
 
   async publish(input: CommunicationPublishInput): Promise<CommunicationMessage> {
-    const sender = communicationPrincipalSchema.parse(input.sender)
-    const parsed = messageInputSchema.parse({
+    const sender = decode(communicationPrincipalSchema, input.sender)
+    const parsed = decode(messageInputSchema, {
       topic: input.topic,
       text: input.text,
       intent: input.intent,
@@ -806,7 +812,7 @@ export class CommunicationService {
           delivery: 'passive',
           readAt: null,
         }))
-      const item = communicationMessageSchema.parse({
+      const item = decode(communicationMessageSchema, {
         id: messageId(),
         topic,
         sender,
@@ -824,8 +830,8 @@ export class CommunicationService {
   }
 
   async send(input: CommunicationSendInput): Promise<CommunicationMessage> {
-    const sender = communicationPrincipalSchema.parse(input.sender)
-    const parsed = directMessageInputSchema.parse({
+    const sender = decode(communicationPrincipalSchema, input.sender)
+    const parsed = decode(directMessageInputSchema, {
       toAgentId: input.toAgentId,
       text: input.text,
       intent: input.intent,
@@ -850,7 +856,7 @@ export class CommunicationService {
                 item.recipients.some(entry => entry.principal.kind === 'agent' && entry.principal.id === parsed.toAgentId),
             )
       if (duplicate !== undefined) return { state, value: duplicate }
-      const item = communicationMessageSchema.parse({
+      const item = decode(communicationMessageSchema, {
         id: messageId(),
         topic: null,
         sender,
@@ -868,7 +874,7 @@ export class CommunicationService {
   }
 
   async inbox(input: CommunicationInboxInput): Promise<readonly CommunicationMessage[]> {
-    const principal = communicationPrincipalSchema.parse(input.principal)
+    const principal = decode(communicationPrincipalSchema, input.principal)
     const topic = input.topic === undefined ? undefined : assertTopic(input.topic, true)
     const limit = input.limit ?? 50
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
@@ -906,8 +912,8 @@ export class CommunicationService {
   }
 
   async acknowledge(principalInput: CommunicationPrincipal, messageIdInput: string): Promise<{ readonly acknowledged: boolean }> {
-    const principal = communicationPrincipalSchema.parse(principalInput)
-    const id = z.string().uuid().parse(messageIdInput)
+    const principal = decode(communicationPrincipalSchema, principalInput)
+    const id = decode(Schema.String.check(Schema.isUUID()), messageIdInput)
     let acknowledged = false
     await this.#updateState(state => {
       const message = state.messages.find(item => item.id === id)
@@ -928,7 +934,7 @@ export class CommunicationService {
   }
 
   async #readMessage(messageIdInput: string): Promise<{ readonly state: CommunicationState; readonly message: CommunicationMessage }> {
-    const messageId = z.string().uuid().parse(messageIdInput)
+    const messageId = decode(Schema.String.check(Schema.isUUID()), messageIdInput)
     const state = await this.#readState()
     const message = state.messages.find(item => item.id === messageId)
     if (message === undefined) throw new CommunicationError('message-not-found', 'Message is no longer retained.')
@@ -971,7 +977,7 @@ export class CommunicationService {
     }
     if (Buffer.byteLength(text) > MAX_STATE_BYTES) throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')
     try {
-      const persistedState = persistedCommunicationStateSchema.parse(decodeJson(jsonValueSchema, text))
+      const persistedState = decode(persistedCommunicationStateSchema, decodeJson(jsonValueSchema, text))
       const state = persistedState.schemaVersion === 4 ? persistedState : migrateLegacyState(persistedState)
       const cleaned = cleanState(state, this.#now())
       this.#cachedState = { revision, at: this.#now(), state: cleaned }
@@ -986,7 +992,7 @@ export class CommunicationService {
       const current = cleanState(await this.#readState(), this.#now())
       const updated = update(current)
       if (updated.state === current) return updated.value
-      const parsed = communicationStateSchema.parse(cleanState(updated.state, this.#now()))
+      const parsed = decode(communicationStateSchema, cleanState(updated.state, this.#now()))
       const serialized = `${JSON.stringify(parsed)}\n`
       if (Buffer.byteLength(serialized) > MAX_STATE_BYTES) {
         throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')

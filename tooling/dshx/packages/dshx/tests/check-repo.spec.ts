@@ -3,22 +3,30 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
+import * as Schema from 'effect/Schema'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { runCli } from '../src/cli/run.js'
 import { decodeJson } from '../src/json.js'
 
-const envelopeSchema = z.object({
-  schemaVersion: z.literal(1),
-  command: z.literal('check repo'),
-  ok: z.boolean(),
-  data: z.object({
-    checks: z.array(
-      z.object({
-        name: z.string(),
-        ok: z.boolean(),
-        inspected: z.number(),
-        findings: z.array(z.object({ rule: z.string(), message: z.string(), file: z.string().nullable(), line: z.number().nullable(), hint: z.string() })),
+const envelopeSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  command: Schema.Literal('check repo'),
+  ok: Schema.Boolean,
+  data: Schema.Struct({
+    checks: Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        ok: Schema.Boolean,
+        inspected: Schema.Number,
+        findings: Schema.Array(
+          Schema.Struct({
+            rule: Schema.String,
+            message: Schema.String,
+            file: Schema.NullOr(Schema.String),
+            line: Schema.NullOr(Schema.Number),
+            hint: Schema.String,
+          }),
+        ),
       }),
     ),
   }),
@@ -156,7 +164,7 @@ describe('dshx check repo', () => {
   it('rejects an unknown check as a usage error', async () => {
     const { code, envelope } = await check('--json', '--only', 'lint').then(result => ({
       code: result.code,
-      envelope: decodeJson(z.object({ ok: z.literal(false), error: z.object({ code: z.literal('usage') }) }), result.stdout),
+      envelope: decodeJson(Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.Literal('usage') }) }), result.stdout),
     }))
     expect(code).toBe(2)
     expect(envelope.error.code).toBe('usage')

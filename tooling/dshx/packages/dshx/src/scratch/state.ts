@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process'
+import { Result, SchemaIssue } from 'effect'
+import * as Schema from 'effect/Schema'
 import { closeSync, openSync } from 'node:fs'
 import { appendFile, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import { REACH_SEEDS } from '../project/features.js'
 
@@ -22,51 +23,57 @@ export class ScratchError extends Error {
   }
 }
 
-const ownedProcessSchema = z.object({ pid: z.number().int().positive(), signature: z.array(z.string().min(1)).min(1) }).strict()
+const ownedProcessFields = {
+  pid: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+  signature: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
+}
+const ownedProcessSchema = Schema.Struct(ownedProcessFields)
 
-export const ScratchStateSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    name: z.string(),
-    createdAt: z.string(),
-    stateDir: z.string(),
-    home: z.string(),
-    profile: z.string(),
-    port: z.number().int(),
-    origin: z.string(),
-    /** Tokenized launch URL. A secret: only this file (mode 600) holds it; never print it. */
-    launchUrl: z.string(),
-    bundles: z.array(z.string()),
-    expectedClientEntries: z.array(z.string()),
-    project: z.object({ path: z.string(), workspaceId: z.string(), ownedByScratch: z.boolean() }).strict(),
-    host: ownedProcessSchema,
-    browser: ownedProcessSchema.extend({ cdpPort: z.number().int() }).strict(),
-    hostLog: z.string(),
-    browserLog: z.string(),
-    browserEvents: z.string(),
-    evidenceDir: z.string(),
-    /** Directory holding the fake `secret` CLI and its store, first on the Host's PATH (`up --fake-secret-cli`). */
-    fakeSecretCli: z.string().optional(),
-    /** Seeds `dshx dev open` already applied to this instance, with the checkout file one changed for `down` to restore. */
-    seeds: z.array(z.object({ seed: z.enum(REACH_SEEDS), changedFile: z.string().optional() }).strict()).optional(),
-    /** The loopback model provider started by `tool-call-thread` or `credential-recovery`; `down` stops it. */
-    fakeProvider: ownedProcessSchema.optional(),
-    /** Minutes without a `dshx dev` command (the state file's mtime is the lease) before the watchdog warns; 0 never. */
-    idleTimeoutMinutes: z.number().int().nonnegative().optional(),
-    /** Minutes of warning grace between the expired lease and the automatic `down`; 0 stops without warning. The CLI takes whole minutes; a spec passes a fraction to watch the grace end quickly. */
-    warnMinutes: z.number().nonnegative().optional(),
-    /** ISO time the warning started; absent while the instance is in use. Its own grace clock, not the lease. */
-    warnedAt: z.string().optional(),
-    /** `dshx dev keep --forever` pinned the instance: no idle stop until another `up` or `down`. */
-    kept: z.boolean().optional(),
-    /** The detached process that runs `down` when the lease expires or the dsh process is gone. */
-    watchdog: ownedProcessSchema.optional(),
-  })
-  .strict()
+export const ScratchStateSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  name: Schema.String,
+  createdAt: Schema.String,
+  stateDir: Schema.String,
+  home: Schema.String,
+  profile: Schema.String,
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+  origin: Schema.String,
+  /** Tokenized launch URL. A secret: only this file (mode 600) holds it; never print it. */
+  launchUrl: Schema.String,
+  bundles: Schema.Array(Schema.String),
+  expectedClientEntries: Schema.Array(Schema.String),
+  project: Schema.Struct({ path: Schema.String, workspaceId: Schema.String, ownedByScratch: Schema.Boolean }),
+  host: ownedProcessSchema,
+  browser: Schema.Struct({ ...ownedProcessFields, cdpPort: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
+  hostLog: Schema.String,
+  browserLog: Schema.String,
+  browserEvents: Schema.String,
+  evidenceDir: Schema.String,
+  /** Directory holding the fake `secret` CLI and its store, first on the Host's PATH (`up --fake-secret-cli`). */
+  fakeSecretCli: Schema.optional(Schema.String),
+  /** Seeds `dshx dev open` already applied to this instance, with the checkout file one changed for `down` to restore. */
+  seeds: Schema.optional(Schema.Array(Schema.Struct({ seed: Schema.Literals(REACH_SEEDS), changedFile: Schema.optional(Schema.String) }))),
+  /** The loopback model provider started by `tool-call-thread` or `credential-recovery`; `down` stops it. */
+  fakeProvider: Schema.optional(ownedProcessSchema),
+  /** Minutes without a `dshx dev` command (the state file's mtime is the lease) before the watchdog warns; 0 never. */
+  idleTimeoutMinutes: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  /** Minutes of warning grace between the expired lease and the automatic `down`; 0 stops without warning. The CLI takes whole minutes; a spec passes a fraction to watch the grace end quickly. */
+  warnMinutes: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))),
+  /** ISO time the warning started; absent while the instance is in use. Its own grace clock, not the lease. */
+  warnedAt: Schema.optional(Schema.String),
+  /** `dshx dev keep --forever` pinned the instance: no idle stop until another `up` or `down`. */
+  kept: Schema.optional(Schema.Boolean),
+  /** The detached process that runs `down` when the lease expires or the dsh process is gone. */
+  watchdog: Schema.optional(ownedProcessSchema),
+})
 
-export type ScratchState = z.infer<typeof ScratchStateSchema>
+type Mutable<T> = T extends ReadonlyArray<infer Item> ? Mutable<Item>[] : T extends object ? { -readonly [Key in keyof T]: Mutable<T[Key]> } : T
 
-export const scratchNameSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'use 1-32 lowercase letters, digits or hyphens')
+export type ScratchState = Mutable<Schema.Schema.Type<typeof ScratchStateSchema>>
+
+export const scratchNameSchema = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/, { message: 'use 1-32 lowercase letters, digits or hyphens' }),
+)
 
 export const DEFAULT_IDLE_TIMEOUT_MINUTES = 30
 
@@ -95,15 +102,16 @@ const readScratchState = async (stateDir: string, name: string): Promise<Scratch
       `Run "dshx dev up${name === 'default' ? '' : ` --name ${name}`}" first.`,
     )
   }
-  const parsed = ScratchStateSchema.safeParse(decodeJson(jsonValueSchema, source))
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(ScratchStateSchema, { onExcessProperty: 'error' })(decodeJson(jsonValueSchema, source))
+  if (Result.isFailure(parsed)) {
+    const issues = SchemaIssue.makeFormatterStandardSchemaV1()(parsed.failure.issue).issues
     throw new ScratchError(
       'invalid-state',
-      `The scratch state in ${stateFile(stateDir)} is unreadable: ${parsed.error.issues[0]?.message ?? 'invalid shape'}.`,
+      `The scratch state in ${stateFile(stateDir)} is unreadable: ${issues[0]?.message ?? 'invalid shape'}.`,
       'Run "dshx dev down --dry-run" to see what it would stop, then "dshx dev down".',
     )
   }
-  return parsed.data
+  return parsed.success as ScratchState
 }
 
 const writeScratchState = async (state: ScratchState): Promise<void> => {

@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { randomBytes } from 'node:crypto'
-import { z } from 'zod'
 import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
 import { SpanRecorders } from './recorder.js'
 import { TraceparentModel, type SpanContext } from './traceparent.js'
@@ -76,10 +77,10 @@ const bounded = (value: SpanAttributeValue): SpanAttributeValue => {
   return value.slice(0, MAX_LIST).map(item => (typeof item === 'string' ? item.slice(0, MAX_STRING) : item))
 }
 
-const errorCodeSchema = z.object({ code: z.string() })
+const errorCodeSchema = Schema.Struct({ code: Schema.String })
 
 const errorType = (error: unknown): string => {
-  const code = errorCodeSchema.safeParse(error).data?.code
+  const code = Option.getOrUndefined(Schema.decodeUnknownOption(errorCodeSchema)(error))?.code
   const name = error instanceof Error ? error.name : 'NonError'
   return (code === undefined ? name : `${name}:${code}`).slice(0, MAX_ERROR_TYPE)
 }

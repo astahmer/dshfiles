@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { chmod, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createServer, type Server, type Socket } from 'node:net'
-import { z } from 'zod'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonObject, JsonValue } from '../json.js'
@@ -34,27 +34,39 @@ const PROTOCOL_VERSION = 1
 const MAX_REQUEST_BYTES = 64 * 1024
 const MAX_RESPONSE_BYTES = 1024 * 1024
 const REQUEST_TIMEOUT_MS = 5_000
-const operationSchema = z.enum(['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack'])
+const operationSchema = Schema.Literals(['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack'])
 
-const bridgeRequestSchema = z
-  .object({
-    version: z.literal(PROTOCOL_VERSION),
-    requestId: z.string().uuid(),
-    token: z.string().uuid(),
-    operation: operationSchema,
-    principal: communicationPrincipalSchema.refine(value => value.kind === 'external', 'Only external principals may connect over the local bridge.'),
-    input: z.unknown().optional(),
-  })
-  .strict()
+const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => {
+  const struct = Schema.Struct(fields)
+  return Schema.StructWithRest(struct, [
+    Schema.Record(Schema.String.check(Schema.makeFilter(key => !Object.prototype.hasOwnProperty.call(fields, key))), Schema.Never),
+  ])
+}
 
-const bridgeMetadataSchema = z
-  .object({
-    version: z.literal(PROTOCOL_VERSION),
-    pid: z.number().int().positive(),
-    socketPath: z.string().min(1),
-    token: z.string().uuid(),
-  })
-  .strict()
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(value)
+const uuidSchema = Schema.String.check(Schema.isUUID())
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const boundedInteger = (minimum: number, maximum: number) =>
+  Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
+const positiveInteger = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
+
+const bridgeRequestSchema = strictStruct({
+  version: Schema.Literal(PROTOCOL_VERSION),
+  requestId: uuidSchema,
+  token: uuidSchema,
+  operation: operationSchema,
+  principal: communicationPrincipalSchema.check(
+    Schema.makeFilter(value => value.kind === 'external' || 'Only external principals may connect over the local bridge.'),
+  ),
+  input: Schema.optional(Schema.Unknown),
+})
+
+const bridgeMetadataSchema = strictStruct({
+  version: Schema.Literal(PROTOCOL_VERSION),
+  pid: positiveInteger,
+  socketPath: Schema.String.check(Schema.isMinLength(1)),
+  token: uuidSchema,
+})
 
 export interface HostCommunicationBridgeHandle {
   readonly metadataPath: string
@@ -127,7 +139,7 @@ const responseError = (requestId: string, code: string, message: string) => ({
   error: { code, message },
 })
 
-const readMetadata = async (stateHome?: string): Promise<z.infer<typeof bridgeMetadataSchema>> => {
+const readMetadata = async (stateHome?: string): Promise<Schema.Schema.Type<typeof bridgeMetadataSchema>> => {
   const location = bridgePaths(stateHome)
   const metadataStat = await lstat(location.metadataPath).catch(() => undefined)
   if (!metadataStat?.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > 4_096 || (metadataStat.mode & 0o077) !== 0) {
@@ -143,7 +155,7 @@ const readMetadata = async (stateHome?: string): Promise<z.infer<typeof bridgeMe
   if (typeof process.getuid === 'function' && directoryStat.uid !== process.getuid()) {
     throw new CommunicationError('host-unavailable', 'DSHX Communication Host bridge directory belongs to a different user.')
   }
-  return bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, await readFile(location.metadataPath, 'utf8')))
+  return decode(bridgeMetadataSchema, decodeJson(jsonValueSchema, await readFile(location.metadataPath, 'utf8')))
 }
 
 /** One communication operation's result, as the JSON response envelope carries it. */
@@ -161,33 +173,30 @@ type CommunicationOperationResult =
 const dispatch = async (
   service: CommunicationService,
   listAgents: () => readonly CommunicationAgent[] | Promise<readonly CommunicationAgent[]>,
-  request: z.infer<typeof bridgeRequestSchema>,
+  request: Schema.Schema.Type<typeof bridgeRequestSchema>,
 ): Promise<CommunicationOperationResult> => {
   if (request.operation === 'agents') {
     if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
-    return (await listAgents()).map(item => communicationAgentSchema.parse(item))
+    return (await listAgents()).map(item => decode(communicationAgentSchema, item))
   }
   if (request.operation === 'topics') {
     if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
     return service.listTopics()
   }
   if (request.operation === 'report') {
-    const input = z
-      .object({ limit: z.number().int().min(1).max(100).optional() })
-      .strict()
-      .parse(request.input ?? {})
+    const input = decode(strictStruct({ limit: Schema.optional(boundedInteger(1, 100)) }), request.input ?? {})
     return service.diagnostics({ agents: await listAgents(), limit: input.limit ?? 20 })
   }
   if (!isRecord(request.input)) throw new CommunicationError('invalid-request', 'Communication operation input must be an object.')
   if (request.operation === 'subscribe') {
-    const input = z
-      .object({
-        topic: z.string().min(1).max(128),
-        delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]).optional(),
-        allowSteerFrom: z.array(z.string().min(1).max(256)).max(64).optional(),
-      })
-      .strict()
-      .parse(request.input)
+    const input = decode(
+      strictStruct({
+        topic: boundedString(1, 128),
+        delivery: Schema.optional(Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema])),
+        allowSteerFrom: Schema.optional(Schema.Array(boundedString(1, 256)).check(Schema.isMaxLength(64))),
+      }),
+      request.input,
+    )
     return service.subscribe(request.principal, {
       topic: input.topic,
       ...(input.delivery !== undefined && { delivery: input.delivery }),
@@ -195,24 +204,21 @@ const dispatch = async (
     })
   }
   if (request.operation === 'unsubscribe') {
-    const input = z
-      .object({ topic: z.string().min(1).max(128) })
-      .strict()
-      .parse(request.input)
+    const input = decode(strictStruct({ topic: boundedString(1, 128) }), request.input)
     return service.unsubscribe(request.principal, input.topic)
   }
   if (request.operation === 'publish') {
-    const input = z
-      .object({
-        topic: z.string().min(1).max(128),
-        text: z.string().min(1).max(12_000),
-        intent: communicationMessageIntentSchema.optional(),
-        priority: z.enum(['normal', 'urgent']).optional(),
-        correlationId: z.string().min(1).max(128).optional(),
-        dedupeKey: z.string().min(1).max(128).optional(),
-      })
-      .strict()
-      .parse(request.input)
+    const input = decode(
+      strictStruct({
+        topic: boundedString(1, 128),
+        text: boundedString(1, 12_000),
+        intent: Schema.optional(communicationMessageIntentSchema),
+        priority: Schema.optional(Schema.Literals(['normal', 'urgent'])),
+        correlationId: Schema.optional(boundedString(1, 128)),
+        dedupeKey: Schema.optional(boundedString(1, 128)),
+      }),
+      request.input,
+    )
     return service.publish({
       sender: request.principal,
       topic: input.topic,
@@ -224,17 +230,17 @@ const dispatch = async (
     })
   }
   if (request.operation === 'send') {
-    const input = z
-      .object({
-        toAgentId: z.string().min(1).max(256),
-        text: z.string().min(1).max(12_000),
-        intent: communicationMessageIntentSchema.optional(),
-        priority: z.enum(['normal', 'urgent']).optional(),
-        correlationId: z.string().min(1).max(128).optional(),
-        dedupeKey: z.string().min(1).max(128).optional(),
-      })
-      .strict()
-      .parse(request.input)
+    const input = decode(
+      strictStruct({
+        toAgentId: boundedString(1, 256),
+        text: boundedString(1, 12_000),
+        intent: Schema.optional(communicationMessageIntentSchema),
+        priority: Schema.optional(Schema.Literals(['normal', 'urgent'])),
+        correlationId: Schema.optional(boundedString(1, 128)),
+        dedupeKey: Schema.optional(boundedString(1, 128)),
+      }),
+      request.input,
+    )
     return service.send({
       sender: request.principal,
       toAgentId: input.toAgentId,
@@ -246,10 +252,13 @@ const dispatch = async (
     })
   }
   if (request.operation === 'inbox') {
-    const input = z
-      .object({ topic: z.string().min(1).max(128).optional(), limit: z.number().int().min(1).max(500).optional() })
-      .strict()
-      .parse(request.input)
+    const input = decode(
+      strictStruct({
+        topic: Schema.optional(boundedString(1, 128)),
+        limit: Schema.optional(boundedInteger(1, 500)),
+      }),
+      request.input,
+    )
     return {
       items: await service.inbox({
         principal: request.principal,
@@ -258,7 +267,7 @@ const dispatch = async (
       }),
     }
   }
-  const input = z.object({ messageId: z.string().uuid() }).strict().parse(request.input)
+  const input = decode(strictStruct({ messageId: uuidSchema }), request.input)
   return service.acknowledge(request.principal, input.messageId)
 }
 
@@ -277,7 +286,7 @@ const removeStaleEndpoint = async (location: ReturnType<typeof bridgePaths>): Pr
   const metadata = await readFile(location.metadataPath, 'utf8').catch(() => undefined)
   if (metadata !== undefined) {
     try {
-      const parsed = bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, metadata))
+      const parsed = decode(bridgeMetadataSchema, decodeJson(jsonValueSchema, metadata))
       try {
         process.kill(parsed.pid, 0)
         throw new CommunicationError('host-already-active', `A DSHX Communication bridge is already active with pid ${parsed.pid}.`)
@@ -324,7 +333,7 @@ export const startHostCommunicationBridge = async (
         try {
           const parsedValue = decodeJson(jsonValueSchema, text)
           if (isRecord(parsedValue) && typeof parsedValue.requestId === 'string') requestId = parsedValue.requestId
-          const request = bridgeRequestSchema.parse(parsedValue)
+          const request = decode(bridgeRequestSchema, parsedValue)
           if (request.token !== token) throw new CommunicationError('unauthorized', 'Communication bridge authentication failed.')
           void dispatch(service, options.listAgents, request)
             .then(result => writeResponse(socket, requestId, result))
@@ -376,7 +385,7 @@ export const startHostCommunicationBridge = async (
     let stillOwned = false
     if (current !== undefined) {
       try {
-        stillOwned = bridgeMetadataSchema.parse(decodeJson(jsonValueSchema, current)).token === token
+        stillOwned = decode(bridgeMetadataSchema, decodeJson(jsonValueSchema, current)).token === token
       } catch {
         stillOwned = false
       }
@@ -390,9 +399,9 @@ export const startHostCommunicationBridge = async (
 }
 
 export const connectCommunicationClient = async (options: ConnectCommunicationClientOptions = {}): Promise<CommunicationClient> => {
-  const principal = communicationPrincipalSchema.parse({ kind: 'external', id: options.principalId ?? 'cli' })
+  const principal = decode(communicationPrincipalSchema, { kind: 'external', id: options.principalId ?? 'cli' })
   const metadata = await readMetadata(options.stateHome)
-  const request = async (operation: z.infer<typeof operationSchema>, input?: JsonValue): Promise<JsonValue | undefined> => {
+  const request = async (operation: Schema.Schema.Type<typeof operationSchema>, input?: JsonValue): Promise<JsonValue | undefined> => {
     const requestId = randomUUID()
     const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input !== undefined && { input }) })}\n`
     const value = await JsonLineTransport.request(metadata.socketPath, body, {
@@ -418,22 +427,14 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
 
   return {
     principal,
-    listAgents: async () => z.array(communicationAgentSchema).parse(await request('agents')),
-    listTopics: async () => z.array(communicationTopicSchema).parse(await request('topics')),
-    diagnostics: async input => communicationDiagnosticsSchema.parse(await request('report', input ?? {})),
-    subscribe: async input => communicationSubscriptionSchema.parse(await request('subscribe', input)),
-    unsubscribe: async topic =>
-      z
-        .object({ removed: z.boolean() })
-        .strict()
-        .parse(await request('unsubscribe', { topic })),
-    publish: async input => communicationMessageSchema.parse(await request('publish', input)),
-    send: async input => communicationMessageSchema.parse(await request('send', input)),
-    inbox: async input => communicationInboxSchema.parse(await request('inbox', input ?? {})),
-    acknowledge: async messageId =>
-      z
-        .object({ acknowledged: z.boolean() })
-        .strict()
-        .parse(await request('ack', { messageId })),
+    listAgents: async () => decode(Schema.Array(communicationAgentSchema), await request('agents')),
+    listTopics: async () => decode(Schema.Array(communicationTopicSchema), await request('topics')),
+    diagnostics: async input => decode(communicationDiagnosticsSchema, await request('report', input ?? {})),
+    subscribe: async input => decode(communicationSubscriptionSchema, await request('subscribe', input)),
+    unsubscribe: async topic => decode(strictStruct({ removed: Schema.Boolean }), await request('unsubscribe', { topic })),
+    publish: async input => decode(communicationMessageSchema, await request('publish', input)),
+    send: async input => decode(communicationMessageSchema, await request('send', input)),
+    inbox: async input => decode(communicationInboxSchema, await request('inbox', input ?? {})),
+    acknowledge: async messageId => decode(strictStruct({ acknowledged: Schema.Boolean }), await request('ack', { messageId })),
   }
 }

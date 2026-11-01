@@ -1,77 +1,87 @@
 import { randomUUID } from 'node:crypto'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isIPv4 } from 'node:net'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import WebSocket, { type RawData } from 'ws'
 import { createDshxApiCaller, type DshxApiCall } from './dshx-api.js'
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
-const sessionSummarySchema = z.object({
-  agentAvailable: z.boolean(),
-  sessionId: z.string(),
-  updatedAt: z.number(),
-  running: z.boolean(),
-  blank: z.boolean(),
-  parentSessionId: z.string().optional(),
-  origin: z.enum(['subagent']).optional(),
-  cwd: z.string().optional(),
-  projections: jsonValueSchema.optional(),
+const sessionSummarySchema = Schema.Struct({
+  agentAvailable: Schema.Boolean,
+  sessionId: Schema.String,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
+  running: Schema.Boolean,
+  blank: Schema.Boolean,
+  parentSessionId: Schema.optional(Schema.String),
+  origin: Schema.optional(Schema.Literals(['subagent'])),
+  cwd: Schema.optional(Schema.String),
+  projections: Schema.optional(jsonValueSchema),
 })
 
-const sessionSearchItemSchema = z.object({
-  sessionId: z.string(),
-  snippet: z.string(),
+const sessionSearchItemSchema = Schema.Struct({
+  sessionId: Schema.String,
+  snippet: Schema.String,
 })
-const sessionSearchSchema = z.object({
-  items: z.array(sessionSearchItemSchema),
-  hasMore: z.boolean(),
+const sessionSearchSchema = Schema.Struct({
+  items: Schema.Array(sessionSearchItemSchema),
+  hasMore: Schema.Boolean,
 })
 
-const threadFinderHitSchema = z
-  .object({
-    sessionId: z.string(),
-    title: z.string(),
-    createdAt: z.number(),
-    updatedAt: z.number(),
-    cwd: z.string().nullable(),
-    project: z.string(),
-    live: z.boolean(),
-    persisted: z.boolean(),
-    parentSessionId: z.string().nullable(),
-    snippet: z.string(),
-    sources: z.array(z.string()),
-    evidence: z.array(z.string()),
-    score: z.number(),
-  })
-  .loose()
+const threadFinderHitSchema = withUnknownProperties({
+  sessionId: Schema.String,
+  title: Schema.String,
+  createdAt: Schema.Number.check(Schema.isFinite()),
+  updatedAt: Schema.Number.check(Schema.isFinite()),
+  cwd: Schema.NullOr(Schema.String),
+  project: Schema.String,
+  live: Schema.Boolean,
+  persisted: Schema.Boolean,
+  parentSessionId: Schema.NullOr(Schema.String),
+  snippet: Schema.String,
+  sources: Schema.Array(Schema.String),
+  evidence: Schema.Array(Schema.String),
+  score: Schema.Number.check(Schema.isFinite()),
+})
 
-const threadFinderPageSchema = z
-  .object({
-    hits: z.array(threadFinderHitSchema),
-    notes: z.array(
-      z.object({ noteId: z.number(), project: z.string(), updatedAt: z.number(), sourceThread: z.string().nullable(), excerpt: z.string() }).loose(),
-    ),
-    nextCursor: z.string().nullable(),
-    degraded: z.array(z.object({ source: z.string(), code: z.string(), message: z.string(), attempts: z.number(), elapsedMs: z.number() }).loose()),
-    diagnostics: z
-      .object({
-        correlationId: z.string(),
-        elapsedMs: z.number(),
-        sources: z.array(z.string()),
-        attempts: z.number(),
-        scannedSessions: z.number(),
-        incomplete: z.boolean(),
-      })
-      .loose(),
-    project: z.string(),
-  })
-  .loose()
+const threadFinderPageSchema = withUnknownProperties({
+  hits: Schema.Array(threadFinderHitSchema),
+  notes: Schema.Array(
+    withUnknownProperties({
+      noteId: Schema.Number.check(Schema.isFinite()),
+      project: Schema.String,
+      updatedAt: Schema.Number.check(Schema.isFinite()),
+      sourceThread: Schema.NullOr(Schema.String),
+      excerpt: Schema.String,
+    }),
+  ),
+  nextCursor: Schema.NullOr(Schema.String),
+  degraded: Schema.Array(
+    withUnknownProperties({
+      source: Schema.String,
+      code: Schema.String,
+      message: Schema.String,
+      attempts: Schema.Number.check(Schema.isFinite()),
+      elapsedMs: Schema.Number.check(Schema.isFinite()),
+    }),
+  ),
+  diagnostics: withUnknownProperties({
+    correlationId: Schema.String,
+    elapsedMs: Schema.Number.check(Schema.isFinite()),
+    sources: Schema.Array(Schema.String),
+    attempts: Schema.Number.check(Schema.isFinite()),
+    scannedSessions: Schema.Number.check(Schema.isFinite()),
+    incomplete: Schema.Boolean,
+  }),
+  project: Schema.String,
+})
 
-export type ThreadFinderPageResult = z.infer<typeof threadFinderPageSchema>
+export type ThreadFinderPageResult = Schema.Schema.Type<typeof threadFinderPageSchema>
 
 export type ThreadFinderCallInput = {
   readonly query: string
@@ -97,176 +107,176 @@ type DshxRegistryApi = {
   readonly methods: readonly string[]
 }
 
-const agentPresetRowSchema = z.object({
-  id: z.string(),
-  isDefault: z.boolean(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  broken: z.string().optional(),
+const agentPresetRowSchema = Schema.Struct({
+  id: Schema.String,
+  isDefault: Schema.Boolean,
+  name: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  broken: Schema.optional(Schema.String),
 })
-const agentPresetRosterSchema = z.object({
-  presets: z.array(agentPresetRowSchema),
+const agentPresetRosterSchema = Schema.Struct({
+  presets: Schema.Array(agentPresetRowSchema),
 })
-const agentPresetDocumentSchema = z.object({
-  agentPreset: z.string(),
-  content: z.string(),
-  name: z.string().optional(),
-  description: z.string().optional(),
+const agentPresetDocumentSchema = Schema.Struct({
+  agentPreset: Schema.String,
+  content: Schema.String,
+  name: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
 })
 
-const modelSelectionSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
-  reasoningEffort: z.string().optional(),
+const modelSelectionSchema = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  reasoningEffort: Schema.optional(Schema.String),
 })
-const modelCatalogSchema = z.object({
+const modelCatalogSchema = Schema.Struct({
   default: modelSelectionSchema,
-  routableProviders: z.array(z.string()),
-  groups: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      models: z.array(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-          description: z.string().optional(),
-          reasoning: z
-            .object({
-              efforts: z.array(
-                z.object({
-                  id: z.string(),
-                  name: z.string(),
-                  description: z.string().optional(),
+  routableProviders: Schema.Array(Schema.String),
+  groups: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+      models: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          description: Schema.optional(Schema.String),
+          reasoning: Schema.optional(
+            Schema.Struct({
+              efforts: Schema.Array(
+                Schema.Struct({
+                  id: Schema.String,
+                  name: Schema.String,
+                  description: Schema.optional(Schema.String),
                 }),
               ),
-              defaultEffort: z.string().optional(),
-            })
-            .optional(),
+              defaultEffort: Schema.optional(Schema.String),
+            }),
+          ),
         }),
       ),
     }),
   ),
-  failures: z.array(z.object({ id: z.string(), name: z.string(), message: z.string() })),
+  failures: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String })),
 })
 
-const skillEntrySchema = z.object({
-  path: z.string().optional(),
-  name: z.string(),
-  description: z.string(),
-  whenToUse: z.string().optional(),
-  modelInvocable: z.boolean(),
+const skillEntrySchema = Schema.Struct({
+  path: Schema.optional(Schema.String),
+  name: Schema.String,
+  description: Schema.String,
+  whenToUse: Schema.optional(Schema.String),
+  modelInvocable: Schema.Boolean,
 })
 
-const pluginInspectionSchema = z.discriminatedUnion('status', [
-  z.object({
-    status: z.literal('accepted'),
-    kind: z.enum(['registry', 'path', 'git', 'tarball']),
-    name: z.string().optional(),
-    version: z.string().optional(),
-    description: z.string().optional(),
-    bundle: z.union([z.boolean(), z.null()]),
-    registry: z.union([z.string(), z.null()]),
-    host: z.string().optional(),
+const pluginInspectionSchema = Schema.Union([
+  Schema.Struct({
+    status: Schema.Literal('accepted'),
+    kind: Schema.Literals(['registry', 'path', 'git', 'tarball']),
+    name: Schema.optional(Schema.String),
+    version: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String),
+    bundle: Schema.Union([Schema.Boolean, Schema.Null]),
+    registry: Schema.Union([Schema.String, Schema.Null]),
+    host: Schema.optional(Schema.String),
   }),
-  z.object({
-    status: z.literal('refused'),
-    problem: z.enum(['invalid-spec', 'already-installed', 'not-found', 'not-a-package', 'not-a-bundle', 'network', 'unknown']),
-    reason: z.string(),
-    registries: z.array(z.union([z.string(), z.null()])).optional(),
+  Schema.Struct({
+    status: Schema.Literal('refused'),
+    problem: Schema.Literals(['invalid-spec', 'already-installed', 'not-found', 'not-a-package', 'not-a-bundle', 'network', 'unknown']),
+    reason: Schema.String,
+    registries: Schema.optional(Schema.Array(Schema.Union([Schema.String, Schema.Null]))),
   }),
 ])
 
-const pluginSchema = z.object({
-  entryId: z.string(),
-  moduleName: z.string(),
-  meta: jsonValueSchema.optional(),
-  enabled: z.boolean(),
-  fiberPhase: z.enum(['pending', 'loading', 'active', 'failed', 'unloading']).nullable(),
-  readOnlyReason: z.string().optional(),
+const pluginSchema = Schema.Struct({
+  entryId: Schema.String,
+  moduleName: Schema.String,
+  meta: Schema.optional(jsonValueSchema),
+  enabled: Schema.Boolean,
+  fiberPhase: Schema.NullOr(Schema.Literals(['pending', 'loading', 'active', 'failed', 'unloading'])),
+  readOnlyReason: Schema.optional(Schema.String),
 })
 
-const bundleSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  enabled: z.boolean(),
-  installed: z.boolean(),
-  optional: z.boolean(),
-  removable: z.boolean(),
-  readOnlyReason: z.enum(['management-required', 'unaddressable']).optional(),
-  error: z.unknown().optional(),
-  rows: z.array(
-    z.object({
-      rowId: z.string(),
-      moduleName: z.string(),
-      entryId: z.string().optional(),
+const bundleSchema = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  enabled: Schema.Boolean,
+  installed: Schema.Boolean,
+  optional: Schema.Boolean,
+  removable: Schema.Boolean,
+  readOnlyReason: Schema.optional(Schema.Literals(['management-required', 'unaddressable'])),
+  error: Schema.optional(Schema.Unknown),
+  rows: Schema.Array(
+    Schema.Struct({
+      rowId: Schema.String,
+      moduleName: Schema.String,
+      entryId: Schema.optional(Schema.String),
     }),
   ),
-  overrides: z.array(z.string()),
+  overrides: Schema.Array(Schema.String),
 })
 
-const commandInputSchema = z.object({
-  hint: z.string(),
-  attachments: z.boolean().optional(),
+const commandInputSchema = Schema.Struct({
+  hint: Schema.String,
+  attachments: Schema.optional(Schema.Boolean),
 })
 
-const commandSchema = z.object({
-  definitionId: z.string().optional(),
-  name: z.string(),
-  description: z.string(),
-  input: commandInputSchema.optional(),
+const commandSchema = Schema.Struct({
+  definitionId: Schema.optional(Schema.String),
+  name: Schema.String,
+  description: Schema.String,
+  input: Schema.optional(commandInputSchema),
 })
 
-const settingsNamespaceSchema = z.object({
-  ns: z.string(),
+const settingsNamespaceSchema = Schema.Struct({
+  ns: Schema.String,
   schema: jsonValueSchema,
   value: jsonValueSchema,
-  autoGenerate: z.boolean(),
-  revision: z.number().safe().nonnegative(),
-  applies: z.literal('live'),
-  secrets: z.array(z.object({ path: z.array(z.string()), set: z.boolean() })),
+  autoGenerate: Schema.Boolean,
+  revision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
+  applies: Schema.Literal('live'),
+  secrets: Schema.Array(Schema.Struct({ path: Schema.Array(Schema.String), set: Schema.Boolean })),
 })
 
-const settingsDescriptionSchema = z.object({
-  writable: z.boolean(),
-  hasDocument: z.boolean(),
-  namespaces: z.array(settingsNamespaceSchema),
+const settingsDescriptionSchema = Schema.Struct({
+  writable: Schema.Boolean,
+  hasDocument: Schema.Boolean,
+  namespaces: Schema.Array(settingsNamespaceSchema),
 })
 
-const rpcResponseSchema = z.object({
-  type: z.literal('server-response'),
-  rpcId: z.string(),
-  result: z.union([
-    z.object({ ok: z.literal(true), value: jsonValueSchema }),
-    z.object({
-      ok: z.literal(false),
-      error: z.object({
-        code: z.string().optional(),
-        message: z.string(),
-        details: z.unknown().optional(),
+const rpcResponseSchema = Schema.Struct({
+  type: Schema.Literal('server-response'),
+  rpcId: Schema.String,
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: jsonValueSchema }),
+    Schema.Struct({
+      ok: Schema.Literal(false),
+      error: Schema.Struct({
+        code: Schema.optional(Schema.String),
+        message: Schema.String,
+        details: Schema.optional(Schema.Unknown),
       }),
     }),
   ]),
 })
 
-const streamFrameSchema = z.object({
-  type: z.enum(['item', 'error', 'end']),
-  streamId: z.string(),
-  value: z.unknown().optional(),
-  error: z.object({ code: z.string(), message: z.string() }).optional(),
+const streamFrameSchema = Schema.Struct({
+  type: Schema.Literals(['item', 'error', 'end']),
+  streamId: Schema.String,
+  value: Schema.optional(Schema.Unknown),
+  error: Schema.optional(Schema.Struct({ code: Schema.String, message: Schema.String })),
 })
 
-const snapshotSchema = z.object({
-  type: z.literal('snapshot'),
-  cursor: z.number().safe().min(-1),
+const snapshotSchema = Schema.Struct({
+  type: Schema.Literal('snapshot'),
+  cursor: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(-1), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
 })
 
-const historyRecordSchema = z
-  .object({
-    type: z.literal('event'),
-    event: z.object({ seq: z.number().safe().nonnegative() }).passthrough(),
-  })
-  .passthrough()
+const historyRecordSchema = withUnknownProperties({
+  type: Schema.Literal('event'),
+  event: withUnknownProperties({
+    seq: Schema.Number.check(Schema.isFinite(), Schema.makeFilter(Number.isSafeInteger), Schema.isGreaterThanOrEqualTo(0)),
+  }),
+})
 
 export interface SessionSummary {
   readonly sessionId: string
@@ -507,6 +517,9 @@ export class DshPlatformError extends Error {
   }
 }
 
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(value)
+const decodeResult = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown) => Schema.decodeUnknownResult(schema)(value)
+
 function parseJson(body: string, context: string): JsonValue {
   try {
     return decodeJson(jsonValueSchema, body)
@@ -522,9 +535,9 @@ async function streamMessageText(data: RawData): Promise<string> {
 }
 
 function decodeJsonValue(value: unknown, context: string): JsonValue {
-  const result = jsonValueSchema.safeParse(value)
-  if (!result.success) throw new DshPlatformError('invalid-response', `${context} returned data outside the JSON value contract.`)
-  return result.data
+  const result = decodeResult(jsonValueSchema, value)
+  if (Result.isFailure(result)) throw new DshPlatformError('invalid-response', `${context} returned data outside the JSON value contract.`)
+  return result.success
 }
 
 const loopbackLaunchUrl = (value: string) => {
@@ -547,7 +560,7 @@ const loopbackLaunchUrl = (value: string) => {
 }
 
 function parseSession(value: unknown, archived?: boolean): SessionSummary {
-  const parsed = sessionSummarySchema.parse(value)
+  const parsed = decode(sessionSummarySchema, value)
   const summary = {
     sessionId: parsed.sessionId,
     updatedAt: parsed.updatedAt,
@@ -564,7 +577,7 @@ function parseSession(value: unknown, archived?: boolean): SessionSummary {
 }
 
 function parsePlugin(value: unknown): PluginSummary {
-  const parsed = pluginSchema.parse(value)
+  const parsed = decode(pluginSchema, value)
   return {
     id: parsed.entryId,
     moduleName: parsed.moduleName,
@@ -576,7 +589,7 @@ function parsePlugin(value: unknown): PluginSummary {
 }
 
 function parseBundle(value: unknown): BundleSummary {
-  const parsed = bundleSchema.parse(value)
+  const parsed = decode(bundleSchema, value)
   return {
     name: parsed.name,
     ...(parsed.description !== undefined && { description: parsed.description }),
@@ -591,7 +604,7 @@ function parseBundle(value: unknown): BundleSummary {
 }
 
 function parseSettings(value: unknown): SettingsDescription {
-  const parsed = settingsDescriptionSchema.parse(value)
+  const parsed = decode(settingsDescriptionSchema, value)
   return {
     writable: parsed.writable,
     hasDocument: parsed.hasDocument,
@@ -608,23 +621,24 @@ function parseSettings(value: unknown): SettingsDescription {
 }
 
 function parseChangeResult(value: unknown): ChangeResult {
-  const parsed = z
-    .object({
-      application: z.enum(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
-      changed: z.boolean(),
-      enabled: z.boolean().optional(),
-      stage: z.enum(['install', 'enable', 'remove']),
-      target: z.string(),
-      error: z
-        .object({
-          code: z.string(),
-          diagnostic: z.string().optional(),
-          incompatible: jsonValueSchema.optional(),
-        })
-        .optional(),
-      warnings: z.array(z.string()).optional(),
-    })
-    .parse(value)
+  const parsed = decode(
+    Schema.Struct({
+      application: Schema.Literals(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
+      changed: Schema.Boolean,
+      enabled: Schema.optional(Schema.Boolean),
+      stage: Schema.Literals(['install', 'enable', 'remove']),
+      target: Schema.String,
+      error: Schema.optional(
+        Schema.Struct({
+          code: Schema.String,
+          diagnostic: Schema.optional(Schema.String),
+          incompatible: Schema.optional(jsonValueSchema),
+        }),
+      ),
+      warnings: Schema.optional(Schema.Array(Schema.String)),
+    }),
+    value,
+  )
   return {
     application: parsed.application,
     changed: parsed.changed,
@@ -643,7 +657,7 @@ function parseChangeResult(value: unknown): ChangeResult {
 }
 
 function parsePluginInspection(value: unknown): PluginInspection {
-  const parsed = pluginInspectionSchema.parse(value)
+  const parsed = decode(pluginInspectionSchema, value)
   if (parsed.status === 'refused') {
     return {
       status: parsed.status,
@@ -664,7 +678,7 @@ function parsePluginInspection(value: unknown): PluginInspection {
   }
 }
 
-function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPresetRow {
+function mapAgentPresetRow(value: Schema.Schema.Type<typeof agentPresetRowSchema>): AgentPresetRow {
   return {
     id: value.id,
     isDefault: value.isDefault,
@@ -675,7 +689,7 @@ function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPr
 }
 
 function parseAgentPresetDocument(value: unknown): AgentPresetDocument {
-  const parsed = agentPresetDocumentSchema.parse(value)
+  const parsed = decode(agentPresetDocumentSchema, value)
   return {
     agentPreset: parsed.agentPreset,
     content: parsed.content,
@@ -685,7 +699,7 @@ function parseAgentPresetDocument(value: unknown): AgentPresetDocument {
 }
 
 function parseModelCatalog(value: unknown): ModelCatalog {
-  const parsed = modelCatalogSchema.parse(value)
+  const parsed = decode(modelCatalogSchema, value)
   return {
     default: {
       provider: parsed.default.provider,
@@ -721,7 +735,7 @@ function parseModelCatalog(value: unknown): ModelCatalog {
 }
 
 function parseModelSelection(value: unknown): ModelSelection {
-  const parsed = modelSelectionSchema.parse(value)
+  const parsed = decode(modelSelectionSchema, value)
   return {
     provider: parsed.provider,
     model: parsed.model,
@@ -729,7 +743,7 @@ function parseModelSelection(value: unknown): ModelSelection {
   }
 }
 
-function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
+function mapSkillEntry(value: Schema.Schema.Type<typeof skillEntrySchema>): SkillEntry {
   return {
     name: value.name,
     description: value.description,
@@ -742,7 +756,7 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
 function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   const readSessionList = async (projections?: readonly string[]) => {
     const request = projections === undefined ? {} : { projections: [...projections] }
-    return z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', { _request: request }))
+    return decode(Schema.Struct({ items: Schema.Array(sessionSummarySchema) }), await transport.rpc('session', 'list', { _request: request }))
   }
   const listSessions = async (projections?: readonly string[]): Promise<readonly SessionSummary[]> => {
     const read = async () => {
@@ -762,7 +776,8 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   }
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
-    const result = z.object({ records: z.array(jsonValueSchema), hasMore: z.boolean() }).parse(
+    const result = decode(
+      Schema.Struct({ records: Schema.Array(jsonValueSchema), hasMore: Schema.Boolean }),
       await transport.rpc('session', 'page', {
         request: {
           address: { kind: 'session', sessionId },
@@ -784,32 +799,43 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       list: listSessions,
       findThreads: findThreadsFor,
       search: async query => {
-        const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', { request: { query } }))
+        const result = decode(sessionSearchSchema, await transport.rpc('session', 'search', { request: { query } }))
         return { items: result.items, hasMore: result.hasMore }
       },
       create: async input => {
-        const parsed = z
-          .object({ sessionId: z.string(), agentPreset: z.string().optional() })
-          .parse(await transport.rpc('session', 'create', { request: input }))
+        const parsed = decode(
+          Schema.Struct({ sessionId: Schema.String, agentPreset: Schema.optional(Schema.String) }),
+          await transport.rpc('session', 'create', { request: input }),
+        )
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
       fork: async (sessionId, atSeq) =>
-        z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq !== undefined && { atSeq }) } })),
-      cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', { request: { sessionId } })),
+        decode(
+          Schema.Struct({ sessionId: Schema.String }),
+          await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq !== undefined && { atSeq }) } }),
+        ),
+      cancel: async sessionId =>
+        decode(Schema.Struct({ accepted: Schema.Literal(true) }), await transport.rpc('session', 'cancel', { request: { sessionId } })),
       rename: async (sessionId, title) =>
-        z
-          .object({ title: z.string(), seq: z.number().safe().nonnegative() })
-          .parse(await transport.rpc('session', 'rename', { request: { sessionId, title } })),
+        decode(
+          Schema.Struct({
+            title: Schema.String,
+            seq: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
+          }),
+          await transport.rpc('session', 'rename', { request: { sessionId, title } }),
+        ),
       archive: async sessionId => {
-        const result = z
-          .object({ archivedSessionIds: z.array(z.string()) })
-          .parse(await transport.rpc('workspace', 'archiveSession', { request: { sessionId } }))
+        const result = decode(
+          Schema.Struct({ archivedSessionIds: Schema.Array(Schema.String) }),
+          await transport.rpc('workspace', 'archiveSession', { request: { sessionId } }),
+        )
         return { archivedSessionIds: result.archivedSessionIds }
       },
       unarchive: async sessionId => {
-        const result = z
-          .object({ archivedSessionIds: z.array(z.string()) })
-          .parse(await transport.rpc('workspace', 'unarchiveSession', { request: { sessionId } }))
+        const result = decode(
+          Schema.Struct({ archivedSessionIds: Schema.Array(Schema.String) }),
+          await transport.rpc('workspace', 'unarchiveSession', { request: { sessionId } }),
+        )
         return { archivedSessionIds: result.archivedSessionIds }
       },
       prompt: async (sessionId, text, mode, signal) => {
@@ -819,7 +845,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
           mode,
           content: [{ type: 'text', text }],
         }
-        return z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'prompt', { request }, signal))
+        return decode(Schema.Struct({ accepted: Schema.Literal(true) }), await transport.rpc('session', 'prompt', { request }, signal))
       },
       page,
       history: async (sessionId, maxMessages = 100) => {
@@ -830,8 +856,8 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       export: async (sessionId, range = {}) => {
         const throughSeq = range.throughSeq ?? (await transport.sessionCursor(sessionId))
         const recordSeq = (record: JsonValue): number | undefined => {
-          const parsed = historyRecordSchema.safeParse(record)
-          return parsed.success ? parsed.data.event.seq : undefined
+          const parsed = decodeResult(historyRecordSchema, record)
+          return Result.isSuccess(parsed) ? parsed.success.event.seq : undefined
         }
         const isWanted = (record: JsonValue): boolean => {
           const seq = recordSeq(record)
@@ -866,7 +892,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     },
     plugins: {
       list: async () => {
-        const values = z.array(pluginSchema).parse(await transport.rpc('pluginManager', 'listPlugins', {}))
+        const values = decode(Schema.Array(pluginSchema), await transport.rpc('pluginManager', 'listPlugins', {}))
         return values.map(parsePlugin)
       },
       check: async spec => parsePluginInspection(await transport.rpc('pluginManager', 'inspect', { spec, options: {} })),
@@ -874,7 +900,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     },
     bundles: {
       list: async () => {
-        const values = z.array(bundleSchema).parse(await transport.rpc('pluginManager', 'listBundles', {}))
+        const values = decode(Schema.Array(bundleSchema), await transport.rpc('pluginManager', 'listBundles', {}))
         return values.map(parseBundle)
       },
       install: async (spec, signal) => {
@@ -899,26 +925,26 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       setEnabled: async (name, enabled) => parseChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', { name, enabled })),
     },
     presets: {
-      list: async () => agentPresetRosterSchema.parse(await transport.rpc('agentPresets', 'list', {})).presets.map(mapAgentPresetRow),
+      list: async () => decode(agentPresetRosterSchema, await transport.rpc('agentPresets', 'list', {})).presets.map(mapAgentPresetRow),
       show: async id => parseAgentPresetDocument(await transport.rpc('agentPresets', 'read', { agentPreset: id })),
     },
     models: {
       list: async () => parseModelCatalog(await transport.rpc('session', 'modelCatalog', {})),
       select: async (sessionId, selection) => {
         const request = { sessionId, ...selection }
-        const result = z.object({ selected: modelSelectionSchema }).parse(await transport.rpc('session', 'selectModel', { request }))
+        const result = decode(Schema.Struct({ selected: modelSelectionSchema }), await transport.rpc('session', 'selectModel', { request }))
         return parseModelSelection(result.selected)
       },
     },
     skills: {
       list: async sessionId => {
-        const result = z.object({ skills: z.array(skillEntrySchema) }).parse(await transport.rpc('skills', 'list', { request: { sessionId } }))
+        const result = decode(Schema.Struct({ skills: Schema.Array(skillEntrySchema) }), await transport.rpc('skills', 'list', { request: { sessionId } }))
         return result.skills.map(mapSkillEntry)
       },
     },
     commands: {
       list: async sessionId => {
-        const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', { agentId: sessionId }))
+        const values = decode(Schema.Array(commandSchema), await transport.rpc('commands', 'list', { agentId: sessionId }))
         return values.map(item => ({
           ...(item.definitionId !== undefined && { definitionId: item.definitionId }),
           name: item.name,
@@ -1019,14 +1045,14 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     }
     if (response.status === 401) throw new DshPlatformError('authentication-expired', 'The DSH session expired. Copy the current tokenized URL printed by dsh.')
     if (!response.ok) throw new DshPlatformError('rpc-http-error', `DSH API returned HTTP ${response.status} for ${namespace}/${method}.`)
-    const envelope = rpcResponseSchema.safeParse(parseJson(await response.text(), `DSH ${namespace}/${method}`))
-    if (!envelope.success || envelope.data.rpcId !== rpcId)
+    const envelope = decodeResult(rpcResponseSchema, parseJson(await response.text(), `DSH ${namespace}/${method}`))
+    if (Result.isFailure(envelope) || envelope.success.rpcId !== rpcId)
       throw new DshPlatformError('invalid-response', `DSH ${namespace}/${method} returned an invalid RPC response.`)
-    if (!envelope.data.result.ok) {
-      const remoteError = envelope.data.result.error
+    if (!envelope.success.result.ok) {
+      const remoteError = envelope.success.result.error
       throw new DshPlatformError(remoteError.code ?? 'remote-error', remoteError.message)
     }
-    return envelope.data.result.value
+    return envelope.success.result.value
   }
 
   let registryApis: Promise<readonly DshxRegistryApi[]> | undefined
@@ -1040,18 +1066,19 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
         version: 1,
         fetch: request,
       })
-      const registry = z
-        .object({
-          apis: z.array(
-            z.object({
-              owner: z.string(),
-              id: z.string(),
-              version: z.number().int().positive(),
-              methods: z.array(z.object({ name: z.string() })),
+      const registry = decode(
+        Schema.Struct({
+          apis: Schema.Array(
+            Schema.Struct({
+              owner: Schema.String,
+              id: Schema.String,
+              version: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)),
+              methods: Schema.Array(Schema.Struct({ name: Schema.String })),
             }),
           ),
-        })
-        .parse(await registryCall('list'))
+        }),
+        await registryCall('list'),
+      )
       return registry.apis.map(api => ({ owner: api.owner, id: api.id, version: api.version, methods: api.methods.map(method => method.name) }))
     })()
     return registryApis
@@ -1069,8 +1096,12 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     try {
       const call = await pluginApi('@dshfiles/thread-sidebar', 'thread-sidebar-session-archive', ['status'])
       if (call === undefined) return undefined
-      return z.object({ archivedSessionIds: z.array(z.string().min(1).max(256)).max(10_000) }).parse(await call('status', { sessionIds: [...sessionIds] }))
-        .archivedSessionIds
+      return decode(
+        Schema.Struct({
+          archivedSessionIds: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000)),
+        }),
+        await call('status', { sessionIds: [...sessionIds] }),
+      ).archivedSessionIds
     } catch {
       return undefined
     }
@@ -1089,7 +1120,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     }
     if (call === undefined) return { kind: 'absent' }
     try {
-      return { kind: 'page', page: threadFinderPageSchema.parse(await call('findThreads', input)) }
+      return { kind: 'page', page: decode(threadFinderPageSchema, await call('findThreads', input)) }
     } catch (error) {
       return {
         kind: 'failed',
@@ -1146,25 +1177,25 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
               finish(new DshPlatformError('invalid-response', 'DSH sent invalid JSON on the session history stream.'))
               return
             }
-            const frame = streamFrameSchema.safeParse(response)
-            if (!frame.success || frame.data.streamId !== streamId) {
+            const frame = decodeResult(streamFrameSchema, response)
+            if (Result.isFailure(frame) || frame.success.streamId !== streamId) {
               finish(new DshPlatformError('invalid-response', 'DSH sent an invalid session history frame.'))
               return
             }
-            if (frame.data.type === 'error') {
-              finish(new DshPlatformError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'DSH session history stream failed.'))
+            if (frame.success.type === 'error') {
+              finish(new DshPlatformError(frame.success.error?.code ?? 'stream-error', frame.success.error?.message ?? 'DSH session history stream failed.'))
               return
             }
-            if (frame.data.type === 'end') {
+            if (frame.success.type === 'end') {
               finish(new DshPlatformError('invalid-response', 'DSH closed the history stream before sending its snapshot.'))
               return
             }
-            const snapshot = snapshotSchema.safeParse(frame.data.value)
-            if (!snapshot.success) {
+            const snapshot = decodeResult(snapshotSchema, frame.success.value)
+            if (Result.isFailure(snapshot)) {
               finish(new DshPlatformError('invalid-response', 'DSH session history stream did not begin with a snapshot.'))
               return
             }
-            finish(undefined, snapshot.data.cursor)
+            finish(undefined, snapshot.success.cursor)
           })
           .catch(() => finish(new DshPlatformError('invalid-response', 'Could not read the DSH session history frame.')))
       })

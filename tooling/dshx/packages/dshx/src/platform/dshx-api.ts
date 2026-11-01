@@ -1,27 +1,25 @@
 import { randomUUID } from 'node:crypto'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { ApiProtocolModel } from '../api/common.js'
 import { TracerModel } from '../tracing/tracer.js'
+import { withUnknownProperties } from '../schema.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, DshPlatformLaunchUrl } from './client.js'
 
-const responseSchema = z
-  .object({
-    type: z.literal('server-response'),
-    rpcId: z.string(),
-    result: z.discriminatedUnion('ok', [
-      z.object({ ok: z.literal(true), value: z.unknown() }).passthrough(),
-      z
-        .object({
-          ok: z.literal(false),
-          error: z.object({ code: z.string().optional(), message: z.string() }).passthrough(),
-        })
-        .passthrough(),
-    ]),
-  })
-  .passthrough()
+const responseSchema = withUnknownProperties({
+  type: Schema.Literal('server-response'),
+  rpcId: Schema.String,
+  result: Schema.Union([
+    withUnknownProperties({ ok: Schema.Literal(true), value: Schema.Unknown }),
+    withUnknownProperties({
+      ok: Schema.Literal(false),
+      error: withUnknownProperties({ code: Schema.optional(Schema.String), message: Schema.String }),
+    }),
+  ]),
+})
 
-const outputSchema = z.object({ version: z.number().int(), output: z.unknown() }).passthrough()
+const outputSchema = withUnknownProperties({ version: Schema.Number.check(Schema.isFinite(), Schema.isInt()), output: Schema.Unknown })
 
 export type DshxApiCall = (method: string, input?: JsonValue, signal?: AbortSignal) => Promise<unknown>
 
@@ -74,19 +72,19 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
     } catch {
       throw new DshPlatformError('invalid-response', 'DSH API ' + apiId + '/' + method + ' returned invalid JSON.')
     }
-    const parsed = responseSchema.safeParse(body)
-    if (!parsed.success || parsed.data.rpcId !== rpcId) {
+    const parsed = Schema.decodeUnknownOption(responseSchema)(body)
+    if (Option.isNone(parsed) || parsed.value.rpcId !== rpcId) {
       throw new DshPlatformError('invalid-response', 'DSH API ' + apiId + '/' + method + ' returned an invalid RPC envelope.')
     }
-    if (!parsed.data.result.ok) {
-      const failure = parsed.data.result.error
+    if (!parsed.value.result.ok) {
+      const failure = parsed.value.result.error
       throw new DshPlatformError(failure.code ?? 'remote-error', safeMessage(failure.message))
     }
-    const output = outputSchema.safeParse(parsed.data.result.value)
-    if (!output.success || output.data.version !== version) {
+    const output = Schema.decodeUnknownOption(outputSchema)(parsed.value.result.value)
+    if (Option.isNone(output) || output.value.version !== version) {
       throw new DshPlatformError('invalid-response', 'DSH API ' + apiId + '/' + method + ' returned an invalid versioned output.')
     }
-    return output.data.output
+    return output.value.output
   }
   return (method, input, signal) =>
     tracer.enabled

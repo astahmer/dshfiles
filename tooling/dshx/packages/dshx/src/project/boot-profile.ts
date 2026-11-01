@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import { parse } from 'yaml'
 import { CORDIS_IDENTITY_DEPENDENCIES } from 'create-dshx/capabilities'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
@@ -13,27 +15,20 @@ import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 const WORKSPACE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
 const PROFILE_NAME = 'dshx-boot'
 const BASE_BUNDLES = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'] as const
-const ProfilePackage = z
-  .object({
-    dependencies: z.record(z.string(), z.string()).default({}),
-    dsh: z.object({ profile: z.object({ bundles: z.array(z.string()).default([]) }).passthrough() }).passthrough(),
-  })
-  .passthrough()
-const WorkspacePackage = z.object({ packageManager: z.string() }).passthrough()
-const ProjectPackage = z.object({ dsh: z.unknown() }).passthrough()
-const ClientExternals = z
-  .object({
-    dsh: z
-      .object({
-        client: z
-          .object({ external: z.array(z.string()).default([]) })
-          .passthrough()
-          .optional(),
-      })
-      .passthrough(),
-  })
-  .passthrough()
-const PnpmModules = z.object({ packageManager: z.string(), storeDir: z.string().min(1) }).passthrough()
+const ProfilePackage = withUnknownProperties({
+  dependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  dsh: withUnknownProperties({
+    profile: withUnknownProperties({ bundles: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) }),
+  }),
+})
+const WorkspacePackage = withUnknownProperties({ packageManager: Schema.String })
+const ProjectPackage = withUnknownProperties({ dsh: Schema.Unknown })
+const ClientExternals = withUnknownProperties({
+  dsh: withUnknownProperties({
+    client: Schema.optional(withUnknownProperties({ external: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) })),
+  }),
+})
+const PnpmModules = withUnknownProperties({ packageManager: Schema.String, storeDir: Schema.String.check(Schema.isMinLength(1)) })
 const SHARED_CORDIS_PACKAGES = Object.keys(CORDIS_IDENTITY_DEPENDENCIES)
 
 export interface PreparedBootProfile {
@@ -148,7 +143,7 @@ const installProfile = async (profileRoot: string, homeRoot: string, expectedPac
   }
   await runPnpm(profileRoot, homeRoot, ['install', '--prefer-offline'], 180_000)
   const modulesSource = await readFile(join(profileRoot, 'node_modules/.modules.yaml'), 'utf8')
-  const modules = PnpmModules.parse(parse(modulesSource))
+  const modules = Schema.decodeUnknownSync(PnpmModules)(parse(modulesSource))
   if (modules.packageManager !== expectedPackageManager) {
     throw new Error(`Boot profile store metadata uses ${modules.packageManager}; expected ${expectedPackageManager}.`)
   }
@@ -168,9 +163,11 @@ const prepareBootProfiles = async (
 ): Promise<PreparedBootProfile> => {
   const sourceHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const sourceProfileRoot = options.sourceProfileRoot ?? join(sourceHome, 'profiles', 'web')
-  const sourceManifest = ProfilePackage.parse(decodeJson(jsonValueSchema, await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
+  const sourceManifest = Schema.decodeUnknownSync(ProfilePackage)(decodeJson(jsonValueSchema, await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
   const pnpmWorkspace = await readFile(join(sourceProfileRoot, 'pnpm-workspace.yaml'))
-  const workspaceManifest = WorkspacePackage.parse(decodeJson(jsonValueSchema, await readFile(join(WORKSPACE_ROOT, 'tooling/dshx/package.json'), 'utf8')))
+  const workspaceManifest = Schema.decodeUnknownSync(WorkspacePackage)(
+    decodeJson(jsonValueSchema, await readFile(join(WORKSPACE_ROOT, 'tooling/dshx/package.json'), 'utf8')),
+  )
   const pinnedNode = (await readFile(join(WORKSPACE_ROOT, '.node-version'), 'utf8')).trim()
   if (pinnedNode !== '' && process.versions.node !== pinnedNode) {
     throw new Error(`Boot checks require repository Node ${pinnedNode}; current Node is ${process.versions.node}.`)
@@ -178,12 +175,14 @@ const prepareBootProfiles = async (
   // A bundle that keeps an owned package external (shared-runtime) cannot load without it, so its provider joins the profile.
   const composedBundles: [BootProfileBundle, ...BootProfileBundle[]] = [...localBundles]
   for (const bundle of composedBundles) {
-    const projectManifest = ProjectPackage.parse(decodeJson(jsonValueSchema, await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')))
+    const projectManifest = Schema.decodeUnknownSync(ProjectPackage)(
+      decodeJson(jsonValueSchema, await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')),
+    )
     if (typeof projectManifest.dsh !== 'object' || projectManifest.dsh === null || Array.isArray(projectManifest.dsh)) {
       throw new Error(`Cannot prepare a DSH boot profile for ${bundle.packageId}: package.json has no dsh bundle metadata.`)
     }
     assertSharedCordisIdentity(bundle.projectRoot)
-    for (const external of ClientExternals.parse(projectManifest).dsh.client?.external ?? []) {
+    for (const external of Schema.decodeUnknownSync(ClientExternals)(projectManifest).dsh.client?.external ?? []) {
       const providerRoot = join(WORKSPACE_ROOT, 'plugins', external)
       if (!external.startsWith('@dshfiles/') || composedBundles.some(composed => composed.packageId === external)) continue
       if (!existsSync(join(providerRoot, 'package.json'))) continue

@@ -9,13 +9,16 @@ declare const apiHostInputBrand: unique symbol
 declare const apiHostOutputBrand: unique symbol
 declare const apiClientOutputBrand: unique symbol
 declare const apiClientEventsBrand: unique symbol
+declare const apiEventPayloadBrand: unique symbol
 
-export type ApiSchema<Input = unknown, Output = Input> = StandardSchemaV1<Input, Output> | {
-  readonly Encoded: Input
-  readonly Type: Output
-  readonly DecodingServices: never
-  readonly EncodingServices: unknown
-}
+export type ApiSchema<Input = unknown, Output = Input> =
+  | StandardSchemaV1<Input, Output>
+  | {
+      readonly Encoded: Input
+      readonly Type: Output
+      readonly DecodingServices: never
+      readonly EncodingServices: unknown
+    }
 export type ApiSchemaInput<S> = S extends StandardSchemaV1<infer Input, any> ? Input : S extends { readonly Encoded: infer Input } ? Input : never
 export type ApiSchemaOutput<S> = S extends StandardSchemaV1<any, infer Output> ? Output : S extends { readonly Type: infer Output } ? Output : never
 
@@ -67,6 +70,7 @@ export type AnyApiMethodDefinition = ApiMethodDefinition<any, any, any, any>
  */
 export interface ApiEventDefinition<HostPayload = unknown, ClientPayload = HostPayload> {
   readonly schema: ApiSchema
+  readonly [apiEventPayloadBrand]?: readonly [HostPayload, ClientPayload]
   /** What the event announces, written for another plugin author. */
   readonly description?: string
 }

@@ -1,30 +1,31 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { createUiScaffold } from '../src/scaffold/ui.js'
 import { decodeJson, jsonObjectSchema, type JsonObject } from '../src/json.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import type { InspectResult, SlotSummary } from '../src/inspect/types.js'
 import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
+import { withUnknownProperties } from '../src/schema.js'
 
-const packageManifestSchema = z.looseObject({
-  exports: z.record(z.string(), z.string()).optional(),
-  dsh: z
-    .looseObject({
-      client: z
-        .looseObject({
-          platform: z.string(),
-          inject: z.array(z.string()),
-          external: z.array(z.string()),
-          immediately: z.boolean(),
-        })
-        .optional(),
-    })
-    .optional(),
-  devDependencies: z.record(z.string(), z.string()).optional(),
-  peerDependencies: z.record(z.string(), z.string()).optional(),
+const packageManifestSchema = withUnknownProperties({
+  exports: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  dsh: Schema.optional(
+    withUnknownProperties({
+      client: Schema.optional(
+        withUnknownProperties({
+          platform: Schema.String,
+          inject: Schema.Array(Schema.String),
+          external: Schema.Array(Schema.String),
+          immediately: Schema.Boolean,
+        }),
+      ),
+    }),
+  ),
+  devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  peerDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 })
 
 const compatibility = {

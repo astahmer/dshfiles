@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 import type { JsonValue } from './client.js'
 
@@ -89,12 +90,12 @@ const isTransientSessionSearchFailure = (error: unknown): boolean => {
 
 const isFatalSessionSearchFailure = (error: unknown): boolean => fatalCodes.has(codeOf(error))
 
-const projectionTitle = z.object({ values: z.object({ title: z.string() }) })
+const projectionTitle = Schema.Struct({ values: Schema.Struct({ title: Schema.String }) })
 
 /** The title the Host already projects for a Session row, decoded defensively; a different projection shape means no title. */
 const sessionTitleOf = (summary: { readonly projections?: JsonValue | undefined }): string | undefined => {
-  const parsed = projectionTitle.safeParse(summary.projections)
-  return parsed.success ? parsed.data.values.title : undefined
+  const parsed = Schema.decodeUnknownOption(projectionTitle)(summary.projections)
+  return Option.isSome(parsed) ? parsed.value.values.title : undefined
 }
 
 const normalize = (value: string): string => value.toLowerCase().replace(/\s+/gu, ' ').trim()

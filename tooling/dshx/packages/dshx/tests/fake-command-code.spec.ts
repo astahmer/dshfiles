@@ -1,10 +1,11 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { withUnknownProperties } from '../src/schema.js'
 import { startFakeCommandCode } from '../src/scratch/fake-command-code.js'
 
-const completionChunkSchema = z.object({
-  id: z.string(),
-  choices: z.array(z.object({ delta: z.object({ content: z.string().optional() }).passthrough() })),
+const completionChunkSchema = Schema.Struct({
+  id: Schema.String,
+  choices: Schema.Array(Schema.Struct({ delta: withUnknownProperties({ content: Schema.optional(Schema.String) }) })),
 })
 
 const requestCompletion = (baseUrl: string, content: string) =>
@@ -17,7 +18,7 @@ const requestCompletion = (baseUrl: string, content: string) =>
 const readCompletionChunks = async (response: Awaited<ReturnType<typeof fetch>>) =>
   (await response.text()).split(/\r?\n/u).flatMap(line => {
     if (!line.startsWith('data: {')) return []
-    return [completionChunkSchema.parse(JSON.parse(line.slice('data: '.length)))]
+    return [Schema.decodeUnknownSync(completionChunkSchema)(JSON.parse(line.slice('data: '.length)))]
   })
 
 describe('fake Command Code provider', () => {

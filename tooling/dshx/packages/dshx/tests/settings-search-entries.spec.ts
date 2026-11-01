@@ -89,6 +89,9 @@ describe('settings.section search entries', () => {
     const metadata = { settingsTargets: ['a'], searchEntries: [{ id: 'a', title: 'A', keywords: 'x y' }] }
     expect(settingsSectionMetadataSchema.parse(metadata)).toEqual(metadata)
     expect(settingsSectionMetadataSchema.parse({})).toEqual({})
+    expect(settingsSectionMetadataSchema.parse({ searchEntries: [{ id: ' a ', title: ' A ' }] })).toEqual({
+      searchEntries: [{ id: 'a', title: 'A' }],
+    })
   })
 
   it.each([

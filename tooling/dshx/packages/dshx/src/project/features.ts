@@ -1,15 +1,34 @@
-import { z } from 'zod'
+import { Result, SchemaIssue } from 'effect'
+import * as Schema from 'effect/Schema'
+
+const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.Struct(fields).check(
+    Schema.makeFilter(value => {
+      const unknownKeys = Object.keys(value).filter(key => !Object.prototype.hasOwnProperty.call(fields, key))
+      return unknownKeys.length === 0 || `Unrecognized key(s): ${unknownKeys.join(', ')}`
+    }),
+  )
 
 const idPattern = /^[a-z0-9][a-z0-9.-]*$/
-const scenarioIdSchema = z.string().regex(idPattern)
+const scenarioIdSchema = Schema.String.check(Schema.isPattern(idPattern))
 
-export const DshxFeatureSurfaceSchema = z.enum(['client', 'host', 'tool', 'command', 'api', 'settings', 'storage', 'integration'])
+export const DshxFeatureSurfaceSchema = Schema.Literals(['client', 'host', 'tool', 'command', 'api', 'settings', 'storage', 'integration'])
 
-const verificationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('gherkin'), id: scenarioIdSchema, featureFile: z.string().min(1) }).strict(),
-  z.object({ kind: z.literal('unit-test'), id: scenarioIdSchema, file: z.string().min(1), testName: z.string().min(1) }).strict(),
-  z.object({ kind: z.literal('host-test'), id: scenarioIdSchema, file: z.string().min(1), testName: z.string().min(1) }).strict(),
-  z.object({ kind: z.literal('not-applicable'), id: scenarioIdSchema, reason: z.string().min(20) }).strict(),
+const verificationSchema = Schema.Union([
+  strictStruct({ kind: Schema.Literal('gherkin'), id: scenarioIdSchema, featureFile: Schema.String.check(Schema.isMinLength(1)) }),
+  strictStruct({
+    kind: Schema.Literal('unit-test'),
+    id: scenarioIdSchema,
+    file: Schema.String.check(Schema.isMinLength(1)),
+    testName: Schema.String.check(Schema.isMinLength(1)),
+  }),
+  strictStruct({
+    kind: Schema.Literal('host-test'),
+    id: scenarioIdSchema,
+    file: Schema.String.check(Schema.isMinLength(1)),
+    testName: Schema.String.check(Schema.isMinLength(1)),
+  }),
+  strictStruct({ kind: Schema.Literal('not-applicable'), id: scenarioIdSchema, reason: Schema.String.check(Schema.isMinLength(20)) }),
 ])
 
 /**
@@ -18,46 +37,45 @@ const verificationSchema = z.discriminatedUnion('kind', [
  * `model-stream` (`chat <model>` for a `ctx.llm` stream), and the shared helpers another owned plugin opens for it:
  * `jj` (jujutsu / jj-integration APIs), `secret` (`secretCatalogValues`), `multi-host` (gateway requests).
  */
-export const DshxTelemetrySourceSchema = z.enum(['api-dispatch', 'agent-tool', 'model-stream', 'jj', 'secret', 'multi-host'])
+export const DshxTelemetrySourceSchema = Schema.Literals(['api-dispatch', 'agent-tool', 'model-stream', 'jj', 'secret', 'multi-host'])
 
 /** `<word>` marks a dynamic part of a span name (`jj <subcommand>`); everything else is literal. */
-const spanNameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[a-z_<][a-z0-9_./ <>-]*$/u, 'span names are lowercase `<subject> <verb>`; mark a dynamic part as <word>')
+const spanNameSchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(128),
+  Schema.makeFilter(value => /^[a-z_<][a-z0-9_./ <>-]*$/u.test(value) || 'span names are lowercase `<subject> <verb>`; mark a dynamic part as <word>'),
+)
 
-const telemetrySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('automatic'), source: DshxTelemetrySourceSchema }).strict(),
-  z.object({ kind: z.literal('custom'), span: spanNameSchema, file: z.string().min(1), testName: z.string().min(1) }).strict(),
-  z.object({ kind: z.literal('not-applicable'), reason: z.string().min(20) }).strict(),
+const telemetrySchema = Schema.Union([
+  strictStruct({ kind: Schema.Literal('automatic'), source: DshxTelemetrySourceSchema }),
+  strictStruct({
+    kind: Schema.Literal('custom'),
+    span: spanNameSchema,
+    file: Schema.String.check(Schema.isMinLength(1)),
+    testName: Schema.String.check(Schema.isMinLength(1)),
+  }),
+  strictStruct({ kind: Schema.Literal('not-applicable'), reason: Schema.String.check(Schema.isMinLength(20)) }),
 ])
 
-const ioDelegationSchema = z
-  .object({
-    file: z.string().min(1),
-    tracedBy: spanNameSchema.optional(),
-    reason: z.string().min(20),
-  })
-  .strict()
+const ioDelegationSchema = strictStruct({
+  file: Schema.String.check(Schema.isMinLength(1)),
+  tracedBy: Schema.optional(spanNameSchema),
+  reason: Schema.String.check(Schema.isMinLength(20)),
+})
 
-const configurationOptionSchema = z
-  .object({
-    key: z.string().min(1),
-    defaultValue: z.string(),
-    constraints: z.string().min(1),
-    choices: z.array(z.string()).optional(),
-    coveredBy: z.array(scenarioIdSchema).min(1),
-  })
-  .strict()
+const configurationOptionSchema = strictStruct({
+  key: Schema.String.check(Schema.isMinLength(1)),
+  defaultValue: Schema.String,
+  constraints: Schema.String.check(Schema.isMinLength(1)),
+  choices: Schema.optional(Schema.Array(Schema.String)),
+  coveredBy: Schema.Array(scenarioIdSchema).check(Schema.isMinLength(1)),
+})
 
-const externalDependencySchema = z
-  .object({
-    id: z.string().min(1),
-    boundary: z.string().min(1),
-    deterministicFake: z.string().min(1),
-  })
-  .strict()
+const externalDependencySchema = strictStruct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  boundary: Schema.String.check(Schema.isMinLength(1)),
+  deterministicFake: Schema.String.check(Schema.isMinLength(1)),
+})
 
 /**
  * State a reach needs that one short UI path cannot create, set up by `dshx dev open`:
@@ -147,63 +165,62 @@ export const parseReachStep = (
   return { action, by: match[2], name: match[3], ...(match[4] !== undefined && { value: match[4].replace(/\\(.)/gu, '$1') }) }
 }
 
-const reachSchema = z
-  .array(
-    z
-      .string()
-      .refine(
-        step => parseReachStep(step) !== undefined,
-        `reach steps are click/rightclick/hover <role|text|label|title> "<name>" (optionally "at <x>,<y>"), fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`,
-      ),
-  )
-  .min(1)
-  .refine(
-    steps => steps.slice(0, steps.findLastIndex(step => step.startsWith('seed ')) + 1).every(step => step.startsWith('seed ')),
-    'seed steps come first: they set up state before the walk starts from the app root',
-  )
-  .refine(steps => steps.at(-1)?.startsWith('expect ') === true, 'reach must end with an expect step that proves the feature is on screen')
+const reachStepMessage = `reach steps are click/rightclick/hover <role|text|label|title> "<name>" (optionally "at <x>,<y>"), fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`
 
-export const DshxFeatureSchema = z
-  .object({
-    id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
-    title: z.string().min(1),
-    summary: z.string().min(1),
-    surfaces: z.array(DshxFeatureSurfaceSchema).min(1),
-    configuration: z.array(configurationOptionSchema),
-    states: z.array(z.string().min(1)).min(1),
-    failureModes: z.array(z.string().min(1)).min(1),
-    externalDependencies: z.array(externalDependencySchema),
-    verification: z.array(verificationSchema).min(1),
-    telemetry: z
-      .array(telemetrySchema)
-      .min(1)
-      .refine(
-        entries => entries.length === 1 || entries.every(entry => entry.kind !== 'not-applicable'),
+const reachSchema = Schema.Array(Schema.String.check(Schema.makeFilter(step => parseReachStep(step) !== undefined || reachStepMessage))).check(
+  Schema.isMinLength(1),
+  Schema.makeFilter(
+    steps =>
+      steps.slice(0, steps.findLastIndex(step => step.startsWith('seed ')) + 1).every(step => step.startsWith('seed ')) ||
+      'seed steps come first: they set up state before the walk starts from the app root',
+  ),
+  Schema.makeFilter(steps => steps.at(-1)?.startsWith('expect ') === true || 'reach must end with an expect step that proves the feature is on screen'),
+)
+
+export const DshxFeatureSchema = strictStruct({
+  id: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)),
+  title: Schema.String.check(Schema.isMinLength(1)),
+  summary: Schema.String.check(Schema.isMinLength(1)),
+  surfaces: Schema.Array(DshxFeatureSurfaceSchema).check(Schema.isMinLength(1)),
+  configuration: Schema.Array(configurationOptionSchema),
+  states: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
+  failureModes: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
+  externalDependencies: Schema.Array(externalDependencySchema),
+  verification: Schema.Array(verificationSchema).check(Schema.isMinLength(1)),
+  telemetry: Schema.Array(telemetrySchema).check(
+    Schema.isMinLength(1),
+    Schema.makeFilter(
+      entries =>
+        entries.length === 1 ||
+        entries.every(entry => entry.kind !== 'not-applicable') ||
         'a not-applicable telemetry rationale stands alone: drop it or the span entries',
-      ),
-    reach: reachSchema.optional(),
-  })
-  .strict()
+    ),
+  ),
+  reach: Schema.optional(reachSchema),
+})
 
-export const DshxFeatureCatalogSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    kind: z.enum(['bundle', 'library', 'infrastructure']),
-    features: z.array(DshxFeatureSchema).min(1),
-    ioDelegation: z.array(ioDelegationSchema).optional(),
-  })
-  .strict()
+export const DshxFeatureCatalogSchema = strictStruct({
+  schemaVersion: Schema.Literal(1),
+  kind: Schema.Literals(['bundle', 'library', 'infrastructure']),
+  features: Schema.Array(DshxFeatureSchema).check(Schema.isMinLength(1)),
+  ioDelegation: Schema.optional(Schema.Array(ioDelegationSchema)),
+})
 
-export type DshxFeatureCatalog = z.infer<typeof DshxFeatureCatalogSchema>
-export type DshxFeature = z.infer<typeof DshxFeatureSchema>
+export type DshxFeatureCatalog = Schema.Schema.Type<typeof DshxFeatureCatalogSchema>
+export type DshxFeature = Schema.Schema.Type<typeof DshxFeatureSchema>
 
 export const featureCatalogIssues = (value: unknown): readonly string[] => {
-  const parsed = DshxFeatureCatalogSchema.safeParse(value)
-  if (!parsed.success) return parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`)
+  const parsed = Schema.decodeUnknownResult(DshxFeatureCatalogSchema, { onExcessProperty: 'error' })(value)
+  if (Result.isFailure(parsed)) {
+    return SchemaIssue.makeFormatterStandardSchemaV1()(parsed.failure.issue).issues.map(issue => {
+      const path = issue.path?.map(String).join('.') ?? ''
+      return path === '' ? issue.message : `${path}: ${issue.message}`
+    })
+  }
   const featureIds = new Set<string>()
   const verificationIds = new Set<string>()
   const issues: string[] = []
-  for (const feature of parsed.data.features) {
+  for (const feature of parsed.success.features) {
     if (featureIds.has(feature.id)) issues.push(`features.${feature.id}: duplicate feature id`)
     featureIds.add(feature.id)
     for (const verification of feature.verification) {

@@ -1,5 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import { z } from 'zod'
+import { jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 import { PluginApiError } from '../api/common.js'
 import { PluginStorageContract, type StorageListInput, type StoragePage, type StoredEntry } from '../api/storage.js'
 
@@ -19,7 +22,15 @@ interface StorageDomainLike {
   open(spec: typeof domainSpec): Promise<DomainLike>
 }
 
-const recordSchema = z.object({ namespace: z.string(), key: z.string(), value: z.json(), updatedAt: z.number() }).strict()
+const storageDomainJsonValueSchema = z.custom<JsonValue>(value => {
+  try {
+    Schema.decodeUnknownSync(jsonValueSchema)(value)
+    return true
+  } catch {
+    return false
+  }
+})
+const recordSchema = z.object({ namespace: z.string(), key: z.string(), value: storageDomainJsonValueSchema, updatedAt: z.number().finite() })
 type StoredRecord = z.infer<typeof recordSchema>
 
 const DOMAIN_NAME = 'dshx_plugin_kv'
@@ -119,26 +130,28 @@ export interface PluginStorage {
  * that plugin's browser half through `hostStorage(api)`. Needs the profile's `@deepseek-ai/dsh-storage-domain` row.
  */
 const pluginStorage = (ctx: Context, namespace: string): PluginStorage => {
-  const checkedNamespace = PluginStorageContract.namespace.parse(namespace)
+  const checkedNamespace = Schema.decodeUnknownSync(PluginStorageContract.namespace)(namespace)
   return {
     get: async key =>
       withTable(ctx, table => {
-        const record = table.get(recordKey(checkedNamespace, PluginStorageContract.key.parse(key)))
+        const record = table.get(recordKey(checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.key)(key)))
         return record === undefined ? undefined : entryOf(record)
       }),
     set: async (key, value) => {
       const record: StoredRecord = {
         namespace: checkedNamespace,
-        key: PluginStorageContract.key.parse(key),
-        value: PluginStorageContract.value.parse(value),
+        key: Schema.decodeUnknownSync(PluginStorageContract.key)(key),
+        value: Schema.decodeUnknownSync(PluginStorageContract.value)(value),
         updatedAt: Date.now(),
       }
       await withTable(ctx, table => table.put(recordKey(checkedNamespace, record.key), record))
       return entryOf(record)
     },
-    delete: async key => withTable(ctx, table => table.delete(recordKey(checkedNamespace, PluginStorageContract.key.parse(key)))),
+    delete: async key => withTable(ctx, table => table.delete(recordKey(checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.key)(key)))),
     list: async (input = {}) =>
-      withTable(ctx, table => list(table, checkedNamespace, PluginStorageContract.listInput.parse({ ...input, namespace: checkedNamespace }))),
+      withTable(ctx, table =>
+        list(table, checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.listInput)({ ...input, namespace: checkedNamespace })),
+      ),
   }
 }
 

@@ -1,4 +1,7 @@
 import { execa } from 'execa'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
@@ -6,7 +9,6 @@ import { pathToFileURL } from 'node:url'
 import semver from 'semver'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, isMap, isSeq, parse, parseDocument } from 'yaml'
-import { z } from 'zod'
 import { decodeJson, jsonObjectSchema, jsonValueSchema, type JsonObject } from '../json.js'
 import { HostRuntimeModel } from '../host/runtime.js'
 import { DSHFILES_ROOT, LocalBundleModel } from '../project/local-bundles.js'
@@ -18,23 +20,27 @@ export const RESTART_HOST = 'Restart the DSH host process'
 const jsTag = { tag: 'tag:yaml.org,2002:js', resolve: (expression: string) => expression }
 const optionPattern = /^([A-Za-z_][A-Za-z0-9_-]*)=(.*)$/su
 
-const profileTargetSchema = z.object({
-  packageSpec: z.string().min(1),
-  profile: z.string().regex(/^[A-Za-z0-9._-]+$/u, 'Profile names are plain directory names.'),
-  dshHome: z.string().min(1),
-  dryRun: z.boolean().default(false),
-  cwd: z.string().default(process.cwd()),
-})
-type ProfileTarget = z.output<typeof profileTargetSchema>
+const profileTargetFields = {
+  packageSpec: Schema.String.check(Schema.isMinLength(1)),
+  profile: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u, { message: 'Profile names are plain directory names.' })),
+  dshHome: Schema.String.check(Schema.isMinLength(1)),
+  dryRun: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  cwd: Schema.String.pipe(Schema.withDecodingDefault(Effect.sync(() => process.cwd()))),
+}
+const profileTargetSchema = Schema.Struct(profileTargetFields)
+type ProfileTarget = Schema.Schema.Type<typeof profileTargetSchema>
 
-const addPluginInputSchema = profileTargetSchema.extend({
-  options: z.array(z.string().regex(optionPattern, 'Options take the form key=value.')).default([]),
+const addPluginInputSchema = Schema.Struct({
+  ...profileTargetFields,
+  options: Schema.Array(Schema.String.check(Schema.isPattern(optionPattern, { message: 'Options take the form key=value.' }))).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
 })
-type AddPluginInput = z.input<typeof addPluginInputSchema>
+type AddPluginInput = Schema.Codec.Encoded<typeof addPluginInputSchema>
 
-const updatePluginInputSchema = profileTargetSchema.extend({ latest: z.boolean().default(false) })
-type UpdatePluginInput = z.input<typeof updatePluginInputSchema>
-type RemovePluginInput = z.input<typeof profileTargetSchema>
+const updatePluginInputSchema = Schema.Struct({ ...profileTargetFields, latest: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))) })
+type UpdatePluginInput = Schema.Codec.Encoded<typeof updatePluginInputSchema>
+type RemovePluginInput = Schema.Codec.Encoded<typeof profileTargetSchema>
 
 export interface ProfilePluginDependencies {
   readonly pluginsRoot?: string
@@ -86,33 +92,41 @@ export class ProfilePluginError extends Error {
 const packageNamePattern = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u
 const versionedSpecPattern = /^((?:@[^/@]+\/)?[^@]+)@(.+)$/u
 
-const profileManifestSchema = z.looseObject({
-  dependencies: z.record(z.string(), z.string()).default({}),
-  dsh: z.looseObject({ profile: z.looseObject({ bundles: z.array(z.string()).default([]) }).default({ bundles: [] }) }).default({ profile: { bundles: [] } }),
+const looseObject = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+
+const profileManifestSchema = looseObject({
+  dependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  dsh: looseObject({
+    profile: looseObject({ bundles: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) }).pipe(
+      Schema.withDecodingDefault(Effect.succeed({ bundles: [] })),
+    ),
+  }).pipe(Schema.withDecodingDefault(Effect.succeed({ profile: { bundles: [] } }))),
 })
 
-const bundleManifestSchema = z.looseObject({
-  name: z.string().min(1),
-  version: z.string().optional(),
-  main: z.string().optional(),
-  exports: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
-  dsh: z
-    .looseObject({
-      bundle: z.looseObject({ patch: z.string().optional() }).optional(),
-      client: z.looseObject({ inject: z.array(z.string()).default([]) }).optional(),
-    })
-    .optional(),
+const bundleManifestSchema = looseObject({
+  name: Schema.String.check(Schema.isMinLength(1)),
+  version: Schema.optional(Schema.String),
+  main: Schema.optional(Schema.String),
+  exports: Schema.optional(Schema.Union([Schema.String, Schema.Record(Schema.String, Schema.Unknown)])),
+  dsh: Schema.optional(
+    looseObject({
+      bundle: Schema.optional(looseObject({ patch: Schema.optional(Schema.String) })),
+      client: Schema.optional(looseObject({ inject: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) })),
+    }),
+  ),
 })
-type BundleManifest = z.output<typeof bundleManifestSchema>
+type BundleManifest = Schema.Schema.Type<typeof bundleManifestSchema>
 
-const bundlePatchSchema = z.array(
-  z.looseObject({
-    insert: z.array(z.looseObject({ id: z.string().optional(), name: z.string().optional(), config: jsonObjectSchema.optional() })).optional(),
+const bundlePatchSchema = Schema.Array(
+  looseObject({
+    insert: Schema.optional(
+      Schema.Array(looseObject({ id: Schema.optional(Schema.String), name: Schema.optional(Schema.String), config: Schema.optional(jsonObjectSchema) })),
+    ),
   }),
 )
-const callableSchema = z.custom<(value: JsonObject) => void>(value => typeof value === 'function')
-const hostModuleSchema = z.looseObject({ Config: z.unknown() })
-const seedManifestSchema = z.looseObject({ dependencies: z.record(z.string(), z.string()).default({}) })
+const hostModuleSchema = looseObject({ Config: Schema.Unknown })
+const seedManifestSchema = looseObject({ dependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed({}))) })
 
 /** Loader row ids share one namespace per profile, so the scope stays in the id. */
 const scopeKeptSlug = (packageName: string): string => packageName.replace(/^@/u, '').replace(/\//gu, '-')
@@ -135,8 +149,8 @@ const insertedRow = async (projectRoot: string, packageName: string) => {
   const patchPath = join(projectRoot, manifest.dsh?.bundle?.patch ?? 'cordis.patch.yml')
   const shipped = { clientInject: manifest.dsh?.client?.inject ?? [], parts: shippedParts(manifest), version: manifest.version ?? null }
   if (!existsSync(patchPath)) return { id: scopeKeptSlug(packageName), config: {}, ...shipped }
-  const patch = bundlePatchSchema.safeParse(parse(await readFile(patchPath, 'utf8'), { customTags: [jsTag] }))
-  const row = patch.success ? patch.data.flatMap(entry => entry.insert ?? []).find(candidate => candidate.name === packageName) : undefined
+  const patch = Schema.decodeUnknownOption(bundlePatchSchema)(parse(await readFile(patchPath, 'utf8'), { customTags: [jsTag] }))
+  const row = Option.isSome(patch) ? patch.value.flatMap(entry => entry.insert ?? []).find(candidate => candidate.name === packageName) : undefined
   return { id: row?.id ?? scopeKeptSlug(packageName), config: row?.config ?? {}, ...shipped }
 }
 
@@ -146,7 +160,7 @@ const loadConfigValidator = async (projectRoot: string): Promise<((value: JsonOb
   const entry = join(projectRoot, manifest.main ?? 'dist/index.js')
   if (!existsSync(entry)) return `${relative(process.cwd(), entry) || entry} is not built`
   try {
-    const exported = hostModuleSchema.parse(await import(pathToFileURL(entry).href)).Config
+    const exported = Schema.decodeUnknownSync(hostModuleSchema)(await import(pathToFileURL(entry).href)).Config
     if (HostRuntimeModel.isStandardSchema(exported))
       return async value => {
         const result = await exported['~standard'].validate(value)
@@ -160,10 +174,9 @@ const loadConfigValidator = async (projectRoot: string): Promise<((value: JsonOb
               .join('; '),
           )
       }
-    const callable = callableSchema.safeParse(exported)
-    if (callable.success)
+    if (typeof exported === 'function')
       return async value => {
-        callable.data(value)
+        exported(value)
       }
     return 'its Host entry exports no Config schema'
   } catch (error) {
@@ -175,7 +188,7 @@ const parseOptions = (options: readonly string[]): JsonObject =>
   Object.fromEntries(
     options.map(option => {
       const [, key = '', raw = ''] = optionPattern.exec(option) ?? []
-      return [key, raw === '' ? '' : jsonValueSchema.parse(parse(raw))]
+      return [key, raw === '' ? '' : Schema.decodeUnknownSync(jsonValueSchema)(parse(raw))]
     }),
   )
 
@@ -193,7 +206,7 @@ const parsePatch = (source: string): Document => {
   return document
 }
 
-const overrideConfigSchema = z.looseObject({ config: jsonObjectSchema.default({}) })
+const overrideConfigSchema = looseObject({ config: jsonObjectSchema.pipe(Schema.withDecodingDefault(Effect.succeed({}))) })
 
 /** A patch entry replaces the row's whole `config`, so a new override starts from the bundle's own row config. */
 const mergedPatch = (source: string, row: { id: string; name: string; baseConfig: JsonObject }, options: JsonObject) => {
@@ -206,7 +219,7 @@ const mergedPatch = (source: string, row: { id: string; name: string; baseConfig
   } else {
     document.add(document.createNode({ id: row.id, name: row.name, config: { ...row.baseConfig, ...options } }))
   }
-  const config = isMap(existing) ? overrideConfigSchema.parse(existing.toJSON()).config : { ...row.baseConfig, ...options }
+  const config = isMap(existing) ? Schema.decodeUnknownSync(overrideConfigSchema)(existing.toJSON()).config : { ...row.baseConfig, ...options }
   return { text: document.toString({ singleQuote: true }), config }
 }
 
@@ -311,7 +324,7 @@ const profileSteps = (target: ProfileTarget, profile: OpenProfile, dependencies:
 
 /** Install one plugin into a DSH profile and merge its row config; never restarts DSH. */
 const addPluginToProfile = async (input: AddPluginInput, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> => {
-  const request = addPluginInputSchema.parse(input)
+  const request = Schema.decodeUnknownSync(addPluginInputSchema)(input)
   const profile = await openProfile(request)
   const resolved = await resolvePackage(request.packageSpec, request.cwd, dependencies.pluginsRoot)
   const options = parseOptions(request.options)
@@ -417,7 +430,7 @@ const installedPackage = (profile: OpenProfile, packageSpec: string) => {
 
 /** Move a registry plugin within its range, to the latest or to a named version, or relink an owned bundle; never restarts DSH. */
 const updatePluginInProfile = async (input: UpdatePluginInput, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> => {
-  const request = updatePluginInputSchema.parse(input)
+  const request = Schema.decodeUnknownSync(updatePluginInputSchema)(input)
   const profile = await openProfile(request)
   const target = installedPackage(profile, request.packageSpec)
   if (!target.listed)
@@ -471,7 +484,7 @@ const updatePluginInProfile = async (input: UpdatePluginInput, dependencies: Pro
 
 /** Uninstall one plugin and drop its row override from the profile patch; never restarts DSH. */
 const removePluginFromProfile = async (input: RemovePluginInput, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> => {
-  const request = profileTargetSchema.parse(input)
+  const request = Schema.decodeUnknownSync(profileTargetSchema)(input)
   const profile = await openProfile(request)
   const target = installedPackage(profile, request.packageSpec)
   if (target.version !== undefined) throw new ProfilePluginError('dshx remove takes a package name without a version.', `Run "dshx remove ${target.name}".`)
