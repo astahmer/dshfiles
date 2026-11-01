@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
+import * as Result from 'effect/Result'
 import { join } from 'node:path'
-import { z } from 'zod'
 import { dshHome } from './dsh-home.js'
 import { JsonFile } from './json-file.js'
 import { JsonText } from './json-text.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /**
  * Why a thread needs a resume: `restart` is a managed restart that captured its
@@ -13,39 +15,40 @@ import { JsonText } from './json-text.js'
  */
 export type RecoveryReason = 'restart' | 'interrupted'
 
-const sessionIdSchema = z.string().min(1).max(256)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 const MAX_RECOVERY_ENTRIES = 5000
+const DEFAULT_RECOVERY_REASON: RecoveryReason = 'restart'
 
-const recoveryEntrySchema = z
-  .object({
+const recoveryEntrySchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     sessionId: sessionIdSchema,
-    requestId: z.string().uuid(),
-    interruptedAt: z.number().int().nonnegative(),
-    reason: z.enum(['restart', 'interrupted']).default('restart'),
-  })
-  .strict()
+    requestId: Schema.String.check(Schema.isUUID()),
+    interruptedAt: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    reason: SchemaHelpers.withDecodedDefault(Schema.Literals(['restart', 'interrupted']), () => DEFAULT_RECOVERY_REASON),
+  }),
+)
 
-const persistedRecoverySchema = z.object({ version: z.literal(2), entries: z.array(recoveryEntrySchema).max(MAX_RECOVERY_ENTRIES) }).strict()
+const persistedRecoverySchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ version: Schema.Literal(2), entries: Schema.Array(recoveryEntrySchema).check(Schema.isMaxLength(MAX_RECOVERY_ENTRIES)) }),
+)
 
 /** A v1 file predates the reason field, and every entry it holds came from a managed restart. */
-const legacyRecoverySchema = z
-  .object({
-    version: z.literal(1),
-    entries: z
-      .array(
-        z
-          .object({
-            sessionId: sessionIdSchema,
-            requestId: z.string().uuid(),
-            interruptedAt: z.number().int().nonnegative(),
-          })
-          .strict(),
-      )
-      .max(MAX_RECOVERY_ENTRIES),
-  })
-  .strict()
+const legacyRecoverySchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    version: Schema.Literal(1),
+    entries: Schema.Array(
+      SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: sessionIdSchema,
+          requestId: Schema.String.check(Schema.isUUID()),
+          interruptedAt: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+        }),
+      ),
+    ).check(Schema.isMaxLength(MAX_RECOVERY_ENTRIES)),
+  }),
+)
 
-export type RestartRecoveryEntry = z.infer<typeof recoveryEntrySchema>
+export type RestartRecoveryEntry = Schema.Schema.Type<typeof recoveryEntrySchema>
 
 export interface RestartRecoveryStore {
   list(): Promise<RestartRecoveryEntry[]>
@@ -69,11 +72,11 @@ export const createRestartRecoveryStore = (
 
   const read = async (): Promise<RestartRecoveryEntry[]> => {
     const contents = await JsonFile.readText({ path, missing: '{"version":2,"entries":[]}' })
-    const current = JsonText.decode(persistedRecoverySchema, contents)
+    const current = JsonText.decodeEffect(persistedRecoverySchema, contents)
     if (current === undefined) throw new Error('Restart recovery state is unreadable.')
-    if (current.success) return current.data.entries
-    const legacy = JsonText.decode(legacyRecoverySchema, contents)
-    if (legacy !== undefined && legacy.success) return legacy.data.entries.map(entry => ({ ...entry, reason: 'restart' as const }))
+    if (Result.isSuccess(current)) return [...current.success.entries]
+    const legacy = JsonText.decodeEffect(legacyRecoverySchema, contents)
+    if (legacy !== undefined && Result.isSuccess(legacy)) return legacy.success.entries.map(entry => ({ ...entry, reason: 'restart' as const }))
     throw new Error('Restart recovery state is invalid.')
   }
 

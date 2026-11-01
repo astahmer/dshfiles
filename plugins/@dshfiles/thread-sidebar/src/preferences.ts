@@ -1,5 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
+import * as Option from 'effect/Option'
 import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
@@ -20,14 +22,15 @@ import {
   ThreadNotificationModel,
   threadNotificationCategoriesSchema,
 } from './thread-notifications.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
-const sidebarSectionSchema = z.enum(SIDEBAR_SECTIONS)
-const sidebarOrderSectionSchema = z.enum(SIDEBAR_ORDER_SECTIONS)
-const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
-export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
-const projectColorPaletteSchema = z.enum(PROJECT_COLOR_PALETTES)
+const sidebarSectionSchema = Schema.Literals(SIDEBAR_SECTIONS)
+const sidebarOrderSectionSchema = Schema.Literals(SIDEBAR_ORDER_SECTIONS)
+const threadRowActionSchema = Schema.Literals(THREAD_ROW_ACTIONS)
+export const attentionColorSchema = Schema.Literals(ATTENTION_COLOR_OPTIONS)
+const projectColorPaletteSchema = Schema.Literals(PROJECT_COLOR_PALETTES)
 
 /**
  * Auto-archive became auto-settle: the same idle scan now writes our own soft status instead of the
@@ -41,13 +44,13 @@ const legacyPreferenceRenames = {
   rebasedThreadArchiveDelay: 'rebasedThreadSettleDelay',
 } as const
 
-const preferenceDocumentSchema = z.record(z.string(), z.unknown())
+const preferenceDocumentSchema = Schema.Record(Schema.String, Schema.Unknown)
 
 const upgradeLegacyPreferenceKeys = (value: unknown): unknown => {
-  const parsed = preferenceDocumentSchema.safeParse(value)
+  const parsed = Schema.decodeUnknownOption(preferenceDocumentSchema)(value)
   // Anything that is not a preferences document is left to the strict schema, which rejects it.
-  if (!parsed.success) return value
-  const upgraded: Record<string, unknown> = { ...parsed.data }
+  if (Option.isNone(parsed)) return value
+  const upgraded: Record<string, unknown> = { ...parsed.value }
   for (const [legacy, current] of Object.entries(legacyPreferenceRenames)) {
     if (!(legacy in upgraded)) continue
     if (upgraded[current] === undefined) upgraded[current] = upgraded[legacy]
@@ -56,108 +59,181 @@ const upgradeLegacyPreferenceKeys = (value: unknown): unknown => {
   return upgraded
 }
 
-const preferencesInputSchema = z
-  .object({
-    archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
-    archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
-    autoSettleEnabled: z.boolean(),
-    rebasedThreadSettleDelay: z.enum(THREAD_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
-    settledArchiveDelay: z.enum(THREAD_DELAYS).default(DEFAULT_PREFERENCES.settledArchiveDelay),
-    idleMinutes: z.number().int().min(15).max(10080),
-    scanIntervalMinutes: z.number().int().min(1).max(120),
-    excludedWorkspaceIds: z.array(z.string().min(1).max(256)).max(500),
-    excludedSessionIds: z.array(z.string().min(1).max(256)).max(5000),
-    autoSettleSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoSettleSessionIds),
-    autoSettleDisabledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoSettleDisabledSessionIds),
-    parkedSessionIds: z.array(z.string().min(1).max(256)).max(5000),
-    settledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.settledSessionIds),
-    settledAt: z.record(z.string(), z.number().int().nonnegative()).default(DEFAULT_PREFERENCES.settledAt),
-    mutedThreads: threadMutesSchema.default(DEFAULT_PREFERENCES.mutedThreads),
-    collapsedSections: z.array(sidebarSectionSchema).max(SIDEBAR_SECTIONS.length),
-    collapsedGroups: z.array(z.string().min(1).max(200)).max(200).default(DEFAULT_PREFERENCES.collapsedGroups),
-    sectionOrder: z
-      .array(sidebarOrderSectionSchema)
-      .max(SIDEBAR_ORDER_SECTIONS.length)
-      .default([...DEFAULT_PREFERENCES.sectionOrder])
-      .transform(order => SidebarOrganization.orderSections(order)),
-    separateRemoteThreads: z.boolean().default(DEFAULT_PREFERENCES.separateRemoteThreads),
-    idleSectionOverrides: z
-      .record(z.string().min(1).max(256), z.object({ section: z.enum(['active', 'inactive']), at: z.number().int().nonnegative() }).strict())
-      .default(DEFAULT_PREFERENCES.idleSectionOverrides),
-    workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),
-    headerMode: z.enum(['compact', 'expanded']),
-    hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),
-    headerRegionHeight: z.number().int().min(40).max(10000).nullable().default(null),
-    headerOrder: z.array(z.string().min(1).max(256)).max(300),
-    hiddenHeaderIds: z.array(z.string().min(1).max(256)).max(300),
-    footerOrder: z.array(z.string().min(1).max(256)).max(300),
-    hiddenFooterIds: z.array(z.string().min(1).max(256)).max(300),
-    navigationDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.navigationDensity),
-    navigationOverflow: z.enum(['scroll', 'menu', 'scroll-menu']).default(DEFAULT_PREFERENCES.navigationOverflow),
-    paletteChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.paletteChord),
-    fileSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.fileSearchChord),
-    threadSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.threadSearchChord),
-    backChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.backChord),
-    forwardChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.forwardChord),
-    paletteRecentLimit: z.number().int().min(5).max(100).default(DEFAULT_PREFERENCES.paletteRecentLimit),
-    threadRowDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.threadRowDensity),
-    threadRowProject: z.boolean().default(DEFAULT_PREFERENCES.threadRowProject),
-    threadRowProjectColor: z.boolean().default(DEFAULT_PREFERENCES.threadRowProjectColor),
-    projectColorPalette: projectColorPaletteSchema.default(DEFAULT_PREFERENCES.projectColorPalette),
-    threadRowTitle: z.boolean().default(DEFAULT_PREFERENCES.threadRowTitle),
-    threadRowMachine: z.boolean().default(DEFAULT_PREFERENCES.threadRowMachine),
-    threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),
-    threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
-    threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
-    arrowKeysSwitchThread: z.boolean().default(DEFAULT_PREFERENCES.arrowKeysSwitchThread),
-    hiddenRowActions: z.array(threadRowActionSchema).max(THREAD_ROW_ACTIONS.length).default(DEFAULT_PREFERENCES.hiddenRowActions),
-    rowActionOrder: z
-      .array(threadRowActionSchema)
-      .max(THREAD_ROW_ACTIONS.length)
-      .default([...DEFAULT_PREFERENCES.rowActionOrder])
-      .transform(order => SidebarOrganization.orderRowActions(order)),
-    approvalNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.approvalNeededDisplay),
-    inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
-    turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),
-    attentionColors: z
-      .object({
+const preferencesInputFields = {
+  archiveUndoEnabled: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.archiveUndoEnabled),
+  archiveUndoDurationSeconds: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(30)),
+    () => DEFAULT_PREFERENCES.archiveUndoDurationSeconds,
+  ),
+  autoSettleEnabled: Schema.Boolean,
+  rebasedThreadSettleDelay: SchemaHelpers.withDecodedDefault(Schema.Literals(THREAD_DELAYS), () => DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
+  settledArchiveDelay: SchemaHelpers.withDecodedDefault(Schema.Literals(THREAD_DELAYS), () => DEFAULT_PREFERENCES.settledArchiveDelay),
+  idleMinutes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(15)).check(Schema.isLessThanOrEqualTo(10080)),
+  scanIntervalMinutes: Schema.Number.check(Schema.isFinite())
+    .check(Schema.isInt())
+    .check(Schema.isGreaterThanOrEqualTo(1))
+    .check(Schema.isLessThanOrEqualTo(120)),
+  excludedWorkspaceIds: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(500)),
+  excludedSessionIds: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(5000)),
+  autoSettleSessionIds: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(5000)),
+    () => DEFAULT_PREFERENCES.autoSettleSessionIds,
+  ),
+  autoSettleDisabledSessionIds: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(5000)),
+    () => DEFAULT_PREFERENCES.autoSettleDisabledSessionIds,
+  ),
+  parkedSessionIds: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(5000)),
+  settledSessionIds: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(5000)),
+    () => DEFAULT_PREFERENCES.settledSessionIds,
+  ),
+  settledAt: SchemaHelpers.withDecodedDefault(
+    Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+    () => DEFAULT_PREFERENCES.settledAt,
+  ),
+  mutedThreads: SchemaHelpers.withDecodedDefault(threadMutesSchema, () => DEFAULT_PREFERENCES.mutedThreads),
+  collapsedSections: Schema.mutable(Schema.Array(sidebarSectionSchema)).check(Schema.isMaxLength(SIDEBAR_SECTIONS.length)),
+  collapsedGroups: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200)))).check(Schema.isMaxLength(200)),
+    () => DEFAULT_PREFERENCES.collapsedGroups,
+  ),
+  sectionOrder: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(sidebarOrderSectionSchema))
+      .check(Schema.isMaxLength(SIDEBAR_ORDER_SECTIONS.length))
+      .pipe(
+        Schema.decodeTo(Schema.mutable(Schema.Array(sidebarOrderSectionSchema)), {
+          decode: SchemaGetter.transform(order => SidebarOrganization.orderSections(order)),
+          encode: SchemaGetter.transform(order => order),
+        }),
+      ),
+    (): SidebarPreferences['sectionOrder'] => [...DEFAULT_PREFERENCES.sectionOrder],
+  ),
+  separateRemoteThreads: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.separateRemoteThreads),
+  idleSectionOverrides: SchemaHelpers.withDecodedDefault(
+    Schema.Record(
+      Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
+      SchemaHelpers.strictStruct(
+        Schema.Struct({
+          section: Schema.Literals(['active', 'inactive']),
+          at: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+        }),
+      ),
+    ),
+    () => DEFAULT_PREFERENCES.idleSectionOverrides,
+  ),
+  workspaceFilter: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))), () => DEFAULT_PREFERENCES.workspaceFilter),
+  headerMode: Schema.Literals(['compact', 'expanded']),
+  hideBrandLogo: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.hideBrandLogo),
+  headerRegionHeight: SchemaHelpers.withDecodedDefault(
+    Schema.NullOr(
+      Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(40)).check(Schema.isLessThanOrEqualTo(10000)),
+    ),
+    () => null,
+  ),
+  headerOrder: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(300)),
+  hiddenHeaderIds: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(300)),
+  footerOrder: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(300)),
+  hiddenFooterIds: Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)))).check(Schema.isMaxLength(300)),
+  navigationDensity: SchemaHelpers.withDecodedDefault(Schema.Literals(['compact', 'comfortable']), () => DEFAULT_PREFERENCES.navigationDensity),
+  navigationOverflow: SchemaHelpers.withDecodedDefault(Schema.Literals(['scroll', 'menu', 'scroll-menu']), () => DEFAULT_PREFERENCES.navigationOverflow),
+  paletteChord: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))), () => DEFAULT_PREFERENCES.paletteChord),
+  fileSearchChord: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))), () => DEFAULT_PREFERENCES.fileSearchChord),
+  threadSearchChord: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))), () => DEFAULT_PREFERENCES.threadSearchChord),
+  backChord: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))), () => DEFAULT_PREFERENCES.backChord),
+  forwardChord: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))), () => DEFAULT_PREFERENCES.forwardChord),
+  paletteRecentLimit: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(5)).check(Schema.isLessThanOrEqualTo(100)),
+    () => DEFAULT_PREFERENCES.paletteRecentLimit,
+  ),
+  threadRowDensity: SchemaHelpers.withDecodedDefault(Schema.Literals(['compact', 'comfortable']), () => DEFAULT_PREFERENCES.threadRowDensity),
+  threadRowProject: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowProject),
+  threadRowProjectColor: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowProjectColor),
+  projectColorPalette: SchemaHelpers.withDecodedDefault(projectColorPaletteSchema, () => DEFAULT_PREFERENCES.projectColorPalette),
+  threadRowTitle: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowTitle),
+  threadRowMachine: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowMachine),
+  threadRowPath: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowPath),
+  threadRowTime: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowTime),
+  threadRowStatusDot: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.threadRowStatusDot),
+  arrowKeysSwitchThread: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.arrowKeysSwitchThread),
+  hiddenRowActions: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(threadRowActionSchema)).check(Schema.isMaxLength(THREAD_ROW_ACTIONS.length)),
+    () => DEFAULT_PREFERENCES.hiddenRowActions,
+  ),
+  rowActionOrder: SchemaHelpers.withDecodedDefault(
+    Schema.mutable(Schema.Array(threadRowActionSchema))
+      .check(Schema.isMaxLength(THREAD_ROW_ACTIONS.length))
+      .pipe(
+        Schema.decodeTo(Schema.mutable(Schema.Array(threadRowActionSchema)), {
+          decode: SchemaGetter.transform(order => SidebarOrganization.orderRowActions(order)),
+          encode: SchemaGetter.transform(order => order),
+        }),
+      ),
+    (): SidebarPreferences['rowActionOrder'] => [...DEFAULT_PREFERENCES.rowActionOrder],
+  ),
+  approvalNeededDisplay: SchemaHelpers.withDecodedDefault(Schema.Literals(['group', 'label']), () => DEFAULT_PREFERENCES.approvalNeededDisplay),
+  inputNeededDisplay: SchemaHelpers.withDecodedDefault(Schema.Literals(['group', 'label']), () => DEFAULT_PREFERENCES.inputNeededDisplay),
+  turnFinishedDisplay: SchemaHelpers.withDecodedDefault(Schema.Literals(['group', 'label']), () => DEFAULT_PREFERENCES.turnFinishedDisplay),
+  attentionColors: SchemaHelpers.withDecodedDefault(
+    SchemaHelpers.strictStruct(
+      Schema.Struct({
         approvalNeeded: attentionColorSchema,
         inputNeeded: attentionColorSchema,
         turnFinished: attentionColorSchema,
-      })
-      .strict()
-      .default(DEFAULT_PREFERENCES.attentionColors),
-    includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
-    desktopNotificationsEnabled: z.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled),
-    notificationCategories: threadNotificationCategoriesSchema.optional(),
-    notificationPlacement: z.enum(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement),
-    notificationDurationSeconds: z.number().int().min(0).max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds),
-    applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
-    resumeAfterRestart: z.boolean().default(DEFAULT_PREFERENCES.resumeAfterRestart),
-    maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
-    finishedSubagents: z.enum(['show', 'collapse', 'hide']).default(DEFAULT_PREFERENCES.finishedSubagents),
-    threadViews: threadViewSettingsSchema.default(DEFAULT_PREFERENCES.threadViews),
-  })
-  .strict()
+      }),
+    ),
+    () => DEFAULT_PREFERENCES.attentionColors,
+  ),
+  includeSubagentAttention: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.includeSubagentAttention),
+  desktopNotificationsEnabled: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.desktopNotificationsEnabled),
+  notificationCategories: Schema.optional(threadNotificationCategoriesSchema),
+  notificationPlacement: SchemaHelpers.withDecodedDefault(Schema.Literals(THREAD_NOTIFICATION_PLACEMENTS), () => DEFAULT_PREFERENCES.notificationPlacement),
+  notificationDurationSeconds: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(60)),
+    () => DEFAULT_PREFERENCES.notificationDurationSeconds,
+  ),
+  applyActionsToChildThreads: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.applyActionsToChildThreads),
+  resumeAfterRestart: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.resumeAfterRestart),
+  maxChildren: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(50)),
+    () => DEFAULT_PREFERENCES.maxChildren,
+  ),
+  finishedSubagents: SchemaHelpers.withDecodedDefault(Schema.Literals(['show', 'collapse', 'hide']), () => DEFAULT_PREFERENCES.finishedSubagents),
+  threadViews: SchemaHelpers.withDecodedDefault(threadViewSettingsSchema, () => DEFAULT_PREFERENCES.threadViews),
+}
 
-const preferencesSchema = preferencesInputSchema.extend({
-  notificationCategories: threadNotificationCategoriesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
+const preferencesInputSchema = SchemaHelpers.strictStruct(Schema.Struct(preferencesInputFields))
+
+const preferencesSchema = Schema.Struct({
+  ...preferencesInputFields,
+  notificationCategories: SchemaHelpers.withDecodedDefault(threadNotificationCategoriesSchema, () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
 })
+
+const storedPreferencesSchema = Schema.Unknown.pipe(
+  Schema.decodeTo(preferencesSchema, {
+    decode: SchemaGetter.transform(value => {
+      const upgraded = upgradeLegacyPreferenceKeys(value)
+      // SAFETY: the target Struct validates the migrated value after this adapter.
+      return upgraded as Schema.Struct.Encoded<typeof preferencesSchema.fields>
+    }),
+    encode: SchemaGetter.transform(value => value),
+  }),
+)
 
 /** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
 const decodePreferences = (value: unknown): SidebarPreferences | null => {
-  const checked = preferencesInputSchema.safeParse(upgradeLegacyPreferenceKeys(value))
-  if (!checked.success) return null
+  const checked = Schema.decodeUnknownOption(preferencesInputSchema)(upgradeLegacyPreferenceKeys(value))
+  if (Option.isNone(checked)) return null
   const categoriesStillDefault =
-    checked.data.notificationCategories === undefined ||
-    JSON.stringify(checked.data.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
-  const migrateDesktopNotifications = checked.data.desktopNotificationsEnabled && categoriesStillDefault
+    checked.value.notificationCategories === undefined ||
+    JSON.stringify(checked.value.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+  const migrateDesktopNotifications = checked.value.desktopNotificationsEnabled && categoriesStillDefault
   return {
-    ...checked.data,
-    desktopNotificationsEnabled: migrateDesktopNotifications ? false : checked.data.desktopNotificationsEnabled,
+    ...checked.value,
+    desktopNotificationsEnabled: migrateDesktopNotifications ? false : checked.value.desktopNotificationsEnabled,
     notificationCategories: migrateDesktopNotifications
       ? ThreadNotificationModel.categoriesForLegacyDesktopNotifications()
-      : (checked.data.notificationCategories ?? DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
+      : (checked.value.notificationCategories ?? DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
   }
 }
 
@@ -183,9 +259,9 @@ const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreference
 const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
 
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
-export const storedPreferences = createStoredValue({
+export const storedPreferences = createEffectStoredValue({
   key: PREFERENCES_STORAGE_KEY,
-  schema: z.preprocess(upgradeLegacyPreferenceKeys, preferencesSchema),
+  schema: storedPreferencesSchema,
   fallback: null,
 })
 

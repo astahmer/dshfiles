@@ -1,5 +1,5 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import * as Schema from 'effect/Schema'
 
 /**
  * Group headers a user keeps closed, keyed by the view group key
@@ -11,11 +11,11 @@ import { z } from 'zod'
  */
 export const COLLAPSED_GROUPS_STORAGE_KEY = 'dshfiles.thread-sidebar.collapsed-groups.v1'
 
-const collapsedGroupsSchema = z.array(z.string().min(1).max(200)).max(200)
+const collapsedGroupsSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))).check(Schema.isMaxLength(200))
 
 const noCollapsedGroups: readonly string[] = []
 
-export const storedCollapsedGroups = createStoredValue({
+export const storedCollapsedGroups = createEffectStoredValue({
   key: COLLAPSED_GROUPS_STORAGE_KEY,
   schema: collapsedGroupsSchema,
   fallback: noCollapsedGroups,

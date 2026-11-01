@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 import { DEFAULT_THREAD_BOARD_VIEW, ThreadBoardViewModel, threadBoardViewSchema } from './thread-board-view.js'
 
 describe('thread board view', () => {
@@ -15,7 +17,7 @@ describe('thread board view', () => {
 
   it('validates independent grouping and filters', () => {
     expect(
-      threadBoardViewSchema.parse({
+      Schema.decodeUnknownSync(threadBoardViewSchema)({
         groupBy: 'project',
         statusFilters: ['working', 'attention'],
         sourceFilter: 'subagents',
@@ -31,9 +33,11 @@ describe('thread board view', () => {
       collapsedGroups: [],
       collapsedSections: [],
     })
-    expect(threadBoardViewSchema.safeParse({ ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['all'] }).success).toBe(false)
-    expect(threadBoardViewSchema.safeParse({ ...DEFAULT_THREAD_BOARD_VIEW, unexpected: true }).success).toBe(false)
-    expect(threadBoardViewSchema.parse({ ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['not-working'] }).statusFilters).toEqual(['not-running'])
+    expect(SchemaHelpers.decodeUnknownSafe(threadBoardViewSchema, { ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['all'] }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadBoardViewSchema, { ...DEFAULT_THREAD_BOARD_VIEW, unexpected: true }).success).toBe(false)
+    expect(Schema.decodeUnknownSync(threadBoardViewSchema)({ ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['not-working'] }).statusFilters).toEqual([
+      'not-running',
+    ])
   })
 
   it('updates only the board view and rejects invalid patches', () => {

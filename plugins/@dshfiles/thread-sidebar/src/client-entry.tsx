@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { threadActionsApi } from './thread-actions-api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
@@ -367,7 +368,7 @@ export default defineClient({
               if (focusAfterInsert) input.focus()
             } catch (failure) {
               if (!controller.signal.aborted) {
-                const parsedFailure = threadMentionFailureCodeSchema.safeParse(failure)
+                const parsedFailure = SchemaHelpers.decodeUnknownSafe(threadMentionFailureCodeSchema, failure)
                 const diagnostic: ThreadMentionFailureDiagnosticInput = {
                   phase: failurePhase,
                   errorName: failure instanceof Error ? failure.name : 'unknown',

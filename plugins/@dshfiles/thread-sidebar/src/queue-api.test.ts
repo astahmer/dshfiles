@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'vitest'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import { threadQueueApi } from './queue-api.js'
 
 describe('thread queue tool exposure', () => {
@@ -12,15 +14,15 @@ describe('thread queue tool exposure', () => {
     }
   })
 
-  test('an edit carries the replacement text and refuses an empty one', async () => {
-    const accepts = async (value: unknown): Promise<boolean> => {
-      const result = await threadQueueApi.methods.edit.input?.['~standard'].validate(value)
-      return result !== undefined && result.issues === undefined
+  test('an edit carries the replacement text and refuses an empty one', () => {
+    const accepts = (value: unknown): boolean => {
+      const schema = threadQueueApi.methods.edit.input
+      return schema !== undefined && Result.isSuccess(Schema.decodeUnknownResult(schema)(value))
     }
-    expect(await accepts({ itemId: 'message-1', text: 'Use the staging bucket instead' })).toBe(true)
-    expect(await accepts({ sessionId: 'session-1', itemId: 'message-1', text: 'x' })).toBe(true)
-    expect(await accepts({ itemId: 'message-1', text: '   ' })).toBe(false)
-    expect(await accepts({ itemId: 'message-1' })).toBe(false)
-    expect(await accepts({ itemId: '', text: 'x' })).toBe(false)
+    expect(accepts({ itemId: 'message-1', text: 'Use the staging bucket instead' })).toBe(true)
+    expect(accepts({ sessionId: 'session-1', itemId: 'message-1', text: 'x' })).toBe(true)
+    expect(accepts({ itemId: 'message-1', text: '   ' })).toBe(false)
+    expect(accepts({ itemId: 'message-1' })).toBe(false)
+    expect(accepts({ itemId: '', text: 'x' })).toBe(false)
   })
 })

@@ -1,11 +1,12 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import * as Schema from 'effect/Schema'
 import type { DraftInput } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { z } from 'zod'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const sessionIdSchema = z.string().min(1).max(512)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(512))
 
 export const followUpPrompt = (sessionId: string, threadLabel = 'thread'): DraftInput => {
-  const parsed = sessionIdSchema.safeParse(sessionId)
+  const parsed = SchemaHelpers.decodeUnknownSafe(sessionIdSchema, sessionId)
   if (!parsed.success) throw new Error('A follow-up requires a valid thread ID.')
   const label = threadLabel.replace(/[\]\r\n]+/gu, ' ').trim() || 'thread'
   const sessionBytes = new TextEncoder().encode(JSON.stringify(SessionId(parsed.data)))

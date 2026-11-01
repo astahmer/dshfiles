@@ -1,9 +1,11 @@
 import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
+import * as Schema from 'effect/Schema'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Result from 'effect/Result'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
 import { WorkspacePaths } from './workspace-paths.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /** The subset of a Host Session summary these actions read. */
 export interface ThreadSummary {
@@ -174,14 +176,23 @@ const REFERENCE_SEARCH_ATTEMPTS = 3
 const REFERENCE_SEARCH_RETRY_DELAY_MS = 150
 
 /** The Host failures these actions read: a stable code, and the activity an archive refusal named. */
-const remoteFailureSchema = z.looseObject({
-  code: z.string().optional(),
-  details: z.looseObject({ activity: z.array(z.looseObject({ kind: z.string() })).optional() }).optional(),
-})
+const passthroughRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
+const remoteFailureSchema = Schema.StructWithRest(
+  Schema.Struct({
+    code: Schema.optional(Schema.String),
+    details: Schema.optional(
+      Schema.StructWithRest(
+        Schema.Struct({ activity: Schema.optional(Schema.Array(Schema.StructWithRest(Schema.Struct({ kind: Schema.String }), [passthroughRecordSchema]))) }),
+        [passthroughRecordSchema],
+      ),
+    ),
+  }),
+  [passthroughRecordSchema],
+)
 
 const errorCode = (error: unknown): string | undefined => {
-  const parsed = remoteFailureSchema.safeParse(error)
-  return parsed.success ? parsed.data.code : undefined
+  const parsed = Schema.decodeUnknownResult(remoteFailureSchema)(error)
+  return Result.isSuccess(parsed) ? parsed.success.code : undefined
 }
 
 const pluginCode = (code: string | undefined): string => (code !== undefined && /^[a-z][a-z0-9-]{0,63}$/u.test(code) ? code : 'action-failed')
@@ -204,7 +215,7 @@ const failure = (error: unknown, message: string): PluginApiError => {
 }
 
 const activityKinds = (error: unknown): string[] => {
-  const parsed = remoteFailureSchema.safeParse(error)
+  const parsed = SchemaHelpers.decodeUnknownSafe(remoteFailureSchema, error)
   if (!parsed.success) return []
   return (parsed.data.details?.activity ?? []).map(entry => entry.kind)
 }

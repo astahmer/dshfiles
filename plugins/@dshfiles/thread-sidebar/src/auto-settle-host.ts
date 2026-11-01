@@ -154,7 +154,7 @@ export const createAutoSettleScanner = (input: { readonly clock: AutoSettleClock
       if (policy === undefined)
         throw new Error('The thread-sidebar settings namespace is unavailable on this Host; restart DSH so the thread sidebar can settle threads.')
       const snapshot = await sources.readSnapshot()
-      const results: SettleRequestResult['results'] = []
+      const results: Array<SettleRequestResult['results'][number]> = []
       const due: string[] = []
       for (const sessionId of new Set(request.sessionIds)) {
         const outcome = AutoSettleScanModel.requestOutcome({ sessionId, policy, ...snapshot })

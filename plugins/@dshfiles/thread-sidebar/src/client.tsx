@@ -110,7 +110,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { z } from 'zod'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import {
   SidebarOrganization,
   SIDEBAR_SECTIONS,
@@ -391,7 +392,9 @@ const isSidebarSection = (value: string | undefined): value is SidebarSection =>
 
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
-const threadTabFocusEventSchema = z.object({ sessionId: z.string().min(1) }).strict()
+const threadTabFocusEventSchema = Schema.StructWithRest(Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)) }), [
+  Schema.Record(Schema.String, Schema.Never),
+])
 
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
 const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-background'
@@ -1983,8 +1986,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   useEffect(() => {
     if (!isPrimarySurface) return
     const onFocusThread = (event: Event): void => {
-      const request = event instanceof CustomEvent ? threadTabFocusEventSchema.safeParse(event.detail) : undefined
-      if (request?.success === true) setThreadToScrollTo(request.data.sessionId)
+      const request = event instanceof CustomEvent ? Schema.decodeUnknownResult(threadTabFocusEventSchema)(event.detail) : undefined
+      if (request !== undefined && Result.isSuccess(request)) setThreadToScrollTo(request.success.sessionId)
     }
     window.addEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
     return () => window.removeEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
@@ -2192,9 +2195,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               <DropdownMenuRadioGroup
                 value={color}
                 onValueChange={value => {
-                  const checked = attentionColorSchema.safeParse(value)
-                  if (!checked.success) return
-                  changePreferences({ attentionColors: { ...preferences.attentionColors, [colorKey]: checked.data } })
+                  const checked = Schema.decodeUnknownResult(attentionColorSchema)(value)
+                  if (Result.isFailure(checked)) return
+                  changePreferences({ attentionColors: { ...preferences.attentionColors, [colorKey]: checked.success } })
                 }}
               >
                 {attentionColorOptions.map(option => (

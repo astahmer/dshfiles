@@ -1,6 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import * as Schema from 'effect/Schema'
 import type { AttentionFinishReason, ThreadAttentionMigrationEntry } from './attention-api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const THREAD_NOTIFICATION_CATEGORIES = ['approval-needed', 'input-needed', 'turn-finished', 'stopped', 'failed'] as const
 export type ThreadNotificationCategory = (typeof THREAD_NOTIFICATION_CATEGORIES)[number]
@@ -21,15 +22,15 @@ export interface ThreadNotificationCategoryPreferences {
 
 export type ThreadNotificationCategories = Readonly<Record<ThreadNotificationCategory, ThreadNotificationCategoryPreferences>>
 
-export const storedNotificationSoundsMuted = createStoredValue({
+export const storedNotificationSoundsMuted = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.notification-sounds-muted.v1',
-  schema: z.boolean(),
+  schema: Schema.Boolean,
   fallback: false,
 })
 
-export const storedNotificationsMuted = createStoredValue({
+export const storedNotificationsMuted = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.notifications-muted.v1',
-  schema: z.boolean(),
+  schema: Schema.Boolean,
   fallback: false,
 })
 
@@ -41,25 +42,36 @@ export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   failed: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
 } satisfies ThreadNotificationCategories
 
-const threadNotificationCategoryPreferencesSchema = z
-  .object({
-    delivery: z.enum(['off', 'in-app', 'system', 'both']),
-    sound: z.boolean(),
-    soundPreset: z.enum(['soft', 'chime', 'bright', 'low']),
-    volume: z.number().min(0).max(1),
-  })
-  .strict()
+const threadNotificationCategoryPreferencesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    delivery: Schema.Literals(['off', 'in-app', 'system', 'both']),
+    sound: Schema.Boolean,
+    soundPreset: Schema.Literals(['soft', 'chime', 'bright', 'low']),
+    volume: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  }),
+)
 
-export const threadNotificationCategoriesSchema = z
-  .object({
-    'approval-needed': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed']),
-    'input-needed': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed']),
-    'turn-finished': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished']),
-    stopped: threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped),
-    failed: threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed),
-  })
-  .strict()
-  .default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+export const threadNotificationCategoriesSchema = SchemaHelpers.withDecodedDefault(
+  SchemaHelpers.strictStruct(
+    Schema.Struct({
+      'approval-needed': SchemaHelpers.withDecodedDefault(
+        threadNotificationCategoryPreferencesSchema,
+        () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'],
+      ),
+      'input-needed': SchemaHelpers.withDecodedDefault(
+        threadNotificationCategoryPreferencesSchema,
+        () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'],
+      ),
+      'turn-finished': SchemaHelpers.withDecodedDefault(
+        threadNotificationCategoryPreferencesSchema,
+        () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'],
+      ),
+      stopped: SchemaHelpers.withDecodedDefault(threadNotificationCategoryPreferencesSchema, () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped),
+      failed: SchemaHelpers.withDecodedDefault(threadNotificationCategoryPreferencesSchema, () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed),
+    }),
+  ),
+  () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+)
 
 const notificationRouteHasInApp = (delivery: ThreadNotificationDelivery): boolean => delivery === 'in-app' || delivery === 'both'
 const notificationRouteHasSystem = (delivery: ThreadNotificationDelivery): boolean => delivery === 'system' || delivery === 'both'
@@ -100,11 +112,13 @@ const finishReasonCategories = {
 
 const categoryForFinishReason = (reason: AttentionFinishReason): ThreadFinishNotificationCategory => finishReasonCategories[reason]
 
-const deliveredNotificationIdsSchema = z.array(z.string().min(1).max(1024)).max(5000)
-const deliveredNotificationIds = createStoredValue({
+const deliveredNotificationIdsSchema = Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024)))).check(
+  Schema.isMaxLength(5000),
+)
+const deliveredNotificationIds = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.notification-deliveries.v1',
   schema: deliveredNotificationIdsSchema,
-  fallback: deliveredNotificationIdsSchema.parse([]),
+  fallback: Schema.decodeUnknownSync(deliveredNotificationIdsSchema)([]),
 })
 
 const claimNotificationEvent = (knownIds: readonly string[], eventId: string) => {
@@ -157,26 +171,38 @@ const threadInteractionTransitions = <SessionIdentifier extends string>(
   }
 }
 
-const legacyTimestampMap = z.record(z.string().min(1).max(256), z.number().int().nonnegative())
-const legacyMuteMap = z.record(z.string().min(1).max(256), z.number().int().nonnegative().nullable())
+const legacyTimestampMap = Schema.Record(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+)
+const legacyMuteMap = Schema.Record(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+)
 
 /**
  * The blob this plugin used to keep in browser storage while attention was
  * browser-local. Read once to hand its records to the Host, then dropped.
  */
-const legacyNotificationPreferencesSchema = z.object({
-  enabled: z.boolean().default(false),
-  needsYouAt: legacyTimestampMap.default({}),
-  mutedUntil: legacyMuteMap.default({}),
-  manuallyUnreadSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
-  seenCompletionSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
+const legacyNotificationPreferencesSchema = Schema.Struct({
+  enabled: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => false),
+  needsYouAt: SchemaHelpers.withDecodedDefault(legacyTimestampMap, () => ({})),
+  mutedUntil: SchemaHelpers.withDecodedDefault(legacyMuteMap, () => ({})),
+  manuallyUnreadSessionIds: SchemaHelpers.withDecodedDefault(
+    Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))).check(Schema.isMaxLength(5000)),
+    () => [],
+  ),
+  seenCompletionSessionIds: SchemaHelpers.withDecodedDefault(
+    Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))).check(Schema.isMaxLength(5000)),
+    () => [],
+  ),
 })
 
-export type LegacyNotificationPreferences = z.infer<typeof legacyNotificationPreferencesSchema>
+export type LegacyNotificationPreferences = Schema.Schema.Type<typeof legacyNotificationPreferencesSchema>
 
 const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
 
-export const legacyNotificationPreferences = createStoredValue({
+export const legacyNotificationPreferences = createEffectStoredValue({
   key: LEGACY_NOTIFICATION_STORAGE_KEY,
   schema: legacyNotificationPreferencesSchema,
   fallback: null,

@@ -1,5 +1,5 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import {
   MAX_ATTENTION_SESSIONS,
   threadAttentionViewSchema,
@@ -8,20 +8,27 @@ import {
   type ThreadAttentionSnapshot,
   type ThreadAttentionView,
 } from './attention-api.js'
+import { SchemaHelpers } from './schema-helpers.js'
+import { toZodSchema } from './effect-stored-value.js'
 
 export const threadAttentionDomain = defineDomain({
   name: 'thread_attention',
   version: 1,
   tables: {
-    sessions: { valueSchema: threadAttentionViewSchema, __key: 'sessions' },
+    sessions: { valueSchema: toZodSchema(threadAttentionViewSchema), __key: 'sessions' },
   },
 })
 
 export type AttentionTable = KvTable<string, ThreadAttentionView>
 
-const turnEndEventSchema = z.object({
-  type: z.literal('turn/end'),
-  data: z.object({ reason: z.object({ kind: z.string().max(64), reason: z.object({ kind: z.string().max(64) }).optional() }) }),
+const turnEndEventSchema = Schema.Struct({
+  type: Schema.Literal('turn/end'),
+  data: Schema.Struct({
+    reason: Schema.Struct({
+      kind: Schema.String.check(Schema.isMaxLength(64)),
+      reason: Schema.optional(Schema.Struct({ kind: Schema.String.check(Schema.isMaxLength(64)) })),
+    }),
+  }),
 })
 
 /**
@@ -38,7 +45,7 @@ const finishReasonByKind: Readonly<Record<string, AttentionFinishReason>> = {
 }
 
 const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
-  const parsed = turnEndEventSchema.safeParse(event)
+  const parsed = SchemaHelpers.decodeUnknownSafe(turnEndEventSchema, event)
   if (!parsed.success) return null
   const reason = parsed.data.data.reason
   // The Host shutting down disposes a running Agent: that turn resumes after the restart, it was not stopped by anyone.

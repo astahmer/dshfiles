@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { test } from 'vitest'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 import { z } from 'zod'
 import {
   createThreadNotificationClaimer,
@@ -70,10 +72,13 @@ test('browser attention carries over its needs-you timestamps and manual marks',
 })
 
 test('notification categories default off and validate delivery, sound, and volume together', () => {
-  assert.deepEqual(threadNotificationCategoriesSchema.parse(undefined), DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
-  assert.equal(threadNotificationCategoriesSchema.safeParse({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES, failed: { delivery: 'popup' } }).success, false)
+  assert.deepEqual(Schema.decodeUnknownSync(threadNotificationCategoriesSchema)(undefined), DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
   assert.equal(
-    threadNotificationCategoriesSchema.safeParse({
+    SchemaHelpers.decodeUnknownSafe(threadNotificationCategoriesSchema, { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES, failed: { delivery: 'popup' } }).success,
+    false,
+  )
+  assert.equal(
+    SchemaHelpers.decodeUnknownSafe(threadNotificationCategoriesSchema, {
       ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
       failed: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, volume: 2 },
     }).success,
@@ -85,7 +90,7 @@ test('notification categories default off and validate delivery, sound, and volu
 
 test('categories saved before the stopped category decode with it defaulted in', () => {
   const { stopped: _stopped, ...savedBeforeStopped } = DEFAULT_THREAD_NOTIFICATION_CATEGORIES
-  const parsed = threadNotificationCategoriesSchema.parse({
+  const parsed = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
     ...savedBeforeStopped,
     'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system', sound: true },
   })
@@ -97,7 +102,7 @@ test('categories saved before the stopped category decode with it defaulted in',
 test('delivery routing distinguishes in-app, system, both, and off', () => {
   assert.deepEqual(
     ['off', 'in-app', 'system', 'both'].map(delivery => {
-      const parsed = threadNotificationCategoriesSchema.parse({
+      const parsed = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
         ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
         'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery },
       })
@@ -131,7 +136,7 @@ test('system delivery proceeds when the browser refuses the deduplication ledger
   }
   const ledger = createStoredValue({ key: 'notification-test', schema: z.array(z.string()), fallback: [], storage: () => storage })
   const claim = createThreadNotificationClaimer(ledger)
-  const route = threadNotificationCategoriesSchema.parse({
+  const route = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
     ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
     'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system' },
   })['turn-finished']
