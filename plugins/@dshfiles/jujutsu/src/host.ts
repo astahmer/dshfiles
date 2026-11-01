@@ -7,12 +7,12 @@ import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
 import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
-import { z } from 'zod'
 import { jujutsuApi, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { registerRepositoryBatch } from './repository-batch.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { ReferenceGraphModel } from './reference-graph.js'
@@ -34,10 +34,10 @@ const MAX_REVISIONS = 500
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 
 /** One `jj evolog` row from EVOLUTION_TEMPLATE. */
-const evolutionRowSchema = z.object({ commitId: z.string(), predecessors: z.array(z.string()) })
+const evolutionRowSchema = Schema.Struct({ commitId: Schema.String, predecessors: Schema.Array(Schema.String) })
 
 /** One `jj operation log` row from OPERATION_TEMPLATE. */
-const operationRowSchema = z.object({ description: z.string(), attributes: z.string(), time: z.string() })
+const operationRowSchema = Schema.Struct({ description: Schema.String, attributes: Schema.String, time: Schema.String })
 
 interface RegisteredRepo {
   readonly id: string
@@ -260,7 +260,7 @@ const readRevisions = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value))
   return { revisions: revisions.slice(0, limit), hasMore: revisions.length > limit }
 }
 
@@ -307,7 +307,7 @@ const readGraphPage = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision =>
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value)).filter(revision =>
     matchesRevisionSearch(revision, query),
   )
   const page = revisions.slice(0, REVISION_PAGE_SIZE)
@@ -346,7 +346,7 @@ const readEvolvedCommitIds = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      const row = evolutionRowSchema.safeParse(value)
+      const row = SchemaHelpers.decodeSafe(evolutionRowSchema, value)
       if (!row.success || !JujutsuMutationModel.isCommitId(row.data.commitId) || !row.data.predecessors.every(id => JujutsuMutationModel.isCommitId(id))) {
         throw new Error('Invalid evolution record.')
       }
@@ -400,7 +400,7 @@ const readLastPush = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const operations = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      const row = operationRowSchema.safeParse(value)
+      const row = SchemaHelpers.decodeSafe(operationRowSchema, value)
       if (!row.success) throw new Error('Invalid operation row.')
       return { attributes: row.data.attributes, time: row.data.time }
     })
@@ -477,7 +477,7 @@ const mutationRevisions = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision lookup exceeded the bounded output limit.')
-  const loaded = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const loaded = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value))
   const evolution = await readEvolvedCommitIds(ctx, repo, loaded, signal)
   const merged = [...revisions, ...loaded.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) }))]
   for (const commitId of missingIds) findRevision(merged, commitId)

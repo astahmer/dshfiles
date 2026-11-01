@@ -1,8 +1,9 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { Mutation, previewSchema } from './api.js'
 import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
+import { SchemaHelpers } from './schema-helpers.js'
 
-export type ActionPreview = z.infer<typeof previewSchema>
+export type ActionPreview = Schema.Schema.Type<typeof previewSchema>
 
 export const STALE_REVISION_ERROR = 'Revision is no longer visible. Refresh and try again.'
 
@@ -61,10 +62,10 @@ type RevisionActionEvent =
   | { readonly type: 'reset' }
 
 // A Host from before PluginApiError (until the user restarts DSH) sends this generic failure; name the action instead.
-const genericHostFailure = z.object({ kind: z.literal('remote'), remoteCode: z.literal('internal') })
+const genericHostFailure = Schema.Struct({ kind: Schema.Literal('remote'), remoteCode: Schema.Literal('internal') })
 
 const failureMessage = (error: unknown, fallback: string): string => {
-  if (genericHostFailure.safeParse(error).success) return fallback
+  if (SchemaHelpers.decodeSafe(genericHostFailure, error).success) return fallback
   return error instanceof Error && error.message.length > 0 ? error.message : fallback
 }
 

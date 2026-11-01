@@ -1,12 +1,14 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { toStorageSchema } from '@dshfiles/dshx/host'
 import type { ReviewProgressSnapshot, ReviewProgressToggle } from './review-progress-api.js'
 import { ReviewProgressModel, reviewMarkSchema, reviewStoreSchema, type ReviewMark } from './review-progress.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const reviewProgressDomain = defineDomain({
   name: 'jujutsu_review_progress',
   version: 1,
   tables: {
-    marks: { valueSchema: reviewMarkSchema, __key: 'marks' },
+    marks: { valueSchema: toStorageSchema(reviewMarkSchema), __key: 'marks' },
   },
 })
 
@@ -63,7 +65,7 @@ const createReviewProgressStore = ({
     }
   }
 
-  const snapshot = (): ReviewProgressSnapshot => ({ revision, store: reviewStoreSchema.parse({ schemaVersion: 1, marks: bounded() }) })
+  const snapshot = (): ReviewProgressSnapshot => ({ revision, store: SchemaHelpers.decode(reviewStoreSchema, { schemaVersion: 1, marks: bounded() }) })
 
   return {
     snapshot,

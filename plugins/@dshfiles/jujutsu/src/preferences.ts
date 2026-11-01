@@ -1,45 +1,96 @@
 import { useSettings } from '@dshfiles/dshx/client'
-import { decodeJson } from '@dshfiles/dshx/json'
+import * as Schema from 'effect/Schema'
 import { useEffect } from 'react'
-import { z } from 'zod'
+import { SchemaHelpers } from './schema-helpers.js'
 import { jujutsuSettings } from './settings.js'
 
 const LEGACY_PREFERENCES_KEY = 'dshfiles.jujutsu.preferences.v1'
 
-const preferencesSchema = z.object({
-  defaultView: z.enum(['graph', 'source']).catch('graph'),
-  ancestorCount: z.number().int().min(1).max(20).catch(5),
-  fileView: z.enum(['flat', 'tree']).catch('tree'),
-  diffExpanded: z.boolean().catch(false),
-  diffLayout: z.enum(['auto', 'unified', 'split']).catch('auto'),
-  hideImmutable: z.boolean().catch(false),
-  mineOnly: z.boolean().catch(false),
-  dateHeadings: z.boolean().catch(false),
-  revisionDate: z.enum(['edited', 'created', 'both']).catch('edited'),
-  graphDensity: z.enum(['comfortable', 'compact']).catch('comfortable'),
-  refreshMode: z.enum(['interval', 'manual']).catch('interval'),
-  refreshIntervalSeconds: z.number().int().min(10).catch(60),
-  refreshOnVisible: z.boolean().catch(true),
-  composerBar: z.boolean().catch(true),
-  composerChips: z.boolean().catch(true),
-  headerToggle: z.boolean().catch(false),
-  chatReferenceLinks: z.boolean().catch(true),
-  chatReferenceClickBehavior: z.enum(['focus', 'path']).catch('focus'),
-  composerBarBase: z.string().max(512).catch('main'),
-})
+/**
+ * Each preference decodes on its own so one stale value never resets the rest;
+ * an invalid or missing field falls back to its default.
+ */
+const preferenceSchemas = {
+  defaultView: Schema.Literals(['graph', 'source']),
+  ancestorCount: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(20)),
+  fileView: Schema.Literals(['flat', 'tree']),
+  diffExpanded: Schema.Boolean,
+  diffLayout: Schema.Literals(['auto', 'unified', 'split']),
+  hideImmutable: Schema.Boolean,
+  mineOnly: Schema.Boolean,
+  dateHeadings: Schema.Boolean,
+  revisionDate: Schema.Literals(['edited', 'created', 'both']),
+  graphDensity: Schema.Literals(['comfortable', 'compact']),
+  refreshMode: Schema.Literals(['interval', 'manual']),
+  refreshIntervalSeconds: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(10)),
+  refreshOnVisible: Schema.Boolean,
+  composerBar: Schema.Boolean,
+  composerChips: Schema.Boolean,
+  headerToggle: Schema.Boolean,
+  chatReferenceLinks: Schema.Boolean,
+  chatReferenceClickBehavior: Schema.Literals(['focus', 'path']),
+  composerBarBase: Schema.String.check(Schema.isMaxLength(512)),
+} satisfies Record<string, Schema.ConstraintDecoder<unknown>>
 
-export type JujutsuPreferences = z.infer<typeof preferencesSchema>
+type PreferenceSchemas = typeof preferenceSchemas
+
+export type JujutsuPreferences = { readonly [Key in keyof PreferenceSchemas]: PreferenceSchemas[Key]['Type'] }
 export type GraphDensity = JujutsuPreferences['graphDensity']
 export type RevisionDate = JujutsuPreferences['revisionDate']
 
 export const ANCESTOR_COUNT_OPTIONS = [1, 2, 3, 5, 8, 10, 15, 20] as const
 
-const DEFAULT_PREFERENCES = preferencesSchema.parse({})
+const DEFAULT_PREFERENCES: JujutsuPreferences = {
+  defaultView: 'graph',
+  ancestorCount: 5,
+  fileView: 'tree',
+  diffExpanded: false,
+  diffLayout: 'auto',
+  hideImmutable: false,
+  mineOnly: false,
+  dateHeadings: false,
+  revisionDate: 'edited',
+  graphDensity: 'comfortable',
+  refreshMode: 'interval',
+  refreshIntervalSeconds: 60,
+  refreshOnVisible: true,
+  composerBar: true,
+  composerChips: true,
+  headerToggle: false,
+  chatReferenceLinks: true,
+  chatReferenceClickBehavior: 'focus',
+  composerBarBase: 'main',
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const decodeField = <Key extends keyof PreferenceSchemas>(key: Key, source: Record<string, unknown>): PreferenceSchemas[Key]['Type'] =>
+  SchemaHelpers.decodeOr(preferenceSchemas[key], source[key], DEFAULT_PREFERENCES[key])
 
 /** Decode a settings value field by field so one stale value never resets the rest. */
 export const decodePreferences = (value: unknown): JujutsuPreferences => {
-  const decoded = preferencesSchema.safeParse(value)
-  return decoded.success ? decoded.data : DEFAULT_PREFERENCES
+  const source = isRecord(value) ? value : {}
+  return {
+    defaultView: decodeField('defaultView', source),
+    ancestorCount: decodeField('ancestorCount', source),
+    fileView: decodeField('fileView', source),
+    diffExpanded: decodeField('diffExpanded', source),
+    diffLayout: decodeField('diffLayout', source),
+    hideImmutable: decodeField('hideImmutable', source),
+    mineOnly: decodeField('mineOnly', source),
+    dateHeadings: decodeField('dateHeadings', source),
+    revisionDate: decodeField('revisionDate', source),
+    graphDensity: decodeField('graphDensity', source),
+    refreshMode: decodeField('refreshMode', source),
+    refreshIntervalSeconds: decodeField('refreshIntervalSeconds', source),
+    refreshOnVisible: decodeField('refreshOnVisible', source),
+    composerBar: decodeField('composerBar', source),
+    composerChips: decodeField('composerChips', source),
+    headerToggle: decodeField('headerToggle', source),
+    chatReferenceLinks: decodeField('chatReferenceLinks', source),
+    chatReferenceClickBehavior: decodeField('chatReferenceClickBehavior', source),
+    composerBarBase: decodeField('composerBarBase', source),
+  }
 }
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_PREFERENCES).filter((key): key is keyof JujutsuPreferences => key in DEFAULT_PREFERENCES)
@@ -47,7 +98,7 @@ const PREFERENCE_KEYS = Object.keys(DEFAULT_PREFERENCES).filter((key): key is ke
 const parseStored = (raw: string | null): JujutsuPreferences => {
   if (raw === null) return decodePreferences({})
   try {
-    return decodeJson(preferencesSchema, raw)
+    return decodePreferences(JSON.parse(raw))
   } catch {
     return DEFAULT_PREFERENCES
   }

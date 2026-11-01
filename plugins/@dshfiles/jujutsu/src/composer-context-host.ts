@@ -4,7 +4,7 @@ import { Effect } from 'effect'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { composerContextApi, type ComposerBase } from './composer-context-api.js'
 import { RevisionReads } from './revision-reads.js'
 import {
@@ -18,6 +18,7 @@ import {
   ComposerContextModel,
 } from './composer-context-core.js'
 import { JujutsuOutputModel, JujutsuPathModel } from './core.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 type RunJj = (
   ctx: Context,
@@ -27,21 +28,25 @@ type RunJj = (
   options: { readonly outputLimit: number },
 ) => Promise<{ readonly stdout: string; readonly truncated: boolean }>
 
-const headSchema = z.object({
-  changeId: z.string().max(64),
-  commitId: z.string().max(64),
-  bookmarks: z.array(z.string().max(256)).max(32),
-  empty: z.boolean(),
-  conflict: z.boolean(),
-  description: z.string().max(20_000),
+const headSchema = Schema.Struct({
+  changeId: Schema.String.check(Schema.isMaxLength(64)),
+  commitId: Schema.String.check(Schema.isMaxLength(64)),
+  bookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(32)),
+  empty: Schema.Boolean,
+  conflict: Schema.Boolean,
+  description: Schema.String.check(Schema.isMaxLength(20_000)),
 })
 
-const fileRowSchema = z.object({ path: z.string().max(2048), status: z.string().max(32) })
-const baseRevisionIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
-const nameListSchema = z.array(z.string().max(256)).max(64)
-const baseRevisionRowSchema = z.object({ commitId: baseRevisionIdSchema, bookmarks: nameListSchema })
-const remoteBookmarkListSchema = z.array(z.object({ name: z.string().max(256), remote: z.string().max(256) })).max(200)
-const remoteBookmarkRowSchema = z.string().max(513)
+const fileRowSchema = Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(2048)), status: Schema.String.check(Schema.isMaxLength(32)) })
+const baseRevisionIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u))
+const nameListSchema = Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(64))
+const baseRevisionRowSchema = Schema.Struct({ commitId: baseRevisionIdSchema, bookmarks: nameListSchema })
+const remoteBookmarkListSchema = Schema.Array(
+  Schema.Struct({ name: Schema.String.check(Schema.isMaxLength(256)), remote: Schema.String.check(Schema.isMaxLength(256)) }),
+).check(Schema.isMaxLength(200))
+const remoteBookmarkRowSchema = Schema.String.check(Schema.isMaxLength(513))
+const bookmarkNameSchema = Schema.String.check(Schema.isMaxLength(256))
+const workspaceNameSchema = Schema.String.check(Schema.isMaxLength(128))
 const MAX_FILES = 500
 
 /** A Session's cwd keeps its workspace root, so the composer resolves it once instead of spawning jj on every read. */
@@ -141,7 +146,7 @@ const readComposerContext = async (
   const root = await workspaceRoot(ctx, run, input.cwd, signal)
   if (root === null) return { repository: null }
   const headResult = await run(ctx, root, ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], signal, { outputLimit: 64_000 })
-  const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
+  const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => SchemaHelpers.decode(headSchema, value))[0]
   if (head === undefined) return { repository: null }
   const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
   const range = ComposerContextModel.composerDiffRange(input.base)
@@ -159,8 +164,8 @@ const readComposerContext = async (
   ])
   const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
     result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-  const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
-  const baseRows = base === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(base), value => baseRevisionRowSchema.parse(value))
+  const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => SchemaHelpers.decode(nameListSchema, value)).flat()
+  const baseRows = base === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(base), value => SchemaHelpers.decode(baseRevisionRowSchema, value))
   const targetBookmarks = baseRows[0]?.bookmarks ?? []
   const resolvedBaseCommitId = base === null || base.truncated || baseRows.length !== 1 ? undefined : baseRows[0]?.commitId
   const readRevisionCount = async (revset: string): Promise<number | null> => {
@@ -179,18 +184,18 @@ const readComposerContext = async (
           const [ahead, behind] = await Promise.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)])
           return ahead === null || behind === null ? null : { ahead, behind }
         })()
-  const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
+  const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => SchemaHelpers.decode(fileRowSchema, value))
   const bookmarkNames =
-    localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
+    localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => SchemaHelpers.decode(bookmarkNameSchema, value))
   // The remote-bookmark template emits plain `name@remote` lines, not JSON records.
   const remoteBookmarkRows =
-    remoteBookmarks === null ? [] : JujutsuOutputModel.parseLines(completeLines(remoteBookmarks), line => remoteBookmarkRowSchema.parse(line))
+    remoteBookmarks === null ? [] : JujutsuOutputModel.parseLines(completeLines(remoteBookmarks), line => SchemaHelpers.decode(remoteBookmarkRowSchema, line))
   const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
     const separator = value.lastIndexOf('@')
     if (separator < 1 || separator === value.length - 1) return []
     return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
   })
-  const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
+  const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => SchemaHelpers.decode(workspaceNameSchema, value))
   return {
     repository: {
       root,
@@ -209,7 +214,8 @@ const readComposerContext = async (
       files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
       filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
       localBookmarks: bookmarkNames.slice(0, 200),
-      remoteBookmarks: remoteBookmarkListSchema.parse(
+      remoteBookmarks: SchemaHelpers.decode(
+        remoteBookmarkListSchema,
         [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
       ),
     },

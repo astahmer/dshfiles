@@ -1,8 +1,9 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { FileStat, ReadFailure, RevisionDetails } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel } from './core.js'
 import { EDIT_TIME_TEMPLATE, FILE_STATS_TEMPLATE } from './jj-templates.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export interface JjRunResult {
   readonly stdout: string
@@ -11,26 +12,27 @@ export interface JjRunResult {
 
 export type JjRun = (args: readonly string[], options?: { readonly outputLimit?: number }) => Promise<JjRunResult>
 
-const fileStatsRowSchema = z.object({
-  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
-  files: z
-    .array(
-      z.object({
-        path: z.string().max(2048),
-        status: z.string().max(32),
-        additions: z.number().int().min(0),
-        deletions: z.number().int().min(0),
-      }),
-    )
-    .max(20_000),
-  conflicts: z.array(z.string().max(2048)).max(20_000).default([]),
+const fileStatsRowSchema = Schema.Struct({
+  commitId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/)),
+  files: Schema.Array(
+    Schema.Struct({
+      path: Schema.String.check(Schema.isMaxLength(2048)),
+      status: Schema.String.check(Schema.isMaxLength(32)),
+      additions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+      deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    }),
+  ).check(Schema.isMaxLength(20_000)),
+  conflicts: SchemaHelpers.withDecodedDefault(
+    Schema.Array(Schema.String.check(Schema.isMaxLength(2048))).check(Schema.isMaxLength(20_000)),
+    () => [],
+  ),
 })
 
-const editTimeRowSchema = z.object({
-  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
-  changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
-  edited: z.boolean(),
-  time: z.string().max(64),
+const editTimeRowSchema = Schema.Struct({
+  commitId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/)),
+  changeId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{20,64}$/)),
+  edited: Schema.Boolean,
+  time: Schema.String.check(Schema.isMaxLength(64)),
 })
 
 /** A commit's edit time never changes, so it is kept by repository and commit id for the life of the Host. */
@@ -67,7 +69,7 @@ export class RevisionReads {
       outputLimit: 1_000_000,
     })
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-    const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => fileStatsRowSchema.parse(value))
+    const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => SchemaHelpers.decode(fileStatsRowSchema, value))
     let truncated = result.truncated
     const revisions = rows.map(row => {
       if (row.files.length > 2000) truncated = true
@@ -178,7 +180,7 @@ export class RevisionReads {
           { outputLimit: 2_000_000 },
         )
         const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-        const entries = JujutsuOutputModel.parseJsonLines(completeOutput, value => editTimeRowSchema.parse(value))
+        const entries = JujutsuOutputModel.parseJsonLines(completeOutput, value => SchemaHelpers.decode(editTimeRowSchema, value))
         const changeId = entries[0]?.changeId
         // Squashed-in revisions bring their own history into the log; only this change's versions count.
         const versions = entries.filter(entry => entry.changeId === changeId)

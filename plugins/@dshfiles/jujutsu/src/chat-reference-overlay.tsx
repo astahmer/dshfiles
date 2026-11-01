@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
 import {
   chatReferencePreviewDismissEvent,
@@ -58,14 +59,14 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = chatReferencePreviewRequestSchema.safeParse(event.detail)
+      const parsed = SchemaHelpers.decodeSafe(chatReferencePreviewRequestSchema, event.detail)
       if (!parsed.success) return
       cancelClose()
       setRequest(parsed.data)
     }
     const queueTitle = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = chatReferenceTitleRequestSchema.safeParse(event.detail)
+      const parsed = SchemaHelpers.decodeSafe(chatReferenceTitleRequestSchema, event.detail)
       if (!parsed.success) return
       setTitleRequests(current => (current.some(request => titleRequestKey(request) === titleRequestKey(parsed.data)) ? current : [...current, parsed.data]))
     }

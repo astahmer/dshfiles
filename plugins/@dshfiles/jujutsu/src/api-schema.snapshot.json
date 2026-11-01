@@ -31,8 +31,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "root": {
               "type": "string",
@@ -46,8 +46,7 @@
             "repoId",
             "root",
             "initialized"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -77,8 +76,7 @@
             "repoId",
             "root",
             "initialized"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -108,8 +106,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "root": {
               "type": "string",
@@ -119,8 +117,7 @@
           "required": [
             "repoId",
             "root"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -146,8 +143,7 @@
           "required": [
             "repoId",
             "root"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -158,14 +154,14 @@
           "type": "object",
           "properties": {
             "paths": {
-              "minItems": 1,
-              "maxItems": 31,
               "type": "array",
               "items": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 2048
-              }
+              },
+              "minItems": 1,
+              "maxItems": 31
             }
           },
           "required": [
@@ -177,7 +173,6 @@
           "type": "object",
           "properties": {
             "repositories": {
-              "maxItems": 31,
               "type": "array",
               "items": {
                 "type": "object",
@@ -191,8 +186,8 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -215,15 +210,14 @@
                   "path",
                   "repoId",
                   "root"
-                ],
-                "additionalProperties": false
-              }
+                ]
+              },
+              "maxItems": 31
             }
           },
           "required": [
             "repositories"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -239,14 +233,20 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "limit": {
-              "default": 10,
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 10
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -264,18 +264,15 @@
                   "maxLength": 2048
                 },
                 "revisions": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{40,64}$"
+                        "type": "string"
                       },
                       "changeId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{20,64}$"
+                        "type": "string"
                       },
                       "shortestChangeId": {
                         "type": "string",
@@ -299,49 +296,47 @@
                         "maxLength": 64
                       },
                       "parents": {
-                        "maxItems": 16,
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{40,64}$"
-                        }
+                          "type": "string"
+                        },
+                        "maxItems": 16
                       },
                       "bookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "localBookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "remoteBookmarksText": {
-                        "default": "",
                         "type": "string",
                         "maxLength": 32768
                       },
                       "tags": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "workspaces": {
-                        "maxItems": 1024,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 128
-                        }
+                        },
+                        "maxItems": 1024
                       },
                       "workingCopy": {
                         "type": "boolean"
@@ -365,7 +360,6 @@
                         "type": "boolean"
                       },
                       "changeOffset": {
-                        "default": 0,
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 65535
@@ -392,12 +386,11 @@
                       "conflict",
                       "evolved",
                       "changeOffset"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 500
                 },
                 "graphHasMore": {
-                  "default": false,
                   "type": "boolean"
                 },
                 "status": {
@@ -405,20 +398,20 @@
                   "maxLength": 80000
                 },
                 "changedPaths": {
-                  "maxItems": 1000,
                   "type": "array",
                   "items": {
                     "type": "string",
                     "maxLength": 2048
-                  }
+                  },
+                  "maxItems": 1000
                 },
                 "remoteNames": {
-                  "maxItems": 64,
                   "type": "array",
                   "items": {
                     "type": "string",
                     "maxLength": 128
-                  }
+                  },
+                  "maxItems": 64
                 },
                 "lastPushAt": {
                   "anyOf": [
@@ -460,8 +453,7 @@
                 "lastPushDescription",
                 "lastPushHistoryTruncated",
                 "evolutionHistoryTruncated"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -476,14 +468,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -516,21 +506,26 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "query": {
-              "default": "",
-              "type": "string",
-              "maxLength": 256
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "excludeCommitIds": {
-              "maxItems": 10000,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-              }
+                "type": "string"
+              },
+              "maxItems": 10000
             }
           },
           "required": [
@@ -545,18 +540,15 @@
               "type": "object",
               "properties": {
                 "revisions": {
-                  "maxItems": 10,
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{40,64}$"
+                        "type": "string"
                       },
                       "changeId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{20,64}$"
+                        "type": "string"
                       },
                       "shortestChangeId": {
                         "type": "string",
@@ -580,49 +572,47 @@
                         "maxLength": 64
                       },
                       "parents": {
-                        "maxItems": 16,
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{40,64}$"
-                        }
+                          "type": "string"
+                        },
+                        "maxItems": 16
                       },
                       "bookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "localBookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "remoteBookmarksText": {
-                        "default": "",
                         "type": "string",
                         "maxLength": 32768
                       },
                       "tags": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "workspaces": {
-                        "maxItems": 1024,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 128
-                        }
+                        },
+                        "maxItems": 1024
                       },
                       "workingCopy": {
                         "type": "boolean"
@@ -646,7 +636,6 @@
                         "type": "boolean"
                       },
                       "changeOffset": {
-                        "default": 0,
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 65535
@@ -673,9 +662,9 @@
                       "conflict",
                       "evolved",
                       "changeOffset"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 10
                 },
                 "hasMore": {
                   "type": "boolean"
@@ -684,8 +673,7 @@
               "required": [
                 "revisions",
                 "hasMore"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -700,14 +688,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -747,8 +733,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             }
           },
           "required": [
@@ -760,7 +746,6 @@
           "type": "object",
           "properties": {
             "workspaces": {
-              "maxItems": 64,
               "type": "array",
               "items": {
                 "type": "object",
@@ -768,8 +753,7 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    "maxLength": 64
                   },
                   "path": {
                     "type": "string",
@@ -780,15 +764,14 @@
                 "required": [
                   "name",
                   "path"
-                ],
-                "additionalProperties": false
-              }
+                ]
+              },
+              "maxItems": 64
             }
           },
           "required": [
             "workspaces"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -819,15 +802,13 @@
                 "required": [
                   "name",
                   "path"
-                ],
-                "additionalProperties": false
+                ]
               }
             }
           },
           "required": [
             "workspaces"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -843,8 +824,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             }
           },
           "required": [
@@ -858,11 +839,9 @@
               "type": "object",
               "properties": {
                 "operationId": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{128}$"
+                  "type": "string"
                 },
                 "landmarks": {
-                  "maxItems": 4,
                   "type": "array",
                   "items": {
                     "type": "object",
@@ -888,18 +867,15 @@
                         ]
                       },
                       "revisions": {
-                        "maxItems": 500,
                         "type": "array",
                         "items": {
                           "type": "object",
                           "properties": {
                             "commitId": {
-                              "type": "string",
-                              "pattern": "^[a-f0-9]{40,64}$"
+                              "type": "string"
                             },
                             "changeId": {
-                              "type": "string",
-                              "pattern": "^[a-f0-9]{20,64}$"
+                              "type": "string"
                             },
                             "shortestChangeId": {
                               "type": "string",
@@ -923,49 +899,47 @@
                               "maxLength": 64
                             },
                             "parents": {
-                              "maxItems": 16,
                               "type": "array",
                               "items": {
-                                "type": "string",
-                                "pattern": "^[a-f0-9]{40,64}$"
-                              }
+                                "type": "string"
+                              },
+                              "maxItems": 16
                             },
                             "bookmarks": {
-                              "maxItems": 64,
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "maxLength": 256
-                              }
+                              },
+                              "maxItems": 64
                             },
                             "localBookmarks": {
-                              "maxItems": 64,
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "maxLength": 256
-                              }
+                              },
+                              "maxItems": 64
                             },
                             "remoteBookmarksText": {
-                              "default": "",
                               "type": "string",
                               "maxLength": 32768
                             },
                             "tags": {
-                              "maxItems": 64,
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "maxLength": 256
-                              }
+                              },
+                              "maxItems": 64
                             },
                             "workspaces": {
-                              "maxItems": 1024,
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "maxLength": 128
-                              }
+                              },
+                              "maxItems": 1024
                             },
                             "workingCopy": {
                               "type": "boolean"
@@ -989,7 +963,6 @@
                               "type": "boolean"
                             },
                             "changeOffset": {
-                              "default": 0,
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 65535
@@ -1016,9 +989,9 @@
                             "conflict",
                             "evolved",
                             "changeOffset"
-                          ],
-                          "additionalProperties": false
-                        }
+                          ]
+                        },
+                        "maxItems": 500
                       }
                     },
                     "required": [
@@ -1026,16 +999,15 @@
                       "label",
                       "status",
                       "revisions"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 4
                 }
               },
               "required": [
                 "operationId",
                 "landmarks"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1050,14 +1022,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -1087,16 +1057,14 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "commitId": {
-              "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "type": "string"
             },
             "targetCommitId": {
-              "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "type": "string"
             }
           },
           "required": [
@@ -1112,22 +1080,18 @@
               "type": "object",
               "properties": {
                 "operationId": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{128}$"
+                  "type": "string"
                 },
                 "revisions": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{40,64}$"
+                        "type": "string"
                       },
                       "changeId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{20,64}$"
+                        "type": "string"
                       },
                       "shortestChangeId": {
                         "type": "string",
@@ -1151,49 +1115,47 @@
                         "maxLength": 64
                       },
                       "parents": {
-                        "maxItems": 16,
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{40,64}$"
-                        }
+                          "type": "string"
+                        },
+                        "maxItems": 16
                       },
                       "bookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "localBookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "remoteBookmarksText": {
-                        "default": "",
                         "type": "string",
                         "maxLength": 32768
                       },
                       "tags": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "workspaces": {
-                        "maxItems": 1024,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 128
-                        }
+                        },
+                        "maxItems": 1024
                       },
                       "workingCopy": {
                         "type": "boolean"
@@ -1217,7 +1179,6 @@
                         "type": "boolean"
                       },
                       "changeOffset": {
-                        "default": 0,
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 65535
@@ -1244,20 +1205,18 @@
                       "conflict",
                       "evolved",
                       "changeOffset"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 500
                 },
                 "truncated": {
                   "type": "boolean"
                 },
                 "commitId": {
-                  "type": "string",
-                  "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                  "type": "string"
                 },
                 "targetCommitId": {
-                  "type": "string",
-                  "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                  "type": "string"
                 },
                 "relation": {
                   "type": "string",
@@ -1280,31 +1239,28 @@
                   "maximum": 9007199254740991
                 },
                 "commonAncestorIds": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  }
+                    "type": "string"
+                  },
+                  "maxItems": 500
                 },
                 "commonAncestorsTruncated": {
                   "type": "boolean"
                 },
                 "connectionIds": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  }
+                    "type": "string"
+                  },
+                  "maxItems": 500
                 },
                 "differenceIds": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  }
+                    "type": "string"
+                  },
+                  "maxItems": 500
                 }
               },
               "required": [
@@ -1320,8 +1276,7 @@
                 "commonAncestorsTruncated",
                 "connectionIds",
                 "differenceIds"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1336,14 +1291,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -1381,12 +1334,11 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "commitId": {
-              "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "type": "string"
             },
             "mode": {
               "type": "string",
@@ -1409,22 +1361,18 @@
               "type": "object",
               "properties": {
                 "operationId": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{128}$"
+                  "type": "string"
                 },
                 "revisions": {
-                  "maxItems": 500,
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{40,64}$"
+                        "type": "string"
                       },
                       "changeId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{20,64}$"
+                        "type": "string"
                       },
                       "shortestChangeId": {
                         "type": "string",
@@ -1448,49 +1396,47 @@
                         "maxLength": 64
                       },
                       "parents": {
-                        "maxItems": 16,
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{40,64}$"
-                        }
+                          "type": "string"
+                        },
+                        "maxItems": 16
                       },
                       "bookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "localBookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "remoteBookmarksText": {
-                        "default": "",
                         "type": "string",
                         "maxLength": 32768
                       },
                       "tags": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "workspaces": {
-                        "maxItems": 1024,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 128
-                        }
+                        },
+                        "maxItems": 1024
                       },
                       "workingCopy": {
                         "type": "boolean"
@@ -1514,7 +1460,6 @@
                         "type": "boolean"
                       },
                       "changeOffset": {
-                        "default": 0,
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 65535
@@ -1541,9 +1486,9 @@
                       "conflict",
                       "evolved",
                       "changeOffset"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 500
                 },
                 "truncated": {
                   "type": "boolean"
@@ -1553,8 +1498,7 @@
                 "operationId",
                 "revisions",
                 "truncated"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1569,14 +1513,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -1618,8 +1560,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "reference": {
               "type": "string",
@@ -1646,8 +1588,7 @@
                 "commitId": {
                   "anyOf": [
                     {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     {
                       "type": "null"
@@ -1675,26 +1616,22 @@
                   "maxLength": 20000
                 },
                 "listedCommitIds": {
-                  "maxItems": 20,
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  }
+                    "type": "string"
+                  },
+                  "maxItems": 20
                 },
                 "revisions": {
-                  "maxItems": 400,
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{40,64}$"
+                        "type": "string"
                       },
                       "changeId": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{20,64}$"
+                        "type": "string"
                       },
                       "shortestChangeId": {
                         "type": "string",
@@ -1718,49 +1655,47 @@
                         "maxLength": 64
                       },
                       "parents": {
-                        "maxItems": 16,
                         "type": "array",
                         "items": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{40,64}$"
-                        }
+                          "type": "string"
+                        },
+                        "maxItems": 16
                       },
                       "bookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "localBookmarks": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "remoteBookmarksText": {
-                        "default": "",
                         "type": "string",
                         "maxLength": 32768
                       },
                       "tags": {
-                        "maxItems": 64,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 256
-                        }
+                        },
+                        "maxItems": 64
                       },
                       "workspaces": {
-                        "maxItems": 1024,
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 128
-                        }
+                        },
+                        "maxItems": 1024
                       },
                       "workingCopy": {
                         "type": "boolean"
@@ -1784,7 +1719,6 @@
                         "type": "boolean"
                       },
                       "changeOffset": {
-                        "default": 0,
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 65535
@@ -1811,15 +1745,14 @@
                       "conflict",
                       "evolved",
                       "changeOffset"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 400
                 },
                 "defaultCommitId": {
                   "anyOf": [
                     {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     {
                       "type": "null"
@@ -1832,8 +1765,7 @@
                 "commitId",
                 "changeId",
                 "graph"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1848,14 +1780,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -1889,12 +1819,11 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "commitId": {
-              "type": "string",
-              "pattern": "^(?:[a-f0-9]{4,64}|[k-z]{4,32})$"
+              "type": "string"
             }
           },
           "required": [
@@ -1909,7 +1838,6 @@
               "type": "object",
               "properties": {
                 "files": {
-                  "maxItems": 1000,
                   "type": "array",
                   "items": {
                     "type": "object",
@@ -1944,8 +1872,7 @@
                       "contentDigest": {
                         "anyOf": [
                           {
-                            "type": "string",
-                            "pattern": "^[a-f0-9]{64}$"
+                            "type": "string"
                           },
                           {
                             "type": "null"
@@ -1959,9 +1886,9 @@
                       "additions",
                       "deletions",
                       "contentDigest"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 1000
                 },
                 "additions": {
                   "type": "integer",
@@ -1992,8 +1919,7 @@
                 "patch",
                 "truncated",
                 "evolution"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -2008,14 +1934,12 @@
                   },
                   "required": [
                     "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               },
               "required": [
                 "failure"
-              ],
-              "additionalProperties": false
+              ]
             }
           ]
         },
@@ -2049,17 +1973,16 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "commitIds": {
-              "minItems": 1,
-              "maxItems": 40,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-              }
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 40
             }
           },
           "required": [
@@ -2072,17 +1995,14 @@
           "type": "object",
           "properties": {
             "revisions": {
-              "maxItems": 40,
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
                   "commitId": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    "type": "string"
                   },
                   "files": {
-                    "maxItems": 2000,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -2120,17 +2040,17 @@
                         "status",
                         "additions",
                         "deletions"
-                      ],
-                      "additionalProperties": false
-                    }
+                      ]
+                    },
+                    "maxItems": 2000
                   }
                 },
                 "required": [
                   "commitId",
                   "files"
-                ],
-                "additionalProperties": false
-              }
+                ]
+              },
+              "maxItems": 40
             },
             "truncated": {
               "type": "boolean"
@@ -2139,8 +2059,7 @@
           "required": [
             "revisions",
             "truncated"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -2204,16 +2123,14 @@
                         "status",
                         "additions",
                         "deletions"
-                      ],
-                      "additionalProperties": false
+                      ]
                     }
                   }
                 },
                 "required": [
                   "commitId",
                   "files"
-                ],
-                "additionalProperties": false
+                ]
               }
             },
             "truncated": {
@@ -2223,8 +2140,7 @@
           "required": [
             "revisions",
             "truncated"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -2240,17 +2156,16 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "commitIds": {
-              "minItems": 1,
-              "maxItems": 100,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-              }
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100
             }
           },
           "required": [
@@ -2263,14 +2178,12 @@
           "type": "object",
           "properties": {
             "revisions": {
-              "maxItems": 100,
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
                   "commitId": {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    "type": "string"
                   },
                   "editedAt": {
                     "anyOf": [
@@ -2287,15 +2200,14 @@
                 "required": [
                   "commitId",
                   "editedAt"
-                ],
-                "additionalProperties": false
-              }
+                ]
+              },
+              "maxItems": 100
             }
           },
           "required": [
             "revisions"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -2333,15 +2245,13 @@
                 "required": [
                   "commitId",
                   "editedAt"
-                ],
-                "additionalProperties": false
+                ]
               }
             }
           },
           "required": [
             "revisions"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -2357,8 +2267,8 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             }
           },
           "required": [
@@ -2380,8 +2290,7 @@
           "required": [
             "patch",
             "truncated"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -2407,8 +2316,7 @@
           "required": [
             "patch",
             "truncated"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -2423,21 +2331,22 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "action": {
-              "oneOf": [
+              "anyOf": [
                 {
                   "type": "object",
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "describe"
+                      "enum": [
+                        "describe"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "message": {
                       "type": "string",
@@ -2455,21 +2364,22 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "split"
+                      "enum": [
+                        "split"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "paths": {
-                      "minItems": 1,
-                      "maxItems": 100,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 1024
-                      }
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
                     },
                     "message": {
                       "type": "string",
@@ -2489,15 +2399,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "squash"
+                      "enum": [
+                        "squash"
+                      ]
                     },
                     "sourceId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "destinationId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "message": {
                       "type": "string",
@@ -2505,14 +2415,14 @@
                       "maxLength": 4000
                     },
                     "paths": {
-                      "minItems": 1,
-                      "maxItems": 100,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 1024
-                      }
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
                     }
                   },
                   "required": [
@@ -2526,15 +2436,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "rebase"
+                      "enum": [
+                        "rebase"
+                      ]
                     },
                     "sourceId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "destinationId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2548,15 +2458,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "bookmark-move"
+                      "enum": [
+                        "bookmark-move"
+                      ]
                     },
                     "bookmark": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     },
                     "destinationId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2570,15 +2480,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "bookmark-set"
+                      "enum": [
+                        "bookmark-set"
+                      ]
                     },
                     "bookmark": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     },
                     "destinationId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2592,11 +2502,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "bookmark-delete"
+                      "enum": [
+                        "bookmark-delete"
+                      ]
                     },
                     "bookmark": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2609,11 +2520,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "fetch"
+                      "enum": [
+                        "fetch"
+                      ]
                     },
                     "remote": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2626,15 +2538,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "push"
+                      "enum": [
+                        "push"
+                      ]
                     },
                     "remote": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$"
+                      "type": "string"
                     },
                     "bookmark": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2648,7 +2560,9 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "workspace-add"
+                      "enum": [
+                        "workspace-add"
+                      ]
                     },
                     "parentPath": {
                       "type": "string",
@@ -2658,12 +2572,10 @@
                     "name": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                      "maxLength": 64
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2678,13 +2590,14 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "workspace-forget"
+                      "enum": [
+                        "workspace-forget"
+                      ]
                     },
                     "name": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                      "maxLength": 64
                     }
                   },
                   "required": [
@@ -2697,17 +2610,17 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "workspace-edit"
+                      "enum": [
+                        "workspace-edit"
+                      ]
                     },
                     "name": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                      "maxLength": 64
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2721,11 +2634,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "edit"
+                      "enum": [
+                        "edit"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2738,11 +2652,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "new"
+                      "enum": [
+                        "new"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2755,11 +2670,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "commit"
+                      "enum": [
+                        "commit"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "message": {
                       "type": "string",
@@ -2778,11 +2694,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "duplicate"
+                      "enum": [
+                        "duplicate"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2795,16 +2712,17 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "abandon"
+                      "enum": [
+                        "abandon"
+                      ]
                     },
                     "commitIds": {
-                      "minItems": 1,
-                      "maxItems": 50,
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                      }
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "maxItems": 50
                     }
                   },
                   "required": [
@@ -2817,15 +2735,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "revert"
+                      "enum": [
+                        "revert"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "destinationId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2839,21 +2757,22 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "restore"
+                      "enum": [
+                        "restore"
+                      ]
                     },
                     "commitId": {
-                      "type": "string",
-                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                      "type": "string"
                     },
                     "paths": {
-                      "minItems": 1,
-                      "maxItems": 100,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 1024
-                      }
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
                     }
                   },
                   "required": [
@@ -2876,8 +2795,8 @@
           "properties": {
             "id": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "kind": {
               "type": "string",
@@ -2928,8 +2847,7 @@
             "summary",
             "detail",
             "expiresAt"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -2937,388 +2855,7 @@
             "repoId": {
               "type": "string"
             },
-            "action": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "describe"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId",
-                    "message"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "split"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    },
-                    "paths": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId",
-                    "paths",
-                    "message"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "squash"
-                    },
-                    "sourceId": {
-                      "type": "string"
-                    },
-                    "destinationId": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "paths": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "sourceId",
-                    "destinationId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "rebase"
-                    },
-                    "sourceId": {
-                      "type": "string"
-                    },
-                    "destinationId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "sourceId",
-                    "destinationId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "bookmark-move"
-                    },
-                    "bookmark": {
-                      "type": "string"
-                    },
-                    "destinationId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "bookmark",
-                    "destinationId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "bookmark-set"
-                    },
-                    "bookmark": {
-                      "type": "string"
-                    },
-                    "destinationId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "bookmark",
-                    "destinationId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "bookmark-delete"
-                    },
-                    "bookmark": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "bookmark"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "fetch"
-                    },
-                    "remote": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "remote"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "push"
-                    },
-                    "remote": {
-                      "type": "string"
-                    },
-                    "bookmark": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "remote",
-                    "bookmark"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "workspace-add"
-                    },
-                    "parentPath": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "parentPath",
-                    "name",
-                    "commitId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "workspace-forget"
-                    },
-                    "name": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "name"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "workspace-edit"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "name",
-                    "commitId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "edit"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "new"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "commit"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId",
-                    "message"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "duplicate"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "abandon"
-                    },
-                    "commitIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitIds"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "revert"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    },
-                    "destinationId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId",
-                    "destinationId"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "restore"
-                    },
-                    "commitId": {
-                      "type": "string"
-                    },
-                    "paths": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "commitId",
-                    "paths"
-                  ]
-                }
-              ]
-            }
+            "action": {}
           },
           "required": [
             "repoId",
@@ -3375,8 +2912,7 @@
             "summary",
             "detail",
             "expiresAt"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -3391,13 +2927,13 @@
           "properties": {
             "repoId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             },
             "previewId": {
               "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
             }
           },
           "required": [
@@ -3433,8 +2969,7 @@
             "message",
             "output",
             "workspacePath"
-          ],
-          "additionalProperties": false
+          ]
         },
         "toolInput": {
           "type": "object",
@@ -3468,8 +3003,7 @@
             "message",
             "output",
             "workspacePath"
-          ],
-          "additionalProperties": false
+          ]
         }
       }
     ]
@@ -3490,13 +3024,15 @@
               "maxLength": 2048
             },
             "base": {
-              "oneOf": [
+              "anyOf": [
                 {
                   "type": "object",
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "parent"
+                      "enum": [
+                        "parent"
+                      ]
                     }
                   },
                   "required": [
@@ -3508,7 +3044,9 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "trunk"
+                      "enum": [
+                        "trunk"
+                      ]
                     }
                   },
                   "required": [
@@ -3520,11 +3058,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "bookmark"
+                      "enum": [
+                        "bookmark"
+                      ]
                     },
                     "name": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3537,15 +3076,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "remoteBookmark"
+                      "enum": [
+                        "remoteBookmark"
+                      ]
                     },
                     "name": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     },
                     "remote": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3605,20 +3144,20 @@
                       "type": "boolean"
                     },
                     "bookmarks": {
-                      "maxItems": 32,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "maxLength": 256
-                      }
+                      },
+                      "maxItems": 32
                     },
                     "nearestBookmarks": {
-                      "maxItems": 32,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "maxLength": 256
-                      }
+                      },
+                      "maxItems": 32
                     },
                     "base": {
                       "type": "object",
@@ -3634,8 +3173,7 @@
                       "required": [
                         "label",
                         "found"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "revisionCounts": {
                       "anyOf": [
@@ -3656,8 +3194,7 @@
                           "required": [
                             "ahead",
                             "behind"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         {
                           "type": "null"
@@ -3689,8 +3226,7 @@
                             "files",
                             "additions",
                             "deletions"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         {
                           "type": "null"
@@ -3698,7 +3234,6 @@
                       ]
                     },
                     "files": {
-                      "maxItems": 500,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -3721,23 +3256,22 @@
                         "required": [
                           "path",
                           "status"
-                        ],
-                        "additionalProperties": false
-                      }
+                        ]
+                      },
+                      "maxItems": 500
                     },
                     "filesTruncated": {
                       "type": "boolean"
                     },
                     "localBookmarks": {
-                      "maxItems": 200,
                       "type": "array",
                       "items": {
                         "type": "string",
                         "maxLength": 256
-                      }
+                      },
+                      "maxItems": 200
                     },
                     "remoteBookmarks": {
-                      "maxItems": 200,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -3754,9 +3288,9 @@
                         "required": [
                           "name",
                           "remote"
-                        ],
-                        "additionalProperties": false
-                      }
+                        ]
+                      },
+                      "maxItems": 200
                     }
                   },
                   "required": [
@@ -3774,8 +3308,7 @@
                     "files",
                     "filesTruncated",
                     "localBookmarks"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 {
                   "type": "null"
@@ -3785,8 +3318,7 @@
           },
           "required": [
             "repository"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       {
@@ -3801,13 +3333,15 @@
               "maxLength": 2048
             },
             "base": {
-              "oneOf": [
+              "anyOf": [
                 {
                   "type": "object",
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "parent"
+                      "enum": [
+                        "parent"
+                      ]
                     }
                   },
                   "required": [
@@ -3819,7 +3353,9 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "trunk"
+                      "enum": [
+                        "trunk"
+                      ]
                     }
                   },
                   "required": [
@@ -3831,11 +3367,12 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "bookmark"
+                      "enum": [
+                        "bookmark"
+                      ]
                     },
                     "name": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3848,15 +3385,15 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "const": "remoteBookmark"
+                      "enum": [
+                        "remoteBookmark"
+                      ]
                     },
                     "name": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     },
                     "remote": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$"
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3885,7 +3422,6 @@
               "type": "boolean"
             },
             "files": {
-              "maxItems": 2000,
               "type": "array",
               "items": {
                 "type": "object",
@@ -3909,17 +3445,16 @@
                   "path",
                   "additions",
                   "deletions"
-                ],
-                "additionalProperties": false
-              }
+                ]
+              },
+              "maxItems": 2000
             }
           },
           "required": [
             "patch",
             "truncated",
             "files"
-          ],
-          "additionalProperties": false
+          ]
         }
       }
     ]
@@ -3932,130 +3467,9 @@
       {
         "name": "state",
         "description": "Files of which revisions were marked reviewed, keyed to the exact reviewed content. Read-only.",
-        "output": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {
-            "revision": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "store": {
-              "type": "object",
-              "properties": {
-                "schemaVersion": {
-                  "type": "number",
-                  "const": 1
-                },
-                "marks": {
-                  "maxItems": 3000,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "repositoryRoot": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 2048
-                      },
-                      "commitId": {
-                        "type": "string",
-                        "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                      },
-                      "path": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 2048
-                      },
-                      "contentDigest": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{64}$"
-                      },
-                      "reviewedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                      }
-                    },
-                    "required": [
-                      "repositoryRoot",
-                      "commitId",
-                      "path",
-                      "contentDigest",
-                      "reviewedAt"
-                    ],
-                    "additionalProperties": false
-                  }
-                }
-              },
-              "required": [
-                "schemaVersion",
-                "marks"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "revision",
-            "store"
-          ],
-          "additionalProperties": false
-        }
-      },
-      {
-        "name": "toggle",
-        "description": "Mark or unmark one file of one revision reviewed. The Host stamps the review time.",
         "input": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {
-            "repositoryRoot": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 2048
-            },
-            "commitId": {
-              "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-            },
-            "file": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 2048
-                },
-                "contentDigest": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "path",
-                "contentDigest"
-              ],
-              "additionalProperties": false
-            },
-            "reviewed": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "repositoryRoot",
-            "commitId",
-            "file",
-            "reviewed"
-          ],
-          "additionalProperties": false
+          "type": "null"
         },
         "output": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4063,18 +3477,19 @@
           "properties": {
             "revision": {
               "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": 0
             },
             "store": {
               "type": "object",
               "properties": {
                 "schemaVersion": {
                   "type": "number",
-                  "const": 1
+                  "enum": [
+                    1
+                  ]
                 },
                 "marks": {
-                  "maxItems": 3000,
                   "type": "array",
                   "items": {
                     "type": "object",
@@ -4085,8 +3500,7 @@
                         "maxLength": 2048
                       },
                       "commitId": {
-                        "type": "string",
-                        "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                        "type": "string"
                       },
                       "path": {
                         "type": "string",
@@ -4094,13 +3508,10 @@
                         "maxLength": 2048
                       },
                       "contentDigest": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{64}$"
+                        "type": "string"
                       },
                       "reviewedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -4109,23 +3520,93 @@
                       "path",
                       "contentDigest",
                       "reviewedAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    ]
+                  },
+                  "maxItems": 3000
                 }
               },
               "required": [
                 "schemaVersion",
                 "marks"
-              ],
-              "additionalProperties": false
+              ]
             }
           },
           "required": [
             "revision",
             "store"
-          ],
-          "additionalProperties": false
+          ]
+        }
+      },
+      {
+        "name": "toggle",
+        "description": "Mark or unmark one file of one revision reviewed. The Host stamps the review time.",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": 0
+            },
+            "store": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "enum": [
+                    1
+                  ]
+                },
+                "marks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repositoryRoot": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "contentDigest": {
+                        "type": "string"
+                      },
+                      "reviewedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repositoryRoot",
+                      "commitId",
+                      "path",
+                      "contentDigest",
+                      "reviewedAt"
+                    ]
+                  },
+                  "maxItems": 3000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "marks"
+              ]
+            }
+          },
+          "required": [
+            "revision",
+            "store"
+          ]
         }
       }
     ]

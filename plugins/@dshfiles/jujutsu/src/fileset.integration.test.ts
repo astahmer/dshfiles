@@ -4,11 +4,12 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel } from './core.ts'
-import { revisionSchema, type Mutation } from './api.ts'
+import { revisionSchema, type Mutation, type Revision } from './api.ts'
 import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
 import { RevisionGraphModel } from './graph.ts'
+import { SchemaHelpers } from './schema-helpers.ts'
 
 const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', [...argv], {
@@ -59,12 +60,12 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@-', '--name-only'])), selected.slice().sort())
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only'])), unselected.slice().sort())
 
-  const revisions = (): ReturnType<typeof revisionSchema.parse>[] =>
+  const revisions = (): Revision[] =>
     JujutsuOutputModel.parseJsonLines(
       runJj(repo, home, ['log', '--no-graph', '--limit', '500', '--revisions', 'all()', '--template', REVISION_TEMPLATE]),
       value => {
-        const parsed = revisionSchema.safeParse(value)
-        if (!parsed.success) throw new Error(JSON.stringify({ value, issues: parsed.error.issues }))
+        const parsed = SchemaHelpers.decodeSafe(revisionSchema, value)
+        if (!parsed.success) throw new Error(JSON.stringify({ value, error: String(parsed.error) }))
         return parsed.data
       },
     )
@@ -226,7 +227,19 @@ test('file stats template, file moves, and restore act on exact listed files', a
   const ids = (revset: string): string => runJj(repo, home, ['log', '--no-graph', '--revisions', revset, '--template', 'self.commit_id().short(64)']).trim()
 
   const stats = JujutsuOutputModel.parseJsonLines(runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', FILE_STATS_TEMPLATE]), value => {
-    const row = z.object({ files: z.array(z.object({ path: z.string(), status: z.string(), additions: z.number(), deletions: z.number() })) }).parse(value)
+    const row = SchemaHelpers.decode(
+      Schema.Struct({
+        files: Schema.Array(
+          Schema.Struct({
+            path: Schema.String,
+            status: Schema.String,
+            additions: Schema.Number.check(Schema.isFinite()),
+            deletions: Schema.Number.check(Schema.isFinite()),
+          }),
+        ),
+      }),
+      value,
+    )
     return row.files.map(file => ({ ...file, status: JujutsuOutputModel.fileStatusLetter(file.status) }))
   })[0]
   assert.deepEqual(stats, [

@@ -13,14 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
@@ -31,6 +30,7 @@ import { installChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
+import { createEffectStoredValue } from './stored-value.js'
 
 export interface ComposerJujutsuServices {
   readonly sessions: ISessions
@@ -61,7 +61,11 @@ const ABOVE_STYLE: CSSProperties = {
 }
 
 const noStoredBases: Readonly<Record<string, string>> = {}
-const storedBases = createStoredValue({ key: 'dshfiles.jujutsu.composer-base.v1', schema: z.record(z.string(), z.string().max(512)), fallback: noStoredBases })
+const storedBases = createEffectStoredValue({
+  key: 'dshfiles.jujutsu.composer-base.v1',
+  schema: Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(512))),
+  fallback: noStoredBases,
+})
 
 const noCwd = (): null => null
 

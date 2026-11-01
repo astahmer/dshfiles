@@ -6,6 +6,7 @@ import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject }
 import { useState } from 'react'
 import { workspaceNameSchema, type Mutation, type Revision } from './api.js'
 import { InlinePanel, InlinePanelActions } from './inline-panel.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /** `jj workspace add` at one revision, filled in and previewed inside that revision's row. */
 export const InlineWorkspaceProvisioner = (props: {
@@ -19,7 +20,7 @@ export const InlineWorkspaceProvisioner = (props: {
   const [parentPath, setParentPath] = useState('')
   const [name, setName] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
-  const validName = workspaceNameSchema.safeParse(name).success
+  const validName = SchemaHelpers.decodeSafe(workspaceNameSchema, name).success
   const description = props.revision.description.split('\n')[0] || '(no description)'
 
   return (

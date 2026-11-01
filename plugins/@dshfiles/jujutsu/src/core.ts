@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { isAbsolute, join, normalize, parse } from 'node:path'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { workspaceNameSchema, type FileStatus, type Mutation } from './api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export interface FileChange {
   readonly path: string
@@ -101,15 +102,15 @@ const buildMutationArgv = (action: Mutation): readonly string[] => {
       }
       return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
     case 'workspace-add':
-      if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success)
+      if (!isCommitId(action.commitId) || !SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success)
         throw new Error('Choose a valid workspace name and visible revision.')
       return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
     case 'workspace-forget':
-      if (!workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name.')
+      if (!SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success) throw new Error('Choose a valid workspace name.')
       if (action.name === 'default') throw new Error('Workspace default cannot be removed; it is the repository main workspace.')
       return ['workspace', 'forget', action.name]
     case 'workspace-edit':
-      if (!workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name.')
+      if (!SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success) throw new Error('Choose a valid workspace name.')
       return ['edit', checkedCommitId(action.commitId)]
     case 'edit':
       return ['edit', checkedCommitId(action.commitId)]

@@ -10,6 +10,7 @@ import {
   chatReferenceTitleResolvedSchema,
   type ChatReference,
 } from './chat-reference.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export interface ChatReferenceLinkOptions {
   readonly sessionId: string
@@ -121,7 +122,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     const reference = code === null ? undefined : referenceIn(code)
     if (reference === undefined) return false
     const rect = element.getBoundingClientRect()
-    const parsed = chatReferencePreviewRequestSchema.safeParse({
+    const parsed = SchemaHelpers.decodeSafe(chatReferencePreviewRequestSchema, {
       sessionId: options.sessionId,
       cwd: options.cwd,
       reference,
@@ -162,7 +163,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (reference === undefined) return
     const key = referenceKey(reference)
     if (titles.has(key) || requestedTitles.has(key)) return
-    const parsed = chatReferenceTitleRequestSchema.safeParse({ sessionId: options.sessionId, cwd: options.cwd, reference })
+    const parsed = SchemaHelpers.decodeSafe(chatReferenceTitleRequestSchema, { sessionId: options.sessionId, cwd: options.cwd, reference })
     if (!parsed.success) return
     requestedTitles.add(key)
     window.dispatchEvent(new CustomEvent(chatReferenceTitleRequestEvent, { detail: parsed.data }))
@@ -192,7 +193,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   }
   const onTitleResolved = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return
-    const parsed = chatReferenceTitleResolvedSchema.safeParse(event.detail)
+    const parsed = SchemaHelpers.decodeSafe(chatReferenceTitleResolvedSchema, event.detail)
     if (!parsed.success || parsed.data.sessionId !== options.sessionId || parsed.data.cwd !== options.cwd) return
     const key = referenceKey(parsed.data.reference)
     titles.set(key, parsed.data.title)

@@ -7,6 +7,7 @@ import { jujutsuReviewProgressApi } from './review-progress-api.js'
 const contracts = [jujutsuApi, composerContextApi, jujutsuReviewProgressApi]
 
 it('preserves Jujutsu API and agent-tool schemas byte-for-byte', async () => {
+  await import(new URL('../../../../tooling/dshx/packages/dshx/src/effect/index.ts', import.meta.url).href)
   const { publishedJsonSchema, toToolSchema } = await import(new URL('../../../../tooling/dshx/packages/dshx/src/api/json-schema.ts', import.meta.url).href)
   const schemas = contracts.map(contract => ({
     id: contract.id,
