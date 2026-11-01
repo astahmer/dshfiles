@@ -1,13 +1,14 @@
 import { createServer } from 'node:http'
-import { decodeJson } from '@dshfiles/dshx/json'
 import { describe, expect, test } from 'vitest'
 import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { decode, passthrough } from '../src/schema.js'
 import type { NativeRpcRequest } from '../src/api.js'
 import { connectGateway } from '../src/connectors/gateway.js'
 import { NativeRpcModel } from '../src/native-rpc.js'
 
 describe('native mutation outcome recovery', () => {
-  const requestEnvelopeSchema = z.object({ rpcId: z.string() }).passthrough()
+  const requestEnvelopeSchema = Schema.Struct({ rpcId: Schema.String }).pipe(passthrough)
   const addressSchema = z.object({ port: z.number().int().min(0).max(65_535) })
 
   test('reports an admitted create as unknown after its reply is lost and reconciles without replay', async () => {
@@ -24,7 +25,7 @@ describe('native mutation outcome recovery', () => {
       request.on('end', () => {
         let requestId: string
         try {
-          requestId = decodeJson(requestEnvelopeSchema, body.join('')).rpcId
+          requestId = decode(requestEnvelopeSchema, JSON.parse(body.join(''))).rpcId
         } catch {
           response.writeHead(400).end()
           return

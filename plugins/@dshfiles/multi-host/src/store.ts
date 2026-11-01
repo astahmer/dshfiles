@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { chmod, lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { z } from 'zod'
+import { decode, safeDecode } from './schema.js'
 import {
   hostDirectorySchema,
   hostRecordSchema,
@@ -67,18 +68,23 @@ const secureDataPath = async (filePath: string): Promise<void> => {
   }
 }
 
-const legacyDirectorySchema = z.object({
-  schemaVersion: z.literal(1),
-  hosts: z.array(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      connector: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('local'), launchUrl: z.string().min(1) }),
-        z.object({ kind: z.literal('ssh'), sshTarget: z.string().min(1), remoteHome: z.string().min(1), unit: z.string().min(1) }),
+const legacyDirectorySchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  hosts: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMinLength(1)),
+      name: Schema.String.check(Schema.isMinLength(1)),
+      connector: Schema.Union([
+        Schema.Struct({ kind: Schema.Literal('local'), launchUrl: Schema.String.check(Schema.isMinLength(1)) }),
+        Schema.Struct({
+          kind: Schema.Literal('ssh'),
+          sshTarget: Schema.String.check(Schema.isMinLength(1)),
+          remoteHome: Schema.String.check(Schema.isMinLength(1)),
+          unit: Schema.String.check(Schema.isMinLength(1)),
+        }),
       ]),
-      expected: z.object({ homeLeaf: z.string().min(1), profile: z.string().min(1) }),
-      createdAt: z.string().min(10),
+      expected: Schema.Struct({ homeLeaf: Schema.String.check(Schema.isMinLength(1)), profile: Schema.String.check(Schema.isMinLength(1)) }),
+      createdAt: Schema.String.check(Schema.isMinLength(10)),
     }),
   ),
 })
@@ -124,40 +130,48 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
     throw new DirectoryStoreError('directory-corrupt', 'The multi-host directory contains invalid JSON and was left untouched.')
   }
 
-  const current = hostDirectorySchema.safeParse(parsed)
+  const current = safeDecode(hostDirectorySchema, parsed, { onExcessProperty: 'error' })
   if (current.success) return completeHostOrder(completeRuntimePorts(current.data))
 
-  const legacy = legacyDirectorySchema.safeParse(parsed)
+  const legacy = safeDecode(legacyDirectorySchema, parsed)
   if (legacy.success) {
     const hosts: HostRecord[] = []
     const runtimes: RuntimeRecord[] = []
     for (const oldHost of legacy.data.hosts) {
       hosts.push(
-        hostRecordSchema.parse({
-          schemaVersion: 2,
-          id: oldHost.id,
-          name: oldHost.name,
-          connector: oldHost.connector.kind === 'local' ? { kind: 'local' } : { kind: 'ssh', sshTarget: oldHost.connector.sshTarget },
-          createdAt: oldHost.createdAt,
-        }),
+        decode(
+          hostRecordSchema,
+          {
+            schemaVersion: 2,
+            id: oldHost.id,
+            name: oldHost.name,
+            connector: oldHost.connector.kind === 'local' ? { kind: 'local' } : { kind: 'ssh', sshTarget: oldHost.connector.sshTarget },
+            createdAt: oldHost.createdAt,
+          },
+          { onExcessProperty: 'error' },
+        ),
       )
       const locator =
         oldHost.connector.kind === 'local'
           ? { kind: 'local' as const, launchUrl: oldHost.connector.launchUrl }
           : { kind: 'ssh' as const, remoteHome: oldHost.connector.remoteHome, unit: oldHost.connector.unit }
       runtimes.push(
-        runtimeRecordSchema.parse({
-          schemaVersion: 2,
-          id: randomUUID(),
-          hostId: oldHost.id,
-          name: oldHost.name,
-          locator,
-          identity: null,
-          createdAt: oldHost.createdAt,
-        }),
+        decode(
+          runtimeRecordSchema,
+          {
+            schemaVersion: 2,
+            id: randomUUID(),
+            hostId: oldHost.id,
+            name: oldHost.name,
+            locator,
+            identity: null,
+            createdAt: oldHost.createdAt,
+          },
+          { onExcessProperty: 'error' },
+        ),
       )
     }
-    return completeHostOrder(completeRuntimePorts(hostDirectorySchema.parse({ schemaVersion: 2, hosts, runtimes })))
+    return completeHostOrder(completeRuntimePorts(decode(hostDirectorySchema, { schemaVersion: 2, hosts, runtimes }, { onExcessProperty: 'error' })))
   }
 
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')
@@ -194,7 +208,7 @@ const transact = async <Result>(update: (current: HostDirectory) => { readonly n
 const nextHostPosition = (hosts: readonly HostRecord[]): number => hosts.reduce((next, host) => Math.max(next, (host.position ?? -1) + 1), 0)
 
 const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
-  const record = hostRecordSchema.parse(input)
+  const record = decode(hostRecordSchema, input, { onExcessProperty: 'error' })
   return transact(current => {
     const previous = current.hosts.find(host => host.id === record.id)
     const stored: HostRecord = {
@@ -209,12 +223,16 @@ const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
         throw new DirectoryStoreError('host-connector-in-use', 'The host connector cannot change while registered runtimes use it.')
       }
     }
-    const next = hostDirectorySchema.parse({
-      schemaVersion: 2,
-      hosts: hosts.sort((left, right) => (left.position ?? 0) - (right.position ?? 0) || left.id.localeCompare(right.id)),
-      runtimes: current.runtimes,
-      retiredPorts: current.retiredPorts,
-    })
+    const next = decode(
+      hostDirectorySchema,
+      {
+        schemaVersion: 2,
+        hosts: hosts.sort((left, right) => (left.position ?? 0) - (right.position ?? 0) || left.id.localeCompare(right.id)),
+        runtimes: current.runtimes,
+        retiredPorts: current.retiredPorts,
+      },
+      { onExcessProperty: 'error' },
+    )
     return { next, result: stored }
   })
 }
@@ -224,10 +242,14 @@ const setHostHidden = async ({ id, hidden }: { readonly id: string; readonly hid
     const previous = current.hosts.find(host => host.id === id)
     if (previous === undefined) throw new DirectoryStoreError('host-not-found', `No recorded host ${id}.`)
     const record: HostRecord = { ...previous, hidden }
-    const next = hostDirectorySchema.parse({
-      ...current,
-      hosts: current.hosts.map(host => (host.id === id ? record : host)),
-    })
+    const next = decode(
+      hostDirectorySchema,
+      {
+        ...current,
+        hosts: current.hosts.map(host => (host.id === id ? record : host)),
+      },
+      { onExcessProperty: 'error' },
+    )
     return { next: previous.hidden === hidden ? current : next, result: record }
   })
 
@@ -242,12 +264,12 @@ const reorderHosts = async (ids: readonly string[]): Promise<readonly HostRecord
       const host = byId.get(id)
       return host === undefined ? [] : [{ ...host, position }]
     })
-    const next = hostDirectorySchema.parse({ ...current, hosts })
+    const next = decode(hostDirectorySchema, { ...current, hosts }, { onExcessProperty: 'error' })
     return { next, result: hosts }
   })
 
 const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
-  const record = runtimeRecordSchema.parse(input)
+  const record = decode(runtimeRecordSchema, input, { onExcessProperty: 'error' })
   return transact(current => {
     const host = current.hosts.find(candidate => candidate.id === record.hostId)
     if (host === undefined) throw new DirectoryStoreError('host-not-found', `No recorded host ${record.hostId}.`)
@@ -266,12 +288,16 @@ const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
     }
     const runtimes = current.runtimes.filter(runtime => runtime.id !== record.id)
     runtimes.push(normalized)
-    const next = hostDirectorySchema.parse({
-      schemaVersion: 2,
-      hosts: current.hosts,
-      runtimes: runtimes.sort((left, right) => left.id.localeCompare(right.id)),
-      retiredPorts: current.retiredPorts,
-    })
+    const next = decode(
+      hostDirectorySchema,
+      {
+        schemaVersion: 2,
+        hosts: current.hosts,
+        runtimes: runtimes.sort((left, right) => left.id.localeCompare(right.id)),
+        retiredPorts: current.retiredPorts,
+      },
+      { onExcessProperty: 'error' },
+    )
     return { next, result: normalized }
   })
 }

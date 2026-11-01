@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
+import { decode, decodeStrict, passthrough, safeDecode, strictStandardSchema } from './schema.js'
 import { randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
@@ -6,14 +8,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
-import { Effect, Layer, Schema } from 'effect'
-import { z } from 'zod'
+import { Effect, Layer } from 'effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import {
   fileUploadValueSchema,
-  jjRepositoriesSchema,
+  jjRepositoriesEffectSchema,
   multiHostApi,
   resourceSnapshotSchema,
   type ConnectionTestStep,
@@ -61,106 +62,92 @@ import { callNativeRpc } from './native-rpc.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
 
-const profileSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 const requiredCapabilities: readonly RuntimeIdentity['capabilities'][number][] = ['workspace', 'session', 'agent']
-const configSchema = z.object({ profile: profileSchema.optional() }).strict()
-const sessionRowSchema = z
-  .object({
-    sessionId: z.string().min(1).max(256),
-    cwd: z.string().max(4096).optional(),
-    running: z.boolean(),
-    blank: z.boolean(),
-    updatedAt: z.number().finite(),
-    title: z.string().max(512).nullable().optional(),
-    // The remote list names a thread through its title projection; an untitled thread reports null there.
-    projections: z
-      .object({
-        values: z
-          .object({ title: z.string().max(512).nullable().optional() })
-          .passthrough()
-          .optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough()
-const sessionListSchema = z.object({ items: z.array(sessionRowSchema).max(10_000) }).passthrough()
-const sessionCreatedSchema = z.object({ sessionId: z.string().min(1).max(256) }).passthrough()
-const directoryListingSchema = z
-  .object({
-    path: z.string(),
-    home: z.string(),
-    crumbs: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })),
-    entries: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })).max(5_000),
-    truncated: z.boolean(),
-  })
-  .passthrough()
-const workspaceRowSchema = z
-  .object({
-    workspaceId: z.string().min(1).max(256),
-    path: z.string().min(1).max(4096),
-    title: z.string().max(512).optional(),
-    sessionIds: z.array(z.string().max(256)).max(10_000).optional(),
-  })
-  .passthrough()
-const workspaceCreatedSchema = z.object({ workspace: z.object({ workspaceId: z.string().min(1), path: z.string().min(1) }).passthrough() }).passthrough()
-const workspaceContainerSchema = z
-  .object({
-    items: z.unknown().optional(),
-    value: z.unknown().optional(),
-    workspace: z.unknown().optional(),
-    workspaces: z.unknown().optional(),
-    baseline: z.unknown().optional(),
-    snapshot: z.unknown().optional(),
-  })
-  .passthrough()
-const fileReferenceCandidatesSchema = z.array(z.object({ path: z.string().max(4096), kind: z.enum(['file', 'directory']) }).strip()).max(1000)
-const modelCatalogSchema = z
-  .object({
-    default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).passthrough().optional(),
-    routableProviders: z.array(z.string()).optional(),
-    groups: z.array(
-      z
-        .object({
-          id: z.string(),
-          name: z.string(),
-          models: z.array(
-            z
-              .object({
-                id: z.string(),
-                name: z.string(),
-                description: z.string().optional(),
-                reasoning: z
-                  .object({
-                    efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().optional() }).passthrough()),
-                    defaultEffort: z.string().optional(),
-                  })
-                  .passthrough()
-                  .optional(),
-              })
-              .passthrough(),
+const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
+const sessionRowSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  cwd: Schema.optional(Schema.String.check(Schema.isMaxLength(4096))),
+  running: Schema.Boolean,
+  blank: Schema.Boolean,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
+  title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))),
+  // The remote list names a thread through its title projection; an untitled thread reports null there.
+  projections: Schema.optional(
+    Schema.Struct({
+      values: Schema.optional(Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(passthrough)),
+    }).pipe(passthrough),
+  ),
+}).pipe(passthrough)
+const sessionListSchema = Schema.Struct({ items: Schema.Array(sessionRowSchema).check(Schema.isMaxLength(10_000)) }).pipe(passthrough)
+const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(passthrough)
+const directoryListingSchema = Schema.Struct({
+  path: Schema.String,
+  home: Schema.String,
+  crumbs: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })),
+  entries: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })).check(Schema.isMaxLength(5_000)),
+  truncated: Schema.Boolean,
+}).pipe(passthrough)
+const workspaceRowSchema = Schema.Struct({
+  workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+  title: Schema.optional(Schema.String.check(Schema.isMaxLength(512))),
+  sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000))),
+}).pipe(passthrough)
+const workspaceCreatedSchema = Schema.Struct({
+  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(passthrough),
+}).pipe(passthrough)
+const workspaceContainerSchema = Schema.Struct({
+  items: Schema.optional(Schema.Unknown),
+  value: Schema.optional(Schema.Unknown),
+  workspace: Schema.optional(Schema.Unknown),
+  workspaces: Schema.optional(Schema.Unknown),
+  baseline: Schema.optional(Schema.Unknown),
+  snapshot: Schema.optional(Schema.Unknown),
+}).pipe(passthrough)
+const fileReferenceCandidatesSchema = Schema.Array(
+  Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
+).check(Schema.isMaxLength(1000))
+const modelCatalogSchema = Schema.Struct({
+  default: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(passthrough)),
+  routableProviders: Schema.optional(Schema.Array(Schema.String)),
+  groups: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+      models: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          description: Schema.optional(Schema.String),
+          reasoning: Schema.optional(
+            Schema.Struct({
+              efforts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(passthrough)),
+              defaultEffort: Schema.optional(Schema.String),
+            }).pipe(passthrough),
           ),
-        })
-        .passthrough(),
-    ),
-    failures: z.array(z.object({ id: z.string(), name: z.string(), message: z.string() }).passthrough()).optional(),
-  })
-  .passthrough()
-const sessionSnapshotSchema = z
-  .object({
-    type: z.literal('snapshot'),
-    cursor: z.number().int(),
-    header: z.object({ cwd: z.string().optional() }).passthrough().optional(),
-    records: z.array(z.unknown()).max(10_000),
-  })
-  .passthrough()
-const sessionCursorFrameSchema = z.object({ type: z.literal('snapshot'), cursor: z.number().int().safe().min(-1) }).passthrough()
-const webServerSchema = z.object({ port: z.number().int().min(1).max(65_535) }).passthrough()
+        }).pipe(passthrough),
+      ),
+    }).pipe(passthrough),
+  ),
+  failures: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String }).pipe(passthrough))),
+}).pipe(passthrough)
+const sessionSnapshotSchema = Schema.Struct({
+  type: Schema.Literal('snapshot'),
+  cursor: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+  header: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) }).pipe(passthrough)),
+  records: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(10_000)),
+}).pipe(passthrough)
+const sessionCursorFrameSchema = Schema.Struct({
+  type: Schema.Literal('snapshot'),
+  cursor: Schema.Number.check(Schema.isFinite())
+    .check(Schema.isInt())
+    .check(Schema.isBetween({ minimum: -Number.MAX_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }))
+    .check(Schema.isGreaterThanOrEqualTo(-1)),
+}).pipe(passthrough)
+const webServerSchema = Schema.Struct({
+  port: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(65_535)),
+}).pipe(passthrough)
 
 /** Failures that mean the pooled connection itself is gone, so the next call should open a fresh one. */
 const transportFailures = new Set([
@@ -265,7 +252,7 @@ const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
       'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.',
     )
   }
-  const parsed = runtimeIdentitySchema.safeParse(raw)
+  const parsed = safeDecode(runtimeIdentitySchema, raw)
   if (!parsed.success) throw new GatewayUnavailableError('identity-invalid', 'The connected runtime returned an identity outside the supported contract.')
   if (parsed.data.protocolVersion !== 1 || parsed.data.dshVersion === 'unknown' || !parsed.data.dshVersion.startsWith('0.2.')) {
     throw new GatewayUnavailableError('runtime-incompatible', 'The connected runtime does not report a supported DSH 0.2 protocol version.')
@@ -375,8 +362,8 @@ const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => 
   hidden: record.hidden,
 })
 
-const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof workspaceRowSchema.parse>[] => {
-  const results = new Map<string, ReturnType<typeof workspaceRowSchema.parse>>()
+const collectWorkspaces = (frames: readonly unknown[]): Schema.Schema.Type<typeof workspaceRowSchema>[] => {
+  const results = new Map<string, Schema.Schema.Type<typeof workspaceRowSchema>>()
   const visit = (value: unknown, depth: number): void => {
     if (depth > 16 || results.size >= 256) return
     if (Array.isArray(value)) {
@@ -384,9 +371,9 @@ const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof worksp
       return
     }
     if (typeof value !== 'object' || value === null) return
-    const workspace = workspaceRowSchema.safeParse(value)
+    const workspace = safeDecode(workspaceRowSchema, value)
     if (workspace.success) results.set(workspace.data.workspaceId, workspace.data)
-    const record = workspaceContainerSchema.parse(value)
+    const record = decode(workspaceContainerSchema, value)
     for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
       const child = record[key]
       if (child !== undefined) visit(child, depth + 1)
@@ -538,7 +525,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
           resourceProbeLimiter.run(async () => {
             try {
               const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
-              const parsed = resourceSnapshotSchema.safeParse(raw)
+              const parsed = safeDecode(resourceSnapshotSchema, raw)
               if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
               return { ok: true as const, snapshot: parsed.data }
             } catch (error) {
@@ -704,7 +691,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     }
   },
   testConnection: async ({ input, signal }) => {
-    const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+    const connector = decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
     const host: HostRecord = {
       schemaVersion: 2,
       id: sshHostId(input.sshTarget),
@@ -713,7 +700,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       hidden: false,
       createdAt: new Date().toISOString(),
     }
-    const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+    const locator = decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
     try {
       const { identity, steps } = await qualifyRuntime({ host, locator, name: input.name, signal })
       return { ok: true as const, steps, identity }
@@ -723,7 +710,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   },
   saveSshHost: async ({ input, signal }) => {
     try {
-      const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+      const connector = decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
       const previous = input.hostId === undefined ? undefined : await HostDirectoryStore.findHost(input.hostId)
       const host: HostRecord = {
         schemaVersion: 2,
@@ -734,7 +721,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
         ...(previous?.position !== undefined && { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
-      const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+      const locator = decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
       await HostDirectoryStore.upsertHost(host)
       const runtime = await register({ host, locator, name: input.name.trim(), signal })
       // An edit that moved the host to another DSH home leaves the old runtime record behind.
@@ -748,7 +735,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     }
   },
   hostUpsert: async ({ input }) => {
-    const connector = hostConnectorSchema.parse(input.connector)
+    const connector = decodeStrict(hostConnectorSchema, input.connector)
     const previous = await HostDirectoryStore.findHost(input.id)
     const record: HostRecord = {
       schemaVersion: 2,
@@ -783,7 +770,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const host = await HostDirectoryStore.findHost(input.hostId)
       if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
-      const locator = runtimeLocatorSchema.parse(input.locator)
+      const locator = decodeStrict(runtimeLocatorSchema, input.locator)
       if (locator.kind !== host.connector.kind)
         throw new DirectoryStoreError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
       return { ok: true as const, runtime: runtimeSummary(await register({ host, locator, name: input.name.trim(), signal })) }
@@ -808,21 +795,19 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
                 gateway.follow('workspace/follow', {}, 10_000),
                 gateway.run('session', 'list', { _request: {} }),
               ])
-              const sessions = sessionListSchema
-                .parse(sessionValue)
+              const sessions = decode(sessionListSchema, sessionValue)
                 .items.slice(0, 500)
                 .map(item => {
                   const title = item.title ?? item.projections?.values?.title ?? undefined
-                  const summary: SessionSummary = {
+                  return {
                     runtimeId: runtime.id,
                     sessionId: item.sessionId,
                     running: item.running,
                     blank: item.blank,
                     updatedAt: item.updatedAt,
-                  }
-                  if (item.cwd !== undefined) summary.cwd = item.cwd
-                  if (title !== undefined && title !== '') summary.title = title
-                  return summary
+                    ...(item.cwd !== undefined ? { cwd: item.cwd } : {}),
+                    ...(title !== undefined && title !== '' ? { title } : {}),
+                  } satisfies SessionSummary
                 })
               const workspaces = collectWorkspaces(frames).map(item => ({
                 runtimeId: runtime.id,
@@ -892,7 +877,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const listing = await withRuntime(
         input.runtimeId,
-        async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
+        async gateway => decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
         { mutation: false },
       )
       return {
@@ -911,7 +896,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const created = await withRuntime(
         input.runtimeId,
-        async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: input.path } })),
+        async gateway => decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: input.path } })),
         {
           mutation: true,
         },
@@ -940,7 +925,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
       const host = await HostDirectoryStore.findHost(runtime.hostId)
       if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
-      const listing = await withRuntime(input.runtimeId, async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', {}, signal)), {
+      const listing = await withRuntime(input.runtimeId, async gateway => decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)), {
         mutation: false,
       })
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
@@ -988,7 +973,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       try {
         const created = await withRuntime(
           input.runtimeId,
-          async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
+          async gateway => decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
           { mutation: true },
         )
         if (copyWarning !== undefined) {
@@ -1017,7 +1002,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const created = await withRuntime(input.runtimeId, async gateway => gateway.api('createDirectory', { path: input.path, name: input.name }), {
         mutation: true,
       })
-      return { ok: true as const, path: z.object({ path: z.string() }).parse(created).path }
+      return { ok: true as const, path: decode(Schema.Struct({ path: Schema.String }), created).path }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -1057,7 +1042,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             args: { request: { cwd: input.cwd } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          sessionId = decode(sessionCreatedSchema, created.value).sessionId
           await RemoteThreadStore.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: '', createdAt: new Date().toISOString() })
           return { ok: true as const, sessionId }
         },
@@ -1081,7 +1066,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          sessionId = decode(sessionCreatedSchema, created.value).sessionId
           if (input.model !== undefined) {
             const selected = await gateway.runSafe('session', 'selectModel', {
               request: {
@@ -1118,9 +1103,13 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   },
   runtimeModels: async ({ input, signal }) => {
     try {
-      const catalog = await withRuntime(input.runtimeId, async gateway => modelCatalogSchema.parse(await gateway.run('session', 'modelCatalog', {}, signal)), {
-        mutation: false,
-      })
+      const catalog = await withRuntime(
+        input.runtimeId,
+        async gateway => decode(modelCatalogSchema, await gateway.run('session', 'modelCatalog', {}, signal)),
+        {
+          mutation: false,
+        },
+      )
       return {
         ok: true as const,
         default: catalog.default ?? null,
@@ -1169,7 +1158,8 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const repositories = await withRuntime(
         runtimeId,
         async gateway =>
-          jjRepositoriesSchema.parse(
+          decode(
+            jjRepositoriesEffectSchema,
             await gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}, signal),
           ),
         { mutation: false },
@@ -1195,7 +1185,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
         { mutation: false, broken: result => !result.ok && transportFailures.has(result.code) },
       )
       if (!outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message }
-      const candidates = fileReferenceCandidatesSchema.parse(outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
+      const candidates = decode(fileReferenceCandidatesSchema, outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
       return { ok: true as const, candidates }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
@@ -1215,7 +1205,8 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const value = await withRuntime(
         runtime.id,
         async gateway =>
-          fileUploadValueSchema.parse(
+          decode(
+            fileUploadValueSchema,
             await gateway.run(
               'fileUploads',
               'upload',
@@ -1244,7 +1235,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             15_000,
             signal,
           )
-          const snapshot = frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+          const snapshot = frames.map(frame => safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
           if (snapshot === undefined)
             throw new GatewayUnavailableError('session-unavailable', 'The host did not return this thread. It may have been deleted there.')
           const reduced = reduceTranscript(snapshot.records)
@@ -1343,7 +1334,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
           10_000,
           signal,
         )
-        const snapshot = frames.map(frame => sessionCursorFrameSchema.safeParse(frame)).find(result => result.success)
+        const snapshot = frames.map(frame => safeDecode(sessionCursorFrameSchema, frame)).find(result => result.success)
         if (snapshot === undefined) throw new GatewayUnavailableError('session-cursor-unavailable', 'The runtime did not return a session history cursor.')
         return { cursor: snapshot.data.cursor }
       },
@@ -1464,7 +1455,7 @@ const effectHandlers = {
 
 const effectPlugin = DshxEffect.plugin({
   layer: Layer.empty,
-  setup: (ctx: Context, config: z.infer<typeof configSchema>) => Effect.sync(() => setupHost(ctx, config)),
+  setup: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) => Effect.sync(() => setupHost(ctx, config)),
 })
 const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
 
@@ -1479,13 +1470,13 @@ interface ConnectionSurface {
 
 export default defineHost({
   name: '@dshfiles/multi-host',
-  Config: configSchema,
+  Config: strictStandardSchema(configSchema),
   apis: [multiHostHandlers],
   setup: effectPlugin.setup,
 })
 
-function setupHost(ctx: Context, config: z.infer<typeof configSchema>): void {
-  configuredProfile = configSchema.parse(config ?? {}).profile
+function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>): void {
+  configuredProfile = decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
   // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
   ctx.inject(['connection', 'webServer'], scoped => {
     let launchPath: string | undefined
@@ -1494,7 +1485,7 @@ function setupHost(ctx: Context, config: z.infer<typeof configSchema>): void {
       void (async () => {
         const loader: LoaderSurface | undefined = scoped.get('loader')
         await loader?.await?.()
-        const webServer = webServerSchema.safeParse(scoped.get('webServer'))
+        const webServer = safeDecode(webServerSchema, scoped.get('webServer'))
         const connection: ConnectionSurface | undefined = scoped.get('connection')
         const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
         if (disposed || !webServer.success || typeof launchUrl !== 'string') return
@@ -1535,7 +1526,7 @@ function setupHost(ctx: Context, config: z.infer<typeof configSchema>): void {
             gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
           { mutation: false },
         )
-        return frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+        return frames.map(frame => safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
       },
     })
     scoped.effect(() => () => {

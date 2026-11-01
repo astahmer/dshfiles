@@ -1,10 +1,11 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { decode } from './schema.js'
 import { GatewayUnavailableError } from './connectors/gateway.js'
 import { SshConnector, shellQuote } from './connectors/ssh.js'
 
 const probeTimeoutMs = 25_000
 
-const fnmNodeSchema = z.object({ version: z.string(), path: z.string() })
+const fnmNodeSchema = Schema.Struct({ version: Schema.String, path: Schema.String })
 
 export interface RemoteDiagnostic {
   readonly code: string
@@ -18,7 +19,7 @@ export interface RemoteFacts {
   readonly user: string | undefined
   readonly home: string | undefined
   readonly node: { readonly path: string | undefined; readonly version: string | undefined; readonly resolved: string | undefined; readonly nix: boolean }
-  readonly fnm: { readonly path: string | undefined; readonly nodes: z.infer<typeof fnmNodeSchema>[] }
+  readonly fnm: { readonly path: string | undefined; readonly nodes: Schema.Schema.Type<typeof fnmNodeSchema>[] }
   readonly dsh: { readonly path: string | undefined; readonly version: string | undefined }
   readonly jj: { readonly path: string | undefined; readonly version: string | undefined }
   readonly pnpm: { readonly path: string | undefined; readonly version: string | undefined }
@@ -113,7 +114,7 @@ const parseRemoteFacts = ({
   readonly checkoutPath: string | undefined
 }): RemoteFacts => {
   const values = new Map<string, string[]>()
-  const fnmNodes: z.infer<typeof fnmNodeSchema>[] = []
+  const fnmNodes: Schema.Schema.Type<typeof fnmNodeSchema>[] = []
   for (const line of output.split('\n')) {
     const separator = line.indexOf('=')
     if (separator <= 0) continue
@@ -121,7 +122,7 @@ const parseRemoteFacts = ({
     const value = line.slice(separator + 1)
     if (key === 'fnm_node') {
       const [version, path] = value.split('|')
-      if (version !== undefined && path !== undefined) fnmNodes.push(fnmNodeSchema.parse({ version, path }))
+      if (version !== undefined && path !== undefined) fnmNodes.push(decode(fnmNodeSchema, { version, path }))
       continue
     }
     const current = values.get(key) ?? []

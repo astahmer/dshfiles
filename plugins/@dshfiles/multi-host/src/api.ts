@@ -1,16 +1,32 @@
 import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
+import { z as legacyZod } from 'zod'
+import { dateTimeString, passthrough, strictStandardSchema, urlString } from './schema.js'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
+import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
-import { z } from 'zod'
+import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
 import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
+import { multiHostApi as baselineZodMultiHostApi } from './api-zod-boundary.js'
+
+const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
+  options: Omit<ApiMethodOptions<Input, Output>, 'tool'> & {
+    readonly input: Input
+    readonly output: Output
+    readonly tool?: ApiToolExposure<Output['Type']>
+  },
+) => defineMethod({ ...options, input: strictStandardSchema(options.input) })
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
-const idSchema = z.string().min(1).max(64)
-const sessionIdSchema = z.string().min(1).max(256)
-const brandedSessionIdSchema = z.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
+const idSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+const brandedSessionIdSchema = Schema.declare<SessionId>((value): value is SessionId => typeof value === 'string' && value.length > 0 && value.length <= 256)
+// Zod custom input emits no JSON Schema; an Effect declaration would publish one.
+const brandedSessionIdZodSchema = legacyZod.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 export type LocalProjectFileCandidate = {
@@ -21,520 +37,594 @@ export type LocalProjectFileCandidate = {
   readonly copyReason?: 'potential-secret' | 'too-large' | undefined
 }
 
-export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
+export const jsonValueSchema: Schema.ConstraintDecoder<JsonValue> = Schema.suspend(() =>
+  Schema.Union([
+    Schema.String,
+    Schema.Number.check(Schema.isFinite()),
+    Schema.Boolean,
+    Schema.Null,
+    Schema.Array(jsonValueSchema),
+    Schema.Record(Schema.String, jsonValueSchema),
+  ]),
 )
 
-const hostSummarySchema = z.object({
+const hostSummarySchema = Schema.Struct({
   id: idSchema,
-  name: z.string(),
+  name: Schema.String,
   connector: hostConnectorSchema,
-  runtimeCount: z.number().int().nonnegative(),
-  hidden: z.boolean(),
+  runtimeCount: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+  hidden: Schema.Boolean,
 })
 
-const failureSchema = z.object({ code: z.string().max(128), message: z.string().max(2048) })
+const failureSchema = Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(128)), message: Schema.String.check(Schema.isMaxLength(2048)) })
 
-const runtimeSummarySchema = z.object({
+const runtimeSummarySchema = Schema.Struct({
   id: idSchema,
   hostId: idSchema,
-  name: z.string(),
-  identity: runtimeIdentitySchema.nullable(),
-  remoteHome: z.string().optional(),
-  lastSeenAt: z.string().datetime().optional(),
+  name: Schema.String,
+  identity: Schema.NullOr(runtimeIdentitySchema),
+  remoteHome: Schema.optional(Schema.String),
+  lastSeenAt: Schema.optional(dateTimeString),
   /** Whether a pooled connection is open right now. */
-  connected: z.boolean(),
-  lastError: failureSchema.extend({ at: z.string().datetime() }).optional(),
+  connected: Schema.Boolean,
+  lastError: Schema.optional(Schema.Struct({ ...failureSchema.fields, at: dateTimeString })),
 })
 
-const workspaceSchema = z.object({
+const workspaceSchema = Schema.Struct({
   runtimeId: idSchema,
-  workspaceId: z.string(),
-  path: z.string(),
-  title: z.string(),
-  sessionIds: z.array(z.string()),
+  workspaceId: Schema.String,
+  path: Schema.String,
+  title: Schema.String,
+  sessionIds: Schema.Array(Schema.String),
 })
 
-const sessionSchema = z.object({
+const sessionSchema = Schema.Struct({
   runtimeId: idSchema,
-  sessionId: z.string(),
-  cwd: z.string().optional(),
+  sessionId: Schema.String,
+  cwd: Schema.optional(Schema.String),
   /** The remote thread's title projection when the runtime reports one; an older Host omits it. */
-  title: z.string().optional(),
-  running: z.boolean(),
-  blank: z.boolean(),
-  updatedAt: z.number(),
+  title: Schema.optional(Schema.String),
+  running: Schema.Boolean,
+  blank: Schema.Boolean,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
 })
 
-const runtimeStatusSchema = z.discriminatedUnion('ok', [
-  z.object({
-    ok: z.literal(true),
+const runtimeStatusSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
     runtime: runtimeSummarySchema,
-    workspaces: z.array(workspaceSchema),
-    sessions: z.array(sessionSchema),
-    stale: z.literal(true).optional(),
-    refreshing: z.boolean().optional(),
+    workspaces: Schema.Array(workspaceSchema),
+    sessions: Schema.Array(sessionSchema),
+    stale: Schema.optional(Schema.Literal(true)),
+    refreshing: Schema.optional(Schema.Boolean),
   }),
-  z.object({
-    ok: z.literal(false),
+  Schema.Struct({
+    ok: Schema.Literal(false),
     hostId: idSchema,
     runtimeId: idSchema,
-    code: z.string(),
-    message: z.string(),
-    stale: z.literal(true),
-    refreshing: z.boolean().optional(),
-    lastSeenAt: z.string().datetime().optional(),
+    code: Schema.String,
+    message: Schema.String,
+    stale: Schema.Literal(true),
+    refreshing: Schema.optional(Schema.Boolean),
+    lastSeenAt: Schema.optional(dateTimeString),
   }),
 ])
 
-export const resourceSnapshotSchema = z
-  .object({
-    sampledAt: z.string().datetime(),
-    platform: z.string().min(1).max(32),
-    cpuCount: z.number().int().nonnegative().max(4096),
-    loadAverage1m: z.number().finite().nonnegative().nullable(),
-    memoryTotalBytes: z.number().int().nonnegative(),
-    memoryFreeBytes: z.number().int().nonnegative(),
-  })
-  .strict()
-  .refine(snapshot => snapshot.memoryFreeBytes <= snapshot.memoryTotalBytes, 'Free memory cannot exceed total memory.')
+export const resourceSnapshotSchema = Schema.Struct({
+  sampledAt: dateTimeString,
+  platform: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  cpuCount: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(4096)),
+  loadAverage1m: Schema.NullOr(Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0))),
+  memoryTotalBytes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+  memoryFreeBytes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+}).check(Schema.makeFilter(snapshot => (snapshot.memoryFreeBytes <= snapshot.memoryTotalBytes ? true : 'Free memory cannot exceed total memory.')))
 
-const resourceProbeSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), snapshot: resourceSnapshotSchema }),
-  z.object({ ok: z.literal(false), code: z.string().max(128), message: z.string().max(512) }),
+const resourceProbeSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), snapshot: resourceSnapshotSchema }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String.check(Schema.isMaxLength(128)), message: Schema.String.check(Schema.isMaxLength(512)) }),
 ])
 
-const resourcePoolEntrySchema = z.object({
+const resourcePoolEntrySchema = Schema.Struct({
   hostId: idSchema,
-  hostName: z.string().min(1).max(120),
-  runtimeId: idSchema.nullable(),
-  destination: z
-    .object({ kind: z.literal('runtime'), runtimeId: idSchema })
-    .strict()
-    .nullable(),
-  hidden: z.boolean(),
+  hostName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  runtimeId: Schema.NullOr(idSchema),
+  destination: Schema.NullOr(Schema.Struct({ kind: Schema.Literal('runtime'), runtimeId: idSchema })),
+  hidden: Schema.Boolean,
   probe: resourceProbeSchema,
-  stale: z.boolean(),
-  refreshing: z.boolean(),
+  stale: Schema.Boolean,
+  refreshing: Schema.Boolean,
 })
 
-const resourceSelectionSchema = z.object({
+const resourceSelectionSchema = Schema.Struct({
   hostId: idSchema,
-  hostName: z.string().min(1).max(120),
+  hostName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
   runtimeId: idSchema,
-  score: z.number().finite().nonnegative(),
+  score: Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0)),
 })
 
-const resourcePoolSchema = z.object({ hosts: z.array(resourcePoolEntrySchema).max(64), selected: resourceSelectionSchema.nullable() }).strict()
+const resourcePoolSchema = Schema.Struct({
+  hosts: Schema.Array(resourcePoolEntrySchema).check(Schema.isMaxLength(64)),
+  selected: Schema.NullOr(resourceSelectionSchema),
+})
 
-const failedSchema = failureSchema.extend({ ok: z.literal(false) })
-const runtimeRegistrationSchema = z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }), failedSchema])
-const remoteHomeSchema = z
-  .string()
-  .trim()
-  .min(2)
-  .max(1024)
-  .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/)
-const sshTargetSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(255)
-  .regex(/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/)
-const connectionTestStepSchema = z.object({
-  step: z.enum(['ssh', 'runtime', 'identity']),
-  ok: z.boolean(),
-  ms: z.number().int().nonnegative(),
-  code: z.string().optional(),
-  message: z.string().optional(),
+const failedSchema = Schema.Struct({ ...failureSchema.fields, ok: Schema.Literal(false) })
+const runtimeRegistrationSchema = Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtime: runtimeSummarySchema }), failedSchema])
+const remoteHomeSchema = Schema.Trim.check(Schema.isMinLength(2), Schema.isMaxLength(1024), Schema.isPattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/))
+const sshTargetSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(255), Schema.isPattern(/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/))
+const connectionTestStepSchema = Schema.Struct({
+  step: Schema.Literals(['ssh', 'runtime', 'identity']),
+  ok: Schema.Boolean,
+  ms: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+  code: Schema.optional(Schema.String),
+  message: Schema.optional(Schema.String),
 })
-const directoryEntrySchema = z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })
-const directoryListingSchema = z.object({
-  path: z.string(),
-  home: z.string(),
-  crumbs: z.array(directoryEntrySchema),
-  entries: z.array(directoryEntrySchema),
-  truncated: z.boolean(),
+const directoryEntrySchema = Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })
+const directoryListingSchema = Schema.Struct({
+  path: Schema.String,
+  home: Schema.String,
+  crumbs: Schema.Array(directoryEntrySchema),
+  entries: Schema.Array(directoryEntrySchema),
+  truncated: Schema.Boolean,
 })
-const fileReferenceCandidateSchema = z.object({ path: z.string().max(4096), kind: z.enum(['file', 'directory']) })
-const encodedFileDataSchema = z
-  .string()
-  .max(32_000_000)
-  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u)
-export const fileUploadValueSchema = z.custom<FileUploadValue>(
-  value =>
-    z
-      .object({
-        receiptId: z.string().min(1).max(256),
-        file: z
-          .object({
-            attachmentId: z.string().min(1).max(256),
-            name: z.string().max(1024),
-            bytes: z.number().int().nonnegative(),
-          })
-          .strict(),
-      })
-      .strict()
-      .safeParse(value).success,
+const fileReferenceCandidateSchema = Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) })
+const encodedFileDataSchema = Schema.String.check(
+  Schema.isMaxLength(32_000_000),
+  Schema.isPattern(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u),
 )
-const modelSelectionSchema = z.object({
-  provider: z.string().min(1).max(128),
-  model: z.string().min(1).max(256),
-  reasoningEffort: z.string().min(1).max(128).optional(),
+const fileUploadValueShapeSchema = Schema.Struct({
+  receiptId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  file: Schema.Struct({
+    attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    name: Schema.String.check(Schema.isMaxLength(1024)),
+    bytes: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  }),
 })
-const modelCatalogModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  reasoning: z
-    .object({
-      efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().optional() })),
-      defaultEffort: z.string().optional(),
-    })
-    .optional(),
+const isFileUploadValue = (value: unknown): value is FileUploadValue =>
+  Schema.decodeUnknownResult(fileUploadValueShapeSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
+export const fileUploadValueSchema: Schema.ConstraintDecoder<FileUploadValue> = Schema.declare(isFileUploadValue)
+const modelSelectionSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
 })
-const modelCatalogGroupSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  models: z.array(modelCatalogModelSchema),
+const modelSelectionInputZodSchema = legacyZod.object({
+  provider: legacyZod.string().min(1).max(128),
+  model: legacyZod.string().min(1).max(256),
+  reasoningEffort: legacyZod.string().min(1).max(128).optional(),
 })
-const modelCatalogFailureSchema = z.object({ id: z.string(), name: z.string(), message: z.string() })
-const transcriptEntrySchema = z.object({
-  seq: z.number().int(),
-  kind: z.enum(['user', 'assistant', 'tool', 'status']),
-  text: z.string(),
+const modelCatalogModelSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  reasoning: Schema.optional(
+    Schema.Struct({
+      efforts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) })),
+      defaultEffort: Schema.optional(Schema.String),
+    }),
+  ),
 })
-const transcriptWaitingSchema = z.object({
-  kind: z.enum(['question', 'tool']),
-  tool: z.string(),
-  since: z.number().int(),
+const modelCatalogGroupSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  models: Schema.Array(modelCatalogModelSchema),
 })
-const remoteThreadSchema = z.object({
+const modelCatalogFailureSchema = Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String })
+const transcriptEntrySchema = Schema.Struct({
+  seq: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+  kind: Schema.Literals(['user', 'assistant', 'tool', 'status']),
+  text: Schema.String,
+})
+const transcriptWaitingSchema = Schema.Struct({
+  kind: Schema.Literals(['question', 'tool']),
+  tool: Schema.String,
+  since: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+})
+const remoteThreadSchema = Schema.Struct({
   runtimeId: idSchema,
   sessionId: sessionIdSchema,
-  cwd: z.string(),
-  title: z.string(),
-  mention: z.string().max(2048).optional(),
-  createdAt: z.string().datetime(),
-  hostName: z.string(),
-  connected: z.boolean(),
+  cwd: Schema.String,
+  title: Schema.String,
+  mention: Schema.optional(Schema.String.check(Schema.isMaxLength(2048))),
+  createdAt: dateTimeString,
+  hostName: Schema.String,
+  connected: Schema.Boolean,
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
-const remotePluginMethodSchema = z.enum(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
-export const jjRevisionSchema = z
-  .object({
-    changeId: z.string(),
-    commitId: z.string(),
-    description: z.string(),
-    conflict: z.boolean(),
-  })
-  .strip()
-
-export const jjThreadSchema = z
-  .object({
-    name: z.string(),
-    path: z.string(),
-    workspaceId: z.string().nullable(),
-    workspaceTitle: z.string().optional(),
-    sessionIds: z.array(z.string()).max(10_000),
-    finished: z.boolean(),
-    canRebase: z.boolean().optional(),
-    missing: z.boolean(),
-    behind: z.boolean(),
-    behindCount: z.number().int().nonnegative().optional(),
-    rebasedAt: z.number().int().nonnegative().optional(),
-    rebasedTipChangeId: z.string().min(1).max(128).optional(),
-    integrationQueuedAt: z.number().int().nonnegative().optional(),
-    integrationQueueEvents: z
-      .array(z.object({ at: z.number().int().nonnegative(), kind: z.enum(['queued', 'unqueued']) }).strict())
-      .max(10_000)
-      .optional(),
-    integrations: z
-      .array(z.object({ at: z.number().int().nonnegative(), tipChangeId: z.string().min(1).max(128).optional() }).strict())
-      .max(10_000)
-      .optional(),
-    unlanded: z.array(jjRevisionSchema).max(10_000),
-  })
-  .strip()
-
-export const jjRepositorySchema = z
-  .object({
-    repoRoot: z.string().max(4096),
-    title: z.string().max(512),
-    workspaceId: z.string().nullable(),
-    bookmarks: z.array(z.string().max(512)).max(10_000).default([]),
-    threads: z.array(jjThreadSchema).max(10_000),
-  })
-  .strip()
-
-export const jjRepositoriesSchema = z
-  .object({
-    repositories: z.array(jjRepositorySchema).max(200),
-    refreshing: z.boolean().optional(),
-    refreshFailed: z.boolean().optional(),
-  })
-  .strip()
-export type JjRevisionView = z.infer<typeof jjRevisionSchema>
-export type JjThreadView = z.infer<typeof jjThreadSchema>
-export type JjRepositoryView = z.infer<typeof jjRepositorySchema>
-
-export const nativeRpcSchema = nativeRpcRequestSchema
-
-const nativeValueSchema = z.union([
-  z
-    .object({
-      items: z
-        .array(
-          z
-            .object({
-              sessionId: sessionIdSchema,
-              updatedAt: z.number().finite(),
-              running: z.boolean(),
-              blank: z.boolean(),
-              agentAvailable: z.boolean().optional(),
-              cwd: z.string().optional(),
-            })
-            .passthrough(),
-        )
-        .max(10_000),
-    })
-    .passthrough(),
-  z.object({ items: z.array(z.object({ sessionId: sessionIdSchema, snippet: z.string() }).passthrough()).max(10_000), hasMore: z.boolean() }).passthrough(),
-  z.object({ sessionId: sessionIdSchema, agentPreset: z.string().optional() }).passthrough(),
-  z.object({ accepted: z.literal(true) }).passthrough(),
-  z.object({ title: z.string(), seq: z.number().finite() }).passthrough(),
-  z.object({ records: z.array(jsonValueSchema).max(10_000), hasMore: z.boolean() }).passthrough(),
-  z.object({ archivedSessionIds: z.array(sessionIdSchema).max(10_000) }).passthrough(),
-])
-
-export const nativeRpcResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: nativeValueSchema }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
-])
-
-const remotePathSchema = z
-  .string()
-  .trim()
-  .min(2)
-  .max(4096)
-  .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)
-const cloneDestinationSchema = z.union([
-  remotePathSchema,
-  z
-    .string()
-    .trim()
-    .min(3)
-    .max(4096)
-    .regex(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u),
-])
-const localProjectPathSchema = z.string().trim().min(1).max(4096)
-const localProjectFilePathSchema = z
-  .string()
-  .min(1)
-  .max(4096)
-  .refine(path => !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..'))
-const repositoryUrlSchema = z
-  .string()
-  .trim()
-  .max(2048)
-  .regex(
-    /^(?:https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?|git@[A-Za-z0-9.-]+:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?)$/u,
-  )
-const cloneProjectInputSchema = z
-  .object({
-    runtimeId: idSchema,
-    repositoryUrl: repositoryUrlSchema,
-    destinationPath: cloneDestinationSchema,
-    copyFromPath: localProjectPathSchema.optional(),
-    copyPaths: z.array(localProjectFilePathSchema).max(128).optional(),
-    includeIgnored: z.boolean().optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if ((input.copyFromPath === undefined) !== (input.copyPaths === undefined)) {
-      context.addIssue({ code: 'custom', message: 'Local source folder and selected file list must be supplied together.' })
-    }
-    if (input.includeIgnored === true && input.copyFromPath === undefined) {
-      context.addIssue({ code: 'custom', message: 'Scanning ignored files requires an explicit local source folder.' })
-    }
-  })
-
-const profileNameSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u)
-
-const semanticVersionSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u)
-
-const repositorySchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(1024)
-  .regex(/^(?:https:\/\/[^\s]+|git@[^\s]+|ssh:\/\/[^\s]+)$/u)
-
-const provisionStepSchema = z.enum(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime'])
-
-const remoteNodeSchema = z.object({
-  path: z.string().optional(),
-  version: z.string().optional(),
-  resolved: z.string().optional(),
-  nix: z.boolean(),
+const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+export const jjRevisionEffectSchema = Schema.Struct({
+  changeId: Schema.String,
+  commitId: Schema.String,
+  description: Schema.String,
+  conflict: Schema.Boolean,
 })
 
-const remoteFactsSchema = z.object({
-  uname: z.string(),
-  osVersion: z.string().optional(),
-  user: z.string().optional(),
-  home: z.string().optional(),
+export const jjThreadEffectSchema = Schema.Struct({
+  name: Schema.String,
+  path: Schema.String,
+  workspaceId: Schema.NullOr(Schema.String),
+  workspaceTitle: Schema.optional(Schema.String),
+  sessionIds: Schema.Array(Schema.String).check(Schema.isMaxLength(10_000)),
+  finished: Schema.Boolean,
+  canRebase: Schema.optional(Schema.Boolean),
+  missing: Schema.Boolean,
+  behind: Schema.Boolean,
+  behindCount: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+  rebasedAt: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+  rebasedTipChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+  integrationQueuedAt: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+  integrationQueueEvents: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        at: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+        kind: Schema.Literals(['queued', 'unqueued']),
+      }),
+    ).check(Schema.isMaxLength(10_000)),
+  ),
+  integrations: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        at: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+        tipChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+      }),
+    ).check(Schema.isMaxLength(10_000)),
+  ),
+  unlanded: Schema.Array(jjRevisionEffectSchema).check(Schema.isMaxLength(10_000)),
+})
+
+export const jjRepositoryEffectSchema = Schema.Struct({
+  repoRoot: Schema.String.check(Schema.isMaxLength(4096)),
+  title: Schema.String.check(Schema.isMaxLength(512)),
+  workspaceId: Schema.NullOr(Schema.String),
+  bookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(512)))
+    .check(Schema.isMaxLength(10_000))
+    .pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  threads: Schema.Array(jjThreadEffectSchema).check(Schema.isMaxLength(10_000)),
+})
+
+export const jjRepositoriesEffectSchema = Schema.Struct({
+  repositories: Schema.Array(jjRepositoryEffectSchema).check(Schema.isMaxLength(200)),
+  refreshing: Schema.optional(Schema.Boolean),
+  refreshFailed: Schema.optional(Schema.Boolean),
+})
+
+export const jjRevisionSchema = legacyZod
+  .object({
+    changeId: legacyZod.string(),
+    commitId: legacyZod.string(),
+    description: legacyZod.string(),
+    conflict: legacyZod.boolean(),
+  })
+  .strip()
+
+export const jjThreadSchema = legacyZod
+  .object({
+    name: legacyZod.string(),
+    path: legacyZod.string(),
+    workspaceId: legacyZod.string().nullable(),
+    workspaceTitle: legacyZod.string().optional(),
+    sessionIds: legacyZod.array(legacyZod.string()).max(10_000),
+    finished: legacyZod.boolean(),
+    canRebase: legacyZod.boolean().optional(),
+    missing: legacyZod.boolean(),
+    behind: legacyZod.boolean(),
+    behindCount: legacyZod.number().int().nonnegative().optional(),
+    rebasedAt: legacyZod.number().int().nonnegative().optional(),
+    rebasedTipChangeId: legacyZod.string().min(1).max(128).optional(),
+    integrationQueuedAt: legacyZod.number().int().nonnegative().optional(),
+    integrationQueueEvents: legacyZod
+      .array(legacyZod.object({ at: legacyZod.number().int().nonnegative(), kind: legacyZod.enum(['queued', 'unqueued']) }).strict())
+      .max(10_000)
+      .optional(),
+    integrations: legacyZod
+      .array(legacyZod.object({ at: legacyZod.number().int().nonnegative(), tipChangeId: legacyZod.string().min(1).max(128).optional() }).strict())
+      .max(10_000)
+      .optional(),
+    unlanded: legacyZod.array(jjRevisionSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositorySchema = legacyZod
+  .object({
+    repoRoot: legacyZod.string().max(4096),
+    title: legacyZod.string().max(512),
+    workspaceId: legacyZod.string().nullable(),
+    bookmarks: legacyZod.array(legacyZod.string().max(512)).max(10_000).default([]),
+    threads: legacyZod.array(jjThreadSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositoriesSchema = legacyZod
+  .object({
+    repositories: legacyZod.array(jjRepositorySchema).max(200),
+    refreshing: legacyZod.boolean().optional(),
+    refreshFailed: legacyZod.boolean().optional(),
+  })
+  .strip()
+
+export type JjRevisionView = Schema.Schema.Type<typeof jjRevisionEffectSchema>
+export type JjThreadView = Schema.Schema.Type<typeof jjThreadEffectSchema>
+export type JjRepositoryView = Schema.Schema.Type<typeof jjRepositoryEffectSchema>
+
+export const nativeRpcSchema: Schema.ConstraintDecoder<DshxNativeRpcRequest> = Schema.declare(
+  (value): value is DshxNativeRpcRequest => Schema.is(nativeRpcRequestSchema)(value),
+  { toJsonSchema: () => Schema.toJsonSchemaDocument(nativeRpcRequestSchema).schema },
+)
+
+const nativeValueSchema = Schema.Union([
+  Schema.Struct({
+    items: Schema.Array(
+      Schema.Struct({
+        sessionId: sessionIdSchema,
+        updatedAt: Schema.Number.check(Schema.isFinite()),
+        running: Schema.Boolean,
+        blank: Schema.Boolean,
+        agentAvailable: Schema.optional(Schema.Boolean),
+        cwd: Schema.optional(Schema.String),
+      }).pipe(passthrough),
+    ).check(Schema.isMaxLength(10_000)),
+  }).pipe(passthrough),
+  Schema.Struct({
+    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(passthrough)).check(Schema.isMaxLength(10_000)),
+    hasMore: Schema.Boolean,
+  }).pipe(passthrough),
+  Schema.Struct({ sessionId: sessionIdSchema, agentPreset: Schema.optional(Schema.String) }).pipe(passthrough),
+  Schema.Struct({ accepted: Schema.Literal(true) }).pipe(passthrough),
+  Schema.Struct({ title: Schema.String, seq: Schema.Number.check(Schema.isFinite()) }).pipe(passthrough),
+  Schema.Struct({ records: Schema.Array(jsonValueSchema).check(Schema.isMaxLength(10_000)), hasMore: Schema.Boolean }).pipe(passthrough),
+  Schema.Struct({ archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)) }).pipe(passthrough),
+])
+
+export const nativeRpcResultSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: nativeValueSchema }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
+])
+
+const trimmedStringSchema = <S extends Schema.ConstraintDecoder<string>>(schema: S) => {
+  const constraints = { ...Schema.toJsonSchemaDocument(schema).schema }
+  delete constraints.type
+
+  return Schema.String.check(
+    Schema.makeFilter(
+      value => {
+        const result = Schema.decodeUnknownResult(schema)(value.trim())
+        return result._tag === 'Success' ? true : result.failure.message
+      },
+      { toJsonSchema: () => constraints },
+    ),
+  ).pipe(Schema.decodeTo(Schema.Trim))
+}
+const stringMinLength = (minimum: number) =>
+  Schema.makeFilter((value: string) => (value.length >= minimum ? true : 'Expected a longer string.'), {
+    toJsonSchema: () => ({ minLength: minimum }),
+  })
+const remotePathSchema = trimmedStringSchema(
+  Schema.String.check(stringMinLength(2), Schema.isMaxLength(4096), Schema.isPattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)),
+)
+const cloneDestinationSchema = Schema.Union([
+  remotePathSchema,
+  trimmedStringSchema(Schema.String.check(stringMinLength(3), Schema.isMaxLength(4096), Schema.isPattern(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u))),
+])
+const localProjectPathSchema = trimmedStringSchema(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)))
+const localProjectFilePathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
+  Schema.makeFilter(path =>
+    !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
+      ? true
+      : 'Invalid input',
+  ),
+)
+const repositoryUrlSchema = trimmedStringSchema(
+  Schema.String.check(
+    Schema.isMaxLength(2048),
+    Schema.isPattern(
+      /^(?:https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?|git@[A-Za-z0-9.-]+:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?)$/u,
+    ),
+  ),
+)
+export const cloneProjectInputEffectSchema = Schema.Struct({
+  runtimeId: idSchema,
+  repositoryUrl: repositoryUrlSchema,
+  destinationPath: cloneDestinationSchema,
+  copyFromPath: Schema.optionalKey(localProjectPathSchema),
+  copyPaths: Schema.optionalKey(Schema.Array(localProjectFilePathSchema).check(Schema.isMaxLength(128))),
+  includeIgnored: Schema.optionalKey(Schema.Boolean),
+}).check(
+  Schema.makeFilter(input => {
+    const issues: string[] = []
+    if ((input.copyFromPath === undefined) !== (input.copyPaths === undefined)) {
+      issues.push('Local source folder and selected file list must be supplied together.')
+    }
+    if (input.includeIgnored === true && input.copyFromPath === undefined) {
+      issues.push('Scanning ignored files requires an explicit local source folder.')
+    }
+    return issues
+  }),
+)
+
+const profileNameSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u))
+
+const semanticVersionSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-legacyZod.-]+)?$/u))
+
+const repositorySchema = Schema.Trim.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(1024),
+  Schema.isPattern(/^(?:https:\/\/[^\s]+|git@[^\s]+|ssh:\/\/[^\s]+)$/u),
+)
+
+const provisionStepSchema = Schema.Literals(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime'])
+
+const remoteNodeSchema = Schema.Struct({
+  path: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  resolved: Schema.optional(Schema.String),
+  nix: Schema.Boolean,
+})
+
+const remoteFactsSchema = Schema.Struct({
+  uname: Schema.String,
+  osVersion: Schema.optional(Schema.String),
+  user: Schema.optional(Schema.String),
+  home: Schema.optional(Schema.String),
   node: remoteNodeSchema,
-  fnm: z.object({ path: z.string().optional(), nodes: z.array(z.object({ version: z.string(), path: z.string() })) }),
-  dsh: z.object({ path: z.string().optional(), version: z.string().optional() }),
-  jj: z.object({ path: z.string().optional(), version: z.string().optional() }),
-  pnpm: z.object({ path: z.string().optional(), version: z.string().optional() }),
-  launch: z.object({ files: z.array(z.string()), port: z.number().int().optional(), pid: z.number().int().optional() }),
-  profile: z.object({ path: z.string(), exists: z.boolean(), pluginLinks: z.number().int(), coreVersion: z.string().optional() }),
-  checkout: z.object({
-    path: z.string(),
-    exists: z.boolean(),
-    installed: z.boolean(),
-    built: z.boolean(),
-    changeId: z.string().optional(),
-    commitId: z.string().optional(),
-    description: z.string().optional(),
-    conflicts: z.number().int(),
-    mainOrigin: z.string().optional(),
+  fnm: Schema.Struct({ path: Schema.optional(Schema.String), nodes: Schema.Array(Schema.Struct({ version: Schema.String, path: Schema.String })) }),
+  dsh: Schema.Struct({ path: Schema.optional(Schema.String), version: Schema.optional(Schema.String) }),
+  jj: Schema.Struct({ path: Schema.optional(Schema.String), version: Schema.optional(Schema.String) }),
+  pnpm: Schema.Struct({ path: Schema.optional(Schema.String), version: Schema.optional(Schema.String) }),
+  launch: Schema.Struct({
+    files: Schema.Array(Schema.String),
+    port: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
+    pid: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
+  }),
+  profile: Schema.Struct({
+    path: Schema.String,
+    exists: Schema.Boolean,
+    pluginLinks: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+    coreVersion: Schema.optional(Schema.String),
+  }),
+  checkout: Schema.Struct({
+    path: Schema.String,
+    exists: Schema.Boolean,
+    installed: Schema.Boolean,
+    built: Schema.Boolean,
+    changeId: Schema.optional(Schema.String),
+    commitId: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String),
+    conflicts: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+    mainOrigin: Schema.optional(Schema.String),
   }),
 })
 
-const remoteDiagnosticSchema = z.object({ code: z.string().max(128), severity: z.enum(['error', 'warning', 'info']), message: z.string().max(2048) })
-
-const remoteExecOutputSchema = z.object({
-  ok: z.literal(true),
-  code: z.number().int().nullable(),
-  stdout: z.string(),
-  stderr: z.string(),
-  timedOut: z.boolean(),
-  durationMs: z.number().int().nonnegative(),
+const remoteDiagnosticSchema = Schema.Struct({
+  code: Schema.String.check(Schema.isMaxLength(128)),
+  severity: Schema.Literals(['error', 'warning', 'info']),
+  message: Schema.String.check(Schema.isMaxLength(2048)),
 })
 
-const provisionPlanStepSchema = z.object({
+const remoteExecOutputSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  code: Schema.NullOr(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
+  stdout: Schema.String,
+  stderr: Schema.String,
+  timedOut: Schema.Boolean,
+  durationMs: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+})
+
+const provisionPlanStepSchema = Schema.Struct({
   id: provisionStepSchema,
-  title: z.string(),
-  state: z.enum(['done', 'pending', 'blocked']),
-  reason: z.string(),
-  commands: z.array(z.string()),
+  title: Schema.String,
+  state: Schema.Literals(['done', 'pending', 'blocked']),
+  reason: Schema.String,
+  commands: Schema.Array(Schema.String),
 })
 
-const provisionStepRunSchema = z.object({
+const provisionStepRunSchema = Schema.Struct({
   id: provisionStepSchema,
-  ok: z.boolean(),
-  state: z.enum(['ran', 'failed', 'skipped', 'blocked']),
-  detail: z.string(),
-  stdout: z.string(),
-  stderr: z.string(),
+  ok: Schema.Boolean,
+  state: Schema.Literals(['ran', 'failed', 'skipped', 'blocked']),
+  detail: Schema.String,
+  stdout: Schema.String,
+  stderr: Schema.String,
 })
 
-const remoteRuntimeStatusSchema = z.object({
-  running: z.boolean(),
-  port: z.number().int().optional(),
-  pid: z.number().int().optional(),
-  command: z.string().optional(),
-  listening: z.boolean(),
-  launchFiles: z.array(z.string()),
-  logFile: z.string(),
-  logBytes: z.number().int().optional(),
+const remoteRuntimeStatusSchema = Schema.Struct({
+  running: Schema.Boolean,
+  port: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
+  pid: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
+  command: Schema.optional(Schema.String),
+  listening: Schema.Boolean,
+  launchFiles: Schema.Array(Schema.String),
+  logFile: Schema.String,
+  logBytes: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
 })
 
-const checkoutSyncPlanSchema = z.object({
-  path: z.string(),
-  bookmark: z.string(),
-  upToDate: z.boolean(),
-  reason: z.string(),
-  commands: z.array(z.string()),
+const checkoutSyncPlanSchema = Schema.Struct({
+  path: Schema.String,
+  bookmark: Schema.String,
+  upToDate: Schema.Boolean,
+  reason: Schema.String,
+  commands: Schema.Array(Schema.String),
 })
 
-export const multiHostApi = defineApi({
+const effectMultiHostApi = defineApi({
   id: 'multi-host',
   version: 1,
   owner: '@dshfiles/multi-host',
   methods: {
     identity: method({
-      input: z.void(),
+      input: Schema.Void,
       output: runtimeIdentitySchema,
       description: 'Identity of this DSH runtime as other hosts see it. Read-only.',
       tool: { name: 'multi_host_identity', readOnly: true, render: compactJson },
     }),
     resourceSnapshot: method({
-      input: z.void(),
+      input: Schema.Void,
       output: resourceSnapshotSchema,
       description: 'Read CPU load and memory capacity for this DSH machine. Read-only.',
       tool: { name: 'multi_host_resource_snapshot', readOnly: true, render: compactJson },
     }),
     resourcePool: method({
-      input: z.void(),
+      input: Schema.Void,
       output: resourcePoolSchema,
       description: 'Read resource snapshots for registered hosts and the least-pressured eligible remote destination. Read-only.',
       tool: { name: 'multi_host_resource_pool', readOnly: true, render: compactJson },
     }),
     list: method({
-      input: z.void(),
-      output: z.object({ hosts: z.array(hostSummarySchema), runtimes: z.array(runtimeSummarySchema) }),
+      input: Schema.Void,
+      output: Schema.Struct({ hosts: Schema.Array(hostSummarySchema), runtimes: Schema.Array(runtimeSummarySchema) }),
       description:
         'List the machines (hosts) this DSH can run threads on and their DSH runtimes: connector, remote home, whether a connection is open, and the last error. Read-only.',
       tool: { name: 'multi_host_list', readOnly: true },
     }),
     hostUpsert: method({
-      input: z.object({ id: idSchema, name: z.string().min(1).max(120), connector: hostConnectorSchema }).strict(),
+      input: Schema.Struct({ id: idSchema, name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)), connector: hostConnectorSchema }),
       output: hostSummarySchema,
     }),
     hostRemove: method({
-      input: z.object({ id: idSchema, removeDirectory: z.boolean() }).strict(),
-      output: z.object({ removed: z.boolean() }),
+      input: Schema.Struct({ id: idSchema, removeDirectory: Schema.Boolean }),
+      output: Schema.Struct({ removed: Schema.Boolean }),
       description:
         'Remove one host record, optionally deleting its directory on that machine; its threads are kept. Call only when the user asked to remove that host.',
       tool: { name: 'multi_host_remove_host', render: compactJson },
     }),
     hostSetHidden: method({
-      input: z.object({ id: idSchema, hidden: z.boolean() }).strict(),
+      input: Schema.Struct({ id: idSchema, hidden: Schema.Boolean }),
       output: hostSummarySchema,
       description:
         'Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.',
       tool: { name: 'multi_host_set_host_hidden', render: compactJson },
     }),
     hostReorder: method({
-      input: z.object({ ids: z.array(idSchema).min(1).max(64) }).strict(),
-      output: z.object({ hosts: z.array(hostSummarySchema) }),
+      input: Schema.Struct({ ids: Schema.Array(idSchema).check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
+      output: Schema.Struct({ hosts: Schema.Array(hostSummarySchema) }),
       description:
         'Reorder the hosts: pass every host id exactly once, in the order the picker page should list them. Call only when the user asked to reorder hosts.',
       tool: { name: 'multi_host_reorder_hosts', render: compactJson },
     }),
     sshConfigHosts: method({
-      input: z.void(),
-      output: z.object({ hosts: z.object({ aliases: z.array(z.string()), knownHosts: z.array(z.string()) }) }),
+      input: Schema.Void,
+      output: Schema.Struct({ hosts: Schema.Struct({ aliases: Schema.Array(Schema.String), knownHosts: Schema.Array(Schema.String) }) }),
       description: 'SSH aliases from the local ssh config and known_hosts entries, as suggestions when adding a host. Read-only.',
       tool: { name: 'multi_host_ssh_hosts', readOnly: true, render: compactJson },
     }),
     discoverHomes: method({
-      input: z.object({ sshTarget: sshTargetSchema }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), homes: z.array(z.object({ path: z.string(), source: z.enum(['multi-host', 'web-url']) })) }),
+      input: Schema.Struct({ sshTarget: sshTargetSchema }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          homes: Schema.Array(Schema.Struct({ path: Schema.String, source: Schema.Literals(['multi-host', 'web-url']) })),
+        }),
         failedSchema,
       ]),
       description: 'Look for DSH homes on a host over SSH, the way the add-host dialog does. Call only when the user asked to set that host up.',
       tool: { name: 'multi_host_find_homes', render: compactJson },
     }),
     testConnection: method({
-      input: z.object({ name: z.string().trim().min(1).max(120), sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), steps: z.array(connectionTestStepSchema), identity: runtimeIdentitySchema }),
+      input: Schema.Struct({
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+        sshTarget: sshTargetSchema,
+        remoteHome: remoteHomeSchema,
+      }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), steps: Schema.Array(connectionTestStepSchema), identity: runtimeIdentitySchema }),
         failedSchema,
       ]),
       description:
@@ -542,26 +632,27 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_test', render: compactJson },
     }),
     saveSshHost: method({
-      input: z
-        .object({ hostId: idSchema.optional(), name: z.string().trim().min(1).max(120), sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema })
-        .strict(),
+      input: Schema.Struct({
+        hostId: Schema.optional(idSchema),
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+        sshTarget: sshTargetSchema,
+        remoteHome: remoteHomeSchema,
+      }),
       output: runtimeRegistrationSchema,
       description:
         'Add or edit an SSH host: its name, ssh target and the remote DSH home to register. Call only when the user asked to add or change that host.',
       tool: { name: 'multi_host_save_ssh_host', render: compactJson },
     }),
     runtimeUpsert: method({
-      input: z
-        .object({
-          hostId: idSchema,
-          name: z.string().min(1).max(120),
-          locator: runtimeLocatorSchema,
-        })
-        .strict(),
+      input: Schema.Struct({
+        hostId: idSchema,
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+        locator: runtimeLocatorSchema,
+      }),
       output: runtimeRegistrationSchema,
     }),
     runtimeStatus: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
+      input: Schema.Struct({ runtimeId: idSchema }),
       output: runtimeStatusSchema,
       description:
         'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. A cold or stale result returns immediately while one coalesced background refresh runs. Read-only.',
@@ -569,56 +660,64 @@ export const multiHostApi = defineApi({
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
     runtimePing: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), ms: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
+        failedSchema,
+      ]),
     }),
     runtimeReconnect: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
       description: 'Drop and reopen the pooled connection to one remote runtime. Call only when the user asked to reconnect it.',
       tool: { name: 'multi_host_reconnect', render: compactJson },
     }),
     /** This runtime's own folders; a manager calls it on a remote runtime to browse that machine. */
     listDirectory: method({
-      input: z.object({ path: z.string().min(1).max(4096).optional() }).strict(),
+      input: Schema.Struct({ path: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096))) }),
       output: directoryListingSchema,
     }),
     createDirectory: method({
-      input: z.object({ path: z.string().min(1).max(4096), name: z.string().min(1).max(255) }).strict(),
-      output: z.object({ path: z.string() }),
+      input: Schema.Struct({
+        path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+      }),
+      output: Schema.Struct({ path: Schema.String }),
     }),
     runtimeCreateDirectory: method({
-      input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096), name: z.string().min(1).max(255) }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), path: z.string() }), failedSchema]),
+      input: Schema.Struct({
+        runtimeId: idSchema,
+        path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), path: Schema.String }), failedSchema]),
       description: 'Create one folder on a remote runtime. Call only when the user asked to create that folder.',
       tool: { name: 'multi_host_mkdir', render: compactJson },
     }),
     /** Register a folder as a workspace on the runtime, so its jj-integration can describe and isolate it. */
     runtimeOpenFolder: method({
-      input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096) }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), workspaceId: z.string(), path: z.string() }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema, path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), workspaceId: Schema.String, path: Schema.String }), failedSchema]),
       description:
         'Register a folder on a remote runtime as a workspace, so the remote jj-integration can describe and isolate it. Call only when the user asked to open that folder there.',
       tool: { name: 'multi_host_open_folder', render: compactJson },
     }),
     localProjectFiles: method({
-      input: z.object({ path: localProjectPathSchema, includeIgnored: z.boolean().optional() }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          root: z.string(),
-          files: z.array(
-            z
-              .object({
-                path: z.string(),
-                bytes: z.number().int().nonnegative(),
-                ignored: z.boolean(),
-                copyable: z.boolean(),
-                copyReason: z.enum(['potential-secret', 'too-large']).optional(),
-              })
-              .strict(),
+      input: Schema.Struct({ path: localProjectPathSchema, includeIgnored: Schema.optional(Schema.Boolean) }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          root: Schema.String,
+          files: Schema.Array(
+            Schema.Struct({
+              path: Schema.String,
+              bytes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+              ignored: Schema.Boolean,
+              copyable: Schema.Boolean,
+              copyReason: Schema.optional(Schema.Literals(['potential-secret', 'too-large'])),
+            }),
           ),
-          truncated: z.boolean(),
+          truncated: Schema.Boolean,
         }),
         failedSchema,
       ]),
@@ -628,14 +727,14 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_local_project_files', readOnly: true, render: compactJson },
     }),
     runtimeCloneProject: method({
-      input: cloneProjectInputSchema,
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          workspaceId: z.string(),
-          path: z.string(),
-          copiedFileCount: z.number().int().nonnegative().optional(),
-          copyWarning: z.string().max(2048).optional(),
+      input: cloneProjectInputEffectSchema,
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          workspaceId: Schema.String,
+          path: Schema.String,
+          copiedFileCount: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+          copyWarning: Schema.optional(Schema.String.check(Schema.isMaxLength(2048))),
         }),
         failedSchema,
       ]),
@@ -644,24 +743,24 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_clone_project', render: compactJson },
     }),
     runtimeBrowse: method({
-      input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),
-      output: z.discriminatedUnion('ok', [directoryListingSchema.extend({ ok: z.literal(true) }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema, path: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096))) }),
+      output: Schema.Union([Schema.Struct({ ...directoryListingSchema.fields, ok: Schema.Literal(true) }), failedSchema]),
       description: 'List folders on a remote runtime at one path (default: the runtime home), for choosing where a remote thread runs. Read-only.',
       tool: { name: 'multi_host_browse', readOnly: true, render: compactJson },
     }),
     runtimePluginCall: method({
-      input: z.object({ runtimeId: idSchema, method: remotePluginMethodSchema, input: jsonValueSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: z.unknown() }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema, method: remotePluginMethodSchema, input: jsonValueSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
     }),
     runtimeModels: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          default: modelSelectionSchema.nullable(),
-          routableProviders: z.array(z.string()),
-          groups: z.array(modelCatalogGroupSchema),
-          failures: z.array(modelCatalogFailureSchema),
+      input: Schema.Struct({ runtimeId: idSchema }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          default: Schema.NullOr(modelSelectionSchema),
+          routableProviders: Schema.Array(Schema.String),
+          groups: Schema.Array(modelCatalogGroupSchema),
+          failures: Schema.Array(modelCatalogFailureSchema),
         }),
         failedSchema,
       ]),
@@ -670,60 +769,65 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_models', readOnly: true, render: compactJson },
     }),
     sessionRuntime: method({
-      input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtimeId: idSchema.nullable() }), failedSchema]),
+      input: Schema.Struct({ sessionId: brandedSessionIdSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtimeId: Schema.NullOr(idSchema) }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
     }),
-    sessionJjRepositories: method({
-      input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), repositories: jjRepositoriesSchema }), failedSchema]),
+    sessionJjRepositories: defineMethod({
+      input: legacyZod.object({ sessionId: brandedSessionIdZodSchema }).strict(),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), repositories: jjRepositoriesEffectSchema }), failedSchema]),
       description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
       tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
     }),
-    runtimeFileReferences: method({
-      input: z.object({ runtimeId: idSchema, sessionId: brandedSessionIdSchema, query: z.string().max(4096) }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), candidates: z.array(fileReferenceCandidateSchema.strict()).max(1000) }),
+    runtimeFileReferences: defineMethod({
+      input: legacyZod
+        .object({
+          runtimeId: legacyZod.string().min(1).max(64),
+          sessionId: brandedSessionIdZodSchema,
+          query: legacyZod.string().max(4096),
+        })
+        .strict(),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), candidates: Schema.Array(fileReferenceCandidateSchema).check(Schema.isMaxLength(1000)) }),
         failedSchema,
       ]),
       description: 'List file and directory mentions for one remote Session cwd. Read-only.',
       tool: { name: 'multi_host_file_references', readOnly: true, render: compactJson },
     }),
     sessionUploadFile: method({
-      input: z
-        .object({
-          runtimeId: idSchema,
-          sessionId: brandedSessionIdSchema,
-          data: encodedFileDataSchema,
-          name: z.string().max(1024).optional(),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: fileUploadValueSchema }), failedSchema]),
+      input: Schema.Struct({
+        runtimeId: idSchema,
+        sessionId: brandedSessionIdSchema,
+        data: encodedFileDataSchema,
+        name: Schema.optional(Schema.String.check(Schema.isMaxLength(1024))),
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: fileUploadValueSchema }), failedSchema]),
       description: 'Stage one file attachment up to 24 MB for a remote Session. This is a non-replayable mutation.',
     }),
     threadCreate: method({
-      input: z.object({ runtimeId: idSchema, cwd: z.string().min(1).max(4096) }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), sessionId: sessionIdSchema }),
-        failedSchema.extend({ sessionId: sessionIdSchema.optional() }),
+      input: Schema.Struct({ runtimeId: idSchema, cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)) }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema }),
+        Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
       ]),
       description:
         'Create an empty thread on one remote runtime and open it in the native chat composer. Call only when the user asked to start a thread on that machine.',
       tool: { name: 'multi_host_create_thread', render: compactJson },
     }),
-    threadStart: method({
-      input: z
+    threadStart: defineMethod({
+      // Effect emits additionalProperties: false for nested model, absent from the Zod baseline.
+      input: legacyZod
         .object({
-          runtimeId: idSchema,
-          cwd: z.string().min(1).max(4096),
-          text: z.string().trim().min(1).max(100_000),
-          agentPreset: z.string().max(128).optional(),
-          model: modelSelectionSchema.optional(),
+          runtimeId: legacyZod.string().min(1).max(64),
+          cwd: legacyZod.string().min(1).max(4096),
+          text: legacyZod.string().trim().min(1).max(100_000),
+          agentPreset: legacyZod.string().max(128).optional(),
+          model: modelSelectionInputZodSchema.optional(),
         })
         .strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), sessionId: sessionIdSchema }),
-        failedSchema.extend({ sessionId: sessionIdSchema.optional() }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema }),
+        Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
       ]),
       description:
         'Start a thread on one remote runtime: its directory, the first message, and optionally an agent preset and model. Call only when the user asked to start a thread on that machine.',
@@ -731,17 +835,23 @@ export const multiHostApi = defineApi({
     }),
     /** The latest messages of a remote thread, reduced to text, for the local remote-thread view. */
     threadTranscript: method({
-      input: z.object({ runtimeId: idSchema, sessionId: sessionIdSchema, maxMessages: z.number().int().min(1).max(200).optional() }).strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          cursor: z.number().int(),
-          cwd: z.string().optional(),
-          title: z.string().optional(),
-          running: z.boolean(),
-          model: modelSelectionSchema.optional(),
-          waiting: transcriptWaitingSchema.optional(),
-          entries: z.array(transcriptEntrySchema),
+      input: Schema.Struct({
+        runtimeId: idSchema,
+        sessionId: sessionIdSchema,
+        maxMessages: Schema.optional(
+          Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(200)),
+        ),
+      }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          cursor: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+          cwd: Schema.optional(Schema.String),
+          title: Schema.optional(Schema.String),
+          running: Schema.Boolean,
+          model: Schema.optional(modelSelectionSchema),
+          waiting: Schema.optional(transcriptWaitingSchema),
+          entries: Schema.Array(transcriptEntrySchema),
         }),
         failedSchema,
       ]),
@@ -749,29 +859,27 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_thread_transcript', readOnly: true, render: compactJson },
     }),
     threadList: method({
-      input: z.void(),
-      output: z.object({ threads: z.array(remoteThreadSchema) }),
+      input: Schema.Void,
+      output: Schema.Struct({ threads: Schema.Array(remoteThreadSchema) }),
       description: 'Every thread this DSH started on remote runtimes, with its host, Session, title and state. Read-only.',
       tool: { name: 'multi_host_threads', readOnly: true, render: compactJson },
     }),
     threadForget: method({
-      input: z.object({ runtimeId: idSchema, sessionId: sessionIdSchema.optional() }).strict(),
-      output: z.object({ removed: z.number().int().nonnegative() }),
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: Schema.optional(sessionIdSchema) }),
+      output: Schema.Struct({ removed: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
       description:
         'Forget the local records of remote threads (one Session, or every thread on a runtime). The remote threads keep running. Call only when the user asked to forget them.',
       tool: { name: 'multi_host_forget_thread', render: compactJson },
     }),
     /** Reply on one remote thread. Steer when it is running, otherwise queue. */
     threadReply: method({
-      input: z
-        .object({
-          runtimeId: idSchema,
-          sessionId: sessionIdSchema,
-          text: z.string().trim().min(1).max(100_000),
-          steer: z.boolean().default(false),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      input: Schema.Struct({
+        runtimeId: idSchema,
+        sessionId: sessionIdSchema,
+        text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(100_000)),
+        steer: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
       description:
         'Send a message to one thread running on another machine: it queues the message, or steers the running turn when steer is true. Call only when the user asked to reply on that thread.',
       tool: {
@@ -781,8 +889,8 @@ export const multiHostApi = defineApi({
     }),
     /** Stop one remote thread through the same cancel path the local Stop uses. */
     threadStop: method({
-      input: z.object({ runtimeId: idSchema, sessionId: sessionIdSchema }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
       description:
         'Stop the running turn of one thread on another machine, through the same cancel path its Stop button uses. Call only when the user asked to stop that thread.',
       tool: {
@@ -792,30 +900,30 @@ export const multiHostApi = defineApi({
     }),
 
     remoteExec: method({
-      input: z
-        .object({
-          sshTarget: sshTargetSchema,
-          command: z.string().trim().min(1).max(2000),
-          cwd: remotePathSchema.optional(),
-          timeoutMs: z.number().int().min(1000).max(120_000).default(30_000),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [remoteExecOutputSchema, failedSchema]),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        command: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(2000)),
+        cwd: Schema.optional(remotePathSchema),
+        timeoutMs: Schema.Number.check(Schema.isFinite())
+          .check(Schema.isInt())
+          .check(Schema.isGreaterThanOrEqualTo(1000))
+          .check(Schema.isLessThanOrEqualTo(120_000))
+          .pipe(Schema.withDecodingDefault(Effect.succeed(30_000))),
+      }),
+      output: Schema.Union([remoteExecOutputSchema, failedSchema]),
       description:
         'Run one bounded command on an SSH host and return its exit code, stdout and stderr (120 s at most). Call only when the user asked to run something on that machine.',
       tool: { name: 'multi_host_exec', render: compactJson },
     }),
     doctor: method({
-      input: z
-        .object({
-          sshTarget: sshTargetSchema,
-          profile: profileNameSchema.default('web'),
-          checkoutPath: remotePathSchema.optional(),
-          dshVersion: semanticVersionSchema.optional(),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), facts: remoteFactsSchema, diagnostics: z.array(remoteDiagnosticSchema) }),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        profile: profileNameSchema.pipe(Schema.withDecodingDefault(Effect.succeed('web'))),
+        checkoutPath: Schema.optional(remotePathSchema),
+        dshVersion: Schema.optional(semanticVersionSchema),
+      }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), facts: remoteFactsSchema, diagnostics: Schema.Array(remoteDiagnosticSchema) }),
         failedSchema,
       ]),
       description:
@@ -823,27 +931,27 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_doctor', readOnly: true, render: compactJson },
     }),
     provision: method({
-      input: z
-        .object({
-          sshTarget: sshTargetSchema,
-          remoteHome: remoteHomeSchema,
-          checkoutPath: remotePathSchema.optional(),
-          profile: profileNameSchema.default('web'),
-          repository: repositorySchema,
-          revision: z.string().trim().min(1).max(128).optional(),
-          dshVersion: semanticVersionSchema,
-          nodeVersion: z.string().trim().min(1).max(32).default('22.23.3'),
-          steps: z.array(provisionStepSchema).min(1).default(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime']),
-          confirm: z.enum(['all', 'next']).default('next'),
-          dryRun: z.boolean().default(false),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          plan: z.array(provisionPlanStepSchema),
-          executed: z.array(provisionStepRunSchema),
-          remaining: z.array(provisionStepSchema),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        remoteHome: remoteHomeSchema,
+        checkoutPath: Schema.optional(remotePathSchema),
+        profile: profileNameSchema.pipe(Schema.withDecodingDefault(Effect.succeed('web'))),
+        repository: repositorySchema,
+        revision: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+        dshVersion: semanticVersionSchema,
+        nodeVersion: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(32)).pipe(Schema.withDecodingDefault(Effect.succeed('22.23.3'))),
+        steps: Schema.Array(provisionStepSchema)
+          .check(Schema.isMinLength(1))
+          .pipe(Schema.withDecodingDefault(Effect.succeed(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime']))),
+        confirm: Schema.Literals(['all', 'next']).pipe(Schema.withDecodingDefault(Effect.succeed('next'))),
+        dryRun: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+      }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          plan: Schema.Array(provisionPlanStepSchema),
+          executed: Schema.Array(provisionStepRunSchema),
+          remaining: Schema.Array(provisionStepSchema),
         }),
         failedSchema,
       ]),
@@ -852,23 +960,21 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_provision', render: compactJson },
     }),
     remoteRuntimeStatus: method({
-      input: z.object({ sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema.optional() }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), status: remoteRuntimeStatusSchema }), failedSchema]),
+      input: Schema.Struct({ sshTarget: sshTargetSchema, remoteHome: Schema.optional(remoteHomeSchema) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), status: remoteRuntimeStatusSchema }), failedSchema]),
       description: 'Whether a DSH runtime answers on one SSH host: its launch file, port, pid, process command and log size. Read-only.',
       tool: { name: 'multi_host_runtime_status', readOnly: true, render: compactJson },
     }),
     runtimeControl: method({
-      input: z
-        .object({
-          sshTarget: sshTargetSchema,
-          remoteHome: remoteHomeSchema.optional(),
-          action: z.enum(['start', 'stop']),
-          checkoutPath: remotePathSchema.optional(),
-          profile: profileNameSchema.default('web'),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({ ok: z.literal(true), action: z.enum(['start', 'stop']), detail: z.string(), status: remoteRuntimeStatusSchema }),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        remoteHome: Schema.optional(remoteHomeSchema),
+        action: Schema.Literals(['start', 'stop']),
+        checkoutPath: Schema.optional(remotePathSchema),
+        profile: profileNameSchema.pipe(Schema.withDecodingDefault(Effect.succeed('web'))),
+      }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literals(['start', 'stop']), detail: Schema.String, status: remoteRuntimeStatusSchema }),
         failedSchema,
       ]),
       description:
@@ -876,28 +982,34 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_runtime_control', render: compactJson },
     }),
     runtimeLogs: method({
-      input: z.object({ sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema.optional(), lines: z.number().int().min(1).max(400).default(200) }).strict(),
-      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), logFile: z.string(), tail: z.string() }), failedSchema]),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        remoteHome: Schema.optional(remoteHomeSchema),
+        lines: Schema.Number.check(Schema.isFinite())
+          .check(Schema.isInt())
+          .check(Schema.isGreaterThanOrEqualTo(1))
+          .check(Schema.isLessThanOrEqualTo(400))
+          .pipe(Schema.withDecodingDefault(Effect.succeed(200))),
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), logFile: Schema.String, tail: Schema.String }), failedSchema]),
       description: 'Read the tail of the headless DSH runtime log on one SSH host (400 lines at most). Read-only.',
       tool: { name: 'multi_host_runtime_logs', readOnly: true, render: compactJson },
     }),
     checkoutSync: method({
-      input: z
-        .object({
-          sshTarget: sshTargetSchema,
-          path: remotePathSchema,
-          bookmark: z.string().trim().min(1).max(128).default('main'),
-          apply: z.boolean().default(false),
-        })
-        .strict(),
-      output: z.discriminatedUnion('ok', [
-        z.object({
-          ok: z.literal(true),
-          applied: z.boolean(),
-          detail: z.string(),
+      input: Schema.Struct({
+        sshTarget: sshTargetSchema,
+        path: remotePathSchema,
+        bookmark: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128)).pipe(Schema.withDecodingDefault(Effect.succeed('main'))),
+        apply: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+      }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          applied: Schema.Boolean,
+          detail: Schema.String,
           plan: checkoutSyncPlanSchema,
-          stdout: z.string(),
-          stderr: z.string(),
+          stdout: Schema.String,
+          stderr: Schema.String,
         }),
         failedSchema,
       ]),
@@ -906,45 +1018,53 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_checkout_sync', render: compactJson },
     }),
     runtimeCall: method({
-      input: z.object({ runtimeId: idSchema, request: nativeRpcSchema }).strict(),
+      input: Schema.Struct({ runtimeId: idSchema, request: nativeRpcSchema }),
       output: nativeRpcResultSchema,
     }),
     sessionCursor: method({
-      input: z.object({ runtimeId: idSchema, sessionId: z.string().min(1) }).strict(),
-      output: z.object({ cursor: z.number().int().safe().min(-1) }),
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: Schema.String.check(Schema.isMinLength(1)) }),
+      output: Schema.Struct({
+        cursor: Schema.Number.check(Schema.isFinite())
+          .check(Schema.isInt())
+          .check(Schema.isBetween({ minimum: -Number.MAX_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }))
+          .check(Schema.isGreaterThanOrEqualTo(-1)),
+      }),
     }),
     runtimeOpenView: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
-      output: z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }),
+      input: Schema.Struct({ runtimeId: idSchema }),
+      output: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()), launchUrl: urlString }),
     }),
     runtimeCloseView: method({
-      input: z.object({ leaseId: z.string().uuid() }).strict(),
-      output: z.object({ closed: z.boolean() }),
+      input: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()) }),
+      output: Schema.Struct({ closed: Schema.Boolean }),
     }),
     runtimeRemove: method({
-      input: z.object({ runtimeId: idSchema }).strict(),
-      output: z.object({ removed: z.boolean() }),
+      input: Schema.Struct({ runtimeId: idSchema }),
+      output: Schema.Struct({ removed: Schema.Boolean }),
       description: 'Remove one runtime registration from a host. Call only when the user asked to remove it.',
       tool: { name: 'multi_host_remove_runtime', render: compactJson },
     }),
   },
 })
 
-export type HostSummary = z.infer<typeof hostSummarySchema>
-export type ConnectionTestStep = z.infer<typeof connectionTestStepSchema>
-export type RemoteThreadSummary = z.infer<typeof remoteThreadSchema>
-export type DirectoryListing = z.infer<typeof directoryListingSchema>
-export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>
-export type TranscriptWaiting = z.infer<typeof transcriptWaitingSchema>
-export type ModelSelection = z.infer<typeof modelSelectionSchema>
-export type RuntimeSummary = z.infer<typeof runtimeSummarySchema>
-export type WorkspaceSummary = z.infer<typeof workspaceSchema>
-export type SessionSummary = z.infer<typeof sessionSchema>
-export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>
-export type ResourceSnapshot = z.infer<typeof resourceSnapshotSchema>
-export type ResourceProbe = z.infer<typeof resourceProbeSchema>
-export type ResourcePoolEntry = z.infer<typeof resourcePoolEntrySchema>
-export type ResourceSelection = z.infer<typeof resourceSelectionSchema>
-export type ResourcePool = z.infer<typeof resourcePoolSchema>
-export type NativeRpcRequest = z.infer<typeof nativeRpcSchema>
-export type NativeRpcResult = z.infer<typeof nativeRpcResultSchema>
+export type EffectMultiHostApi = typeof effectMultiHostApi
+export const multiHostApi = baselineZodMultiHostApi
+
+export type HostSummary = Schema.Schema.Type<typeof hostSummarySchema>
+export type ConnectionTestStep = Schema.Schema.Type<typeof connectionTestStepSchema>
+export type RemoteThreadSummary = Schema.Schema.Type<typeof remoteThreadSchema>
+export type DirectoryListing = Schema.Schema.Type<typeof directoryListingSchema>
+export type TranscriptEntry = Schema.Schema.Type<typeof transcriptEntrySchema>
+export type TranscriptWaiting = Schema.Schema.Type<typeof transcriptWaitingSchema>
+export type ModelSelection = Schema.Schema.Type<typeof modelSelectionSchema>
+export type RuntimeSummary = Schema.Schema.Type<typeof runtimeSummarySchema>
+export type WorkspaceSummary = Schema.Schema.Type<typeof workspaceSchema>
+export type SessionSummary = Schema.Schema.Type<typeof sessionSchema>
+export type RuntimeStatus = Schema.Schema.Type<typeof runtimeStatusSchema>
+export type ResourceSnapshot = Schema.Schema.Type<typeof resourceSnapshotSchema>
+export type ResourceProbe = Schema.Schema.Type<typeof resourceProbeSchema>
+export type ResourcePoolEntry = Schema.Schema.Type<typeof resourcePoolEntrySchema>
+export type ResourceSelection = Schema.Schema.Type<typeof resourceSelectionSchema>
+export type ResourcePool = Schema.Schema.Type<typeof resourcePoolSchema>
+export type NativeRpcRequest = Schema.Schema.Type<typeof nativeRpcSchema>
+export type NativeRpcResult = Schema.Schema.Type<typeof nativeRpcResultSchema>

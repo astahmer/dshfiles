@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
+import { passthrough, safeDecode } from '../schema.js'
 import { Buffer } from 'node:buffer'
 import { WebSocket } from 'ws'
-import { z } from 'zod'
 import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
 import { traceparent, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 
@@ -9,30 +10,27 @@ const maxNativeResponseBytes = 32 * 1024 * 1024
 const maxNativeRequestBytes = 48 * 1024 * 1024
 const maxStreamFrameBytes = 2 * 1024 * 1024
 
-const nativeResponseSchema = z
-  .object({
-    type: z.literal('server-response'),
-    rpcId: z.string(),
-    result: z.discriminatedUnion('ok', [
-      z.object({ ok: z.literal(true), value: z.unknown() }).passthrough(),
-      z
-        .object({
-          ok: z.literal(false),
-          error: z.object({ code: z.string().max(128).optional(), message: z.string().max(8192) }).passthrough(),
-        })
-        .passthrough(),
-    ]),
-  })
-  .passthrough()
+const nativeResponseSchema = Schema.Struct({
+  type: Schema.Literal('server-response'),
+  rpcId: Schema.String,
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }).pipe(passthrough),
+    Schema.Struct({
+      ok: Schema.Literal(false),
+      error: Schema.Struct({
+        code: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+        message: Schema.String.check(Schema.isMaxLength(8192)),
+      }).pipe(passthrough),
+    }).pipe(passthrough),
+  ]),
+}).pipe(passthrough)
 
-const streamFrameSchema = z
-  .object({
-    streamId: z.string(),
-    type: z.enum(['item', 'error', 'end']),
-    value: z.unknown().optional(),
-    error: z.object({ code: z.string().optional(), message: z.string().optional() }).optional(),
-  })
-  .passthrough()
+const streamFrameSchema = Schema.Struct({
+  streamId: Schema.String,
+  type: Schema.Literals(['item', 'error', 'end']),
+  value: Schema.optional(Schema.Unknown),
+  error: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String), message: Schema.optional(Schema.String) })),
+}).pipe(passthrough)
 
 export type Gateway = {
   readonly origin: string
@@ -243,7 +241,7 @@ const followOnce = async ({
         finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent invalid JSON.'))
         return
       }
-      const frame = streamFrameSchema.safeParse(raw)
+      const frame = safeDecode(streamFrameSchema, raw)
       if (!frame.success) {
         finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.'))
         return
@@ -328,7 +326,7 @@ const streamFrames = async function* ({
       notify()
       return
     }
-    const frame = streamFrameSchema.safeParse(raw)
+    const frame = safeDecode(streamFrameSchema, raw)
     if (!frame.success) {
       failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.')
       notify()
@@ -437,7 +435,7 @@ const attemptUntracedRun = async ({ origin, cookie, namespace, method, args, sig
   } catch {
     return { ok: false, code: 'invalid-response', message: 'The runtime API returned invalid JSON.' }
   }
-  const parsed = nativeResponseSchema.safeParse(body)
+  const parsed = safeDecode(nativeResponseSchema, body)
   if (!parsed.success || parsed.data.rpcId !== rpcId) {
     return { ok: false, code: 'invalid-response', message: 'The runtime API returned an invalid RPC envelope.' }
   }

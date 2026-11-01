@@ -1,147 +1,117 @@
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
+import { dateTimeString } from './schema.js'
 
-const idSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const idSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
-const sshTargetSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(255)
-  .regex(/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const sshTargetSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(255), Schema.isPattern(/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
-const profileSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
-const originPortSchema = z.number().int().safe().min(40_000).max(59_999)
+const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
+const originPortSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(40_000), Schema.isLessThanOrEqualTo(59_999))
 
-const localLaunchUrlSchema = z
-  .string()
-  .min(1)
-  .max(2048)
-  .superRefine((value, context) => {
+const localLaunchUrlSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)).check(
+  Schema.makeFilter(value => {
     let url: URL
     try {
       url = new URL(value)
     } catch {
-      context.addIssue({ code: 'custom', message: 'The launch URL is invalid.' })
-      return
+      return 'The launch URL is invalid.'
     }
     const addressParts = url.hostname.split('.')
     const loopbackIpv4 = addressParts.length === 4 && addressParts[0] === '127' && addressParts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
     const loopback = url.hostname === 'localhost' || url.hostname === '[::1]' || url.hostname === '::1' || loopbackIpv4
+    const issues: string[] = []
     if (url.protocol !== 'http:' || !loopback || url.username || url.password) {
-      context.addIssue({ code: 'custom', message: 'A local runtime URL must use HTTP loopback without user information.' })
+      issues.push('A local runtime URL must use HTTP loopback without user information.')
     }
     const token = url.searchParams.get('token')
     if (url.pathname !== '/' || token === null || !/^[A-Za-z0-9._~-]{8,512}$/.test(token) || url.searchParams.size !== 1 || url.hash) {
-      context.addIssue({ code: 'custom', message: 'A local runtime URL must be the tokenized root launch URL.' })
+      issues.push('A local runtime URL must be the tokenized root launch URL.')
     }
-  })
+    return issues
+  }),
+)
 
-export const hostConnectorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local') }).strict(),
-  z.object({ kind: z.literal('ssh'), sshTarget: sshTargetSchema }).strict(),
+export const hostConnectorSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('local') }),
+  Schema.Struct({ kind: Schema.Literal('ssh'), sshTarget: sshTargetSchema }),
 ])
 
-export const runtimeLocatorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local'), launchUrl: localLaunchUrlSchema }).strict(),
-  z
-    .object({
-      kind: z.literal('ssh'),
-      /** Ignored since discovery reads the launch file; kept so directories written before that still decode. */
-      unit: z
-        .string()
-        .trim()
-        .min(1)
-        .max(128)
-        .regex(/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/)
-        .optional(),
-      remoteHome: z
-        .string()
-        .trim()
-        .min(2)
-        .max(1024)
-        .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/),
-    })
-    .strict(),
+export const runtimeLocatorSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('local'), launchUrl: localLaunchUrlSchema }),
+  Schema.Struct({
+    kind: Schema.Literal('ssh'),
+    /** Ignored since discovery reads the launch file; kept so directories written before that still decode. */
+    unit: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/))),
+    remoteHome: Schema.Trim.check(Schema.isMinLength(2), Schema.isMaxLength(1024), Schema.isPattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/)),
+  }),
 ])
 
-export const runtimeIdentitySchema = z
-  .object({
-    protocolVersion: z.literal(1),
-    runtimeId: z.string().uuid(),
-    profile: profileSchema,
-    homeLeaf: z.string().min(1).max(128),
-    dshVersion: z.string().min(1).max(80),
-    capabilities: z.array(z.enum(['workspace', 'session', 'agent'])).max(8),
-  })
-  .strict()
+export const runtimeIdentitySchema = Schema.Struct({
+  protocolVersion: Schema.Literal(1),
+  runtimeId: Schema.String.check(Schema.isUUID()),
+  profile: profileSchema,
+  homeLeaf: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  dshVersion: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  capabilities: Schema.Array(Schema.Literals(['workspace', 'session', 'agent'])).check(Schema.isMaxLength(8)),
+})
 
-export const hostRecordSchema = z
-  .object({
-    schemaVersion: z.literal(2),
-    id: idSchema,
-    name: z.string().trim().min(1).max(120),
-    connector: hostConnectorSchema,
-    /** Hidden hosts stay registered and keep their threads; only the destination picker leaves them out. */
-    hidden: z.boolean().default(false),
-    /** Directory order, lowest first; the store fills it in for records written before it existed. */
-    position: z.number().int().nonnegative().optional(),
-    createdAt: z.string().datetime(),
-  })
-  .strict()
+export const hostRecordSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  id: idSchema,
+  name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  connector: hostConnectorSchema,
+  /** Hidden hosts stay registered and keep their threads; only the destination picker leaves them out. */
+  hidden: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** Directory order, lowest first; the store fills it in for records written before it existed. */
+  position: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  createdAt: dateTimeString,
+})
 
-export const runtimeRecordSchema = z
-  .object({
-    schemaVersion: z.literal(2),
-    id: idSchema,
-    hostId: idSchema,
-    name: z.string().trim().min(1).max(120),
-    locator: runtimeLocatorSchema,
-    identity: runtimeIdentitySchema.nullable(),
-    originPort: originPortSchema.optional(),
-    createdAt: z.string().datetime(),
-    lastSeenAt: z.string().datetime().optional(),
-  })
-  .strict()
+export const runtimeRecordSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  id: idSchema,
+  hostId: idSchema,
+  name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  locator: runtimeLocatorSchema,
+  identity: Schema.NullOr(runtimeIdentitySchema),
+  originPort: Schema.optional(originPortSchema),
+  createdAt: dateTimeString,
+  lastSeenAt: Schema.optional(dateTimeString),
+})
 
-export const hostDirectorySchema = z
-  .object({
-    schemaVersion: z.literal(2),
-    hosts: z.array(hostRecordSchema).max(64),
-    runtimes: z.array(runtimeRecordSchema).max(128),
-    retiredPorts: z.array(originPortSchema).max(20_000).default([]),
-  })
-  .strict()
-  .superRefine((directory, context) => {
+export const hostDirectorySchema = Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  hosts: Schema.Array(hostRecordSchema).check(Schema.isMaxLength(64)),
+  runtimes: Schema.Array(runtimeRecordSchema).check(Schema.isMaxLength(128)),
+  retiredPorts: Schema.Array(originPortSchema)
+    .check(Schema.isMaxLength(20_000))
+    .pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+}).check(
+  Schema.makeFilter(directory => {
+    const issues: string[] = []
     if (new Set(directory.retiredPorts).size !== directory.retiredPorts.length) {
-      context.addIssue({ code: 'custom', message: 'Duplicate retired runtime origin port.' })
+      issues.push('Duplicate retired runtime origin port.')
     }
     const hostIds = new Set<string>()
     for (const host of directory.hosts) {
-      if (hostIds.has(host.id)) context.addIssue({ code: 'custom', message: `Duplicate host id ${host.id}.` })
+      if (hostIds.has(host.id)) issues.push(`Duplicate host id ${host.id}.`)
       hostIds.add(host.id)
     }
     const runtimeIds = new Set<string>()
     const originPorts = new Set(directory.retiredPorts)
     for (const runtime of directory.runtimes) {
-      if (runtimeIds.has(runtime.id)) context.addIssue({ code: 'custom', message: `Duplicate runtime id ${runtime.id}.` })
+      if (runtimeIds.has(runtime.id)) issues.push(`Duplicate runtime id ${runtime.id}.`)
       runtimeIds.add(runtime.id)
       if (runtime.originPort !== undefined) {
-        if (originPorts.has(runtime.originPort)) context.addIssue({ code: 'custom', message: `Duplicate runtime origin port ${runtime.originPort}.` })
+        if (originPorts.has(runtime.originPort)) issues.push(`Duplicate runtime origin port ${runtime.originPort}.`)
         originPorts.add(runtime.originPort)
       }
-      if (!hostIds.has(runtime.hostId)) context.addIssue({ code: 'custom', message: `Runtime ${runtime.id} refers to missing host ${runtime.hostId}.` })
+      if (!hostIds.has(runtime.hostId)) issues.push(`Runtime ${runtime.id} refers to missing host ${runtime.hostId}.`)
     }
-  })
+    return issues
+  }),
+)
 
 export const runtimeOriginPort = (runtimeId: string, occupied: readonly number[] = []): number => {
   const occupiedPorts = new Set(occupied)
@@ -159,9 +129,9 @@ export const runtimeOriginPort = (runtimeId: string, occupied: readonly number[]
   throw new Error('The runtime browser origin port range is exhausted.')
 }
 
-export type HostConnector = z.infer<typeof hostConnectorSchema>
-export type RuntimeLocator = z.infer<typeof runtimeLocatorSchema>
-export type RuntimeIdentity = z.infer<typeof runtimeIdentitySchema>
-export type HostRecord = z.infer<typeof hostRecordSchema>
-export type RuntimeRecord = z.infer<typeof runtimeRecordSchema>
-export type HostDirectory = z.infer<typeof hostDirectorySchema>
+export type HostConnector = Schema.Schema.Type<typeof hostConnectorSchema>
+export type RuntimeLocator = Schema.Schema.Type<typeof runtimeLocatorSchema>
+export type RuntimeIdentity = Schema.Schema.Type<typeof runtimeIdentitySchema>
+export type HostRecord = Schema.Schema.Type<typeof hostRecordSchema>
+export type RuntimeRecord = Schema.Schema.Type<typeof runtimeRecordSchema>
+export type HostDirectory = Schema.Schema.Type<typeof hostDirectorySchema>

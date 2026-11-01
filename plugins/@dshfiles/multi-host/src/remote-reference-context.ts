@@ -1,13 +1,23 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { passthrough, safeDecode } from './schema.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { formatSessionReferenceMention, parseSessionReferenceText } from '@deepseek-ai/dsh-session-reference'
 import type { SessionReferenceInput } from '@deepseek-ai/dsh-session-reference/types'
 
-const eventSchema = z.object({ type: z.string(), seq: z.number().int().nonnegative(), data: z.unknown() }).passthrough()
-const recordSchema = z.object({ type: z.literal('event'), event: eventSchema }).passthrough()
-const textBlockSchema = z.object({ type: z.string(), text: z.string().max(100_000).optional() }).passthrough()
-const userMessageSchema = z.object({ source: z.object({ kind: z.string() }).passthrough(), content: z.array(textBlockSchema).max(512) }).passthrough()
-const assistantMessageSchema = z.object({ message: z.object({ content: z.array(textBlockSchema).max(512) }).passthrough() }).passthrough()
+const eventSchema = Schema.Struct({
+  type: Schema.String,
+  seq: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  data: Schema.Unknown,
+}).pipe(passthrough)
+const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(passthrough)
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))) }).pipe(passthrough)
+const userMessageSchema = Schema.Struct({
+  source: Schema.Struct({ kind: Schema.String }).pipe(passthrough),
+  content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)),
+}).pipe(passthrough)
+const assistantMessageSchema = Schema.Struct({
+  message: Schema.Struct({ content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)) }).pipe(passthrough),
+}).pipe(passthrough)
 
 const MAX_REMOTE_REFERENCE_MESSAGES = 24
 const MAX_REMOTE_REFERENCE_CHARS = 3_000
@@ -15,7 +25,7 @@ const MAX_REMOTE_REFERENCE_BYTES = 16_000
 
 export type RemoteReferenceConversationItem = { readonly role: 'user' | 'assistant'; readonly text: string }
 
-const messageText = (blocks: readonly z.infer<typeof textBlockSchema>[]): string =>
+const messageText = (blocks: readonly Schema.Schema.Type<typeof textBlockSchema>[]): string =>
   blocks
     .filter(block => block.type === 'text' && block.text !== undefined)
     .map(block => block.text ?? '')
@@ -47,18 +57,18 @@ export class RemoteReferenceContext {
   static remoteReferenceConversation(records: readonly unknown[]): readonly RemoteReferenceConversationItem[] {
     const messages: { readonly seq: number; readonly item: RemoteReferenceConversationItem }[] = []
     for (const raw of records) {
-      const record = recordSchema.safeParse(raw)
+      const record = safeDecode(recordSchema, raw)
       if (!record.success) continue
       const { type, seq, data } = record.data.event
       if (type === 'user/message') {
-        const message = userMessageSchema.safeParse(data)
+        const message = safeDecode(userMessageSchema, data)
         if (!message.success || message.data.source.kind !== 'user') continue
         const text = messageText(message.data.content)
         if (text !== '') messages.push({ seq, item: { role: 'user', text } })
         continue
       }
       if (type !== 'assistant/message') continue
-      const message = assistantMessageSchema.safeParse(data)
+      const message = safeDecode(assistantMessageSchema, data)
       if (!message.success) continue
       const text = messageText(message.data.message.content)
       if (text !== '') messages.push({ seq, item: { role: 'assistant', text } })

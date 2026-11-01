@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
+import { decode, passthrough, safeDecode } from './schema.js'
 import { readFileSync, rmSync } from 'node:fs'
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { z } from 'zod'
 
 /**
  * Where a running DSH tells a multi-host manager how to reach it: the tokenized loopback launch URL, written 0600 by
@@ -14,11 +15,12 @@ export const launchFilePaths = (dshHome: string): readonly [string, string] => [
   join(dshHome, 'runtime', 'web-url'),
 ]
 
-const launchUrlSchema = z
-  .string()
-  .trim()
-  .regex(/^http:\/\/127\.0\.0\.1:\d{1,5}\/\?token=[A-Za-z0-9._~-]{8,512}$/)
-const launchRecordSchema = z.object({ schemaVersion: z.literal(1), launchUrl: launchUrlSchema, pid: z.number().int().positive() }).passthrough()
+const launchUrlSchema = Schema.Trim.check(Schema.isPattern(/^http:\/\/127\.0\.0\.1:\d{1,5}\/\?token=[A-Za-z0-9._~-]{8,512}$/))
+const launchRecordSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  launchUrl: launchUrlSchema,
+  pid: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+}).pipe(passthrough)
 
 export type RuntimeLaunch = { readonly port: number; readonly token: string }
 
@@ -26,10 +28,10 @@ export type RuntimeLaunch = { readonly port: number; readonly token: string }
 export const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined => {
   let url: string | undefined
   try {
-    const record = launchRecordSchema.safeParse(JSON.parse(content))
+    const record = safeDecode(launchRecordSchema, JSON.parse(content))
     if (record.success) url = record.data.launchUrl
   } catch {
-    const line = launchUrlSchema.safeParse(content.split('\n', 1)[0] ?? '')
+    const line = safeDecode(launchUrlSchema, content.split('\n', 1)[0] ?? '')
     if (line.success) url = line.data
   }
   if (url === undefined) return undefined
@@ -42,7 +44,7 @@ export const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined =
 
 const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome: string; readonly launchUrl: string }): Promise<string> => {
   const [path] = launchFilePaths(dshHome)
-  const record = { schemaVersion: 1, launchUrl: launchUrlSchema.parse(launchUrl), pid: process.pid, writtenAt: new Date().toISOString() }
+  const record = { schemaVersion: 1, launchUrl: decode(launchUrlSchema, launchUrl), pid: process.pid, writtenAt: new Date().toISOString() }
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   await chmod(dirname(path), 0o700)
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
@@ -65,7 +67,7 @@ const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome: strin
 const removeLaunchFile = async (path: string): Promise<void> => {
   const content = await readFile(path, 'utf8').catch(() => '')
   try {
-    const record = launchRecordSchema.safeParse(JSON.parse(content))
+    const record = safeDecode(launchRecordSchema, JSON.parse(content))
     if (record.success && record.data.pid === process.pid) await rm(path, { force: true })
   } catch {
     // Not ours to remove.
@@ -74,7 +76,7 @@ const removeLaunchFile = async (path: string): Promise<void> => {
 
 const removeLaunchFileSync = (path: string): void => {
   try {
-    const record = launchRecordSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')))
+    const record = safeDecode(launchRecordSchema, JSON.parse(readFileSync(path, 'utf8')))
     if (record.success && record.data.pid === process.pid) rmSync(path, { force: true })
   } catch {
     // Not ours to remove.

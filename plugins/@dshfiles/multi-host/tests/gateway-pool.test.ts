@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import type { Gateway } from '../src/connectors/gateway.js'
 import { createServer, type Server } from 'node:http'
-import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { decode, passthrough } from '../src/schema.js'
 import { connectGateway, GatewayUnavailableError } from '../src/connectors/gateway.js'
 import { createGatewayPool } from '../src/gateway-pool.js'
 import { NativeRpcModel } from '../src/native-rpc.js'
@@ -119,7 +120,7 @@ const startRuntimeFixture = async () => {
         response.destroy()
         return
       }
-      const rpcId = decodeJson(z.object({ rpcId: z.string() }).passthrough(), body.join('')).rpcId
+      const rpcId = decode(Schema.Struct({ rpcId: Schema.String }).pipe(passthrough), JSON.parse(body.join(''))).rpcId
       const value = request.url === '/api/session/create' ? { sessionId: 'session-1' } : { items: [] }
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value } }))

@@ -1,23 +1,24 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { z as storedValueZod } from 'zod'
 
+/** Persisted-value storage is ZodType-only; keep this boundary on Zod until that API changes. */
 /** Where the next new thread runs. Shared by every bundle that renders the destination bar. */
-const destinationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local') }),
-  z.object({
-    kind: z.literal('runtime'),
-    runtimeId: z.string().min(1).max(64),
+const destinationSchema = storedValueZod.discriminatedUnion('kind', [
+  storedValueZod.object({ kind: storedValueZod.literal('local') }),
+  storedValueZod.object({
+    kind: storedValueZod.literal('runtime'),
+    runtimeId: storedValueZod.string().min(1).max(64),
     /** Folder on that host; the composer stays inert until one is chosen. */
-    folder: z.string().min(1).max(4096).optional(),
+    folder: storedValueZod.string().min(1).max(4096).optional(),
     /** jj options applied on the host when it runs @dshfiles/jj-integration. */
-    isolate: z.boolean().optional(),
-    base: z.string().min(1).max(256).optional(),
+    isolate: storedValueZod.boolean().optional(),
+    base: storedValueZod.string().min(1).max(256).optional(),
   }),
 ])
-export type HostDestination = z.infer<typeof destinationSchema>
+export type HostDestination = storedValueZod.infer<typeof destinationSchema>
 
-const remoteThreadRefSchema = z.object({ runtimeId: z.string().min(1).max(64), sessionId: z.string().min(1).max(256) })
-export type RemoteThreadRef = z.infer<typeof remoteThreadRefSchema>
+const remoteThreadRefSchema = storedValueZod.object({ runtimeId: storedValueZod.string().min(1).max(64), sessionId: storedValueZod.string().min(1).max(256) })
+export type RemoteThreadRef = storedValueZod.infer<typeof remoteThreadRefSchema>
 
 /** The `main` panel key of the remote thread view, selected with `layout.selectPanel`. */
 export const REMOTE_THREAD_PANEL = 'dshfiles-multi-host-thread'
