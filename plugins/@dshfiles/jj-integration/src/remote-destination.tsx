@@ -16,21 +16,21 @@ import {
   type MultiHostClient,
 } from '@dshfiles/multi-host/destination'
 import { useState } from 'react'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { DestinationView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 type RuntimeDestination = Extract<HostDestination, { kind: 'runtime' }>
 
-const remoteProjectsSchema = z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() })) })
-const remoteWorkspaceClassificationSchema = z.object({ jjWorkspaceIds: z.array(z.string()) }).strict()
-const remoteDestinationSchema = z.object({
-  vcs: z.enum(['jj', 'none']),
-  bookmark: z.string().nullable(),
-  bookmarks: z.array(z.string()),
-  isolateByDefault: z.boolean(),
-}) satisfies z.ZodType<Pick<DestinationView, 'vcs' | 'bookmark' | 'bookmarks' | 'isolateByDefault'>>
-const provisionedSchema = z.object({ workspaceId: z.string(), isolated: z.boolean() })
+const remoteProjectsSchema = Schema.Struct({ projects: Schema.Array(Schema.Struct({ workspaceId: Schema.String, title: Schema.String, path: Schema.String })) })
+const remoteWorkspaceClassificationSchema = Schema.Struct({ jjWorkspaceIds: Schema.Array(Schema.String) })
+const remoteDestinationSchema = Schema.Struct({
+  vcs: Schema.Literals(['jj', 'none']),
+  bookmark: Schema.NullOr(Schema.String),
+  bookmarks: Schema.Array(Schema.String),
+  isolateByDefault: Schema.Boolean,
+}) satisfies Schema.ConstraintDecoder<Pick<DestinationView, 'vcs' | 'bookmark' | 'bookmarks' | 'isolateByDefault'>>
+const provisionedSchema = Schema.Struct({ workspaceId: Schema.String, isolated: Schema.Boolean })
 
 const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
 const baseName = (path: string): string => path.split('/').filter(Boolean).at(-1) ?? path
@@ -49,8 +49,8 @@ const useRemoteJj = (api: MultiHostClient, destination: RuntimeDestination) =>
         { signal },
       )
       if (!described.ok) return null
-      const parsed = remoteDestinationSchema.safeParse(described.value)
-      return parsed.success ? { ...parsed.data, workspaceId: opened.workspaceId, path: opened.path } : null
+      const parsed = Schema.decodeUnknownOption(remoteDestinationSchema)(described.value)
+      return parsed._tag === 'Some' ? { ...parsed.value, workspaceId: opened.workspaceId, path: opened.path } : null
     },
   })
 
@@ -76,7 +76,7 @@ export const RemoteDestinationChips = (props: {
     retry: false,
     queryFn: async ({ signal }) => {
       const result = await api.runtimePluginCall({ runtimeId: destination.runtimeId, method: 'projects', input: {} }, { signal })
-      return result.ok ? remoteProjectsSchema.safeParse(result.value).data?.projects : undefined
+      return result.ok ? Schema.decodeUnknownOption(remoteProjectsSchema)(result.value).pipe(option => option._tag === 'Some' ? option.value.projects : undefined) : undefined
     },
   })
   const remoteWorkspaceIds = (status.data?.ok === true ? status.data.workspaces : []).map(workspace => workspace.workspaceId).sort()
@@ -95,8 +95,8 @@ export const RemoteDestinationChips = (props: {
           signal.throwIfAborted()
           return []
         }
-        const parsed = remoteWorkspaceClassificationSchema.safeParse(result.value)
-        return parsed.success ? parsed.data.jjWorkspaceIds : []
+        const parsed = Schema.decodeUnknownOption(remoteWorkspaceClassificationSchema)(result.value)
+        return parsed._tag === 'Some' ? parsed.value.jjWorkspaceIds : []
       } catch (error) {
         if (signal.aborted) throw error
         return []
@@ -221,7 +221,7 @@ export const prepareRemoteFolder = async (api: MultiHostClient, destination: Run
     input: { workspaceId: opened.workspaceId, isolate: destination.isolate ?? true, ...(destination.base !== undefined && { base: destination.base }) },
   })
   if (!provisioned.ok) throw new Error(`${provisioned.message} (${provisioned.code})`)
-  const workspaceId = provisionedSchema.parse(provisioned.value).workspaceId
+  const workspaceId = Schema.decodeUnknownSync(provisionedSchema)(provisioned.value).workspaceId
   const status = await api.runtimeStatus({ runtimeId: destination.runtimeId })
   const path = status.ok ? status.workspaces.find(workspace => workspace.workspaceId === workspaceId)?.path : undefined
   if (path === undefined) throw new Error('The host created the thread workspace but did not report its folder.')

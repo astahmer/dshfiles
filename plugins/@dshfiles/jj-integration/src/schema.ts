@@ -102,7 +102,7 @@ export const strictStandardSchema = <S extends SchemaTypes.ConstraintDecoder<unk
   const document = closedDocument(schema)
 
   return {
-    ast: schema.ast,
+    ...schema,
     '~standard': {
       ...standardSchema['~standard'],
       jsonSchema: {

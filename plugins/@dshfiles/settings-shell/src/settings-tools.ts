@@ -2,11 +2,10 @@ import { PluginApiError } from '@dshfiles/dshx/api'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
-import type { z } from 'zod'
-import type { settingsPatchSchema } from './shell-api.js'
+import type { settingsPatchEffectSchema } from './shell-api.js'
 
 /** One namespace's field patch, derived from the contract's input schema. */
-export type SettingsPatch = z.infer<typeof settingsPatchSchema>
+export type SettingsPatch = typeof settingsPatchEffectSchema.Type
 
 /** What these tools read from one settings namespace; `SettingsDescriptor` satisfies it. */
 export interface SettingsRow {

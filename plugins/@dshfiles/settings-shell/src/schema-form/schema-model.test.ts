@@ -1,29 +1,30 @@
-import Schema from '@deepseek-ai/schemastery'
+import Schemastery from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { jsonValueSchema, SettingsSchemaModel, type JsonValue } from './schema-model.js'
 
-const text = (value: JsonValue | undefined): string => z.string().catch('').parse(value)
+const text = (value: JsonValue | undefined): string => Schema.decodeUnknownOption(Schema.String)(value).pipe(Option.getOrElse(() => ''))
 
-const schema = jsonValueSchema.parse(
-  Schema.object({
-    enabled: Schema.boolean().default(true).description('Show the strip.'),
-    maxTabs: Schema.natural().min(2).max(50).default(12).description('Most tabs.'),
-    idleMinutes: Schema.number().default(30),
-    ratio: Schema.percent().default(0.5),
-    openMode: Schema.union([
-      Schema.const('preview').description('Preview: what you open replaces the preview tab.'),
-      Schema.const('new').description('New tab'),
-      Schema.const('replace'),
+const schema = Schema.decodeUnknownSync(jsonValueSchema)(
+  Schemastery.object({
+    enabled: Schemastery.boolean().default(true).description('Show the strip.'),
+    maxTabs: Schemastery.natural().min(2).max(50).default(12).description('Most tabs.'),
+    idleMinutes: Schemastery.number().default(30),
+    ratio: Schemastery.percent().default(0.5),
+    openMode: Schemastery.union([
+      Schemastery.const('preview').description('Preview: what you open replaces the preview tab.'),
+      Schemastery.const('new').description('New tab'),
+      Schemastery.const('replace'),
     ]).default('preview'),
-    notes: Schema.string().role('textarea').default(''),
-    token: Schema.string().role('secret'),
-    secretRef: Schema.string().role('secret-ref').default(''),
-    tags: Schema.array(Schema.string()).default([]),
-    colors: Schema.dict(Schema.union(['warning', 'success'])).default({}),
-    layout: Schema.object({ dense: Schema.boolean().default(false).description('Tighter rows.') }),
-    state: Schema.string().hidden(),
-    rows: Schema.array(Schema.object({ id: Schema.string() })),
+    notes: Schemastery.string().role('textarea').default(''),
+    token: Schemastery.string().role('secret'),
+    secretRef: Schemastery.string().role('secret-ref').default(''),
+    tags: Schemastery.array(Schemastery.string()).default([]),
+    colors: Schemastery.dict(Schemastery.union(['warning', 'success'])).default({}),
+    layout: Schemastery.object({ dense: Schemastery.boolean().default(false).description('Tighter rows.') }),
+    state: Schemastery.string().hidden(),
+    rows: Schemastery.array(Schemastery.object({ id: Schemastery.string() })),
   }).toJSON(),
 )
 

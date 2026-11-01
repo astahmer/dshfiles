@@ -1,8 +1,14 @@
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
-import { jjRepositoriesSchema, jjRepositorySchema, jjRevisionSchema, jjThreadSchema } from '@dshfiles/multi-host/api'
+import {
+  jjRepositoriesEffectSchema,
+  jjRevisionEffectSchema,
+  jjThreadEffectSchema,
+  type JjRepositoryView,
+  type JjRevisionView,
+  type JjThreadView,
+} from '@dshfiles/multi-host/api'
 import { Schema } from 'effect'
-import { z } from 'zod'
 import {
   cancelQueuedLandOutputSchema,
   cleanupKindSchema,
@@ -33,9 +39,7 @@ import { CleanupJobModel } from './cleanup-jobs.js'
 import { strictStandardSchema } from './schema.js'
 
 /**
- * Effect-schema methods publish through `strictStandardSchema` so the closed objects and excess-property rejection
- * `z.object(...).strict()` provided survive. The land, discard and cleanup result trees stay on zod below: they embed
- * the zod revision schemas `@dshfiles/multi-host/api` still publishes, which an Effect tree cannot nest.
+ * Effect-schema methods publish through `strictStandardSchema` so closed objects and excess-property rejection survive.
  */
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
   options: Omit<ApiMethodOptions<Input, Output>, 'input' | 'output' | 'tool'> & {
@@ -45,134 +49,108 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
   },
 ) => defineMethod({ ...options, input: strictStandardSchema(options.input), output: strictStandardSchema(options.output) })
 
-export type ThreadRevisionView = z.infer<typeof jjRevisionSchema>
-export type ThreadView = z.infer<typeof jjThreadSchema>
-export type RepositoryView = z.infer<typeof jjRepositorySchema>
+export type ThreadRevisionView = JjRevisionView
+export type ThreadView = JjThreadView
+export type RepositoryView = JjRepositoryView
 
-const landResultSchema = z
-  .object({
-    status: z.enum(['landed', 'nothing-to-land', 'needs-description', 'conflicted']),
-    revisions: z.array(jjRevisionSchema),
-    files: z.array(z.string()),
-    bookmark: z.string(),
-    /** Where the bookmark points after rebasing; absent from a Host older than this field. */
-    head: jjRevisionSchema.optional(),
-    agentAsked: z.boolean(),
-  })
-  .strict()
-export type LandResult = z.infer<typeof landResultSchema>
+const landResultSchema = Schema.Struct({
+  status: Schema.Literals(['landed', 'nothing-to-land', 'needs-description', 'conflicted']),
+  revisions: Schema.Array(jjRevisionEffectSchema),
+  files: Schema.Array(Schema.String),
+  bookmark: Schema.String,
+  /** Where the bookmark points after rebasing; absent from a Host older than this field. */
+  head: Schema.optional(jjRevisionEffectSchema),
+  agentAsked: Schema.Boolean,
+})
+export type LandResult = typeof landResultSchema.Type
 
 export type WorkspaceSyncView = typeof workspaceSyncSchema.Type
 export type DestinationView = typeof destinationSchema.Type
 
-export const threadWorkspaceName = z.string().regex(/^thread-[0-9a-f]{6}$/u)
+export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
+export const threadWorkspaceName = threadWorkspaceNameEffect
 
-/** The zod cleanup request the cleanup results on zod still use; its Effect twin lives in `api-effect-schemas.ts`. */
-const cleanupRequestSchemaZod = z
-  .object({
-    path: z.string().min(1).optional(),
-    olderThanHours: z
-      .number()
-      .int()
-      .min(0)
-      .max(24 * 90),
-    kinds: z.array(z.enum(['empty', 'integrated', 'secondary', 'untracked'])).min(1).max(4),
-    targets: z
-      .array(z.object({ repoRoot: z.string().min(1), name: z.string().min(1), kind: z.enum(['empty', 'integrated', 'secondary', 'untracked']) }).strict())
-      .max(500)
-      .optional(),
-  })
-  .strict()
+/** Cleanup requests and results are validated with Effect Schema. */
+const cleanupRequestSchema = Schema.Struct({
+  path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+  olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
+})
 
-/** The zod path input the results on zod still use; its Effect twin is `threadPathInput` in `api-effect-schemas.ts`. */
-const threadPathInputZod = z
-  .object({
-    path: z.string().min(1).optional().describe('Thread workspace path; defaults to this Session’s working directory or its on-demand isolated workspace.'),
-  })
-  .strict()
+/** Optional path for operations targeting the current thread workspace by default. */
+const threadPathInputSchema = Schema.Struct({
+  path: Schema.optional(Schema.String.check(Schema.isMinLength(1)).pipe(Schema.annotate({ description: 'Thread workspace path; defaults to this Session’s working directory or its on-demand isolated workspace.' }))),
+})
 
-const cleanupWorkspaceSchema = z
-  .object({
-    repoRoot: z.string(),
-    name: z.string(),
-    path: z.string(),
-    kind: z.enum(['empty', 'integrated', 'secondary']),
-    lastUsedAt: z.number().int().nonnegative(),
-    missing: z.boolean(),
-    outcome: z.enum(['would-remove', 'removed', 'has-work', 'failed']),
-    message: z.string().max(400).optional(),
-  })
-  .strict()
+const cleanupWorkspaceSchema = Schema.Struct({
+  repoRoot: Schema.String,
+  name: Schema.String,
+  path: Schema.String,
+  kind: Schema.Literals(['empty', 'integrated', 'secondary']),
+  lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  missing: Schema.Boolean,
+  outcome: Schema.Literals(['would-remove', 'removed', 'has-work', 'failed']),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+})
 
-const cleanupSkippedSchema = z
-  .object({
-    repoRoot: z.string(),
-    name: z.string(),
-    reason: z.enum(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
-  })
-  .strict()
+const cleanupSkippedSchema = Schema.Struct({
+  repoRoot: Schema.String,
+  name: Schema.String,
+  reason: Schema.Literals(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
+})
 
-const cleanupUntrackedSchema = z
-  .object({
-    repoRoot: z.string(),
-    name: z.string(),
-    path: z.string(),
-    modifiedAt: z.number().int().nonnegative(),
-    outcome: z.enum(['would-remove', 'removed', 'failed']),
-    message: z.string().max(400).optional(),
-  })
-  .strict()
+const cleanupUntrackedSchema = Schema.Struct({
+  repoRoot: Schema.String,
+  name: Schema.String,
+  path: Schema.String,
+  modifiedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  outcome: Schema.Literals(['would-remove', 'removed', 'failed']),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+})
 
-const cleanupResultSchema = z
-  .object({
-    applied: z.boolean(),
-    workspaces: z.array(cleanupWorkspaceSchema),
-    skipped: z.array(cleanupSkippedSchema),
-    /** Threads-directory folders and files no jj workspace owns, such as forgotten workspaces and stray logs. */
-    untracked: z.array(cleanupUntrackedSchema),
-    /** Empty, undescribed revisions nothing builds on, found (and abandoned when applied) after the workspaces went. */
-    emptyRevisions: z.array(jjRevisionSchema),
-  })
-  .strict()
-export type CleanupResult = z.infer<typeof cleanupResultSchema>
+const cleanupResultSchema = Schema.Struct({
+  applied: Schema.Boolean,
+  workspaces: Schema.Array(cleanupWorkspaceSchema),
+  skipped: Schema.Array(cleanupSkippedSchema),
+  /** Threads-directory folders and files no jj workspace owns, such as forgotten workspaces and stray logs. */
+  untracked: Schema.Array(cleanupUntrackedSchema),
+  /** Empty, undescribed revisions nothing builds on, found (and abandoned when applied) after the workspaces went. */
+  emptyRevisions: Schema.Array(jjRevisionEffectSchema),
+})
+export type CleanupResult = typeof cleanupResultSchema.Type
 export type CleanupKindView = typeof cleanupKindSchema.Type
 export type CleanupTarget = typeof cleanupTargetSchema.Type
 
-const cleanupJobSchema = z
-  .object({
-    id: z.string().min(1).max(64),
-    /** `queued` waits behind the job that runs; a Host restart drops the trail with the job. */
-    state: z.enum(['queued', 'running', 'done', 'failed']),
-    phase: z.enum(['queued', 'scanning', 'removing', 'abandoning', 'done', 'failed']),
-    request: z
-      .object({
-        path: z.string().nullable(),
-        olderThanHours: z.number().int().nonnegative(),
-        kinds: z.array(z.enum(['empty', 'integrated', 'secondary', 'untracked'])),
-        targets: z.array(z.object({ repoRoot: z.string().min(1), name: z.string().min(1), kind: z.enum(['empty', 'integrated', 'secondary', 'untracked']) }).strict()).max(500).optional(),
-        /** `automatic` is the Host's interval run (setting autoCleanup); a Host from before it omits the field. */
-        trigger: z.enum(['manual', 'automatic']).optional(),
-      })
-      .strict(),
-    startedAt: z.number().int().nonnegative(),
-    finishedAt: z.number().int().nonnegative().nullable(),
-    progress: z
-      .object({
-        /** Workspaces and untracked folders the scan decided to remove; empty revisions settle only at the end. */
-        total: z.number().int().nonnegative(),
-        processed: z.number().int().nonnegative(),
-        removed: z.number().int().nonnegative(),
-        kept: z.number().int().nonnegative(),
-        failed: z.number().int().nonnegative(),
-        current: z.string().max(400).nullable(),
-      })
-      .strict(),
-    error: z.string().max(400).nullable(),
-    /** Only the newest job carries its rows, so a poll of the whole trail stays small. */
-    result: cleanupResultSchema.nullable(),
-  })
-  .strict()
-export type CleanupJobView = z.infer<typeof cleanupJobSchema>
+const cleanupJobSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  /** `queued` waits behind the job that runs; a Host restart drops the trail with the job. */
+  state: Schema.Literals(['queued', 'running', 'done', 'failed']),
+  phase: Schema.Literals(['queued', 'scanning', 'removing', 'abandoning', 'done', 'failed']),
+  request: Schema.Struct({
+    path: Schema.NullOr(Schema.String),
+    olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    kinds: Schema.Array(cleanupKindSchema),
+    targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
+    /** `automatic` is the Host's interval run (setting autoCleanup); a Host from before it omits the field. */
+    trigger: Schema.optional(Schema.Literals(['manual', 'automatic'])),
+  }),
+  startedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  finishedAt: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  progress: Schema.Struct({
+    /** Workspaces and untracked folders the scan decided to remove; empty revisions settle only at the end. */
+    total: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    processed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    removed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    kept: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    failed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    current: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+  }),
+  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+  /** Only the newest job carries its rows, so a poll of the whole trail stays small. */
+  result: Schema.NullOr(cleanupResultSchema),
+})
+export type CleanupJobView = typeof cleanupJobSchema.Type
 
 const renderCleanup = (output: CleanupResult): string => {
   const verb = output.applied ? 'Removed' : 'Would remove'
@@ -244,9 +222,9 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     noFolder: method({ input: emptyInputSchema, output: noFolderOutputSchema }),
-    repositories: defineMethod({
-      input: z.object({}).strict(),
-      output: jjRepositoriesSchema,
+    repositories: method({
+      input: emptyInputSchema,
+      output: jjRepositoriesEffectSchema,
       description:
         'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
       tool: {
@@ -296,15 +274,13 @@ export const jjIntegrationApi = defineApi({
         render: output => (output.started ? 'Repository status scan started.' : 'A repository status scan is already running.'),
       },
     }),
-    threadAt: defineMethod({
-      input: z
-        .object({
-          path: z.string().min(1),
-          /** The reading Session, so integration notices stay inside its own conversation; an older Host rejects it. */
-          sessionId: z.string().min(1).max(128).optional(),
-        })
-        .strict(),
-      output: z.object({ thread: jjThreadSchema.nullable() }).strict(),
+    threadAt: method({
+      input: Schema.Struct({
+        path: Schema.String.check(Schema.isMinLength(1)),
+        /** The reading Session, so integration notices stay inside its own conversation; an older Host rejects it. */
+        sessionId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+      }),
+      output: Schema.Struct({ thread: Schema.NullOr(jjThreadEffectSchema) }),
       description:
         'The thread workspace at a path (revisions not yet on the bookmark, conflicts, whether main moved, and whether it is safe to rebase), or null when the path is not a thread.',
     }),
@@ -324,8 +300,8 @@ export const jjIntegrationApi = defineApi({
           `${output.created ? 'Created' : 'Already in'} isolated jj workspace ${output.name} at ${output.path}. Use that absolute path for all subsequent file operations and shell workdir. Relative @ file references still resolve against the original Session cwd; use absolute thread-workspace paths for references. Thread status and rebase tools will target this workspace automatically.`,
       },
     }),
-    land: defineMethod({
-      input: z.object({ path: z.string().min(1), sessionId: z.string().optional(), bookmark: z.string().min(1).optional() }).strict(),
+    land: method({
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), sessionId: Schema.optional(Schema.String), bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
       output: landResultSchema,
       description:
         'Rebase the thread at a path: move its described revisions onto the selected bookmark (the configured bookmark by default) and advance it. Never pushes. Refuses while any Session working in that jj workspace is running or waiting for input, and names them; the calling agent may rebase its own thread once it resolved a handed-back problem.',
@@ -360,9 +336,9 @@ export const jjIntegrationApi = defineApi({
             .join('\\n') || 'No exact saved review ranges. Older integrations may lack a stored base change ID.',
       },
     }),
-    threadStatus: defineMethod({
-      input: threadPathInputZod,
-      output: z.object({ bookmark: z.string(), thread: jjThreadSchema.nullable() }).strict(),
+    threadStatus: method({
+      input: threadPathInputSchema,
+      output: Schema.Struct({ bookmark: Schema.String, thread: Schema.NullOr(jjThreadEffectSchema) }),
       description:
         'Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
       tool: {
@@ -374,9 +350,9 @@ export const jjIntegrationApi = defineApi({
             : JSON.stringify({ bookmark: output.bookmark, ...output.thread }),
       },
     }),
-    landThread: defineMethod({
-      input: threadPathInputZod.extend({ bookmark: z.string().min(1).optional() }),
-      output: z.object({ summary: z.string(), result: landResultSchema.nullable() }).strict(),
+    landThread: method({
+      input: Schema.Struct({ ...threadPathInputSchema.fields, bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
+      output: Schema.Struct({ summary: Schema.String, result: Schema.NullOr(landResultSchema) }),
       description:
         'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
@@ -404,9 +380,9 @@ export const jjIntegrationApi = defineApi({
                 .join(' · '),
       },
     }),
-    discard: defineMethod({
-      input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
-      output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(jjRevisionSchema) }).strict(),
+    discard: method({
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), force: Schema.Boolean }),
+      output: Schema.Struct({ status: Schema.Literals(['discarded', 'has-work']), revisions: Schema.Array(jjRevisionEffectSchema) }),
       description:
         'Remove one thread workspace: forget its jj workspace and its DSH project registration. Unlanded revisions are kept unless force is true, which abandons them. Call only when the user asked to remove that thread workspace.',
       tool: {
@@ -419,22 +395,9 @@ export const jjIntegrationApi = defineApi({
                 .join('; ')}). Ask the user before passing force: true.`,
       },
     }),
-    discardMany: defineMethod({
-      input: z.object({ paths: z.array(z.string().min(1)).min(1).max(100), force: z.boolean(), confirm: z.literal(true) }).strict(),
-      output: z
-        .object({
-          results: z.array(
-            z
-              .object({
-                path: z.string(),
-                status: z.enum(['discarded', 'has-work', 'error']),
-                revisions: z.array(jjRevisionSchema),
-                error: z.string().nullable(),
-              })
-              .strict(),
-          ),
-        })
-        .strict(),
+    discardMany: method({
+      input: Schema.Struct({ paths: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1), Schema.isMaxLength(100)), force: Schema.Boolean, confirm: Schema.Literal(true) }),
+      output: Schema.Struct({ results: Schema.Array(Schema.Struct({ path: Schema.String, status: Schema.Literals(['discarded', 'has-work', 'error']), revisions: Schema.Array(jjRevisionEffectSchema), error: Schema.NullOr(Schema.String) })) }),
       description:
         'Remove up to 100 specified thread workspaces in one request. Each target follows jj_thread_discard rules: with force false, unlanded revisions are kept; force true abandons them. Requires confirm: true as explicit opt-in, and force: true only when the user explicitly authorized abandoning unlanded work. Each target reports its own result and failures do not prevent later targets. Call only when the user asked to remove these workspaces.',
       tool: {
@@ -451,22 +414,22 @@ export const jjIntegrationApi = defineApi({
             .join('\n'),
       },
     }),
-    cleanupWorkspaces: defineMethod({
-      input: cleanupRequestSchemaZod.extend({ apply: z.boolean() }).strict(),
+    cleanupWorkspaces: method({
+      input: Schema.Struct({ ...cleanupRequestSchema.fields, apply: Schema.Boolean }),
       output: cleanupResultSchema,
       description:
         'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
-    startCleanup: defineMethod({
-      input: cleanupRequestSchemaZod,
-      output: z.object({ job: cleanupJobSchema }).strict(),
+    startCleanup: method({
+      input: cleanupRequestSchema,
+      output: Schema.Struct({ job: cleanupJobSchema }),
       description:
         'Start removing idle workspaces in the background. Returns at once with the job, so a UI click never waits on node_modules deletion; cleanupJobs reports its progress and outcome, and the newest job carries the full result. The same scope already queued or running is returned instead of queued twice. Secondary JJ workspaces are manual-only and opt-in; cleanupWorkspaces documents their safety checks. Call only when the user asked to clean up.',
     }),
-    cleanupJobs: defineMethod({
-      input: z.object({}).strict(),
-      output: z.object({ jobs: z.array(cleanupJobSchema).max(32) }).strict(),
+    cleanupJobs: method({
+      input: emptyInputSchema,
+      output: Schema.Struct({ jobs: Schema.Array(cleanupJobSchema).check(Schema.isMaxLength(32)) }),
       description:
         'Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.',
       tool: {

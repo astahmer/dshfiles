@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { JjFilesystem } from './jj-filesystem.js'
 import { JsonText } from './json-text.js'
 import { createThreads, ThreadWorkspaceModel, type JjExecutor } from './threads.js'
@@ -328,7 +328,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const first = await threads.provision(repo)
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
     await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
-    const spareName = JsonText.decode(z.record(z.string(), z.string()), readFileSync(spares, 'utf8'))?.data?.main
+    const spareText = JsonText.decodeEffect(Schema.Record(Schema.String, Schema.String), readFileSync(spares, 'utf8'))
+    const spareName = spareText?.success === true ? spareText.data.main : undefined
     if (spareName === undefined) throw new Error('expected a spare for main')
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([first.name])
 
@@ -995,7 +996,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       revision: landedCommitId,
     })
     const synced = spawnSync(command, args, { encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
-    expect(JsonText.decode(z.unknown(), synced.stdout)?.data).toMatchObject({
+    const syncOutput = JsonText.decodeEffect(Schema.Unknown, synced.stdout)
+    expect(syncOutput?.success === true ? syncOutput.data : undefined).toMatchObject({
       ok: true,
       data: { status: 'synced', to: landedCommitId, kept: [{ description: '' }], changedFiles: ['feature.txt'] },
     })

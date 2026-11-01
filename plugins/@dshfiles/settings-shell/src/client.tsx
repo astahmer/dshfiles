@@ -29,7 +29,6 @@ import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -72,7 +71,7 @@ const SETTINGS_SIDEBAR_TAB_ID = '@dshfiles/settings-shell/side-panel'
 const SETTINGS_SIDEBAR_KIND = 'dshfiles-settings-panel'
 /** `@dshfiles/main-tabs` asks this for the side-panel Settings tab when its main tab is dropped there. */
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
-const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
+const panelAsideRequestSchema = Schema.Struct({ panelId: Schema.String.check(Schema.isMinLength(1)) })
 
 /** A frame's portal target: the element the panel or the side panel currently renders, or null while unmounted. */
 interface HostSlot {
@@ -90,9 +89,20 @@ const shortcutCommandId = (value: string): ShortcutCommandId => {
  * The Client `connection` service. Its Context property is typed by the Host half of the same package (the dshx Host
  * runtime imports it), so the browser face is decoded once here.
  */
-const clientConnectionShape = z.object({ reconnect: z.function(), state: z.object({ getSnapshot: z.function(), subscribe: z.function() }) })
-/** `z.custom` keeps the service's own reference: `z.object` would hand back a copy whose methods lose their `this`. */
-const clientConnectionSchema = z.custom<ConnectionHandle>(value => clientConnectionShape.safeParse(value).success)
+const clientConnectionSchema = Schema.declare<ConnectionHandle>(
+  (value): value is ConnectionHandle =>
+    typeof value === 'object' &&
+    value !== null &&
+    'reconnect' in value &&
+    typeof value.reconnect === 'function' &&
+    'state' in value &&
+    typeof value.state === 'object' &&
+    value.state !== null &&
+    'getSnapshot' in value.state &&
+    typeof value.state.getSnapshot === 'function' &&
+    'subscribe' in value.state &&
+    typeof value.state.subscribe === 'function',
+)
 
 /** A cached projection over one slot ledger that changes only when the ledger or the locale moves. */
 const ledgerProjection = <T,>(read: () => T, versionOf: () => string, subscribe: (listener: () => void) => () => void): ObservableSnapshot<T> => {
@@ -144,7 +154,7 @@ export default defineClient({
   ],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
-    const connection = clientConnectionSchema.parse(ctx.get('connection'))
+    const connection = Schema.decodeUnknownSync(clientConnectionSchema)(ctx.get('connection'))
     const openSettingsCommand = shortcutCommandId(OPEN_SETTINGS_COMMAND)
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
@@ -237,8 +247,8 @@ export default defineClient({
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
         if (!(event instanceof CustomEvent) || event.defaultPrevented) return
-        const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== SETTINGS_PANEL_ID) return
+        const request = Schema.decodeUnknownOption(panelAsideRequestSchema)(event.detail)
+        if (Option.isNone(request) || request.value.panelId !== SETTINGS_PANEL_ID) return
         if (openNativeAside()) event.preventDefault()
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)

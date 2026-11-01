@@ -829,8 +829,8 @@ const landThread = async (input: {
     files: outcome.status === 'conflicted' ? [...outcome.files] : [],
     bookmark,
     agentAsked: false,
+    ...(outcome.status === 'landed' && { head: outcome.head }),
   }
-  if (outcome.status === 'landed') result.head = outcome.head
   const message = landingMessage(result)
   const agentAsked =
     message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
@@ -1015,8 +1015,8 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const repoRoots: string[] = []
   const workspaces: PlannedWorkspace[] = []
   const workspaceIds = new Map<string, string | null>()
-  const skipped: CleanupResult['skipped'] = []
-  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  const skipped: Array<CleanupResult['skipped'][number]> = []
+  const emptyRevisions: Array<CleanupResult['emptyRevisions'][number]> = []
   const untracked: PlannedUntracked[] = []
   for (const repository of repositories) {
     repoRoots.push(repository.repoRoot)
@@ -1151,9 +1151,9 @@ const applyCleanup = async (input: {
   const scan = input.scan
   const report = input.report
   const active = requireThreads()
-  const workspaces: CleanupResult['workspaces'] = []
-  const untracked: CleanupResult['untracked'] = []
-  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  const workspaces: Array<CleanupResult['workspaces'][number]> = []
+  const untracked: Array<CleanupResult['untracked'][number]> = []
+  const emptyRevisions: Array<CleanupResult['emptyRevisions'][number]> = []
   report.beginPhase('removing')
   const plannedByRepository = new Map<string, PlannedWorkspace[]>()
   for (const planned of scan.workspaces) {

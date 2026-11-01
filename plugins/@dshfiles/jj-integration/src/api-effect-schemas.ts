@@ -1,10 +1,8 @@
 import { Schema } from 'effect'
 
 /**
- * The jj-integration API contracts whose JSON Schema matches the zod schemas they replace, byte for byte.
- * `strictStandardSchema` in `api.ts` publishes the closed objects and excess-property rejection that
- * `z.object(...).strict()` provided. Contracts that embed the zod schemas `@dshfiles/multi-host/api` still publishes
- * (revision, thread, repository views), `z.literal(true)`, and the land/cleanup result trees stay on zod in `api.ts`.
+ * Effect Schema contracts for the jj-integration API. `strictStandardSchema` in `api.ts` publishes closed objects
+ * and excess-property rejection.
  */
 
 const countSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))

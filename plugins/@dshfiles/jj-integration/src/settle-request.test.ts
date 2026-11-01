@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requestThreadSettle, SETTLE_THREAD_EVENT } from './settle-request.js'
 
-const requestSchema = z.object({ sessionId: z.string() })
+const requestSchema = Schema.Struct({ sessionId: Schema.String })
 const listeners: EventListener[] = []
 
 const listenForRequest = (handle: (detail: { readonly sessionId: string }, cancelable: boolean) => void): void => {
   const handler = (event: Event): void => {
-    handle(requestSchema.parse(event instanceof CustomEvent ? event.detail : undefined), event.cancelable)
+    handle(Schema.decodeUnknownSync(requestSchema)(event instanceof CustomEvent ? event.detail : undefined), event.cancelable)
   }
   window.addEventListener(SETTLE_THREAD_EVENT, handler)
   listeners.push(handler)

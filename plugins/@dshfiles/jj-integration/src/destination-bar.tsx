@@ -12,11 +12,12 @@ import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
-import { jjIntegrationApi, threadWorkspaceName, type DestinationView } from './api.js'
+import { Schema } from 'effect'
+import { jjIntegrationApi, threadWorkspaceNameEffect, type DestinationView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
 import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
@@ -54,7 +55,7 @@ const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
 
 const storedSpares = createStoredValue({
   key: 'dshfiles-jj-integration.spare-workspaces',
-  schema: z.record(z.string(), z.object({ workspaceId: z.string(), name: threadWorkspaceName })),
+  schema: zodSchemaFromEffect(Schema.Record(Schema.String, Schema.Struct({ workspaceId: Schema.String, name: threadWorkspaceNameEffect }))),
   fallback: noSpares,
 })
 
@@ -65,7 +66,7 @@ const randomThreadName = (): string => {
 
 const threadNameOf = (path: string | undefined): string | null => {
   const name = path?.split('/').at(-1)
-  return threadWorkspaceName.safeParse(name).success && name !== undefined ? name : null
+  return name !== undefined && Schema.is(threadWorkspaceNameEffect)(name) ? name : null
 }
 
 /**

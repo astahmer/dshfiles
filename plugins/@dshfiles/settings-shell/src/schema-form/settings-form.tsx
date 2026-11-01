@@ -9,7 +9,8 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as Option from 'effect/Option'
 import type { ShellTranslate } from '../native/locales.js'
 import {
   jsonValueSchema,
@@ -22,7 +23,15 @@ import {
   type SettingField,
 } from './schema-model.js'
 
-const numberSchema = z.coerce.number().finite()
+const numberSchema = Schema.Union([Schema.Number, Schema.NumberFromString]).check(Schema.isFinite())
+
+type MutableJsonValue = string | number | boolean | null | MutableJsonValue[] | { [key: string]: MutableJsonValue }
+
+const mutableJsonValue = (value: JsonValue): MutableJsonValue => {
+  if (Array.isArray(value)) return value.map(item => mutableJsonValue(item))
+  if (typeof value === 'object' && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mutableJsonValue(item)]))
+  return value
+}
 
 /** A choice's value as a stable string key for selects and segments. */
 const choiceKey = (value: JsonValue | undefined): string => JSON.stringify(value) ?? ''
@@ -76,9 +85,9 @@ const useDraft = (stored: string, commit: (draft: string) => void) => {
 }
 
 const formatNumber = (control: NumberControl, value: JsonValue | undefined): string => {
-  const parsed = numberSchema.safeParse(value)
-  if (!parsed.success || value === undefined || value === null) return ''
-  return String(control.percent ? Math.round(parsed.data * 10_000) / 100 : parsed.data)
+  const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(value))
+  if (parsed === undefined || value === undefined || value === null) return ''
+  return String(control.percent ? Math.round(parsed * 10_000) / 100 : parsed)
 }
 
 const ChoiceInput = (props: {
@@ -135,11 +144,11 @@ const NumberInput = (props: {
   const { control } = props
   const scale = control.percent ? 100 : 1
   const draft = useDraft(formatNumber(control, props.value), text => {
-    const parsed = numberSchema.safeParse(text)
-    const value = parsed.success ? parsed.data / scale : Number.NaN
+    const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(text))
+    const value = parsed !== undefined ? parsed / scale : Number.NaN
     const outOfRange = (control.min !== undefined && value < control.min) || (control.max !== undefined && value > control.max)
-    setInvalid(!parsed.success || text.trim() === '' || outOfRange)
-    if (parsed.success && text.trim() !== '' && !outOfRange) props.onChange(value)
+    setInvalid(parsed === undefined || text.trim() === '' || outOfRange)
+    if (parsed !== undefined && text.trim() !== '' && !outOfRange) props.onChange(value)
   })
   return (
     <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1">
@@ -189,7 +198,7 @@ const TextInput = (props: {
   readonly secretReference?: boolean
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
-  const draft = useDraft(z.string().catch('').parse(props.value), text => props.onChange(text))
+  const draft = useDraft(Schema.decodeUnknownOption(Schema.String)(props.value).pipe(Option.getOrElse(() => '')), text => props.onChange(text))
   if (props.multiline) {
     return (
       <Textarea
@@ -259,7 +268,7 @@ const ListInput = (props: {
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
-  const items = z.array(jsonValueSchema).catch([]).parse(props.value)
+  const items = Schema.decodeUnknownOption(Schema.Array(jsonValueSchema))(props.value).pipe(Option.getOrElse(() => []))
   const replace = (index: number, next: JsonValue): void => props.onChange(items.map((item, at) => (at === index ? next : item)))
   return (
     <div className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5" role="list" aria-label={props.label}>
@@ -311,7 +320,7 @@ const RecordInput = (props: {
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
-  const entries = Object.entries(z.record(z.string(), jsonValueSchema).catch({}).parse(props.value))
+  const entries = Object.entries(Schema.decodeUnknownOption(Schema.Record(Schema.String, jsonValueSchema))(props.value).pipe(Option.getOrElse(() => ({}))))
   const [newKey, setNewKey] = useState('')
   const write = (next: readonly (readonly [string, JsonValue])[]): void => props.onChange(Object.fromEntries(next))
   return (
@@ -553,7 +562,7 @@ export const SettingsForm = (props: {
   readonly focusPath?: readonly string[]
 }): JSX.Element => {
   const snapshot = useConfigFormSnapshot(props.form)
-  const values = jsonValueSchema.safeParse(snapshot.value)
+  const values = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.value))
   const disabled = snapshot.status !== 'ready' || !snapshot.writable
   // A Host write settles in seconds (it persists the profile and reloads the entry), so a row shows what was asked for
   // until the write settles: `set` holds the new value, `reset` the cleared override.
@@ -571,13 +580,16 @@ export const SettingsForm = (props: {
   }
   // No revision of our own: the form queues writes per namespace and fences each with the revision the previous one
   // answered, so a reset clicked while a change is saving lands after it instead of carrying the pre-change revision.
-  const write = (field: SettingField, value: JsonValue): Promise<boolean> =>
-    settle(field.path.join('.'), { kind: 'set', value }, props.form.mutate([{ op: 'set', path: [...field.path], value }]))
+  const write = (field: SettingField, value: JsonValue): Promise<boolean> => {
+    const nativeValue = mutableJsonValue(value)
+    return settle(field.path.join('.'), { kind: 'set', value }, props.form.mutate([{ op: 'set', path: [...field.path], value: nativeValue }]))
+  }
   const reset = (field: SettingField): Promise<boolean> =>
     settle(field.path.join('.'), { kind: 'reset' }, props.form.mutate([{ op: 'unset', path: [...field.path] }]))
-  const user = jsonValueSchema.safeParse(snapshot.user)
-  const base = jsonValueSchema.safeParse(snapshot.base)
+  const user = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.user))
+  const base = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.base))
   const focusKey = props.focusPath?.join('.')
+  if (values === undefined) return <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace} />
   return (
     <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
       {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
@@ -596,10 +608,10 @@ export const SettingsForm = (props: {
               field={field}
               focused={focusKey === field.path.join('.')}
               highlight={props.highlight}
-              modified={edit === undefined ? user.success && SettingsSchemaModel.hasValueAt(user.data, field.path) : edit.kind === 'set'}
+              modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
               reset={reset}
               t={props.t}
-              value={displayedValue({ edit, field, values: values.success ? values.data : undefined, base: base.success ? base.data : undefined })}
+              value={displayedValue({ edit, field, values, base })}
               write={write}
             />
           </Fragment>
