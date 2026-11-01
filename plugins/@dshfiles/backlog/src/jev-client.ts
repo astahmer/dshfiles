@@ -1,17 +1,24 @@
 import { randomUUID } from 'node:crypto'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import type { JevUsageRecord } from '@dshfiles/usage/api'
 import type { TriageQuestion } from './triage.js'
 
-const jevAnswerSchema = z.object({
-  answers: z.object({ verdict: z.object({ type: z.literal('noul'), noul: z.number().min(0).max(1) }) }),
-  usage: z
-    .object({
-      input_tokens: z.number().int().min(0).max(1_000_000).optional(),
-      output_tokens: z.number().int().min(0).max(1_000_000).optional(),
-    })
-    .optional(),
+const tokenCountSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000))
+
+const jevAnswerSchema = Schema.Struct({
+  answers: Schema.Struct({
+    verdict: Schema.Struct({
+      type: Schema.Literal('noul'),
+      noul: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+    }),
+  }),
+  usage: Schema.optionalKey(
+    Schema.Struct({
+      input_tokens: Schema.optionalKey(tokenCountSchema),
+      output_tokens: Schema.optionalKey(tokenCountSchema),
+    }),
+  ),
 })
 
 export const JevClient = {
@@ -68,7 +75,7 @@ export const JevClient = {
           })
           span.setAttribute('http.response.status_code', response.status)
           if (!response.ok) throw new Error(`Jev answered ${String(response.status)}`)
-          const answer = jevAnswerSchema.parse(await response.json())
+          const answer = Schema.decodeUnknownSync(jevAnswerSchema)(await response.json())
           span.setAttributes({ 'gen_ai.usage.input_tokens': answer.usage?.input_tokens, 'gen_ai.usage.output_tokens': answer.usage?.output_tokens })
           await record('success', answer.usage?.input_tokens ?? null, answer.usage?.output_tokens ?? null)
           return answer.answers.verdict.noul

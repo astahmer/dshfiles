@@ -1,3 +1,4 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { randomUUID } from 'node:crypto'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
@@ -15,40 +16,49 @@ import {
   type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
+/**
+ * `defineDomain` still types its record validator as a zod schema; `zodSchemaFromEffect` publishes each Effect record
+ * schema in that shape, so a stored row is decoded by the same schema that writes it and keeps the defaults older rows
+ * omit.
+ */
 export const backlogDomain = defineDomain({
   name: 'backlog',
   version: 1,
   tables: {
-    items: { valueSchema: BacklogItems.itemSchema, __key: 'items' },
+    items: { valueSchema: zodSchemaFromEffect(BacklogItems.itemSchema), __key: 'items' },
   },
 })
 
+/** The fields one edit replaces, mutable because a handler assembles them before the record is rewritten. */
+type BacklogChange = { -readonly [K in keyof BacklogItem]?: BacklogItem[K] }
+/** The optional dimensions an upload carries; mutable while the attachment is assembled. */
+type AttachmentDimensions = { -readonly [K in 'width' | 'height']?: BacklogAttachment[K] }
+type ProposalDraft = { -readonly [K in keyof BacklogProposal]?: BacklogProposal[K] }
+
 /** File bytes live beside the items instead of inside them: a list never decodes a megabyte it does not show. */
-const storedFileSchema = z
-  .object({
-    itemId: z.number().int().positive(),
-    attachment: BacklogItems.attachmentSchema,
-    data: z.string().min(1).max(12_000_000),
-  })
-  .strict()
+const storedFileSchema = Schema.Struct({
+  itemId: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  attachment: BacklogItems.attachmentSchema,
+  data: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(12_000_000)),
+})
 
 export const backlogFileDomain = defineDomain({
   name: 'backlog_files',
   version: 1,
   tables: {
-    files: { valueSchema: storedFileSchema, __key: 'files' },
+    files: { valueSchema: zodSchemaFromEffect(storedFileSchema), __key: 'files' },
   },
 })
 
 type ItemTable = KvTable<string, BacklogItem>
-type FileTable = KvTable<string, z.infer<typeof storedFileSchema>>
-export type BacklogFileRecord = z.infer<typeof storedFileSchema>
+type FileTable = KvTable<string, BacklogFileRecord>
+export type BacklogFileRecord = typeof storedFileSchema.Type
 
 const fileKey = (itemId: number, attachmentId: string): string => `${String(itemId)}:${attachmentId}`
 
@@ -233,13 +243,13 @@ const closedStateChange = (input: {
   readonly item: BacklogItem
   readonly status: BacklogItem['status']
   readonly attention?: BacklogItem['attention'] | undefined
-}): Partial<BacklogItem> => {
+}): BacklogChange => {
   if (input.status !== 'done' && input.status !== 'dropped') return {}
   const attention = input.attention ?? input.item.attention ?? 'none'
   const clearAttention = attention !== 'none' && !input.item.humanFields.includes('attention')
   const clearProposal = input.item.proposal !== undefined && input.item.proposal !== null
   if (!clearAttention && !clearProposal) return {}
-  const change: Partial<BacklogItem> = {}
+  const change: BacklogChange = {}
   if (clearAttention) change.attention = 'none'
   if (clearProposal) change.proposal = null
   return change
@@ -332,7 +342,7 @@ const createBacklogStore = ({
     item: BacklogItem,
     actor: BacklogActor,
     event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
-    change: Partial<BacklogItem>,
+    change: BacklogChange,
   ): Promise<BacklogDetail> => {
     const at = now()
     const actorId = actorIdOf(actor)
@@ -377,7 +387,7 @@ const createBacklogStore = ({
     item: BacklogItem,
     actor: BacklogActor,
     event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
-    change: Partial<BacklogItem>,
+    change: BacklogChange,
   ): Promise<BacklogDetail> => {
     const detail = await touch(item, actor, event, change)
     if (change.status === 'done' && item.status !== 'done') {
@@ -388,17 +398,18 @@ const createBacklogStore = ({
   }
 
   const attachmentOf = (file: BacklogFileInput, at: number): BacklogAttachment => {
-    const attachment: BacklogAttachment = {
+    const dimensions: AttachmentDimensions = {}
+    if (file.width !== undefined) dimensions.width = file.width
+    if (file.height !== undefined) dimensions.height = file.height
+    return {
       id: file.id,
       kind: file.kind,
       name: file.name,
       mediaType: file.mediaType,
       bytes: file.bytes,
+      ...dimensions,
       createdAt: at,
     }
-    if (file.width !== undefined) attachment.width = file.width
-    if (file.height !== undefined) attachment.height = file.height
-    return attachment
   }
 
   /** An attachment kept on the item or inside one of its events, such as an image a comment carried. */
@@ -457,8 +468,11 @@ const createBacklogStore = ({
       const chosenKind = kind ?? triaged.kind
       const chosenStatus = status ?? 'inbox'
       const chosenProject = BacklogItems.projectOf(project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null))
-      const createdEvent: BacklogEvent = { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
-      if (actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '') createdEvent.threadId = actor.sessionId
+      const startedInThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? actor.sessionId : null
+      const createdEvent: BacklogEvent =
+        startedInThread === null
+          ? { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
+          : { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
       const item: BacklogItem = {
         id: nextId,
         title: triaged.title,
@@ -509,16 +523,15 @@ const createBacklogStore = ({
       const bodyRoom = Math.max(0, BacklogItems.maxBodyChars - item.body.length - separator.length)
       const bodyAddition = bodySection.slice(0, bodyRoom)
       const nextBody = bodyAddition === '' ? item.body : `${item.body}${separator}${bodyAddition}`
-      const change: Partial<BacklogItem> = {
+      const change: BacklogChange = {
         tweetContextUrls: [...imported, url],
         attachments: [...item.attachments, ...additions],
       }
       if (nextBody !== item.body) change.body = nextBody
-      const event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'> = {
-        kind: 'edited',
-        detail: `retrieved tweet context from ${url}`,
-      }
-      if (additions.length !== 0) event.attachments = additions
+      const event =
+        additions.length === 0
+          ? { kind: 'edited' as const, detail: `retrieved tweet context from ${url}` }
+          : { kind: 'edited' as const, detail: `retrieved tweet context from ${url}`, attachments: additions }
       const detail = await touch(item, actor, event, change)
       return { ok: true, value: detail }
     },
@@ -563,7 +576,7 @@ const createBacklogStore = ({
     update: async ({ id, actor, ...fields }) => {
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
-      const change: Partial<BacklogItem> = {}
+      const change: BacklogChange = {}
       const changed: BacklogHumanField[] = []
       const userChanged = new Set<BacklogHumanField>()
       const recordChange = (field: BacklogHumanField): void => {
@@ -730,8 +743,8 @@ const createBacklogStore = ({
       if (item === undefined) return { ok: false, reason: 'not-found' }
       if (chosen === undefined) return { ok: true, value: detailOf(item) }
       const locked = actor.kind === 'system' ? new Set(item.humanFields) : new Set<BacklogHumanField>()
-      const change: Partial<BacklogItem> = { proposal: null }
-      const applied: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'> = {}
+      const change: BacklogChange = { proposal: null }
+      const applied: ProposalDraft = {}
       if (chosen.kind !== undefined && !locked.has('kind')) {
         change.kind = chosen.kind
         applied.kind = chosen.kind
@@ -784,7 +797,7 @@ const createBacklogStore = ({
           value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `closed item: cleared ${cleared.join(' and ')}` }, closedChange),
         }
       }
-      const change: Partial<BacklogItem> = { links: BacklogItems.uniqueLinks([...item.links, link]), ...closedChange }
+      const change: BacklogChange = { links: BacklogItems.uniqueLinks([...item.links, link]), ...closedChange }
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       const sourceThread = link.type === 'thread' ? { threadId: link.target } : {}

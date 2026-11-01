@@ -1,3 +1,4 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import {
@@ -9,6 +10,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { Schema } from 'effect'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   ArrowUpIcon,
@@ -28,7 +30,6 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
-import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
@@ -61,7 +62,7 @@ type ReferenceMode = 'item' | 'thread'
 
 const captureProject = createStoredValue({
   key: 'dshfiles.backlog.capture-project.v1',
-  schema: z.string().max(BacklogItems.maxTargetChars).nullable(),
+  schema: zodSchemaFromEffect(Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))),
   fallback: null,
 })
 
@@ -397,11 +398,11 @@ export const Composer = (props: {
     const serializedText = serializeProjectReferenceDraft(submitted.markdownText, props.projects)
     const payload: Parameters<typeof api.capture>[0] = {
       text: serializedText.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : serializedText,
+      status: statusTouched || (props.status !== undefined && props.status !== null) ? status : undefined,
+      kind: kind ?? undefined,
+      project: project ?? undefined,
+      files: submitted.files.length > 0 ? submitted.files.map(fileInput) : undefined,
     }
-    if (statusTouched || (props.status !== undefined && props.status !== null)) payload.status = status
-    if (kind !== null) payload.kind = kind
-    if (project !== null) payload.project = project
-    if (submitted.files.length > 0) payload.files = submitted.files.map(fileInput)
     actions.capture.mutate(payload, {
       onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
       onError: error => {

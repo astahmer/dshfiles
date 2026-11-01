@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
+import { Schema } from 'effect'
 import type { UserTextTransformContext } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -55,7 +56,7 @@ describe('backlog sent mentions', () => {
 
       await act(async () => button?.click())
 
-      expect(backlogReferencePreviewRequestSchema.safeParse(requests[0]).success).toBe(true)
+      expect(Schema.is(backlogReferencePreviewRequestSchema)(requests[0])).toBe(true)
       expect(requests[0]).toMatchObject({ id: 12 })
     } finally {
       await act(async () => root.unmount())

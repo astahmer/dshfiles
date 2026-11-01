@@ -1,3 +1,4 @@
+import { Result, Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
 import { backlogApi } from './api.js'
 import { BacklogItems } from './item.js'
@@ -6,18 +7,17 @@ describe('backlog tool exposure', () => {
   test('empty actor filters mean no filter without weakening actor ID validation', async () => {
     const schema = backlogApi.methods.list.input
     if (schema === undefined) throw new Error('List input schema is missing')
-    const validate = (value: unknown) => schema['~standard'].validate(value)
+    const validate = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
 
-    expect(BacklogItems.actorIdSchema.safeParse('').success).toBe(false)
-    const emptyActor = await validate({ actor: '' })
-    expect(emptyActor.issues).toBeUndefined()
-    if ('issues' in emptyActor) throw new Error('Empty actor should be normalized to no filter')
-    expect(emptyActor.value).toMatchObject({ actor: undefined })
+    expect(Schema.is(BacklogItems.actorIdSchema)('')).toBe(false)
+    const emptyActor = validate({ actor: '' })
+    if (Result.isFailure(emptyActor)) throw new Error('Empty actor should be normalized to no filter')
+    expect(emptyActor.success).toMatchObject({ actor: undefined })
     for (const actor of ['user', 'system', 'agent:session-123']) {
-      expect((await validate({ actor })).issues).toBeUndefined()
+      expect(Result.isSuccess(validate({ actor }))).toBe(true)
     }
     for (const actor of ['agent:', 'other']) {
-      expect((await validate({ actor })).issues).toBeDefined()
+      expect(Result.isFailure(validate({ actor }))).toBe(true)
     }
   })
 
@@ -35,12 +35,12 @@ describe('backlog tool exposure', () => {
       data: 'iVBORw==',
     }
 
-    const validate = (value: unknown) => schema['~standard'].validate(value)
+    const validate = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
 
-    expect((await validate({ id: 1, text: '', files: [image] })).issues).toBeUndefined()
-    expect((await validate({ id: 1, text: 'Progress update' })).issues).toBeUndefined()
-    expect((await validate({ id: 1, text: '  ' })).issues).toBeDefined()
-    expect((await validate({ id: 1, text: '', files: [] })).issues).toBeDefined()
+    expect(Result.isSuccess(validate({ id: 1, text: '', files: [image] }))).toBe(true)
+    expect(Result.isSuccess(validate({ id: 1, text: 'Progress update' }))).toBe(true)
+    expect(Result.isFailure(validate({ id: 1, text: '  ' }))).toBe(true)
+    expect(Result.isFailure(validate({ id: 1, text: '', files: [] }))).toBe(true)
   })
   test('every panel verb a human can take is a named tool', () => {
     const tools = Object.values(backlogApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
@@ -121,10 +121,7 @@ describe('backlog tool exposure', () => {
   test('comments accept an attachment-only reply, but reject an empty comment', () => {
     const input = backlogApi.methods.comment.input
     if (input === undefined) throw new Error('Comment input schema is missing.')
-    const validate = (value: unknown): boolean => {
-      const result = input['~standard'].validate(value)
-      return !('issues' in result)
-    }
+    const validate = (value: unknown): boolean => Result.isSuccess(Schema.decodeUnknownResult(input)(value))
     expect(
       validate({
         id: 1,

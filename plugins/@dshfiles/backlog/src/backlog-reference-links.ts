@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import { BacklogReference, backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
 import { BacklogAnchorModel } from './backlog-anchor.js'
 
@@ -85,9 +86,9 @@ const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => 
 export const previewBacklogReference = (id: number, element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const parsed = backlogReferencePreviewRequestSchema.safeParse({ id, anchorId: BacklogAnchorModel.idOf(element), anchor })
-  if (!parsed.success) return false
-  window.dispatchEvent(new CustomEvent(backlogReferencePreviewEvent, { detail: parsed.data }))
+  const request = Option.getOrNull(Schema.decodeUnknownOption(backlogReferencePreviewRequestSchema)({ id, anchorId: BacklogAnchorModel.idOf(element), anchor }))
+  if (request === null) return false
+  window.dispatchEvent(new CustomEvent(backlogReferencePreviewEvent, { detail: request }))
   return true
 }
 

@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -11,7 +12,6 @@ import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/clien
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { z } from 'zod'
 
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
@@ -32,7 +32,7 @@ import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartT
 import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel' satisfies typeof BACKLOG_PANEL_ID
-const backlogCaptureEventSchema = z.object({ text: z.string().max(20_000) })
+const backlogCaptureEventSchema = Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(20_000)) })
 
 export default defineClient({
   name: '@dshfiles/backlog',
@@ -44,10 +44,10 @@ export default defineClient({
     ctx.effect(() => {
       const openCapture = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
-        const parsed = backlogCaptureEventSchema.safeParse(event.detail)
-        if (!parsed.success) return
+        const capture = Option.getOrNull(Schema.decodeUnknownOption(backlogCaptureEventSchema)(event.detail))
+        if (capture === null) return
         event.preventDefault()
-        BacklogFocusModel.requestCapture(parsed.data.text)
+        BacklogFocusModel.requestCapture(capture.text)
         // SAFETY: this entry registers PANEL_ID as a main-slot key below.
         ctx.layout.selectPanel(PANEL_ID as MainPanelId)
       }
@@ -61,14 +61,16 @@ export default defineClient({
         return { ok: false, reason }
       }
       if (report) BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
-      const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id) }
-      if (request.target.kind === 'project') start.workspaceId = request.target.projectId
-      else if (request.target.kind === 'cwd') start.cwd = request.target.path
-      if (request.agent !== undefined) start.agent = request.agent.handle
-      if (request.provider !== null) start.provider = request.provider
-      if (request.model !== null) start.model = request.model
-      if (request.reasoningEffort !== undefined) start.reasoningEffort = request.reasoningEffort
-      if (request.message !== '') start.message = request.message
+      const start: Parameters<typeof api.safe.startThread>[0] = {
+        ids: request.items.map(item => item.id),
+        workspaceId: request.target.kind === 'project' ? request.target.projectId : undefined,
+        cwd: request.target.kind === 'cwd' ? request.target.path : undefined,
+        agent: request.agent?.handle,
+        provider: request.provider ?? undefined,
+        model: request.model ?? undefined,
+        reasoningEffort: request.reasoningEffort,
+        message: request.message === '' ? undefined : request.message,
+      }
       const started = await api.safe.startThread(start)
       if (!started.ok) return failed(started.error.message)
       // SAFETY: SessionId is a type-only brand over the Host-minted unique id returned for this request.

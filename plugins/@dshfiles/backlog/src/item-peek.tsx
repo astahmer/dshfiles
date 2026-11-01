@@ -1374,7 +1374,10 @@ const ItemPeek = (props: {
   const placeholder =
     summary === undefined
       ? undefined
-      : { ok: true as const, value: { item: { ...summary, body: summary.preview, humanFields: [], events: [] }, backlinks: [] } }
+      : {
+          ok: true as const,
+          value: { item: { ...summary, body: summary.preview, tweetContextUrls: summary.tweetContextUrls ?? [], humanFields: [], events: [] }, backlinks: [] },
+        }
   const detail = useQuery({
     queryKey: [BacklogQueries.key, 'item', props.id],
     queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: props.id }, { signal })),

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 const DAY_MS = 86_400_000
 const MAX_TITLE_CHARS = 200
@@ -21,109 +21,118 @@ const freshnessStates = ['fresh', 'stale', 'dormant', 'archived'] as const
 const humanFieldNames = ['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention'] as const
 const imageMediaTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 
-const kindSchema = z.enum(kinds)
-const statusSchema = z.enum(statuses)
-const relationSchema = z.enum(relations)
-const provenanceSchema = z.enum(provenances)
-const attentionSchema = z.enum(attentions)
+const kindSchema = Schema.Literals(kinds)
+const statusSchema = Schema.Literals(statuses)
+const relationSchema = Schema.Literals(relations)
+const provenanceSchema = Schema.Literals(provenances)
+const attentionSchema = Schema.Literals(attentions)
 /** `relation` and `provenance` came later: rows written before them decode as a plain related link. */
-const linkSchema = z
-  .object({
-    type: z.enum(linkTypes),
-    target: z.string().min(1).max(MAX_TARGET_CHARS),
-    relation: relationSchema.optional(),
-    provenance: provenanceSchema.optional(),
-  })
-  .strict()
+const linkSchema = Schema.Struct({
+  type: Schema.Literals(linkTypes),
+  target: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TARGET_CHARS)),
+  relation: Schema.optionalKey(relationSchema),
+  provenance: Schema.optionalKey(provenanceSchema),
+})
 /** `user`, `system`, or `agent:<sessionId>`. */
-const actorIdSchema = z.string().regex(/^(user|system|agent:[\w.-]+)$/)
-const fieldChangeSchema = z.object({ field: z.enum(humanFieldNames), before: z.string().max(MAX_BODY_CHARS), after: z.string().max(MAX_BODY_CHARS) }).strict()
+const actorIdSchema = Schema.String.check(Schema.isPattern(/^(user|system|agent:[\w.-]+)$/))
+const fieldChangeSchema = Schema.Struct({
+  field: Schema.Literals(humanFieldNames),
+  before: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
+  after: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
+})
+
+/** The fields a caller supplies; `createdAt` is the Host's to stamp, so the API input shares these and not the stored shape. */
+const attachmentPayloadFields = {
+  id: Schema.String.check(Schema.isPattern(/^[a-z0-9-]{8,64}$/i)),
+  kind: Schema.Literals(attachmentKinds),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+  mediaType: Schema.String.check(Schema.isPattern(/^[\w.+-]+\/[\w.+-]+$/)),
+  bytes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_FILE_BYTES)),
+  width: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(20_000))),
+  height: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(20_000))),
+} satisfies Schema.Struct.Fields
 
 /** One file kept with an item; the bytes live in their own table, keyed by item and attachment. */
-const attachmentSchema = z
-  .object({
-    id: z.string().regex(/^[a-z0-9-]{8,64}$/i),
-    kind: z.enum(attachmentKinds),
-    name: z.string().min(1).max(200),
-    mediaType: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/),
-    bytes: z.number().int().positive().max(MAX_FILE_BYTES),
-    width: z.number().int().positive().max(20_000).optional(),
-    height: z.number().int().positive().max(20_000).optional(),
-    createdAt: z.number().int().nonnegative(),
-  })
-  .strict()
+const attachmentFields = {
+  ...attachmentPayloadFields,
+  createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+} satisfies Schema.Struct.Fields
+const attachmentSchema = Schema.Struct(attachmentFields)
 
 /** `attachments` came later: events written before it decode without one, and a comment may carry images or files. */
-const eventSchema = z
-  .object({
-    at: z.number().int().nonnegative(),
-    actor: actorIdSchema,
-    commentId: z.string().min(1).max(128).optional(),
-    kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
-    detail: z.string().max(MAX_BODY_CHARS),
-    threadId: z.string().min(1).max(MAX_TARGET_CHARS).optional(),
-    attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).optional(),
-    fieldChanges: z.array(fieldChangeSchema).max(humanFieldNames.length).optional(),
-  })
-  .strict()
+const eventSchema = Schema.Struct({
+  at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  actor: actorIdSchema,
+  commentId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+  kind: Schema.Literals(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
+  detail: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
+  threadId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TARGET_CHARS))),
+  attachments: Schema.optionalKey(Schema.Array(attachmentSchema).check(Schema.isMaxLength(MAX_ATTACHMENTS))),
+  fieldChanges: Schema.optionalKey(Schema.Array(fieldChangeSchema).check(Schema.isMaxLength(humanFieldNames.length))),
+})
 
 /** What triage would change, with how sure it is; applied above the threshold, otherwise left for the user. */
-const proposalSchema = z
-  .object({
-    kind: kindSchema.optional(),
-    status: statusSchema.optional(),
-    title: z.string().min(1).max(MAX_TITLE_CHARS).optional(),
-    tags: z.array(z.string().max(60)).max(MAX_TAGS).optional(),
-    duplicateOf: z.number().int().positive().optional(),
-    confidence: z.number().min(0).max(1),
-    reason: z.string().max(500),
-    source: z.enum(['jev', 'model', 'jev+model']),
-    /** `thread` when a finished thread's reply suggested it, absent for a capture-time triage suggestion. */
-    origin: z.enum(['thread']).optional(),
-    at: z.number().int().nonnegative(),
-  })
-  .strict()
+const proposalSchema = Schema.Struct({
+  kind: Schema.optionalKey(kindSchema),
+  status: Schema.optionalKey(statusSchema),
+  title: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TITLE_CHARS))),
+  tags: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(60))).check(Schema.isMaxLength(MAX_TAGS))),
+  duplicateOf: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  confidence: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  reason: Schema.String.check(Schema.isMaxLength(500)),
+  source: Schema.Literals(['jev', 'model', 'jev+model']),
+  /** `thread` when a finished thread's reply suggested it, absent for a capture-time triage suggestion. */
+  origin: Schema.optionalKey(Schema.Literal('thread')),
+  at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
-const itemSchema = z
-  .object({
-    id: z.number().int().positive(),
-    title: z.string().min(1).max(MAX_TITLE_CHARS),
-    body: z.string().max(MAX_BODY_CHARS),
-    kind: kindSchema,
-    status: statusSchema,
-    project: z.string().max(MAX_TARGET_CHARS).nullable(),
-    tags: z.array(z.string().max(60)).max(MAX_TAGS),
-    links: z.array(linkSchema).max(MAX_LINKS),
-    tweetContextUrls: z.array(z.string().url().max(2_048)).max(20).optional(),
-    attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).default([]),
-    actors: z.array(z.object({ id: actorIdSchema, role: z.enum(['owner', 'contributor']) }).strict()).max(50),
-    pinned: z.boolean(),
-    humanFields: z.array(z.enum(humanFieldNames)),
-    createdAt: z.number().int().nonnegative(),
-    lastActivityAt: z.number().int().nonnegative(),
-    events: z.array(eventSchema).max(MAX_EVENTS),
-    proposal: proposalSchema.nullable().optional(),
-    attention: attentionSchema.optional(),
-    acknowledgedAt: z.number().int().nonnegative().nullable().optional(),
-    snoozedUntil: z.number().int().nonnegative().nullable().optional(),
-  })
-  .strict()
+/** `URL.canParse` keeps the absolute-URL check the previous string rule applied while the value stays a string. */
+const absoluteUrl = Schema.makeFilter((value: string) => (URL.canParse(value) ? undefined : 'Expected an absolute URL.'))
+const tweetContextUrlSchema = Schema.String.check(Schema.isMaxLength(2_048), absoluteUrl)
 
-export type BacklogProposal = z.infer<typeof proposalSchema>
-export type BacklogKind = z.infer<typeof kindSchema>
-export type BacklogStatus = z.infer<typeof statusSchema>
-export type BacklogLink = z.infer<typeof linkSchema>
-export type BacklogAttention = z.infer<typeof attentionSchema>
-export type BacklogRelation = z.infer<typeof relationSchema>
-export type BacklogEvent = z.infer<typeof eventSchema>
-export type BacklogAttachment = z.infer<typeof attachmentSchema>
+const actorSchema = Schema.Struct({ id: actorIdSchema, role: Schema.Literals(['owner', 'contributor']) })
+
+const itemSchema = Schema.Struct({
+  id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TITLE_CHARS)),
+  body: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
+  kind: kindSchema,
+  status: statusSchema,
+  project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_TARGET_CHARS))),
+  tags: Schema.Array(Schema.String.check(Schema.isMaxLength(60))).check(Schema.isMaxLength(MAX_TAGS)),
+  links: Schema.Array(linkSchema).check(Schema.isMaxLength(MAX_LINKS)),
+  tweetContextUrls: Schema.optionalKey(Schema.Array(tweetContextUrlSchema).check(Schema.isMaxLength(20))),
+  /** Items persisted before attachments existed decode without the field, so its absence still fills an empty list. */
+  attachments: Schema.Array(attachmentSchema)
+    .check(Schema.isMaxLength(MAX_ATTACHMENTS))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  actors: Schema.Array(actorSchema).check(Schema.isMaxLength(50)),
+  pinned: Schema.Boolean,
+  humanFields: Schema.Array(Schema.Literals(humanFieldNames)),
+  createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  lastActivityAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  events: Schema.Array(eventSchema).check(Schema.isMaxLength(MAX_EVENTS)),
+  proposal: Schema.optionalKey(Schema.NullOr(proposalSchema)),
+  attention: Schema.optionalKey(attentionSchema),
+  acknowledgedAt: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
+  snoozedUntil: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
+})
+
+export type BacklogProposal = typeof proposalSchema.Type
+export type BacklogKind = typeof kindSchema.Type
+export type BacklogStatus = typeof statusSchema.Type
+export type BacklogLink = typeof linkSchema.Type
+export type BacklogAttention = typeof attentionSchema.Type
+export type BacklogRelation = typeof relationSchema.Type
+export type BacklogEvent = typeof eventSchema.Type
+export type BacklogAttachment = typeof attachmentSchema.Type
 /** One file the API receives; the bytes are base64 without a data-URL prefix. */
 export type BacklogFileInput = Omit<BacklogAttachment, 'createdAt'> & {
   readonly data: string
   readonly width?: number | undefined
   readonly height?: number | undefined
 }
-export type BacklogItem = z.infer<typeof itemSchema>
+export type BacklogItem = typeof itemSchema.Type
 export type BacklogFreshness = (typeof freshnessStates)[number]
 export type BacklogHumanField = (typeof humanFieldNames)[number]
 
@@ -258,7 +267,11 @@ export class BacklogItems {
   static readonly maxFileBytes = MAX_FILE_BYTES
   static readonly attachmentKinds = attachmentKinds
   static readonly imageMediaTypes = imageMediaTypes
+  static readonly attachmentPayloadFields = attachmentPayloadFields
+  static readonly attachmentFields = attachmentFields
+  static readonly actorSchema = actorSchema
   static readonly attachmentSchema = attachmentSchema
+  static readonly tweetContextUrlSchema = tweetContextUrlSchema
   static readonly itemSchema = itemSchema
   static readonly proposalSchema = proposalSchema
   static readonly linkSchema = linkSchema
