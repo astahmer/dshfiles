@@ -1,7 +1,8 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import { McpCommandLineModel } from './command-line.js'
-import { serverDraftSchema, type StoredServer } from './api.js'
+import { httpDraftSchema, stdioDraftSchema, type StoredServer } from './api.js'
 import { McpCatalogModel } from './catalog.js'
 import { ManagedLocalCommand } from './local-process.js'
 import { ClientReconciler } from './reconcile.js'
@@ -10,6 +11,11 @@ import { McpServerStateModel } from './server-state.js'
 import { createQuickPanelContribution, SessionQuickPanels } from './quick-panel.js'
 
 type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
+
+const acceptsDraft = (value: unknown): boolean => {
+  const schema = typeof value === 'object' && value !== null && 'transport' in value && value.transport === 'stdio' ? stdioDraftSchema : httpDraftSchema
+  return Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
+}
 
 const server = (overrides: Partial<StoredStdioServer> = {}): StoredStdioServer => ({
   id: 'one',
@@ -59,7 +65,7 @@ describe('MCP manager state', () => {
 
   it('rejects secret values where only credential references are allowed', () => {
     expect(
-      serverDraftSchema.safeParse({
+      acceptsDraft({
         id: '',
         name: 'Remote',
         serverName: 'remote',
@@ -68,7 +74,7 @@ describe('MCP manager state', () => {
         url: 'https://example.com/mcp',
         headerRefs: { Authorization: 'REMOTE_TOKEN' },
         token: 'secret',
-      }).success,
+      }),
     ).toBe(false)
   })
 
@@ -83,20 +89,20 @@ describe('MCP manager state', () => {
       headerRefs: { Authorization: 'REMOTE_TOKEN' },
       startCommand: { commandLine: 'npx -y @example/tunnel', cwd: '/opt/tunnel', envRefs: { ACCESS_TOKEN: 'TUNNEL_TOKEN' } },
     }
-    expect(serverDraftSchema.safeParse(valid).success).toBe(true)
+    expect(acceptsDraft(valid)).toBe(true)
     expect(
-      serverDraftSchema.safeParse({
+      acceptsDraft({
         ...valid,
         startCommand: { ...valid.startCommand, cwd: 'relative/path' },
-      }).success,
+      }),
     ).toBe(false)
-    expect(serverDraftSchema.safeParse({ ...valid, startCommand: null, credential: 'plaintext' }).success).toBe(false)
+    expect(acceptsDraft({ ...valid, startCommand: null, credential: 'plaintext' })).toBe(false)
   })
 
   it('rejects credential-bearing URL userinfo, query strings, and fragments', () => {
     for (const url of ['https://user:password@example.com/mcp', 'https://example.com/mcp?access_token=secret', 'https://example.com/mcp#token=secret']) {
       expect(
-        serverDraftSchema.safeParse({
+        acceptsDraft({
           id: '',
           name: 'Remote',
           serverName: 'remote',
@@ -104,14 +110,14 @@ describe('MCP manager state', () => {
           transport: 'streamable-http',
           url,
           headerRefs: {},
-        }).success,
+        }),
       ).toBe(false)
     }
   })
 
   it('accepts plain HTTP only on a loopback host, like the OAuth endpoints', () => {
     const draft = (url: string) =>
-      serverDraftSchema.safeParse({ id: '', name: 'Local', serverName: 'local', enabled: true, transport: 'streamable-http', url, headerRefs: {} }).success
+      acceptsDraft({ id: '', name: 'Local', serverName: 'local', enabled: true, transport: 'streamable-http', url, headerRefs: {} })
     expect(draft('http://127.0.0.1:4100/mcp')).toBe(true)
     expect(draft('http://localhost:4100/mcp')).toBe(true)
     expect(draft('http://example.com/mcp')).toBe(false)

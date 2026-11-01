@@ -1,5 +1,6 @@
 import * as oauth from 'oauth4webapi'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { McpSchema } from './schema.js'
 
 /** OAuth 2.1 client flow for remote MCP servers: discovery, dynamic registration, PKCE, and refresh. */
 
@@ -8,19 +9,21 @@ type Fetch = (url: string, init: RequestInit) => Promise<Response>
 const REQUEST_TIMEOUT_MS = 10_000
 const REFRESH_MARGIN_MS = 60_000
 
-export const oauthGrantSchema = z.object({
-  clientId: z.string().min(1),
-  clientSecret: z.string().optional(),
-  issuer: z.string().url().optional(),
-  tokenEndpoint: z.string().url(),
-  resource: z.string().url(),
-  accessToken: z.string().min(1),
-  refreshToken: z.string().optional(),
-  expiresAt: z.number().optional(),
-  issuedAt: z.number(),
+const endpointUrlSchema = McpSchema.absoluteUrl('Expected an absolute OAuth endpoint URL.')
+
+export const oauthGrantSchema = Schema.Struct({
+  clientId: Schema.String.check(Schema.isMinLength(1)),
+  clientSecret: Schema.optional(Schema.String),
+  issuer: Schema.optional(endpointUrlSchema),
+  tokenEndpoint: endpointUrlSchema,
+  resource: endpointUrlSchema,
+  accessToken: Schema.String.check(Schema.isMinLength(1)),
+  refreshToken: Schema.optional(Schema.String),
+  expiresAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  issuedAt: Schema.Number.check(Schema.isFinite()),
 })
 
-export type OAuthGrant = z.infer<typeof oauthGrantSchema>
+export type OAuthGrant = typeof oauthGrantSchema.Type
 
 export interface OAuthEndpoints {
   readonly resource: string
@@ -168,8 +171,8 @@ export class McpOAuthModel {
       requestOptions(input.fetcher ?? fetch, endpoint),
     )
     const client = await oauth.processDynamicClientRegistrationResponse(response)
-    const clientSecret = z.string().safeParse(client.client_secret)
-    return { clientId: client.client_id, clientSecret: clientSecret.success ? clientSecret.data : undefined }
+    const clientSecret = Schema.decodeUnknownResult(Schema.String)(client.client_secret)
+    return { clientId: client.client_id, clientSecret: clientSecret._tag === 'Success' ? clientSecret.success : undefined }
   }
 
   static readonly createPkcePair = async (): Promise<{ readonly verifier: string; readonly challenge: string }> => {
@@ -207,18 +210,17 @@ export class McpOAuthModel {
     readonly previousRefreshToken: string | undefined
   }): OAuthGrant => {
     const refreshToken = input.token.refresh_token ?? input.previousRefreshToken
-    const grant: OAuthGrant = {
+    return {
       clientId: input.client.clientId,
       tokenEndpoint: input.client.tokenEndpoint,
       resource: input.client.resource,
       accessToken: input.token.access_token,
       issuedAt: input.now,
+      ...(input.client.clientSecret !== undefined && { clientSecret: input.client.clientSecret }),
+      ...(input.client.issuer !== undefined && { issuer: input.client.issuer }),
+      ...(refreshToken !== undefined && { refreshToken }),
+      ...(input.token.expires_in !== undefined && { expiresAt: input.now + input.token.expires_in * 1000 }),
     }
-    if (input.client.clientSecret !== undefined) grant.clientSecret = input.client.clientSecret
-    if (input.client.issuer !== undefined) grant.issuer = input.client.issuer
-    if (refreshToken !== undefined) grant.refreshToken = refreshToken
-    if (input.token.expires_in !== undefined) grant.expiresAt = input.now + input.token.expires_in * 1000
-    return grant
   }
 
   /** Validates the callback (state, RFC 9207 `iss`) and exchanges its code with the PKCE verifier. */

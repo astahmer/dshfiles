@@ -11,7 +11,6 @@ import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { z } from 'zod'
 import {
   mcpServersApi,
   preferencesSchema,
@@ -29,6 +28,7 @@ import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js
 import { McpOAuthModel, oauthGrantSchema, type OAuthGrant, type PendingAuthorization } from './oauth.js'
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
+import { McpContract, McpSchema, type McpFilterIssue } from './schema.js'
 import { McpServerStateModel } from './server-state.js'
 import { createTracedRegistrySearch } from './registry-search-host.js'
 
@@ -58,26 +58,33 @@ const operation = <A>(name: string, run: () => Promise<A>) =>
  * Loader row: the registered servers and the manager preferences. dshx refuses a Host that owns both a native Config
  * and a Settings namespace, so the preferences live in this row and the manager page edits them.
  */
-export const Config = z
-  .object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]), preferences: preferencesSchema.optional() })
-  .superRefine((value, context) => {
+const configRowSchema = Schema.Struct({
+  servers: Schema.Array(storedServerSchema)
+    .check(Schema.isMaxLength(MAX_SERVERS))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  preferences: Schema.optional(preferencesSchema),
+})
+
+const configSchema = configRowSchema.check(
+  Schema.makeFilter((value: typeof configRowSchema.Type) => {
+    const issues: McpFilterIssue[] = []
     value.servers.forEach((server, index) => {
       if (server.transport === 'stdio' && McpCommandLineModel.hasInlineCredential([server.command, ...server.args])) {
-        context.addIssue({ code: 'custom', path: ['servers', index], message: 'Use credential references instead of inline command credentials.' })
+        issues.push({ path: ['servers', index], issue: 'Use credential references instead of inline command credentials.' })
       }
       if (
         server.transport === 'streamable-http' &&
         server.startCommand !== undefined &&
         McpCommandLineModel.hasInlineCredential([server.startCommand.command, ...server.startCommand.args])
       ) {
-        context.addIssue({
-          code: 'custom',
-          path: ['servers', index, 'startCommand'],
-          message: 'Use credential references instead of inline command credentials.',
-        })
+        issues.push({ path: ['servers', index, 'startCommand'], issue: 'Use credential references instead of inline command credentials.' })
       }
     })
-  })
+    return issues
+  }),
+)
+
+export const Config = McpContract.standard(configSchema)
 
 type NativeTarget = ClientTarget & {
   readonly config: NativeMcpConfig
@@ -98,18 +105,23 @@ const currentContext = (ctx: Context): Context => {
 }
 
 const parseStoredConfig = (value: unknown): StoredServer[] => {
-  const result = Config.safeParse(value ?? {})
-  if (!result.success) throw new Error('MCP manager configuration is invalid.')
-  return result.data.servers
+  const result = Schema.decodeUnknownResult(configSchema)(value ?? {})
+  if (result._tag === 'Failure') throw new Error('MCP manager configuration is invalid.')
+  return [...result.success.servers]
 }
 
 const serversFor = (ctx: Context): StoredServer[] => {
   return parseStoredConfig(entryFor(ctx).options.config)
 }
 
+/** A row may be unreadable or predate a field; either way the preferences fall back to their parsed defaults. */
+const preferencesFrom = (value: unknown): ManagerPreferences => {
+  const parsed = Schema.decodeUnknownResult(configSchema)(value ?? {})
+  return McpSchema.decode(preferencesSchema, parsed._tag === 'Success' ? (parsed.success.preferences ?? {}) : {})
+}
+
 /** Read on every use, so a saved preference applies without a restart. */
-const preferencesFor = (ctx: Context): ManagerPreferences =>
-  preferencesSchema.parse(Config.safeParse(entryFor(ctx).options.config ?? {}).data?.preferences ?? {})
+const preferencesFor = (ctx: Context): ManagerPreferences => preferencesFrom(entryFor(ctx).options.config)
 
 const grantKey = (server: StoredServer): CredentialKey =>
   credentialKey(CREDENTIAL_SCOPE, `oauth-${createHash('sha256').update(server.id).digest('hex').slice(0, 24)}`)
@@ -122,8 +134,8 @@ const readGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant
   try {
     const record = await ctx.credentials.readRecord(grantKey(server))
     if (record?.kind !== 'grant') return undefined
-    const parsed = oauthGrantSchema.safeParse(record.payload)
-    return parsed.success ? parsed.data : undefined
+    const parsed = Schema.decodeUnknownResult(oauthGrantSchema)(record.payload)
+    return parsed._tag === 'Success' ? parsed.success : undefined
   } catch {
     return undefined
   }
@@ -136,8 +148,8 @@ const liveGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant
   let refreshed: OAuthGrant | undefined
   try {
     await ctx.credentials.modifyRecord(grantKey(server), async current => {
-      const parsed = current?.kind === 'grant' ? oauthGrantSchema.safeParse(current.payload) : undefined
-      const stored = parsed?.success === true ? parsed.data : undefined
+      const parsed = current?.kind === 'grant' ? Schema.decodeUnknownResult(oauthGrantSchema)(current.payload) : undefined
+      const stored = parsed?._tag === 'Success' ? parsed.success : undefined
       if (stored === undefined) return current
       if (!McpOAuthModel.needsRefresh({ grant: stored })) {
         refreshed = stored
@@ -224,7 +236,7 @@ const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boole
       transport: 'stdio',
       serverName: server.serverName,
       command: server.command,
-      args: server.args,
+      args: [...server.args],
       cwd: server.cwd,
       env: env ?? {},
       toolCallTimeoutMs,
@@ -525,7 +537,7 @@ const { hostApi, setup: effectSetup } = DshxEffect.plugin({
       let manuallyDisconnected = disconnectionsByRoot.get(root)
       if (manuallyDisconnected === undefined) {
         manuallyDisconnected = new Set(
-          preferencesSchema.parse(Config.safeParse(config).data?.preferences ?? {}).connectOnStartup ? [] : servers.map(server => server.id),
+          preferencesFrom(config).connectOnStartup ? [] : servers.map(server => server.id),
         )
         disconnectionsByRoot.set(root, manuallyDisconnected)
       }
@@ -596,7 +608,7 @@ export default defineHost({
         }),
       save: ({ ctx, input }) =>
         operation('mcp servers save', async () => {
-          const draft = serverDraftSchema.parse(input.server)
+          const draft = McpSchema.decodeStrict(serverDraftSchema, input.server)
           const candidate = storedDraft(draft)
           const servers = serversFor(ctx)
           return persist(ctx, McpServerStateModel.saveServer({ current: servers, candidate, max: MAX_SERVERS }))

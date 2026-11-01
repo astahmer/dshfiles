@@ -1,20 +1,23 @@
 import type { ClientSessionContext, InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
 import type { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { RegistryListing } from '@dshfiles/dshx/api'
-import { z } from 'zod'
-import { jsonTextSchema } from './json-text.js'
+import * as Schema from 'effect/Schema'
+import { decodeJsonText } from './json-text.js'
 
-const registryMcpToolSchema = z.object({
-  name: z.string().min(1).max(256),
-  source: z.literal('mcp'),
-  description: z.string().max(16_384),
+const registryMcpToolSchema = Schema.Struct({
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  source: Schema.Literal('mcp'),
+  description: Schema.String.check(Schema.isMaxLength(16_384)),
 })
-const registryToolRowSchema = z.union([registryMcpToolSchema, z.undefined()]).catch(undefined)
-const registryListingSchema = z.object({ tools: z.array(registryToolRowSchema).max(2_000) })
+const registryListingSchema = Schema.Struct({ tools: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(2_000)) })
 
-const mentionValueSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('server'), displayName: z.string().min(1).max(120), serverName: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/u) }).strict(),
-  z.object({ kind: z.literal('tool'), name: z.string().min(1).max(256) }).strict(),
+const mentionValueSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal('server'),
+    displayName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+    serverName: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,32}$/u)),
+  }),
+  Schema.Struct({ kind: Schema.Literal('tool'), name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }),
 ])
 
 type MentionServer = {
@@ -32,7 +35,7 @@ type MentionServerSearchRow = {
   readonly name: string
 }
 
-type MentionValue = z.infer<typeof mentionValueSchema>
+type MentionValue = typeof mentionValueSchema.Type
 type MentionCatalog = {
   readonly servers: readonly MentionServer[]
   readonly tools: readonly MentionTool[]
@@ -56,11 +59,9 @@ const CATALOG_TTL_MS = 1_000
 const MAX_SERVER_CANDIDATES = 40
 const MAX_TOOL_CANDIDATES = 80
 
-const mentionValueTextSchema = jsonTextSchema('An MCP mention value is JSON text.').pipe(mentionValueSchema)
-
 const decodeMentionValue = (value: unknown): MentionValue | null => {
-  const parsed = mentionValueTextSchema.safeParse(value)
-  return parsed.success ? parsed.data : null
+  const parsed = decodeJsonText(value, mentionValueSchema, 'An MCP mention value is JSON text.')
+  return parsed._tag === 'Success' ? parsed.success : null
 }
 
 const mentionClipboardText = (value: MentionValue): string => (value.kind === 'server' ? `MCP server: ${value.serverName}` : `MCP tool: ${value.name}`)
@@ -77,9 +78,12 @@ export class McpMentionModel {
   }
 
   static readonly decodeTools = (listing: RegistryListing): readonly MentionTool[] => {
-    const parsedListing = registryListingSchema.safeParse(listing)
-    if (!parsedListing.success) return []
-    return parsedListing.data.tools.flatMap(tool => (tool === undefined ? [] : [{ name: tool.name, description: tool.description.slice(0, 1_024) }]))
+    const parsedListing = Schema.decodeUnknownResult(registryListingSchema)(listing)
+    if (parsedListing._tag === 'Failure') return []
+    return parsedListing.success.tools.flatMap(row => {
+      const tool = Schema.decodeUnknownResult(registryMcpToolSchema)(row)
+      return tool._tag === 'Success' ? [{ name: tool.success.name, description: tool.success.description.slice(0, 1_024) }] : []
+    })
   }
 
   static readonly candidates = (input: {

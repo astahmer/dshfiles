@@ -10,7 +10,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 import type { ServerDraft } from './api.js'
 import type { McpServersTranslate } from './locales.js'
-import { McpServerFormModel, type ServerFormValues } from './server-form.js'
+import { McpServerFormModel, serverFormValidator, type ServerFormValues } from './server-form.js'
 
 export interface ServerEditorProps {
   readonly t: McpServersTranslate
@@ -44,7 +44,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
   const form = useAppForm({
     defaultValues: values,
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: McpServerFormModel.serverFormSchema },
+    validators: { onDynamic: serverFormValidator },
     onSubmit: async ({ value }) => {
       const parsed = McpServerFormModel.parseServerForm(value)
       if (parsed.success) await props.onSave(parsed.draft)

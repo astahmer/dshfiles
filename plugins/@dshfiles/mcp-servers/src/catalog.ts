@@ -1,5 +1,4 @@
-import { decodeJson } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { RegistryEntry } from './api.js'
 
 const providers = [
@@ -88,31 +87,51 @@ const providers = [
 const REGISTRY_ENDPOINT = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const MAX_REGISTRY_BYTES = 1_000_000
 
-const categoryValueSchema = z.union([z.string(), z.array(z.string().catch(''))])
-const registryMetadataSchema = z.object({
-  category: categoryValueSchema.optional().catch(undefined),
-  documentationUrl: z.string().optional().catch(undefined),
+const categoryValueSchema = Schema.Union([Schema.String, Schema.Array(Schema.String)])
+
+const registryMetadataSchema = Schema.Struct({
+  category: Schema.optional(categoryValueSchema),
+  documentationUrl: Schema.optional(Schema.String),
 })
 
-const registryRemoteSchema = z.object({
-  type: z.string().optional().catch(undefined),
-  transport: z.string().optional().catch(undefined),
-  url: z.string().optional().catch(undefined),
+const registryRemoteSchema = Schema.Struct({
+  type: Schema.optional(Schema.String),
+  transport: Schema.optional(Schema.String),
+  url: Schema.optional(Schema.String),
 })
 
-const registryServerSchema = z.object({
-  name: z.string().max(200),
-  title: z.string().catch(''),
-  category: categoryValueSchema.optional().catch(undefined),
-  description: z.string().catch(''),
-  version: z.string().catch(''),
-  documentationUrl: z.string().optional().catch(undefined),
-  websiteUrl: z.string().optional().catch(undefined),
-  _meta: z.record(z.string(), registryMetadataSchema.catch({})).catch({}),
-  remotes: z.array(registryRemoteSchema.catch({})).catch([]),
+/** A Registry row is lenient by design: a field this version does not model is ignored, never fatal. */
+const registryServerSchema = Schema.Struct({
+  name: Schema.String.check(Schema.isMaxLength(200)),
+  title: Schema.optional(Schema.String),
+  category: Schema.optional(categoryValueSchema),
+  description: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  documentationUrl: Schema.optional(Schema.String),
+  websiteUrl: Schema.optional(Schema.String),
+  _meta: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  remotes: Schema.optional(Schema.Array(Schema.Unknown)),
 })
 
-type RegistryServer = z.infer<typeof registryServerSchema>
+type RegistryServer = typeof registryServerSchema.Type
+type RegistryMetadata = typeof registryMetadataSchema.Type
+type RegistryRemote = typeof registryRemoteSchema.Type
+
+const registryMetadataOf = (value: unknown): RegistryMetadata => {
+  const parsed = Schema.decodeUnknownResult(registryMetadataSchema)(value)
+  return parsed._tag === 'Success' ? parsed.success : {}
+}
+
+const registryRemoteOf = (value: unknown): RegistryRemote | undefined => {
+  const parsed = Schema.decodeUnknownResult(registryRemoteSchema)(value)
+  return parsed._tag === 'Success' ? parsed.success : undefined
+}
+
+const metadataOf = (item: RegistryServer): readonly RegistryMetadata[] => Object.values(item._meta ?? {}).map(registryMetadataOf)
+const remotesOf = (item: RegistryServer): readonly RegistryRemote[] => (item.remotes ?? []).flatMap(remote => {
+  const parsed = registryRemoteOf(remote)
+  return parsed === undefined ? [] : [parsed]
+})
 
 const safeHttps = (value: string | undefined): string | null => {
   if (value === undefined || value.length > 2048) return null
@@ -125,13 +144,15 @@ const safeHttps = (value: string | undefined): string | null => {
 }
 
 const categoryOf = (item: RegistryServer): string => {
-  for (const metadata of Object.values(item._meta)) {
+  for (const metadata of metadataOf(item)) {
     const category = metadata.category
-    if (Array.isArray(category)) {
-      const first = category.find(value => value.trim().length > 0)
-      if (first !== undefined) return first.trim().slice(0, 80)
+    if (category === undefined) continue
+    if (typeof category === 'string') {
+      if (category.trim().length > 0) return category.trim().slice(0, 80)
+      continue
     }
-    if (category !== undefined && !Array.isArray(category) && category.trim().length > 0) return category.trim().slice(0, 80)
+    const first = category.find(value => value.trim().length > 0)
+    if (first !== undefined) return first.trim().slice(0, 80)
   }
   return 'Uncategorized'
 }
@@ -139,35 +160,50 @@ const categoryOf = (item: RegistryServer): string => {
 const documentationOf = (item: RegistryServer): string | null => {
   const direct = safeHttps(item.documentationUrl) ?? safeHttps(item.websiteUrl)
   if (direct !== null) return direct
-  for (const metadata of Object.values(item._meta)) {
+  for (const metadata of metadataOf(item)) {
     const url = safeHttps(metadata.documentationUrl)
     if (url !== null) return url
   }
   return null
 }
 
-const registryEntrySchema = z
-  .union([z.object({ server: registryServerSchema }).transform(input => input.server), registryServerSchema])
-  .transform((item): RegistryEntry => {
-    const endpoint = item.remotes.find(
-      remote => (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null,
-    )
-    return {
-      name: item.name,
-      title: item.title.slice(0, 120),
-      category: categoryOf(item),
-      description: item.description.slice(0, 500),
-      version: item.version.slice(0, 80),
-      endpoint: endpoint === undefined ? null : safeHttps(endpoint.url),
-      docsUrl: documentationOf(item),
-    }
+/** A Registry row arrives either wrapped in `{ server }` or bare; an unrecognized row is dropped, not fatal. */
+const registryServerFromRow = (row: unknown): RegistryServer | undefined => {
+  const wrapped = Schema.decodeUnknownResult(Schema.Struct({ server: registryServerSchema }))(row)
+  if (wrapped._tag === 'Success') return wrapped.success.server
+  const bare = Schema.decodeUnknownResult(registryServerSchema)(row)
+  return bare._tag === 'Success' ? bare.success : undefined
+}
+
+const registryEntryFromRow = (row: unknown): RegistryEntry | undefined => {
+  const item = registryServerFromRow(row)
+  if (item === undefined) return undefined
+  const endpoint = remotesOf(item).find(
+    remote => (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null,
+  )
+  return {
+    name: item.name,
+    title: (item.title ?? '').slice(0, 120),
+    category: categoryOf(item),
+    description: (item.description ?? '').slice(0, 500),
+    version: (item.version ?? '').slice(0, 80),
+    endpoint: endpoint === undefined ? null : safeHttps(endpoint.url),
+    docsUrl: documentationOf(item),
+  }
+}
+
+const registryPayloadSchema = Schema.Struct({ servers: Schema.optional(Schema.Array(Schema.Unknown)) })
+
+const parseRegistryRows = (text: string): readonly RegistryEntry[] => {
+  const parsed = Schema.decodeUnknownResult(registryPayloadSchema)(JSON.parse(text))
+  if (parsed._tag === 'Failure') return []
+  return (parsed.success.servers ?? []).flatMap(row => {
+    const entry = registryEntryFromRow(row)
+    return entry === undefined ? [] : [entry]
   })
-const registryRowSchema = z.union([registryEntrySchema, z.undefined()]).catch(undefined)
+}
 
-const registryPayloadSchema = z.object({ servers: z.array(registryRowSchema).catch([]) }).catch({ servers: [] })
-type RegistryPayload = z.infer<typeof registryPayloadSchema>
-
-const readBoundedJson = async (response: Response): Promise<RegistryPayload> => {
+const readBoundedJson = async (response: Response): Promise<readonly RegistryEntry[]> => {
   if (response.body === null) throw new Error('Registry response has no body.')
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -192,7 +228,7 @@ const readBoundedJson = async (response: Response): Promise<RegistryPayload> => 
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return decodeJson(registryPayloadSchema, new TextDecoder().decode(bytes))
+  return parseRegistryRows(new TextDecoder().decode(bytes))
 }
 
 export type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>
@@ -234,8 +270,8 @@ export class McpCatalogModel {
         redirect: 'error',
       })
       if (!response.ok) throw new Error('Registry request failed.')
-      const payload = await readBoundedJson(response)
-      return payload.servers.slice(0, 20).flatMap(row => (row === undefined ? [] : [row]))
+      const rows = await readBoundedJson(response)
+      return rows.slice(0, 20)
     },
   })
 }
