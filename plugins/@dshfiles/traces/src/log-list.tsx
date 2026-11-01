@@ -6,13 +6,14 @@ import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { ChevronDownIcon, ChevronRightIcon, WaypointsIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { useState } from 'react'
-import { z } from 'zod'
 import type { LogsInput } from './api.js'
+import type { Mutable } from './schema.js'
+import { createStoredValue } from './stored-value.js'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesQueries, type TracesClient } from './queries.js'
@@ -30,14 +31,14 @@ const SEVERITY_FLOORS = [
   { value: 17, key: 'severityError' },
 ] as const
 
-export const logsViewSchema = z
-  .object({
-    search: z.string().max(200).catch(''),
-    service: z.string().max(256).nullable().catch(null),
-    minSeverity: z.number().int().min(0).max(24).catch(0),
-    attribute: z.string().max(640).catch(''),
-  })
-  .strip()
+export const logsViewSchema = Schema.Struct({
+  search: Schema.String.check(Schema.isMaxLength(200)),
+  service: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  minSeverity: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24)),
+  attribute: Schema.String.check(Schema.isMaxLength(640)),
+})
+
+export type LogsView = Schema.Schema.Type<typeof logsViewSchema>
 
 export const storedLogsView = createStoredValue({
   key: 'dshfiles.traces.logs-view.v1',
@@ -133,13 +134,13 @@ export const LogsView = (props: {
 }): JSX.Element => {
   const t = props.t
   const view = storedLogsView.useValue()
-  const update = (patch: Partial<z.infer<typeof logsViewSchema>>): void => {
+  const update = (patch: Partial<LogsView>): void => {
     storedLogsView.set({ ...view, ...patch })
   }
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   const attribute = parseAttributeFilter(useDebouncedValue({ value: view.attribute, delayMs: 250 }))
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const filters: Omit<LogsInput, 'cursor'> = { limit: 100 }
+  const filters: Mutable<Omit<LogsInput, 'cursor'>> = { limit: 100 }
   if (search.length > 0) filters.search = search
   if (view.service !== null) filters.service = view.service
   if (view.minSeverity !== 0) filters.minSeverity = view.minSeverity

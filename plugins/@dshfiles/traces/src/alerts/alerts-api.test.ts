@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { tracesBoardsApi } from '../boards/boards-api.js'
+import { TracesSchema } from '../schema.js'
 import { ALERT_KINDS, alertRuleDraftSchema } from './alert-types.js'
 import { muteInputSchema, removeInputSchema, tracesAlertsApi } from './alerts-api.js'
 
@@ -39,17 +40,17 @@ describe('alert and board agent tools', () => {
   })
 
   test('delete refuses to run without an explicit confirm', () => {
-    expect(removeInputSchema.safeParse({ id: 'rule-1' }).success).toBe(false)
-    expect(removeInputSchema.safeParse({ id: 'rule-1', confirm: false }).success).toBe(false)
-    expect(removeInputSchema.safeParse({ id: 'rule-1', confirm: true }).success).toBe(true)
+    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1' })).toBe(false)
+    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: false })).toBe(false)
+    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: true })).toBe(true)
   })
 
   test('mute takes minutes within a week, or null to unmute', () => {
-    expect(muteInputSchema.safeParse({ id: 'rule-1', minutes: 60 }).success).toBe(true)
-    expect(muteInputSchema.safeParse({ id: 'rule-1', minutes: null }).success).toBe(true)
-    expect(muteInputSchema.safeParse({ id: 'rule-1', minutes: 0 }).success).toBe(false)
-    expect(muteInputSchema.safeParse({ id: 'rule-1', minutes: 7 * 24 * 60 + 1 }).success).toBe(false)
-    expect(muteInputSchema.safeParse({ id: 'rule-1' }).success).toBe(false)
+    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 60 })).toBe(true)
+    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: null })).toBe(true)
+    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 0 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 7 * 24 * 60 + 1 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1' })).toBe(false)
   })
 })
 
@@ -62,22 +63,22 @@ describe('alert rule drafts', () => {
       { service: null, operation: 'chat deepseek', attribute: { key: 'gen_ai.provider.name', value: 'deepseek' } },
       { service: null, operation: null, attribute: { key: 'rpc.system', value: '*' } },
     ])
-      expect(alertRuleDraftSchema.safeParse({ ...draft, kind, threshold, filter }).success).toBe(true)
+      expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, kind, threshold, filter })).toBe(true)
   })
 
   test('refuses an error-rate threshold above 1 but allows it for other kinds', () => {
-    expect(alertRuleDraftSchema.safeParse({ ...draft, threshold: 20 }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, kind: 'latency', threshold: 20 }).success).toBe(true)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: 20 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, kind: 'latency', threshold: 20 })).toBe(true)
   })
 
   test('refuses windows, percentiles, ids and attribute keys outside the contract', () => {
-    expect(alertRuleDraftSchema.safeParse({ ...draft, windowMinutes: 0 }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, windowMinutes: 24 * 60 + 1 }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, percentile: 75 }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, threshold: -1 }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, id: 'Rule One' }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, filter: { ...draft.filter, attribute: { key: 'a"b', value: 'x' } } }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, name: '  ' }).success).toBe(false)
-    expect(alertRuleDraftSchema.safeParse({ ...draft, extra: true }).success).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 0 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 24 * 60 + 1 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, percentile: 75 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: -1 })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, id: 'Rule One' })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, filter: { ...draft.filter, attribute: { key: 'a"b', value: 'x' } } })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, name: '  ' })).toBe(false)
+    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, extra: true })).toBe(false)
   })
 })

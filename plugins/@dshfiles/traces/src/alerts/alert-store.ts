@@ -2,9 +2,11 @@ import { randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type StatementSync } from 'node:sqlite'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { TracesSchema } from '../schema.js'
 import { initialAlertState } from './alert-evaluator.js'
 import {
+  alertEventPayloadSchema,
   alertEventSchema,
   alertRuleSchema,
   alertStateSchema,
@@ -40,9 +42,15 @@ export class AlertStoreError extends Error {
 
 type NewEvent = Omit<AlertEvent, 'id'>
 
-const ruleRowSchema = z.object({ rule: z.string() })
-const stateRowSchema = z.object({ rule_id: z.string(), state: z.string() })
-const eventRowSchema = z.object({ id: z.number(), event: z.string() })
+const ruleRowSchema = Schema.Struct({ rule: Schema.String })
+const stateRowSchema = Schema.Struct({ rule_id: Schema.String, state: Schema.String })
+const eventRowSchema = Schema.Struct({ id: Schema.Int, event: Schema.String })
+
+const userVersionSchema = Schema.Struct({ user_version: Schema.Int })
+const positionSchema = Schema.Struct({ position: Schema.Int })
+const nextPositionSchema = Schema.Struct({ next: Schema.NullOr(Schema.Int) })
+const latestEventIdSchema = Schema.Struct({ id: Schema.NullOr(Schema.Int) })
+const attributedRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
 
 const newRuleId = (): string => `rule-${randomBytes(5).toString('hex')}`
 
@@ -59,7 +67,7 @@ export const openAlertStore = (options: { readonly path: string; readonly now?: 
   const database = new DatabaseSync(options.path)
   database.exec('PRAGMA busy_timeout = 5000')
   database.exec('PRAGMA journal_mode = WAL')
-  const version = z.object({ user_version: z.number() }).parse(database.prepare('PRAGMA user_version').get()).user_version
+  const version = TracesSchema.decode(userVersionSchema, database.prepare('PRAGMA user_version').get()).user_version
   for (let index = version; index < MIGRATIONS.length; index++) {
     database.exec('BEGIN IMMEDIATE')
     database.exec(MIGRATIONS[index] ?? '')
@@ -78,7 +86,11 @@ export const openAlertStore = (options: { readonly path: string; readonly now?: 
   }
 
   const writeRule = (rule: AlertRule, position: number): void => {
-    prepare('INSERT OR REPLACE INTO rules (id, position, rule) VALUES (?, ?, ?)').run(rule.id, position, JSON.stringify(alertRuleSchema.parse(rule)))
+    prepare('INSERT OR REPLACE INTO rules (id, position, rule) VALUES (?, ?, ?)').run(
+      rule.id,
+      position,
+      JSON.stringify(TracesSchema.decode(alertRuleSchema, rule)),
+    )
   }
 
   if (version === 0) {
@@ -87,21 +99,20 @@ export const openAlertStore = (options: { readonly path: string; readonly now?: 
   }
 
   const rules = (): AlertRule[] =>
-    z
-      .array(ruleRowSchema)
-      .parse(prepare('SELECT rule FROM rules ORDER BY position, id').all())
-      .map(row => alertRuleSchema.parse(JSON.parse(row.rule)))
+    TracesSchema.decode(Schema.Array(ruleRowSchema), prepare('SELECT rule FROM rules ORDER BY position, id').all()).map(row =>
+      TracesSchema.decode(alertRuleSchema, JSON.parse(row.rule)),
+    )
 
   const rule = (id: string): AlertRule => {
     const row = prepare('SELECT rule FROM rules WHERE id = ?').get(id)
     if (row === undefined) throw new AlertStoreError('not-found', `No alert rule ${id}.`)
-    return alertRuleSchema.parse(JSON.parse(ruleRowSchema.parse(row).rule))
+    return TracesSchema.decode(alertRuleSchema, JSON.parse(TracesSchema.decode(ruleRowSchema, row).rule))
   }
 
   const positionOf = (id: string): number => {
     const row = prepare('SELECT position FROM rules WHERE id = ?').get(id)
-    if (row !== undefined) return z.object({ position: z.number() }).parse(row).position
-    return z.object({ next: z.number().nullable() }).parse(prepare('SELECT MAX(position) + 1 AS next FROM rules').get()).next ?? 0
+    if (row !== undefined) return TracesSchema.decode(positionSchema, row).position
+    return TracesSchema.decode(nextPositionSchema, prepare('SELECT MAX(position) + 1 AS next FROM rules').get()).next ?? 0
   }
 
   const save = (draft: AlertRuleDraft): AlertRule => {
@@ -133,16 +144,16 @@ export const openAlertStore = (options: { readonly path: string; readonly now?: 
 
   const states = (): Map<string, AlertState> =>
     new Map(
-      z
-        .array(stateRowSchema)
-        .parse(prepare('SELECT rule_id, state FROM states').all())
-        .map(row => [row.rule_id, alertStateSchema.parse(JSON.parse(row.state))]),
+      TracesSchema.decode(Schema.Array(stateRowSchema), prepare('SELECT rule_id, state FROM states').all()).map(row => [
+        row.rule_id,
+        TracesSchema.decode(alertStateSchema, JSON.parse(row.state)),
+      ]),
     )
 
   const stateOf = (id: string): AlertState => states().get(id) ?? initialAlertState
 
   const writeState = (id: string, state: AlertState): void => {
-    prepare('INSERT OR REPLACE INTO states (rule_id, state) VALUES (?, ?)').run(id, JSON.stringify(alertStateSchema.parse(state)))
+    prepare('INSERT OR REPLACE INTO states (rule_id, state) VALUES (?, ?)').run(id, JSON.stringify(TracesSchema.decode(alertStateSchema, state)))
   }
 
   const clearState = (id: string): void => {
@@ -150,22 +161,24 @@ export const openAlertStore = (options: { readonly path: string; readonly now?: 
   }
 
   const appendEvent = (event: NewEvent): AlertEvent => {
-    const parsed = alertEventSchema.omit({ id: true }).parse(event)
+    const parsed = TracesSchema.decode(alertEventPayloadSchema, event)
     const id = Number(prepare('INSERT INTO events (rule_id, at, event) VALUES (?, ?, ?)').run(parsed.ruleId, parsed.at, JSON.stringify(parsed)).lastInsertRowid)
     prepare('DELETE FROM events WHERE id <= ?').run(id - MAX_ALERT_EVENTS)
     return { ...parsed, id }
   }
 
-  const eventsOf = (rows: readonly z.infer<typeof eventRowSchema>[]): AlertEvent[] =>
-    rows.map(row => alertEventSchema.parse({ ...z.record(z.string(), z.unknown()).parse(JSON.parse(row.event)), id: row.id }))
+  const eventsOf = (rows: readonly Schema.Schema.Type<typeof eventRowSchema>[]): AlertEvent[] =>
+    rows.map(row => TracesSchema.decode(alertEventSchema, { ...TracesSchema.decode(attributedRecordSchema, JSON.parse(row.event)), id: row.id }))
 
   const history = (limit: number): AlertEvent[] =>
-    eventsOf(z.array(eventRowSchema).parse(prepare('SELECT id, event FROM events ORDER BY id DESC LIMIT ?').all(limit)))
+    eventsOf(TracesSchema.decode(Schema.Array(eventRowSchema), prepare('SELECT id, event FROM events ORDER BY id DESC LIMIT ?').all(limit)))
 
   const eventsAfter = (afterId: number, limit: number): AlertEvent[] =>
-    eventsOf(z.array(eventRowSchema).parse(prepare('SELECT id, event FROM events WHERE id > ? ORDER BY id DESC LIMIT ?').all(afterId, limit)))
+    eventsOf(
+      TracesSchema.decode(Schema.Array(eventRowSchema), prepare('SELECT id, event FROM events WHERE id > ? ORDER BY id DESC LIMIT ?').all(afterId, limit)),
+    )
 
-  const latestEventId = (): number => z.object({ id: z.number().nullable() }).parse(prepare('SELECT MAX(id) AS id FROM events').get()).id ?? 0
+  const latestEventId = (): number => TracesSchema.decode(latestEventIdSchema, prepare('SELECT MAX(id) AS id FROM events').get()).id ?? 0
 
   return {
     rules,

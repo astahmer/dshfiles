@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { TracesSchema } from '../schema.js'
 import { OtlpBody } from './decode.js'
 import { otlpTraceRequestSchema, type OtlpSpan } from './json-schema.js'
 import { SPAN_BOUNDS, SpanNormalizer } from './normalize.js'
@@ -79,7 +80,7 @@ describe('OTLP trace decoding', () => {
 })
 
 const jsonRequest = (span: OtlpSpan) =>
-  otlpTraceRequestSchema.parse({
+  TracesSchema.decode(otlpTraceRequestSchema, {
     resourceSpans: [
       { resource: { attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }] }, scopeSpans: [{ scope: { name: 'scope' }, spans: [span] }] },
     ],
@@ -148,7 +149,7 @@ describe('span normalization', () => {
 
   test('accepts base64 ids, string enums and a missing service, and rejects spans without valid ids or start', () => {
     const result = SpanNormalizer.normalizeTraces(
-      otlpTraceRequestSchema.parse({
+      TracesSchema.decode(otlpTraceRequestSchema, {
         resourceSpans: [
           {
             scopeSpans: [

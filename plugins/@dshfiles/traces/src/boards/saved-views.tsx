@@ -13,36 +13,39 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { BookmarkIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { TracesAlertsTranslate } from '../alerts/alerts-locale.js'
 import { logsViewSchema, storedLogsView } from '../log-list.js'
 import { storedTracesView, tracesViewSchema } from '../view-state.js'
 import { BUILTIN_BOARDS } from './board-definitions.js'
+import { TracesSchema } from '../schema.js'
+import { createStoredValue } from '../stored-value.js'
 import { boardCopyOf, storedBoardId } from './boards-view.js'
 
 const MAX_SAVED_VIEWS = 30
 
-const savedViewSchema = z
-  .object({
-    id: z.string().max(64),
-    name: z.string().trim().min(1).max(80),
-    savedAt: z.number(),
-    traces: tracesViewSchema,
-    logs: logsViewSchema,
-    board: z.string().max(64).nullable(),
-  })
-  .strip()
-type SavedView = z.infer<typeof savedViewSchema>
+const savedViewSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMaxLength(64)),
+  name: TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  savedAt: Schema.Number.check(Schema.isFinite()),
+  traces: tracesViewSchema,
+  logs: logsViewSchema,
+  board: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))),
+})
+type SavedView = Schema.Schema.Type<typeof savedViewSchema>
 
 /**
  * Named snapshots of the panel's own view state (tab, trace filters, log filters, window, open board), like a bookmark
  * of a URL. They are this browser's presentation state, not Host data, so they live in localStorage and have no agent
  * tool; an agent reproduces a view with the same traces_search / traces_search_logs / traces_breakdown filters.
  */
-const storedSavedViews = createStoredValue({ key: 'dshfiles.traces.saved-views.v1', schema: z.array(savedViewSchema).max(MAX_SAVED_VIEWS), fallback: [] })
+const storedSavedViews = createStoredValue({
+  key: 'dshfiles.traces.saved-views.v1',
+  schema: Schema.Array(savedViewSchema).check(Schema.isMaxLength(MAX_SAVED_VIEWS)),
+  fallback: [],
+})
 
 const applyView = (view: SavedView): void => {
   storedTracesView.set(view.traces)

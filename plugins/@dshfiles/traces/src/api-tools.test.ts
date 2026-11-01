@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { clearInputSchema, tracesApi } from './api.js'
+import { TracesSchema } from './schema.js'
 
 describe('traces agent tools', () => {
   test('every traces capability is a named tool and only clear writes', () => {
@@ -22,8 +23,8 @@ describe('traces agent tools', () => {
   })
 
   test('clear refuses to run without an explicit confirm', () => {
-    expect(clearInputSchema.safeParse({}).success).toBe(false)
-    expect(clearInputSchema.safeParse({ confirm: false }).success).toBe(false)
-    expect(clearInputSchema.safeParse({ confirm: true }).success).toBe(true)
+    expect(TracesSchema.acceptsStrict(clearInputSchema, {})).toBe(false)
+    expect(TracesSchema.acceptsStrict(clearInputSchema, { confirm: false })).toBe(false)
+    expect(TracesSchema.acceptsStrict(clearInputSchema, { confirm: true })).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { AttributeValue } from './types.js'
 
 const formatDuration = (milliseconds: number | null): string => {
@@ -75,11 +75,11 @@ const formatUsd = (usd: number | null | undefined): string => {
 }
 
 /** The `dshx.cost.usd` agent telemetry put on a span, or null. */
-const costSchema = z.number().nonnegative().finite()
+const costSchema = Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0))
 
 const spanCostUsd = (attributes: Readonly<Record<string, AttributeValue>>): number | null => {
-  const cost = costSchema.safeParse(attributes['dshx.cost.usd'])
-  return cost.success ? cost.data : null
+  const result = Schema.decodeUnknownResult(costSchema)(attributes['dshx.cost.usd'])
+  return result._tag === 'Success' ? result.success : null
 }
 
 export class TraceFormat {

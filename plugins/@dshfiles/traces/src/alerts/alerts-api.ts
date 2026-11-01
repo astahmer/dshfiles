@@ -1,28 +1,21 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
+import { method } from '../api-schema.js'
 import { alertFeedSchema, alertRuleDraftSchema, alertRuleSchema, alertsSnapshotSchema, evaluationSummarySchema } from './alert-types.js'
 
-const ruleIdSchema = z
-  .string()
-  .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
-  .describe('Alert rule id from traces_alerts.')
+const ruleIdSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,63}$/)).annotate({ description: 'Alert rule id from traces_alerts.' })
 
-export const muteInputSchema = z
-  .object({
-    id: ruleIdSchema,
-    minutes: z
-      .number()
-      .int()
-      .min(1)
-      .max(7 * 24 * 60)
-      .nullable()
-      .describe('Mute for this many minutes; null unmutes. A muted rule still evaluates but announces nothing.'),
-  })
-  .strict()
+export const muteInputSchema = Schema.Struct({
+  id: ruleIdSchema,
+  minutes: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(7 * 24 * 60))).annotate({
+    description: 'Mute for this many minutes; null unmutes. A muted rule still evaluates but announces nothing.',
+  }),
+})
 
-export const removeInputSchema = z
-  .object({ id: ruleIdSchema, confirm: z.literal(true).describe('Must be true: removing a rule drops its state; its history stays.') })
-  .strict()
+export const removeInputSchema = Schema.Struct({
+  id: ruleIdSchema,
+  confirm: Schema.Literal(true).annotate({ description: 'Must be true: removing a rule drops its state; its history stays.' }),
+})
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -33,14 +26,22 @@ export const tracesAlertsApi = defineApi({
   owner: '@dshfiles/traces',
   methods: {
     state: method({
-      input: z.object({ historyLimit: z.number().int().min(0).max(200).optional().describe('Newest history events to include; defaults to 50.') }).strict(),
+      input: Schema.Struct({
+        historyLimit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(200))).annotate({
+          description: 'Newest history events to include; defaults to 50.',
+        }),
+      }),
       output: alertsSnapshotSchema,
       description:
         'Alert rules over stored telemetry (error rate, latency percentile, throughput, span count, span duration), each with its filter, window, threshold, severity, enabled and mute state, and current state (ok or firing, last value, sample count); how many fire now; and the newest firing/resolved events with the threads they named. Read-only.',
       tool: { name: 'traces_alerts', readOnly: true, render: compactJson },
     }),
     feed: method({
-      input: z.object({ afterId: z.number().int().nonnegative().nullable().describe('Last event id seen; null returns only the latest id.') }).strict(),
+      input: Schema.Struct({
+        afterId: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))).annotate({
+          description: 'Last event id seen; null returns only the latest id.',
+        }),
+      }),
       output: alertFeedSchema,
       description: 'Alert events newer than an id, newest first (at most 20), with the latest id and the firing count; what a notifier polls.',
     }),
@@ -64,7 +65,7 @@ export const tracesAlertsApi = defineApi({
       tool: { name: 'traces_alert_delete', readOnly: false, render: compactJson },
     }),
     evaluate: method({
-      input: z.object({}).strict(),
+      input: Schema.Struct({}),
       output: evaluationSummarySchema,
       description:
         'Evaluate every enabled alert rule now instead of at the next minute; transitions are recorded and announced as on the timer. Run only when the user asked to evaluate alerts now.',

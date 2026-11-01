@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 
 /**
  * The OTLP/HTTP JSON mapping of `ExportTraceServiceRequest`
@@ -8,8 +9,8 @@ import { z } from 'zod'
 
 const MAX_ANY_VALUE_DEPTH = 8
 
-const int64Schema = z.union([z.string().regex(/^-?\d{1,20}$/), z.number().int()])
-const unixNanoSchema = z.union([z.string().regex(/^\d{1,20}$/), z.number().int().nonnegative()])
+const int64Schema = Schema.Union([Schema.String.check(Schema.isPattern(/^-?\d{1,20}$/)), Schema.Int])
+const unixNanoSchema = Schema.Union([Schema.String.check(Schema.isPattern(/^\d{1,20}$/)), Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))])
 
 export type OtlpAnyValue = {
   readonly stringValue?: string | undefined
@@ -23,34 +24,36 @@ export type OtlpAnyValue = {
 
 export type OtlpKeyValue = { readonly key: string; readonly value?: OtlpAnyValue | undefined }
 
-const anyValueAt = (depth: number): z.ZodType<OtlpAnyValue> =>
-  z.lazy(() =>
+/** Past the depth bound the payload is left unread, exactly as the encoder forbids deeper nesting. */
+const opaqueObject: Schema.ConstraintDecoder<OtlpAnyValue> = Schema.Unknown.pipe(
+  Schema.refine((value): value is OtlpAnyValue => typeof value === 'object' && value !== null),
+)
+
+const anyValueAt = (depth: number): Schema.ConstraintDecoder<OtlpAnyValue> =>
+  Schema.suspend(() =>
     depth >= MAX_ANY_VALUE_DEPTH
-      ? z.object({}).loose()
-      : z
-          .object({
-            stringValue: z.string().optional(),
-            boolValue: z.boolean().optional(),
-            intValue: int64Schema.optional(),
-            doubleValue: z.union([z.number(), z.enum(['NaN', 'Infinity', '-Infinity'])]).optional(),
-            bytesValue: z.string().optional(),
-            arrayValue: z.object({ values: z.array(anyValueAt(depth + 1)).optional() }).optional(),
-            kvlistValue: z.object({ values: z.array(keyValueAt(depth + 1)).optional() }).optional(),
-          })
-          .loose(),
+      ? opaqueObject
+      : Schema.Struct({
+          stringValue: Schema.optional(Schema.String),
+          boolValue: Schema.optional(Schema.Boolean),
+          intValue: Schema.optional(int64Schema),
+          doubleValue: Schema.optional(Schema.Union([Schema.Number, Schema.Literals(['NaN', 'Infinity', '-Infinity'])])),
+          bytesValue: Schema.optional(Schema.String),
+          arrayValue: Schema.optional(Schema.Struct({ values: Schema.optional(Schema.Array(anyValueAt(depth + 1))) })),
+          kvlistValue: Schema.optional(Schema.Struct({ values: Schema.optional(Schema.Array(keyValueAt(depth + 1))) })),
+        }),
   )
 
-const keyValueAt = (depth: number): z.ZodType<OtlpKeyValue> => z.lazy(() => z.object({ key: z.string(), value: anyValueAt(depth).optional() }).loose())
+const keyValueAt = (depth: number): Schema.ConstraintDecoder<OtlpKeyValue> =>
+  Schema.suspend(() => Schema.Struct({ key: Schema.String, value: Schema.optional(anyValueAt(depth)) }))
 
-const attributesSchema = z.array(keyValueAt(0)).optional()
+const attributesSchema = Schema.optional(Schema.Array(keyValueAt(0)))
 
-const otlpEventSchema = z
-  .object({
-    timeUnixNano: unixNanoSchema.optional(),
-    name: z.string().optional(),
-    attributes: attributesSchema,
-  })
-  .loose()
+const otlpEventSchema = Schema.Struct({
+  timeUnixNano: Schema.optional(unixNanoSchema),
+  name: Schema.optional(Schema.String),
+  attributes: attributesSchema,
+})
 
 const SPAN_KIND_NUMBERS = new Map([
   ['SPAN_KIND_UNSPECIFIED', 0],
@@ -78,157 +81,140 @@ const SEVERITY_NUMBERS = new Map([
 ])
 
 /** OTLP/JSON may spell an enum by its name; decoding settles it to the number the protobuf wire carries. */
-const enumNumberSchema = (numbers: ReadonlyMap<string, number>) => z.union([z.number().int(), z.string().transform(name => numbers.get(name) ?? 0)])
+const enumNumberSchema = (numbers: ReadonlyMap<string, number>) =>
+  Schema.Union([
+    Schema.Int,
+    Schema.String.pipe(
+      Schema.decodeTo(Schema.Int, {
+        decode: SchemaGetter.transform<number, string>(name => numbers.get(name) ?? 0),
+        encode: SchemaGetter.transform<string, number>(value => String(value)),
+      }),
+    ),
+  ])
 
-const otlpSpanSchema = z
-  .object({
-    traceId: z.string(),
-    spanId: z.string(),
-    parentSpanId: z.string().optional(),
-    name: z.string().optional(),
-    kind: enumNumberSchema(SPAN_KIND_NUMBERS).optional(),
-    startTimeUnixNano: unixNanoSchema.optional(),
-    endTimeUnixNano: unixNanoSchema.optional(),
-    attributes: attributesSchema,
-    events: z.array(otlpEventSchema).optional(),
-    links: z.array(z.unknown()).optional(),
-    status: z
-      .object({ code: enumNumberSchema(STATUS_CODE_NUMBERS).optional(), message: z.string().optional() })
-      .loose()
-      .optional(),
-  })
-  .loose()
+const otlpSpanSchema = Schema.Struct({
+  traceId: Schema.String,
+  spanId: Schema.String,
+  parentSpanId: Schema.optional(Schema.String),
+  name: Schema.optional(Schema.String),
+  kind: Schema.optional(enumNumberSchema(SPAN_KIND_NUMBERS)),
+  startTimeUnixNano: Schema.optional(unixNanoSchema),
+  endTimeUnixNano: Schema.optional(unixNanoSchema),
+  attributes: attributesSchema,
+  events: Schema.optional(Schema.Array(otlpEventSchema)),
+  links: Schema.optional(Schema.Array(Schema.Unknown)),
+  status: Schema.optional(
+    Schema.Struct({
+      code: Schema.optional(enumNumberSchema(STATUS_CODE_NUMBERS)),
+      message: Schema.optional(Schema.String),
+    }),
+  ),
+})
 
-export const otlpTraceRequestSchema = z
-  .object({
-    resourceSpans: z
-      .array(
-        z
-          .object({
-            resource: z.object({ attributes: attributesSchema }).loose().optional(),
-            scopeSpans: z
-              .array(
-                z
-                  .object({
-                    scope: z.object({ name: z.string().optional(), version: z.string().optional() }).loose().optional(),
-                    spans: z.array(otlpSpanSchema).optional(),
-                  })
-                  .loose(),
-              )
-              .optional(),
-          })
-          .loose(),
-      )
-      .optional(),
-  })
-  .loose()
+export const otlpTraceRequestSchema = Schema.Struct({
+  resourceSpans: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        resource: Schema.optional(Schema.Struct({ attributes: attributesSchema })),
+        scopeSpans: Schema.optional(
+          Schema.Array(
+            Schema.Struct({
+              scope: Schema.optional(Schema.Struct({ name: Schema.optional(Schema.String), version: Schema.optional(Schema.String) })),
+              spans: Schema.optional(Schema.Array(otlpSpanSchema)),
+            }),
+          ),
+        ),
+      }),
+    ),
+  ),
+})
 
-export type OtlpTraceRequest = z.infer<typeof otlpTraceRequestSchema>
+export type OtlpTraceRequest = Schema.Schema.Type<typeof otlpTraceRequestSchema>
 
-const otlpLogRecordSchema = z
-  .object({
-    timeUnixNano: unixNanoSchema.optional(),
-    observedTimeUnixNano: unixNanoSchema.optional(),
-    severityNumber: enumNumberSchema(SEVERITY_NUMBERS).optional(),
-    severityText: z.string().optional(),
-    body: anyValueAt(0).optional(),
-    attributes: attributesSchema,
-    traceId: z.string().optional(),
-    spanId: z.string().optional(),
-    eventName: z.string().optional(),
-  })
-  .loose()
+const otlpLogRecordSchema = Schema.Struct({
+  timeUnixNano: Schema.optional(unixNanoSchema),
+  observedTimeUnixNano: Schema.optional(unixNanoSchema),
+  severityNumber: Schema.optional(enumNumberSchema(SEVERITY_NUMBERS)),
+  severityText: Schema.optional(Schema.String),
+  body: Schema.optional(anyValueAt(0)),
+  attributes: attributesSchema,
+  traceId: Schema.optional(Schema.String),
+  spanId: Schema.optional(Schema.String),
+  eventName: Schema.optional(Schema.String),
+})
 
 /** The OTLP/HTTP JSON mapping of `ExportLogsServiceRequest`. */
-export const otlpLogsRequestSchema = z
-  .object({
-    resourceLogs: z
-      .array(
-        z
-          .object({
-            resource: z.object({ attributes: attributesSchema }).loose().optional(),
-            scopeLogs: z
-              .array(
-                z
-                  .object({
-                    scope: z.object({ name: z.string().optional(), version: z.string().optional() }).loose().optional(),
-                    logRecords: z.array(otlpLogRecordSchema).optional(),
-                  })
-                  .loose(),
-              )
-              .optional(),
-          })
-          .loose(),
-      )
-      .optional(),
-  })
-  .loose()
+export const otlpLogsRequestSchema = Schema.Struct({
+  resourceLogs: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        resource: Schema.optional(Schema.Struct({ attributes: attributesSchema })),
+        scopeLogs: Schema.optional(
+          Schema.Array(
+            Schema.Struct({
+              scope: Schema.optional(Schema.Struct({ name: Schema.optional(Schema.String), version: Schema.optional(Schema.String) })),
+              logRecords: Schema.optional(Schema.Array(otlpLogRecordSchema)),
+            }),
+          ),
+        ),
+      }),
+    ),
+  ),
+})
 
-export type OtlpLogsRequest = z.infer<typeof otlpLogsRequestSchema>
-export type OtlpLogRecord = z.infer<typeof otlpLogRecordSchema>
-export type OtlpSpan = z.infer<typeof otlpSpanSchema>
+export type OtlpLogsRequest = Schema.Schema.Type<typeof otlpLogsRequestSchema>
+export type OtlpLogRecord = Schema.Schema.Type<typeof otlpLogRecordSchema>
+export type OtlpSpan = Schema.Schema.Type<typeof otlpSpanSchema>
 
-const numericSchema = z.union([z.number(), z.enum(['NaN', 'Infinity', '-Infinity'])])
+const numericSchema = Schema.Union([Schema.Number, Schema.Literals(['NaN', 'Infinity', '-Infinity'])])
 
-const otlpPointSchema = z
-  .object({
-    attributes: attributesSchema,
-    timeUnixNano: unixNanoSchema.optional(),
-    asDouble: numericSchema.optional(),
-    asInt: int64Schema.optional(),
-    count: z.union([z.string().regex(/^\d{1,20}$/), z.number().int().nonnegative()]).optional(),
-    sum: numericSchema.optional(),
-    min: numericSchema.optional(),
-    max: numericSchema.optional(),
-  })
-  .loose()
+const otlpPointSchema = Schema.Struct({
+  attributes: attributesSchema,
+  timeUnixNano: Schema.optional(unixNanoSchema),
+  asDouble: Schema.optional(numericSchema),
+  asInt: Schema.optional(int64Schema),
+  count: Schema.optional(Schema.Union([Schema.String.check(Schema.isPattern(/^\d{1,20}$/)), Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))])),
+  sum: Schema.optional(numericSchema),
+  min: Schema.optional(numericSchema),
+  max: Schema.optional(numericSchema),
+})
 
-const otlpDataSchema = z
-  .object({
-    dataPoints: z.array(otlpPointSchema).optional(),
-    aggregationTemporality: z.union([z.number().int(), z.string()]).optional(),
-    isMonotonic: z.boolean().optional(),
-  })
-  .loose()
+const otlpDataSchema = Schema.Struct({
+  dataPoints: Schema.optional(Schema.Array(otlpPointSchema)),
+  aggregationTemporality: Schema.optional(Schema.Union([Schema.Int, Schema.String])),
+  isMonotonic: Schema.optional(Schema.Boolean),
+})
 
-const otlpMetricSchema = z
-  .object({
-    name: z.string().optional(),
-    description: z.string().optional(),
-    unit: z.string().optional(),
-    gauge: otlpDataSchema.optional(),
-    sum: otlpDataSchema.optional(),
-    histogram: otlpDataSchema.optional(),
-    exponentialHistogram: otlpDataSchema.optional(),
-    summary: otlpDataSchema.optional(),
-  })
-  .loose()
+const otlpMetricSchema = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  unit: Schema.optional(Schema.String),
+  gauge: Schema.optional(otlpDataSchema),
+  sum: Schema.optional(otlpDataSchema),
+  histogram: Schema.optional(otlpDataSchema),
+  exponentialHistogram: Schema.optional(otlpDataSchema),
+  summary: Schema.optional(otlpDataSchema),
+})
 
 /** The OTLP/HTTP JSON mapping of `ExportMetricsServiceRequest`, limited to the fields the metric charts read. */
-export const otlpMetricsRequestSchema = z
-  .object({
-    resourceMetrics: z
-      .array(
-        z
-          .object({
-            resource: z.object({ attributes: attributesSchema }).loose().optional(),
-            scopeMetrics: z
-              .array(
-                z
-                  .object({
-                    scope: z.object({ name: z.string().optional(), version: z.string().optional() }).loose().optional(),
-                    metrics: z.array(otlpMetricSchema).optional(),
-                  })
-                  .loose(),
-              )
-              .optional(),
-          })
-          .loose(),
-      )
-      .optional(),
-  })
-  .loose()
+export const otlpMetricsRequestSchema = Schema.Struct({
+  resourceMetrics: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        resource: Schema.optional(Schema.Struct({ attributes: attributesSchema })),
+        scopeMetrics: Schema.optional(
+          Schema.Array(
+            Schema.Struct({
+              scope: Schema.optional(Schema.Struct({ name: Schema.optional(Schema.String), version: Schema.optional(Schema.String) })),
+              metrics: Schema.optional(Schema.Array(otlpMetricSchema)),
+            }),
+          ),
+        ),
+      }),
+    ),
+  ),
+})
 
-export type OtlpMetricsRequest = z.infer<typeof otlpMetricsRequestSchema>
-export type OtlpMetric = z.infer<typeof otlpMetricSchema>
-export type OtlpMetricPoint = z.infer<typeof otlpPointSchema>
+export type OtlpMetricsRequest = Schema.Schema.Type<typeof otlpMetricsRequestSchema>
+export type OtlpMetric = Schema.Schema.Type<typeof otlpMetricSchema>
+export type OtlpMetricPoint = Schema.Schema.Type<typeof otlpPointSchema>

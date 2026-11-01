@@ -3,9 +3,11 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
+import * as Schema from 'effect/Schema'
 import { useState } from 'react'
-import { z } from 'zod'
+import { TracesSchema } from '../schema.js'
 import {
+  ALERT_KINDS,
   alertComparatorSchema,
   alertKindSchema,
   alertRuleDraftSchema,
@@ -28,45 +30,48 @@ const parseAttribute = (text: string): AlertRuleDraft['filter']['attribute'] | u
   return /^[\w.:/-]{1,128}$/.test(key) ? { key, value: trimmed.slice(separator + 1).trim() } : undefined
 }
 
-const ruleFormSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    kind: alertKindSchema,
-    service: z.string().max(256),
-    operation: z.string().max(256),
-    attribute: z
-      .string()
-      .max(640)
-      .refine(text => parseAttribute(text) !== undefined, 'Use key=value, or key=* for any value.'),
-    windowMinutes: z
-      .string()
-      .regex(/^\d+$/, 'Whole minutes.')
-      .refine(text => Number(text) >= 1 && Number(text) <= 1_440, 'Use 1 to 1,440 minutes.'),
-    threshold: z.string().refine(text => text.trim() !== '' && Number.isFinite(Number(text)) && Number(text) >= 0, 'A number of at least 0.'),
-    comparator: alertComparatorSchema,
-    percentile: z.enum(percentileValues),
-    minSamples: z
-      .string()
-      .regex(/^\d+$/, 'A whole number.')
-      .refine(text => Number(text) >= 1, 'At least 1.'),
-    severity: alertSeveritySchema,
-    enabled: z.boolean(),
-    notify: z.boolean(),
-    markThreads: z.boolean(),
-  })
-  .superRefine((value, context) => {
-    if (value.kind === 'error-rate' && Number(value.threshold) > 1)
-      context.addIssue({ code: 'custom', path: ['threshold'], message: 'An error rate is a share from 0 to 1.' })
-  })
+const wholeMinutes = Schema.String.check(
+  Schema.isPattern(/^\d+$/),
+  Schema.makeFilter(text => (Number(text) >= 1 && Number(text) <= 1_440 ? true : 'Use 1 to 1,440 minutes.')),
+)
 
-type RuleFormValues = z.infer<typeof ruleFormSchema>
+const ruleFormSchema = Schema.Struct({
+  name: TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  kind: alertKindSchema,
+  service: Schema.String.check(Schema.isMaxLength(256)),
+  operation: Schema.String.check(Schema.isMaxLength(256)),
+  attribute: Schema.String.check(
+    Schema.isMaxLength(640),
+    Schema.makeFilter(text => (parseAttribute(text) === undefined ? 'Use key=value, or key=* for any value.' : true)),
+  ),
+  windowMinutes: wholeMinutes,
+  threshold: Schema.String.check(
+    Schema.makeFilter(text => (text.trim() !== '' && Number.isFinite(Number(text)) && Number(text) >= 0 ? true : 'A number of at least 0.')),
+  ),
+  comparator: alertComparatorSchema,
+  percentile: Schema.Literals(percentileValues),
+  minSamples: Schema.String.check(
+    Schema.isPattern(/^\d+$/),
+    Schema.makeFilter(text => (Number(text) >= 1 ? true : 'At least 1.')),
+  ),
+  severity: alertSeveritySchema,
+  enabled: Schema.Boolean,
+  notify: Schema.Boolean,
+  markThreads: Schema.Boolean,
+}).check(
+  Schema.makeFilter(value =>
+    value.kind === 'error-rate' && Number(value.threshold) > 1 ? { path: ['threshold'], issue: 'An error rate is a share from 0 to 1.' } : undefined,
+  ),
+)
+
+type RuleFormValues = Schema.Schema.Type<typeof ruleFormSchema>
 
 const PERCENTILE_OF = { '50': 50, '90': 90, '95': 95, '99': 99 } satisfies Record<RuleFormValues['percentile'], AlertRuleDraft['percentile']>
 
 const percentileOf = (text: RuleFormValues['percentile']): AlertRuleDraft['percentile'] => PERCENTILE_OF[text]
 
 const toDraft = (values: RuleFormValues, id: string | undefined): AlertRuleDraft => {
-  const draft = alertRuleDraftSchema.parse({
+  const draft = TracesSchema.decode(alertRuleDraftSchema, {
     name: values.name.trim(),
     kind: values.kind,
     filter: {
@@ -84,8 +89,7 @@ const toDraft = (values: RuleFormValues, id: string | undefined): AlertRuleDraft
     notify: values.notify,
     markThreads: values.markThreads,
   })
-  if (id !== undefined) draft.id = id
-  return draft
+  return id === undefined ? draft : { ...draft, id }
 }
 
 const valuesOf = (rule: AlertRule | null): RuleFormValues => ({
@@ -158,7 +162,7 @@ const AlertRuleForm = (props: {
   const form = useAppForm({
     defaultValues: valuesOf(props.rule),
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: ruleFormSchema },
+    validators: { onDynamic: Schema.toStandardSchemaV1(ruleFormSchema) },
     onSubmit: async ({ value }) => {
       setSaveError(null)
       try {
@@ -181,9 +185,7 @@ const AlertRuleForm = (props: {
       <form.AppField name="name">{field => <field.TextField label={t('ruleName')} required />}</form.AppField>
       <div className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-narrow:grid-cols-1">
         <form.AppField name="kind">
-          {field => (
-            <field.SelectField label={t('kind')} options={alertKindSchema.options.map(kind => ({ value: kind, label: AlertRuleLabels.kind(kind, t) }))} />
-          )}
+          {field => <field.SelectField label={t('kind')} options={ALERT_KINDS.map(kind => ({ value: kind, label: AlertRuleLabels.kind(kind, t) }))} />}
         </form.AppField>
         <form.AppField name="severity">
           {field => (

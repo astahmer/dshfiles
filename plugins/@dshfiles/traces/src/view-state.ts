@@ -1,21 +1,23 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { createStoredValue } from './stored-value.js'
 
 export const WINDOW_OPTIONS = [15, 60, 1_440, 10_080] as const
 
-export const tracesViewSchema = z
-  .object({
-    tab: z.enum(['traces', 'logs', 'map', 'metrics', 'operations', 'errors', 'alerts', 'boards']).catch('traces'),
-    search: z.string().max(200).catch(''),
-    service: z.string().max(256).nullable().catch(null),
-    operation: z.string().max(256).nullable().catch(null),
-    status: z.enum(['all', 'error', 'ok']).catch('all'),
-    minDurationMs: z.number().nonnegative().nullable().catch(null),
-    windowMinutes: z.number().int().positive().catch(60),
-  })
-  .strip()
+const FINITE_NON_NEGATIVE = Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0))
 
-export type TracesView = z.infer<typeof tracesViewSchema>
+export const tracesTabSchema = Schema.Literals(['traces', 'logs', 'map', 'metrics', 'operations', 'errors', 'alerts', 'boards'])
+
+export const tracesViewSchema = Schema.Struct({
+  tab: tracesTabSchema,
+  search: Schema.String.check(Schema.isMaxLength(200)),
+  service: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  operation: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  status: Schema.Literals(['all', 'error', 'ok']),
+  minDurationMs: Schema.NullOr(FINITE_NON_NEGATIVE),
+  windowMinutes: Schema.Int.check(Schema.isGreaterThan(0)),
+})
+
+export type TracesView = Schema.Schema.Type<typeof tracesViewSchema>
 
 const defaultTracesView: TracesView = {
   tab: 'traces',

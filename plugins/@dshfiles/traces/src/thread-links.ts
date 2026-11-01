@@ -1,22 +1,23 @@
 import { ChatFocusModel, type ChatFocus } from '@dshfiles/chat/chat-focus'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { TracesSchema } from './schema.js'
 import type { AttributeValue } from './types.js'
 
 const TRACES_VIEW_ID = 'dshfiles-traces'
 const FOCUS_PREFIX = 'dshfiles-traces-focus:'
 
-const tracesFocusSchema = z.object({ turn: z.number().int().nonnegative() }).strict()
+const tracesFocusSchema = Schema.Struct({ turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) })
 
 /** What the Traces tab opens for a Conversation View request: the trace of one of the thread's turns. */
-export type TracesFocus = z.infer<typeof tracesFocusSchema>
+export type TracesFocus = Schema.Schema.Type<typeof tracesFocusSchema>
 
-const encodeFocus = (focus: TracesFocus): string => `${FOCUS_PREFIX}${JSON.stringify(tracesFocusSchema.parse(focus))}`
+const encodeFocus = (focus: TracesFocus): string => `${FOCUS_PREFIX}${JSON.stringify(TracesSchema.decode(tracesFocusSchema, focus))}`
 
 const decodeFocus = (value: string): TracesFocus | null => {
   if (!value.startsWith(FOCUS_PREFIX)) return null
   try {
-    const parsed = tracesFocusSchema.safeParse(JSON.parse(value.slice(FOCUS_PREFIX.length)))
-    return parsed.success ? parsed.data : null
+    const parsed = Schema.decodeUnknownResult(tracesFocusSchema)(JSON.parse(value.slice(FOCUS_PREFIX.length)))
+    return parsed._tag === 'Success' ? parsed.success : null
   } catch {
     return null
   }
@@ -35,20 +36,20 @@ export interface ThreadTarget {
   readonly focus: ChatFocus | null
 }
 
-const identifierSchema = z.string().min(1)
-const counterSchema = z.number().int().nonnegative()
+const identifierSchema = Schema.String.check(Schema.isMinLength(1))
+const counterSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 /** The thread and Chat focus attributes one span carries, decoded from its stored attribute values. */
 const linkAttributesOf = (span: LinkableSpan) => {
-  const sessionAttribute = identifierSchema.safeParse(span.attributes['dsh.session.id'])
-  const turn = counterSchema.safeParse(span.attributes['dsh.turn'])
-  const step = counterSchema.safeParse(span.attributes['dsh.step'])
-  const toolCallId = identifierSchema.safeParse(span.attributes['gen_ai.tool.call.id'])
+  const sessionAttribute = Schema.decodeUnknownResult(identifierSchema)(span.attributes['dsh.session.id'])
+  const turn = Schema.decodeUnknownResult(counterSchema)(span.attributes['dsh.turn'])
+  const step = Schema.decodeUnknownResult(counterSchema)(span.attributes['dsh.step'])
+  const toolCallId = Schema.decodeUnknownResult(identifierSchema)(span.attributes['gen_ai.tool.call.id'])
   return {
-    sessionId: sessionAttribute.success ? sessionAttribute.data : (span.sessionId ?? undefined),
-    turn: turn.success ? turn.data : undefined,
-    step: step.success ? step.data : undefined,
-    toolCallId: toolCallId.success ? toolCallId.data : undefined,
+    sessionId: sessionAttribute._tag === 'Success' ? sessionAttribute.success : (span.sessionId ?? undefined),
+    turn: turn._tag === 'Success' ? turn.success : undefined,
+    step: step._tag === 'Success' ? step.success : undefined,
+    toolCallId: toolCallId._tag === 'Success' ? toolCallId.success : undefined,
   }
 }
 
