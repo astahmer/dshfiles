@@ -52,8 +52,8 @@ describe('account usage dashboard', () => {
   })
 
   it('shows missing cost, counts and means as unavailable, never an invented zero or p50 mean', () => {
-    const view = emptyView()
-    const missing = { ...view.summary, requests: 1, missingUsage: 1 }
+    const baseView = emptyView()
+    const missing = { ...baseView.summary, requests: 1, missingUsage: 1 }
     expect(AccountUsageDashboardModel.totalTokens(missing)).toBeNull()
     expect(AccountUsageDashboardModel.completeCost(missing)).toBeNull()
     expect(AccountUsageDashboardModel.completeCost({ ...missing, missingUsage: 0, unpriced: 1 })).toBeNull()
@@ -64,71 +64,81 @@ describe('account usage dashboard', () => {
     expect(AccountUsageDashboardModel.percentChange(120, 100)).toBe(20)
     expect(AccountUsageDashboardModel.percentChange(100, 200)).toBe(-50)
     const query = AccountUsageDashboardModel.accountUsageQuery('account', 7, new Date(2026, 9, 20, 15).getTime())
-    view.buckets.push({
-      start: query.from,
-      key: 'model',
-      cost: 0,
-      requests: 1,
-      failed: 0,
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      missingUsage: 1,
-      unpriced: 0,
-    })
+    const view: ChartView = {
+      ...baseView,
+      buckets: [
+        {
+          start: query.from,
+          key: 'model',
+          cost: 0,
+          requests: 1,
+          failed: 0,
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          missingUsage: 1,
+          unpriced: 0,
+        },
+      ],
+    }
     expect(AccountUsageDashboardModel.accountUsageDays(query, view)[0]).toMatchObject({ requests: 1, input: null, output: null, tokens: null, cost: null })
   })
 
   it('renders actual model shares, dates and request outcomes without replacing missing counts', () => {
-    const view = emptyView()
+    const baseView = emptyView()
     const query = AccountUsageDashboardModel.accountUsageQuery('account', 7, new Date(2026, 9, 20, 15).getTime())
-    view.summary = { ...view.summary, requests: 2, input: 100, output: 20, cost: 0.25, averageDurationMs: 1_500 }
-    view.breakdown.model = [{ key: 'real-model', requests: 2, tokens: 120, cost: 0.25, missingUsage: 0, unpriced: 0 }]
-    view.buckets = [
-      {
-        start: query.from,
-        key: 'real-model',
-        requests: 2,
-        failed: 1,
-        input: 100,
-        output: 20,
-        cacheRead: 0,
-        cacheWrite: 0,
-        cost: 0.25,
-        missingUsage: 0,
-        unpriced: 0,
-      },
-    ]
-    const requests = emptyRequests()
-    requests.rows = [
-      {
-        id: 'r',
-        sessionId: 's',
-        sessionTitle: null,
-        parentSessionId: null,
-        project: null,
-        cwd: null,
-        seq: null,
-        messageId: null,
-        turn: null,
-        step: null,
-        purpose: 'agent',
-        provider: 'account',
-        model: 'real-model',
-        startedAt: query.from + 1_000,
-        durationMs: 1_500,
-        ttftMs: null,
-        input: null,
-        cacheRead: null,
-        cacheWrite: null,
-        output: null,
-        cost: null,
-        status: 'failed',
-        stopReason: null,
-        errorCode: null,
-      },
-    ]
+    const view: ChartView = {
+      ...baseView,
+      summary: { ...baseView.summary, requests: 2, input: 100, output: 20, cost: 0.25, averageDurationMs: 1_500 },
+      breakdown: { ...baseView.breakdown, model: [{ key: 'real-model', requests: 2, tokens: 120, cost: 0.25, missingUsage: 0, unpriced: 0 }] },
+      buckets: [
+        {
+          start: query.from,
+          key: 'real-model',
+          requests: 2,
+          failed: 1,
+          input: 100,
+          output: 20,
+          cacheRead: 0,
+          cacheWrite: 0,
+          cost: 0.25,
+          missingUsage: 0,
+          unpriced: 0,
+        },
+      ],
+    }
+    const requests: RequestPage = {
+      ...emptyRequests(),
+      rows: [
+        {
+          id: 'r',
+          sessionId: 's',
+          sessionTitle: null,
+          parentSessionId: null,
+          project: null,
+          cwd: null,
+          seq: null,
+          messageId: null,
+          turn: null,
+          step: null,
+          purpose: 'agent',
+          provider: 'account',
+          model: 'real-model',
+          startedAt: query.from + 1_000,
+          durationMs: 1_500,
+          ttftMs: null,
+          input: null,
+          cacheRead: null,
+          cacheWrite: null,
+          output: null,
+          cost: null,
+          status: 'failed',
+          stopReason: null,
+          errorCode: null,
+        },
+      ],
+    }
     const markup = renderToStaticMarkup(
       <AccountUsageDashboardContent query={query} days={7} view={view} requests={requests} onOpenUsageHistory={() => undefined} />,
     )

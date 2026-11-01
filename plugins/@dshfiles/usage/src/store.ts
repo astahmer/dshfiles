@@ -11,8 +11,8 @@ import {
   type JevUsageQuery,
   type JevUsageRecord,
   type JevUsageView,
-  jevUsageOutcomeSchema,
-  jevUsageSourceSchema,
+  JEV_USAGE_OUTCOMES,
+  JEV_USAGE_SOURCES,
 } from './jev-usage.js'
 import { secretCredentialLabelSchemaEffect } from '@dshfiles/credential-port/effect'
 import { UsageFoldModel, type RequestRow, type SessionMeta, type ToolExecutionRow } from './fold.js'
@@ -322,10 +322,10 @@ const jevEventRowSchema = Schema.Struct({
   at: integer,
   endedAt: integer,
   durationMs: integer,
-  source: Schema.Literals(jevUsageSourceSchema.options),
-  outcome: Schema.Literals(jevUsageOutcomeSchema.options),
+  source: Schema.Literals(JEV_USAGE_SOURCES),
+  outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
 })
-const jevOutcomeRowSchema = Schema.Struct({ outcome: Schema.Literals(jevUsageOutcomeSchema.options), calls: integer })
+const jevOutcomeRowSchema = Schema.Struct({ outcome: Schema.Literals(JEV_USAGE_OUTCOMES), calls: integer })
 const jevActivityRowSchema = Schema.Struct({
   calls: integer,
   successes: integer,
@@ -1238,7 +1238,7 @@ export const openUsageStore = (path: string) => {
     const jevSources = decodeStoreValue(
       Schema.Array(
         Schema.Struct({
-          source: Schema.Literals(jevUsageSourceSchema.options),
+          source: Schema.Literals(JEV_USAGE_SOURCES),
           calls: Schema.Number,
           successes: Schema.Number,
           failures: Schema.Number,
@@ -1452,8 +1452,8 @@ export const openUsageStore = (path: string) => {
     const jevCountRows = decodeStoreValue(
       Schema.Array(
         Schema.Struct({
-          source: Schema.Literals(jevUsageSourceSchema.options),
-          outcome: Schema.Literals(jevUsageOutcomeSchema.options),
+          source: Schema.Literals(JEV_USAGE_SOURCES),
+          outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
           calls: integer,
         }),
       ),
@@ -1461,17 +1461,15 @@ export const openUsageStore = (path: string) => {
       prepare(`SELECT source, outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ?
           GROUP BY source, outcome ORDER BY source, outcome`).all(range.from, range.to),
     )
-    const jevTokenRows = decodeStoreValue(
-      Schema.Array(Schema.Struct({ source: Schema.Literals(jevUsageSourceSchema.options), input: integer, output: integer })),
-    )(
+    const jevTokenRows = decodeStoreValue(Schema.Array(Schema.Struct({ source: Schema.Literals(JEV_USAGE_SOURCES), input: integer, output: integer })))(
       prepare(`SELECT source, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output
           FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY source ORDER BY source`).all(range.from, range.to),
     )
     const jevDurationRows = decodeStoreValue(
       Schema.Array(
         Schema.Struct({
-          source: Schema.Literals(jevUsageSourceSchema.options),
-          outcome: Schema.Literals(jevUsageOutcomeSchema.options),
+          source: Schema.Literals(JEV_USAGE_SOURCES),
+          outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
           calls: integer,
           durationSumMs: Schema.Number,
           ...otelBucketRowFields,

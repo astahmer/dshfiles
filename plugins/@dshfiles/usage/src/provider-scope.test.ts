@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { chartQuerySchema, chartViewSchema, requestQuerySchema, usageApi } from './api.js'
 import { UsageFoldModel, type RequestRow } from './fold.js'
 import { openUsageStore } from './store.js'
+import * as Schema from 'effect/Schema'
+
+// oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown test input
+const strictParse = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(schema: ValueSchema, value: unknown): ValueSchema['Type'] =>
+  Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
+
+// oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown test input
+const strictAccepts = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(schema: ValueSchema, value: unknown): boolean =>
+  Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const row = (id: string, provider: string, startedAt: number, patch: Partial<RequestRow> = {}): RequestRow => ({
   id,
@@ -134,7 +143,7 @@ describe('exact account provider scope', () => {
     expect(charts.summary.previous.turns).toBe(1)
     expect(charts.summary.cacheSavings).toBeCloseTo(0.000008)
     expect(charts.summary.previous.cacheSavings).toBeCloseTo(0.000005)
-    expect(charts.keys.sort()).toEqual(['agent', 'subagent'])
+    expect([...charts.keys].sort()).toEqual(['agent', 'subagent'])
     expect(charts.buckets.reduce((sum, entry) => sum + entry.requests, 0)).toBe(2)
   })
 
@@ -156,14 +165,14 @@ describe('exact account provider scope', () => {
   })
 
   it('shares optional bounded provider inputs with the existing agent tools and decodes old Hosts', () => {
-    expect(chartQuerySchema.parse(query).provider).toBe('Account')
+    expect(strictParse(chartQuerySchema, query).provider).toBe('Account')
     const requests = { from: 0, to: 1, sort: 'startedAt', direction: 'desc', limit: 5 } as const
-    expect(requestQuerySchema.parse(requests).provider).toBeUndefined()
-    expect(requestQuerySchema.safeParse({ ...requests, provider: '' }).success).toBe(false)
-    expect(chartQuerySchema.safeParse({ ...query, provider: 'a'.repeat(257) }).success).toBe(false)
+    expect(strictParse(requestQuerySchema, requests).provider).toBeUndefined()
+    expect(strictAccepts(requestQuerySchema, { ...requests, provider: '' })).toBe(false)
+    expect(strictAccepts(chartQuerySchema, { ...query, provider: 'a'.repeat(257) })).toBe(false)
     expect(usageApi.methods.requests.tool?.readOnly).toBe(true)
     expect(usageApi.methods.charts.tool?.readOnly).toBe(true)
-    const old = chartViewSchema.parse({
+    const old = strictParse(chartViewSchema, {
       summary: {
         cost: 0,
         requests: 0,

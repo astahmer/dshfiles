@@ -7,9 +7,12 @@ import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Effect, Option } from 'effect'
+import type * as SchemaTypes from 'effect/Schema'
+import * as Schema from 'effect/Schema'
 import { useState } from 'react'
-import { z } from 'zod'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
@@ -17,22 +20,32 @@ import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
 import { UsageToolsTab } from './tools-tab.js'
 
-const preferencesSchema = z.object({
-  tab: z.enum(['log', 'charts', 'activity']).catch('log'),
-  preset: z.enum(['today', '7d', '30d', '365d', 'custom']).catch('7d'),
-  customFrom: z.string().catch(''),
-  customTo: z.string().catch(''),
-  bucket: z.enum(['hour', 'day']).catch('day'),
-  groupBy: z.enum(['model', 'provider', 'project', 'purpose']).catch('model'),
-  purposes: z.array(purposeSchema).catch([]),
+const PRESETS = ['today', '7d', '30d', '365d', 'custom'] as const
+
+/** A stored view preference keeps the value it had when one field is stale, the rule `.catch(...)` carried. */
+const withFallback = <ValueSchema extends SchemaTypes.Top>(schema: ValueSchema, fallback: ValueSchema['Type']) =>
+  schema.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback))))
+
+const preferencesSchema = Schema.Struct({
+  tab: withFallback(Schema.Literals(['log', 'charts', 'activity']), 'log'),
+  preset: withFallback(Schema.Literals(PRESETS), '7d'),
+  customFrom: withFallback(Schema.String, ''),
+  customTo: withFallback(Schema.String, ''),
+  bucket: withFallback(Schema.Literals(['hour', 'day']), 'day'),
+  groupBy: withFallback(Schema.Literals(['model', 'provider', 'project', 'purpose']), 'model'),
+  purposes: withFallback(Schema.Array(purposeSchema), []),
 })
 
-type Preferences = z.infer<typeof preferencesSchema>
+type Preferences = typeof preferencesSchema.Type
 
 const DEFAULT_PREFERENCES: Preferences = { tab: 'log', preset: '7d', customFrom: '', customTo: '', bucket: 'day', groupBy: 'model', purposes: [] }
 type UsageDateRange = { readonly from: number; readonly to: number }
 
-const storedPreferences = createStoredValue({ key: 'dshfiles-usage:view.v1', schema: preferencesSchema, fallback: DEFAULT_PREFERENCES })
+const storedPreferences = createStoredValue({
+  key: 'dshfiles-usage:view.v1',
+  schema: zodSchemaFromEffect(preferencesSchema),
+  fallback: DEFAULT_PREFERENCES,
+})
 
 const startOfDay = (at: number): number => {
   const date = new Date(at)
@@ -144,12 +157,12 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
           size="sm"
           value={preferences.preset}
           onValueChange={value => {
-            const preset = z.enum(['today', '7d', '30d', '365d', 'custom']).safeParse(value)
-            if (!preset.success) return
+            const preset = Schema.decodeUnknownOption(Schema.Literals(PRESETS))(value)
+            if (Option.isNone(preset)) return
             update({
-              preset: preset.data,
-              bucket: preset.data === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-              ...(preset.data === 'custom' &&
+              preset: preset.value,
+              bucket: preset.value === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+              ...(preset.value === 'custom' &&
                 preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
             })
           }}
@@ -239,10 +252,10 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
             onGroupBy={groupBy => update({ groupBy })}
             onShowRequests={(search, groupBy) => {
               if (groupBy === 'purpose') {
-                const purpose = purposeSchema.safeParse(search)
-                if (!purpose.success) return
+                const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
+                if (Option.isNone(purpose)) return
                 setLogSearch('')
-                update({ tab: 'log', purposes: [purpose.data] })
+                update({ tab: 'log', purposes: [purpose.value] })
                 return
               }
               setLogSearch(search)

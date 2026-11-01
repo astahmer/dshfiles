@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { jevUsageQuerySchema, jevUsageRecordSchema, type JevUsageRecord } from './jev-usage.js'
 import { openUsageStore, type UsageStore } from './store.js'
+import * as Schema from 'effect/Schema'
+
+// oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown test input
+const strictAccepts = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(schema: ValueSchema, value: unknown): boolean =>
+  Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const stores: UsageStore[] = []
 
@@ -126,9 +131,9 @@ describe('Jev usage storage', () => {
     store.recordJevUsage(jevRecord)
 
     expect(store.jevUsage({ from: 0, to: 100 }).calls).toBe(1)
-    expect(jevUsageRecordSchema.safeParse({ ...jevRecord, apiKey: 'synthetic-test-key' }).success).toBe(false)
-    expect(jevUsageRecordSchema.safeParse({ ...jevRecord, prompt: 'synthetic request text' }).success).toBe(false)
-    expect(jevUsageRecordSchema.safeParse({ ...jevRecord, credential: 'synthetic-secret-value' }).success).toBe(false)
-    expect(jevUsageQuerySchema.safeParse({ from: 100, to: 0 }).success).toBe(false)
+    expect(strictAccepts(jevUsageRecordSchema, { ...jevRecord, apiKey: 'synthetic-test-key' })).toBe(false)
+    expect(strictAccepts(jevUsageRecordSchema, { ...jevRecord, prompt: 'synthetic request text' })).toBe(false)
+    expect(strictAccepts(jevUsageRecordSchema, { ...jevRecord, credential: 'synthetic-secret-value' })).toBe(false)
+    expect(strictAccepts(jevUsageQuerySchema, { from: 100, to: 0 })).toBe(false)
   })
 })
