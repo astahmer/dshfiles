@@ -1673,7 +1673,17 @@ const promiseApiHandlers: JjPromiseApiHandlers = {
       .list()
       .find(workspace => resolve(threadsDirectory(workspace.path)) === threadDirectory)
     if (project === undefined) throw new PluginApiError('The owning project for this removed thread workspace is not registered.', { code: 'not-a-thread' })
-    return requireThreads().reviewHistory({ repoRoot: project.path, name })
+    const history = await requireThreads().reviewHistory({ repoRoot: project.path, name })
+    return {
+      repoRoot: history.repoRoot,
+      name: history.name,
+      integrations: history.integrations.map(record => ({
+        at: record.at,
+        ...(record.tipChangeId === undefined ? {} : { tipChangeId: record.tipChangeId }),
+        ...(record.baseChangeId === undefined ? {} : { baseChangeId: record.baseChangeId }),
+        ...(record.sessionId === undefined ? {} : { sessionId: record.sessionId }),
+      })),
+    }
   },
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
