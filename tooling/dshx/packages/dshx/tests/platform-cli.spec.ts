@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream'
 import type { JsonValue } from '../src/json.js'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
 import { runCli } from '../src/cli/run.js'
@@ -8,15 +8,21 @@ import { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlat
 import type { DshPlatformClient, DshPlatformTransport } from '../src/platform/client.js'
 import type { CliIO } from '../src/cli/run.js'
 
-const requestBodySchema = z.looseObject({
-  rpcId: z.string().optional(),
-  method: z.string(),
-  payload: z.looseObject({ args: z.unknown().optional() }).optional(),
-})
+const requestBodySchema = Schema.StructWithRest(
+  Schema.Struct({
+    rpcId: Schema.optionalKey(Schema.String),
+    method: Schema.String,
+    payload: Schema.optionalKey(
+      Schema.StructWithRest(Schema.Struct({ args: Schema.optionalKey(Schema.Unknown) }), [Schema.Record(Schema.String, Schema.Unknown)]),
+    ),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
-const decodeRequestBody = (body: BodyInit | null | undefined) => requestBodySchema.parse(JSON.parse(String(body)))
+const decodeRequestBody = (body: BodyInit | null | undefined) => Schema.decodeUnknownSync(requestBodySchema)(JSON.parse(String(body)))
 
-const decodeCliEnvelope = (text: string) => z.looseObject({ ok: z.boolean() }).parse(JSON.parse(text))
+const decodeCliEnvelope = (text: string) =>
+  Schema.decodeUnknownSync(Schema.StructWithRest(Schema.Struct({ ok: Schema.Boolean }), [Schema.Record(Schema.String, Schema.Unknown)]))(JSON.parse(text))
 
 function io(): CliIO & {
   readonly out: PassThrough
@@ -207,7 +213,7 @@ describe('DSH platform CLI', () => {
           },
         })
       }
-      const requestBody = z.object({ rpcId: z.string(), method: z.string() }).parse(decodeRequestBody(init?.body))
+      const requestBody = Schema.decodeUnknownSync(Schema.Struct({ rpcId: Schema.String, method: Schema.String }))(decodeRequestBody(init?.body))
       return new Response(
         JSON.stringify({
           type: 'server-response',
@@ -421,7 +427,7 @@ describe('DSH platform CLI', () => {
       rpc: async (namespace, method, args) => {
         expect(namespace).toBe('session')
         expect(method).toBe('page')
-        const request = z.object({ beforeSeq: z.number().optional() }).parse(args.request)
+        const request = Schema.decodeUnknownSync(Schema.Struct({ beforeSeq: Schema.optionalKey(Schema.Number) }))(args.request)
         beforeSeqs.push(request.beforeSeq)
         if (request.beforeSeq === undefined) {
           return {
@@ -444,7 +450,9 @@ describe('DSH platform CLI', () => {
 
     const records = await client.sessions.export('session-1')
 
-    expect(records.map(record => z.object({ type: z.string(), event: z.object({ seq: z.number() }) }).parse(record).event.seq)).toEqual([1, 2, 3, 4])
+    expect(
+      records.map(record => Schema.decodeUnknownSync(Schema.Struct({ type: Schema.String, event: Schema.Struct({ seq: Schema.Number }) }))(record).event.seq),
+    ).toEqual([1, 2, 3, 4])
     expect(beforeSeqs).toEqual([undefined, 3])
   })
 
@@ -793,7 +801,7 @@ describe('DSH platform CLI', () => {
     })
 
     await expect(installation).rejects.toMatchObject({ code: 'cancelled' })
-    const requestId = z.object({ requestId: z.string() }).parse(calls[0]?.args.options).requestId
+    const requestId = Schema.decodeUnknownSync(Schema.Struct({ requestId: Schema.String }))(calls[0]?.args.options).requestId
     expect(calls[0]).toMatchObject({
       namespace: 'pluginManager',
       method: 'installBundle',

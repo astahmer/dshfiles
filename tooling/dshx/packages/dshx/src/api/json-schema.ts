@@ -3,7 +3,7 @@ import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/sp
 import type { ApiSchema, PublishedJsonSchema } from './types.js'
 import { resolveApiSchema } from './schema.js'
 
-/** The Standard JSON Schema a contract schema publishes (zod >= 4.2 does), or undefined when it publishes none or cannot represent itself. */
+/** The Standard JSON Schema a contract schema publishes, or undefined when it publishes none or cannot represent itself. */
 export function publishedJsonSchema(schema: ApiSchema | undefined, io: 'input' | 'output'): PublishedJsonSchema | undefined {
   if (schema === undefined) return undefined
   let standard: StandardSchemaV1['~standard']
@@ -34,6 +34,20 @@ const nodeType = (type: PublishedJsonSchema['type']): JsonSchemaType | undefined
 }
 
 /** Object branches only: two branches that both project to `{}` would match every value and make `oneOf` unsatisfiable. */
+const hasDistinctDiscriminator = (branches: readonly PublishedJsonSchema[]): boolean => {
+  const firstProperties = branches[0]?.properties
+  if (firstProperties === undefined) return false
+  const keys = Object.keys(firstProperties)
+  return keys.some(key => {
+    const values = branches.map(branch => {
+      const property = branch.properties?.[key]
+      if (property?.const !== undefined) return JSON.stringify(property.const)
+      return property?.enum?.length === 1 ? JSON.stringify(property.enum[0]) : undefined
+    })
+    return values.every(value => value !== undefined) && new Set(values).size === branches.length
+  })
+}
+
 const projectDiscriminatedUnion = (branches: readonly PublishedJsonSchema[], projected: JsonSchemaNode): JsonSchemaNode => {
   const projectedBranches = branches.map(toToolSchema)
   return projectedBranches.every(branch => branch.type === 'object' && branch.properties !== undefined) ? { ...projected, oneOf: projectedBranches } : projected
@@ -60,7 +74,9 @@ export function toToolSchema(node: PublishedJsonSchema | undefined): JsonSchemaN
   }
   if (node.anyOf !== undefined) {
     const meaningful = node.anyOf.filter(branch => branch.type !== 'null')
-    return meaningful.length === 1 ? { ...toToolSchema(meaningful[0]), ...projected } : projected
+    if (meaningful.length === 1) return { ...toToolSchema(meaningful[0]), ...projected }
+    if (meaningful.length > 1 && hasDistinctDiscriminator(meaningful)) return projectDiscriminatedUnion(meaningful, projected)
+    return projected
   }
   const type = nodeType(node.type)
   if (type === undefined) return projected

@@ -246,7 +246,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
-          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
+          `export { settingsSearchEntriesSchema, settingsSearchEntryFields, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }

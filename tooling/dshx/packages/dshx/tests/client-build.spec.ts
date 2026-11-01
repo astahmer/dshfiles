@@ -2,23 +2,23 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import type { Plugin } from 'vite'
 import { buildClient, watchClient } from '../src/compiler/client/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
-const clientPluginShape = z.object({
-  name: z.string(),
-  inject: z.array(z.string()),
-  Config: z.unknown().optional(),
-  apply: z.function({ input: [z.unknown(), z.unknown().optional()], output: z.unknown() }),
+const FunctionSchema = Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => unknown => typeof value === 'function')
+const clientPluginShape = Schema.Struct({
+  name: Schema.String,
+  inject: Schema.Array(Schema.String),
+  Config: Schema.optionalKey(Schema.Unknown),
+  apply: FunctionSchema,
 })
-const clientRegistrationShape = z.object({
-  factory: z.function({ input: [z.function({ input: [z.string()], output: z.unknown() })], output: z.unknown() }),
-})
+const clientRegistrationShape = Schema.Struct({ factory: FunctionSchema })
+type ClientPlugin = Schema.Schema.Type<typeof clientPluginShape>
 
 function evaluateClientRegistration(code: string) {
   let registration: unknown
@@ -31,9 +31,9 @@ function evaluateClientRegistration(code: string) {
       },
     },
   })
-  return clientRegistrationShape.parse(registration)
+  return Schema.decodeUnknownSync(clientRegistrationShape)(registration)
 }
-const isClientPlugin = (value: unknown): value is z.infer<typeof clientPluginShape> => clientPluginShape.safeParse(value).success
+const isClientPlugin = (value: unknown): value is ClientPlugin => Schema.decodeUnknownOption(clientPluginShape)(value)._tag === 'Some'
 
 interface ApplyContext {
   received?: unknown
@@ -76,9 +76,9 @@ describe('client compiler', () => {
     await writeFile(resolve(root, 'src/helper.ts'), 'export const helper = "manifest-helper"\n')
     await writeFile(resolve(root, 'src/client.tsx'), "import { helper } from './helper'\nexport const name = helper\nexport function apply() {}\n")
     await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
-    const manifest = z
-      .object({ version: z.number(), face: z.string(), sources: z.array(z.string()) })
-      .parse(JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')))
+    const manifest = Schema.decodeUnknownSync(Schema.Struct({ version: Schema.Number, face: Schema.String, sources: Schema.Array(Schema.String) }))(
+      JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')),
+    )
     expect(manifest.version).toBe(1)
     expect(manifest.face).toBe('client')
     expect(manifest.sources).toContain('src/client.tsx')
@@ -97,9 +97,12 @@ describe('client compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const map = z
-      .object({ sources: z.array(z.string()), sourcesContent: z.array(z.string().nullable()).optional() })
-      .parse(JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')))
+    const map = Schema.decodeUnknownSync(
+      Schema.Struct({
+        sources: Schema.Array(Schema.String),
+        sourcesContent: Schema.optionalKey(Schema.Array(Schema.NullOr(Schema.String))),
+      }),
+    )(JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')))
     expect(code).toMatch(/window\.__ModuleLoader__\.load\(\{\s*id: "@dshx\/fixture-plugin"/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(JSON.stringify(map)).not.toContain(root)
@@ -228,7 +231,7 @@ describe('client compiler', () => {
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toMatch(/(?:from|require)\(["']dshx\/client/)
     const registration = evaluateClientRegistration(code)
-    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
+    const plugin = Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({})))
     expect(plugin.name).toBe('explicit-client')
     expect(plugin.inject).toEqual(['remote'])
   })
@@ -293,7 +296,7 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     const registration = evaluateClientRegistration(code)
-    expect(clientPluginShape.parse(registration.factory(() => ({}))).inject).toEqual(['locale', 'slots'])
+    expect(Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({}))).inject).toEqual(['locale', 'slots'])
   })
 
   it('builds declarative locales through the virtual Client API without a duplicate service injection', async () => {
@@ -331,7 +334,7 @@ describe('client compiler', () => {
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toContain("require('@deepseek-ai/dsh-client-locale")
     const registration = evaluateClientRegistration(code)
-    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
+    const plugin = Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({})))
     expect(plugin.inject).toEqual(['locale', 'slots'])
     const register = vi.fn(() => vi.fn())
     const bind = vi.fn()
@@ -545,7 +548,7 @@ describe('client compiler', () => {
       inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation'],
     })
     const registration = evaluateClientRegistration(await readFile(resolve(root, 'dist/client.js'), 'utf8'))
-    expect(clientPluginShape.parse(registration.factory(() => ({}))).inject).toEqual(['slots', 'sessions'])
+    expect(Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({}))).inject).toEqual(['slots', 'sessions'])
   })
 
   it('applies the same setup-service validation to the dev watcher', async () => {
@@ -761,7 +764,7 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     const registration = evaluateClientRegistration(code)
-    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
+    const plugin = Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({})))
     const config = { enabled: true }
     const context: ApplyContext = {}
     plugin.apply(context, config)
@@ -841,8 +844,8 @@ describe('client compiler', () => {
     expect(code).not.toContain('@dshfiles/dshx/settings')
 
     const registration = evaluateClientRegistration(code)
-    const plugin = clientPluginShape.parse(
-      registration.factory(id => {
+    const plugin = Schema.decodeUnknownSync(clientPluginShape)(
+      registration.factory((id: string) => {
         if (id === 'react') return {}
         if (id === 'react/jsx-runtime') return {}
         throw new Error(`unexpected require: ${id}`)
@@ -958,7 +961,7 @@ describe('client compiler', () => {
     expect(code).not.toMatch(/require\(["']@deepseek-ai\/dsh-client-connection(?:\/client)?["']\)/)
 
     const registration = evaluateClientRegistration(code)
-    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
+    const plugin = Schema.decodeUnknownSync(clientPluginShape)(registration.factory(() => ({})))
     expect(plugin.inject).toEqual(['slots', 'connection'])
   })
 

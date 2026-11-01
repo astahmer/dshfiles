@@ -250,7 +250,7 @@ const { value } = await generate(ctx, {
 
 - `model` defaults to the Host's default model (`agentDefaultModel`). A reasoning effort the model refuses is dropped
   and the call retried once.
-- With `schema` (any Standard Schema; zod also publishes its JSON Schema to the model) the reply must be one JSON value;
+- With `schema` (any Standard Schema; Effect Schema and zod publish JSON Schema to the model) the reply must be one JSON value;
   a code fence is tolerated. One invalid reply is answered with the validation issues; a second fails.
 - Failures are `PluginApiError`s with codes `llm-unavailable`, `model-unavailable`, `generate-failed`,
   `generate-aborted` and `generate-invalid-output`, so an API handler can return them to a browser as they are.

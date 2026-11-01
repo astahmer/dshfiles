@@ -3,14 +3,14 @@
  * The native slot ledger keeps only `id`/`order`/`label`/`priority`, so the entries ride a browser-local seat shared by
  * every DSHX Client bundle (each bundles its own copy of this module), like the Plugins-page renderer seat. The seat
  * holds what each bundle published; a reader decodes it with `section-entries-schema.ts`, which stays out of this
- * module so every Client bundle without a shared zod does not inline it.
+ * module so every Client bundle does not inline the same schema validator.
  */
 /** One control a section can scroll to: `id` comes back as the section's `target` prop. */
 export interface SettingsSearchEntry {
   readonly id: string
   readonly title: string
-  readonly description?: string | undefined
-  readonly keywords?: string | undefined
+  readonly description?: string
+  readonly keywords?: string
 }
 
 /** `metadata` a `settings.section` contribution may carry. */

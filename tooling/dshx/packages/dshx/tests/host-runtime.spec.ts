@@ -2,7 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import Schema from '@deepseek-ai/schemastery'
 import { defineTool as officialDefineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { z } from 'zod'
+import * as EffectSchema from 'effect/Schema'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   defineCommand,
@@ -81,7 +81,7 @@ describe('defineHost', () => {
 
   it('infers Host setup config from its Standard Schema output', () => {
     defineHost({
-      Config: z.object({ sessionPersistenceRoot: z.string() }),
+      Config: EffectSchema.toStandardSchemaV1(EffectSchema.Struct({ sessionPersistenceRoot: EffectSchema.String })),
       setup(_ctx, config) {
         expectTypeOf(config.sessionPersistenceRoot).toBeString()
       },
@@ -148,7 +148,7 @@ describe('Host runtime adapter', () => {
     const received = vi.fn()
     const plugin = createHostPlugin(
       defineHost({
-        Config: z.object({ sessionPersistenceRoot: z.string() }),
+        Config: EffectSchema.toStandardSchemaV1(EffectSchema.Struct({ sessionPersistenceRoot: EffectSchema.String })),
         setup(_ctx, config) {
           received(config)
         },
@@ -368,7 +368,7 @@ describe('Host runtime adapter', () => {
 
   it('infers configured Host output without an explicit schema argument', () => {
     defineHost({
-      Config: z.object({ sessionRoot: z.string() }),
+      Config: EffectSchema.toStandardSchemaV1(EffectSchema.Struct({ sessionRoot: EffectSchema.String })),
       setup(_context, config) {
         expectTypeOf(config.sessionRoot).toEqualTypeOf<string>()
       },

@@ -33,14 +33,12 @@ const differences = (left, right, path = '$') => {
   return [{ path, left, right }]
 }
 const results = fixtureModule.fixtures.map(fixture => {
-  const zodDocument = fixtureModule.z.toJSONSchema(fixture.zod)
   const effectDocument = fixtureModule.Schema.toJsonSchemaDocument(fixture.effect, { additionalProperties: false }).schema
-  const zodSchema = normalize(zodDocument)
+  const expectedSchema = normalize(fixture.expectedSchema)
   const effectSchema = normalize(effectDocument)
-  const diff = differences(zodSchema, effectSchema)
-  const zodResult = fixture.zod.safeParse(fixture.input)
+  const diff = differences(expectedSchema, effectSchema)
   const effectResult = fixtureModule.Schema.decodeUnknownOption(fixture.effect)(fixture.input)
-  const roundTrip = zodResult.success && effectResult._tag === 'Some' && JSON.stringify(zodResult.data) === JSON.stringify(effectResult.value)
+  const roundTrip = effectResult._tag === 'Some' && JSON.stringify(fixture.expectedOutput) === JSON.stringify(effectResult.value)
   return { name: fixture.name, equal: diff.length === 0, roundTrip, diff }
 })
 const report = {

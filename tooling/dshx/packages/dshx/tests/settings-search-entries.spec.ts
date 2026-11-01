@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineSlot, publishSettingsSearchEntries, settingsSearchEntries, subscribeSettingsSearchEntries } from '../src/client/index.js'
 import type { SettingsSectionSearchProps } from '../src/client/index.js'
@@ -87,9 +88,10 @@ describe('settings.section search entries', () => {
 
   it('accepts valid metadata', () => {
     const metadata = { settingsTargets: ['a'], searchEntries: [{ id: 'a', title: 'A', keywords: 'x y' }] }
-    expect(settingsSectionMetadataSchema.parse(metadata)).toEqual(metadata)
-    expect(settingsSectionMetadataSchema.parse({})).toEqual({})
-    expect(settingsSectionMetadataSchema.parse({ searchEntries: [{ id: ' a ', title: ' A ' }] })).toEqual({
+    const decode = Schema.decodeUnknownSync(settingsSectionMetadataSchema)
+    expect(decode(metadata)).toEqual(metadata)
+    expect(decode({})).toEqual({})
+    expect(decode({ searchEntries: [{ id: ' a ', title: ' A ' }] })).toEqual({
       searchEntries: [{ id: 'a', title: 'A' }],
     })
   })
@@ -110,7 +112,7 @@ describe('settings.section search entries', () => {
     ['an unknown metadata field', { searchEntry: [] }],
     ['a non-array entry list', { searchEntries: { id: 'a', title: 'A' } }],
   ])('rejects settings.section metadata with %s', (_label, metadata) => {
-    expect(settingsSectionMetadataSchema.safeParse(metadata).success).toBe(false)
+    expect(() => Schema.decodeUnknownSync(settingsSectionMetadataSchema)(metadata)).toThrow()
   })
 
   it('publishes untyped metadata as given: the reader decodes it', () => {

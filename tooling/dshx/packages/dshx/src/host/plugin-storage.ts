@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
 import * as Schema from 'effect/Schema'
-import { z } from 'zod'
 import { jsonValueSchema } from '../json.js'
 import type { JsonValue } from '../json.js'
 import { PluginApiError } from '../api/common.js'
@@ -22,16 +21,14 @@ interface StorageDomainLike {
   open(spec: typeof domainSpec): Promise<DomainLike>
 }
 
-const storageDomainJsonValueSchema = z.custom<JsonValue>(value => {
-  try {
-    Schema.decodeUnknownSync(jsonValueSchema)(value)
-    return true
-  } catch {
-    return false
-  }
+const effectRecordSchema = Schema.Struct({
+  namespace: Schema.String,
+  key: Schema.String,
+  value: jsonValueSchema,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
 })
-const recordSchema = z.object({ namespace: z.string(), key: z.string(), value: storageDomainJsonValueSchema, updatedAt: z.number().finite() })
-type StoredRecord = z.infer<typeof recordSchema>
+type StoredRecord = { readonly namespace: string; readonly key: string; readonly value: JsonValue; readonly updatedAt: number }
+const recordSchema = { parse: (value: unknown): StoredRecord => Schema.decodeUnknownSync(effectRecordSchema)(value) }
 
 const DOMAIN_NAME = 'dshx_plugin_kv'
 

@@ -2,7 +2,6 @@ import { Context as Services, Effect, Exit, Fiber, Layer, ManagedRuntime, Schema
 import { it as effectIt } from '@effect/vitest'
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { z } from 'zod'
 import { defineApi, event, method } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
 import { ApiProtocolModel } from '../src/api/common.js'
@@ -27,10 +26,10 @@ const notesApi = defineApi({
   version: 1,
   owner: '@test/notes',
   methods: {
-    get: method({ input: z.object({ id: z.string() }), output: z.object({ id: z.string(), text: z.string() }) }),
+    get: method({ input: Schema.Struct({ id: Schema.String }), output: Schema.Struct({ id: Schema.String, text: Schema.String }) }),
     slow: method<void, string>(),
   },
-  events: { changed: event({ schema: z.object({ id: z.string() }) }) },
+  events: { changed: event({ schema: Schema.Struct({ id: Schema.String }) }) },
 })
 
 const greetApi = defineApi({ id: 'greet', version: 1, owner: '@test/greet', methods: { hello: method<{ readonly name: string }, string>() } })
@@ -85,20 +84,20 @@ describe('@dshfiles/dshx/effect', () => {
     expectTypeOf<Schema.Schema.Type<typeof communicationDiagnosticsSchema>['unnotifiedRecipientCount']>().toEqualTypeOf<number | undefined>()
 
     expect(communicationDiagnosticsSchema.safeParse({}).success).toBe(false)
-    expect(() => communicationDiagnosticsSchema.parse({})).toThrow()
+    expect(() => Schema.decodeUnknownSync(communicationDiagnosticsSchema)({})).toThrow()
     expect(communicationMessageRecipientsSchema.safeParse({}).success).toBe(false)
-    expect(
-      communicationMessageBodySchema.safeParse({ messageId: '67e55044-10b1-426f-9247-bb680e5fe0c8', text: 'message', unexpected: true }).success,
-    ).toBe(false)
+    expect(communicationMessageBodySchema.safeParse({ messageId: '67e55044-10b1-426f-9247-bb680e5fe0c8', text: 'message', unexpected: true }).success).toBe(
+      false,
+    )
   })
 
-  it('retains concrete Zod and Effect schema types on API declarations', async () => {
-    const zodInput = notesApi.methods.get.input
-    const zodOutput = notesApi.methods.get.output
-    if (zodInput === undefined || zodOutput === undefined) throw new Error('Zod API declarations need their schemas')
+  it('retains concrete Effect schema types on API declarations', () => {
+    const input = notesApi.methods.get.input
+    const output = notesApi.methods.get.output
+    if (input === undefined || output === undefined) throw new Error('Effect API declarations need their schemas')
 
-    expect(await zodInput['~standard'].validate({ id: 'a' })).toEqual({ value: { id: 'a' } })
-    expect(await zodOutput['~standard'].validate({ id: 'a', text: 'note' })).toEqual({ value: { id: 'a', text: 'note' } })
+    expect(Schema.isSchema(input)).toBe(true)
+    expect(Schema.isSchema(output)).toBe(true)
 
     const effectInput = effectSchemaApi.methods.lookup.input
     if (effectInput === undefined) throw new Error('Effect API declarations need their input schema')
@@ -123,7 +122,7 @@ describe('@dshfiles/dshx/effect', () => {
       .filter(schema => schema.name === 'effect_schema_lookup')
       .map(schema => ({ name: schema.name, parameters: schema.parameters }))
     expect(Buffer.from(JSON.stringify(effectToolSchema))).toEqual(readFileSync(new URL('./fixtures/effect-api-tool-schema.json', import.meta.url)))
-    expect(effectToolSchema[0]?.parameters).toEqual(toToolSchema(publishedJsonSchema(z.object({ id: z.string() }), 'input')))
+    expect(effectToolSchema[0]?.parameters).toEqual(toToolSchema(publishedJsonSchema(Schema.Struct({ id: Schema.String }), 'input')))
     await expect(createHostApiClient(host.ctx, effectSchemaApi, '@test/caller').lookup({ id: 'a' })).resolves.toEqual({ id: 'a', text: 'value' })
     await host.dispose()
   })

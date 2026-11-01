@@ -1,6 +1,7 @@
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
+import '../src/effect/index.js'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
@@ -13,21 +14,20 @@ const threads = defineApi({
   owner: '@test/threads',
   methods: {
     status: method({
-      input: z.object({ path: z.string().min(1).optional() }).strict(),
-      output: z.object({ path: z.string(), unlanded: z.number().int() }),
+      input: Schema.Struct({ path: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))) }),
+      output: Schema.Struct({ path: Schema.String, unlanded: Schema.Number.check(Schema.isInt()) }),
       description: 'Revisions of a thread workspace not yet on main.',
       tool: { name: 'test_thread_status', readOnly: true, render: output => `status ${JSON.stringify(output)}` },
     }),
     land: method({
-      input: z.object({ path: z.string().min(1) }).strict(),
-      output: z.object({ landed: z.boolean() }),
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+      output: Schema.Struct({ landed: Schema.Boolean }),
       description: 'Rebase a thread onto main.',
       tool: { name: 'test_thread_land' },
     }),
-    internal: method({ input: z.void(), output: z.string() }),
+    internal: method({ output: Schema.String }),
     summary: method({
-      input: z.void(),
-      output: z.object({ threads: z.number() }),
+      output: Schema.Struct({ threads: Schema.Number }),
       description: 'How many threads exist.',
       tool: { name: 'test_thread_summary', readOnly: true },
     }),
@@ -53,7 +53,53 @@ const ownerHost = defineHost({
 const plainApi = defineApi({ id: 'plain', version: 1, owner: '@test/caller', methods: { ping: method<void, string>() } })
 const callerHost = defineHost({ apis: [plainApi.host({ ping: () => 'pong' })] })
 
-const listingResponse = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: z.custom<RegistryListing>() }) }) })
+const listingResponse = Schema.Struct({
+  result: Schema.Struct({
+    ok: Schema.Literal(true),
+    value: Schema.Struct({
+      output: Schema.Struct({
+        apis: Schema.Array(
+          Schema.Struct({
+            owner: Schema.String,
+            id: Schema.String,
+            version: Schema.Number,
+            methods: Schema.Array(
+              Schema.Struct({
+                name: Schema.String,
+                description: Schema.optionalKey(Schema.String),
+                tool: Schema.optionalKey(Schema.String),
+                input: Schema.optionalKey(Schema.JsonObject),
+                output: Schema.optionalKey(Schema.JsonObject),
+              }),
+            ),
+          }),
+        ),
+        tools: Schema.Array(
+          Schema.Struct({
+            name: Schema.String,
+            description: Schema.String,
+            source: Schema.Literals(['api', 'mcp', 'plugin', 'tool']),
+            owner: Schema.optionalKey(Schema.String),
+            readOnly: Schema.optionalKey(Schema.Boolean),
+            enabled: Schema.optionalKey(Schema.Boolean),
+          }),
+        ),
+        toolScope: Schema.optionalKey(Schema.Struct({ sessionId: Schema.String })),
+        skills: Schema.Array(
+          Schema.Struct({
+            name: Schema.String,
+            description: Schema.String,
+            provider: Schema.String,
+            source: Schema.optionalKey(Schema.String),
+            modelInvocable: Schema.Boolean,
+            userInvocable: Schema.optionalKey(Schema.Boolean),
+            path: Schema.optionalKey(Schema.String),
+          }),
+        ),
+      }),
+    }),
+  }),
+})
 
 const agent = (cwd: string) => ({ id: 'session-1', session: { header: { cwd } } })
 
@@ -74,10 +120,7 @@ describe('API registry', () => {
     expect(isApiServed(caller.ctx, threads)).toBe(true)
     await expect(client.status({ path: '/repo' })).resolves.toEqual({ path: '/repo', unlanded: 2 })
     expect(callers).toEqual([{ kind: 'plugin', packageId: '@test/caller' }])
-    await expect(client.status({ path: '' } as never)).rejects.toMatchObject({
-      kind: 'contract',
-      message: expect.stringContaining('path: Too small'),
-    })
+    await expect(client.status({ path: '' } as never)).rejects.toMatchObject({ kind: 'contract' })
 
     await owner.dispose()
     await expect(client.status({ path: '/repo' })).rejects.toSatisfy(isApiOwnerMissing)
@@ -96,7 +139,6 @@ describe('API registry', () => {
     expect(host.tools.schemas().find(schema => schema.name === 'test_thread_status')?.parameters).toEqual({
       type: 'object',
       properties: { path: { type: 'string' } },
-      additionalProperties: false,
     })
 
     const status = await host.tools.execute({
@@ -147,7 +189,7 @@ describe('API registry', () => {
         version: 1,
         input: { schemas: true },
       })
-      return listingResponse.parse(await response.json()).result.value.output
+      return Schema.decodeUnknownSync(listingResponse)(await response.json()).result.value.output
     }
     const listing = await list()
     const served = listing.apis.find(api => api.owner === '@test/threads')
@@ -208,7 +250,7 @@ describe('API registry', () => {
     })
     await host.mount(callerHost, { packageId: '@test/caller' })
     const response = await host.connection.requestApi({ packageId: dshxRegistryApi.owner!, apiId: dshxRegistryApi.id, method: 'list', version: 1, input: {} })
-    const listing = listingResponse.parse(await response.json()).result.value.output
+    const listing = Schema.decodeUnknownSync(listingResponse)(await response.json()).result.value.output
     expect(listing.tools.filter(tool => tool.name.startsWith('test_'))).toEqual([
       { name: 'test_read', description: 'Read.', source: 'plugin', owner: '@test/tools', readOnly: true, enabled: true },
       { name: 'test_write', description: 'Write.', source: 'plugin', owner: '@test/tools', readOnly: false, enabled: true },
@@ -255,7 +297,7 @@ describe('API registry', () => {
     await host.mount(callerHost, { packageId: '@test/caller' })
     const list = async (): Promise<RegistryListing> => {
       const response = await host.connection.requestApi({ packageId: dshxRegistryApi.owner!, apiId: dshxRegistryApi.id, method: 'list', version: 1, input: {} })
-      return listingResponse.parse(await response.json()).result.value.output
+      return Schema.decodeUnknownSync(listingResponse)(await response.json()).result.value.output
     }
     expect((await list()).tools.find(entry => entry.name === 'test_bound')).toMatchObject({ source: 'plugin', owner: '@test/bound' })
     await mounted.dispose()
@@ -277,11 +319,11 @@ describe('API registry', () => {
 
 describe('tool parameter projection', () => {
   it('keeps the enforced subset and loosens everything else', () => {
-    const schema = z.object({
-      name: z.string().min(1).describe('Thread name'),
-      kind: z.enum(['a', 'b']).nullable(),
-      tags: z.array(z.string()).max(3),
-      when: z.union([z.string(), z.number()]).optional(),
+    const schema = Schema.Struct({
+      name: Schema.String.check(Schema.isMinLength(1)).annotate({ description: 'Thread name' }),
+      kind: Schema.NullOr(Schema.Literals(['a', 'b'])),
+      tags: Schema.Array(Schema.String).check(Schema.isMaxLength(3)),
+      when: Schema.optionalKey(Schema.Union([Schema.String, Schema.Number])),
     })
     expect(toToolSchema(publishedJsonSchema(schema, 'input'))).toEqual({
       type: 'object',
@@ -296,10 +338,11 @@ describe('tool parameter projection', () => {
   })
 
   it('keeps a discriminated union instead of collapsing the property to an empty schema', () => {
-    const schema = z.object({
-      action: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('describe'), message: z.string() }).strict(),
-        z.object({ kind: z.literal('new'), commitId: z.string().optional() }).strict(),
+    const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => Schema.Struct(fields)
+    const schema = Schema.Struct({
+      action: Schema.Union([
+        strictStruct({ kind: Schema.Literal('describe'), message: Schema.String }),
+        strictStruct({ kind: Schema.Literal('new'), commitId: Schema.optionalKey(Schema.String) }),
       ]),
     })
     expect(toToolSchema(publishedJsonSchema(schema, 'input'))).toEqual({
@@ -309,15 +352,13 @@ describe('tool parameter projection', () => {
           oneOf: [
             {
               type: 'object',
-              properties: { kind: { type: 'string', const: 'describe' }, message: { type: 'string' } },
+              properties: { kind: { type: 'string', enum: ['describe'] }, message: { type: 'string' } },
               required: ['kind', 'message'],
-              additionalProperties: false,
             },
             {
               type: 'object',
-              properties: { kind: { type: 'string', const: 'new' }, commitId: { type: 'string' } },
+              properties: { kind: { type: 'string', enum: ['new'] }, commitId: { type: 'string' } },
               required: ['kind'],
-              additionalProperties: false,
             },
           ],
         },

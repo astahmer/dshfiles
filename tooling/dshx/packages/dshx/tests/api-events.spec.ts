@@ -1,12 +1,13 @@
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { z } from 'zod'
 import { defineApi, event, method } from '../src/api/index.js'
 import { ApiClientEventsModel } from '../src/api/client-events.js'
 import { ApiProtocolModel } from '../src/api/common.js'
 import { HostApiEventsModel } from '../src/api/host-events.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
+import '../src/effect/index.js'
 import type { ApiEventStatus } from '../src/api/types.js'
 
 const jobsApi = defineApi({
@@ -15,7 +16,10 @@ const jobsApi = defineApi({
   owner: '@acme/jobs',
   methods: { board: method<void, { readonly rows: number }>() },
   events: {
-    changed: event({ schema: z.object({ running: z.number().int().nonnegative() }).strict(), description: 'The job board changed.' }),
+    changed: event({
+      schema: Schema.Struct({ running: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
+      description: 'The job board changed.',
+    }),
   },
 })
 
@@ -127,7 +131,7 @@ const subscribe = () => {
   const payloads: unknown[] = []
   const unsubscribe = ApiClientEventsModel.subscribe(browserClient(), 'changed', {
     onEvent: payload => {
-      expectTypeOf(payload).toEqualTypeOf<{ running: number }>()
+      expectTypeOf(payload).toEqualTypeOf<{ readonly running: number }>()
       payloads.push(payload)
     },
     onStatus: status => statuses.push(status),

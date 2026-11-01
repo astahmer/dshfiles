@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import * as Schema from 'effect/Schema'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { z } from 'zod'
 import { ApiClientLifecycle } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/index.js'
 import * as publicApi from '../src/api/index.js'
@@ -22,15 +22,15 @@ const api = defineApi({
   },
 })
 
-const routeResponseSchema = z.object({
-  result: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.unknown() }),
-    z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string(), details: z.looseObject({}) }) }),
+const routeResponseSchema = Schema.Struct({
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }),
+    Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String, details: Schema.JsonObject }) }),
   ]),
 })
 
 describe('createRegisteredApiClient', () => {
-  const registeredContext = (call: (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => Promise<unknown>) => ({
+  const registeredContext = (call: (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => Promise<Schema.Json>) => ({
     get: (name: string) => (name === 'connection' ? { rpc: { call } } : undefined),
   })
 
@@ -89,7 +89,7 @@ function connectionFixture() {
     const request = new Request(`http://localhost${path}`, requestInit)
     const response = await route.fetch(request)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return routeResponseSchema.parse(await response.json()).result
+    return Schema.decodeUnknownSync(routeResponseSchema)(await response.json()).result
   })
   const context = {
     get(name: string) {

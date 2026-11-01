@@ -375,7 +375,7 @@ const staleLinkedBundles = (): readonly string[] => {
   const manifest = readJson(profileManifestSchema, manifestPath)
   return Object.entries(manifest.dependencies).flatMap(([name, spec]) => {
     if (!isOwned(name) || !spec.startsWith('link:')) return []
-    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)), decodeJson })
+    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)) })
     return report.status === 'stale' || report.status === 'unbuilt' ? [name] : []
   })
 }

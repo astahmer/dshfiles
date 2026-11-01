@@ -13,7 +13,7 @@ Effect is an opt-in authoring API for owned Host code. DSH core remains Promise-
 | Errors | Use one `Schema.TaggedError` per expected failure kind. Existing dshx mapping converts `_tag` to the remote kebab-case code; defects remain internal. | API boundary |
 | Services | Use `Context.Service` classes and `Layer`. Read Cordis `ctx.get(...)` only in the plugin's root Layer, where Promise adapters can be constructed. | Layer construction |
 | Promise edge | Keep `runPromise` and Promise conversion in dshx adapters, plugin registration, fork boundaries, and tests. Effect domain code composes Effects and never runs its own fibers as Promises. | `effect-antislop/no-domain-effect-run` is an error under `src/effect/**`, excluding only the API Promise boundary and tracer bridge. Valid/invalid Oxlint fixtures pin this behavior. |
-| Schemas | Standard Schema contracts remain the interop point. zod and Effect Schema can coexist per API; conversion must preserve the existing API and tool JSON Schemas byte-for-byte. | `defineApi` / JSON Schema projection |
+| Schemas | Standard Schema remains the interop point. Effect Schema and zod can coexist per API; Effect discriminated unions are projected from `anyOf` to the native tool `oneOf` subset, while validation remains at the contract boundary. | `defineApi` / JSON Schema projection |
 | Tests | Use `@effect/vitest` (`it.effect`, `it.layer`) for Effect tests. Exercise real implementations and scratch Layers; do not mock the Effect service being tested. | `tests/effect.spec.ts` includes `it.effect`; `@effect/vitest` is pinned to 4.1.0. |
 | Cancellation | Pass the Host call's `AbortSignal` into `runPromiseExit`; interruption cancels the handler fiber. Scoped child processes must be interrupted and reaped. | `DshxEffect.host` and platform adapters |
 
@@ -78,6 +78,6 @@ export default defineHost({
 | Host service Layers and Effect Schema `defineApi` conversion | plugin `Layer` + context-bound typed API handlers and direct Effect Schema conversion implemented; named Host service adapters pending |
 | dshx tracer bridge and both-direction parentage test | implemented |
 | Event/publish helpers; Promise APIs unchanged | existing and retained |
-| Tool-schema JSON dump and committed byte-identical snapshot harness | pending |
+| Tool-schema JSON dump and committed pre-Effect snapshot | collected; the fixture remains unchanged by this migration, and the contract delta is reported separately |
 | `effect-host` scaffold template | implemented; generates a typed API/tool, plugin `Layer`, and `effect@4.1.0` dependency |
-| Focused tests, package typecheck and targeted zod/Effect tool-schema parity | in progress; full built-bundle byte snapshot pending |
+| Focused tests, package typecheck and targeted zod/Effect tool-schema parity | validated; the legacy built-bundle snapshot differs in documented Effect JSON Schema output |

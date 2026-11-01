@@ -2,14 +2,10 @@ import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Writable } from 'node:stream'
 import { parseArgs } from 'node:util'
-import * as Schema from 'effect/Schema'
-import { z } from 'zod'
 import { decodeJson } from '../json.js'
 import { BundleFreshness } from '../repository/bundle-freshness.js'
 import { PluginBoundaries } from '../repository/plugin-boundaries.js'
 import { RepositoryWorkspace, type WorkspacePackage } from '../repository/workspace.js'
-
-const decodeBundleFreshnessJson = <S extends z.ZodType>(schema: S, text: string): z.output<S> => schema.parse(decodeJson(Schema.Unknown, text))
 
 const HELP = `dshx check repo — repository health checks for a dshx monorepo or a standalone plugin repository.
 
@@ -84,7 +80,7 @@ const runCheck = (name: CheckName, root: string, packages: readonly WorkspacePac
     }))
     return { name, ok: findings.length === 0, inspected: packages.length, findings }
   }
-  const reports = packages.map(item => ({ item, report: BundleFreshness.inspect({ directory: item.directory, decodeJson: decodeBundleFreshnessJson }) }))
+  const reports = packages.map(item => ({ item, report: BundleFreshness.inspect({ directory: item.directory }) }))
   const findings = reports.flatMap(({ item, report }) => {
     if (report.status !== 'stale') return []
     const subject = report.source === null ? `dist/${report.bundle} is missing` : `dist/${report.bundle} is older than ${report.source}`

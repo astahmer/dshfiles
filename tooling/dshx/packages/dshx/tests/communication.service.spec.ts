@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { createCommunicationService } from '../src/communication/service.js'
 import type { CommunicationPrincipal } from '../src/communication/types.js'
 
@@ -15,35 +15,36 @@ const statePath = async (): Promise<string> => {
   return join(root, 'state.json')
 }
 
-const persistedRecipientSchema = z.looseObject({ delivery: z.string(), readAt: z.number().nullable().optional() })
+const persistedRecipientSchema = Schema.Struct({ delivery: Schema.String, readAt: Schema.optionalKey(Schema.NullOr(Schema.Number)) })
 
 /** The persisted file is a boundary this suite asserts on, so decode it instead of casting a parse result. */
-const persistedStateSchema = z.looseObject({
-  schemaVersion: z.number(),
-  messages: z.array(
-    z.looseObject({
-      id: z.string(),
-      intent: z.string().optional(),
-      correlationId: z.string().nullable().optional(),
-      dedupeKey: z.string().nullable().optional(),
-      recipients: z.array(persistedRecipientSchema),
+const persistedStateSchema = Schema.Struct({
+  schemaVersion: Schema.Number,
+  messages: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      intent: Schema.optionalKey(Schema.String),
+      correlationId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      dedupeKey: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      recipients: Schema.Array(persistedRecipientSchema),
     }),
   ),
-  subscriptions: z.array(
-    z.looseObject({
-      principal: z.looseObject({ kind: z.string(), id: z.string() }),
-      topic: z.string(),
-      delivery: z.string(),
+  subscriptions: Schema.Array(
+    Schema.Struct({
+      principal: Schema.Struct({ kind: Schema.String, id: Schema.String }),
+      topic: Schema.String,
+      delivery: Schema.String,
     }),
   ),
-  acknowledgements: z.array(z.looseObject({ messageId: z.string() })).optional(),
-  notifications: z.array(z.looseObject({})).optional(),
-  activityStartedAt: z.number().nullable().optional(),
-  activityEvents: z.array(z.looseObject({})).optional(),
+  acknowledgements: Schema.optionalKey(Schema.Array(Schema.Struct({ messageId: Schema.String }))),
+  notifications: Schema.optionalKey(Schema.Array(Schema.Json)),
+  activityStartedAt: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  activityEvents: Schema.optionalKey(Schema.Array(Schema.Json)),
 })
+type PersistedState = Schema.Schema.Type<typeof persistedStateSchema>
 
-const readPersistedState = async (path: string): Promise<z.infer<typeof persistedStateSchema>> =>
-  persistedStateSchema.parse(JSON.parse(await readFile(path, 'utf8')))
+const readPersistedState = async (path: string): Promise<PersistedState> =>
+  Schema.decodeUnknownSync(persistedStateSchema)(JSON.parse(await readFile(path, 'utf8')))
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))

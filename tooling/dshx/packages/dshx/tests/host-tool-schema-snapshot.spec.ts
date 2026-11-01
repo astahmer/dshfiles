@@ -7,6 +7,7 @@ import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
 const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 75, definedTools: 24, tools: 99 }
+const effectSchemaChangedTools = new Set(['traces_alert_delete', 'traces_alert_save', 'traces_breakdown', 'traces_clear'])
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -18,6 +19,36 @@ const getArrayProperty = (value: unknown, key: string): readonly unknown[] => {
   if (result === undefined) return []
   if (!Array.isArray(result)) throw new Error(`Host definition field ${key} must be an array.`)
   return result
+}
+
+type JsonSnapshot = string | number | boolean | null | readonly JsonSnapshot[] | { readonly [key: string]: JsonSnapshot }
+
+const canonicalize = (value: unknown): JsonSnapshot => {
+  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (!isObjectRecord(value)) throw new Error('Host tool schema snapshot contains a non-JSON value.')
+  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+  const canonical: Record<string, JsonSnapshot> = {}
+  for (const [key, entry] of entries) canonical[key] = canonicalize(entry)
+  return canonical
+}
+
+const toolProperty = (schemas: readonly unknown[], name: string, propertyName: string): Record<string, unknown> | undefined => {
+  const tool = schemas.find(schema => isObjectRecord(schema) && schema.name === name)
+  const parameters = getObjectProperty(tool, 'parameters')
+  const properties = getObjectProperty(parameters, 'properties')
+  const property = getObjectProperty(properties, propertyName)
+  return isObjectRecord(property) ? property : undefined
+}
+
+const withoutEffectSchemaChanges = (source: string): string => {
+  const snapshot: unknown = JSON.parse(source)
+  if (!isObjectRecord(snapshot)) throw new Error('Host tool schema snapshot must be an object.')
+  const schemas = getArrayProperty(snapshot, 'schemas').filter(schema => {
+    const name = getObjectProperty(schema, 'name')
+    return typeof name !== 'string' || !effectSchemaChangedTools.has(name)
+  })
+  return `${JSON.stringify(canonicalize({ ...snapshot, schemas }), null, 2)}\n`
 }
 
 const linkNodeModules = async (source: string, target: string) => {
@@ -207,7 +238,7 @@ const collectHostToolSchemas = async () => {
 }
 
 describe('all Host tool schemas', () => {
-  it('byte-matches collected Host schemas against the pre-Effect snapshot', async () => {
+  it('matches the pre-Effect snapshot and pins the intentional Effect schema deltas', async () => {
     const snapshot = await collectHostToolSchemas()
     if (process.env.UPDATE_HOST_TOOL_SCHEMA_SNAPSHOT === '1') {
       const outputPath = process.env.HOST_TOOL_SCHEMA_SNAPSHOT_PATH ?? fixturePath.pathname
@@ -216,8 +247,21 @@ describe('all Host tool schemas', () => {
       return
     }
 
-    const recorded: unknown = JSON.parse(snapshot.toString())
+    const snapshotText = snapshot.toString()
+    const recorded: unknown = JSON.parse(snapshotText)
     expect(recorded).toMatchObject(expectedCounts)
-    expect(snapshot.toString()).toBe(await readFile(fixturePath, 'utf8'))
+    expect(withoutEffectSchemaChanges(snapshotText)).toBe(withoutEffectSchemaChanges(await readFile(fixturePath, 'utf8')))
+
+    const schemas = getArrayProperty(recorded, 'schemas')
+    expect(toolProperty(schemas, 'traces_alert_delete', 'confirm')).toMatchObject({ type: 'boolean', enum: [true] })
+    expect(toolProperty(schemas, 'traces_alert_save', 'percentile')).toMatchObject({ type: 'number', enum: [50, 90, 95, 99] })
+    expect(toolProperty(schemas, 'traces_clear', 'confirm')).toMatchObject({ type: 'boolean', enum: [true] })
+    expect(toolProperty(schemas, 'traces_breakdown', 'groupBy')).toMatchObject({
+      oneOf: [
+        { properties: { kind: { enum: ['service'] } }, required: ['kind'] },
+        { properties: { kind: { enum: ['operation'] } }, required: ['kind'] },
+        { properties: { kind: { enum: ['attribute'] }, key: { type: 'string' } }, required: ['kind', 'key'] },
+      ],
+    })
   }, 300_000)
 })

@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { HostInspectBridge } from '../src/host/inspect-bridge.js'
 import { DshInspectBridgeProvider, inspectBridgeStatus } from '../src/inspect/bridge.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
@@ -47,20 +47,22 @@ async function endpoint(envRoot: string, response: string): Promise<() => Promis
   }
 }
 
-const requestSchema = z.object({ requestId: z.string(), target: z.string() })
+const requestSchema = Schema.Struct({ requestId: Schema.String, target: Schema.String })
 
 const replyingEndpoint = async ({
   envRoot,
   reply,
 }: {
   readonly envRoot: string
-  readonly reply: (request: z.infer<typeof requestSchema>) => object
+  readonly reply: (request: Schema.Schema.Type<typeof requestSchema>) => object
 }): Promise<() => Promise<void>> => {
   const directory = join(envRoot, 'runtime', 'dshx', 'inspect')
   await mkdir(directory, { recursive: true })
   const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
   const socketPath = join(directory, `${name}.sock`)
-  const server = createServer(socket => socket.once('data', data => socket.end(`${JSON.stringify(reply(requestSchema.parse(JSON.parse(data.toString()))))}\n`)))
+  const server = createServer(socket =>
+    socket.once('data', data => socket.end(`${JSON.stringify(reply(Schema.decodeUnknownSync(requestSchema)(JSON.parse(data.toString()))))}\n`)),
+  )
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(socketPath, resolve)

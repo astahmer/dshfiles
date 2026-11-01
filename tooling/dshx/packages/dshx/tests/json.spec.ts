@@ -1,6 +1,6 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { describe, expect, it } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { z } from 'zod'
 import { decodeJson, decodeJsonSafe } from '../src/json.js'
 
 describe('JSON decoder schema boundary', () => {
@@ -14,21 +14,30 @@ describe('JSON decoder schema boundary', () => {
     if (result._tag === 'Success') expect(result.success).toEqual({ count: 1 })
   })
 
-  it('preserves Zod decoding and safeParse output', () => {
-    const schema = z.object({ count: z.number().default(1), label: z.string().trim() })
-    const decoded = decodeJson(schema, '{"label":" DSH "}')
-    const result = decodeJsonSafe(schema, '{"label":" DSH "}')
+  it('accepts any synchronous Standard Schema validator', () => {
+    const schema: StandardSchemaV1<unknown, { readonly count: number }> = {
+      '~standard': {
+        version: 1,
+        vendor: 'dshx-json-test',
+        validate: value => {
+          if (typeof value !== 'object' || value === null || !('count' in value) || typeof value.count !== 'number') {
+            return { issues: [{ message: 'expected a numeric count' }] }
+          }
+          return { value: { count: value.count } }
+        },
+      },
+    }
+    const decoded = decodeJson(schema, '{"count":1}')
+    const success = decodeJsonSafe(schema, '{"count":2}')
+    const failure = decodeJsonSafe(schema, '{"count":"bad"}')
 
-    expect(decoded).toEqual({ count: 1, label: 'DSH' })
-    expect(result.success).toBe(true)
-    if (result.success) expect(result.data).toEqual({ count: 1, label: 'DSH' })
+    expect(decoded).toEqual({ count: 1 })
+    expect(success).toEqual({ success: true, data: { count: 2 } })
+    expect(failure.success).toBe(false)
   })
 
-  it('preserves each schema library’s invalid-result shape', () => {
-    const zodResult = decodeJsonSafe(z.object({ count: z.number() }), '{"count":"bad"}')
+  it('preserves the Effect Schema Result output', () => {
     const effectResult = decodeJsonSafe(Schema.Struct({ count: Schema.Number }), '{"count":"bad"}')
-
-    expect(zodResult.success).toBe(false)
     expect(effectResult._tag).toBe('Failure')
   })
 })

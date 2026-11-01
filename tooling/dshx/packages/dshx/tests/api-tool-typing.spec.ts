@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { describe, expectTypeOf, it } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
 
@@ -9,13 +9,13 @@ describe('tool exposure typing', () => {
       version: 1,
       methods: {
         status: method({
-          input: z.object({ path: z.string() }),
-          output: z.object({ summary: z.string(), count: z.number() }),
+          input: Schema.Struct({ path: Schema.String }),
+          output: Schema.Struct({ summary: Schema.String, count: Schema.Number.check(Schema.isFinite()) }),
           description: 'Status.',
           tool: {
             name: 'typed_status',
             render: output => {
-              expectTypeOf(output).toEqualTypeOf<{ summary: string; count: number }>()
+              expectTypeOf(output).toEqualTypeOf<{ readonly summary: string; readonly count: number }>()
               return output.summary
             },
           },

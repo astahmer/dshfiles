@@ -96,8 +96,8 @@ function record(value: unknown): Record<string, unknown> | undefined {
 }
 
 function isStandardSchema(value: unknown): value is StandardSchemaV1 {
-  const source = record(value)
-  const standard = record(source?.['~standard'])
+  const source = ((typeof value === 'object' && value !== null) || typeof value === 'function') && '~standard' in value ? value['~standard'] : undefined
+  const standard = record(source)
   return standard?.version === 1 && typeof standard.vendor === 'string' && typeof standard.validate === 'function'
 }
 

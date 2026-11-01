@@ -232,7 +232,7 @@ function apiTool(contract: ApiContract, method: string, definition: AnyApiMethod
   const inputSchema = publishedJsonSchema(definition.input, 'input')
   if (definition.input !== undefined && inputSchema === undefined && !acceptsNoInput(definition.input)) {
     throw new Error(
-      `API ${contract.id}.${method} cannot become tool ${exposure.name}: its input schema publishes no Standard JSON Schema (use zod 4.2+ or remove tool).`,
+      `API ${contract.id}.${method} cannot become tool ${exposure.name}: its input schema publishes no Standard JSON Schema (use a supported Effect or Standard Schema adapter, or remove tool).`,
     )
   }
   const parameters = toToolSchema(inputSchema)

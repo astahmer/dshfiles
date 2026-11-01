@@ -1,15 +1,27 @@
-import { z } from 'zod'
 import * as Schema from 'effect/Schema'
 import { communicationDeliverySchema, communicationPrioritySchema, legacyCommunicationDeliverySchema } from '../../src/communication/types.ts'
 
-export { z, Schema }
+export { Schema }
 export const fixtures = [
-  { name: 'communication-delivery', zod: z.literal('passive'), effect: communicationDeliverySchema, input: 'passive' },
-  { name: 'communication-priority', zod: z.enum(['normal', 'urgent']), effect: communicationPrioritySchema, input: 'urgent' },
+  {
+    name: 'communication-delivery',
+    expectedSchema: { type: 'string', enum: ['passive'] },
+    effect: communicationDeliverySchema,
+    input: 'passive',
+    expectedOutput: 'passive',
+  },
+  {
+    name: 'communication-priority',
+    expectedSchema: { type: 'string', enum: ['normal', 'urgent'] },
+    effect: communicationPrioritySchema,
+    input: 'urgent',
+    expectedOutput: 'urgent',
+  },
   {
     name: 'legacy-communication-delivery',
-    zod: z.enum(['quiet', 'queue', 'steer']),
+    expectedSchema: { type: 'string', enum: ['quiet', 'queue', 'steer'] },
     effect: legacyCommunicationDeliverySchema,
     input: 'queue',
+    expectedOutput: 'queue',
   },
 ]

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import '../src/effect/index.js'
+import * as Schema from 'effect/Schema'
 import { defineApi, isApiOwnerMissing, method, PluginApiError } from '../src/api/index.js'
 import { defineHost } from '../src/host/index.js'
 import { connectDshxApiClient } from '../src/platform/index.js'
@@ -10,7 +11,10 @@ const notesApi = defineApi({
   version: 2,
   owner: '@test/notes',
   methods: {
-    get: method({ input: z.object({ id: z.string().min(1) }), output: z.object({ id: z.string(), text: z.string() }) }),
+    get: method({
+      input: Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)) }),
+      output: Schema.Struct({ id: Schema.String, text: Schema.String }),
+    }),
     count: method<void, number>(),
   },
 })

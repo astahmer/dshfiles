@@ -148,7 +148,7 @@ Import `@deepseek-ai/dsh-client-ui-settings/client` as a type-only module so `se
 
 ### Settings search entries
 
-A section can let a Settings search find its controls without being mounted. List them in `metadata.searchEntries`: each entry has a unique `id`, a `title`, and optional `description` and `keywords`, all matched by the search. TypeScript checks the shape, and only `settings.section` accepts `metadata`. The zod schemas `settingsSectionMetadataSchema`, `settingsSearchEntriesSchema` and `settingsSearchEntrySchema` (unique ids, non-empty titles, no unknown fields) are exported from `@dshfiles/dshx/settings`; the Client runtime itself carries no zod, so a bundle without a shared zod does not inline it, and the reader decodes what each bundle published.
+A section can let a Settings search find its controls without being mounted. List them in `metadata.searchEntries`: each entry has a unique `id`, a `title`, and optional `description` and `keywords`, all matched by the search. TypeScript checks the shape, and only `settings.section` accepts `metadata`. The Effect schemas `settingsSectionMetadataSchema`, `settingsSearchEntriesSchema` and `settingsSearchEntrySchema` are exported from `@dshfiles/dshx/settings`; the Client runtime decodes what each bundle published.
 
 ```tsx
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'

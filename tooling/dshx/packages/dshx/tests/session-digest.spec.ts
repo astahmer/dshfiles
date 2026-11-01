@@ -1,28 +1,28 @@
 import { readFileSync } from 'node:fs'
 import { PassThrough } from 'node:stream'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.js'
 import { createDshPlatformClientFromTransport } from '../src/platform/client.js'
 import type { DshPlatformClient, JsonValue } from '../src/platform/client.js'
 import { SessionDigestModel } from '../src/platform/session-digest.js'
 
-const fixtureSchema = z.object({
-  summary: z.object({
-    sessionId: z.string(),
-    updatedAt: z.number(),
-    running: z.boolean(),
-    blank: z.boolean(),
-    agentAvailable: z.boolean(),
-    cwd: z.string().optional(),
-    projections: z.json().optional(),
+const fixtureSchema = Schema.Struct({
+  summary: Schema.Struct({
+    sessionId: Schema.String,
+    updatedAt: Schema.Number,
+    running: Schema.Boolean,
+    blank: Schema.Boolean,
+    agentAvailable: Schema.Boolean,
+    cwd: Schema.optionalKey(Schema.String),
+    projections: Schema.optionalKey(Schema.Json),
   }),
-  records: z.array(z.json()),
+  records: Schema.Array(Schema.Json),
 })
 
 // Captured from a scratch DSH driven by a scripted Messages endpoint; paths rewritten to /tmp/dshx-digest.
 const loadFixture = (name: string) => {
-  const fixture = fixtureSchema.parse(JSON.parse(readFileSync(new URL(`./fixtures/session-digest/${name}.json`, import.meta.url), 'utf8')))
+  const fixture = Schema.decodeUnknownSync(fixtureSchema)(JSON.parse(readFileSync(new URL(`./fixtures/session-digest/${name}.json`, import.meta.url), 'utf8')))
   return {
     summary: {
       sessionId: fixture.summary.sessionId,
@@ -37,8 +37,9 @@ const loadFixture = (name: string) => {
   }
 }
 
-const recordSeq = (record: JsonValue): number => z.object({ event: z.object({ seq: z.number() }) }).parse(record).event.seq
-const lastTime = (records: readonly JsonValue[]): number => z.object({ event: z.object({ time: z.number() }) }).parse(records.at(-1)).event.time
+const recordSeq = (record: JsonValue): number => Schema.decodeUnknownSync(Schema.Struct({ event: Schema.Struct({ seq: Schema.Number }) }))(record).event.seq
+const lastTime = (records: readonly JsonValue[]): number =>
+  Schema.decodeUnknownSync(Schema.Struct({ event: Schema.Struct({ time: Schema.Number }) }))(records.at(-1)).event.time
 
 /** Serves fixture records through the real paging client, recording which pages were read. */
 const fixtureClient = (fixture: ReturnType<typeof loadFixture>, pageReads: number[] = []): DshPlatformClient =>
@@ -47,7 +48,13 @@ const fixtureClient = (fixture: ReturnType<typeof loadFixture>, pageReads: numbe
     rpc: async (namespace, method, args) => {
       if (namespace === 'session' && method === 'list') return { items: [fixture.summary] }
       if (namespace !== 'session' || method !== 'page') throw new Error(`Unexpected RPC ${namespace}/${method}`)
-      const request = z.object({ throughSeq: z.number(), beforeSeq: z.number().optional(), maxMessages: z.number() }).parse(args.request)
+      const request = Schema.decodeUnknownSync(
+        Schema.Struct({
+          throughSeq: Schema.Number,
+          beforeSeq: Schema.optionalKey(Schema.Number),
+          maxMessages: Schema.Number,
+        }),
+      )(args.request)
       const eligible = fixture.records.filter(
         record => recordSeq(record) <= request.throughSeq && (request.beforeSeq === undefined || recordSeq(record) < request.beforeSeq),
       )
@@ -185,9 +192,11 @@ describe('sessions export filters', () => {
       version: 'test-version',
       runtime: { connectPlatform: async () => fixtureClient(fixture, pageReads) },
     })
-    const records = z
-      .object({ data: z.object({ records: z.array(z.object({ event: z.object({ seq: z.number(), type: z.string() }) })) }) })
-      .parse(JSON.parse(output.stdout())).data.records
+    const records = Schema.decodeUnknownSync(
+      Schema.Struct({
+        data: Schema.Struct({ records: Schema.Array(Schema.Struct({ event: Schema.Struct({ seq: Schema.Number, type: Schema.String }) })) }),
+      }),
+    )(JSON.parse(output.stdout())).data.records
 
     expect(exitCode).toBe(0)
     expect(records.map(record => record.event.type)).toEqual(['tool/call', 'tool/result', 'tool/call', 'tool/result'])
@@ -203,9 +212,11 @@ describe('sessions export filters', () => {
       version: 'test-version',
       runtime: { connectPlatform: async () => fixtureClient(fixture) },
     })
-    const records = z
-      .object({ data: z.object({ records: z.array(z.object({ event: z.object({ seq: z.number(), type: z.string() }) })) }) })
-      .parse(JSON.parse(output.stdout())).data.records
+    const records = Schema.decodeUnknownSync(
+      Schema.Struct({
+        data: Schema.Struct({ records: Schema.Array(Schema.Struct({ event: Schema.Struct({ seq: Schema.Number, type: Schema.String }) })) }),
+      }),
+    )(JSON.parse(output.stdout())).data.records
 
     expect(records.map(record => record.event.type)).toEqual(['tool/call', 'tool/call'])
     expect(records[0]!.event.seq).toBeLessThan(records[1]!.event.seq)

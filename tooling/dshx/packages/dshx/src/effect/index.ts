@@ -119,7 +119,8 @@ const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDef
   const promised = Object.fromEntries(
     Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers).map(([name, handler]) => [
       name,
-      async (context: ApiHandlerContext<never>) => settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx)),
+      async (context: ApiHandlerContext<never>) =>
+        settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx)),
     ]),
   )
   // SAFETY: every method key of `handlers` (typed against the contract's methods) maps to a Promise handler of the same input and output.
@@ -131,10 +132,15 @@ const host = <const Methods extends Record<string, AnyApiMethodDefinition>, R = 
   handlers: EffectHandlers<Methods, R>,
   ...[options]: HostOptions<R>
 ): ApiHostRegistration<Methods> =>
-  registerEffectHost(contract, handlers, ctx => {
-    // SAFETY: explicit runtimes match R; context runtimes are created by DshxEffect.plugin for the same plugin instance.
-    return options?.runtime as AnyManagedRuntime | undefined ?? pluginRuntimes.get(ctx)
-  }, false)
+  registerEffectHost(
+    contract,
+    handlers,
+    ctx => {
+      // SAFETY: explicit runtimes match R; context runtimes are created by DshxEffect.plugin for the same plugin instance.
+      return (options?.runtime as AnyManagedRuntime | undefined) ?? pluginRuntimes.get(ctx)
+    },
+    false,
+  )
 
 /**
  * A Host `setup` whose plugin lifetime is an Effect Scope: resources acquired with `Effect.acquireRelease`,
