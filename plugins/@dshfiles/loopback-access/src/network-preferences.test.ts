@@ -1,5 +1,8 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { NetworkPreferencesModel, preferencesSchema } from './network-preferences.js'
+
+const decodes = (value: unknown): boolean => Schema.decodeUnknownResult(preferencesSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 describe('network launch preferences', () => {
   it('inherits the native host and port when no preferences are saved', () => {
@@ -30,8 +33,8 @@ describe('network launch preferences', () => {
   })
 
   it('rejects unknown preferences and malformed legacy flags', () => {
-    expect(preferencesSchema.safeParse({ arbitrary: true }).success).toBe(false)
-    expect(preferencesSchema.safeParse({ localhostEnabled: 'false' }).success).toBe(false)
+    expect(decodes({ arbitrary: true })).toBe(false)
+    expect(decodes({ localhostEnabled: 'false' })).toBe(false)
   })
 
   it('trims an address before persisting it', () => {
@@ -41,19 +44,19 @@ describe('network launch preferences', () => {
   it.each(['0.0.0.0', '::', '::ffff:0.0.0.0', 'localhost', 'example.com', '', '127.0.0.1', '127.3.4.5', '::1', '::ffff:127.0.0.1'])(
     'rejects an unsafe or non-literal LAN address: %s',
     bindAddress => {
-      expect(preferencesSchema.safeParse({ lanEnabled: true, bindAddress }).success).toBe(false)
+      expect(decodes({ lanEnabled: true, bindAddress })).toBe(false)
     },
   )
 
   it('requires an address only when LAN is explicitly enabled', () => {
-    expect(preferencesSchema.safeParse({ lanEnabled: true }).success).toBe(false)
-    expect(preferencesSchema.safeParse({ lanEnabled: true, bindAddress: null }).success).toBe(false)
-    expect(preferencesSchema.safeParse({ lanEnabled: null }).success).toBe(true)
-    expect(preferencesSchema.safeParse({ lanEnabled: false }).success).toBe(true)
+    expect(decodes({ lanEnabled: true })).toBe(false)
+    expect(decodes({ lanEnabled: true, bindAddress: null })).toBe(false)
+    expect(decodes({ lanEnabled: null })).toBe(true)
+    expect(decodes({ lanEnabled: false })).toBe(true)
   })
 
   it.each([-1, 65536, 1.5, '3080'])('rejects an invalid port: %s', port => {
-    expect(preferencesSchema.safeParse({ port }).success).toBe(false)
+    expect(decodes({ port })).toBe(false)
   })
 
   it('keeps the boot plan detached and immutable', () => {

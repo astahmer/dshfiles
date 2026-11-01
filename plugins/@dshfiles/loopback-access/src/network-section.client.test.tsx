@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
 import { networkEnglish, type NetworkTranslate } from './locales.js'
-import { networkSnapshotSchema, type NetworkSnapshot } from './network-api.js'
+import { decodeNetworkSnapshot, type NetworkSnapshot } from './network-api.js'
 import { NetworkPreferences, NetworkSection } from './network-section.js'
 
 const unavailableHost = vi.hoisted(() => ({
@@ -72,8 +72,8 @@ afterEach(() => {
 
 describe('Network access preferences', () => {
   it('offers only a LAN switch and keeps localhost enabled across LAN changes', async () => {
-    const snapshot = initialSnapshot()
-    snapshot.saved.bindAddress = '192.168.1.94'
+    const base = initialSnapshot()
+    const snapshot = { ...base, saved: { ...base.saved, bindAddress: '192.168.1.94' } }
     const { save } = mount(snapshot)
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.queryByRole('switch', { name: 'Localhost access' })).toBeNull()
@@ -95,7 +95,7 @@ describe('Network access preferences', () => {
 
   it('can save against an older Host without restoring its localhost opt-out', async () => {
     const original = initialSnapshot()
-    const snapshot = networkSnapshotSchema.parse({
+    const snapshot = decodeNetworkSnapshot({
       ...original,
       saved: { ...original.saved, lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: false },
       active: { ...original.active, localhostEnabled: false },
@@ -131,8 +131,8 @@ describe('Network access preferences', () => {
   })
 
   it('shows an unavailable saved address and never silently chooses an available replacement', async () => {
-    const snapshot = initialSnapshot()
-    snapshot.saved = { ...snapshot.saved, lanEnabled: true, bindAddress: '192.168.2.20' }
+    const base = initialSnapshot()
+    const snapshot = { ...base, saved: { ...base.saved, lanEnabled: true, bindAddress: '192.168.2.20' } }
     const { save } = mount(snapshot)
     expect(screen.getByRole('combobox', { name: 'LAN address' }).textContent).toContain('Unavailable saved address · 192.168.2.20')
     fireEvent.click(screen.getByRole('switch', { name: 'LAN access' }))

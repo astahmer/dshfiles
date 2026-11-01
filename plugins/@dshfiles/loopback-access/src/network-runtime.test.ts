@@ -5,8 +5,8 @@ import { Loader } from '@deepseek-ai/cordis-plugin-loader'
 import { ConfigEditor } from '@deepseek-ai/dsh-config-editor'
 import { SettingsForms } from '@deepseek-ai/dsh-settings'
 import { createTestHost } from '@dshfiles/dshx/testing'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import hostDefinition from './host.js'
 import { NetworkController } from './network-controller.js'
 import { NETWORK_SETTINGS_NAMESPACE } from './network-preferences.js'
@@ -16,6 +16,13 @@ import { socketClosed } from './socket-closed.test-support.js'
 const lanHost = Object.values(networkInterfaces())
   .flat()
   .find(address => address?.family === 'IPv4' && !address.internal)?.address
+
+const tcpAddressSchema = Schema.Struct({
+  address: Schema.String,
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
+})
+const unavailableFamilySchema = Schema.Struct({ code: Schema.Literals(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
+const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 
 async function mountRuntime(bindAddress: string, localhostEnabled: boolean, freshDefaults = false) {
   const host = await createTestHost()
@@ -30,7 +37,7 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean, fres
       const listening = once(ipv4, 'listening', { signal: AbortSignal.timeout(2_000) })
       ipv4.listen({ host: '127.0.0.1', port: 0, exclusive: true })
       await listening
-      port = z.object({ port: z.number().int().min(1).max(65535) }).parse(ipv4.address()).port
+      port = Schema.decodeUnknownSync(tcpAddressSchema)(ipv4.address()).port
       const ipv6 = createServer()
       reservations.push(ipv6)
       try {
@@ -38,7 +45,7 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean, fres
         ipv6.listen({ host: '::1', port, ipv6Only: true, exclusive: true })
         await listeningIPv6
       } catch (error) {
-        if (!z.object({ code: z.enum(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) }).safeParse(error).success) throw error
+        if (!accepts(unavailableFamilySchema, error)) throw error
       }
     }
     await host.ctx.plugin(Loader, { baseUrl: import.meta.url })

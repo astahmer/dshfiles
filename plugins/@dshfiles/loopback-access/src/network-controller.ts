@@ -8,16 +8,15 @@ import { readWebStartupOverrides } from '@dshfiles/dshx/host'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import type { z } from 'zod'
 import type { LoopbackAccess } from './access.js'
-import { networkSaveSchema, type NetworkForm, type NetworkSnapshot } from './network-api.js'
+import { networkSaveSchema, type NetworkAddress, type NetworkForm, type NetworkSnapshot } from './network-api.js'
 import {
   NETWORK_SETTINGS_NAMESPACE,
   NetworkPreferencesModel,
-  preferencesSchema,
   type NetworkPreferences,
   type NetworkStartupValues,
 } from './network-preferences.js'
+import { LoopbackSchema } from './schema.js'
 
 const rawObject = Schema.Record(Schema.String, Schema.Unknown)
 // A strict object still rejects unknown keys: the decoder below keeps `onExcessProperty: 'error'`, as zod did.
@@ -37,7 +36,7 @@ const isManagedNetworkConfiguration = (value: typeof rawObject.Type): boolean =>
 }
 
 const localNetworkAddresses = (): NetworkSnapshot['addresses'] => {
-  const result: NetworkSnapshot['addresses'] = []
+  const result: NetworkAddress[] = []
   const seen = new Set<string>()
   for (const [interfaceName, entries] of Object.entries(networkInterfaces())) {
     for (const entry of entries ?? []) {
@@ -91,7 +90,7 @@ export class NetworkController {
     const native = this.#ctx.webServer
     const port = native.port
     if (port === undefined) throw new Error('The native Web listener has not initialized.')
-    const preferences = preferencesSchema.parse(descriptor.value)
+    const preferences = NetworkPreferencesModel.decode(descriptor.value)
     const saved = preferencesToForm(preferences, native.host, port)
     const applied = preferencesToForm(this.#boot.preferences, native.host, port)
     const current = this.#access.status()
@@ -121,8 +120,8 @@ export class NetworkController {
     }
   }
 
-  save(input: z.infer<typeof networkSaveSchema>, signal: AbortSignal): Promise<NetworkSnapshot> {
-    const parsed = networkSaveSchema.parse(input)
+  save(input: typeof networkSaveSchema.Type, signal: AbortSignal): Promise<NetworkSnapshot> {
+    const parsed = LoopbackSchema.decodeStrict(networkSaveSchema, input)
     const change = this.#pending.then(async () => {
       signal.throwIfAborted()
       const before = this.snapshot()

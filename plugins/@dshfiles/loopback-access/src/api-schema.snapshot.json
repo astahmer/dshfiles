@@ -10,8 +10,315 @@
         "name": "network_access_settings",
         "readOnly": true
       },
-      "toolInput": {},
-      "toolOutput": {}
+      "input": {
+        "type": "null"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "localhostEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "type": "string"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      }
     },
     {
       "name": "saveNetwork",
@@ -21,7 +328,6 @@
         "readOnly": false
       },
       "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "lanEnabled": {
@@ -38,9 +344,10 @@
             ]
           },
           "localhostEnabled": {
-            "default": true,
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           },
           "port": {
             "type": "integer",
@@ -61,6 +368,179 @@
         ],
         "additionalProperties": false
       },
+      "output": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "localhostEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      },
       "toolInput": {
         "type": "object",
         "properties": {
@@ -72,7 +552,9 @@
           },
           "localhostEnabled": {
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           },
           "port": {
             "type": "integer"
@@ -89,7 +571,136 @@
         ],
         "additionalProperties": false
       },
-      "toolOutput": {}
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "type": "string"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      }
     },
     {
       "name": "status",
@@ -98,8 +709,10 @@
         "name": "loopback_access_status",
         "readOnly": true
       },
+      "input": {
+        "type": "null"
+      },
       "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "state": {
@@ -167,7 +780,9 @@
         ],
         "additionalProperties": false
       },
-      "toolInput": {},
+      "toolInput": {
+        "type": "null"
+      },
       "toolOutput": {
         "type": "object",
         "properties": {

@@ -1,13 +1,7 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import schema from '@deepseek-ai/schemastery'
-import {
-  NETWORK_SETTINGS_NAMESPACE,
-  NetworkPreferencesModel,
-  preferencesSchema,
-  type NetworkPreferences,
-  type NetworkStartupValues,
-} from './network-preferences.js'
+import { NETWORK_SETTINGS_NAMESPACE, NetworkPreferencesModel, type NetworkPreferences, type NetworkStartupValues } from './network-preferences.js'
 
 export const name = NETWORK_SETTINGS_NAMESPACE
 export const inject = ['settings']
@@ -22,7 +16,7 @@ export const Config = schema
       bindAddress: schema.union([schema.transform(schema.string(), NetworkPreferencesModel.normalizeLanAddress), schema.const(null)]).default(null),
       port: schema.union([schema.natural().max(65535), schema.const(null)]).default(null),
     }),
-    value => preferencesSchema.parse(value),
+    value => NetworkPreferencesModel.normalize(value),
   )
   .default({})
   .volatile()
