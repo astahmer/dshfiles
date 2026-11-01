@@ -20,6 +20,7 @@ import { afterEach, expect, it } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
 import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
+import { sessionControllerEffectPlugin } from '../../src/effect-runtime.ts'
 import { sessionsApi } from '../../src/sessions-api.ts'
 import { loadSessionInstructions, sessionInstructionsSection, sessionsHost } from '../../src/sessions-host.ts'
 
@@ -104,11 +105,15 @@ const fixture = async (replies: readonly string[] = []) => {
   })
   await host.mount(
     defineHost({
+      ...sessionControllerEffectPlugin,
       name: '@dshfiles/session-controller',
       inject: ['remoteAccess', 'agents'],
       apis: [sessionsHost],
       prompts: [sessionInstructionsSection],
-      setup: loadSessionInstructions,
+      setup: async (setupContext, config) => {
+        loadSessionInstructions(setupContext)
+        return sessionControllerEffectPlugin.setup(setupContext, config)
+      },
     }),
     { packageId: '@dshfiles/session-controller' },
   )
