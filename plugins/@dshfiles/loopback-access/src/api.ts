@@ -2,6 +2,8 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { networkSaveSchema, networkSnapshotSchema } from './network-api.js'
 
+// Keep this published tree on zod: an Effect Struct publishes `additionalProperties: true`, where zod publishes no
+// keyword, so the API snapshot would no longer be byte-identical.
 export const loopbackAccessStatusSchema = z.object({
   state: z.enum(['starting', 'native-loopback', 'forwarding', 'disabled', 'stopped', 'failed']),
   upstreamOrigin: z.string().nullable(),

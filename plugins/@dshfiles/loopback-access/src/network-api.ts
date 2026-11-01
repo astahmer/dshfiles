@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+// Keep these contracts on zod: Effect publishes `enum` where zod publishes `const` for a literal, omits the `default`
+// keyword, and has no equivalent for `networkFormSchema`'s `.default().transform(...)`.
 export const networkFormSchema = z
   .object({
     lanEnabled: z.boolean(),

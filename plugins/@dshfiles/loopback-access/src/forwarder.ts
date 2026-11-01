@@ -1,6 +1,7 @@
 import { createServer, isIP, Socket } from 'node:net'
 import type { Server } from 'node:net'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { isWildcardHost } from '@deepseek-ai/dsh-host-webserver'
 import { startSpan, withSpan } from '@dshfiles/dshx/tracing'
 
@@ -23,16 +24,16 @@ interface ConnectionPair {
 const unavailableIPv6 = new Set(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT'])
 const maxConnections = 256
 const connectTimeoutMs = 5_000
-const socketErrorSchema = z.object({ code: z.string().regex(/^E[A-Z0-9_]+$/) })
-const listenerAddressSchema = z.object({
-  address: z.enum(['127.0.0.1', '::1']),
-  port: z.number().int().min(1).max(65_535),
+const socketErrorSchema = Schema.Struct({ code: Schema.String.check(Schema.isPattern(/^E[A-Z0-9_]+$/)) })
+const listenerAddressSchema = Schema.Struct({
+  address: Schema.Literals(['127.0.0.1', '::1']),
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
 })
 
 function errorCode(error: unknown): string {
   // Do not copy arbitrary error text (which may include connection details).
-  const parsed = socketErrorSchema.safeParse(error)
-  return parsed.success ? parsed.data.code : 'UNKNOWN'
+  const parsed = Schema.decodeUnknownOption(socketErrorSchema)(error)
+  return Option.isSome(parsed) ? parsed.value.code : 'UNKNOWN'
 }
 
 function validPort(port: number, minimum: number): boolean {
@@ -72,8 +73,8 @@ export class LoopbackForwarder {
   /** Fresh snapshots of actual, currently owned listening addresses. */
   listeners(): Listener[] {
     return this.servers.flatMap(server => {
-      const parsed = listenerAddressSchema.safeParse(server.address())
-      return parsed.success ? [{ host: parsed.data.address, port: parsed.data.port }] : []
+      const parsed = Schema.decodeUnknownOption(listenerAddressSchema)(server.address())
+      return Option.isSome(parsed) ? [{ host: parsed.value.address, port: parsed.value.port }] : []
     })
   }
 
