@@ -40,6 +40,7 @@ const HOST_WEB_STARTUP_PATH = fileURLToPath(new URL('../../host/web-startup.js',
 const HOST_OUTSIDE_RELOAD_PATH = fileURLToPath(new URL('../../host/outside-reload.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
+const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
@@ -161,6 +162,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const method = ApiDefinitionModel.method',
           'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
+          `export { zodSchemaFromEffect } from ${JSON.stringify(API_ZOD_VIEW_PATH)}`,
           '',
         ].join('\n')
       }

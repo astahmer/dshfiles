@@ -53,6 +53,7 @@ const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.me
 const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js', import.meta.url))
 const CLIENT_HOST_STORAGE_PATH = fileURLToPath(new URL('../../client/host-storage.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
+const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
@@ -237,6 +238,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const method = ApiDefinitionModel.method',
           'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
+          `export { zodSchemaFromEffect } from ${JSON.stringify(API_ZOD_VIEW_PATH)}`,
           '',
         ].join('\n')
       }
