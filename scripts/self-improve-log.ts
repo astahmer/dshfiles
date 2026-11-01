@@ -1,8 +1,8 @@
 import { open, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
-import { z } from 'zod'
-import { decodeJson } from './json.ts'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 
 /**
  * Discovers and streams DSH Session logs (`session.v<N>.jsonl.zstd`).
@@ -18,9 +18,14 @@ const LOG_NAME = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/
 const ZSTD_MAGIC = 0xfd2fb528
 const SLICE_BYTES = 4 * 1024 * 1024
 
-const logRecordSchema = z.object({ type: z.string(), seq: z.number().optional(), time: z.number().optional(), data: z.unknown().optional() }).passthrough()
+const logRecordSchema = Schema.Struct({
+  type: Schema.String,
+  seq: Schema.optionalKey(Schema.Number),
+  time: Schema.optionalKey(Schema.Number),
+  data: Schema.optionalKey(Schema.Unknown),
+})
 
-export type LogRecord = z.infer<typeof logRecordSchema>
+export type LogRecord = Schema.Schema.Type<typeof logRecordSchema>
 
 export interface SessionLogRef {
   readonly sessionId: string
@@ -162,11 +167,11 @@ const parseSince = (input: string, now: number): number | undefined => {
  * reports and flags are always schema-validated before use.
  */
 export class SessionLogs {
-  static readonly decodeJson = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> => decodeJson(schema, text)
+  static readonly decodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] => ScriptJson.decodeJson(schema, text)
 
-  static readonly decodeJsonSafe = <Output>(schema: z.ZodType<Output>, text: string): Output | undefined => {
+  static readonly decodeJsonSafe = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] | undefined => {
     try {
-      return SessionLogs.decodeJson(schema, text)
+      return ScriptJson.decodeJson(schema, text)
     } catch {
       return undefined
     }

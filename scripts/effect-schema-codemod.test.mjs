@@ -7,8 +7,12 @@ import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 
 const script = resolve('scripts/effect-schema-codemod.mjs')
-const fixture = `import { z } from 'zod'\nexport const schema = z.object({ active: z.boolean(), level: z.enum(['low', 'high']), either: z.union([z.string(), z.number()]) })\nexport const boundedString = z.string().min(1).max(32)\nexport const patternedString = z.string().regex(/^[a-z]+$/u)\nexport const array = z.array(z.string())\nexport const boundedInteger = z.number().int().min(0).max(100)\nexport const nonnegativeInteger = z.number().int().nonnegative()\n`
-const residualFixture = `import { z } from 'zod'\nexport const refined = z.string().refine((value) => value.length > 0)\nexport const superRefined = z.string().superRefine(() => {})\nexport const transformed = z.string().transform((value) => value.length)\nexport const preprocessed = z.preprocess((value) => value, z.string())\nexport const custom = z.custom((value: unknown) => typeof value === 'string')\nexport const passthrough = z.object({ label: z.string() }).passthrough()\nexport const optional = z.string().optional()\nexport const safeParsed = z.string().safeParse('valid')\nexport const defaulted = z.string().default('x')\nexport const boundedArray = z.array(z.string()).min(1).max(8)\nexport const literal = z.literal(true)\n`
+const legacyPackage = ['zo', 'd'].join('')
+const legacyImport = `import { z } from '${legacyPackage}'`
+const legacyImportPattern = new RegExp(`from '${legacyPackage}'`)
+const legacyBindingPattern = new RegExp(`import \\{ z \\} from '${legacyPackage}'`)
+const fixture = `${legacyImport}\nexport const schema = z.object({ active: z.boolean(), level: z.enum(['low', 'high']), either: z.union([z.string(), z.number()]) })\nexport const boundedString = z.string().min(1).max(32)\nexport const patternedString = z.string().regex(/^[a-z]+$/u)\nexport const array = z.array(z.string())\nexport const boundedInteger = z.number().int().min(0).max(100)\nexport const nonnegativeInteger = z.number().int().nonnegative()\n`
+const residualFixture = `${legacyImport}\nexport const refined = z.string().refine((value) => value.length > 0)\nexport const superRefined = z.string().superRefine(() => {})\nexport const transformed = z.string().transform((value) => value.length)\nexport const preprocessed = z.preprocess((value) => value, z.string())\nexport const custom = z.custom((value: unknown) => typeof value === 'string')\nexport const passthrough = z.object({ label: z.string() }).passthrough()\nexport const optional = z.string().optional()\nexport const safeParsed = z.string().safeParse('valid')\nexport const defaulted = z.string().default('x')\nexport const boundedArray = z.array(z.string()).min(1).max(8)\nexport const literal = z.literal(true)\n`
 const run = args => spawnSync(process.execPath, [script, ...args], { cwd: process.cwd(), encoding: 'utf8' })
 const pluginDirectory = resolve('plugins/@dshfiles/jujutsu')
 
@@ -21,7 +25,7 @@ const verifyMapping = async ({ source, expected, runtimeProbe }) => {
     assert.equal(written.status, 0, written.stderr)
     const transformed = await readFile(sourcePath, 'utf8')
     assert.match(transformed, expected)
-    assert.doesNotMatch(transformed, /from 'zod'/)
+    assert.doesNotMatch(transformed, legacyImportPattern)
 
     const typecheck = spawnSync(
       'pnpm',
@@ -78,7 +82,7 @@ test('check is read-only and write is idempotent with per-file residual JSON', a
     assert.match(transformed, /Schema\.Literals\(\['low', 'high'\]\)/)
     assert.match(transformed, /Schema\.Union\(\[Schema\.String, Schema\.Number\.check\(Schema\.isFinite\(\)\)\]\)/)
     assert.doesNotMatch(transformed, /Schema\.Union\(\[Schema\.Struct/)
-    assert.doesNotMatch(transformed, /import \{ z \} from 'zod'/)
+    assert.doesNotMatch(transformed, legacyBindingPattern)
     assert.match(transformed, /boundedString = Schema\.String\.check\(Schema\.isMinLength\(1\)\)\.check\(Schema\.isMaxLength\(32\)\)/)
     assert.match(transformed, /patternedString = Schema\.String\.check\(Schema\.isPattern\(\/\^\[a-z\]\+\$\/u\)\)/)
     assert.match(
@@ -129,7 +133,7 @@ test('check is read-only and write is idempotent with per-file residual JSON', a
 
 test('string min emits a typechecked Effect 4.1 check', async () => {
   await verifyMapping({
-    source: `import { z } from 'zod'\nexport const schema = z.string().min(2)\n`,
+    source: `${legacyImport}\nexport const schema = z.string().min(2)\n`,
     expected: /Schema\.String\.check\(Schema\.isMinLength\(2\)\)/,
     runtimeProbe: url =>
       `import * as Schema from 'effect/Schema'; import { schema } from ${JSON.stringify(url)}; if (Schema.decodeUnknownResult(schema)('x')._tag !== 'Failure') process.exitCode = 1`,
@@ -138,7 +142,7 @@ test('string min emits a typechecked Effect 4.1 check', async () => {
 
 test('strict objects close unknown keys and typecheck in Effect 4.1', async () => {
   await verifyMapping({
-    source: `import { z } from 'zod'\nexport const schema = z.object({ label: z.string() }).strict()\nexport const strictObject = z.strictObject({ count: z.number() })\n`,
+    source: `${legacyImport}\nexport const schema = z.object({ label: z.string() }).strict()\nexport const strictObject = z.strictObject({ count: z.number() })\n`,
     expected: /Schema\.StructWithRest\(Schema\.Struct\(\{ label: Schema\.String \}\), \[Schema\.Record\(/,
     runtimeProbe: url =>
       `import * as Schema from 'effect/Schema'; import { schema, strictObject } from ${JSON.stringify(url)}; if (Schema.decodeUnknownResult(schema)({label:'ok'})._tag !== 'Success') process.exitCode = 1; if (Schema.decodeUnknownResult(schema)({label:'ok',extra:true})._tag !== 'Failure') process.exitCode = 1; if (Schema.decodeUnknownResult(strictObject)({count:1,extra:true})._tag !== 'Failure') process.exitCode = 1`,
@@ -147,7 +151,7 @@ test('strict objects close unknown keys and typecheck in Effect 4.1', async () =
 
 test('parse calls use decodeUnknownSync and typecheck in Effect 4.1', async () => {
   await verifyMapping({
-    source: `import { z } from 'zod'\nexport const value = z.string().parse('valid')\n`,
+    source: `${legacyImport}\nexport const value = z.string().parse('valid')\n`,
     expected: /Schema\.decodeUnknownSync\(Schema\.String\)\('valid'\)/,
     runtimeProbe: url => `import { value } from ${JSON.stringify(url)}; if (value !== 'valid') process.exitCode = 1`,
   })

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { SessionLogs, type SessionLogRef } from './self-improve-log.ts'
 import { SessionMiner, type SessionFacts } from './self-improve-mine.ts'
 
@@ -13,11 +13,14 @@ import { SessionMiner, type SessionFacts } from './self-improve-mine.ts'
  * corpus cheap: only Sessions new to the cache are decoded.
  */
 
-const cacheSchema = z.object({
-  version: z.number(),
-  entries: z.record(z.string(), z.object({ size: z.number(), mtimeMs: z.number(), facts: SessionMiner.factsSchema })),
+const cacheSchema = Schema.Struct({
+  version: Schema.Number,
+  entries: Schema.Record(Schema.String, Schema.Struct({ size: Schema.Number, mtimeMs: Schema.Number, facts: SessionMiner.factsSchema })),
 })
-export type CorpusCache = z.infer<typeof cacheSchema>
+export interface CorpusCache {
+  version: number
+  entries: Record<string, { size: number; mtimeMs: number; facts: SessionFacts }>
+}
 
 export interface CorpusOptions {
   dshHome: string
@@ -47,7 +50,7 @@ const loadCache = async (path: string | undefined): Promise<CorpusCache> => {
   if (text === undefined) return emptyCache()
   const parsed = SessionLogs.decodeJsonSafe(cacheSchema, text)
   if (parsed === undefined || parsed.version !== SessionMiner.EXTRACTOR_VERSION) return emptyCache()
-  return parsed
+  return { version: parsed.version, entries: { ...parsed.entries } }
 }
 
 const mapPool = async <Item, Result>(items: readonly Item[], width: number, worker: (item: Item) => Promise<Result>): Promise<Result[]> => {

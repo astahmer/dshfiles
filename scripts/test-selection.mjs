@@ -3,15 +3,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { turboCacheDir } from './turbo-cache.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const manifestSchema = z.object({
-  name: z.string(),
-  scripts: z.record(z.string(), z.string()).default({}),
-  dependencies: z.record(z.string(), z.string()).default({}),
-  devDependencies: z.record(z.string(), z.string()).default({}),
+const manifestSchema = Schema.Struct({
+  name: Schema.String,
+  scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  devDependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
 })
 const isDocumentation = path => /\.(md|mdx)$/.test(path)
 const globalInputs = new Set(['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'turbo.json', '.node-version'])
@@ -183,7 +183,13 @@ const discoverPackages = () =>
       .filter(entry => entry.isDirectory() && existsSync(join(repositoryRoot, packageRoot, entry.name, 'package.json')))
       .map(entry => {
         const directory = `${packageRoot}/${entry.name}`
-        const manifest = manifestSchema.parse(JSON.parse(readFileSync(join(repositoryRoot, directory, 'package.json'), 'utf8')))
+        const decodedManifest = Schema.decodeUnknownSync(manifestSchema)(JSON.parse(readFileSync(join(repositoryRoot, directory, 'package.json'), 'utf8')))
+        const manifest = {
+          ...decodedManifest,
+          scripts: decodedManifest.scripts ?? {},
+          dependencies: decodedManifest.dependencies ?? {},
+          devDependencies: decodedManifest.devDependencies ?? {},
+        }
         return {
           name: manifest.name,
           directory,

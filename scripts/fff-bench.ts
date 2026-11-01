@@ -18,74 +18,72 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { z } from 'zod'
-import { decodeJson } from './json.ts'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 
-const Task = z.object({
-  id: z.string(),
-  prompt: z.string(),
-  expect: z.array(z.string()).optional(),
-  recall: z.array(z.string()).optional(),
+const Task = Schema.Struct({
+  id: Schema.String,
+  prompt: Schema.String,
+  expect: Schema.optionalKey(Schema.Array(Schema.String)),
+  recall: Schema.optionalKey(Schema.Array(Schema.String)),
 })
-type Task = z.infer<typeof Task>
-const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
+type Task = Schema.Schema.Type<typeof Task>
+const TaskFile = Schema.Struct({ corpus: Schema.String, tasks: Schema.Array(Task) })
 
-const AssistantEvent = z.object({
-  type: z.literal('assistant'),
-  message: z.object({ content: z.array(z.looseObject({ type: z.string(), name: z.string().optional() })) }),
+const AssistantEvent = Schema.Struct({
+  type: Schema.Literal('assistant'),
+  message: Schema.Struct({ content: Schema.Array(Schema.Struct({ type: Schema.String, name: Schema.optionalKey(Schema.String) })) }),
 })
-const ToolResultLength = z.union([
-  z.string().transform(text => text.length),
-  z.array(z.looseObject({ text: z.string().optional() })).transform(parts => parts.reduce((sum, part) => sum + (part.text?.length ?? 0), 0)),
-])
-const UserEvent = z.object({
-  type: z.literal('user'),
-  message: z.object({
-    content: z.union([z.string(), z.array(z.looseObject({ type: z.string(), content: ToolResultLength.optional() }))]),
+const ToolResultContent = Schema.Union([Schema.String, Schema.Array(Schema.Struct({ text: Schema.optionalKey(Schema.String) }))])
+const UserEvent = Schema.Struct({
+  type: Schema.Literal('user'),
+  message: Schema.Struct({
+    content: Schema.Union([Schema.String, Schema.Array(Schema.Struct({ type: Schema.String, content: Schema.optionalKey(ToolResultContent) }))]),
   }),
 })
-const ResultEvent = z.object({
-  type: z.literal('result'),
-  is_error: z.boolean(),
-  result: z.string().optional(),
-  duration_ms: z.number(),
-  duration_api_ms: z.number(),
-  num_turns: z.number(),
-  total_cost_usd: z.number(),
-  usage: z.object({
-    input_tokens: z.number(),
-    output_tokens: z.number(),
-    cache_creation_input_tokens: z.number(),
-    cache_read_input_tokens: z.number(),
+const ResultEvent = Schema.Struct({
+  type: Schema.Literal('result'),
+  is_error: Schema.Boolean,
+  result: Schema.optionalKey(Schema.String),
+  duration_ms: Schema.Number,
+  duration_api_ms: Schema.Number,
+  num_turns: Schema.Number,
+  total_cost_usd: Schema.Number,
+  usage: Schema.Struct({
+    input_tokens: Schema.Number,
+    output_tokens: Schema.Number,
+    cache_creation_input_tokens: Schema.Number,
+    cache_read_input_tokens: Schema.Number,
   }),
 })
-const StreamEvent = z.discriminatedUnion('type', [AssistantEvent, UserEvent, ResultEvent])
-const decodeStreamEvent = (line: string): z.output<typeof StreamEvent> | undefined => {
+const StreamEvent = Schema.Union([AssistantEvent, UserEvent, ResultEvent])
+type StreamEvent = Schema.Schema.Type<typeof StreamEvent>
+const decodeStreamEvent = (line: string): StreamEvent | undefined => {
   try {
-    return decodeJson(StreamEvent, line)
+    return ScriptJson.decodeJson(StreamEvent, line)
   } catch {
     return undefined
   }
 }
 
-const RunRecord = z.object({
-  task: z.string(),
-  arm: z.string(),
-  rep: z.number(),
-  ok: z.boolean(),
-  score: z.number(),
-  wallMs: z.number(),
-  sessionMs: z.number(),
-  apiMs: z.number(),
-  turns: z.number(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  costUsd: z.number(),
-  toolResultChars: z.number(),
-  toolCalls: z.record(z.string(), z.number()),
-  answer: z.string(),
+const RunRecord = Schema.Struct({
+  task: Schema.String,
+  arm: Schema.String,
+  rep: Schema.Number,
+  ok: Schema.Boolean,
+  score: Schema.Number,
+  wallMs: Schema.Number,
+  sessionMs: Schema.Number,
+  apiMs: Schema.Number,
+  turns: Schema.Number,
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  costUsd: Schema.Number,
+  toolResultChars: Schema.Number,
+  toolCalls: Schema.Record(Schema.String, Schema.Number),
+  answer: Schema.String,
 })
-type RunRecord = z.infer<typeof RunRecord>
+type RunRecord = Schema.Schema.Type<typeof RunRecord>
 
 const fffHint = 'For any file search or grep in the current git-indexed directory, use fff tools.'
 const answerRule = 'Answer from the repository only. End with one line starting `ANSWER:` that lists the repo-relative path(s) and any value asked for.'
@@ -96,8 +94,8 @@ const arms = {
   fff: { tools: 'Read,Grep,Glob,Bash', allowed: ['Read', 'Grep', 'Glob', ...readOnlyBash, 'mcp__fff'], fff: true },
   'fff-only': { tools: 'Read', allowed: ['Read', 'mcp__fff'], fff: true },
 } as const
-const ArmName = z.enum(['baseline', 'fff', 'fff-only'])
-type ArmName = z.infer<typeof ArmName>
+const ArmName = Schema.Literals(['baseline', 'fff', 'fff-only'])
+type ArmName = Schema.Schema.Type<typeof ArmName>
 
 const score = (task: Task, answer: string): number => {
   const haystack = answer.toLowerCase()
@@ -172,7 +170,7 @@ const runOnce = async (options: {
 
   const toolCalls: Record<string, number> = {}
   let toolResultChars = 0
-  let result: z.infer<typeof ResultEvent> | undefined
+  let result: Schema.Schema.Type<typeof ResultEvent> | undefined
   for (const line of stdout.split('\n')) {
     if (line.trim() === '') continue
     const event = decodeStreamEvent(line)
@@ -184,7 +182,11 @@ const runOnce = async (options: {
     }
     if (event.type === 'user' && Array.isArray(event.message.content)) {
       for (const part of event.message.content) {
-        if (part.type === 'tool_result') toolResultChars += part.content ?? 0
+        if (part.type === 'tool_result') {
+          const content = part.content
+          toolResultChars +=
+            typeof content === 'string' ? content.length : Array.isArray(content) ? content.reduce((sum, item) => sum + (item.text?.length ?? 0), 0) : 0
+        }
       }
     }
     if (event.type === 'result') result = event
@@ -225,7 +227,7 @@ const report = (outDir: string): void => {
   const records = readFileSync(join(outDir, 'runs.jsonl'), 'utf8')
     .split('\n')
     .filter(line => line.trim() !== '')
-    .map(line => decodeJson(RunRecord, line))
+    .map(line => ScriptJson.decodeJson(RunRecord, line))
   const armNames = [...new Set(records.map(record => record.arm))]
   const rows = armNames.map(armName => {
     const runs = records.filter(record => record.arm === armName)
@@ -284,18 +286,25 @@ if (values.report !== undefined) {
   process.exit(0)
 }
 
-const Options = z.object({
-  corpus: z.string().transform(path => resolve(path)),
-  fff: z.string().transform(path => resolve(path)),
-  out: z.string().transform(path => resolve(path)),
-  arms: z.string().transform(list => z.array(ArmName).parse(list.split(','))),
-  reps: z.coerce.number().int().positive(),
-  model: z.string(),
-  parallel: z.coerce.number().int().positive(),
-  only: z.string().optional(),
+const Options = Schema.Struct({
+  corpus: Schema.String,
+  fff: Schema.String,
+  out: Schema.String,
+  arms: Schema.String,
+  reps: Schema.NumberFromString.check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+  model: Schema.String,
+  parallel: Schema.NumberFromString.check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+  only: Schema.optionalKey(Schema.String),
 })
-const options = Options.parse(values)
-const taskFile = decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
+const parsedOptions = Schema.decodeUnknownSync(Options)(values)
+const options = {
+  ...parsedOptions,
+  corpus: resolve(parsedOptions.corpus),
+  fff: resolve(parsedOptions.fff),
+  out: resolve(parsedOptions.out),
+  arms: Schema.decodeUnknownSync(Schema.Array(ArmName))(parsedOptions.arms.split(',')),
+}
+const taskFile = ScriptJson.decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
 const tasks = taskFile.tasks.filter(task => options.only === undefined || task.id === options.only)
 mkdirSync(options.out, { recursive: true })
 const runsPath = join(options.out, 'runs.jsonl')
@@ -305,7 +314,7 @@ const done = new Set(
         .split('\n')
         .filter(line => line.trim() !== '')
         .map(line => {
-          const record = decodeJson(RunRecord, line)
+          const record = ScriptJson.decodeJson(RunRecord, line)
           return `${record.task}.${record.arm}.${record.rep}`
         })
     : [],

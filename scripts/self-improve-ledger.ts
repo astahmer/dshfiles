@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { SessionLogs } from './self-improve-log.ts'
 
 /**
@@ -19,59 +19,57 @@ const LEDGER_STATUSES = ['proposed', 'investigating', 'implemented', 'validated'
  * artifact (`ref`) such as a file a deterministic check flagged. One of the two
  * is required: an entry with no provenance is not storable.
  */
-const evidenceSchema = z
-  .object({
-    sessionId: z.string().optional(),
-    seq: z.number().optional(),
-    time: z.number(),
-    excerpt: z.string(),
-    ref: z.string().optional(),
-    note: z.string().optional(),
-  })
-  .refine(evidence => evidence.sessionId !== undefined || evidence.ref !== undefined, { message: 'evidence needs a sessionId or a ref' })
+const evidenceSchema = Schema.Struct({
+  sessionId: Schema.optionalKey(Schema.String),
+  seq: Schema.optionalKey(Schema.Number),
+  time: Schema.Number,
+  excerpt: Schema.String,
+  ref: Schema.optionalKey(Schema.String),
+  note: Schema.optionalKey(Schema.String),
+}).check(Schema.makeFilter(evidence => evidence.sessionId !== undefined || evidence.ref !== undefined, { message: 'evidence needs a sessionId or a ref' }))
 
-const experimentSchema = z.object({
-  hypothesis: z.string(),
-  baseline: z.string(),
-  metric: z.string(),
-  before: z.string(),
-  after: z.string().optional(),
-  conditions: z.string(),
-  verdict: z.enum(['helped', 'hurt', 'no-observed-effect', 'confounded', 'pending']),
-  artifact: z.string().optional(),
+const experimentSchema = Schema.Struct({
+  hypothesis: Schema.String,
+  baseline: Schema.String,
+  metric: Schema.String,
+  before: Schema.String,
+  after: Schema.optionalKey(Schema.String),
+  conditions: Schema.String,
+  verdict: Schema.Literals(['helped', 'hurt', 'no-observed-effect', 'confounded', 'pending']),
+  artifact: Schema.optionalKey(Schema.String),
 })
 
-const candidateSchema = z.object({
-  summary: z.string(),
-  status: z.enum(['proposed', 'implemented', 'rejected']),
-  revision: z.string().optional(),
+const candidateSchema = Schema.Struct({
+  summary: Schema.String,
+  status: Schema.Literals(['proposed', 'implemented', 'rejected']),
+  revision: Schema.optionalKey(Schema.String),
 })
 
-const historySchema = z.object({ at: z.number(), status: z.string(), note: z.string() })
+const historySchema = Schema.Struct({ at: Schema.Number, status: Schema.String, note: Schema.String })
 
-const ledgerEntrySchema = z.object({
-  id: z.string(),
-  key: z.string(),
-  title: z.string(),
-  category: z.string(),
-  status: z.enum(LEDGER_STATUSES),
-  confidence: z.enum(['high', 'medium', 'low']),
-  signalIds: z.array(z.string()),
-  evidence: z.array(evidenceSchema).min(1),
-  rootCause: z.string().optional(),
-  hypothesis: z.string().optional(),
-  candidates: z.array(candidateSchema),
-  experiments: z.array(experimentSchema),
-  revisions: z.array(z.string()),
-  regressions: z.array(z.string()),
-  attempts: z.number().int().nonnegative(),
-  reopenWhen: z.string().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  history: z.array(historySchema),
+const ledgerEntrySchema = Schema.Struct({
+  id: Schema.String,
+  key: Schema.String,
+  title: Schema.String,
+  category: Schema.String,
+  status: Schema.Literals(LEDGER_STATUSES),
+  confidence: Schema.Literals(['high', 'medium', 'low']),
+  signalIds: Schema.Array(Schema.String),
+  evidence: Schema.Array(evidenceSchema).check(Schema.isMinLength(1)),
+  rootCause: Schema.optionalKey(Schema.String),
+  hypothesis: Schema.optionalKey(Schema.String),
+  candidates: Schema.Array(candidateSchema),
+  experiments: Schema.Array(experimentSchema),
+  revisions: Schema.Array(Schema.String),
+  regressions: Schema.Array(Schema.String),
+  attempts: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+  reopenWhen: Schema.optionalKey(Schema.String),
+  createdAt: Schema.Number,
+  updatedAt: Schema.Number,
+  history: Schema.Array(historySchema),
 })
 
-export type LedgerEntry = z.infer<typeof ledgerEntrySchema>
+export type LedgerEntry = Schema.Schema.Type<typeof ledgerEntrySchema>
 
 const OPEN_STATUSES: ReadonlySet<string> = new Set(['proposed', 'investigating', 'deferred'])
 
@@ -158,7 +156,7 @@ const addEntry = ({ entries, input }: { readonly entries: readonly LedgerEntry[]
       },
     }
   }
-  const entry: LedgerEntry = {
+  const entry: Omit<LedgerEntry, 'rootCause' | 'hypothesis' | 'reopenWhen'> & { rootCause?: string; hypothesis?: string; reopenWhen?: string } = {
     id: entryId({ key: input.key, now: input.now, taken: new Set(entries.map(item => item.id)) }),
     key: input.key,
     title: input.title,

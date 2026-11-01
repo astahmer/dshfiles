@@ -494,6 +494,9 @@ importers:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       oxfmt:
         specifier: 'catalog:'
         version: 0.71.0
@@ -2612,7 +2615,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(a0a78967c034d117949c2fe8292ea2f3)
+        version: 0.2.1-rc.2(bcdfac5f2ce62deffc6a7f3207026071)
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(985cd115661eba5d1b0384c99b1a6beb)
@@ -4623,7 +4626,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(a0a78967c034d117949c2fe8292ea2f3)
+        version: 0.2.1-rc.2(bcdfac5f2ce62deffc6a7f3207026071)
       '@deepseek-ai/dsh-agent':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(3bb27a3380dabe8aa6c4edfe696d286a)

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Result, Schema } from 'effect'
 
 /**
  * The one place repository scripts turn JSON text into a value: every parse goes
@@ -6,7 +6,21 @@ import { z } from 'zod'
  * lines are validated before use. Declared as the JSON boundary in
  * `scripts/lint-ratchet.ts`; nothing else under `scripts/` calls `JSON.parse`.
  */
-export const decodeJson = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> => schema.parse(JSON.parse(text))
+export class ScriptJson {
+  static readonly decodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] =>
+    Schema.decodeUnknownSync(schema)(JSON.parse(text))
 
-export const decodeJsonSafe = <Schema extends z.ZodType>(schema: Schema, text: string): z.ZodSafeParseResult<z.output<Schema>> =>
-  schema.safeParse(JSON.parse(text))
+  static readonly decodeUnknownSafe = <S extends Schema.ConstraintDecoder<unknown>>(
+    schema: S,
+    input: unknown,
+  ): { readonly success: true; readonly data: S['Type'] } | { readonly success: false; readonly error: Schema.SchemaError } => {
+    const result = Schema.decodeUnknownResult(schema)(input)
+    return Result.isSuccess(result) ? { success: true, data: result.success } : { success: false, error: result.failure }
+  }
+
+  static readonly decodeJsonSafe = <S extends Schema.ConstraintDecoder<unknown>>(
+    schema: S,
+    text: string,
+  ): { readonly success: true; readonly data: S['Type'] } | { readonly success: false; readonly error: Schema.SchemaError } =>
+    ScriptJson.decodeUnknownSafe(schema, JSON.parse(text))
+}

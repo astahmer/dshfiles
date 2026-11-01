@@ -2,7 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { SessionCorpus, type CorpusOptions } from './self-improve-corpus.ts'
 import { HarnessAudit } from './self-improve-harness.ts'
 import { ImprovementLedger, type AddInput, type LedgerEntry, type UpdateInput } from './self-improve-ledger.ts'
@@ -237,24 +237,32 @@ const signalEvidence = (
   evidence: readonly { readonly sessionId: string; readonly seq: number; readonly time: number; readonly excerpt: string }[],
 ): LedgerEntry['evidence'] => evidence.map(entry => ({ sessionId: entry.sessionId, seq: entry.seq, time: entry.time, excerpt: entry.excerpt }))
 
-const evidenceFileSchema = z.array(
-  z.object({ sessionId: z.string().optional(), seq: z.number().optional(), time: z.number(), excerpt: z.string(), ref: z.string().optional() }),
+const evidenceFileSchema = Schema.Array(
+  Schema.Struct({
+    sessionId: Schema.optionalKey(Schema.String),
+    seq: Schema.optionalKey(Schema.Number),
+    time: Schema.Number,
+    excerpt: Schema.String,
+    ref: Schema.optionalKey(Schema.String),
+  }),
 )
 
-const reportSchema = z.object({
-  signals: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      category: z.string(),
-      confidence: z.enum(['high', 'medium', 'low']),
-      evidence: z.array(z.object({ sessionId: z.string(), project: z.string(), seq: z.number(), time: z.number(), excerpt: z.string() })),
+const reportSchema = Schema.Struct({
+  signals: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      title: Schema.String,
+      category: Schema.String,
+      confidence: Schema.Literals(['high', 'medium', 'low']),
+      evidence: Schema.Array(
+        Schema.Struct({ sessionId: Schema.String, project: Schema.String, seq: Schema.Number, time: Schema.Number, excerpt: Schema.String }),
+      ),
     }),
   ),
 })
 
-const confidenceSchema = z.enum(['high', 'medium', 'low'])
-const statusSchema = z.enum(ImprovementLedger.STATUSES)
+const confidenceSchema = Schema.Literals(['high', 'medium', 'low'])
+const statusSchema = Schema.Literals(ImprovementLedger.STATUSES)
 
 const ledgerAdd = async (flags: ReadonlyMap<string, string>): Promise<number> => {
   const path = ledgerPathOf(flags)
@@ -280,7 +288,7 @@ const ledgerAdd = async (flags: ReadonlyMap<string, string>): Promise<number> =>
     key: signal?.id ?? key ?? '',
     title: flags.get('title') ?? signal?.title ?? '',
     category: flags.get('category') ?? signal?.category ?? 'harness',
-    confidence: confidenceFlag === undefined ? (signal?.confidence ?? 'medium') : confidenceSchema.parse(confidenceFlag),
+    confidence: confidenceFlag === undefined ? (signal?.confidence ?? 'medium') : Schema.decodeUnknownSync(confidenceSchema)(confidenceFlag),
     signalIds: signal === undefined ? [] : [signal.id],
     evidence: signal === undefined ? (evidence ?? []) : signalEvidence(signal.evidence),
     now: Date.now(),
@@ -327,7 +335,7 @@ const ledgerUpdate = async (flags: ReadonlyMap<string, string>): Promise<number>
   const candidate = flags.get('candidate')
   const experiment = experimentPath === undefined ? undefined : ImprovementLedger.parseExperiment(await readFile(experimentPath, 'utf8'))
   const input: UpdateInput = { id, note, now: Date.now() }
-  if (statusFlag !== undefined) input.status = statusSchema.parse(statusFlag)
+  if (statusFlag !== undefined) input.status = Schema.decodeUnknownSync(statusSchema)(statusFlag)
   if (rootCause !== undefined) input.rootCause = rootCause
   if (hypothesis !== undefined) input.hypothesis = hypothesis
   if (reopenWhen !== undefined) input.reopenWhen = reopenWhen
