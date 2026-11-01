@@ -5,6 +5,8 @@ export const REVISION_PAGE_SIZE = 10
 // One revision can be the working copy of every thread workspace; the Host's bounded jj output still caps the row.
 const MAX_REVISION_WORKSPACES = 1024
 
+// Keep this published Zod boundary until Effect's UUID `pattern`, literal `const`, and
+// bounded-array keyword ordering match byte-for-byte.
 export const revisionSchema = z.object({
   commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
   changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
