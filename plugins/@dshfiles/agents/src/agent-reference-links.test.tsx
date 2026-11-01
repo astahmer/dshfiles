@@ -3,7 +3,7 @@
 import { Option } from 'effect'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { agentReferencePreviewEvent, decodeAgentReferencePreviewRequest } from './agent-reference.js'
+import { AgentReference } from './agent-reference.js'
 import { installAgentReferenceLinks } from './agent-reference-links.js'
 
 const handles = new Set(['luna', 'dsh'])
@@ -60,10 +60,10 @@ describe('agent reference links', () => {
     const requests: { readonly handle: string; readonly anchorId: number }[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      const parsed = AgentReference.decodePreviewRequest(event.detail)
       if (Option.isSome(parsed)) requests.push(parsed.value)
     }
-    window.addEventListener(agentReferencePreviewEvent, onRequest)
+    window.addEventListener(AgentReference.previewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
 
     const link = document.querySelector('[data-dshfiles-agent-reference]')
@@ -73,7 +73,7 @@ describe('agent reference links', () => {
     expect(requests[0]?.handle).toBe('luna')
     // The request carries the anchor the card re-measures when the page scrolls.
     expect(document.querySelector(`[data-dshfiles-agent-preview-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
-    window.removeEventListener(agentReferencePreviewEvent, onRequest)
+    window.removeEventListener(AgentReference.previewEvent, onRequest)
     stop()
   })
 
@@ -82,10 +82,10 @@ describe('agent reference links', () => {
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      const parsed = AgentReference.decodePreviewRequest(event.detail)
       if (Option.isSome(parsed)) handlesSeen.push(parsed.value.handle)
     }
-    window.addEventListener(agentReferencePreviewEvent, onRequest)
+    window.addEventListener(AgentReference.previewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
 
     const link = document.querySelector('[data-dshfiles-agent-reference]')
@@ -93,7 +93,7 @@ describe('agent reference links', () => {
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 2 }))
 
     expect(handlesSeen).toEqual(['luna'])
-    window.removeEventListener(agentReferencePreviewEvent, onRequest)
+    window.removeEventListener(AgentReference.previewEvent, onRequest)
     stop()
   })
 
@@ -108,10 +108,10 @@ describe('agent reference links', () => {
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      const parsed = AgentReference.decodePreviewRequest(event.detail)
       if (Option.isSome(parsed)) handlesSeen.push(parsed.value.handle)
     }
-    window.addEventListener(agentReferencePreviewEvent, onRequest)
+    window.addEventListener(AgentReference.previewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
     const chip = document.querySelector('[data-ref-chip][title="@luna"]')
 
@@ -123,7 +123,7 @@ describe('agent reference links', () => {
     expect(handlesSeen).toEqual(['luna'])
     // The chip is the conversation's own button; the card replaces its inert default.
     expect(click.defaultPrevented).toBe(true)
-    window.removeEventListener(agentReferencePreviewEvent, onRequest)
+    window.removeEventListener(AgentReference.previewEvent, onRequest)
     stop()
   })
 })

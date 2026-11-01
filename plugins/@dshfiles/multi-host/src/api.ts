@@ -2,7 +2,7 @@ import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { z as legacyZod } from 'zod'
-import { dateTimeString, passthrough, strictStandardSchema, urlString } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
@@ -17,7 +17,7 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
     readonly output: Output
     readonly tool?: ApiToolExposure<Output['Type']>
   },
-) => defineMethod({ ...options, input: strictStandardSchema(options.input) })
+) => defineMethod({ ...options, input: MultiHostSchema.strictStandardSchema(options.input) })
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -64,10 +64,10 @@ const runtimeSummarySchema = Schema.Struct({
   name: Schema.String,
   identity: Schema.NullOr(runtimeIdentitySchema),
   remoteHome: Schema.optional(Schema.String),
-  lastSeenAt: Schema.optional(dateTimeString),
+  lastSeenAt: Schema.optional(MultiHostSchema.dateTimeString),
   /** Whether a pooled connection is open right now. */
   connected: Schema.Boolean,
-  lastError: Schema.optional(Schema.Struct({ ...failureSchema.fields, at: dateTimeString })),
+  lastError: Schema.optional(Schema.Struct({ ...failureSchema.fields, at: MultiHostSchema.dateTimeString })),
 })
 
 const workspaceSchema = Schema.Struct({
@@ -106,12 +106,12 @@ const runtimeStatusSchema = Schema.Union([
     message: Schema.String,
     stale: Schema.Literal(true),
     refreshing: Schema.optional(Schema.Boolean),
-    lastSeenAt: Schema.optional(dateTimeString),
+    lastSeenAt: Schema.optional(MultiHostSchema.dateTimeString),
   }),
 ])
 
 export const resourceSnapshotSchema = Schema.Struct({
-  sampledAt: dateTimeString,
+  sampledAt: MultiHostSchema.dateTimeString,
   platform: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
   cpuCount: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(4096)),
   loadAverage1m: Schema.NullOr(Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0))),
@@ -225,7 +225,7 @@ const remoteThreadSchema = Schema.Struct({
   cwd: Schema.String,
   title: Schema.String,
   mention: Schema.optional(Schema.String.check(Schema.isMaxLength(2048))),
-  createdAt: dateTimeString,
+  createdAt: MultiHostSchema.dateTimeString,
   hostName: Schema.String,
   connected: Schema.Boolean,
 })
@@ -360,18 +360,18 @@ const nativeValueSchema = Schema.Union([
         blank: Schema.Boolean,
         agentAvailable: Schema.optional(Schema.Boolean),
         cwd: Schema.optional(Schema.String),
-      }).pipe(passthrough),
+      }).pipe(MultiHostSchema.passthrough),
     ).check(Schema.isMaxLength(10_000)),
-  }).pipe(passthrough),
+  }).pipe(MultiHostSchema.passthrough),
   Schema.Struct({
-    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(passthrough)).check(Schema.isMaxLength(10_000)),
+    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(MultiHostSchema.passthrough)).check(Schema.isMaxLength(10_000)),
     hasMore: Schema.Boolean,
-  }).pipe(passthrough),
-  Schema.Struct({ sessionId: sessionIdSchema, agentPreset: Schema.optional(Schema.String) }).pipe(passthrough),
-  Schema.Struct({ accepted: Schema.Literal(true) }).pipe(passthrough),
-  Schema.Struct({ title: Schema.String, seq: Schema.Number.check(Schema.isFinite()) }).pipe(passthrough),
-  Schema.Struct({ records: Schema.Array(jsonValueSchema).check(Schema.isMaxLength(10_000)), hasMore: Schema.Boolean }).pipe(passthrough),
-  Schema.Struct({ archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)) }).pipe(passthrough),
+  }).pipe(MultiHostSchema.passthrough),
+  Schema.Struct({ sessionId: sessionIdSchema, agentPreset: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
+  Schema.Struct({ accepted: Schema.Literal(true) }).pipe(MultiHostSchema.passthrough),
+  Schema.Struct({ title: Schema.String, seq: Schema.Number.check(Schema.isFinite()) }).pipe(MultiHostSchema.passthrough),
+  Schema.Struct({ records: Schema.Array(jsonValueSchema).check(Schema.isMaxLength(10_000)), hasMore: Schema.Boolean }).pipe(MultiHostSchema.passthrough),
+  Schema.Struct({ archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)) }).pipe(MultiHostSchema.passthrough),
 ])
 
 export const nativeRpcResultSchema = Schema.Union([
@@ -1032,7 +1032,7 @@ const effectMultiHostApi = defineApi({
     }),
     runtimeOpenView: method({
       input: Schema.Struct({ runtimeId: idSchema }),
-      output: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()), launchUrl: urlString }),
+      output: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()), launchUrl: MultiHostSchema.urlString }),
     }),
     runtimeCloseView: method({
       input: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()) }),

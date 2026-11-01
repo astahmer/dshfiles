@@ -18,14 +18,9 @@ export const strictStandardSchema = <S extends SchemaTypes.ConstraintDecoder<unk
 
   const current = (options: Parameters<typeof standardJsonSchema.input>[0]) => {
     const built = options.target === 'draft-07' ? JsonSchema.toDocumentDraft07(document) : document
-    return {
-      ...built.schema,
-      ...(Object.keys(built.definitions).length > 0
-        ? options.target === 'draft-07'
-          ? { definitions: built.definitions }
-          : { $defs: built.definitions }
-        : {}),
-    }
+    if (Object.keys(built.definitions).length === 0) return { ...built.schema }
+    if (options.target === 'draft-07') return { ...built.schema, definitions: built.definitions }
+    return { ...built.schema, $defs: built.definitions }
   }
 
   const merge = (standardDocument: Record<string, unknown>, options: Parameters<typeof standardJsonSchema.input>[0]) => {

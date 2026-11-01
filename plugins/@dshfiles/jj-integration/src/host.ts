@@ -1577,6 +1577,13 @@ type JjPromiseApiHandlers = {
   readonly [Key in keyof JjApiMethods]: ApiHandler<ApiHostInput<JjApiMethods[Key]>, ApiHostOutput<JjApiMethods[Key]>>
 }
 
+type IntegrationSummary = {
+  readonly at: number
+  tipChangeId?: string
+  baseChangeId?: string
+  sessionId?: string
+}
+
 const promiseApiHandlers: JjPromiseApiHandlers = {
   ownWorkspaceFor: async ({ input }) => {
     const registry = registryOf()
@@ -1677,12 +1684,13 @@ const promiseApiHandlers: JjPromiseApiHandlers = {
     return {
       repoRoot: history.repoRoot,
       name: history.name,
-      integrations: history.integrations.map(record => ({
-        at: record.at,
-        ...(record.tipChangeId === undefined ? {} : { tipChangeId: record.tipChangeId }),
-        ...(record.baseChangeId === undefined ? {} : { baseChangeId: record.baseChangeId }),
-        ...(record.sessionId === undefined ? {} : { sessionId: record.sessionId }),
-      })),
+      integrations: history.integrations.map(record => {
+        const integration: IntegrationSummary = { at: record.at }
+        if (record.tipChangeId !== undefined) integration.tipChangeId = record.tipChangeId
+        if (record.baseChangeId !== undefined) integration.baseChangeId = record.baseChangeId
+        if (record.sessionId !== undefined) integration.sessionId = record.sessionId
+        return integration
+      }),
     }
   },
   threadStatus: async ({ input, caller }) => {

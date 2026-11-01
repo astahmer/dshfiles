@@ -11,7 +11,6 @@ import {
   receiptsInputSchema,
   retryTaskInputSchema,
   runInputSchema,
-  tasksInputSchema,
 } from '../src/api-effect-schemas.ts'
 
 const Schema = {

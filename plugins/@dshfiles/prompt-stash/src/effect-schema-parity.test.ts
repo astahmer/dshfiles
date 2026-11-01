@@ -46,11 +46,16 @@ const effectLegacyDraft = Schema.Struct({
   updatedAt: dateTimeString,
 })
 
-const normalize = (value: unknown): unknown => {
+type JsonSchemaValue = null | boolean | number | string | JsonSchemaValue[] | { readonly [key: string]: JsonSchemaValue }
+
+const isJsonSchemaRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const normalize = (value: unknown): JsonSchemaValue => {
   if (Array.isArray(value)) return value.map(normalize)
-  if (value === null || typeof value !== 'object') return value
+  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return value
+  if (!isJsonSchemaRecord(value)) throw new TypeError('Expected a JSON Schema value.')
   const entries = Object.entries(value).filter(
-    ([key, child]) => key !== '$schema' && !(key === 'definitions' && Object.keys(child).length === 0) && key !== 'dialect',
+    ([key, child]) => key !== '$schema' && !(key === 'definitions' && isJsonSchemaRecord(child) && Object.keys(child).length === 0) && key !== 'dialect',
   )
   const normalized = Object.fromEntries(entries.map(([key, child]) => [key, normalize(child)]))
   if ('const' in normalized) {

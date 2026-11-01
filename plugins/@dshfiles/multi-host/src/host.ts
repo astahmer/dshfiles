@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import * as Schema from 'effect/Schema'
-import { decode, decodeStrict, passthrough, safeDecode, strictStandardSchema } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import { randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
@@ -75,28 +75,30 @@ const sessionRowSchema = Schema.Struct({
   // The remote list names a thread through its title projection; an untitled thread reports null there.
   projections: Schema.optional(
     Schema.Struct({
-      values: Schema.optional(Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(passthrough)),
-    }).pipe(passthrough),
+      values: Schema.optional(Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(MultiHostSchema.passthrough)),
+    }).pipe(MultiHostSchema.passthrough),
   ),
-}).pipe(passthrough)
-const sessionListSchema = Schema.Struct({ items: Schema.Array(sessionRowSchema).check(Schema.isMaxLength(10_000)) }).pipe(passthrough)
-const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
+type MutableSessionSummary = { -readonly [Key in keyof SessionSummary]: SessionSummary[Key] }
+
+const sessionListSchema = Schema.Struct({ items: Schema.Array(sessionRowSchema).check(Schema.isMaxLength(10_000)) }).pipe(MultiHostSchema.passthrough)
+const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(MultiHostSchema.passthrough)
 const directoryListingSchema = Schema.Struct({
   path: Schema.String,
   home: Schema.String,
   crumbs: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })),
   entries: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })).check(Schema.isMaxLength(5_000)),
   truncated: Schema.Boolean,
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const workspaceRowSchema = Schema.Struct({
   workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
   title: Schema.optional(Schema.String.check(Schema.isMaxLength(512))),
   sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000))),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const workspaceCreatedSchema = Schema.Struct({
-  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(passthrough),
-}).pipe(passthrough)
+  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(MultiHostSchema.passthrough),
+}).pipe(MultiHostSchema.passthrough)
 const workspaceContainerSchema = Schema.Struct({
   items: Schema.optional(Schema.Unknown),
   value: Schema.optional(Schema.Unknown),
@@ -104,12 +106,12 @@ const workspaceContainerSchema = Schema.Struct({
   workspaces: Schema.optional(Schema.Unknown),
   baseline: Schema.optional(Schema.Unknown),
   snapshot: Schema.optional(Schema.Unknown),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const fileReferenceCandidatesSchema = Schema.Array(
   Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
 ).check(Schema.isMaxLength(1000))
 const modelCatalogSchema = Schema.Struct({
-  default: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(passthrough)),
+  default: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
   routableProviders: Schema.optional(Schema.Array(Schema.String)),
   groups: Schema.Array(
     Schema.Struct({
@@ -122,32 +124,32 @@ const modelCatalogSchema = Schema.Struct({
           description: Schema.optional(Schema.String),
           reasoning: Schema.optional(
             Schema.Struct({
-              efforts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(passthrough)),
+              efforts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
               defaultEffort: Schema.optional(Schema.String),
-            }).pipe(passthrough),
+            }).pipe(MultiHostSchema.passthrough),
           ),
-        }).pipe(passthrough),
+        }).pipe(MultiHostSchema.passthrough),
       ),
-    }).pipe(passthrough),
+    }).pipe(MultiHostSchema.passthrough),
   ),
-  failures: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String }).pipe(passthrough))),
-}).pipe(passthrough)
+  failures: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String }).pipe(MultiHostSchema.passthrough))),
+}).pipe(MultiHostSchema.passthrough)
 const sessionSnapshotSchema = Schema.Struct({
   type: Schema.Literal('snapshot'),
   cursor: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
-  header: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) }).pipe(passthrough)),
+  header: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
   records: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(10_000)),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const sessionCursorFrameSchema = Schema.Struct({
   type: Schema.Literal('snapshot'),
   cursor: Schema.Number.check(Schema.isFinite())
     .check(Schema.isInt())
     .check(Schema.isBetween({ minimum: -Number.MAX_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }))
     .check(Schema.isGreaterThanOrEqualTo(-1)),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const webServerSchema = Schema.Struct({
   port: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(65_535)),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 
 /** Failures that mean the pooled connection itself is gone, so the next call should open a fresh one. */
 const transportFailures = new Set([
@@ -252,7 +254,7 @@ const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
       'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.',
     )
   }
-  const parsed = safeDecode(runtimeIdentitySchema, raw)
+  const parsed = MultiHostSchema.safeDecode(runtimeIdentitySchema, raw)
   if (!parsed.success) throw new GatewayUnavailableError('identity-invalid', 'The connected runtime returned an identity outside the supported contract.')
   if (parsed.data.protocolVersion !== 1 || parsed.data.dshVersion === 'unknown' || !parsed.data.dshVersion.startsWith('0.2.')) {
     throw new GatewayUnavailableError('runtime-incompatible', 'The connected runtime does not report a supported DSH 0.2 protocol version.')
@@ -371,9 +373,9 @@ const collectWorkspaces = (frames: readonly unknown[]): Schema.Schema.Type<typeo
       return
     }
     if (typeof value !== 'object' || value === null) return
-    const workspace = safeDecode(workspaceRowSchema, value)
+    const workspace = MultiHostSchema.safeDecode(workspaceRowSchema, value)
     if (workspace.success) results.set(workspace.data.workspaceId, workspace.data)
-    const record = decode(workspaceContainerSchema, value)
+    const record = MultiHostSchema.decode(workspaceContainerSchema, value)
     for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
       const child = record[key]
       if (child !== undefined) visit(child, depth + 1)
@@ -525,7 +527,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
           resourceProbeLimiter.run(async () => {
             try {
               const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
-              const parsed = safeDecode(resourceSnapshotSchema, raw)
+              const parsed = MultiHostSchema.safeDecode(resourceSnapshotSchema, raw)
               if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
               return { ok: true as const, snapshot: parsed.data }
             } catch (error) {
@@ -691,7 +693,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     }
   },
   testConnection: async ({ input, signal }) => {
-    const connector = decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
+    const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
     const host: HostRecord = {
       schemaVersion: 2,
       id: sshHostId(input.sshTarget),
@@ -700,7 +702,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       hidden: false,
       createdAt: new Date().toISOString(),
     }
-    const locator = decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
+    const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
     try {
       const { identity, steps } = await qualifyRuntime({ host, locator, name: input.name, signal })
       return { ok: true as const, steps, identity }
@@ -710,7 +712,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   },
   saveSshHost: async ({ input, signal }) => {
     try {
-      const connector = decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
+      const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
       const previous = input.hostId === undefined ? undefined : await HostDirectoryStore.findHost(input.hostId)
       const host: HostRecord = {
         schemaVersion: 2,
@@ -721,7 +723,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
         ...(previous?.position !== undefined && { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
-      const locator = decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
+      const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
       await HostDirectoryStore.upsertHost(host)
       const runtime = await register({ host, locator, name: input.name.trim(), signal })
       // An edit that moved the host to another DSH home leaves the old runtime record behind.
@@ -735,7 +737,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     }
   },
   hostUpsert: async ({ input }) => {
-    const connector = decodeStrict(hostConnectorSchema, input.connector)
+    const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, input.connector)
     const previous = await HostDirectoryStore.findHost(input.id)
     const record: HostRecord = {
       schemaVersion: 2,
@@ -770,7 +772,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const host = await HostDirectoryStore.findHost(input.hostId)
       if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
-      const locator = decodeStrict(runtimeLocatorSchema, input.locator)
+      const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, input.locator)
       if (locator.kind !== host.connector.kind)
         throw new DirectoryStoreError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
       return { ok: true as const, runtime: runtimeSummary(await register({ host, locator, name: input.name.trim(), signal })) }
@@ -795,19 +797,20 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
                 gateway.follow('workspace/follow', {}, 10_000),
                 gateway.run('session', 'list', { _request: {} }),
               ])
-              const sessions = decode(sessionListSchema, sessionValue)
+              const sessions = MultiHostSchema.decode(sessionListSchema, sessionValue)
                 .items.slice(0, 500)
                 .map(item => {
                   const title = item.title ?? item.projections?.values?.title ?? undefined
-                  return {
+                  const summary: MutableSessionSummary = {
                     runtimeId: runtime.id,
                     sessionId: item.sessionId,
                     running: item.running,
                     blank: item.blank,
                     updatedAt: item.updatedAt,
-                    ...(item.cwd !== undefined ? { cwd: item.cwd } : {}),
-                    ...(title !== undefined && title !== '' ? { title } : {}),
-                  } satisfies SessionSummary
+                  }
+                  if (item.cwd !== undefined) summary.cwd = item.cwd
+                  if (title !== undefined && title !== '') summary.title = title
+                  return summary
                 })
               const workspaces = collectWorkspaces(frames).map(item => ({
                 runtimeId: runtime.id,
@@ -877,7 +880,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const listing = await withRuntime(
         input.runtimeId,
-        async gateway => decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
+        async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
         { mutation: false },
       )
       return {
@@ -896,7 +899,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const created = await withRuntime(
         input.runtimeId,
-        async gateway => decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: input.path } })),
+        async gateway => MultiHostSchema.decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: input.path } })),
         {
           mutation: true,
         },
@@ -925,7 +928,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
       const host = await HostDirectoryStore.findHost(runtime.hostId)
       if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
-      const listing = await withRuntime(input.runtimeId, async gateway => decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)), {
+      const listing = await withRuntime(input.runtimeId, async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)), {
         mutation: false,
       })
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
@@ -973,7 +976,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       try {
         const created = await withRuntime(
           input.runtimeId,
-          async gateway => decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
+          async gateway => MultiHostSchema.decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
           { mutation: true },
         )
         if (copyWarning !== undefined) {
@@ -1002,7 +1005,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const created = await withRuntime(input.runtimeId, async gateway => gateway.api('createDirectory', { path: input.path, name: input.name }), {
         mutation: true,
       })
-      return { ok: true as const, path: decode(Schema.Struct({ path: Schema.String }), created).path }
+      return { ok: true as const, path: MultiHostSchema.decode(Schema.Struct({ path: Schema.String }), created).path }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -1042,7 +1045,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             args: { request: { cwd: input.cwd } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = decode(sessionCreatedSchema, created.value).sessionId
+          sessionId = MultiHostSchema.decode(sessionCreatedSchema, created.value).sessionId
           await RemoteThreadStore.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: '', createdAt: new Date().toISOString() })
           return { ok: true as const, sessionId }
         },
@@ -1066,7 +1069,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = decode(sessionCreatedSchema, created.value).sessionId
+          sessionId = MultiHostSchema.decode(sessionCreatedSchema, created.value).sessionId
           if (input.model !== undefined) {
             const selected = await gateway.runSafe('session', 'selectModel', {
               request: {
@@ -1105,7 +1108,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const catalog = await withRuntime(
         input.runtimeId,
-        async gateway => decode(modelCatalogSchema, await gateway.run('session', 'modelCatalog', {}, signal)),
+        async gateway => MultiHostSchema.decode(modelCatalogSchema, await gateway.run('session', 'modelCatalog', {}, signal)),
         {
           mutation: false,
         },
@@ -1158,7 +1161,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const repositories = await withRuntime(
         runtimeId,
         async gateway =>
-          decode(
+          MultiHostSchema.decode(
             jjRepositoriesEffectSchema,
             await gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}, signal),
           ),
@@ -1185,7 +1188,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
         { mutation: false, broken: result => !result.ok && transportFailures.has(result.code) },
       )
       if (!outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message }
-      const candidates = decode(fileReferenceCandidatesSchema, outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
+      const candidates = MultiHostSchema.decode(fileReferenceCandidatesSchema, outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
       return { ok: true as const, candidates }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
@@ -1205,7 +1208,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       const value = await withRuntime(
         runtime.id,
         async gateway =>
-          decode(
+          MultiHostSchema.decode(
             fileUploadValueSchema,
             await gateway.run(
               'fileUploads',
@@ -1235,7 +1238,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
             15_000,
             signal,
           )
-          const snapshot = frames.map(frame => safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
+          const snapshot = frames.map(frame => MultiHostSchema.safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
           if (snapshot === undefined)
             throw new GatewayUnavailableError('session-unavailable', 'The host did not return this thread. It may have been deleted there.')
           const reduced = reduceTranscript(snapshot.records)
@@ -1334,7 +1337,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
           10_000,
           signal,
         )
-        const snapshot = frames.map(frame => safeDecode(sessionCursorFrameSchema, frame)).find(result => result.success)
+        const snapshot = frames.map(frame => MultiHostSchema.safeDecode(sessionCursorFrameSchema, frame)).find(result => result.success)
         if (snapshot === undefined) throw new GatewayUnavailableError('session-cursor-unavailable', 'The runtime did not return a session history cursor.')
         return { cursor: snapshot.data.cursor }
       },
@@ -1470,13 +1473,13 @@ interface ConnectionSurface {
 
 export default defineHost({
   name: '@dshfiles/multi-host',
-  Config: strictStandardSchema(configSchema),
+  Config: MultiHostSchema.strictStandardSchema(configSchema),
   apis: [multiHostHandlers],
   setup: effectPlugin.setup,
 })
 
 function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>): void {
-  configuredProfile = decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
+  configuredProfile = MultiHostSchema.decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
   // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
   ctx.inject(['connection', 'webServer'], scoped => {
     let launchPath: string | undefined
@@ -1485,7 +1488,7 @@ function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>
       void (async () => {
         const loader: LoaderSurface | undefined = scoped.get('loader')
         await loader?.await?.()
-        const webServer = safeDecode(webServerSchema, scoped.get('webServer'))
+        const webServer = MultiHostSchema.safeDecode(webServerSchema, scoped.get('webServer'))
         const connection: ConnectionSurface | undefined = scoped.get('connection')
         const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
         if (disposed || !webServer.success || typeof launchUrl !== 'string') return
@@ -1526,7 +1529,7 @@ function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>
             gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
           { mutation: false },
         )
-        return frames.map(frame => safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
+        return frames.map(frame => MultiHostSchema.safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
       },
     })
     scoped.effect(() => () => {

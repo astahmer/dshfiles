@@ -100,13 +100,14 @@ class ContextCompactionEngine extends BasicCompactionEngine {
   protected override summarize(input: SummarizeInput, agent: CompactionAgent, signal?: AbortSignal): ReturnType<BasicCompactionEngine['summarize']> {
     const summarize = summarizeByContext.get(this.ctx)
     if (summarize === undefined) return Promise.reject(new ContextCompactionFailure({ message: 'Context compaction is not initialized.' }))
-    return summarize({
+    const request = {
       input,
       agent,
       config: this.config,
-      summarize: (candidate, candidateSignal) => super.summarize(candidate, agent, candidateSignal),
-      ...(signal === undefined ? {} : { signal }),
-    })
+      summarize: (candidate: SummarizeInput, candidateSignal?: AbortSignal) => super.summarize(candidate, agent, candidateSignal),
+    }
+    if (signal !== undefined) return summarize({ ...request, signal })
+    return summarize(request)
   }
 }
 

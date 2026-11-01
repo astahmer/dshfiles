@@ -13,20 +13,23 @@ const closedDocument = (schema: SchemaTypes.ConstraintDecoder<unknown>) => Schem
 
 const current = (document: ReturnType<typeof closedDocument>, options: JsonSchemaOptions) => {
   const built = options.target === 'draft-07' ? JsonSchema.toDocumentDraft07(document) : document
-  return {
-    ...built.schema,
-    ...(Object.keys(built.definitions).length > 0 ? (options.target === 'draft-07' ? { definitions: built.definitions } : { $defs: built.definitions }) : {}),
+  const schema: Record<string, unknown> = { ...built.schema }
+  if (Object.keys(built.definitions).length > 0) {
+    schema[options.target === 'draft-07' ? 'definitions' : '$defs'] = built.definitions
   }
+  return schema
 }
 
 type JsonObject = Record<string, unknown>
+type JsonSchemaValue = JsonObject | readonly JsonSchemaValue[] | string | number | boolean | null
 
 const isJsonObject = (value: unknown): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** dshx drops `additionalProperties: true` before publishing, so the wrapper publishes the same document zod did. */
-const omitDefaultAdditionalProperties = (value: unknown): unknown => {
+const omitDefaultAdditionalProperties = (value: unknown): JsonSchemaValue => {
   if (Array.isArray(value)) return value.map(entry => omitDefaultAdditionalProperties(entry))
-  if (!isJsonObject(value)) return value
+  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return value
+  if (!isJsonObject(value)) throw new TypeError('Expected a JSON Schema value.')
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key, child]) => !(key === 'additionalProperties' && child === true))
@@ -37,9 +40,10 @@ const omitDefaultAdditionalProperties = (value: unknown): unknown => {
 const ARRAY_KEY_ORDER = ['$schema', 'description', 'title', 'minItems', 'maxItems', 'type', 'items']
 
 /** zod published an array's description and bounds before `type`; Effect publishes them after `items`. */
-const reorderArrayKeywords = (value: unknown): unknown => {
+const reorderArrayKeywords = (value: unknown): JsonSchemaValue => {
   if (Array.isArray(value)) return value.map(entry => reorderArrayKeywords(entry))
-  if (!isJsonObject(value)) return value
+  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return value
+  if (!isJsonObject(value)) throw new TypeError('Expected a JSON Schema value.')
   const node = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, reorderArrayKeywords(child)]))
   if (node['type'] !== 'array' && node['items'] === undefined) return node
   const ordered = ARRAY_KEY_ORDER.filter(key => key in node).map(key => [key, node[key]])

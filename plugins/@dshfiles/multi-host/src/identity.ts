@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { chmod, link, lstat, mkdir, open, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { HostDirectoryStore } from './store.js'
-import { decode, decodeStrict, safeDecode, safeDecodeStrict } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import { runtimeIdentitySchema, type RuntimeIdentity } from './records.js'
 
 const persistedIdentitySchema = Schema.Struct({
@@ -54,7 +54,7 @@ const dshVersion = (): string => {
     const require = createRequire(import.meta.url)
     const packagePath = require.resolve('@deepseek-ai/dsh/package.json')
     const packageValue: unknown = JSON.parse(readFileSync(packagePath, 'utf8'))
-    const parsed = safeDecode(Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }), packageValue)
+    const parsed = MultiHostSchema.safeDecode(Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }), packageValue)
     return parsed.success ? parsed.data.version : 'unknown'
   } catch {
     return 'unknown'
@@ -98,7 +98,7 @@ const readPersistedIdentity = async (path: string): Promise<Schema.Schema.Type<t
   } catch {
     throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file contains invalid JSON and was left untouched.')
   }
-  const result = safeDecodeStrict(persistedIdentitySchema, parsed)
+  const result = MultiHostSchema.safeDecodeStrict(persistedIdentitySchema, parsed)
   if (!result.success) throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file has an unsupported shape and was left untouched.')
   return result.data
 }
@@ -134,7 +134,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
   if (discoveredProfile !== undefined && configuredProfile !== undefined && discoveredProfile !== configuredProfile) {
     throw new RuntimeIdentityError('profile-mismatch', 'The multi-host profile setting does not match the running DSH profile.')
   }
-  const profile = decode(profileSchema, reportedProfile)
+  const profile = MultiHostSchema.decode(profileSchema, reportedProfile)
   const path = HostDirectoryStore.pluginDataPath(join('runtime-identities', profile + '.json'))
   let persisted = await readPersistedIdentity(path)
   if (persisted === undefined) {
@@ -151,7 +151,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
   if (persisted.profile !== profile) {
     throw new RuntimeIdentityError('profile-mismatch', 'The recorded runtime identity belongs to a different DSH profile.')
   }
-  return decodeStrict(runtimeIdentitySchema, {
+  return MultiHostSchema.decodeStrict(runtimeIdentitySchema, {
     protocolVersion: 1,
     runtimeId: persisted.runtimeId,
     profile: persisted.profile,

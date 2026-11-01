@@ -2,7 +2,7 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import type { ApiSchema } from '@dshfiles/dshx/api'
 import { multiHostApi, resourceSnapshotSchema } from './api.js'
-import { safeDecode } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 
 const isEffectSchema = (schema: ApiSchema): schema is Schema.ConstraintDecoder<unknown> => 'ast' in schema
 
@@ -10,6 +10,26 @@ const standard = (schema: ApiSchema) => {
   if ('~standard' in schema) return schema['~standard']
   if (isEffectSchema(schema)) return Schema.toStandardSchemaV1(schema)['~standard']
   throw new Error('The API schema must expose Standard Schema validation.')
+}
+
+type JsonSchemaDocument = Record<string, unknown>
+type JsonSchemaInput = (options: { readonly target: 'draft-2020-12' }) => object
+type JsonSchemaConverter = { readonly input: JsonSchemaInput }
+
+const isRecord = (value: unknown): value is JsonSchemaDocument => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isJsonSchemaConverter = (value: unknown): value is JsonSchemaConverter =>
+  typeof value === 'object' && value !== null && 'input' in value && typeof value.input === 'function'
+
+const jsonSchemaInput = (boundary: ReturnType<typeof standard>): (options: { readonly target: 'draft-2020-12' }) => JsonSchemaDocument => {
+  if (!('jsonSchema' in boundary)) throw new Error('The schema boundary must expose its JSON Schema converter.')
+  const converter = boundary.jsonSchema
+  if (!isJsonSchemaConverter(converter)) throw new Error('The schema boundary must expose its JSON Schema converter.')
+  return options => {
+    const document = converter.input(options)
+    if (!isRecord(document)) throw new Error('JSON Schema input must be an object document.')
+    return document
+  }
 }
 
 describe('multi-host tool exposure', () => {
@@ -140,11 +160,8 @@ describe('multi-host tool exposure', () => {
     for (const { schema, valid } of inputs) {
       if (schema === undefined) throw new Error('The session API must define an input schema.')
       const boundary = standard(schema)
-      const jsonSchema = Reflect.get(boundary, 'jsonSchema')
-      if (typeof jsonSchema !== 'object' || jsonSchema === null) throw new Error('Zod custom input must expose its unrepresentable JSON Schema converter.')
-      const inputJsonSchema = Reflect.get(jsonSchema, 'input')
-      if (typeof inputJsonSchema !== 'function') throw new Error('Zod custom input must expose its unrepresentable JSON Schema converter.')
-      expect(() => Reflect.apply(inputJsonSchema, jsonSchema, [{ target: 'draft-2020-12' }])).toThrow('Custom types cannot be represented in JSON Schema')
+      const inputJsonSchema = jsonSchemaInput(boundary)
+      expect(() => inputJsonSchema({ target: 'draft-2020-12' })).toThrow('Custom types cannot be represented in JSON Schema')
       expect('issues' in (await boundary.validate(valid))).toBe(false)
       expect('issues' in (await boundary.validate({ ...valid, sessionId: '' }))).toBe(true)
       expect('issues' in (await boundary.validate({ ...valid, extra: true }))).toBe(true)
@@ -155,11 +172,8 @@ describe('multi-host tool exposure', () => {
     const input = multiHostApi.methods.threadStart.input
     if (input === undefined) throw new Error('The remote thread start API must define an input schema.')
     const boundary = standard(input)
-    const jsonSchema = Reflect.get(boundary, 'jsonSchema')
-    if (typeof jsonSchema !== 'object' || jsonSchema === null) throw new Error('The remote thread start input must publish Standard JSON Schema.')
-    const inputJsonSchema = Reflect.get(jsonSchema, 'input')
-    if (typeof inputJsonSchema !== 'function') throw new Error('The remote thread start input must publish Standard JSON Schema.')
-    const document = Reflect.apply(inputJsonSchema, jsonSchema, [{ target: 'draft-2020-12' }])
+    const inputJsonSchema = jsonSchemaInput(boundary)
+    const document = inputJsonSchema({ target: 'draft-2020-12' })
     expect(document).toMatchObject({
       properties: { model: { type: 'object', required: ['provider', 'model'] } },
       additionalProperties: false,
@@ -222,9 +236,9 @@ describe('multi-host tool exposure', () => {
       memoryFreeBytes: 60,
     }
 
-    expect(safeDecode(resourceSnapshotSchema, snapshot).success).toBe(true)
-    expect(safeDecode(resourceSnapshotSchema, { ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
-    expect(safeDecode(resourceSnapshotSchema, { ...snapshot, loadAverage1m: -1 }).success).toBe(false)
+    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, snapshot).success).toBe(true)
+    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, { ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
+    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, { ...snapshot, loadAverage1m: -1 }).success).toBe(false)
   })
 
   test('the remote JJ repository proxy validates bounded read-only data', async () => {

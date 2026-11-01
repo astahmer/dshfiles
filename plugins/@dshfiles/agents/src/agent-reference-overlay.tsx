@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AgentAnchorModel } from './agent-anchor.js'
 import { AGENTS_QUERY_ROOT, type Agent, type AgentThread } from './agent.js'
-import { agentReferenceLabel, agentReferencePreviewEvent, decodeAgentReferencePreviewRequest, type AgentReferencePreviewRequest } from './agent-reference.js'
+import { AgentReference, type AgentReferencePreviewRequest } from './agent-reference.js'
 import { installAgentReferenceLinks } from './agent-reference-links.js'
 import { agentsApi } from './api.js'
 
@@ -63,7 +63,7 @@ const AgentCard = (props: {
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
             <span className="dshx:truncate dshx:text-sm dshx:font-semibold">{agent.name}</span>
             <Badge variant="muted" className="dshx:font-normal">
-              {agentReferenceLabel(agent.handle)}
+              {AgentReference.label(agent.handle)}
             </Badge>
             {agent.enabled ? null : <Badge variant="outline">Disabled</Badge>}
           </div>
@@ -138,13 +138,13 @@ export const AgentReferenceOverlay = (props: {
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      const parsed = AgentReference.decodePreviewRequest(event.detail)
       if (Option.isNone(parsed)) return
       setAnchor(parsed.value.anchor)
       setRequest(parsed.value)
     }
-    window.addEventListener(agentReferencePreviewEvent, open)
-    return () => window.removeEventListener(agentReferencePreviewEvent, open)
+    window.addEventListener(AgentReference.previewEvent, open)
+    return () => window.removeEventListener(AgentReference.previewEvent, open)
   }, [])
 
   // A landing message scrolls the conversation; the card follows the mention instead of disappearing under it.
@@ -223,7 +223,7 @@ export const AgentReferenceOverlay = (props: {
             </p>
           ) : null}
           {missing ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No agent {agentReferenceLabel(request.handle)}. It may have been removed.</p>
+            <p className="dshx:text-xs dshx:text-muted-foreground">No agent {AgentReference.label(request.handle)}. It may have been removed.</p>
           ) : null}
           {found === null ? null : <AgentCard agent={found} threads={threads.data ?? []} openThread={props.openThread} />}
         </div>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import * as Schema from 'effect/Schema'
-import { passthrough, safeDecode } from '../schema.js'
+import { MultiHostSchema } from '../schema.js'
 import { Buffer } from 'node:buffer'
 import { WebSocket } from 'ws'
 import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
@@ -14,23 +14,23 @@ const nativeResponseSchema = Schema.Struct({
   type: Schema.Literal('server-response'),
   rpcId: Schema.String,
   result: Schema.Union([
-    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }).pipe(passthrough),
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }).pipe(MultiHostSchema.passthrough),
     Schema.Struct({
       ok: Schema.Literal(false),
       error: Schema.Struct({
         code: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
         message: Schema.String.check(Schema.isMaxLength(8192)),
-      }).pipe(passthrough),
-    }).pipe(passthrough),
+      }).pipe(MultiHostSchema.passthrough),
+    }).pipe(MultiHostSchema.passthrough),
   ]),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 
 const streamFrameSchema = Schema.Struct({
   streamId: Schema.String,
   type: Schema.Literals(['item', 'error', 'end']),
   value: Schema.optional(Schema.Unknown),
   error: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String), message: Schema.optional(Schema.String) })),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 
 export type Gateway = {
   readonly origin: string
@@ -241,7 +241,7 @@ const followOnce = async ({
         finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent invalid JSON.'))
         return
       }
-      const frame = safeDecode(streamFrameSchema, raw)
+      const frame = MultiHostSchema.safeDecode(streamFrameSchema, raw)
       if (!frame.success) {
         finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.'))
         return
@@ -326,7 +326,7 @@ const streamFrames = async function* ({
       notify()
       return
     }
-    const frame = safeDecode(streamFrameSchema, raw)
+    const frame = MultiHostSchema.safeDecode(streamFrameSchema, raw)
     if (!frame.success) {
       failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.')
       notify()
@@ -435,7 +435,7 @@ const attemptUntracedRun = async ({ origin, cookie, namespace, method, args, sig
   } catch {
     return { ok: false, code: 'invalid-response', message: 'The runtime API returned invalid JSON.' }
   }
-  const parsed = safeDecode(nativeResponseSchema, body)
+  const parsed = MultiHostSchema.safeDecode(nativeResponseSchema, body)
   if (!parsed.success || parsed.data.rpcId !== rpcId) {
     return { ok: false, code: 'invalid-response', message: 'The runtime API returned an invalid RPC envelope.' }
   }

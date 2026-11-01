@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { passthrough, safeDecode } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { formatSessionReferenceMention, parseSessionReferenceText } from '@deepseek-ai/dsh-session-reference'
 import type { SessionReferenceInput } from '@deepseek-ai/dsh-session-reference/types'
@@ -8,16 +8,16 @@ const eventSchema = Schema.Struct({
   type: Schema.String,
   seq: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   data: Schema.Unknown,
-}).pipe(passthrough)
-const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(passthrough)
-const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))) }).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
+const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(MultiHostSchema.passthrough)
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))) }).pipe(MultiHostSchema.passthrough)
 const userMessageSchema = Schema.Struct({
-  source: Schema.Struct({ kind: Schema.String }).pipe(passthrough),
+  source: Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough),
   content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)),
-}).pipe(passthrough)
+}).pipe(MultiHostSchema.passthrough)
 const assistantMessageSchema = Schema.Struct({
-  message: Schema.Struct({ content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)) }).pipe(passthrough),
-}).pipe(passthrough)
+  message: Schema.Struct({ content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)) }).pipe(MultiHostSchema.passthrough),
+}).pipe(MultiHostSchema.passthrough)
 
 const MAX_REMOTE_REFERENCE_MESSAGES = 24
 const MAX_REMOTE_REFERENCE_CHARS = 3_000
@@ -57,18 +57,18 @@ export class RemoteReferenceContext {
   static remoteReferenceConversation(records: readonly unknown[]): readonly RemoteReferenceConversationItem[] {
     const messages: { readonly seq: number; readonly item: RemoteReferenceConversationItem }[] = []
     for (const raw of records) {
-      const record = safeDecode(recordSchema, raw)
+      const record = MultiHostSchema.safeDecode(recordSchema, raw)
       if (!record.success) continue
       const { type, seq, data } = record.data.event
       if (type === 'user/message') {
-        const message = safeDecode(userMessageSchema, data)
+        const message = MultiHostSchema.safeDecode(userMessageSchema, data)
         if (!message.success || message.data.source.kind !== 'user') continue
         const text = messageText(message.data.content)
         if (text !== '') messages.push({ seq, item: { role: 'user', text } })
         continue
       }
       if (type !== 'assistant/message') continue
-      const message = safeDecode(assistantMessageSchema, data)
+      const message = MultiHostSchema.safeDecode(assistantMessageSchema, data)
       if (!message.success) continue
       const text = messageText(message.data.message.content)
       if (text !== '') messages.push({ seq, item: { role: 'assistant', text } })

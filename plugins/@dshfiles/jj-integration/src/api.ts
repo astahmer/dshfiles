@@ -13,7 +13,6 @@ import {
   destinationSchema,
   emptyInputSchema,
   integrationProgressOutputSchema,
-  integrationProgressSchema,
   isolatedWorkspaceSchema,
   noFolderOutputSchema,
   ownWorkspaceForInputSchema,

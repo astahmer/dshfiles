@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { decode } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import { GatewayUnavailableError } from './connectors/gateway.js'
 import { SshConnector, shellQuote } from './connectors/ssh.js'
 
@@ -122,7 +122,7 @@ const parseRemoteFacts = ({
     const value = line.slice(separator + 1)
     if (key === 'fnm_node') {
       const [version, path] = value.split('|')
-      if (version !== undefined && path !== undefined) fnmNodes.push(decode(fnmNodeSchema, { version, path }))
+      if (version !== undefined && path !== undefined) fnmNodes.push(MultiHostSchema.decode(fnmNodeSchema, { version, path }))
       continue
     }
     const current = values.get(key) ?? []

@@ -41,7 +41,7 @@ export const layoutSchema = Schema.declare<SerializedDockview>(
   (value): value is SerializedDockview => Schema.decodeUnknownResult(serializedDockviewSchema)(value)._tag === 'Success',
 )
 
-export const decodeLayout = (value: unknown): SerializedDockview => Schema.decodeUnknownSync(layoutSchema)(value)
+const decodeLayout = (value: unknown): SerializedDockview => Schema.decodeUnknownSync(layoutSchema)(value)
 
 /** The regions a saved layout can carry, in the order the surfaces mount. */
 export const LAYOUT_SURFACES = ['main', 'left', 'dock', 'bottom'] as const
@@ -210,6 +210,7 @@ const restoreLayout = (
 }
 
 export class WorkbenchLayout {
+  static readonly decodeLayout = decodeLayout
   static readonly openPanel = openPanel
   static readonly applyDefaultLayout = applyDefaultLayout
   static readonly restoreLayout = restoreLayout

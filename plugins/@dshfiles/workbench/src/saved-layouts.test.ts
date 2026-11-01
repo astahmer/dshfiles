@@ -1,11 +1,11 @@
 import type { SerializedDockview } from 'dockview-react'
 import { describe, expect, it } from 'vitest'
-import { createNestedLayoutStores, decodeLayout } from './layout-store.js'
+import { createNestedLayoutStores, WorkbenchLayout } from './layout-store.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 
 /** Test double: built through the store's own schema, so it is exactly what storage accepts. */
 const arrangement = (panelId: string): SerializedDockview =>
-  decodeLayout({
+  WorkbenchLayout.decodeLayout({
     grid: { root: { type: 'branch', data: [] }, width: 100, height: 100, orientation: 'HORIZONTAL' },
     panels: { [panelId]: { id: panelId, contentComponent: 'workbench-panel' } },
   })

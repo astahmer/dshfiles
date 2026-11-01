@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { chmod, lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { decode, safeDecode } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import {
   hostDirectorySchema,
   hostRecordSchema,
@@ -130,16 +130,16 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
     throw new DirectoryStoreError('directory-corrupt', 'The multi-host directory contains invalid JSON and was left untouched.')
   }
 
-  const current = safeDecode(hostDirectorySchema, parsed, { onExcessProperty: 'error' })
+  const current = MultiHostSchema.safeDecode(hostDirectorySchema, parsed, { onExcessProperty: 'error' })
   if (current.success) return completeHostOrder(completeRuntimePorts(current.data))
 
-  const legacy = safeDecode(legacyDirectorySchema, parsed)
+  const legacy = MultiHostSchema.safeDecode(legacyDirectorySchema, parsed)
   if (legacy.success) {
     const hosts: HostRecord[] = []
     const runtimes: RuntimeRecord[] = []
     for (const oldHost of legacy.data.hosts) {
       hosts.push(
-        decode(
+        MultiHostSchema.decode(
           hostRecordSchema,
           {
             schemaVersion: 2,
@@ -156,7 +156,7 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
           ? { kind: 'local' as const, launchUrl: oldHost.connector.launchUrl }
           : { kind: 'ssh' as const, remoteHome: oldHost.connector.remoteHome, unit: oldHost.connector.unit }
       runtimes.push(
-        decode(
+        MultiHostSchema.decode(
           runtimeRecordSchema,
           {
             schemaVersion: 2,
@@ -171,7 +171,7 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
         ),
       )
     }
-    return completeHostOrder(completeRuntimePorts(decode(hostDirectorySchema, { schemaVersion: 2, hosts, runtimes }, { onExcessProperty: 'error' })))
+    return completeHostOrder(completeRuntimePorts(MultiHostSchema.decode(hostDirectorySchema, { schemaVersion: 2, hosts, runtimes }, { onExcessProperty: 'error' })))
   }
 
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')
@@ -208,7 +208,7 @@ const transact = async <Result>(update: (current: HostDirectory) => { readonly n
 const nextHostPosition = (hosts: readonly HostRecord[]): number => hosts.reduce((next, host) => Math.max(next, (host.position ?? -1) + 1), 0)
 
 const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
-  const record = decode(hostRecordSchema, input, { onExcessProperty: 'error' })
+  const record = MultiHostSchema.decode(hostRecordSchema, input, { onExcessProperty: 'error' })
   return transact(current => {
     const previous = current.hosts.find(host => host.id === record.id)
     const stored: HostRecord = {
@@ -223,7 +223,7 @@ const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
         throw new DirectoryStoreError('host-connector-in-use', 'The host connector cannot change while registered runtimes use it.')
       }
     }
-    const next = decode(
+    const next = MultiHostSchema.decode(
       hostDirectorySchema,
       {
         schemaVersion: 2,
@@ -242,7 +242,7 @@ const setHostHidden = async ({ id, hidden }: { readonly id: string; readonly hid
     const previous = current.hosts.find(host => host.id === id)
     if (previous === undefined) throw new DirectoryStoreError('host-not-found', `No recorded host ${id}.`)
     const record: HostRecord = { ...previous, hidden }
-    const next = decode(
+    const next = MultiHostSchema.decode(
       hostDirectorySchema,
       {
         ...current,
@@ -264,12 +264,12 @@ const reorderHosts = async (ids: readonly string[]): Promise<readonly HostRecord
       const host = byId.get(id)
       return host === undefined ? [] : [{ ...host, position }]
     })
-    const next = decode(hostDirectorySchema, { ...current, hosts }, { onExcessProperty: 'error' })
+    const next = MultiHostSchema.decode(hostDirectorySchema, { ...current, hosts }, { onExcessProperty: 'error' })
     return { next, result: hosts }
   })
 
 const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
-  const record = decode(runtimeRecordSchema, input, { onExcessProperty: 'error' })
+  const record = MultiHostSchema.decode(runtimeRecordSchema, input, { onExcessProperty: 'error' })
   return transact(current => {
     const host = current.hosts.find(candidate => candidate.id === record.hostId)
     if (host === undefined) throw new DirectoryStoreError('host-not-found', `No recorded host ${record.hostId}.`)
@@ -288,7 +288,7 @@ const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
     }
     const runtimes = current.runtimes.filter(runtime => runtime.id !== record.id)
     runtimes.push(normalized)
-    const next = decode(
+    const next = MultiHostSchema.decode(
       hostDirectorySchema,
       {
         schemaVersion: 2,

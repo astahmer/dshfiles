@@ -7,7 +7,7 @@ import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/pl
 import type { EffectMultiHostApi } from './api.js'
 import { z } from 'zod'
 import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records-zod.js'
-import { strictStandardSchema } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 
 /**
  * Keep Zod at the API boundary except for the 14 byte-identical Effect inputs. Other inputs differ in additionalProperties,
@@ -512,14 +512,14 @@ const zodBoundaryMethods = {
     output: outputFor('hostUpsert')(hostSummarySchema),
   }),
   hostRemove: method({
-    input: strictStandardSchema(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), removeDirectory: Schema.Boolean })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), removeDirectory: Schema.Boolean })),
     output: outputFor('hostRemove')(z.object({ removed: z.boolean() })),
     description:
       'Remove one host record, optionally deleting its directory on that machine; its threads are kept. Call only when the user asked to remove that host.',
     tool: { name: 'multi_host_remove_host', render: compactJson },
   }),
   hostSetHidden: method({
-    input: strictStandardSchema(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), hidden: Schema.Boolean })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), hidden: Schema.Boolean })),
     output: outputFor('hostSetHidden')(hostSummarySchema),
     description:
       'Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.',
@@ -577,7 +577,7 @@ const zodBoundaryMethods = {
     output: outputFor('runtimeUpsert')(runtimeRegistrationSchema),
   }),
   runtimeStatus: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimeStatus')(runtimeStatusSchema),
     description:
       'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. A cold or stale result returns immediately while one coalesced background refresh runs. Read-only.',
@@ -585,11 +585,11 @@ const zodBoundaryMethods = {
   }),
   /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
   runtimePing: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimePing')(z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }), failedSchema])),
   }),
   runtimeReconnect: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimeReconnect')(z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema])),
     description: 'Drop and reopen the pooled connection to one remote runtime. Call only when the user asked to reconnect it.',
     tool: { name: 'multi_host_reconnect', render: compactJson },
@@ -600,7 +600,7 @@ const zodBoundaryMethods = {
     output: outputFor('listDirectory')(directoryListingSchema),
   }),
   createDirectory: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
         name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
@@ -609,7 +609,7 @@ const zodBoundaryMethods = {
     output: outputFor('createDirectory')(z.object({ path: z.string() })),
   }),
   runtimeCreateDirectory: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
@@ -622,7 +622,7 @@ const zodBoundaryMethods = {
   }),
   /** Register a folder as a workspace on the runtime, so its jj-integration can describe and isolate it. */
   runtimeOpenFolder: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
@@ -692,7 +692,7 @@ const zodBoundaryMethods = {
     output: outputFor('runtimePluginCall')(z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: z.unknown() }), failedSchema])),
   }),
   runtimeModels: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimeModels')(
       z.discriminatedUnion('ok', [
         z.object({
@@ -743,7 +743,7 @@ const zodBoundaryMethods = {
     description: 'Stage one file attachment up to 24 MB for a remote Session. This is a non-replayable mutation.',
   }),
   threadCreate: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
@@ -833,7 +833,7 @@ const zodBoundaryMethods = {
   }),
   /** Stop one remote thread through the same cancel path the local Stop uses. */
   threadStop: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
@@ -972,7 +972,7 @@ const zodBoundaryMethods = {
     output: outputFor('runtimeCall')(nativeRpcResultSchema),
   }),
   sessionCursor: method({
-    input: strictStandardSchema(
+    input: MultiHostSchema.strictStandardSchema(
       Schema.Struct({
         runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         sessionId: Schema.String.check(Schema.isMinLength(1)),
@@ -981,7 +981,7 @@ const zodBoundaryMethods = {
     output: outputFor('sessionCursor')(z.object({ cursor: z.number().int().safe().min(-1) })),
   }),
   runtimeOpenView: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimeOpenView')(z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() })),
   }),
   runtimeCloseView: method({
@@ -989,7 +989,7 @@ const zodBoundaryMethods = {
     output: outputFor('runtimeCloseView')(z.object({ closed: z.boolean() })),
   }),
   runtimeRemove: method({
-    input: strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
+    input: MultiHostSchema.strictStandardSchema(Schema.Struct({ runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) })),
     output: outputFor('runtimeRemove')(z.object({ removed: z.boolean() })),
     description: 'Remove one runtime registration from a host. Call only when the user asked to remove it.',
     tool: { name: 'multi_host_remove_runtime', render: compactJson },

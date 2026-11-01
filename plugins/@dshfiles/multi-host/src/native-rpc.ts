@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { decode } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 import { jsonValueSchema, nativeRpcResultSchema, type NativeRpcRequest, type NativeRpcResult } from './api.js'
 import type { Gateway } from './connectors/gateway.js'
 
@@ -10,13 +10,13 @@ const mayHaveReachedRuntime = (code: string): boolean =>
   ['cancelled', 'gateway-unreachable', 'authentication-expired', 'invalid-response', 'gateway-http-error'].includes(code)
 
 export const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest, signal?: AbortSignal): Promise<NativeRpcResult> => {
-  const args = decode(jsonValueSchema, request.args)
-  const safeArgs = decode(Schema.Record(Schema.String, jsonValueSchema), args)
+  const args = MultiHostSchema.decode(jsonValueSchema, request.args)
+  const safeArgs = MultiHostSchema.decode(Schema.Record(Schema.String, jsonValueSchema), args)
   try {
     const outcome = await gateway.runSafe(request.namespace, request.method, safeArgs, signal)
     if (outcome.ok) {
       try {
-        return decode(nativeRpcResultSchema, { ok: true, value: decode(jsonValueSchema, outcome.value) })
+        return MultiHostSchema.decode(nativeRpcResultSchema, { ok: true, value: MultiHostSchema.decode(jsonValueSchema, outcome.value) })
       } catch {
         return isMutation(request)
           ? {

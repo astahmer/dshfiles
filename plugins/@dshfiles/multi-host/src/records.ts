@@ -1,6 +1,6 @@
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { dateTimeString } from './schema.js'
+import { MultiHostSchema } from './schema.js'
 
 const idSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
@@ -65,7 +65,7 @@ export const hostRecordSchema = Schema.Struct({
   hidden: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Directory order, lowest first; the store fills it in for records written before it existed. */
   position: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
-  createdAt: dateTimeString,
+  createdAt: MultiHostSchema.dateTimeString,
 })
 
 export const runtimeRecordSchema = Schema.Struct({
@@ -76,8 +76,8 @@ export const runtimeRecordSchema = Schema.Struct({
   locator: runtimeLocatorSchema,
   identity: Schema.NullOr(runtimeIdentitySchema),
   originPort: Schema.optional(originPortSchema),
-  createdAt: dateTimeString,
-  lastSeenAt: Schema.optional(dateTimeString),
+  createdAt: MultiHostSchema.dateTimeString,
+  lastSeenAt: Schema.optional(MultiHostSchema.dateTimeString),
 })
 
 export const hostDirectorySchema = Schema.Struct({

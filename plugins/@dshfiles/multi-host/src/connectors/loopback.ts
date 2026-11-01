@@ -1,6 +1,6 @@
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import * as Schema from 'effect/Schema'
-import { safeDecode } from '../schema.js'
+import { MultiHostSchema } from '../schema.js'
 import { GatewayUnavailableError } from './gateway.js'
 
 const boundAddressSchema = Schema.Struct({
@@ -33,7 +33,7 @@ export const reserveLoopbackEndpoint = async (port = 0): Promise<LoopbackEndpoin
   const probe = createServer()
   try {
     await listen(probe, address, port)
-    const bound = safeDecode(boundAddressSchema, probe.address())
+    const bound = MultiHostSchema.safeDecode(boundAddressSchema, probe.address())
     if (!bound.success) throw new Error('No TCP address was allocated.')
     await closeServer(probe)
     return { address, port: bound.data.port, release: () => {} }
