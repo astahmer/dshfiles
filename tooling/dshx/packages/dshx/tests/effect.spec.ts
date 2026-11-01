@@ -1,7 +1,7 @@
 import { Context as Services, Effect, Exit, Fiber, Layer, ManagedRuntime, Schema, Stream } from 'effect'
 import { it as effectIt } from '@effect/vitest'
 import { readFileSync } from 'node:fs'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
 import { defineApi, event, method } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
@@ -9,6 +9,12 @@ import { ApiProtocolModel } from '../src/api/common.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { DshxEffect } from '../src/effect/index.js'
 import { createHostApiClient, defineHost } from '../src/host/index.js'
+import {
+  communicationDiagnosticRecipientSchema,
+  communicationDiagnosticsSchema,
+  communicationMessageBodySchema,
+  communicationMessageRecipientsSchema,
+} from '../src/communication/types.js'
 import { createTestHost } from '../src/testing/index.js'
 import { recordSpans, withSpan } from '../src/tracing/index.js'
 
@@ -71,6 +77,19 @@ describe('@dshfiles/dshx/effect', () => {
     const failure = await Effect.runPromise(Effect.flip(effectNotes.get({ id: 'b' })))
     expect(failure).toMatchObject({ _tag: 'ApiCallError', kind: 'remote', remoteCode: 'not-found', apiId: 'notes', method: 'get' })
     await host.dispose()
+  })
+
+  it('preserves parser compatibility and exact optional output types for communication schemas', () => {
+    expectTypeOf<Schema.Schema.Type<typeof communicationDiagnosticRecipientSchema>['readAt']>().toEqualTypeOf<number | null>()
+    expectTypeOf<Schema.Schema.Type<typeof communicationDiagnosticRecipientSchema>['notifiedAt']>().toEqualTypeOf<number | null | undefined>()
+    expectTypeOf<Schema.Schema.Type<typeof communicationDiagnosticsSchema>['unnotifiedRecipientCount']>().toEqualTypeOf<number | undefined>()
+
+    expect(communicationDiagnosticsSchema.safeParse({}).success).toBe(false)
+    expect(() => communicationDiagnosticsSchema.parse({})).toThrow()
+    expect(communicationMessageRecipientsSchema.safeParse({}).success).toBe(false)
+    expect(
+      communicationMessageBodySchema.safeParse({ messageId: '67e55044-10b1-426f-9247-bb680e5fe0c8', text: 'message', unexpected: true }).success,
+    ).toBe(false)
   })
 
   it('retains concrete Zod and Effect schema types on API declarations', async () => {

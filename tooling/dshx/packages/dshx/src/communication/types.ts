@@ -1,168 +1,181 @@
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 
-export const communicationDeliverySchema = z.literal('passive')
-export type CommunicationDelivery = z.infer<typeof communicationDeliverySchema>
+const strictStruct = <const Fields extends Schema.Struct.Fields & { readonly [Key in keyof Fields]: Schema.ConstraintDecoder<unknown, never> }>(fields: Fields) => {
+  const struct = Schema.Struct(fields).check(
+    Schema.makeFilter(value =>
+      Object.keys(value).every(key => Object.prototype.hasOwnProperty.call(fields, key)) ? true : 'Unexpected properties are not allowed.',
+    ),
+  )
+  const parse = (value: unknown): typeof struct.Type => {
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.keys(value).some(key => !Object.prototype.hasOwnProperty.call(fields, key))
+    ) {
+      throw new TypeError('Unexpected properties are not allowed.')
+    }
+    return Schema.decodeUnknownSync(struct)(value)
+  }
+  return Object.assign(struct, {
+    parse,
+    safeParse: (value: unknown): { readonly success: true; readonly data: typeof struct.Type } | { readonly success: false; readonly error: unknown } => {
+      try {
+        return { success: true, data: parse(value) }
+      } catch (error) {
+        return { success: false, error }
+      }
+    },
+  })
+}
 
-export const legacyCommunicationDeliverySchema = z.enum(['quiet', 'queue', 'steer'])
-export type LegacyCommunicationDelivery = z.infer<typeof legacyCommunicationDeliverySchema>
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
 
-export const communicationPrioritySchema = z.enum(['normal', 'urgent'])
-export type CommunicationPriority = z.infer<typeof communicationPrioritySchema>
+const nonNegativeInteger = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
-export const communicationPrincipalSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('agent'), id: z.string().min(1).max(256) }).strict(),
-  z
-    .object({
-      kind: z.literal('external'),
-      id: z
-        .string()
-        .min(1)
-        .max(80)
-        .regex(/^[a-zA-Z0-9._-]+$/),
-    })
-    .strict(),
+const boundedArray = <Item extends Schema.Constraint>(item: Item, maximum: number) => Schema.Array(item).check(Schema.isMaxLength(maximum))
+
+const boundedInteger = (maximum: number) => nonNegativeInteger.check(Schema.isLessThanOrEqualTo(maximum))
+
+export const communicationDeliverySchema = Schema.Literal('passive')
+export type CommunicationDelivery = Schema.Schema.Type<typeof communicationDeliverySchema>
+
+export const legacyCommunicationDeliverySchema = Schema.Literals(['quiet', 'queue', 'steer'])
+export type LegacyCommunicationDelivery = Schema.Schema.Type<typeof legacyCommunicationDeliverySchema>
+
+export const communicationPrioritySchema = Schema.Literals(['normal', 'urgent'])
+export type CommunicationPriority = Schema.Schema.Type<typeof communicationPrioritySchema>
+
+export const communicationPrincipalSchema = Schema.Union([
+  strictStruct({ kind: Schema.Literal('agent'), id: boundedString(1, 256) }),
+  strictStruct({
+    kind: Schema.Literal('external'),
+    id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80), Schema.isPattern(/^[a-zA-Z0-9._-]+$/)),
+  }),
 ])
-export type CommunicationPrincipal = z.infer<typeof communicationPrincipalSchema>
+export type CommunicationPrincipal = Schema.Schema.Type<typeof communicationPrincipalSchema>
 
-export const communicationSubscriptionSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    topic: z.string().min(1).max(128),
-    delivery: communicationDeliverySchema,
-    createdAt: z.number().int().nonnegative(),
-  })
-  .strict()
-export type CommunicationSubscription = z.infer<typeof communicationSubscriptionSchema>
+export const communicationSubscriptionSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  topic: boundedString(1, 128),
+  delivery: communicationDeliverySchema,
+  createdAt: nonNegativeInteger,
+})
 
-export const communicationRecipientSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    delivery: communicationDeliverySchema,
-    readAt: z.number().int().nonnegative().nullable(),
-  })
-  .strict()
-export type CommunicationRecipient = z.infer<typeof communicationRecipientSchema>
+export type CommunicationSubscription = Schema.Schema.Type<typeof communicationSubscriptionSchema>
 
-export const communicationMessageIntentSchema = z.enum(['notice', 'request'])
-export type CommunicationMessageIntent = z.infer<typeof communicationMessageIntentSchema>
+export const communicationRecipientSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  delivery: communicationDeliverySchema,
+  readAt: Schema.NullOr(nonNegativeInteger),
+})
 
-const communicationMessageV3Schema = z
-  .object({
-    id: z.string().uuid(),
-    topic: z.string().min(1).max(128).nullable(),
-    sender: communicationPrincipalSchema,
-    text: z.string().min(1).max(12_000),
-    priority: communicationPrioritySchema,
-    createdAt: z.number().int().nonnegative(),
-    recipients: z.array(communicationRecipientSchema).max(512),
-  })
-  .strict()
+export type CommunicationRecipient = Schema.Schema.Type<typeof communicationRecipientSchema>
 
-export const communicationMessageSchema = z
-  .object({
-    id: z.string().uuid(),
-    topic: z.string().min(1).max(128).nullable(),
-    sender: communicationPrincipalSchema,
-    text: z.string().min(1).max(12_000),
-    intent: communicationMessageIntentSchema.default('notice'),
-    priority: communicationPrioritySchema,
-    correlationId: z.string().min(1).max(128).nullable().default(null),
-    dedupeKey: z.string().min(1).max(128).nullable().default(null),
-    createdAt: z.number().int().nonnegative(),
-    recipients: z.array(communicationRecipientSchema).max(512),
-  })
-  .strict()
-export type CommunicationMessage = z.infer<typeof communicationMessageSchema>
+export const communicationMessageIntentSchema = Schema.Literals(['notice', 'request'])
+export type CommunicationMessageIntent = Schema.Schema.Type<typeof communicationMessageIntentSchema>
 
-export const communicationAgentSchema = z
-  .object({
-    id: z.string().min(1).max(256),
-    status: z.enum(['idle', 'running']).optional(),
-    workspaceTopic: z.string().min(1).max(128).nullable().optional(),
-  })
-  .strict()
-export type CommunicationAgent = z.infer<typeof communicationAgentSchema>
+const communicationMessageV3Schema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
+  topic: Schema.NullOr(boundedString(1, 128)),
+  sender: communicationPrincipalSchema,
+  text: boundedString(1, 12_000),
+  priority: communicationPrioritySchema,
+  createdAt: nonNegativeInteger,
+  recipients: boundedArray(communicationRecipientSchema, 512),
+})
 
-export const communicationDiagnosticAgentSchema = communicationAgentSchema
-  .extend({
-    workspaceTopic: z.string().min(1).max(128).nullable(),
-    workspaceOptedOut: z.boolean(),
-    workspaceSubscribed: z.boolean().optional(),
-  })
-  .strict()
-export type CommunicationDiagnosticAgent = z.infer<typeof communicationDiagnosticAgentSchema>
+export const communicationMessageSchema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
+  topic: Schema.NullOr(boundedString(1, 128)),
+  sender: communicationPrincipalSchema,
+  text: boundedString(1, 12_000),
+  intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
+  priority: communicationPrioritySchema,
+  correlationId: Schema.NullOr(boundedString(1, 128)).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  dedupeKey: Schema.NullOr(boundedString(1, 128)).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  createdAt: nonNegativeInteger,
+  recipients: boundedArray(communicationRecipientSchema, 512),
+})
 
-export const communicationTopicSchema = z
-  .object({
-    topic: z.string().min(1).max(128),
-    subscribers: z.number().int().nonnegative(),
-  })
-  .strict()
-export type CommunicationTopic = z.infer<typeof communicationTopicSchema>
+export type CommunicationMessage = Schema.Schema.Type<typeof communicationMessageSchema>
 
-export const communicationInboxSchema = z
-  .object({
-    items: z.array(communicationMessageSchema).max(500),
-  })
-  .strict()
-export type CommunicationInbox = z.infer<typeof communicationInboxSchema>
+const communicationAgentFields = {
+  id: boundedString(1, 256),
+  status: Schema.optional(Schema.Literals(['idle', 'running'])),
+  workspaceTopic: Schema.optional(Schema.NullOr(boundedString(1, 128))),
+}
 
-export const communicationMessagePageSchema = z
-  .object({
-    items: z.array(communicationMessageSchema).max(100),
-    nextCursor: z.string().uuid().nullable(),
-    totalMatching: z.number().int().nonnegative().max(5_000),
-  })
-  .strict()
-export type CommunicationMessagePage = z.infer<typeof communicationMessagePageSchema>
+export const communicationAgentSchema = strictStruct(communicationAgentFields)
+export type CommunicationAgent = Schema.Schema.Type<typeof communicationAgentSchema>
 
-const communicationAcknowledgementSchema = z
-  .object({
-    messageId: z.string().uuid(),
-    principal: communicationPrincipalSchema,
-    acknowledgedAt: z.number().int().nonnegative(),
-  })
-  .strict()
+export const communicationDiagnosticAgentSchema = strictStruct({
+  ...communicationAgentFields,
+  workspaceTopic: Schema.NullOr(boundedString(1, 128)),
+  workspaceOptedOut: Schema.Boolean,
+  workspaceSubscribed: Schema.optional(Schema.Boolean),
+})
+export type CommunicationDiagnosticAgent = Schema.Schema.Type<typeof communicationDiagnosticAgentSchema>
 
-const communicationNotificationSchema = z
-  .object({
-    messageId: z.string().uuid(),
-    agentId: z.string().min(1).max(256),
-    notifiedAt: z.number().int().nonnegative(),
-  })
-  .strict()
+export const communicationTopicSchema = strictStruct({
+  topic: boundedString(1, 128),
+  subscribers: nonNegativeInteger,
+})
 
-const legacyCommunicationSubscriptionSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    topic: z.string().min(1).max(128),
-    delivery: legacyCommunicationDeliverySchema,
-    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
-    createdAt: z.number().int().nonnegative(),
-  })
-  .strict()
+export type CommunicationTopic = Schema.Schema.Type<typeof communicationTopicSchema>
 
-const legacyCommunicationRecipientSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    delivery: legacyCommunicationDeliverySchema,
-    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
-  })
-  .strict()
+export const communicationInboxSchema = strictStruct({
+  items: boundedArray(communicationMessageSchema, 500),
+})
 
-const legacyCommunicationMessageSchema = z
-  .object({
-    id: z.string().uuid(),
-    topic: z.string().min(1).max(128).nullable(),
-    sender: communicationPrincipalSchema,
-    text: z.string().min(1).max(12_000),
-    priority: communicationPrioritySchema,
-    createdAt: z.number().int().nonnegative(),
-    recipients: z.array(legacyCommunicationRecipientSchema).max(512),
-  })
-  .strict()
+export type CommunicationInbox = Schema.Schema.Type<typeof communicationInboxSchema>
 
-export const communicationActivityOperationSchema = z.enum([
+export const communicationMessagePageSchema = strictStruct({
+  items: boundedArray(communicationMessageSchema, 100),
+  nextCursor: Schema.NullOr(Schema.String.check(Schema.isUUID())),
+  totalMatching: boundedInteger(5_000),
+})
+
+export type CommunicationMessagePage = Schema.Schema.Type<typeof communicationMessagePageSchema>
+
+const communicationAcknowledgementSchema = strictStruct({
+  messageId: Schema.String.check(Schema.isUUID()),
+  principal: communicationPrincipalSchema,
+  acknowledgedAt: nonNegativeInteger,
+})
+
+const communicationNotificationSchema = strictStruct({
+  messageId: Schema.String.check(Schema.isUUID()),
+  agentId: boundedString(1, 256),
+  notifiedAt: nonNegativeInteger,
+})
+
+const legacyCommunicationSubscriptionSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  topic: boundedString(1, 128),
+  delivery: legacyCommunicationDeliverySchema,
+  allowSteerFrom: boundedArray(boundedString(1, 256), 64),
+  createdAt: nonNegativeInteger,
+})
+
+const legacyCommunicationRecipientSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  delivery: legacyCommunicationDeliverySchema,
+  allowSteerFrom: boundedArray(boundedString(1, 256), 64),
+})
+
+const legacyCommunicationMessageSchema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
+  topic: Schema.NullOr(boundedString(1, 128)),
+  sender: communicationPrincipalSchema,
+  text: boundedString(1, 12_000),
+  priority: communicationPrioritySchema,
+  createdAt: nonNegativeInteger,
+  recipients: boundedArray(legacyCommunicationRecipientSchema, 512),
+})
+
+export const communicationActivityOperationSchema = Schema.Literals([
   'dshx_comm_agents',
   'dshx_comm_workspace',
   'dshx_comm_history',
@@ -174,153 +187,140 @@ export const communicationActivityOperationSchema = z.enum([
   'dshx_comm_inbox',
   'dshx_comm_ack',
 ])
-export type CommunicationActivityOperation = z.infer<typeof communicationActivityOperationSchema>
+export type CommunicationActivityOperation = Schema.Schema.Type<typeof communicationActivityOperationSchema>
 
-export const communicationActivityEventSchema = z
-  .object({
-    id: z.string().uuid(),
-    principal: z.object({ kind: z.literal('agent'), id: z.string().min(1).max(256) }).strict(),
-    operation: communicationActivityOperationSchema,
-    outcome: z.enum(['success', 'failure']),
-    occurredAt: z.number().int().nonnegative(),
-    durationMs: z.number().int().nonnegative().max(3_600_000),
-    callId: z.string().min(1).max(256),
-    rootCallId: z.string().min(1).max(256).nullable(),
-    errorCode: z.string().min(1).max(80).nullable(),
-  })
-  .strict()
-export type CommunicationActivityEvent = z.infer<typeof communicationActivityEventSchema>
+export const communicationActivityEventSchema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
+  principal: strictStruct({ kind: Schema.Literal('agent'), id: boundedString(1, 256) }),
+  operation: communicationActivityOperationSchema,
+  outcome: Schema.Literals(['success', 'failure']),
+  occurredAt: nonNegativeInteger,
+  durationMs: boundedInteger(3_600_000),
+  callId: boundedString(1, 256),
+  rootCallId: Schema.NullOr(boundedString(1, 256)),
+  errorCode: Schema.NullOr(boundedString(1, 80)),
+})
 
-export const communicationStateV1Schema = z
-  .object({
-    schemaVersion: z.literal(1),
-    messages: z.array(legacyCommunicationMessageSchema).max(5_000),
-    subscriptions: z.array(legacyCommunicationSubscriptionSchema).max(5_000),
-    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
-    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
-    notifications: z.array(communicationNotificationSchema).max(100_000),
-  })
-  .strict()
-export type CommunicationStateV1 = z.infer<typeof communicationStateV1Schema>
+export type CommunicationActivityEvent = Schema.Schema.Type<typeof communicationActivityEventSchema>
 
-export const communicationStateV2Schema = z
-  .object({
-    schemaVersion: z.literal(2),
-    messages: z.array(legacyCommunicationMessageSchema).max(5_000),
-    subscriptions: z.array(legacyCommunicationSubscriptionSchema).max(5_000),
-    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
-    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
-    notifications: z.array(communicationNotificationSchema).max(100_000),
-    activityStartedAt: z.number().int().nonnegative().nullable(),
-    activityEvents: z.array(communicationActivityEventSchema).max(5_000),
-  })
-  .strict()
-export type CommunicationStateV2 = z.infer<typeof communicationStateV2Schema>
+export const communicationStateV1Schema = strictStruct({
+  schemaVersion: Schema.Literal(1),
+  messages: boundedArray(legacyCommunicationMessageSchema, 5_000),
+  subscriptions: boundedArray(legacyCommunicationSubscriptionSchema, 5_000),
+  acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
+  workspaceOptOuts: boundedArray(boundedString(1, 256), 10_000),
+  notifications: boundedArray(communicationNotificationSchema, 100_000),
+})
 
-export const communicationStateV3Schema = z
-  .object({
-    schemaVersion: z.literal(3),
-    messages: z.array(communicationMessageV3Schema).max(5_000),
-    subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
-    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
-    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
-    activityStartedAt: z.number().int().nonnegative().nullable(),
-    activityEvents: z.array(communicationActivityEventSchema).max(5_000),
-  })
-  .strict()
-export type CommunicationStateV3 = z.infer<typeof communicationStateV3Schema>
+export type CommunicationStateV1 = Schema.Schema.Type<typeof communicationStateV1Schema>
 
-export const communicationStateSchema = z
-  .object({
-    schemaVersion: z.literal(4),
-    messages: z.array(communicationMessageSchema).max(5_000),
-    subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
-    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
-    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
-    activityStartedAt: z.number().int().nonnegative().nullable(),
-    activityEvents: z.array(communicationActivityEventSchema).max(5_000),
-  })
-  .strict()
-export type CommunicationState = z.infer<typeof communicationStateSchema>
+export const communicationStateV2Schema = strictStruct({
+  schemaVersion: Schema.Literal(2),
+  messages: boundedArray(legacyCommunicationMessageSchema, 5_000),
+  subscriptions: boundedArray(legacyCommunicationSubscriptionSchema, 5_000),
+  acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
+  workspaceOptOuts: boundedArray(boundedString(1, 256), 10_000),
+  notifications: boundedArray(communicationNotificationSchema, 100_000),
+  activityStartedAt: Schema.NullOr(nonNegativeInteger),
+  activityEvents: boundedArray(communicationActivityEventSchema, 5_000),
+})
 
-export const communicationDiagnosticRecipientSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
-    readAt: z.number().int().nonnegative().nullable().optional().default(null),
-    acknowledgedAt: z.number().int().nonnegative().nullable(),
-    notifiedAt: z.number().int().nonnegative().nullable().optional(),
-    allowSteerFromCount: z.number().int().nonnegative().optional(),
-  })
-  .strict()
-export type CommunicationDiagnosticRecipient = z.infer<typeof communicationDiagnosticRecipientSchema>
+export type CommunicationStateV2 = Schema.Schema.Type<typeof communicationStateV2Schema>
 
-export const communicationMessageRecipientsSchema = z
-  .object({
-    messageId: z.string().uuid(),
-    recipientCount: z.number().int().nonnegative().max(512),
-    recipients: z.array(communicationDiagnosticRecipientSchema).max(512),
-  })
-  .strict()
-export type CommunicationMessageRecipients = z.infer<typeof communicationMessageRecipientsSchema>
+export const communicationStateV3Schema = strictStruct({
+  schemaVersion: Schema.Literal(3),
+  messages: boundedArray(communicationMessageV3Schema, 5_000),
+  subscriptions: boundedArray(communicationSubscriptionSchema, 5_000),
+  acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
+  workspaceOptOuts: boundedArray(boundedString(1, 256), 10_000),
+  activityStartedAt: Schema.NullOr(nonNegativeInteger),
+  activityEvents: boundedArray(communicationActivityEventSchema, 5_000),
+})
 
-export const communicationMessageBodySchema = z
-  .object({
-    messageId: z.string().uuid(),
-    text: z.string().max(12_000),
-  })
-  .strict()
-export type CommunicationMessageBody = z.infer<typeof communicationMessageBodySchema>
+export type CommunicationStateV3 = Schema.Schema.Type<typeof communicationStateV3Schema>
 
-export const communicationDiagnosticSubscriptionSchema = z
-  .object({
-    principal: communicationPrincipalSchema,
-    topic: z.string().min(1).max(128),
-    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
-    createdAt: z.number().int().nonnegative(),
-    allowSteerFromCount: z.number().int().nonnegative().optional(),
-  })
-  .strict()
-export type CommunicationDiagnosticSubscription = z.infer<typeof communicationDiagnosticSubscriptionSchema>
+export const communicationStateSchema = strictStruct({
+  schemaVersion: Schema.Literal(4),
+  messages: boundedArray(communicationMessageSchema, 5_000),
+  subscriptions: boundedArray(communicationSubscriptionSchema, 5_000),
+  acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
+  workspaceOptOuts: boundedArray(boundedString(1, 256), 10_000),
+  activityStartedAt: Schema.NullOr(nonNegativeInteger),
+  activityEvents: boundedArray(communicationActivityEventSchema, 5_000),
+})
 
-export const communicationDiagnosticMessageSchema = z
-  .object({
-    id: z.string().uuid(),
-    topic: z.string().min(1).max(128).nullable(),
-    sender: communicationPrincipalSchema,
-    intent: communicationMessageIntentSchema.default('notice'),
-    priority: communicationPrioritySchema,
-    createdAt: z.number().int().nonnegative(),
-    recipientCount: z.number().int().nonnegative().max(512),
-    pendingRecipientCount: z.number().int().nonnegative().max(512),
-    unnotifiedRecipientCount: z.number().int().nonnegative().max(512).optional(),
-  })
-  .strict()
-export type CommunicationDiagnosticMessage = z.infer<typeof communicationDiagnosticMessageSchema>
+export type CommunicationState = Schema.Schema.Type<typeof communicationStateSchema>
 
-export const communicationDiagnosticsSchema = z
-  .object({
-    generatedAt: z.number().int().nonnegative(),
-    agentCount: z.number().int().nonnegative(),
-    agents: z.array(communicationDiagnosticAgentSchema).max(100),
-    topicCount: z.number().int().nonnegative(),
-    topics: z.array(communicationTopicSchema).max(100),
-    subscriptionCount: z.number().int().nonnegative(),
-    subscriptions: z.array(communicationDiagnosticSubscriptionSchema).max(100),
-    messageCount: z.number().int().nonnegative(),
-    pendingMessageCount: z.number().int().nonnegative(),
-    pendingRecipientCount: z.number().int().nonnegative(),
-    unnotifiedRecipientCount: z.number().int().nonnegative().optional(),
-    recentMessages: z.array(communicationDiagnosticMessageSchema).max(100),
-    activity: z
-      .object({
-        trackingStartedAt: z.number().int().nonnegative().nullable(),
-        oldestRetainedAt: z.number().int().nonnegative().nullable(),
-        retainedCount: z.number().int().nonnegative(),
-        events: z.array(communicationActivityEventSchema).max(100),
-      })
-      .strict(),
-    historyNote: z.string().max(256),
-  })
-  .strict()
-export type CommunicationDiagnostics = z.infer<typeof communicationDiagnosticsSchema>
+export const communicationDiagnosticRecipientSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  delivery: Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
+  readAt: Schema.NullOr(nonNegativeInteger).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
+  acknowledgedAt: Schema.NullOr(nonNegativeInteger),
+  notifiedAt: Schema.optional(Schema.NullOr(nonNegativeInteger)),
+  allowSteerFromCount: Schema.optional(nonNegativeInteger),
+})
+
+export type CommunicationDiagnosticRecipient = Schema.Schema.Type<typeof communicationDiagnosticRecipientSchema>
+
+export const communicationMessageRecipientsSchema = strictStruct({
+  messageId: Schema.String.check(Schema.isUUID()),
+  recipientCount: boundedInteger(512),
+  recipients: boundedArray(communicationDiagnosticRecipientSchema, 512),
+})
+
+export type CommunicationMessageRecipients = Schema.Schema.Type<typeof communicationMessageRecipientsSchema>
+
+export const communicationMessageBodySchema = strictStruct({
+  messageId: Schema.String.check(Schema.isUUID()),
+  text: Schema.String.check(Schema.isMaxLength(12_000)),
+})
+
+export type CommunicationMessageBody = Schema.Schema.Type<typeof communicationMessageBodySchema>
+
+export const communicationDiagnosticSubscriptionSchema = strictStruct({
+  principal: communicationPrincipalSchema,
+  topic: boundedString(1, 128),
+  delivery: Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
+  createdAt: nonNegativeInteger,
+  allowSteerFromCount: Schema.optional(nonNegativeInteger),
+})
+
+export type CommunicationDiagnosticSubscription = Schema.Schema.Type<typeof communicationDiagnosticSubscriptionSchema>
+
+export const communicationDiagnosticMessageSchema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
+  topic: Schema.NullOr(boundedString(1, 128)),
+  sender: communicationPrincipalSchema,
+  intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
+  priority: communicationPrioritySchema,
+  createdAt: nonNegativeInteger,
+  recipientCount: boundedInteger(512),
+  pendingRecipientCount: boundedInteger(512),
+  unnotifiedRecipientCount: Schema.optional(boundedInteger(512)),
+})
+
+export type CommunicationDiagnosticMessage = Schema.Schema.Type<typeof communicationDiagnosticMessageSchema>
+
+export const communicationDiagnosticsSchema = strictStruct({
+  generatedAt: nonNegativeInteger,
+  agentCount: nonNegativeInteger,
+  agents: boundedArray(communicationDiagnosticAgentSchema, 100),
+  topicCount: nonNegativeInteger,
+  topics: boundedArray(communicationTopicSchema, 100),
+  subscriptionCount: nonNegativeInteger,
+  subscriptions: boundedArray(communicationDiagnosticSubscriptionSchema, 100),
+  messageCount: nonNegativeInteger,
+  pendingMessageCount: nonNegativeInteger,
+  pendingRecipientCount: nonNegativeInteger,
+  unnotifiedRecipientCount: Schema.optional(nonNegativeInteger),
+  recentMessages: boundedArray(communicationDiagnosticMessageSchema, 100),
+  activity: strictStruct({
+    trackingStartedAt: Schema.NullOr(nonNegativeInteger),
+    oldestRetainedAt: Schema.NullOr(nonNegativeInteger),
+    retainedCount: nonNegativeInteger,
+    events: boundedArray(communicationActivityEventSchema, 100),
+  }),
+  historyNote: Schema.String.check(Schema.isMaxLength(256)),
+})
+
+export type CommunicationDiagnostics = Schema.Schema.Type<typeof communicationDiagnosticsSchema>
