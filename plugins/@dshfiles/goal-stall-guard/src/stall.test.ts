@@ -114,20 +114,26 @@ describe('StallDetector', () => {
   })
 })
 
+const decodeConfig = async (input: unknown) => {
+  const result = await Config['~standard'].validate(input)
+  if (result.issues !== undefined) throw new Error(result.issues.map(issue => issue.message).join('; '))
+  return result.value
+}
+
 describe('Config', () => {
-  it('accepts the absent config a row without a config key produces', () => {
-    expect(Config.parse(undefined)).toEqual({ stallThreshold: DEFAULT_STALL_POLICY.threshold })
+  it('accepts the absent config a row without a config key produces', async () => {
+    await expect(decodeConfig(undefined)).resolves.toEqual({ stallThreshold: DEFAULT_STALL_POLICY.threshold })
   })
 
-  it('accepts an explicit empty config', () => {
-    expect(Config.parse({})).toEqual({ stallThreshold: DEFAULT_STALL_POLICY.threshold })
+  it('accepts an explicit empty config', async () => {
+    await expect(decodeConfig({})).resolves.toEqual({ stallThreshold: DEFAULT_STALL_POLICY.threshold })
   })
 
-  it('keeps an explicit threshold', () => {
-    expect(Config.parse({ stallThreshold: 9 })).toEqual({ stallThreshold: 9 })
+  it('keeps an explicit threshold', async () => {
+    await expect(decodeConfig({ stallThreshold: 9 })).resolves.toEqual({ stallThreshold: 9 })
   })
 
-  it('rejects a threshold below the floor', () => {
-    expect(() => Config.parse({ stallThreshold: 1 })).toThrow()
+  it('rejects a threshold below the floor', async () => {
+    await expect(decodeConfig({ stallThreshold: 1 })).rejects.toThrow()
   })
 })

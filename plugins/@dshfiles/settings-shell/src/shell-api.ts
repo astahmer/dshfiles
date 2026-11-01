@@ -1,17 +1,21 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { settingsSearchEntrySchema } from '@dshfiles/dshx/settings'
+import { settingsSearchEntryFields } from '@dshfiles/dshx/settings'
+import * as Schema from 'effect/Schema'
 import { z } from 'zod'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
 export const settingsPatchSchema = z.record(z.string(), z.json())
 
-// Keep these published contracts on zod: Effect publishes `additionalProperties: true` for a plain object where zod
-// publishes `additionalProperties: false` for `.strict()`, emits `enum` instead of `const` for `.literal()`, and has no
-// `void` or record-of-JSON equivalent.
+// The remaining contracts keep Zod's strict-object and JSON-schema behavior; search entries compose the SDK's Effect schema.
 
 /** One control a live settings section publishes to search, with the section that opens at it. */
-const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
+const sectionEntryFields = {
+  ...settingsSearchEntryFields,
+  sectionId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200)),
+  sectionLabel: Schema.String.check(Schema.isMaxLength(200)),
+}
+const sectionEntrySchema = Schema.Struct(sectionEntryFields)
 
 const MAX_LISTED_ENTRIES = 50
 
@@ -63,8 +67,8 @@ export const settingsShellApi = defineApi({
      * Host keeps the last set any page reported: every page loads the same plugins.
      */
     publishSearchEntries: method({
-      input: z.object({ entries: z.array(sectionEntrySchema).max(2000) }).strict(),
-      output: z.object({ count: z.number() }).strict(),
+      input: Schema.toStandardSchemaV1(Schema.Struct({ entries: Schema.Array(sectionEntrySchema).check(Schema.isMaxLength(2000)) })),
+      output: Schema.toStandardSchemaV1(Schema.Struct({ count: Schema.Number })),
     }),
     /**
      * Every settings namespace the profile serves, with the revision a write must expect. Naming one namespace also
@@ -72,26 +76,22 @@ export const settingsShellApi = defineApi({
      */
     list: method({
       input: z.object({ namespace: z.string().min(1).max(128).optional(), query: z.string().max(128).optional() }).strict(),
-      output: z
-        .object({
-          writable: z.boolean(),
-          namespaces: z
-            .array(
-              z
-                .object({
-                  namespace: z.string(),
-                  revision: z.number(),
-                  autoGenerate: z.boolean(),
-                  secretFields: z.number(),
-                  value: z.string().optional(),
-                  valueTooLarge: z.boolean().optional(),
-                })
-                .strict(),
-            )
-            .max(500),
-          entries: z.array(sectionEntrySchema).max(MAX_LISTED_ENTRIES).optional(),
-        })
-        .strict(),
+      output: Schema.toStandardSchemaV1(
+        Schema.Struct({
+          writable: Schema.Boolean,
+          namespaces: Schema.Array(
+            Schema.Struct({
+              namespace: Schema.String,
+              revision: Schema.Number,
+              autoGenerate: Schema.Boolean,
+              secretFields: Schema.Number,
+              value: Schema.optionalKey(Schema.String),
+              valueTooLarge: Schema.optionalKey(Schema.Boolean),
+            }),
+          ).check(Schema.isMaxLength(500)),
+          entries: Schema.optionalKey(Schema.Array(sectionEntrySchema).check(Schema.isMaxLength(MAX_LISTED_ENTRIES))),
+        }),
+      ),
       description:
         'List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. A query also searches the controls Settings sections publish (title, description, keywords), returning each with its section id and entry id. Read-only.',
       tool: {

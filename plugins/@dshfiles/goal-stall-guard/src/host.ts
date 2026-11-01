@@ -6,17 +6,18 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { Context as EffectContext, Effect, Layer, Queue, Schema } from 'effect'
-import { z } from 'zod'
 import { DEFAULT_STALL_POLICY, StallDetector } from './stall.js'
 import { registerGoalContinuationTools } from './goal-continuation.js'
 
-const rowConfig = z.object({
-  stallThreshold: z.number().int().min(2).max(50).default(DEFAULT_STALL_POLICY.threshold),
-})
+const configSchema = Schema.Struct({
+  stallThreshold: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(2), Schema.isLessThanOrEqualTo(50)).pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_STALL_POLICY.threshold)),
+  ),
+}).pipe(Schema.withDecodingDefault(Effect.succeed({ stallThreshold: DEFAULT_STALL_POLICY.threshold })))
 
-export const Config = z.union([rowConfig, z.undefined()]).transform(config => rowConfig.parse(config ?? {}))
+export const Config = Schema.toStandardSchemaV1(configSchema)
 
-type PluginConfig = z.output<typeof Config>
+type PluginConfig = Schema.Schema.Type<typeof configSchema>
 
 interface PendingPause {
   readonly agent: Agent
