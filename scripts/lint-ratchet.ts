@@ -20,6 +20,8 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/plugin-ui/src/virtual.ts',
   'plugins/@dshfiles/plugin-ui/src/icons.ts',
   'plugins/@dshfiles/project-folder-picker/src/index.ts',
+  'plugins/@dshfiles/project-checks/src/api.ts',
+  'tooling/dshx/packages/dshx/src/effect/index.ts',
   'plugins/@dshfiles/usage/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
   'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',

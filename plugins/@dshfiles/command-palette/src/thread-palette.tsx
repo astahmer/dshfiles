@@ -143,6 +143,19 @@ const withoutRepeatedTitle = (snippet: string, title: string): string => {
 
 const projectLabel = (project: string): string => project.split(/[\\/]/u).filter(Boolean).at(-1) ?? project
 
+const contentStatusLabel = (input: {
+  readonly running: boolean | undefined
+  readonly live: boolean | undefined
+  readonly persisted: boolean | undefined
+  readonly copy: ThreadPaletteCopy
+}): string | undefined => {
+  if (input.running === true) return input.copy.contentStatusRunning
+  if (input.running === false) return input.copy.contentStatusFinished
+  if (input.live === true) return input.copy.contentStatusLive
+  if (input.persisted === true) return input.copy.contentStatusSaved
+  return undefined
+}
+
 const contentDate = (timestamp: number | undefined): string | undefined =>
   timestamp === undefined || !Number.isFinite(timestamp) ? undefined : new Date(timestamp).toISOString().slice(0, 10)
 
@@ -671,16 +684,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const row: PaletteRow = { kind: 'content', ...hit }
                   const snippet = withoutRepeatedTitle(hit.snippet, hit.thread.title)
                   const date = contentDate(hit.thread.updatedAt)
-                  const status =
-                    hit.thread.running === true
-                      ? props.copy.contentStatusRunning
-                      : hit.thread.running === false
-                        ? props.copy.contentStatusFinished
-                        : hit.live === true
-                          ? props.copy.contentStatusLive
-                          : hit.persisted === true
-                            ? props.copy.contentStatusSaved
-                            : undefined
+                  const status = contentStatusLabel({ running: hit.thread.running, live: hit.live, persisted: hit.persisted, copy: props.copy })
                   const project = hit.thread.project.length === 0 ? props.copy.unassigned : projectLabel(hit.thread.project)
                   return (
                     <CommandItem key={hit.thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>

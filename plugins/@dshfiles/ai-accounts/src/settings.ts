@@ -1,7 +1,7 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
-import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy, type RecoveryPolicy } from './failure-policy.js'
+import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy } from './failure-policy.js'
 
 const kindPolicySetting = (fallback: KindPolicy, description: string) =>
   Schema.object({
@@ -167,11 +167,7 @@ const recoverySettingsSchema = z.object({
 })
 
 /** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-const readRecoverySettings = (): {
-  readonly policy: RecoveryPolicy
-  readonly usageOrder: readonly string[]
-  readonly hiddenUsageAccounts: readonly string[]
-} => {
+const readRecoverySettings = () => {
   const parsed = recoverySettingsSchema.parse(readLiveSettings())
   // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
   return { policy: parsed.failureRecovery, usageOrder: [], hiddenUsageAccounts: parsed.hiddenUsageAccounts }
@@ -183,10 +179,7 @@ const quotaRetrySettingsSchema = z.object({
 })
 
 /** Quota retry defaults; old or unregistered Hosts stay opted in and show the turn-level option. */
-const readQuotaRetrySettings = (): {
-  readonly autoRetryDefault: boolean
-  readonly showChoice: boolean
-} => {
+const readQuotaRetrySettings = () => {
   const parsed = quotaRetrySettingsSchema.parse(readLiveSettings())
   return { autoRetryDefault: parsed.autoRetryQuotaDefault, showChoice: parsed.showQuotaRetryChoice }
 }

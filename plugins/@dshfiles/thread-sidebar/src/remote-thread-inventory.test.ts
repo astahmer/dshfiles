@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
-import { buildRemoteSidebarThreads, filterRemoteSidebarThreads, runtimesWithStartedThreads } from './remote-thread-inventory.js'
+import { RemoteThreadInventoryModel } from './remote-thread-inventory.js'
 
 const status = {
   ok: true,
@@ -16,15 +16,15 @@ const status = {
 
 test('only probes runtimes that own started-here threads', () => {
   const runtimes = [{ id: 'runtime-a' }, { id: 'runtime-b' }, { id: 'runtime-c' }]
-  expect(runtimesWithStartedThreads(runtimes, [{ runtimeId: 'runtime-c' }, { runtimeId: 'runtime-a' }, { runtimeId: 'runtime-c' }])).toEqual([
+  expect(RemoteThreadInventoryModel.runtimesWithStartedThreads(runtimes, [{ runtimeId: 'runtime-c' }, { runtimeId: 'runtime-a' }, { runtimeId: 'runtime-c' }])).toEqual([
     runtimes[0],
     runtimes[2],
   ])
-  expect(runtimesWithStartedThreads(runtimes, [])).toEqual([])
+  expect(RemoteThreadInventoryModel.runtimesWithStartedThreads(runtimes, [])).toEqual([])
 })
 
 test('remote inventory enriches started-here threads without adding host-only sessions', () => {
-  const rows = buildRemoteSidebarThreads({
+  const rows = RemoteThreadInventoryModel.build({
     startedHere: [
       {
         runtimeId: 'runtime-a',
@@ -111,7 +111,7 @@ test('remote rows respect settled status and source filters', () => {
   ]
 
   expect(
-    filterRemoteSidebarThreads({
+    RemoteThreadInventoryModel.filter({
       threads,
       filters: ['not-running'],
       sourceFilter: 'all',
@@ -121,7 +121,7 @@ test('remote rows respect settled status and source filters', () => {
     }).map(thread => thread.sessionId),
   ).toEqual(['active-thread'])
   expect(
-    filterRemoteSidebarThreads({
+    RemoteThreadInventoryModel.filter({
       threads,
       filters: [],
       sourceFilter: 'subagents',

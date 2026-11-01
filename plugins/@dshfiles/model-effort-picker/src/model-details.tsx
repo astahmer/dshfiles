@@ -13,6 +13,19 @@ import { AccountBadge, BrandMark, InfoHint } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 
+const buildSelection = (input: {
+  readonly group: CatalogGroup
+  readonly model: CatalogGroup['models'][number]
+  readonly current: ModelSelection | null
+}): ModelSelection => {
+  const selection = { provider: input.group.id, model: input.model.id }
+  const keepsEffort =
+    input.current?.provider === input.group.id &&
+    input.current.model === input.model.id &&
+    input.current.reasoningEffort !== undefined
+  return keepsEffort ? { ...selection, reasoningEffort: input.current?.reasoningEffort } : selection
+}
+
 export type InspectedRoute = { readonly provider: string; readonly model: string }
 
 export const ModelDetails = (props: {
@@ -49,13 +62,7 @@ export const ModelDetails = (props: {
   const selection: ModelSelection | null =
     group === undefined || model === undefined
       ? null
-      : {
-          provider: group.id,
-          model: model.id,
-          ...(props.current?.provider === group.id && props.current.model === model.id && props.current.reasoningEffort !== undefined
-            ? { reasoningEffort: props.current.reasoningEffort }
-            : {}),
-        }
+      : buildSelection({ group, model, current: props.current })
   const name = group === undefined || model === undefined ? undefined : ModelPickerModel.displayName({ group, model })
   const accent = group === undefined ? undefined : (props.accountAccents.get(group.id) ?? accountColor({ instanceId: group.id }))
   const accounts = model === undefined ? [] : props.groups.filter(candidate => candidate.models.some(entry => entry.id === model.id))

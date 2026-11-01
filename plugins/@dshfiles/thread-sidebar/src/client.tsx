@@ -18,7 +18,7 @@ import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
-import { filterRemoteSidebarThreads, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
+import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
@@ -3400,7 +3400,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const separatesRemoteThreads = preferences.separateRemoteThreads && !isBoard
   const filteredRemoteThreads = useMemo(
     () =>
-      filterRemoteSidebarThreads({
+      RemoteThreadInventoryModel.filter({
         threads: remoteThreads,
         filters: threadView.statusFilters,
         sourceFilter: threadView.sourceFilter,
