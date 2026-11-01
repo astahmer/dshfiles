@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+// Keep these published Zod trees together: Effect 4.1 differs on `additionalProperties`,
+// regex `pattern`, record `propertyNames`, and literal `const` keywords.
 const MAX_NOTE_CHARS = 2000
 export const MAX_TEXT_CHARS = 240
 export const MAX_SELECTOR_CHARS = 600
