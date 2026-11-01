@@ -1,20 +1,25 @@
 import { useSettings } from '@dshfiles/dshx/client'
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 import { recoveryPolicySchema } from './failure-policy.js'
 import { QuotaCoverageModel } from './quota-coverage-model.js'
 import { DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './settings.js'
 
-const meterLabelSchema = z.enum(['both', 'percent', 'reset']).catch('both')
-export type MeterLabel = z.infer<typeof meterLabelSchema>
-const usageWindowLayoutSchema = z.enum(['binding', 'horizontal', 'vertical']).catch('binding')
-export type UsageWindowLayout = z.infer<typeof usageWindowLayoutSchema>
-const workHoursSchema = z
-  .object({
-    days: z.array(z.number().int().min(0).max(6)),
-    startHour: z.number().int().min(0).max(23),
-    endHour: z.number().int().min(1).max(24),
-  })
-  .catch(() => ({ ...QuotaCoverageModel.defaultWorkHours, days: [...QuotaCoverageModel.defaultWorkHours.days] }))
+const meterLabelSchema = Schema.Literals(['both', 'percent', 'reset']).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some('both'))))
+export type MeterLabel = typeof meterLabelSchema.Type
+const usageWindowLayoutSchema = Schema.Literals(['binding', 'horizontal', 'vertical']).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some('binding'))))
+export type UsageWindowLayout = typeof usageWindowLayoutSchema.Type
+const nonNegativeIntBetween = (minimum: number, maximum: number) =>
+  Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
+const workHoursSchema = Schema.Struct({
+  days: Schema.Array(nonNegativeIntBetween(0, 6)),
+  startHour: nonNegativeIntBetween(0, 23),
+  endHour: nonNegativeIntBetween(1, 24),
+}).pipe(
+  Schema.catchDecoding(() => Effect.succeed(Option.some({ ...QuotaCoverageModel.defaultWorkHours, days: [...QuotaCoverageModel.defaultWorkHours.days] }))),
+)
 
 /** The accounts preferences with defaults filled in while Settings loads or is unavailable. */
 export const usePreferences = () => {
@@ -27,8 +32,8 @@ export const usePreferences = () => {
     autoSaveDelayMs: value?.autoSaveDelayMs ?? DEFAULT_CLIENT_SETTINGS.autoSaveDelayMs,
     usageRefreshMs: (value?.usageRefreshSeconds ?? DEFAULT_CLIENT_SETTINGS.usageRefreshSeconds) * 1000,
     footerButton: value?.footerButton ?? DEFAULT_CLIENT_SETTINGS.footerButton,
-    meterLabel: meterLabelSchema.parse(value?.meterLabel),
-    usageWindowLayout: usageWindowLayoutSchema.parse(value?.usageWindowLayout),
+    meterLabel: AiAccountsSchema.decode(meterLabelSchema, value?.meterLabel),
+    usageWindowLayout: AiAccountsSchema.decode(usageWindowLayoutSchema, value?.usageWindowLayout),
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     usageShortNames: value?.usageShortNames ?? true,
     usageShortNameOverrides: value?.usageShortNameOverrides ?? {},
@@ -38,12 +43,12 @@ export const usePreferences = () => {
     codexLunaReserve: value?.codexLunaReserve ?? true,
     autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? true,
     showQuotaRetryChoice: value?.showQuotaRetryChoice ?? true,
-    failureRecovery: recoveryPolicySchema.parse(value?.failureRecovery),
+    failureRecovery: AiAccountsSchema.decode(recoveryPolicySchema, value?.failureRecovery),
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,
     costPlacement: value?.costPlacement === 'separate' ? 'separate' : 'inside',
     pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,
     pricingOverrides: value?.pricingOverrides ?? {},
-    workHours: workHoursSchema.parse(value?.workHours),
+    workHours: AiAccountsSchema.decode(workHoursSchema, value?.workHours),
   }
 }

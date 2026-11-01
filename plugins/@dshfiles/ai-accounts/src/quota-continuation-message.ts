@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 
 export type ContinuationMessage = {
   readonly content: readonly { readonly type: string; readonly text?: string }[]
@@ -31,8 +32,8 @@ export class QuotaContinuationMessage {
     const encoded = SCHEDULE_REMINDER_PROMPT_LINE.exec(text)?.[1]
     if (encoded === undefined) return null
     try {
-      const prompt = z.string().safeParse(JSON.parse(encoded))
-      return prompt.success ? prompt.data : null
+      const prompt = AiAccountsSchema.decodeResult(Schema.String, JSON.parse(encoded))
+      return prompt._tag === 'Success' ? prompt.success : null
     } catch {
       return null
     }

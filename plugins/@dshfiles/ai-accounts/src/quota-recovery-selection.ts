@@ -20,11 +20,9 @@ export const suggestedQuotaRecoverySelection = (
 
   const defaultModel = catalog.groups.find(group => group.id === catalog.default.provider)?.models.find(model => model.id === catalog.default.model)
   if (catalog.default.provider !== failedRoute.provider) {
-    const selection: QuotaRecoveryModelSelection = { ...catalog.default }
-    if (selection.reasoningEffort === undefined && defaultModel?.reasoning?.defaultEffort !== undefined) {
-      selection.reasoningEffort = defaultModel.reasoning.defaultEffort
-    }
-    return selection
+    const base = { ...catalog.default }
+    if (catalog.default.reasoningEffort !== undefined || defaultModel?.reasoning?.defaultEffort === undefined) return base
+    return { ...base, reasoningEffort: defaultModel.reasoning.defaultEffort }
   }
 
   const otherProvider = catalog.groups.find(group => group.id !== failedRoute.provider)

@@ -1,39 +1,43 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
+import { method } from './api-schema.js'
 
-const accountInput = z.object({ instanceId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/u) }).strict()
+const accountInput = Schema.Struct({ instanceId: Schema.String.check(Schema.isPattern(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/u)) })
+
+const lowercasedUuidSchema = Schema.String.check(Schema.isUUID()).pipe(
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transform((value: string) => value.toLowerCase()),
+    encode: SchemaGetter.transform((value: string) => value),
+  }),
+)
 
 /** Only validated device instructions cross to the authenticated Web client. No CLI output or credentials. */
-export const accountLoginStateSchema = z
-  .object({
-    instanceId: z.string().max(64),
-    status: z.enum(['idle', 'starting', 'waiting', 'complete', 'error', 'cancelled']),
-    message: z.string().max(512),
-    errorCode: z
-      .enum([
-        'unsupported',
-        'unavailable',
-        'unsafe-home',
-        'timeout',
-        'invalid-output',
-        'failed',
-        'auth-not-saved',
-        'refresh-failed',
-        'replace-required',
-        'auth-changed',
-        'cleanup-failed',
-      ])
-      .nullable(),
-    verificationUri: z.literal('https://auth.openai.com/codex/device').nullable(),
-    userCode: z
-      .string()
-      .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4,5}$/u)
-      .nullable(),
-    expiresAt: z.number().nullable(),
-  })
-  .strict()
+export const accountLoginStateSchema = Schema.Struct({
+  instanceId: Schema.String.check(Schema.isMaxLength(64)),
+  status: Schema.Literals(['idle', 'starting', 'waiting', 'complete', 'error', 'cancelled']),
+  message: Schema.String.check(Schema.isMaxLength(512)),
+  errorCode: Schema.NullOr(
+    Schema.Literals([
+      'unsupported',
+      'unavailable',
+      'unsafe-home',
+      'timeout',
+      'invalid-output',
+      'failed',
+      'auth-not-saved',
+      'refresh-failed',
+      'replace-required',
+      'auth-changed',
+      'cleanup-failed',
+    ]),
+  ),
+  verificationUri: Schema.NullOr(Schema.Literal('https://auth.openai.com/codex/device')),
+  userCode: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[A-Z0-9]{4}-[A-Z0-9]{4,5}$/u))),
+  expiresAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+})
 
-export type AccountLoginState = z.infer<typeof accountLoginStateSchema>
+export type AccountLoginState = typeof accountLoginStateSchema.Type
 
 /** Device codes are human-only, including when a caller bypasses the tool renderer. */
 export const accountLoginMetadata = (state: AccountLoginState): AccountLoginState => ({ ...state, verificationUri: null, userCode: null })
@@ -45,15 +49,11 @@ export const aiAccountsLoginApi = defineApi({
   owner: '@dshfiles/ai-accounts',
   methods: {
     begin: method({
-      input: accountInput
-        .extend({
-          replaceExisting: z.literal(true).optional(),
-          operationId: z
-            .uuid()
-            .transform(value => value.toLowerCase())
-            .optional(),
-        })
-        .strict(),
+      input: Schema.Struct({
+        ...accountInput.fields,
+        replaceExisting: Schema.optional(Schema.Literal(true)),
+        operationId: Schema.optional(lowercasedUuidSchema),
+      }),
       output: accountLoginStateSchema,
       description:
         'Start official Codex CLI device sign-in in fresh private staging under an existing account’s shadow home. Call only when the user asked to sign in. Replacing existing credentials requires explicit replaceExisting:true consent; cancellation preserves the existing login. The user completes authorization in the Web GUI; device codes and URLs are excluded from agent output. No auto-install or Claude OAuth.',
@@ -66,15 +66,11 @@ export const aiAccountsLoginApi = defineApi({
       tool: { name: 'ai_accounts_login_status', readOnly: true, render: renderMetadata },
     }),
     cancel: method({
-      input: accountInput
-        .extend({
-          confirm: z.literal(true),
-          operationId: z
-            .uuid()
-            .transform(value => value.toLowerCase())
-            .optional(),
-        })
-        .strict(),
+      input: Schema.Struct({
+        ...accountInput.fields,
+        confirm: Schema.Literal(true),
+        operationId: Schema.optional(lowercasedUuidSchema),
+      }),
       output: accountLoginStateSchema,
       description:
         'Cancel the managed Codex sign-in process for an account. Preserves the existing account login until a successful sign-in commits. Call only when the user asked to cancel sign-in; explicit confirm: true is required.',

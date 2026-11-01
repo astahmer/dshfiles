@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
 import {
   AccountsRules,
   accountDraftSchema,
@@ -29,7 +30,7 @@ const draft: AccountDraft = {
   modelOrder: [],
 }
 
-const accepts = (patch: Partial<AccountDraft>) => accountDraftSchema.safeParse({ ...draft, ...patch }).success
+const accepts = (patch: Partial<AccountDraft>) => Schema.decodeUnknownResult(accountDraftSchema)({ ...draft, ...patch })._tag === 'Success'
 
 describe('account draft boundary', () => {
   it('accepts a keyed account on the Command Code host', () => {
@@ -57,7 +58,10 @@ describe('account draft boundary', () => {
 
 describe('connection method compatibility', () => {
   it.each(['cli', 'reference', 'device'])('preserves explicit %s connection selection on the Host wire', mode => {
-    expect(prepareAccountConnectionInputSchema.safeParse({ kind: 'commandcode', requestId: '11111111-1111-4111-8111-111111111111', mode }).success).toBe(true)
+    expect(
+      Schema.decodeUnknownResult(prepareAccountConnectionInputSchema)({ kind: 'commandcode', requestId: '11111111-1111-4111-8111-111111111111', mode })._tag ===
+        'Success',
+    ).toBe(true)
   })
 })
 
@@ -65,41 +69,45 @@ describe('provisional account display name boundary', () => {
   const operationId = '11111111-1111-4111-8111-111111111111'
 
   it('accepts optional names, trims them, and reuses the saved account length limit', () => {
-    expect(configureAccountConnectionInputSchema.parse({ operationId })).toEqual({ operationId })
-    expect(configureAccountConnectionInputSchema.parse({ operationId, displayName: '  Claude work  ' }).displayName).toBe('Claude work')
+    expect(Schema.decodeUnknownSync(configureAccountConnectionInputSchema)({ operationId })).toEqual({ operationId })
+    expect(Schema.decodeUnknownSync(configureAccountConnectionInputSchema)({ operationId, displayName: '  Claude work  ' }).displayName).toBe('Claude work')
     const displayName = 'n'.repeat(120)
-    expect(configureAccountConnectionInputSchema.parse({ operationId, displayName }).displayName).toBe(accountDraftSchema.shape.displayName.parse(displayName))
+    expect(Schema.decodeUnknownSync(configureAccountConnectionInputSchema)({ operationId, displayName }).displayName).toBe(
+      Schema.decodeUnknownSync(accountDraftSchema.fields.displayName)(displayName),
+    )
   })
 
   it.each(['', '   ', 'n'.repeat(121)])('rejects invalid provisional names', displayName => {
-    expect(configureAccountConnectionInputSchema.safeParse({ operationId, displayName }).success).toBe(false)
+    expect(Schema.decodeUnknownResult(configureAccountConnectionInputSchema)({ operationId, displayName })._tag === 'Success').toBe(false)
   })
 })
 
 describe('setup-account creation boundary', () => {
-  it.each(accountKindSchema.options)('accepts %s with a UUID request identity', kind => {
-    expect(createSetupAccountInputSchema.safeParse({ kind, requestId: '11111111-1111-4111-8111-111111111111' }).success).toBe(true)
+  it.each(accountKindSchema.literals)('accepts %s with a UUID request identity', kind => {
+    expect(Schema.decodeUnknownResult(createSetupAccountInputSchema)({ kind, requestId: '11111111-1111-4111-8111-111111111111' })._tag === 'Success').toBe(true)
     expect(`${kind}_work_${'11111111-1111-4111-8111-111111111111'.replaceAll('-', '')}`.length).toBeLessThanOrEqual(64)
   })
 
   it.each(['', 'not-a-uuid', '../escape', '11111111111141118111111111111111'])('rejects invalid request identity %s', requestId => {
-    expect(createSetupAccountInputSchema.safeParse({ kind: 'codex', requestId }).success).toBe(false)
+    expect(Schema.decodeUnknownResult(createSetupAccountInputSchema)({ kind: 'codex', requestId })._tag === 'Success').toBe(false)
   })
 
   it('rejects unsupported provider kinds', () => {
-    expect(createSetupAccountInputSchema.safeParse({ kind: '../escape', requestId: '11111111-1111-4111-8111-111111111111' }).success).toBe(false)
+    expect(
+      Schema.decodeUnknownResult(createSetupAccountInputSchema)({ kind: '../escape', requestId: '11111111-1111-4111-8111-111111111111' })._tag === 'Success',
+    ).toBe(false)
   })
 })
 
 describe('forecast history batch boundary', () => {
   it('accepts one or two distinct account ids', () => {
-    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work'] }).success).toBe(true)
-    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work', 'home'] }).success).toBe(true)
+    expect(Schema.decodeUnknownResult(forecastHistoryBatchInputSchema)({ instanceIds: ['work'] })._tag === 'Success').toBe(true)
+    expect(Schema.decodeUnknownResult(forecastHistoryBatchInputSchema)({ instanceIds: ['work', 'home'] })._tag === 'Success').toBe(true)
   })
 
   it.each([{ instanceIds: [] }, { instanceIds: [''] }, { instanceIds: ['work', 'work'] }, { instanceIds: ['a', 'b', 'c'] }, { instanceIds: ['x'.repeat(65)] }])(
     'rejects invalid account batches',
-    input => expect(forecastHistoryBatchInputSchema.safeParse(input).success).toBe(false),
+    input => expect(Schema.decodeUnknownResult(forecastHistoryBatchInputSchema)(input)._tag === 'Success').toBe(false),
   )
 })
 

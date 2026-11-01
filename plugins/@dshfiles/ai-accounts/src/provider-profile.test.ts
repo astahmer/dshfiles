@@ -198,7 +198,8 @@ describe('account provider profiles', () => {
 
 describe('Codex OAuth request refresh', () => {
   it('sends a refreshed access token after resolving an expired stored credential', async () => {
-    const claimsFor = (accountId: string) => btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, 'https://api.openai.com/auth': { chatgpt_account_id: accountId } }))
+    const claimsFor = (accountId: string) =>
+      btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, 'https://api.openai.com/auth': { chatgpt_account_id: accountId } }))
     const expiredAccess = `e30.${claimsFor('acct-old')}.sig`
     const refreshedAccess = `e30.${claimsFor('acct-fresh')}.sig`
     let storedCredential: OAuthCredential = { type: 'oauth', access: expiredAccess, refresh: 'refresh-old', expires: 0, accountId: 'acct-old', persist: false }

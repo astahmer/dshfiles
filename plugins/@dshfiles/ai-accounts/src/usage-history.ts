@@ -1,4 +1,5 @@
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import { asZodSchema } from './effect-zod-schema.js'
 import { MAX_USAGE_HISTORY_POINTS, quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
 import type { QuotaSnapshot } from './usage-history-model.js'
 
@@ -111,12 +112,12 @@ export const usageHistoryDomain = defineDomain({
   version: 1,
   // `initial` is the shape the type is inferred from, so it carries every field.
   global: {
-    schema: usageMetaSchema,
+    schema: asZodSchema(usageMetaSchema),
     initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90 },
   },
   tables: {
     /** Keyed by account, interval, and interval bucket. */
-    quota: { valueSchema: quotaSnapshotSchema, __key: 'quota' },
+    quota: { valueSchema: asZodSchema(quotaSnapshotSchema), __key: 'quota' },
   },
 })
 

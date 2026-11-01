@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
 import { accountDraftSchema } from './api.js'
+import * as Schema from 'effect/Schema'
 
 const empty = AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] })
 const model = {
@@ -65,11 +66,11 @@ describe('account model defaults', () => {
   })
 
   it('round trips optional preferences through the wire schema', () => {
-    expect(accountDraftSchema.parse({ ...empty, inheritModelSettings: false, defaultReasoningEffort: 'low' })).toMatchObject({
+    expect(Schema.decodeUnknownSync(accountDraftSchema)({ ...empty, inheritModelSettings: false, defaultReasoningEffort: 'low' })).toMatchObject({
       inheritModelSettings: false,
       defaultReasoningEffort: 'low',
     })
-    const legacy = accountDraftSchema.parse(empty)
+    const legacy = Schema.decodeUnknownSync(accountDraftSchema)(empty)
     expect(Object.hasOwn(legacy, 'inheritModelSettings')).toBe(false)
     expect(Object.hasOwn(legacy, 'defaultReasoningEffort')).toBe(false)
   })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { accountProfileSchema, type AccountDraft, type AccountProfile } from './api.js'
+import * as Schema from 'effect/Schema'
 
 describe('account draft defaults', () => {
   it('creates a unique API-key reference for newly added keyed accounts', () => {
@@ -23,7 +24,7 @@ describe('account draft defaults', () => {
 
 describe('the editor draft following the selection', () => {
   const stored = (draft: AccountDraft): AccountProfile =>
-    accountProfileSchema.parse({
+    Schema.decodeUnknownSync(accountProfileSchema)({
       ...draft,
       mode: 'direct',
       signedIn: false,

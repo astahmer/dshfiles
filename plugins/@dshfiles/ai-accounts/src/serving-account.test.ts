@@ -8,6 +8,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
 import { successfulAccountSchema } from './serving-account-api.js'
 import { servingAccountSessionForCaller } from './serving-account-host.js'
 import {
@@ -17,6 +18,7 @@ import {
   SERVING_ACCOUNT_RETENTION_MS,
   type ServingAccountService,
 } from './serving-account.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 const roots: string[] = []
 const contexts: Context[] = []
@@ -118,9 +120,9 @@ describe('actual serving account ownership', () => {
   })
   it('validates metadata with an explicit allowlist, never content or credentials', () => {
     const good = { ...route, startedAt: 1, updatedAt: 2, status: 'succeeded' }
-    expect(successfulAccountSchema.safeParse(good).success).toBe(true)
+    expect(AiAccountsSchema.accepts(successfulAccountSchema, good)).toBe(true)
     for (const extra of [{ messages: [] }, { token: 'not-a-secret-fixture' }, { purpose: 'title' }, { title: 'private' }]) {
-      expect(successfulAccountSchema.safeParse({ ...good, ...extra }).success).toBe(false)
+      expect(AiAccountsSchema.acceptsStrict(successfulAccountSchema, { ...good, ...extra })).toBe(false)
     }
   })
   it('bounds retained successful chats and expires old metadata on open', async () => {
@@ -133,7 +135,7 @@ describe('actual serving account ownership', () => {
     const entries = new Map(
       Array.from({ length: MAX_SERVING_ACCOUNT_SESSIONS + 3 }, (_, index) => {
         const sessionId = `chat-${index}`
-        return [sessionId, successfulAccountSchema.parse({ ...route, sessionId, startedAt: index, updatedAt: index, status: 'succeeded' })]
+        return [sessionId, Schema.decodeUnknownSync(successfulAccountSchema)({ ...route, sessionId, startedAt: index, updatedAt: index, status: 'succeeded' })]
       }),
     )
     expect(ServingAccountModel.pruneKeys(entries, MAX_SERVING_ACCOUNT_SESSIONS + 3)).toEqual(['chat-2', 'chat-1', 'chat-0'])

@@ -1,15 +1,16 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { providerFetch } from './provider-request.js'
 import type { AccountConnectionMethod } from './api.js'
 import { readAccountUsage } from './account-usage.js'
 import { ClaudeAccountModel } from './claude-account.js'
 import { verifyClaudeAuthStatus, type ClaudeAuthStatusRunner } from './claude-auth-status.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 type UsageInput = Parameters<typeof readAccountUsage>[0]
 const VERIFICATION_TIMEOUT_MS = 6_000
 const RETRY_MESSAGE = 'Could not verify this account connection. Check sign-in and try again.'
 const failure = (): Error => new Error(RETRY_MESSAGE)
-const tokenCountSchema = z.object({ input_tokens: z.number().finite().nonnegative() })
+const tokenCountSchema = Schema.Struct({ input_tokens: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)) })
 
 /** Claude's inference route does not carry apiBaseUrl; never validate another origin instead. */
 const assertOfficialClaudeBase = (value: string): void => {
@@ -103,7 +104,7 @@ export const verifyAccountConnection = async (
             signal: controller.signal,
           },
         })
-        if (!response.ok || !tokenCountSchema.safeParse(await response.json()).success) throw failure()
+        if (!response.ok || AiAccountsSchema.decodeResult(tokenCountSchema, await response.json())._tag === 'Failure') throw failure()
       }
       assertActive()
       return

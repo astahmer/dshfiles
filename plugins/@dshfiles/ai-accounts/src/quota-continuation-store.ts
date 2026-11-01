@@ -1,4 +1,5 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { asZodSchema } from './effect-zod-schema.js'
 import { quotaContinuationRecordSchema, type QuotaContinuationRecord } from './quota-continuation-model.js'
 
 export type QuotaContinuationTable = KvTable<string, QuotaContinuationRecord>
@@ -9,7 +10,7 @@ export const quotaContinuationDomain = defineDomain({
   layout: 'per-record',
   tables: {
     continuations: {
-      valueSchema: quotaContinuationRecordSchema,
+      valueSchema: asZodSchema(quotaContinuationRecordSchema),
       __key: 'continuations',
     },
   },

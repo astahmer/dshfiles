@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { accountDraftSchema } from './api.js'
 import { configFromAccountsFile } from './account-config.js'
+import * as Schema from 'effect/Schema'
 
 const account = (kind: 'codex' | 'commandcode' | 'opencode-go' | 'github-copilot') =>
-  accountDraftSchema.parse({
+  Schema.decodeUnknownSync(accountDraftSchema)({
     instanceId: `${kind}_test`,
     kind,
     displayName: kind,

@@ -1,5 +1,6 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { asZodSchema } from './effect-zod-schema.js'
 import {
   fallbackChainSchema,
   fallbackReturnPolicySchema,
@@ -14,23 +15,25 @@ const MAX_THREAD_ROWS = 2_000
 const DEFAULT_KEY = 'default'
 const POLICY_KEY = 'policy'
 
-const chainRecordSchema = z.object({ chain: fallbackChainSchema, updatedAt: z.number().int().nonnegative() }).strict()
-const activeRecordSchema = z.object({ route: fallbackRouteSchema, from: fallbackRouteSchema, since: z.number().int().nonnegative() }).strict()
-const preferenceRecordSchema = z.object({ returnPolicy: fallbackReturnPolicySchema }).strict()
+const nonNegativeInteger = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
-type ChainRecord = z.infer<typeof chainRecordSchema>
-type ActiveRecord = z.infer<typeof activeRecordSchema>
-type PreferenceRecord = z.infer<typeof preferenceRecordSchema>
+const chainRecordSchema = Schema.Struct({ chain: fallbackChainSchema, updatedAt: nonNegativeInteger })
+const activeRecordSchema = Schema.Struct({ route: fallbackRouteSchema, from: fallbackRouteSchema, since: nonNegativeInteger })
+const preferenceRecordSchema = Schema.Struct({ returnPolicy: fallbackReturnPolicySchema })
+
+type ChainRecord = typeof chainRecordSchema.Type
+type ActiveRecord = typeof activeRecordSchema.Type
+type PreferenceRecord = typeof preferenceRecordSchema.Type
 
 export const modelFallbackDomain = defineDomain({
   name: 'dshfiles_ai_accounts_model_fallbacks',
   version: 1,
   tables: {
     /** `default` plus one row per thread that overrides it. */
-    chains: { valueSchema: chainRecordSchema, __key: 'chains' },
+    chains: { valueSchema: asZodSchema(chainRecordSchema), __key: 'chains' },
     /** Threads a fallback is serving instead of their selected model. */
-    active: { valueSchema: activeRecordSchema, __key: 'active' },
-    preferences: { valueSchema: preferenceRecordSchema, __key: 'preferences' },
+    active: { valueSchema: asZodSchema(activeRecordSchema), __key: 'active' },
+    preferences: { valueSchema: asZodSchema(preferenceRecordSchema), __key: 'preferences' },
   },
 })
 

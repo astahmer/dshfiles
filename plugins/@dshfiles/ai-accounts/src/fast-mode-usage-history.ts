@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import * as Schema from 'effect/Schema'
+import { asZodSchema } from './effect-zod-schema.js'
 import {
   FastModeUsageModel,
   fastModeUsageEventSchema,
@@ -19,7 +21,7 @@ const fastModeUsageDomain = defineDomain({
   layout: 'per-record',
   invalidRecords: 'backup-and-skip',
   tables: {
-    events: { valueSchema: fastModeUsageEventSchema, __key: 'eventId' },
+    events: { valueSchema: asZodSchema(fastModeUsageEventSchema), __key: 'eventId' },
   },
 })
 
@@ -73,7 +75,7 @@ export const createFastModeUsageHistoryService = (
     const opening = domainOf(ctx)
     if (opening === undefined) return
     const domain = await opening
-    const event = fastModeUsageEventSchema.parse({ ...fastModeUsageObservationSchema.parse(input), at: now() })
+    const event = Schema.decodeUnknownSync(fastModeUsageEventSchema)({ ...Schema.decodeUnknownSync(fastModeUsageObservationSchema)(input), at: now() })
     await domain.table('events').put(randomUUID(), event)
     writesSincePrune += 1
     if (writesSincePrune < 100) return

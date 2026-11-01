@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ModelSelection, SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ScheduleId, type ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
@@ -258,9 +259,8 @@ const createQuotaContinuationService = ({
       scheduled: scheduleAvailable && record.scheduleId !== null,
       ready: isReady(record, now),
     }
-    if (record.failedProvider !== undefined) value.failedProvider = record.failedProvider
-    if (record.failedModel !== undefined) value.failedModel = record.failedModel
-    return value
+    const withProvider = record.failedProvider === undefined ? value : { ...value, failedProvider: record.failedProvider }
+    return record.failedModel === undefined ? withProvider : { ...withProvider, failedModel: record.failedModel }
   }
 
   const activeForSession = async (sessionId: string): Promise<QuotaContinuationRecord[]> =>

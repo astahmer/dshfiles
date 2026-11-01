@@ -1,14 +1,10 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { AccountDraft, AccountsCatalog } from './api.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 type CatalogModel = AccountsCatalog['models'][number]
 
-const additionalModelIdSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(120)
-  .regex(/^[^\s\p{C}]+$/u)
+const additionalModelIdSchema = AiAccountsSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120), Schema.isPattern(/^[^\s\p{C}]+$/u))
 
 export class ModelCurationModel {
   static parseAdditionalModelId = (input: string, account: Pick<AccountDraft, 'instanceId' | 'kind'>): string | null => {
@@ -16,8 +12,8 @@ export class ModelCurationModel {
     const prefixes = [`${account.instanceId}/`, ...(account.kind === 'opencode-go' ? ['opencode-go/'] : [])]
     const prefix = prefixes.find(candidate => value.startsWith(candidate))
     const candidate = prefix === undefined ? value : value.slice(prefix.length)
-    const parsed = additionalModelIdSchema.safeParse(candidate)
-    return parsed.success ? parsed.data : null
+    const parsed = AiAccountsSchema.decodeResult(additionalModelIdSchema, candidate)
+    return parsed._tag === 'Success' ? parsed.success : null
   }
 
   static toggleFavoriteModel = (input: {

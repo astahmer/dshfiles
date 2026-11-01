@@ -1,47 +1,57 @@
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 
-const quotaContinuationStateSchema = z.enum(['waiting', 'queued', 'invalidated', 'completed'])
+const quotaContinuationStateSchema = Schema.Literals(['waiting', 'queued', 'invalidated', 'completed'])
 
-export const quotaContinuationRecordSchema = z
-  .object({
-    continuationId: z.string().uuid(),
-    sessionId: z.string().trim().min(1).max(256),
-    accountId: z.string().trim().min(1).max(64),
-    failedProvider: z.string().min(1).max(200).optional(),
-    failedModel: z.string().min(1).max(200).optional(),
-    failedSeq: z.number().int().safe().nonnegative(),
-    failedAt: z.number().int().safe().nonnegative(),
-    resetAt: z.number().int().safe().nonnegative().nullable(),
-    autoRetry: z.boolean().default(false),
-    /** `user` once someone ticked or unticked this recovery, so its choice carries to the thread's next failure. */
-    autoRetrySource: z.enum(['user', 'default']).optional(),
-    snoozedUntil: z.number().int().safe().nonnegative().nullable(),
-    scheduleId: z.string().trim().min(1).max(128).nullable(),
-    queueSource: z.enum(['manual', 'schedule']).nullable(),
-    state: quotaContinuationStateSchema,
-  })
-  .strict()
+const safeNonNegativeInteger = Schema.Number.check(
+  Schema.isFinite(),
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+)
 
-export type QuotaContinuationRecord = z.infer<typeof quotaContinuationRecordSchema>
+const routeText = (maximum: number) => Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maximum))
 
-export const quotaContinuationSummarySchema = z
-  .object({
-    continuationId: z.string().uuid(),
-    sessionId: z.string().trim().min(1).max(256),
-    accountId: z.string().trim().min(1).max(64),
-    title: z.string().trim().min(1).max(512).optional(),
-    cwd: z.string().trim().min(1).max(4096).optional(),
-    failedProvider: z.string().min(1).max(200).optional(),
-    failedModel: z.string().min(1).max(200).optional(),
-    failedAt: z.number().int().safe().nonnegative(),
-    resetAt: z.number().int().safe().nonnegative().nullable(),
-    autoRetry: z.boolean().catch(false),
-    snoozedUntil: z.number().int().safe().nonnegative().nullable(),
-  })
-  .extend({
-    state: z.enum(['waiting', 'queued']),
-    scheduled: z.boolean(),
-    ready: z.boolean(),
-  })
+export const quotaContinuationRecordSchema = Schema.Struct({
+  continuationId: Schema.String.check(Schema.isUUID()),
+  sessionId: AiAccountsSchema.trimmedName(256),
+  accountId: AiAccountsSchema.trimmedName(64),
+  failedProvider: Schema.optional(routeText(200)),
+  failedModel: Schema.optional(routeText(200)),
+  failedSeq: safeNonNegativeInteger,
+  failedAt: safeNonNegativeInteger,
+  resetAt: Schema.NullOr(safeNonNegativeInteger),
+  autoRetry: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  /** `user` once someone ticked or unticked this recovery, so its choice carries to the thread's next failure. */
+  autoRetrySource: Schema.optional(Schema.Literals(['user', 'default'])),
+  snoozedUntil: Schema.NullOr(safeNonNegativeInteger),
+  scheduleId: Schema.NullOr(AiAccountsSchema.trimmedName(128)),
+  queueSource: Schema.NullOr(Schema.Literals(['manual', 'schedule'])),
+  state: quotaContinuationStateSchema,
+})
 
-export type QuotaContinuationSummary = z.infer<typeof quotaContinuationSummarySchema>
+export type QuotaContinuationRecord = typeof quotaContinuationRecordSchema.Type
+
+export const quotaContinuationSummarySchema = Schema.Struct({
+  continuationId: Schema.String.check(Schema.isUUID()),
+  sessionId: AiAccountsSchema.trimmedName(256),
+  accountId: AiAccountsSchema.trimmedName(64),
+  title: Schema.optional(AiAccountsSchema.trimmedName(512)),
+  cwd: Schema.optional(AiAccountsSchema.trimmedName(4096)),
+  failedProvider: Schema.optional(routeText(200)),
+  failedModel: Schema.optional(routeText(200)),
+  failedAt: safeNonNegativeInteger,
+  resetAt: Schema.NullOr(safeNonNegativeInteger),
+  autoRetry: Schema.Boolean.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(false))),
+    Schema.withDecodingDefaultKey(Effect.succeed(false)),
+  ),
+  snoozedUntil: Schema.NullOr(safeNonNegativeInteger),
+  state: Schema.Literals(['waiting', 'queued']),
+  scheduled: Schema.Boolean,
+  ready: Schema.Boolean,
+})
+
+export type QuotaContinuationSummary = typeof quotaContinuationSummarySchema.Type

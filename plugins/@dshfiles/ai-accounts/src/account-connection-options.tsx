@@ -1,7 +1,16 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
+import * as Schema from 'effect/Schema'
 import { AccountConnectionMethodModel } from './account-connection-method.js'
 import { configureAccountConnectionInputSchema, type AccountConnectionMethod, type AccountProfile, type ConfigureAccountConnectionInput } from './api.js'
+
+const connectionHomesFormSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({
+    homePath: Schema.required(configureAccountConnectionInputSchema.fields.homePath),
+    shadowHomePath: Schema.required(configureAccountConnectionInputSchema.fields.shadowHomePath),
+  }),
+)
+const existingKeyFormSchema = Schema.toStandardSchemaV1(Schema.Struct({ apiKeyEnv: Schema.required(configureAccountConnectionInputSchema.fields.apiKeyEnv) }))
 
 type ConnectionChange = Omit<ConfigureAccountConnectionInput, 'operationId'>
 interface ConnectionOptionsProps {
@@ -82,7 +91,7 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
   const form = useAppForm({
     defaultValues: { homePath: props.account.homePath, shadowHomePath: props.account.shadowHomePath },
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: configureAccountConnectionInputSchema.pick({ homePath: true, shadowHomePath: true }).required() },
+    validators: { onDynamic: connectionHomesFormSchema },
     onSubmit: ({ value }) => props.configure(codex ? value : { homePath: value.homePath }),
   })
   return (
@@ -130,7 +139,7 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
   const form = useAppForm({
     defaultValues: { apiKeyEnv: props.account.apiKeyEnv },
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: configureAccountConnectionInputSchema.pick({ apiKeyEnv: true }).required() },
+    validators: { onDynamic: existingKeyFormSchema },
     onSubmit: ({ value }) => props.configure(value),
   })
   const example =

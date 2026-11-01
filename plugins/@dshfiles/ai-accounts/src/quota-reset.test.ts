@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { usageCardSchema, type UsageCard } from './api.js'
 import { knownQuotaResetAt, resetAtFromMessage } from './quota-reset.js'
+import * as Schema from 'effect/Schema'
 
 const usage = (patch: Partial<UsageCard> = {}): UsageCard =>
-  usageCardSchema.parse({
+  Schema.decodeUnknownSync(usageCardSchema)({
     status: 'ok',
     message: null,
     identity: null,

@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import {
   SESSION_COST_PROJECTION_KEY,
   CostEstimateModel,
@@ -9,6 +9,8 @@ import {
   type SessionCostView,
   type TokenBuckets,
 } from './cost-estimate.js'
+import { AiAccountsSchema } from './effect-schema.js'
+import { asZodSchema } from './effect-zod-schema.js'
 
 /**
  * Per-session token usage grouped by route and context band, folded from the
@@ -20,48 +22,53 @@ import {
  * with the model that served it.
  */
 
-const selectionSchema = z.object({ provider: z.string(), model: z.string() }).nullable()
+const nonNegativeInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
-const stateSchema = z.object({
+const selectionSchema = Schema.NullOr(Schema.Struct({ provider: Schema.String, model: Schema.String }))
+
+const stateSchema = Schema.Struct({
   selection: selectionSchema,
-  last: z.object({ turn: z.number().int().min(0), step: z.number().int().min(0), group: costGroupSchema }).nullable(),
+  last: Schema.NullOr(Schema.Struct({ turn: nonNegativeInt, step: nonNegativeInt, group: costGroupSchema })),
   view: sessionCostViewSchema,
 })
 
-type CostState = z.infer<typeof stateSchema>
+type CostState = typeof stateSchema.Type
 
 interface ProjectionEvent {
   readonly type: string
   readonly data?: unknown
 }
 
-const usageSampleSchema = z.object({
-  inputTokens: z.number().int().min(0),
-  outputTokens: z.number().int().min(0),
-  cacheReadTokens: z.number().int().min(0).optional(),
-  cacheWriteTokens: z.number().int().min(0).optional(),
+const usageSampleSchema = Schema.Struct({
+  inputTokens: nonNegativeInt,
+  outputTokens: nonNegativeInt,
+  cacheReadTokens: Schema.optional(nonNegativeInt),
+  cacheWriteTokens: Schema.optional(nonNegativeInt),
 })
 
-const streamUsageSchema = z.object({ type: z.literal('chunk'), chunk: z.object({ type: z.literal('usage'), usage: usageSampleSchema }) })
-
-const settlementSchema = z.object({
-  turn: z.number().int().min(0),
-  step: z.number().int().min(0),
-  usage: usageSampleSchema.optional(),
-  stream: z.array(z.unknown()).optional(),
+const streamUsageSchema = Schema.Struct({
+  type: Schema.Literal('chunk'),
+  chunk: Schema.Struct({ type: Schema.Literal('usage'), usage: usageSampleSchema }),
 })
 
-const headerSchema = z.object({ header: z.object({ config: z.object({ provider: z.string(), model: z.string() }) }) })
-const contextSchema = z.object({ provider: z.string(), model: z.string() })
-const retrySchema = z.object({ turn: z.number().int().min(0), step: z.number().int().min(0) })
+const settlementSchema = Schema.Struct({
+  turn: nonNegativeInt,
+  step: nonNegativeInt,
+  usage: Schema.optional(usageSampleSchema),
+  stream: Schema.optional(Schema.Array(Schema.Unknown)),
+})
 
-const usageOf = (settlement: z.infer<typeof settlementSchema>): TokenBuckets | undefined => {
+const headerSchema = Schema.Struct({ header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }) }) })
+const contextSchema = Schema.Struct({ provider: Schema.String, model: Schema.String })
+const retrySchema = Schema.Struct({ turn: nonNegativeInt, step: nonNegativeInt })
+
+const usageOf = (settlement: typeof settlementSchema.Type): TokenBuckets | undefined => {
   let sample = settlement.usage
   if (sample === undefined) {
     for (const record of [...(settlement.stream ?? [])].reverse()) {
-      const parsed = streamUsageSchema.safeParse(record)
-      if (parsed.success) {
-        sample = parsed.data.chunk.usage
+      const parsed = AiAccountsSchema.decodeResult(streamUsageSchema, record)
+      if (parsed._tag === 'Success') {
+        sample = parsed.success.chunk.usage
         break
       }
     }
@@ -106,29 +113,30 @@ const initialCostState = (): CostState => ({ selection: null, last: null, view: 
 
 const applyCostEvent = (state: CostState, event: ProjectionEvent): CostState => {
   if (event.type === 'request/header') {
-    const parsed = headerSchema.safeParse(event.data)
-    if (!parsed.success) return state
-    const selection = { provider: parsed.data.header.config.provider, model: parsed.data.header.config.model }
+    const parsed = AiAccountsSchema.decodeResult(headerSchema, event.data)
+    if (parsed._tag === 'Failure') return state
+    const selection = { provider: parsed.success.header.config.provider, model: parsed.success.header.config.model }
     if (state.selection?.provider === selection.provider && state.selection.model === selection.model) return state
     return { ...state, selection }
   }
   if (event.type === 'request/context') {
-    const parsed = contextSchema.safeParse(event.data)
-    if (!parsed.success) return state
-    if (state.selection?.provider === parsed.data.provider && state.selection.model === parsed.data.model) return state
-    return { ...state, selection: { provider: parsed.data.provider, model: parsed.data.model } }
+    const parsed = AiAccountsSchema.decodeResult(contextSchema, event.data)
+    if (parsed._tag === 'Failure') return state
+    if (state.selection?.provider === parsed.success.provider && state.selection.model === parsed.success.model) return state
+    return { ...state, selection: { provider: parsed.success.provider, model: parsed.success.model } }
   }
   if (event.type === 'llm/retry-started') {
-    const parsed = retrySchema.safeParse(event.data)
-    if (!parsed.success || state.last === null || state.last.turn !== parsed.data.turn || state.last.step !== parsed.data.step) return state
+    const parsed = AiAccountsSchema.decodeResult(retrySchema, event.data)
+    if (parsed._tag === 'Failure') return state
+    if (state.last === null || state.last.turn !== parsed.success.turn || state.last.step !== parsed.success.step) return state
     return { ...state, last: null }
   }
   if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return state
-  const parsed = settlementSchema.safeParse(event.data)
-  if (!parsed.success) return state
-  const tokens = usageOf(parsed.data)
+  const parsed = AiAccountsSchema.decodeResult(settlementSchema, event.data)
+  if (parsed._tag === 'Failure') return state
+  const tokens = usageOf(parsed.success)
   if (tokens === undefined) return state
-  const { turn, step } = parsed.data
+  const { turn, step } = parsed.success
   const group: CostGroup = {
     provider: state.selection?.provider ?? '',
     model: state.selection?.model ?? '',
@@ -172,11 +180,12 @@ const STATE_VERSION = 2
 const costProjectionDefinition = {
   key: SESSION_COST_PROJECTION_KEY,
   stateVersion: STATE_VERSION,
-  stateSchema,
+  // `ctx.sessionProjections` still declares its schema as a Zod schema and calls `.parse` on it.
+  stateSchema: asZodSchema(stateSchema),
   init: CostProjectionModel.initialState,
   apply: CostProjectionModel.applyEvent,
   wire: {
-    viewSchema: sessionCostViewSchema,
+    viewSchema: asZodSchema(sessionCostViewSchema),
     // The state keeps the view object, so a selection-only change publishes nothing.
     view: (state: CostState): SessionCostView => state.view,
   },

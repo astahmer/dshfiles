@@ -3,6 +3,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PencilIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
+import * as Schema from 'effect/Schema'
 import { accountDraftSchema, type AccountProfile } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 
@@ -30,13 +31,13 @@ export const AccountConnectionSummary = (props: {
           className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-2"
           onSubmit={event => {
             event.preventDefault()
-            const parsed = accountDraftSchema.shape.displayName.safeParse(value.trim())
-            if (!parsed.success) {
+            const parsed = Schema.decodeUnknownResult(accountDraftSchema.fields.displayName)(value.trim())
+            if (parsed._tag === 'Failure') {
               setError('Enter a name between 1 and 120 characters.')
               return
             }
             void props
-              .saveName(parsed.data)
+              .saveName(parsed.success)
               .then(() => setEditing(false))
               .catch(() => setError('Could not update the name. Try again.'))
           }}

@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { accountRouteSlugSchema } from './account-draft.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import type { AccountDraft } from './api.js'
 import { CodexHomeModel, type CodexHomeLayout } from './codex-home.js'
 
@@ -27,7 +28,9 @@ export class AccountHomePolicy {
     if (path !== resolve(path) || dirname(path) !== ownedRoot || !path.startsWith(`${ownedRoot}${sep}`)) return false
     const instanceId = basename(path)
     const prefix = `${kind}_work_`
-    return accountRouteSlugSchema.safeParse(instanceId).success && instanceId.startsWith(prefix) && /^[a-f0-9]{32}$/u.test(instanceId.slice(prefix.length))
+    return (
+      AiAccountsSchema.accepts(accountRouteSlugSchema, instanceId) && instanceId.startsWith(prefix) && /^[a-f0-9]{32}$/u.test(instanceId.slice(prefix.length))
+    )
   }
 
   static readonly codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string): CodexHomeLayout => {
@@ -35,7 +38,7 @@ export class AccountHomePolicy {
     // Only valid generated ids and the exact store-owned pair bypass legacy containment/overlay.
     // A scratch DSH_HOME can live outside the OS home without seeding the user's real Codex auth.
     if (
-      accountRouteSlugSchema.safeParse(profile.instanceId).success &&
+      AiAccountsSchema.accepts(accountRouteSlugSchema, profile.instanceId) &&
       profile.instanceId === basename(privateHome) &&
       AccountHomePolicy.isManagedSetupHome(profile.homePath, 'codex') &&
       profile.homePath === privateHome &&

@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { UsageCard } from './api.js'
 import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel } from './usage.js'
 import { providerFetch } from './provider-request.js'
@@ -30,7 +31,7 @@ const CURSOR_USAGE_URL = 'https://cursor.com/api/usage-summary'
 
 export const CURSOR_LOGIN_HINT = 'cursor-agent login'
 
-const fileAuthSchema = z.object({ accessToken: z.string().min(1) })
+const fileAuthSchema = Schema.Struct({ accessToken: Schema.String.check(Schema.isMinLength(1)) })
 
 export const readCursorToken = async (
   keyEnv: string,
@@ -43,54 +44,54 @@ export const readCursorToken = async (
   const fromKeychain = await readKeychainSecret({ service: 'cursor-access-token', account: 'cursor-user' })
   if (fromKeychain !== undefined) return fromKeychain
   try {
-    const parsed = fileAuthSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.config', 'cursor', 'auth.json'), 'utf8')))
-    return parsed.success ? parsed.data.accessToken : undefined
+    const parsed = AiAccountsSchema.decodeResult(fileAuthSchema, JSON.parse(await readFile(join(homedir(), '.config', 'cursor', 'auth.json'), 'utf8')))
+    return parsed._tag === 'Success' ? parsed.success.accessToken : undefined
   } catch {
     return undefined
   }
 }
 
-const planSchema = z.object({
-  enabled: z.boolean().optional(),
-  used: z.number().finite().optional(),
-  limit: z.number().finite().optional(),
-  totalPercentUsed: z.number().finite().optional(),
+const planSchema = Schema.Struct({
+  enabled: Schema.optional(Schema.Boolean),
+  used: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  limit: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  totalPercentUsed: Schema.optional(Schema.Number.check(Schema.isFinite())),
 })
 
-const cursorUsageSchema = z.object({
-  billingCycleEnd: z.string().optional(),
-  membershipType: z.string().optional(),
-  individualUsage: z.object({ plan: planSchema.nullish() }).nullish(),
+const cursorUsageSchema = Schema.Struct({
+  billingCycleEnd: Schema.optional(Schema.String),
+  membershipType: Schema.optional(Schema.String),
+  individualUsage: Schema.optional(Schema.NullOr(Schema.Struct({ plan: Schema.optional(Schema.NullOr(planSchema)) }))),
 })
 
 export class CursorAccountModel {
   /** The dashboard cookie pairs the JWT subject's user id with the token. */
   static cursorSessionCookie = (token: string): string | undefined => {
-    const parsedSubject = z.string().min(1).safeParse(CodexHomeModel.decodeJwtPayload(token)?.sub)
-    if (!parsedSubject.success) return undefined
-    const subject = parsedSubject.data
+    const parsedSubject = AiAccountsSchema.decodeResult(Schema.String.check(Schema.isMinLength(1)), CodexHomeModel.decodeJwtPayload(token)?.sub)
+    if (parsedSubject._tag !== 'Success') return undefined
+    const subject = parsedSubject.success
     const userId = subject.includes('|') ? subject.slice(subject.lastIndexOf('|') + 1) : subject
     return `WorkosCursorSessionToken=${encodeURIComponent(`${userId}::${token}`)}`
   }
 
   static parseCursorUsage = (raw: JsonValue): UsageCard => {
-    const parsed = cursorUsageSchema.safeParse(raw)
-    if (!parsed.success) return ProviderUsageModel.emptyUsage('unsupported', 'Cursor answered in a shape this plugin does not recognise.')
-    const plan = parsed.data.individualUsage?.plan
+    const parsed = AiAccountsSchema.decodeResult(cursorUsageSchema, raw)
+    if (parsed._tag !== 'Success') return ProviderUsageModel.emptyUsage('unsupported', 'Cursor answered in a shape this plugin does not recognise.')
+    const plan = parsed.success.individualUsage?.plan
     const usedPercent =
       plan?.totalPercentUsed ?? (plan?.used !== undefined && plan.limit !== undefined && plan.limit > 0 ? (plan.used / plan.limit) * 100 : undefined)
-    const resetsAt = parsed.data.billingCycleEnd === undefined ? Number.NaN : Date.parse(parsed.data.billingCycleEnd)
+    const resetsAt = parsed.success.billingCycleEnd === undefined ? Number.NaN : Date.parse(parsed.success.billingCycleEnd)
     if (usedPercent === undefined) {
       return {
         ...ProviderUsageModel.emptyUsage('unsupported', 'Cursor reported no included-usage limit for this plan.'),
-        plan: parsed.data.membershipType ?? null,
+        plan: parsed.success.membershipType ?? null,
       }
     }
     return {
       status: 'ok',
       message: null,
       identity: null,
-      plan: parsed.data.membershipType ?? null,
+      plan: parsed.success.membershipType ?? null,
       windows: [
         { label: 'Monthly limit', percentRemaining: ProviderUsageModel.remainingFromUsed(usedPercent), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt },
       ],
@@ -124,11 +125,11 @@ export const readCursorUsage = async (
       return ProviderUsageModel.emptyUsage('unauthenticated', `Cursor rejected this login; run ${CURSOR_LOGIN_HINT}.`)
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Cursor returned ${String(response.status)} for usage.`)
     const raw: JsonValue = await response.json()
-    const parsed = cursorUsageSchema.safeParse(raw)
-    if (parsed.success) {
-      const plan = parsed.data.individualUsage?.plan
+    const parsed = AiAccountsSchema.decodeResult(cursorUsageSchema, raw)
+    if (parsed._tag === 'Success') {
+      const plan = parsed.success.individualUsage?.plan
       const positive =
-        parsed.data.membershipType?.trim() ||
+        parsed.success.membershipType?.trim() ||
         plan === null ||
         plan?.enabled !== undefined ||
         plan?.totalPercentUsed !== undefined ||

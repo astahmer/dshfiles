@@ -12,7 +12,9 @@ import {
   type StopReason,
   type TranscriptContext,
 } from '@earendil-works/pi-ai'
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 
 /**
  * The Command Code CLI transport: `POST /alpha/generate`, the endpoint the
@@ -63,36 +65,45 @@ type WireMessage =
   | { readonly role: 'assistant'; readonly content: readonly WirePart[] }
   | { readonly role: 'tool'; readonly content: readonly WireToolResult[] }
 
-const streamPartSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text-delta'), text: z.string().default('') }),
-  z.object({ type: z.literal('reasoning-delta'), text: z.string().default('') }),
-  z.object({
-    type: z.literal('tool-call'),
-    toolCallId: z.string().optional(),
-    toolName: z.string().default(''),
-    input: z.record(z.string(), z.json()).optional(),
+const streamPartSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('text-delta'), text: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))) }),
+  Schema.Struct({ type: Schema.Literal('reasoning-delta'), text: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))) }),
+  Schema.Struct({
+    type: Schema.Literal('tool-call'),
+    toolCallId: Schema.optional(Schema.String),
+    toolName: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))),
+    input: Schema.optional(Schema.Record(Schema.String, Schema.Json)),
   }),
-  z.object({ type: z.literal('cache-write-tokens'), cacheWriteTokens: z.number().nonnegative().optional() }),
-  z.object({
-    type: z.literal('finish'),
-    finishReason: z.string().optional(),
-    totalUsage: z
-      .object({
-        inputTokens: z.number().optional(),
-        outputTokens: z.number().optional(),
-        reasoningTokens: z.number().optional(),
-        inputTokenDetails: z
-          .object({ noCacheTokens: z.number().optional(), cacheReadTokens: z.number().optional(), cacheWriteTokens: z.number().optional() })
-          .optional(),
-      })
-      .optional(),
+  Schema.Struct({
+    type: Schema.Literal('cache-write-tokens'),
+    cacheWriteTokens: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))),
   }),
-  z.object({ type: z.literal('error'), error: z.unknown().optional(), message: z.string().optional() }),
+  Schema.Struct({
+    type: Schema.Literal('finish'),
+    finishReason: Schema.optional(Schema.String),
+    totalUsage: Schema.optional(
+      Schema.Struct({
+        inputTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+        outputTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+        reasoningTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+        inputTokenDetails: Schema.optional(
+          Schema.Struct({
+            noCacheTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+            cacheReadTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+            cacheWriteTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+          }),
+        ),
+      }),
+    ),
+  }),
+  Schema.Struct({ type: Schema.Literal('error'), error: Schema.optional(Schema.Unknown), message: Schema.optional(Schema.String) }),
 ])
 
-const errorBodySchema = z.object({
-  error: z.union([z.string(), z.object({ code: z.string().optional(), message: z.string().optional() })]),
+const errorBodySchema = Schema.Struct({
+  error: Schema.Union([Schema.String, Schema.Struct({ code: Schema.optional(Schema.String), message: Schema.optional(Schema.String) })]),
 })
+
+const streamErrorSchema = Schema.Struct({ message: Schema.String, statusCode: Schema.optional(Schema.Number.check(Schema.isFinite())) })
 
 /**
  * The CLI keys prompt caching and analytics by a UUID thread id; DSH session ids
@@ -253,9 +264,10 @@ const stopReasonFor = (finishReason: string | undefined): Extract<StopReason, 's
 const httpFailure = (status: number, body: string): string => {
   let detail = body.slice(0, 500)
   try {
-    const parsed = errorBodySchema.safeParse(JSON.parse(body))
-    if (parsed.success)
-      detail = typeof parsed.data.error === 'string' ? parsed.data.error : [parsed.data.error.code, parsed.data.error.message].filter(Boolean).join(': ')
+    const parsed = AiAccountsSchema.decodeResult(errorBodySchema, JSON.parse(body))
+    if (parsed._tag === 'Success')
+      detail =
+        typeof parsed.success.error === 'string' ? parsed.success.error : [parsed.success.error.code, parsed.success.error.message].filter(Boolean).join(': ')
   } catch {
     // A non-JSON body is reported as text.
   }
@@ -264,8 +276,9 @@ const httpFailure = (status: number, body: string): string => {
 
 const streamErrorText = (error: unknown, message: string | undefined): string => {
   if (typeof error === 'string') return error
-  const parsed = z.object({ message: z.string(), statusCode: z.number().optional() }).safeParse(error)
-  if (parsed.success) return parsed.data.statusCode === undefined ? parsed.data.message : `${String(parsed.data.statusCode)} ${parsed.data.message}`
+  const parsed = AiAccountsSchema.decodeResult(streamErrorSchema, error)
+  if (parsed._tag === 'Success')
+    return parsed.success.statusCode === undefined ? parsed.success.message : `${String(parsed.success.statusCode)} ${parsed.success.message}`
   return message ?? 'Command Code stream error'
 }
 
@@ -330,9 +343,9 @@ export const streamCommandCodeCli = (input: {
       } catch {
         return false
       }
-      const parsed = streamPartSchema.safeParse(raw)
-      if (!parsed.success) return false
-      const part = parsed.data
+      const parsed = AiAccountsSchema.decodeResult(streamPartSchema, raw)
+      if (parsed._tag !== 'Success') return false
+      const part = parsed.success
       switch (part.type) {
         case 'text-delta': {
           if (output.content[openIndex]?.type !== 'text') {

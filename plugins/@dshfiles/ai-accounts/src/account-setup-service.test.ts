@@ -68,7 +68,7 @@ const harness = async (
 }
 
 describe('Host-owned provisional account lifecycle', () => {
-  it.each(accountKindSchema.options)('keeps %s absent until verified completion and commits exactly once', async kind => {
+  it.each(accountKindSchema.literals)('keeps %s absent until verified completion and commits exactly once', async kind => {
     const { service, store, onCommit } = await harness()
     const pending = await service.prepare({ kind, requestId })
     expect(pending.operationId).toBe(requestId)
@@ -85,7 +85,7 @@ describe('Host-owned provisional account lifecycle', () => {
     expect((await store.readAccountFile()).accounts).toHaveLength(1)
   })
 
-  it.each(accountKindSchema.options)('keeps new and reconnected %s snapshots valid at the real JSON wire boundary', async kind => {
+  it.each(accountKindSchema.literals)('keeps new and reconnected %s snapshots valid at the real JSON wire boundary', async kind => {
     const { service, store, onCommit } = await harness()
     const host = await createTestHost()
     const wireApi = defineApi({
@@ -398,7 +398,7 @@ describe('Host-owned provisional account lifecycle', () => {
     expect((await store.readAccountFile()).accounts).toEqual([])
   })
 
-  it.each(accountKindSchema.options)('renames provisional %s metadata without touching auth or publishing it', async kind => {
+  it.each(accountKindSchema.literals)('renames provisional %s metadata without touching auth or publishing it', async kind => {
     const settle = vi.fn(async () => undefined)
     const { service, store, cancelLogin, resolveCredential, saveKey, cleanupCandidate } = await harness(undefined, 60_000, settle)
     const prepared = await service.prepare({ kind, requestId })
@@ -682,7 +682,7 @@ describe('Host-owned provisional account lifecycle', () => {
     expect(service.get(pending.operationId)).toMatchObject({ status: 'discarded', account: null })
   })
 
-  it.each(accountKindSchema.options)('rejects unsupported %s method choices before store reads or login cancellation', async kind => {
+  it.each(accountKindSchema.literals)('rejects unsupported %s method choices before store reads or login cancellation', async kind => {
     const { service, store, cancelLogin } = await harness()
     const read = vi.spyOn(store, 'readAccountFile')
     const unsupported = (['device', 'subscription', 'key', 'cli', 'reference'] as const).find(

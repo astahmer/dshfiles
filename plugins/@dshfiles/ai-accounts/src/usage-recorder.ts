@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
+import * as Schema from 'effect/Schema'
 import { UsageHistoryModel, usageHistoryDomain } from './usage-history.js'
 import { mapRollingUntilAborted } from './rolling-concurrency.js'
 import { usageMetaSchema, type QuotaSnapshot, type UsageHistorySettings, type UsageMeta } from './usage-history-model.js'
@@ -71,7 +72,7 @@ const closeUsageDomain = async (ctx: Context): Promise<void> => {
   await domain?.close()
 }
 
-const defaultUsageMeta = (): UsageMeta => usageMetaSchema.parse({})
+const defaultUsageMeta = (): UsageMeta => Schema.decodeUnknownSync(usageMetaSchema)({})
 
 const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta> => {
   const opening = usageDomain(ctx)
@@ -84,7 +85,7 @@ const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySett
   const opening = usageDomain(ctx)
   if (opening === undefined) throw new Error('Usage history storage is unavailable.')
   const domain = await opening
-  const next = usageMetaSchema.parse({ ...domain.global.get(), ...settings })
+  const next = Schema.decodeUnknownSync(usageMetaSchema)({ ...domain.global.get(), ...settings })
   await domain.global.set(next)
   await pruneUsageHistory(ctx, next.retentionDays)
   return next

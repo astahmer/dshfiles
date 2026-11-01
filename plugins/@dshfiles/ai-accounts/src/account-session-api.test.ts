@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { aiAccountsSessionApi, accountSessionCapabilitySchema } from './account-session-api.js'
 import { AccountSessionWorkModel } from './account-runtime.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 const deferred = () => {
   let complete = (): void => {
@@ -33,13 +34,13 @@ describe('sign-out API explicit consent and shared mutation owner', () => {
     ])
       expect((await validate(request)).issues).toBeDefined()
     expect(
-      accountSessionCapabilitySchema.safeParse({
+      AiAccountsSchema.acceptsStrict(accountSessionCapabilitySchema, {
         instanceId: 'work',
         available: true,
         reason: null,
         credentialScope: 'Private account credential',
         token: 'synthetic-forbidden',
-      }).success,
+      }),
     ).toBe(false)
   })
   it('refuses same-account sign-in/save work while a sign-out awaits I/O, but lets other accounts proceed', async () => {

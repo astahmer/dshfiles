@@ -5,9 +5,10 @@ import { AccountDraftModel } from './account-draft.js'
 import { AccountGroup } from './account-group.js'
 import { accountProfileSchema, type AccountProfile } from './api.js'
 import { ModelCuration } from './model-curation.js'
+import * as Schema from 'effect/Schema'
 
 const account = (instanceId: string, patch: Partial<AccountProfile> = {}): AccountProfile =>
-  accountProfileSchema.parse({
+  Schema.decodeUnknownSync(accountProfileSchema)({
     ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
     instanceId,
     displayName: instanceId,

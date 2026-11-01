@@ -1,22 +1,20 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
+import { method } from './api-schema.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
-const routeSchema = z
-  .object({
-    sessionId: z.string().min(1).max(128).optional(),
-    provider: z.string().min(1).max(128),
-    model: z.string().min(1).max(256),
-  })
-  .strict()
+const routeSchema = Schema.Struct({
+  sessionId: Schema.optional(AiAccountsSchema.id(128)),
+  provider: AiAccountsSchema.id(128),
+  model: AiAccountsSchema.id(256),
+})
 
-export const fastModeStatusSchema = z
-  .object({
-    available: z.boolean(),
-    enabled: z.boolean(),
-  })
-  .strict()
+export const fastModeStatusSchema = Schema.Struct({
+  available: Schema.Boolean,
+  enabled: Schema.Boolean,
+})
 
-export type FastModeStatus = z.infer<typeof fastModeStatusSchema>
+export type FastModeStatus = typeof fastModeStatusSchema.Type
 
 export const aiAccountsFastModeApi = defineApi({
   id: 'ai-accounts-model-fast-mode',
@@ -35,7 +33,7 @@ export const aiAccountsFastModeApi = defineApi({
       },
     }),
     setFast: method({
-      input: routeSchema.extend({ enabled: z.boolean() }).strict(),
+      input: Schema.Struct({ ...routeSchema.fields, enabled: Schema.Boolean }),
       output: fastModeStatusSchema,
       description:
         'Set provider Fast mode for one session and exact model route. Agent callers may omit sessionId and can only target their own Session; other callers must provide it. Call only when the user asks to change Fast mode.',

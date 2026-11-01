@@ -1,24 +1,30 @@
 import { Buffer } from 'node:buffer'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { OAuthCredential } from '@earendil-works/pi-ai'
+import { AiAccountsSchema } from './effect-schema.js'
 
-const credentialSchema = z
-  .object({
-    type: z.literal('oauth'),
-    access: z.string().min(1),
-    refresh: z.string().min(1),
-    expires: z.number(),
-    availableModelIds: z.array(z.string()).optional(),
-    enterpriseUrl: z.string().optional(),
-  })
-  .passthrough()
+/**
+ * The stored grant keeps the SDK's own fields plus whatever the login flow added (`dshLoginOwner`), so the record is a
+ * struct with a free-form rest rather than a closed shape.
+ */
+const credentialSchema = Schema.StructWithRest(
+  Schema.Struct({
+    type: Schema.Literal('oauth'),
+    access: Schema.String.check(Schema.isMinLength(1)),
+    refresh: Schema.String.check(Schema.isMinLength(1)),
+    expires: Schema.Number.check(Schema.isFinite()),
+    availableModelIds: Schema.optional(Schema.Array(Schema.String)),
+    enterpriseUrl: Schema.optional(Schema.String),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
 const credentialForStorage = (credential: OAuthCredential): OAuthCredential => {
-  const parsed = credentialSchema.parse(credential)
+  const parsed = AiAccountsSchema.decode(credentialSchema, credential)
   const entries = Object.entries(parsed).filter(([, value]) => value !== undefined)
-  return credentialSchema.parse(Object.fromEntries(entries))
+  return AiAccountsSchema.decode(credentialSchema, Object.fromEntries(entries))
 }
 
 type CopilotCredentialProvider = Partial<Pick<CredentialProvider, 'readRecord' | 'modifyRecord' | 'deleteRecord'>>
@@ -32,8 +38,8 @@ export const createCopilotCredentialsService = (provider: CopilotCredentialProvi
     if (provider?.readRecord === undefined) return undefined
     const record = await provider.readRecord(CopilotCredentialModel.key(instanceId))
     if (record?.kind !== 'grant') return undefined
-    const parsed = credentialSchema.safeParse(record.payload)
-    return parsed.success ? parsed.data : undefined
+    const parsed = AiAccountsSchema.decodeResult(credentialSchema, record.payload)
+    return parsed._tag === 'Success' ? parsed.success : undefined
   },
 
   modify: async (input: {
@@ -42,20 +48,21 @@ export const createCopilotCredentialsService = (provider: CopilotCredentialProvi
   }): Promise<OAuthCredential | undefined> => {
     if (provider?.modifyRecord === undefined) throw new Error('DSH credential records are unavailable.')
     const result = await provider.modifyRecord(CopilotCredentialModel.key(input.instanceId), async current => {
-      const parsed = current?.kind === 'grant' ? credentialSchema.safeParse(current.payload) : undefined
-      const next = await input.mutate(parsed?.success ? parsed.data : undefined)
+      const parsed = current?.kind === 'grant' ? AiAccountsSchema.decodeResult(credentialSchema, current.payload) : undefined
+      const currentCredential = parsed === undefined || parsed._tag !== 'Success' ? undefined : parsed.success
+      const next = await input.mutate(currentCredential)
       return next === undefined ? undefined : { kind: 'grant', payload: credentialForStorage(next) }
     })
     if (result?.kind !== 'grant') return undefined
-    const parsed = credentialSchema.safeParse(result.payload)
-    return parsed.success ? parsed.data : undefined
+    const parsed = AiAccountsSchema.decodeResult(credentialSchema, result.payload)
+    return parsed._tag === 'Success' ? parsed.success : undefined
   },
 
   restoreOwned: async (instanceId: string, owner: string, previous: OAuthCredential | undefined): Promise<void> => {
     if (provider?.modifyRecord === undefined) return
     await provider.modifyRecord(CopilotCredentialModel.key(instanceId), async current => {
-      const parsed = current?.kind === 'grant' ? credentialSchema.safeParse(current.payload) : undefined
-      if (!parsed?.success || parsed.data.dshLoginOwner !== owner) return undefined
+      const parsed = current?.kind === 'grant' ? AiAccountsSchema.decodeResult(credentialSchema, current.payload) : undefined
+      if (parsed === undefined || parsed._tag !== 'Success' || parsed.success.dshLoginOwner !== owner) return undefined
       // Returning undefined means 'leave unchanged', not delete. A tombstone scrubs our own grant atomically.
       return { kind: 'grant', payload: previous ?? { retiredLoginOwner: owner } }
     })

@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import type { CopilotLoginState } from './api.js'
+
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { SecretCatalogCredentialBridge, SecretCatalogValues } from '@dshfiles/credential-port'
 import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
@@ -39,16 +40,12 @@ import { effectHandler } from './host-effect.js'
  * `ai_accounts` tool can never describe different state.
  */
 const quotaRecoveryModelForClient = (model: ModelCatalogModel): QuotaRecoveryModelCatalog['groups'][number]['models'][number] => {
-  const result: QuotaRecoveryModelCatalog['groups'][number]['models'][number] = { id: model.id, name: model.name }
-  if (model.description !== undefined) result.description = model.description
-  if (model.reasoning !== undefined) {
-    const reasoning: NonNullable<typeof result.reasoning> = {
-      efforts: model.reasoning.efforts.map(effort => ({ id: effort.id, name: effort.name })),
-    }
-    if (model.reasoning.defaultEffort !== undefined) reasoning.defaultEffort = model.reasoning.defaultEffort
-    result.reasoning = reasoning
-  }
-  return result
+  const named = { id: model.id, name: model.name }
+  const described = model.description === undefined ? named : { ...named, description: model.description }
+  if (model.reasoning === undefined) return described
+  const efforts = model.reasoning.efforts.map(effort => ({ id: effort.id, name: effort.name }))
+  const reasoning = model.reasoning.defaultEffort === undefined ? { efforts } : { efforts, defaultEffort: model.reasoning.defaultEffort }
+  return { ...described, reasoning }
 }
 
 const quotaRecoveryCatalogForClient = (catalog: ModelCatalog): QuotaRecoveryModelCatalog => ({

@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto'
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync, renameSync } from 'node:fs'
 import { chmod, lstat, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { CodexHomeModel, type CodexHomeLayout } from './codex-home.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 export interface LoginAuthSnapshot {
   readonly fingerprint: string | null
@@ -22,10 +23,11 @@ export interface CodexLoginFiles {
 }
 
 const MAX_AUTH_BYTES = 64 * 1024
-const storedAuth = z.object({
-  auth_mode: z.literal('chatgpt').optional(),
-  tokens: z.object({ access_token: z.string().min(1), refresh_token: z.string().min(1) }),
+const storedAuth = Schema.Struct({
+  auth_mode: Schema.optional(Schema.Literal('chatgpt')),
+  tokens: Schema.Struct({ access_token: Schema.String.check(Schema.isMinLength(1)), refresh_token: Schema.String.check(Schema.isMinLength(1)) }),
 })
+const emptyObject = Schema.Record(Schema.String, Schema.Never)
 
 /** Reject symlinked ancestors as well as a symlinked shadow/auth file. No shared-home seeding. */
 const assertRealDirectory = async (path: string): Promise<void> => {
@@ -78,9 +80,9 @@ const snapshot = (layout: CodexHomeLayout, isManagedSetupHome: ManagedSetupHomeP
     let hasCredential = raw.toString('utf8').trim().length > 0
     try {
       const parsed: unknown = JSON.parse(raw.toString('utf8'))
-      signedIn = storedAuth.safeParse(parsed).success
+      signedIn = AiAccountsSchema.decodeResult(storedAuth, parsed)._tag === 'Success'
       // The pre-existing materializer creates {} for unsigned accounts. Do not demand replacement consent for that.
-      if (z.object({}).strict().safeParse(parsed).success) hasCredential = false
+      if (AiAccountsSchema.decodeResult(emptyObject, parsed)._tag === 'Success') hasCredential = false
     } catch {
       /* Malformed CLI-owned auth is not a successful login and still requires replacement consent. */
     }

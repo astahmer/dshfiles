@@ -1,43 +1,48 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 
 const HOUR_MS = 60 * 60_000
 const MAX_HISTORY_BUCKETS = 500
 
-export const fastModeUsageObservationSchema = z.object({
-  instanceId: z.string().min(1).max(64),
-  model: z.string().min(1).max(200),
-  serviceTier: z.string().max(32).nullable(),
-  responseStatus: z.enum(['completed', 'incomplete']),
-  inputTokens: z.number().int().min(0),
-  outputTokens: z.number().int().min(0),
-  cacheReadTokens: z.number().int().min(0),
+const tokenCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
+export const fastModeUsageObservationSchema = Schema.Struct({
+  instanceId: AiAccountsSchema.id(64),
+  model: AiAccountsSchema.id(200),
+  serviceTier: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32))),
+  responseStatus: Schema.Literals(['completed', 'incomplete']),
+  inputTokens: tokenCount,
+  outputTokens: tokenCount,
+  cacheReadTokens: tokenCount,
 })
 
-export type FastModeUsageObservation = z.infer<typeof fastModeUsageObservationSchema>
+export type FastModeUsageObservation = typeof fastModeUsageObservationSchema.Type
 
-export const fastModeUsageEventSchema = fastModeUsageObservationSchema.extend({ at: z.number().int().min(0) })
-export type FastModeUsageEvent = z.infer<typeof fastModeUsageEventSchema>
+export const fastModeUsageEventSchema = Schema.Struct({ ...fastModeUsageObservationSchema.fields, at: tokenCount })
+export type FastModeUsageEvent = typeof fastModeUsageEventSchema.Type
 
-const fastModeUsagePointSchema = z.object({
-  at: z.number().int().min(0),
-  requests: z.number().int().min(0),
-  confirmedFast: z.number().int().min(0),
-  returnedDefault: z.number().int().min(0),
-  otherTier: z.number().int().min(0),
-  unreportedTier: z.number().int().min(0),
-  completed: z.number().int().min(0),
-  incomplete: z.number().int().min(0),
-  inputTokens: z.number().int().min(0),
-  outputTokens: z.number().int().min(0),
-  cacheReadTokens: z.number().int().min(0),
+const fastModeUsagePointSchema = Schema.Struct({
+  at: tokenCount,
+  requests: tokenCount,
+  confirmedFast: tokenCount,
+  returnedDefault: tokenCount,
+  otherTier: tokenCount,
+  unreportedTier: tokenCount,
+  completed: tokenCount,
+  incomplete: tokenCount,
+  inputTokens: tokenCount,
+  outputTokens: tokenCount,
+  cacheReadTokens: tokenCount,
 })
 
-export const fastModeUsageHistorySchema = z.object({
-  points: z.array(fastModeUsagePointSchema).max(MAX_HISTORY_BUCKETS),
+export const fastModeUsageHistorySchema = Schema.Struct({
+  points: AiAccountsSchema.list(fastModeUsagePointSchema, MAX_HISTORY_BUCKETS),
 })
 
-export type FastModeUsagePoint = z.infer<typeof fastModeUsagePointSchema>
-export type FastModeUsageHistory = z.infer<typeof fastModeUsageHistorySchema>
+export type FastModeUsagePoint = typeof fastModeUsagePointSchema.Type
+export type FastModeUsageHistory = typeof fastModeUsageHistorySchema.Type
+
+type MutablePoint = { -readonly [Key in keyof FastModeUsagePoint]: FastModeUsagePoint[Key] }
 
 const categoryOf = (serviceTier: string | null): 'confirmedFast' | 'returnedDefault' | 'otherTier' | 'unreportedTier' => {
   if (serviceTier === null) return 'unreportedTier'
@@ -46,7 +51,7 @@ const categoryOf = (serviceTier: string | null): 'confirmedFast' | 'returnedDefa
   return 'otherTier'
 }
 
-const emptyPoint = (at: number): FastModeUsagePoint => ({
+const emptyPoint = (at: number): MutablePoint => ({
   at,
   requests: 0,
   confirmedFast: 0,
@@ -70,7 +75,7 @@ export class FastModeUsageModel {
   }
 
   static aggregate = (events: readonly FastModeUsageEvent[], bucketWidthMs: number): FastModeUsageHistory => {
-    const buckets = new Map<number, FastModeUsagePoint>()
+    const buckets = new Map<number, MutablePoint>()
     for (const event of events) {
       const at = Math.floor(event.at / bucketWidthMs) * bucketWidthMs
       const point = buckets.get(at) ?? emptyPoint(at)
@@ -82,6 +87,8 @@ export class FastModeUsageModel {
       point.cacheReadTokens += event.cacheReadTokens
       buckets.set(at, point)
     }
-    return fastModeUsageHistorySchema.parse({ points: [...buckets.values()].sort((left, right) => left.at - right.at) })
+    return AiAccountsSchema.decode(fastModeUsageHistorySchema, {
+      points: [...buckets.values()].sort((left, right) => left.at - right.at),
+    })
   }
 }

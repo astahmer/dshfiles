@@ -10,12 +10,13 @@ import { accountProfileSchema, type AccountProfile } from './api.js'
 import { aiAccountsSessionApi } from './account-session-api.js'
 import { AccountSignOut } from './account-sign-out.js'
 import { aiAccountsKeys } from './accounts-queries.js'
+import * as Schema from 'effect/Schema'
 
 type SessionClient = typeof aiAccountsSessionApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 const api = vi.hoisted(() => ({ capability: vi.fn<SessionClient['capability']>(), signOut: vi.fn<SessionClient['signOut']>() }))
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({ ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()), useApi: () => api }))
 const profile = (patch: Partial<AccountProfile> = {}): AccountProfile =>
-  accountProfileSchema.parse({
+  Schema.decodeUnknownSync(accountProfileSchema)({
     ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
     instanceId: 'synthetic',
     displayName: 'Synthetic Work',

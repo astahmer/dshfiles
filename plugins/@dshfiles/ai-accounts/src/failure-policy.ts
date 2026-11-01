@@ -1,4 +1,7 @@
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 
 /**
  * What happens when a model request on an account route fails.
@@ -41,29 +44,85 @@ export const DEFAULT_RECOVERY_POLICY: RecoveryPolicy = {
 /** The longest single backoff; a provider asking for more is waited out by the `wait` rung instead. */
 const MAX_BACKOFF_MS = 60_000
 
-const kindPolicySchema = (fallback: KindPolicy) =>
-  z
-    .object({
-      retries: z.number().int().min(0).max(10).catch(fallback.retries),
-      backoffMs: z.number().int().min(100).max(MAX_BACKOFF_MS).catch(fallback.backoffMs),
-      lunaReserve: z.boolean().catch(fallback.lunaReserve),
-      failover: z.boolean().catch(fallback.failover),
-      waitSeconds: z.number().int().min(0).max(3_600).catch(fallback.waitSeconds),
-      shrink: z.boolean().catch(fallback.shrink),
-      then: z.enum(['fail', 'dsh']).catch(fallback.then),
-    })
-    .catch(fallback)
+const integerIn = (minimum: number, maximum: number) =>
+  Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
+
+const kindPolicyFields = {
+  retries: integerIn(0, 10),
+  backoffMs: integerIn(100, MAX_BACKOFF_MS),
+  lunaReserve: Schema.Boolean,
+  failover: Schema.Boolean,
+  waitSeconds: integerIn(0, 3_600),
+  shrink: Schema.Boolean,
+  then: Schema.Literals(['fail', 'dsh']),
+}
+
+const kindPolicySchema = Schema.Struct(kindPolicyFields)
+
+/** Every field may be missing or malformed and is then filled from `fallback`; a sibling field's value still applies. */
+const lenientKindPolicySchema = (fallback: KindPolicy) =>
+  Schema.Struct({
+    retries: Schema.optional(kindPolicyFields.retries.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.retries))))),
+    backoffMs: Schema.optional(kindPolicyFields.backoffMs.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.backoffMs))))),
+    lunaReserve: Schema.optional(kindPolicyFields.lunaReserve.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.lunaReserve))))),
+    failover: Schema.optional(kindPolicyFields.failover.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.failover))))),
+    waitSeconds: Schema.optional(kindPolicyFields.waitSeconds.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.waitSeconds))))),
+    shrink: Schema.optional(kindPolicyFields.shrink.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.shrink))))),
+    then: Schema.optional(kindPolicyFields.then.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback.then))))),
+  })
+
+const lenientRecoveryPolicySchema = Schema.Struct({
+  transport: Schema.optional(
+    lenientKindPolicySchema(DEFAULT_RECOVERY_POLICY.transport).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY.transport)))),
+  ),
+  rateLimit: Schema.optional(
+    lenientKindPolicySchema(DEFAULT_RECOVERY_POLICY.rateLimit).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY.rateLimit)))),
+  ),
+  exhausted: Schema.optional(
+    lenientKindPolicySchema(DEFAULT_RECOVERY_POLICY.exhausted).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY.exhausted)))),
+  ),
+  auth: Schema.optional(
+    lenientKindPolicySchema(DEFAULT_RECOVERY_POLICY.auth).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY.auth)))),
+  ),
+  oversized: Schema.optional(
+    lenientKindPolicySchema(DEFAULT_RECOVERY_POLICY.oversized).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY.oversized)))),
+  ),
+})
+
+type LenientRecoveryPolicy = typeof lenientRecoveryPolicySchema.Type
+
+const fillKindPolicy = (value: LenientRecoveryPolicy['transport'], fallback: KindPolicy): KindPolicy => ({
+  retries: value?.retries ?? fallback.retries,
+  backoffMs: value?.backoffMs ?? fallback.backoffMs,
+  lunaReserve: value?.lunaReserve ?? fallback.lunaReserve,
+  failover: value?.failover ?? fallback.failover,
+  waitSeconds: value?.waitSeconds ?? fallback.waitSeconds,
+  shrink: value?.shrink ?? fallback.shrink,
+  then: value?.then ?? fallback.then,
+})
+
+const strictRecoveryPolicySchema = Schema.Struct({
+  transport: kindPolicySchema,
+  rateLimit: kindPolicySchema,
+  exhausted: kindPolicySchema,
+  auth: kindPolicySchema,
+  oversized: kindPolicySchema,
+})
 
 /** Stored settings decoded once; a missing or malformed field keeps its default, so older settings still load. */
-export const recoveryPolicySchema = z
-  .object({
-    transport: kindPolicySchema(DEFAULT_RECOVERY_POLICY.transport),
-    rateLimit: kindPolicySchema(DEFAULT_RECOVERY_POLICY.rateLimit),
-    exhausted: kindPolicySchema(DEFAULT_RECOVERY_POLICY.exhausted),
-    auth: kindPolicySchema(DEFAULT_RECOVERY_POLICY.auth),
-    oversized: kindPolicySchema(DEFAULT_RECOVERY_POLICY.oversized),
-  })
-  .catch(DEFAULT_RECOVERY_POLICY)
+export const recoveryPolicySchema = lenientRecoveryPolicySchema.pipe(
+  Schema.decodeTo(strictRecoveryPolicySchema, {
+    decode: SchemaGetter.transform((value: LenientRecoveryPolicy) => ({
+      transport: fillKindPolicy(value.transport, DEFAULT_RECOVERY_POLICY.transport),
+      rateLimit: fillKindPolicy(value.rateLimit, DEFAULT_RECOVERY_POLICY.rateLimit),
+      exhausted: fillKindPolicy(value.exhausted, DEFAULT_RECOVERY_POLICY.exhausted),
+      auth: fillKindPolicy(value.auth, DEFAULT_RECOVERY_POLICY.auth),
+      oversized: fillKindPolicy(value.oversized, DEFAULT_RECOVERY_POLICY.oversized),
+    })),
+    encode: SchemaGetter.transform((value: typeof strictRecoveryPolicySchema.Type) => value),
+  }),
+  Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_RECOVERY_POLICY))),
+)
 
 /** How far one failure kind has climbed its ladder within one step. */
 export interface RecoveryProgress {

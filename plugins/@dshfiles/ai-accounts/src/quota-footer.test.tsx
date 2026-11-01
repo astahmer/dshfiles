@@ -11,6 +11,7 @@ import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import type { usePreferences } from './use-preferences.js'
+import * as Schema from 'effect/Schema'
 
 // Only the typed Host boundary is replaced. Query, usage/preferences hooks, arrangement,
 // provider glyphs, Radix popover/collapsible and the overview's quota Progress stay real.
@@ -73,7 +74,7 @@ const savedFile = (cards: readonly Card[]): AccountsFile => ({
   cooldownMs: 0,
   shadowRoot: '/synthetic/shadows',
   accounts: cards.map(card =>
-    accountProfileSchema.parse({
+    Schema.decodeUnknownSync(accountProfileSchema)({
       ...AccountDraftModel.newAccountDraft({ kind: card.kind, existing: [] }),
       instanceId: card.instanceId,
       displayName: card.displayName,
@@ -236,9 +237,8 @@ describe('popover account availability', () => {
     expect(toggle.getAttribute('data-state')).toBe('checked')
     expect(toggle.classList.contains('dshx:data-[state=checked]:bg-info')).toBe(true)
     expect(overviewCard('Work').querySelector('[role="checkbox"]')).toBeNull()
-    const latest = savedFile([initial])
-    latest.accounts[0]!.displayName = 'Renamed elsewhere'
-    latest.accounts[0]!.badge = 'NEW'
+    const renamed = savedFile([{ ...initial, displayName: 'Renamed elsewhere' }])
+    const latest: AccountsFile = { ...renamed, accounts: renamed.accounts.map(account => ({ ...account, badge: 'NEW' })) }
     host.read.mockResolvedValue(latest)
     const next = { ...latest, accounts: latest.accounts.map(account => ({ ...account, enabled: false, state: 'disabled' as const })) }
     host.save.mockImplementation(async () => {
@@ -302,9 +302,12 @@ describe('uniform sidebar account card surfaces', () => {
     expect(quotaButton('Work').classList.contains('dshx:h-8')).toBe(true)
   })
   it('keeps disabled quota and reset data visible with a compact OFF label and muted meter', async () => {
-    const off = healthy('off', 'Work', 42)
-    off.enabled = false
-    off.usage.windows[0]!.resetsAt = Date.now() + 2 * 3_600_000
+    const base = healthy('off', 'Work', 42)
+    const off: Card = {
+      ...base,
+      enabled: false,
+      usage: { ...base.usage, windows: [{ ...base.usage.windows[0]!, resetsAt: Date.now() + 2 * 3_600_000 }] },
+    }
     await mount({ usage: snapshot([off]) })
     const button = quotaButton('Work')
     expect(button.textContent).toContain('42%')
@@ -539,8 +542,11 @@ describe('actual quota strip and usage popover unavailable-account regression', 
   })
 
   it('keeps session before weekly quota in the actual popover even when the Host reports weekly first', async () => {
-    const card = healthy(UNAVAILABLE_ACCOUNT_ID, 'Codex Example', 42)
-    card.usage.windows.push({ label: 'Current session', percentRemaining: 69, resetsAt: null })
+    const base = healthy(UNAVAILABLE_ACCOUNT_ID, 'Codex Example', 42)
+    const card: Card = {
+      ...base,
+      usage: { ...base.usage, windows: [...base.usage.windows, { label: 'Current session', percentRemaining: 69, resetsAt: null }] },
+    }
     await mount({ usage: snapshot([card]) })
     await click(quotaButton('Codex Example'))
     expect([...overviewCard('Codex Example').querySelectorAll('[role="progressbar"]')].map(progress => progress.getAttribute('aria-label'))).toEqual([
