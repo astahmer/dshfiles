@@ -1,49 +1,54 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const taskIdSchema = z.string().regex(/^[a-f0-9]{64}$/)
-const sessionIdSchema = z.string().min(1).max(128)
-const actionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
-const revisionSchema = z.string().regex(/^[a-f0-9]{40,64}$/)
+const taskIdSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+const actionIdSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/u))
+const revisionSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/u))
+const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
-export const durableTaskStatusSchema = z.enum(['queued', 'running', 'cancel-requested', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown', 'blocked'])
-export const durableAttemptStatusSchema = z.enum(['running', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown'])
-export const durableTaskProgressSchema = z.enum(['queued', 'resolving-workspace', 'starting-process', 'recording-result', 'reconciling'])
+/** Stored task statuses. `blocked` is terminal: the task stopped without a runnable retry. */
+export const durableTaskStatusSchema = Schema.Literals([
+  'queued',
+  'running',
+  'cancel-requested',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'timed-out',
+  'unknown',
+  'blocked',
+])
+export const durableAttemptStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown'])
+export const durableTaskProgressSchema = Schema.Literals(['queued', 'resolving-workspace', 'starting-process', 'recording-result', 'reconciling'])
 
-const durableAttemptSchema = z
-  .object({
-    id: z.string().uuid(),
-    number: z.number().int().min(1).max(100),
-    status: durableAttemptStatusSchema,
-    progress: durableTaskProgressSchema,
-    startedAt: z.number().int().nonnegative(),
-    finishedAt: z.number().int().nonnegative().nullable(),
-    exitCode: z.number().int().nullable(),
-  })
-  .strict()
+const durableAttemptSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isUUID()),
+  number: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)),
+  status: durableAttemptStatusSchema,
+  progress: durableTaskProgressSchema,
+  startedAt: countInt,
+  finishedAt: Schema.NullOr(countInt),
+  exitCode: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt())),
+})
 
-export const durableTaskSchema = z
-  .object({
-    id: taskIdSchema,
-    idempotencyKey: z.string().uuid(),
-    sessionId: sessionIdSchema,
-    actionId: actionIdSchema,
-    handlerVersion: z.number().int().min(1).max(100),
-    actionFingerprint: revisionSchema,
-    cwd: z.string().min(1).max(2048),
-    status: durableTaskStatusSchema,
-    attempts: z.array(durableAttemptSchema).max(100),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-    errorCode: z
-      .string()
-      .regex(/^[a-z][a-z0-9-]{0,63}$/)
-      .nullable(),
-  })
-  .strict()
+export const durableTaskSchema = Schema.Struct({
+  id: taskIdSchema,
+  idempotencyKey: Schema.String.check(Schema.isUUID()),
+  sessionId: sessionIdSchema,
+  actionId: actionIdSchema,
+  handlerVersion: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)),
+  actionFingerprint: revisionSchema,
+  cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  status: durableTaskStatusSchema,
+  attempts: Schema.Array(durableAttemptSchema).check(Schema.isMaxLength(100)),
+  createdAt: countInt,
+  updatedAt: countInt,
+  errorCode: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,63}$/u))),
+})
 
-export type DurableTask = z.infer<typeof durableTaskSchema>
-export type DurableAttempt = z.infer<typeof durableAttemptSchema>
-export type DurableTaskStatus = z.infer<typeof durableTaskStatusSchema>
+export type DurableTask = typeof durableTaskSchema.Type
+export type DurableAttempt = typeof durableAttemptSchema.Type
+export type DurableTaskStatus = typeof durableTaskStatusSchema.Type
 export type DurableAttemptResult = Exclude<DurableAttempt['status'], 'running' | 'unknown'>
 
 const terminalTaskStatus = (status: DurableTaskStatus): boolean =>

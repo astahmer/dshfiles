@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { Schema } from 'effect'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -16,7 +17,7 @@ const workerPath = join(sourceDirectory, 'test-fixtures', 'durable-task-process-
 const projectRoot = dirname(sourceDirectory)
 
 const task = () =>
-  durableTaskSchema.parse({
+  Schema.decodeUnknownSync(durableTaskSchema)({
     id: taskId,
     idempotencyKey: '00000000-0000-4000-8000-000000000001',
     sessionId: 'process-race-session',
@@ -190,7 +191,7 @@ describe('durable Project Checks cross-process coordination', () => {
         findReceipt: async (recoveredTaskId, recoveredAttemptId) => {
           const saved = store?.findAttemptReceipt(recoveredTaskId, recoveredAttemptId)
           if (saved === undefined) return null
-          const receipt = storedReceiptSchema.parse(saved)
+          const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
           return { status: receipt.status === 'passed' ? 'succeeded' : receipt.status, exitCode: receipt.exitCode }
         },
         run: async () => {

@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import { Schema } from 'effect'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chmod, lstat, mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -56,8 +57,8 @@ const secureDatabaseFile = async (path: string): Promise<void> => {
   }
 }
 
-const parsedTask = (value: unknown): DurableTask => durableTaskSchema.parse(JSON.parse(String(value)))
-const serializedTask = (task: DurableTask): string => JSON.stringify(durableTaskSchema.parse(task))
+const parsedTask = (value: unknown): DurableTask => Schema.decodeUnknownSync(durableTaskSchema)(JSON.parse(String(value)))
+const serializedTask = (task: DurableTask): string => JSON.stringify(Schema.decodeUnknownSync(durableTaskSchema)(task))
 const parsedReceipt = (value: unknown): unknown => JSON.parse(String(value))
 const serializedReceipt = (receipt: StoredReceipt): string => JSON.stringify(receipt)
 
@@ -100,7 +101,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
       )
       const putTask = this.#database.prepare('INSERT INTO tasks (task_id, session_id, status, created_at, updated_at, payload) VALUES (?, ?, ?, ?, ?, ?)')
       for (const saved of data.tasks) {
-        const task = durableTaskSchema.parse(saved)
+        const task = Schema.decodeUnknownSync(durableTaskSchema)(saved)
         const inserted = putTaskKey.run(task.sessionId, task.idempotencyKey, task.id, task.actionId, task.actionFingerprint)
         if (inserted.changes !== 1) continue
         putTask.run(task.id, task.sessionId, task.status, task.createdAt, task.updatedAt, serializedTask(task))
@@ -144,7 +145,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
   async createIfAbsent(task: DurableTask, maxRows: number): Promise<DurableTask> {
     this.#assertOpen()
     return this.#transaction(() => {
-      const parsed = durableTaskSchema.parse(task)
+      const parsed = Schema.decodeUnknownSync(durableTaskSchema)(task)
       const existingKey = this.#database
         .prepare('SELECT task_id, action_id, action_fingerprint FROM task_keys WHERE session_id = ? AND idempotency_key = ?')
         .get(parsed.sessionId, parsed.idempotencyKey) as { task_id: string; action_id: string; action_fingerprint: string } | undefined
@@ -183,7 +184,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
 
   async put(taskId: string, task: DurableTask): Promise<void> {
     this.#assertOpen()
-    await this.#transaction(() => this.#put(taskId, durableTaskSchema.parse(task)))
+    await this.#transaction(() => this.#put(taskId, Schema.decodeUnknownSync(durableTaskSchema)(task)))
   }
 
   async update(taskId: string, update: (current: DurableTask) => DurableTask): Promise<DurableTask> {
@@ -191,7 +192,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
     return this.#transaction(() => {
       const current = this.get(taskId)
       if (current === undefined) throw new Error('Durable Project Checks task is missing.')
-      const next = durableTaskSchema.parse(update(current))
+      const next = Schema.decodeUnknownSync(durableTaskSchema)(update(current))
       this.#put(taskId, next)
       return next
     })

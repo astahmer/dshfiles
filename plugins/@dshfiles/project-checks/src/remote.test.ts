@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { remoteHostSchema, type RemoteHost } from './core.js'
 import { PeerSnapshotModel, type PeerShellRunner, type StepResult } from './remote.js'
 
@@ -15,7 +16,7 @@ const exited = (code: number, stderr = ''): StepResult => ({ code, stdout: '', s
 const broken = (failure: StepResult['failure'], stderr = ''): StepResult => ({ code: null, stdout: '', stderr, failure })
 
 const remote = (patch: Partial<RemoteHost> = {}): RemoteHost =>
-  remoteHostSchema.parse({ id: 'm1', sshTarget: 'm1-perso', gitRemote: 'm1', workspace: '/Users/peer/dev/dshfiles-check', ...patch })
+  Schema.decodeUnknownSync(remoteHostSchema)({ id: 'm1', sshTarget: 'm1-perso', gitRemote: 'm1', workspace: '/Users/peer/dev/dshfiles-check', ...patch })
 
 const action = { command: 'echo', args: ['ran'], timeoutMs: 1_000 }
 

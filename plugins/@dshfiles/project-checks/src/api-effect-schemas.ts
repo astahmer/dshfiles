@@ -1,10 +1,8 @@
 import * as Schema from 'effect/Schema'
 
 /**
- * The Project Checks API contracts whose JSON Schema is byte-identical to the zod schemas they replace. The receipt,
- * durable-task and rebased-candidate subtree stays on zod in `api.ts`: `z.string().uuid()` emits a wider UUID pattern
- * than `Schema.isUUID()` (`ffffffff-…` vs `[fF]{8}-…`), `z.string().default(...)` has no Effect JSON Schema
- * equivalent, and `z.number().int().nonnegative().safe()` emits safe-integer bounds where Effect emits `minimum: 0`.
+ * The Project Checks API contracts whose JSON Schema the Host publishes for its agent tools. Every schema here is an
+ * Effect schema; `api.ts` wraps them for publication so the closed objects the previous contract produced survive.
  */
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))

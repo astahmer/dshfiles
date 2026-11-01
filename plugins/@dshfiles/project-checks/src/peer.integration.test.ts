@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { Schema } from 'effect'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -64,7 +65,7 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
     await jj(root, ['git', 'init', peer])
     await jj(root, ['-R', peer, 'git', 'remote', 'add', 'origin', bare])
 
-    remote = remoteHostSchema.parse({
+    remote = Schema.decodeUnknownSync(remoteHostSchema)({
       id: 'peer',
       sshTarget: 'peer-host',
       gitRemote: 'peer',

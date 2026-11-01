@@ -7,17 +7,17 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createHash, randomUUID } from 'node:crypto'
-import { z } from 'zod'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectChecksTaskView, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
-import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type RemoteHost } from './core.js'
+import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type ProjectChecksConfig, type RemoteHost } from './core.js'
+import { exactSchema } from './contract-schema.js'
 import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './execution.js'
 import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { runManagedProcess, type ProcessResult } from './managed-process.js'
@@ -44,7 +44,7 @@ const MAX_HOOK_EVENTS = 12
 const REVISION_TIMEOUT_MS = 10_000
 const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
 
-export const Config = projectChecksConfigSchema
+export const Config = exactSchema(projectChecksConfigSchema)
 
 type ReceiptStage =
   | 'resolve-session-paths'
@@ -132,10 +132,10 @@ function entryFor(ctx: Context) {
   return matches[0]
 }
 
-const configFor = (ctx: Context) => {
-  const parsed = Config.safeParse(entryFor(ctx).options.config ?? {})
-  if (!parsed.success) throw new Error('Project checks profile configuration is invalid.')
-  return parsed.data
+const configFor = (ctx: Context): ProjectChecksConfig => {
+  const parsed = Schema.decodeUnknownResult(projectChecksConfigSchema, { onExcessProperty: 'error' })(entryFor(ctx).options.config ?? {})
+  if (parsed._tag === 'Failure') throw new Error('Project checks profile configuration is invalid.')
+  return parsed.success
 }
 
 const sessionPaths = async (ctx: Context, sessionId: string, action: ProjectAction): Promise<ProjectPaths> => {
@@ -270,7 +270,7 @@ const durableTaskRunnerFor = async (ctx: Context): Promise<DurableTaskRunner> =>
       findReceipt: async (taskId, attemptId) => {
         const saved = store.findAttemptReceipt(taskId, attemptId)
         if (saved === undefined) return null
-        const receipt = storedReceiptSchema.parse(saved)
+        const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
         if (receipt.taskId !== taskId || receipt.taskAttemptId !== attemptId)
           throw new Error('A stored receipt does not match the requested durable task attempt.')
         if (receipt.failure === 'process-group-failed') return { status: 'unknown', exitCode: receipt.exitCode }
@@ -342,7 +342,7 @@ const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<Stor
   const receipts = new Map<string, StoredReceipt>()
   for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
   for (const saved of taskStore.listAttemptReceipts({ sessionId, limit: MAX_RECEIPTS_PER_SESSION })) {
-    const receipt = storedReceiptSchema.parse(saved)
+    const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
     receipts.set(receipt.id, receipt)
   }
   return [...receipts.values()]
@@ -356,7 +356,7 @@ const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<rea
   const receipts = new Map<string, StoredReceipt>()
   for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
   for (const saved of taskStore.listAttemptReceipts({ since, limit: MAX_RECEIPTS_TOTAL })) {
-    const receipt = storedReceiptSchema.parse(saved)
+    const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
     receipts.set(receipt.id, receipt)
   }
   return ProjectChecksReceiptModel.after(
@@ -372,7 +372,7 @@ const emitReceiptActivity = (ctx: Context, receipt: StoredReceipt): void =>
 const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<void> => {
   if (receipt.taskId !== undefined || receipt.taskAttemptId !== undefined) {
     if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) throw new Error('A durable task receipt is missing its task identity.')
-    await (await durableTaskStoreFor(ctx)).saveAttemptReceipt(storedReceiptSchema.parse(receipt))
+    await (await durableTaskStoreFor(ctx)).saveAttemptReceipt(Schema.decodeUnknownSync(storedReceiptSchema)(receipt))
     return
   }
   const table = (await storageFor(ctx)).table('receipts')
@@ -632,6 +632,12 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
 
     await options.onProgress?.('recording-result')
     const finishedAt = Date.now()
+    const receiptExtras: { -readonly [Key in keyof StoredReceipt]?: StoredReceipt[Key] } = {}
+    if (options.durableTaskId !== undefined) receiptExtras.taskId = options.durableTaskId
+    if (options.durableTaskAttemptId !== undefined) receiptExtras.taskAttemptId = options.durableTaskAttemptId
+    if (executor !== undefined) receiptExtras.executor = executor
+    if (remoteFailure !== null) receiptExtras.remoteFailure = remoteFailure
+    if (options.verificationStage !== undefined) receiptExtras.verificationStage = options.verificationStage
     const receipt: StoredReceipt = {
       id: diagnosticId,
       sessionId,
@@ -649,12 +655,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       verificationTurn: options.verificationTurn,
       automatic: options.automatic,
       attempt: options.attempt,
+      ...receiptExtras,
     }
-    if (options.durableTaskId !== undefined) receipt.taskId = options.durableTaskId
-    if (options.durableTaskAttemptId !== undefined) receipt.taskAttemptId = options.durableTaskAttemptId
-    if (executor !== undefined) receipt.executor = executor
-    if (remoteFailure !== null) receipt.remoteFailure = remoteFailure
-    if (options.verificationStage !== undefined) receipt.verificationStage = options.verificationStage
     stage = 'persist-receipt'
     await ProjectChecksActivityModel.persistAndEmit({
       receipt,
@@ -908,7 +910,7 @@ const dispatchDurableTask = async (ctx: Context, sessionId: string, actionId: st
   const paths = await sessionPaths(ctx, sessionId, action)
   const taskId = createHash('sha256').update(`${sessionId}\0${idempotencyKey}`).digest('hex')
   const now = Date.now()
-  const task = durableTaskSchema.parse({
+  const task = Schema.decodeUnknownSync(durableTaskSchema)({
     id: taskId,
     idempotencyKey,
     sessionId,
@@ -935,7 +937,7 @@ const projectChecksEffect = <Output>(operation: ProjectChecksOperation, work: (c
     })
   })
 
-const { hostApi: makeHostApi, ...effectPlugin } = DshxEffect.plugin<z.infer<typeof Config>, ProjectChecksOperationError, ProjectChecksRuntime>({
+const { hostApi: makeHostApi, ...effectPlugin } = DshxEffect.plugin<ProjectChecksConfig, ProjectChecksOperationError, ProjectChecksRuntime>({
   layer: (ctx: Context) => {
     storageServices.set(ctx, storageDomainForContext(ctx))
     return Layer.succeed(ProjectChecksRuntime, ProjectChecksRuntime.of({ context: ctx }))
@@ -1048,11 +1050,13 @@ const hostApi = makeHostApi(projectChecksApi, {
   },
 })
 
-const setupHost = (ctx: Context, config: z.infer<typeof Config>): void => {
+const setupHost = (ctx: Context, config: ProjectChecksConfig): void => {
   ctx.on('dshfiles/activity/backfill', payload => {
-    const parsed = z.object({ since: z.number().int().nonnegative().optional() }).strict().safeParse(payload)
-    if (!parsed.success) return undefined
-    void readStoredReceiptsAfter(ctx, parsed.data.since ?? 0)
+    const parsed = Schema.decodeUnknownResult(Schema.Struct({ since: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))) }), {
+      onExcessProperty: 'error',
+    })(payload)
+    if (parsed._tag === 'Failure') return undefined
+    void readStoredReceiptsAfter(ctx, parsed.success.since ?? 0)
       .then(receipts => {
         for (const receipt of receipts) emitReceiptActivity(ctx, receipt)
       })

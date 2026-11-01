@@ -44,7 +44,7 @@ describe('project-checks tool exposure', () => {
   })
 
   test('old Host action snapshots default missing replay policy to manual', () => {
-    const view = actionViewSchema.parse({
+    const view = Schema.decodeUnknownSync(actionViewSchema)({
       id: 'verify',
       label: 'Verify',
       description: 'Run configured checks',

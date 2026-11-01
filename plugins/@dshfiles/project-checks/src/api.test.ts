@@ -37,17 +37,17 @@ describe('rebased candidate verification contract', () => {
   })
 
   it('bounds source and candidate revisions and verification responses', () => {
-    expect(verifiedCompletionInputSchema.safeParse({ sessionId: 'session-1', turn: 2, sourceRevision: 'a'.repeat(40) }).success).toBe(true)
+    expect(Schema.is(verifiedCompletionInputSchema)({ sessionId: 'session-1', turn: 2, sourceRevision: 'a'.repeat(40) })).toBe(true)
     expect(
-      candidateVerificationInputSchema.safeParse({
+      Schema.is(candidateVerificationInputSchema)({
         sessionId: 'session-1',
         turn: 2,
         sourceRevision: 'a'.repeat(40),
         expectedRevision: 'b'.repeat(40),
-      }).success,
+      }),
     ).toBe(true)
     expect(
-      candidateVerificationInputSchema.safeParse({ sessionId: 'session-1', turn: 2, sourceRevision: 'main', expectedRevision: 'b'.repeat(40) }).success,
+      Schema.is(candidateVerificationInputSchema)({ sessionId: 'session-1', turn: 2, sourceRevision: 'main', expectedRevision: 'b'.repeat(40) }),
     ).toBe(false)
     expect(Schema.decodeUnknownSync(completionAuthorizationResultSchema)({ status: 'authorized' })).toEqual({ status: 'authorized' })
     expect(Schema.decodeUnknownSync(candidateVerificationResultSchema)({ status: 'passed', prompt: null })).toEqual({ status: 'passed', prompt: null })

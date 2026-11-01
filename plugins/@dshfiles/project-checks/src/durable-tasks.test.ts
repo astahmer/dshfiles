@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.js'
 
 const queuedTask = (): DurableTask =>
-  durableTaskSchema.parse({
+  Schema.decodeUnknownSync(durableTaskSchema)({
     id: 'a'.repeat(64),
     idempotencyKey: '00000000-0000-4000-8000-000000000001',
     sessionId: 'session-a',

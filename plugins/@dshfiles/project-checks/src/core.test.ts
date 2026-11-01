@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { projectChecksConfigSchema, ProjectChecksModel } from './core.js'
+
+/** The profile config is decoded with its defaults and rejects an undeclared key, exactly as the Host reads it. */
+const acceptsConfig = (value: unknown): boolean =>
+  Schema.decodeUnknownResult(projectChecksConfigSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 import { ProjectChecksReceiptModel, storedReceiptSchema, type StoredReceipt } from './store.js'
 
 describe('trusted project actions', () => {
@@ -11,10 +16,10 @@ describe('trusted project actions', () => {
       root: '/work/project',
     }
 
-    expect(projectChecksConfigSchema.safeParse({ actions: [action, action] }).success).toBe(false)
-    expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, root: 'project' }] }).success).toBe(false)
-    expect(projectChecksConfigSchema.parse({ actions: [action] }).actions[0]).toMatchObject({ timeoutMs: 60_000, replayPolicy: 'manual' })
-    expect(projectChecksConfigSchema.parse(undefined).actions).toEqual([])
+    expect(acceptsConfig({ actions: [action, action] })).toBe(false)
+    expect(acceptsConfig({ actions: [{ ...action, root: 'project' }] })).toBe(false)
+    expect(Schema.decodeUnknownSync(projectChecksConfigSchema)({ actions: [action] }).actions[0]).toMatchObject({ timeoutMs: 60_000, replayPolicy: 'manual' })
+    expect(Schema.decodeUnknownSync(projectChecksConfigSchema)(undefined).actions).toEqual([])
   })
 
   it('trims old receipts per session while preserving the newest rows', () => {
@@ -58,7 +63,7 @@ describe('trusted project actions', () => {
       automatic: false,
       attempt: 0,
     }
-    expect(storedReceiptSchema.parse(legacy)).toEqual(legacy)
+    expect(Schema.decodeUnknownSync(storedReceiptSchema)(legacy)).toEqual(legacy)
 
     const rows: Array<readonly [string, StoredReceipt]> = Array.from({ length: 2_001 }, (_, index) => {
       const receipt: StoredReceipt = {
@@ -111,36 +116,36 @@ describe('trusted project actions', () => {
     }
 
     it('defaults every action to local execution and keeps the load floor', () => {
-      const config = projectChecksConfigSchema.parse({ actions: [action] })
+      const config = Schema.decodeUnknownSync(projectChecksConfigSchema)({ actions: [action] })
       expect(config.actions[0]?.execution).toEqual({ target: 'local', onRemoteFailure: 'local' })
       expect(config.remotes).toEqual([])
       expect(config.load).toEqual({ localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 })
-      expect(projectChecksConfigSchema.parse({ remotes: [remote] }).remotes[0]?.peerRemote).toBe('origin')
+      expect(Schema.decodeUnknownSync(projectChecksConfigSchema)({ remotes: [remote] }).remotes[0]?.peerRemote).toBe('origin')
     })
 
     it('rejects duplicate remote ids, relative workspaces and unknown remote references', () => {
-      expect(projectChecksConfigSchema.safeParse({ remotes: [remote, remote] }).success).toBe(false)
-      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, workspace: 'relative/path' }] }).success).toBe(false)
-      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, sshTarget: '-o ProxyCommand=evil' }] }).success).toBe(false)
+      expect(acceptsConfig({ remotes: [remote, remote] })).toBe(false)
+      expect(acceptsConfig({ remotes: [{ ...remote, workspace: 'relative/path' }] })).toBe(false)
+      expect(acceptsConfig({ remotes: [{ ...remote, sshTarget: '-o ProxyCommand=evil' }] })).toBe(false)
       expect(
-        projectChecksConfigSchema.safeParse({
+        acceptsConfig({
           actions: [{ ...action, execution: { target: 'remote', remote: 'missing' } }],
           remotes: [remote],
-        }).success,
+        }),
       ).toBe(false)
     })
 
     it('requires an enabled remote for a hard remote target but allows auto without one', () => {
-      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }] }).success).toBe(false)
+      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }] })).toBe(false)
       expect(
-        projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] }).success,
+        acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] }),
       ).toBe(false)
-      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] }).success).toBe(true)
-      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'auto' } }] }).success).toBe(true)
+      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] })).toBe(true)
+      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'auto' } }] })).toBe(true)
     })
 
     it('keeps install detection configurable per remote', () => {
-      const parsed = projectChecksConfigSchema.parse({
+      const parsed = Schema.decodeUnknownSync(projectChecksConfigSchema)({
         remotes: [{ ...remote, install: { command: ['pnpm', 'install', '--frozen-lockfile'] } }],
       })
       expect(parsed.remotes[0]?.install).toEqual({
@@ -148,7 +153,7 @@ describe('trusted project actions', () => {
         whenPaths: ['pnpm-lock.yaml', 'pnpm-workspace.yaml'],
         timeoutMs: 300_000,
       })
-      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, install: { command: [] } }] }).success).toBe(false)
+      expect(acceptsConfig({ remotes: [{ ...remote, install: { command: [] } }] })).toBe(false)
     })
   })
 })

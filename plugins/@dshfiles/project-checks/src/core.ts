@@ -1,121 +1,114 @@
 import { isAbsolute, relative, sep } from 'node:path'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
-const remoteIdPattern = /^[a-z0-9][a-z0-9-]{0,31}$/
-const sshTargetPattern = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/
-const shellWord = z.string().min(1).max(512)
+const remoteIdPattern = /^[a-z0-9][a-z0-9-]{0,31}$/u
+const sshTargetPattern = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*$/u
+const shellWord = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))
+const intBetween = (minimum: number, maximum: number) =>
+  Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
+const trimmed = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const absolutePath = (maximum: number, message: string) =>
+  Schema.Trim.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(maximum),
+    Schema.makeFilter(value => (isAbsolute(value) ? undefined : message), { message }),
+  )
 
-const executionPolicySchema = z
-  .object({
-    target: z.enum(['local', 'remote', 'auto']).default('local'),
-    remote: z.string().regex(remoteIdPattern).optional(),
-    onRemoteFailure: z.enum(['local', 'fail']).default('local'),
+const executionPolicySchema = Schema.Struct({
+  target: Schema.Literals(['local', 'remote', 'auto']).pipe(Schema.withDecodingDefaultKey(Effect.succeed('local'))),
+  remote: Schema.optionalKey(Schema.String.check(Schema.isPattern(remoteIdPattern))),
+  onRemoteFailure: Schema.Literals(['local', 'fail']).pipe(Schema.withDecodingDefaultKey(Effect.succeed('local'))),
+}).pipe(Schema.withDecodingDefaultKey(Effect.succeed({ target: 'local', onRemoteFailure: 'local' })))
+
+const loadPolicySchema = Schema.Struct({
+  localMemoryFloorMb: intBetween(0, 1_048_576).pipe(Schema.withDecodingDefaultKey(Effect.succeed(4_096))),
+  remoteCooldownMs: intBetween(1_000, 600_000).pipe(Schema.withDecodingDefaultKey(Effect.succeed(60_000))),
+}).pipe(Schema.withDecodingDefaultKey(Effect.succeed({ localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 })))
+
+const projectActionSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/u)),
+  label: trimmed(1, 80),
+  description: trimmed(0, 240).pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))),
+  command: trimmed(1, 2048),
+  args: Schema.Array(Schema.String.check(Schema.isMaxLength(2048)))
+    .check(Schema.isMaxLength(64))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  root: absolutePath(2048, 'Use an absolute trusted project root.'),
+  timeoutMs: intBetween(1_000, 300_000).pipe(Schema.withDecodingDefaultKey(Effect.succeed(60_000))),
+  verifyBeforeComplete: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  replayPolicy: Schema.Literals(['manual', 'read-only']).pipe(Schema.withDecodingDefaultKey(Effect.succeed('manual'))),
+  execution: executionPolicySchema,
+})
+
+export const remoteHostSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isPattern(remoteIdPattern)),
+  sshTarget: Schema.Trim.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(255),
+    Schema.isPattern(sshTargetPattern, { message: 'Use an ssh destination such as user@host.' }),
+  ),
+  /** Name of the local jj remote that points at this peer's bare snapshot repository. */
+  gitRemote: trimmed(1, 64).check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u)),
+  /** Name of the peer repository's remote that points back at the same bare repository. */
+  peerRemote: trimmed(1, 64)
+    .check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed('origin'))),
+  workspace: absolutePath(2048, 'Use an absolute peer checker workspace path.'),
+  /** Prefix that pins the peer toolchain for action and install commands, e.g. ['mise', 'exec', 'node@22.23.3', '--']. */
+  toolchain: Schema.Array(shellWord).check(Schema.isMaxLength(8)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  install: Schema.optionalKey(
+    Schema.Struct({
+      command: Schema.Array(shellWord).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
+      whenPaths: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)))
+        .check(Schema.isMinLength(1), Schema.isMaxLength(16))
+        .pipe(Schema.withDecodingDefaultKey(Effect.succeed(['pnpm-lock.yaml', 'pnpm-workspace.yaml']))),
+      timeoutMs: intBetween(1_000, 900_000).pipe(Schema.withDecodingDefaultKey(Effect.succeed(300_000))),
+    }),
+  ),
+  priority: intBetween(1, 99).pipe(Schema.withDecodingDefaultKey(Effect.succeed(1))),
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
+})
+
+const configCheck = Schema.makeFilter((value: typeof projectChecksConfigShape.Type) => {
+  const issues: Array<{ readonly path: ReadonlyArray<PropertyKey>; readonly issue: string }> = []
+  const actionIds = new Set<string>()
+  value.actions.forEach((action, index) => {
+    if (actionIds.has(action.id)) issues.push({ path: ['actions', index, 'id'], issue: 'Project action ids must be unique.' })
+    actionIds.add(action.id)
   })
-  .strict()
-  .default({ target: 'local', onRemoteFailure: 'local' })
-
-const loadPolicySchema = z
-  .object({
-    localMemoryFloorMb: z.number().int().min(0).max(1_048_576).default(4_096),
-    remoteCooldownMs: z.number().int().min(1_000).max(600_000).default(60_000),
+  const remoteIds = new Set<string>()
+  value.remotes.forEach((remote, index) => {
+    if (remoteIds.has(remote.id)) issues.push({ path: ['remotes', index, 'id'], issue: 'Project check remote ids must be unique.' })
+    remoteIds.add(remote.id)
   })
-  .strict()
-  .default({ localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 })
-
-const projectActionSchema = z
-  .object({
-    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
-    label: z.string().trim().min(1).max(80),
-    description: z.string().trim().max(240).default(''),
-    command: z.string().trim().min(1).max(2048),
-    args: z.array(z.string().max(2048)).max(64).default([]),
-    root: z.string().trim().min(1).max(2048).refine(isAbsolute, 'Use an absolute trusted project root.'),
-    timeoutMs: z.number().int().min(1_000).max(300_000).default(60_000),
-    verifyBeforeComplete: z.boolean().default(false),
-    replayPolicy: z.enum(['manual', 'read-only']).default('manual'),
-    execution: executionPolicySchema,
+  value.actions.forEach((action, index) => {
+    const policy = action.execution
+    if (policy.remote !== undefined && !remoteIds.has(policy.remote)) {
+      issues.push({ path: ['actions', index, 'execution', 'remote'], issue: 'This execution policy names an unknown remote.' })
+    }
+    if (policy.target === 'remote' && policy.remote === undefined && value.remotes.every(remote => !remote.enabled)) {
+      issues.push({ path: ['actions', index, 'execution', 'target'], issue: 'A remote execution target needs at least one enabled remote.' })
+    }
   })
-  .strict()
+  return issues
+})
 
-export const remoteHostSchema = z
-  .object({
-    id: z.string().regex(remoteIdPattern),
-    sshTarget: z.string().trim().min(1).max(255).regex(sshTargetPattern, 'Use an ssh destination such as user@host.'),
-    /** Name of the local jj remote that points at this peer's bare snapshot repository. */
-    gitRemote: z
-      .string()
-      .trim()
-      .min(1)
-      .max(64)
-      .regex(/^[A-Za-z0-9._-]+$/),
-    /** Name of the peer repository's remote that points back at the same bare repository. */
-    peerRemote: z
-      .string()
-      .trim()
-      .min(1)
-      .max(64)
-      .regex(/^[A-Za-z0-9._-]+$/)
-      .default('origin'),
-    workspace: z.string().trim().min(1).max(2048).refine(isAbsolute, 'Use an absolute peer checker workspace path.'),
-    /** Prefix that pins the peer toolchain for action and install commands, e.g. ['mise', 'exec', 'node@22.23.3', '--']. */
-    toolchain: z.array(shellWord).max(8).default([]),
-    install: z
-      .object({
-        command: z.array(shellWord).min(1).max(16),
-        whenPaths: z.array(z.string().min(1).max(512)).min(1).max(16).default(['pnpm-lock.yaml', 'pnpm-workspace.yaml']),
-        timeoutMs: z.number().int().min(1_000).max(900_000).default(300_000),
-      })
-      .strict()
-      .optional(),
-    priority: z.number().int().min(1).max(99).default(1),
-    enabled: z.boolean().default(true),
-  })
-  .strict()
+const projectChecksConfigShape = Schema.Struct({
+  actions: Schema.Array(projectActionSchema).check(Schema.isMaxLength(32)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  maxVerificationAttempts: intBetween(1, 2).pipe(Schema.withDecodingDefaultKey(Effect.succeed(2))),
+  remotes: Schema.Array(remoteHostSchema).check(Schema.isMaxLength(8)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  load: loadPolicySchema,
+})
 
-export const projectChecksConfigSchema = z
-  .object({
-    actions: z.array(projectActionSchema).max(32).default([]),
-    maxVerificationAttempts: z.number().int().min(1).max(2).default(2),
-    remotes: z.array(remoteHostSchema).max(8).default([]),
-    load: loadPolicySchema,
-  })
-  .strict()
-  .default({ actions: [], maxVerificationAttempts: 2, remotes: [], load: { localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 } })
-  .superRefine((value, context) => {
-    const actionIds = new Set<string>()
-    value.actions.forEach((action, index) => {
-      if (actionIds.has(action.id)) {
-        context.addIssue({ code: 'custom', path: ['actions', index, 'id'], message: 'Project action ids must be unique.' })
-      }
-      actionIds.add(action.id)
-    })
-    const remoteIds = new Set<string>()
-    value.remotes.forEach((remote, index) => {
-      if (remoteIds.has(remote.id)) {
-        context.addIssue({ code: 'custom', path: ['remotes', index, 'id'], message: 'Project check remote ids must be unique.' })
-      }
-      remoteIds.add(remote.id)
-    })
-    value.actions.forEach((action, index) => {
-      const policy = action.execution
-      if (policy.remote !== undefined && !remoteIds.has(policy.remote)) {
-        context.addIssue({ code: 'custom', path: ['actions', index, 'execution', 'remote'], message: 'This execution policy names an unknown remote.' })
-      }
-      if (policy.target === 'remote' && policy.remote === undefined && value.remotes.every(remote => !remote.enabled)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['actions', index, 'execution', 'target'],
-          message: 'A remote execution target needs at least one enabled remote.',
-        })
-      }
-    })
-  })
+export const projectChecksConfigSchema = projectChecksConfigShape
+  .check(configCheck)
+  .pipe(Schema.withDecodingDefault(Effect.succeed({ actions: [], maxVerificationAttempts: 2, remotes: [], load: { localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 } })))
 
-export type ProjectAction = z.infer<typeof projectActionSchema>
-export type RemoteHost = z.infer<typeof remoteHostSchema>
-export type ExecutionPolicy = z.infer<typeof executionPolicySchema>
-export type LoadPolicy = z.infer<typeof loadPolicySchema>
-export type ProjectChecksConfig = z.infer<typeof projectChecksConfigSchema>
+export type ProjectAction = typeof projectActionSchema.Type
+export type RemoteHost = typeof remoteHostSchema.Type
+export type ExecutionPolicy = typeof executionPolicySchema.Type
+export type LoadPolicy = typeof loadPolicySchema.Type
+export type ProjectChecksConfig = typeof projectChecksConfigSchema.Type
 
 export interface VerificationFailure {
   readonly label: string
@@ -140,7 +133,8 @@ export class ProjectChecksModel {
     const failed = failures
       .slice(0, 6)
       .map(
-        item => `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`,
+        item =>
+          `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`,
       )
       .join(', ')
     const extra = failures.length > 6 ? `, and ${failures.length - 6} more` : ''
