@@ -1,6 +1,6 @@
 import { defineApi } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { MemoryContract } from './schema.ts'
+import { MemoryContract } from './schema.js'
 
 /** Kept apart from the memory API so another plugin's Host can call it without compiling memory's sources. */
 export const workspaceScriptsApi = defineApi({
