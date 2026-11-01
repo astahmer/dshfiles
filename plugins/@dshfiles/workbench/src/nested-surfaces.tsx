@@ -1,37 +1,44 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { ComponentType } from 'react'
-import { z } from 'zod'
-import { nestedLayoutStores, nestedSurfacePathSchema, type LayoutStore, type NestedLayouts } from './layout-store.js'
+import * as Schema from 'effect/Schema'
 import { workbenchRegions, type NestedSurfacePath, type WorkbenchRegionId, type WorkbenchRegionRegistry, type WorkbenchRegionSurface } from './dock-regions.js'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import { nestedLayoutStores, decodeNestedSurfacePath, nestedSurfacePathSchema, type LayoutStore, type NestedLayouts } from './layout-store.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
+import { trimmedString } from './schema.js'
 
 export type { NestedSurfacePath } from './dock-regions.js'
 
 const NESTED_PANEL_PREFIX = 'dshfiles-workbench.'
-const pathTokenSchema = z.string().regex(/^[a-zA-Z0-9._-]+$/u)
-const descriptorSchema = z.object({ path: nestedSurfacePathSchema, title: z.string().trim().min(1) })
+const pathTokenSchema = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9._-]+$/u))
+const descriptorSchema = Schema.Struct({ path: nestedSurfacePathSchema, title: trimmedString(Schema.String.check(Schema.isMinLength(1))) })
+
+/** A named container identity: the storage path plus the title its panel shows. */
+export interface NestedSurfaceDescriptor {
+  readonly path: NestedSurfacePath
+  readonly title: string
+}
 
 /** Stable container identities, retained even when their containing surface is unmounted. */
-export const nestedSurfaceDefinitions = createStoredValue({
+export const nestedSurfaceDefinitions = createEffectStoredValue({
   key: 'dshfiles.workbench.nested-surfaces.v1',
-  schema: z.array(descriptorSchema),
+  schema: Schema.Array(descriptorSchema),
   fallback: [],
 })
 
 /** Allocate once in an Add-container action, not during a component render. */
 export const nestedSurfacePath = (parent: WorkbenchRegionId, token: string = crypto.randomUUID()): NestedSurfacePath => {
-  pathTokenSchema.parse(token)
-  const prefix = parent.startsWith('nested/') ? nestedSurfacePathSchema.parse(parent) : `nested/${parent}`
-  return nestedSurfacePathSchema.parse(`${prefix}/${token}`)
+  Schema.decodeUnknownSync(pathTokenSchema)(token)
+  const prefix = parent.startsWith('nested/') ? decodeNestedSurfacePath(parent) : `nested/${parent}`
+  return decodeNestedSurfacePath(`${prefix}/${token}`)
 }
 
 /** Container panel identity and storage path stay stable when the container moves. */
-export const nestedPanelId = (path: NestedSurfacePath): string => `${NESTED_PANEL_PREFIX}${nestedSurfacePathSchema.parse(path)}`
+export const nestedPanelId = (path: NestedSurfacePath): string => `${NESTED_PANEL_PREFIX}${decodeNestedSurfacePath(path)}`
 
 const pathOfPanel = (panelId: string): NestedSurfacePath | undefined => {
   if (!panelId.startsWith(NESTED_PANEL_PREFIX)) return undefined
-  const result = nestedSurfacePathSchema.safeParse(panelId.slice(NESTED_PANEL_PREFIX.length))
-  return result.success ? result.data : undefined
+  const result = Schema.decodeUnknownResult(nestedSurfacePathSchema)(panelId.slice(NESTED_PANEL_PREFIX.length))
+  return result._tag === 'Success' ? result.success : undefined
 }
 
 type RegionLookup = Pick<WorkbenchRegionRegistry<WorkbenchRegionSurface>, 'entries'>
@@ -56,7 +63,7 @@ export const canMovePanelToRegion = (
   while (current.startsWith('nested/')) {
     if (current === moving || visited.has(current)) return false
     visited.add(current)
-    const currentPath = nestedSurfacePathSchema.parse(current)
+    const currentPath = decodeNestedSurfacePath(current)
     const containerId = nestedPanelId(currentPath)
     const parent = live.find(([, surface]) => surface.getPanel(containerId) !== undefined)?.[0]
     if (parent !== undefined) {
@@ -69,7 +76,7 @@ export const canMovePanelToRegion = (
       ([path, layout]) => !live.some(([region]) => region === path) && layout?.panels[containerId] !== undefined,
     )?.[0]
     if (savedParent !== undefined) {
-      current = nestedSurfacePathSchema.parse(savedParent)
+      current = decodeNestedSurfacePath(savedParent)
       continue
     }
     // No mounted or persisted owner can prove this branch left its origin.
@@ -88,7 +95,7 @@ export interface NestedSurfaceProps {
 /** Own every registration created during this plugin lifetime, including new Add actions. */
 export const createNestedSurfaceRegistry = (registry: WorkbenchPanelRegistry, component: ComponentType<NestedSurfaceProps>) => {
   const owned = new Map<NestedSurfacePath, { definition: WorkbenchPanelDefinition; dispose: () => void }>()
-  const register = (descriptor: z.infer<typeof descriptorSchema>): WorkbenchPanelDefinition => {
+  const register = (descriptor: NestedSurfaceDescriptor): WorkbenchPanelDefinition => {
     const existing = owned.get(descriptor.path)
     if (existing?.definition.title === descriptor.title) return existing.definition
     const definition = createNestedSurface({ ...descriptor, component })
@@ -119,7 +126,7 @@ export const createNestedSurface = (options: {
   readonly title: string
   readonly component: ComponentType<NestedSurfaceProps>
 }): WorkbenchPanelDefinition => {
-  const descriptor = descriptorSchema.parse(options)
+  const descriptor: NestedSurfaceDescriptor = Schema.decodeUnknownSync(descriptorSchema)(options)
   const definitions = nestedSurfaceDefinitions.get()
   const previous = definitions.find(entry => entry.path === descriptor.path)
   if (previous?.title !== descriptor.title) {

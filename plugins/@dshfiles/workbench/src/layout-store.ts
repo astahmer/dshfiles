@@ -1,8 +1,8 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { DockviewApi, SerializedDockview } from 'dockview-react'
-import { z } from 'zod'
-import type { WorkbenchPanelDefinition } from './registry.js'
+import * as Schema from 'effect/Schema'
 import type { NestedSurfacePath } from './dock-regions.js'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import type { WorkbenchPanelDefinition } from './registry.js'
 
 /** Every docked panel uses this one Dockview component; the panel id names the registry entry it renders. */
 export const WORKBENCH_COMPONENT = 'workbench-panel'
@@ -15,15 +15,33 @@ const LAYOUT_STORAGE_KEYS = {
   bottom: 'dshfiles.workbench.bottom-layout.v1',
 } as const
 
-const serializedPanelSchema = z.looseObject({ id: z.string(), contentComponent: z.literal(WORKBENCH_COMPONENT), title: z.string().optional() })
+const serializedPanelSchema = Schema.StructWithRest(
+  Schema.Struct({ id: Schema.String, contentComponent: Schema.Literal(WORKBENCH_COMPONENT), title: Schema.optionalKey(Schema.String) }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
-const serializedDockviewSchema = z.looseObject({
-  grid: z.looseObject({ root: z.looseObject({ type: z.string() }), width: z.number(), height: z.number(), orientation: z.string() }),
-  panels: z.record(z.string(), serializedPanelSchema),
-})
+const serializedDockviewSchema = Schema.StructWithRest(
+  Schema.Struct({
+    grid: Schema.StructWithRest(
+      Schema.Struct({
+        root: Schema.StructWithRest(Schema.Struct({ type: Schema.String }), [Schema.Record(Schema.String, Schema.Unknown)]),
+        width: Schema.Number.check(Schema.isFinite()),
+        height: Schema.Number.check(Schema.isFinite()),
+        orientation: Schema.String,
+      }),
+      [Schema.Record(Schema.String, Schema.Unknown)],
+    ),
+    panels: Schema.Record(Schema.String, serializedPanelSchema),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
 /** The outer shape Dockview reads; anything deeper that it rejects makes `restoreLayout` fall back to the default. */
-export const layoutSchema = z.custom<SerializedDockview>(value => serializedDockviewSchema.safeParse(value).success)
+export const layoutSchema = Schema.declare<SerializedDockview>(
+  (value): value is SerializedDockview => Schema.decodeUnknownResult(serializedDockviewSchema)(value)._tag === 'Success',
+)
+
+export const decodeLayout = (value: unknown): SerializedDockview => Schema.decodeUnknownSync(layoutSchema)(value)
 
 /** The regions a saved layout can carry, in the order the surfaces mount. */
 export const LAYOUT_SURFACES = ['main', 'left', 'dock', 'bottom'] as const
@@ -36,21 +54,23 @@ export type LayoutStoreSurface = keyof typeof LAYOUT_STORAGE_KEYS | NestedSurfac
 type LayoutStorage = () => Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
 
 /** Shared validation for persisted nested identities and named nested layouts. */
-export const nestedSurfacePathSchema = z
-  .string()
-  .regex(/^nested\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*$/u)
-  .transform((value): NestedSurfacePath => `nested/${value.slice('nested/'.length)}`)
+export const nestedSurfacePathSchema = Schema.TemplateLiteral(['nested/', Schema.String]).check(
+  Schema.isPattern(/^nested\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*$/u),
+)
+
+const decodeNestedSurfacePath = (value: string): NestedSurfacePath => Schema.decodeUnknownSync(nestedSurfacePathSchema)(value)
+export { decodeNestedSurfacePath }
 
 const surfaceStorageKey = (surface: LayoutStoreSurface): string => {
   if (surface === 'main' || surface === 'left' || surface === 'side-panel' || surface === 'dock' || surface === 'bottom') return LAYOUT_STORAGE_KEYS[surface]
-  return `dshfiles.workbench.nested-layout.v1:${nestedSurfacePathSchema.parse(surface)}`
+  return `dshfiles.workbench.nested-layout.v1:${decodeNestedSurfacePath(surface)}`
 }
 
 type LayoutStoreOptions = { surface?: LayoutStoreSurface; storage?: LayoutStorage }
 
 /** Every region keeps its own layout, so docking in one never rearranges another. */
 export const createLayoutStore = (options?: Readonly<LayoutStoreOptions>) =>
-  createStoredValue({ key: surfaceStorageKey(options?.surface ?? 'main'), schema: layoutSchema, fallback: null, storage: options?.storage })
+  createEffectStoredValue({ key: surfaceStorageKey(options?.surface ?? 'main'), schema: layoutSchema, fallback: null, storage: options?.storage })
 
 export type LayoutStore = ReturnType<typeof createLayoutStore>
 export type NestedLayouts = Record<NestedSurfacePath, SerializedDockview | null>
@@ -62,15 +82,15 @@ const NO_NESTED_PATHS: NestedSurfacePath[] = []
  * notifies an already-mounted surface through its existing subscription.
  */
 export const createNestedLayoutStores = (options?: { readonly storage?: LayoutStorage }) => {
-  const paths = createStoredValue({
+  const paths = createEffectStoredValue({
     key: 'dshfiles.workbench.nested-paths.v1',
-    schema: z.array(nestedSurfacePathSchema),
+    schema: Schema.Array(nestedSurfacePathSchema),
     fallback: NO_NESTED_PATHS,
     storage: options?.storage,
   })
   const stores = new Map<NestedSurfacePath, LayoutStore>()
   const store = (path: NestedSurfacePath): LayoutStore => {
-    nestedSurfacePathSchema.parse(path)
+    decodeNestedSurfacePath(path)
     if (!paths.get().includes(path)) paths.set([...paths.get(), path])
     let existing = stores.get(path)
     if (existing === undefined) {
@@ -87,7 +107,7 @@ export const createNestedLayoutStores = (options?: { readonly storage?: LayoutSt
     capture: (): NestedLayouts => Object.fromEntries(paths.get().map(path => [path, store(path).get()])),
     restore: (layouts: Readonly<NestedLayouts>): void => {
       for (const [path, layout] of Object.entries(layouts)) {
-        const target = store(nestedSurfacePathSchema.parse(path))
+        const target = store(decodeNestedSurfacePath(path))
         if (layout === null) target.remove()
         else if (layout !== undefined) target.set(layout)
       }

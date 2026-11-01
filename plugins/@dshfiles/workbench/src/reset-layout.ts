@@ -1,6 +1,6 @@
 import type { DockviewApi } from 'dockview-react'
 import type { ArrangementPorts, ArrangementSurface } from './layout-arrangements.js'
-import { nestedSurfacePathSchema, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
+import { decodeNestedSurfacePath, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
 import type { WorkbenchPanelRegistry } from './registry.js'
 import { nestedPanelId } from './nested-surfaces.js'
 import { createNativeAsidePlacement } from './native-aside-placement.js'
@@ -86,7 +86,7 @@ export class WorkbenchReset {
     const parentOf = new Map<Surface, Surface>()
     for (const [region, api] of live) {
       if (!region.startsWith('nested/')) continue
-      const id = nestedPanelId(nestedSurfacePathSchema.parse(region))
+      const id = nestedPanelId(decodeNestedSurfacePath(region))
       const parent = live.find(([, candidate]) => candidate.getPanel(id) !== undefined)?.[1]
       if (parent !== undefined) parentOf.set(api, parent)
     }

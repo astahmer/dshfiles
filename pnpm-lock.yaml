@@ -6991,6 +6991,9 @@ importers:
       dockview-react:
         specifier: 8.4.1
         version: 8.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3

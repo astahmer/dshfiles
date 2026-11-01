@@ -1,6 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
 import type { ComponentType } from 'react'
+import * as Schema from 'effect/Schema'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import { trimmedString } from './schema.js'
 
 /** The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded. */
 export const WORKBENCH_MAIN_PANEL_ID = 'dshfiles-workbench'
@@ -49,13 +50,18 @@ export interface WorkbenchPanelDefinition {
   readonly showInEmptyState?: boolean
 }
 
-const panelIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/u)
-const panelDefinitionSchema = z.object({ id: panelIdSchema, title: z.string().trim().min(1) })
-const panelPreferenceSchema = z.object({ contextMenu: z.boolean(), emptyState: z.boolean(), order: z.number().int() }).strict()
-const panelPreferencesSchema = z.record(z.string().min(1), panelPreferenceSchema)
+const panelIdSchema = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/u))
+const panelDefinitionSchema = Schema.Struct({ id: panelIdSchema, title: trimmedString(Schema.String.check(Schema.isMinLength(1))) })
+const panelPreferenceSchema = Schema.Struct({
+  contextMenu: Schema.Boolean,
+  emptyState: Schema.Boolean,
+  order: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+})
+const panelPreferencesSchema = Schema.Record(Schema.String.check(Schema.isMinLength(1)), panelPreferenceSchema)
+const isStrictPanelPreference = (value: unknown): value is WorkbenchPanelPreference => Schema.is(panelPreferenceSchema)(value)
 
-const emptyPanelPreferences: z.infer<typeof panelPreferencesSchema> = {}
-const storedPanelPreferences = createStoredValue({
+const emptyPanelPreferences: Record<string, WorkbenchPanelPreference> = {}
+const storedPanelPreferences = createEffectStoredValue({
   key: 'dshfiles.workbench.side-panel-preferences.v1',
   schema: panelPreferencesSchema,
   fallback: emptyPanelPreferences,
@@ -109,7 +115,7 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
 
   return {
     register: definition => {
-      if (!panelDefinitionSchema.safeParse(definition).success) throw new TypeError('Workbench panel id and title must be valid.')
+      if (!Schema.is(panelDefinitionSchema)(definition)) throw new TypeError('Workbench panel id and title must be valid.')
       definitions.set(definition.id, definition)
       notify()
       return () => {
@@ -123,7 +129,7 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
     listContextMenuPanels: () => snapshot.filter(panel => !panel.hiddenFromAdd && panel.tabId === undefined && preference(panel.id)?.contextMenu === true),
     preference,
     setPreference: (id, preference) => {
-      if (!definitions.has(id) || !panelPreferenceSchema.safeParse(preference).success) return false
+      if (!definitions.has(id) || !isStrictPanelPreference(preference)) return false
       storedPanelPreferences.set({ ...storedPanelPreferences.get(), [id]: preference })
       notify()
       return true
