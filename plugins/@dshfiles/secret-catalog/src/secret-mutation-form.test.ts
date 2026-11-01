@@ -1,15 +1,17 @@
+import type { StandardSchemaV1 } from 'effect/StandardSchema'
 import { describe, expect, it } from 'vitest'
 import type { SecretMetadata } from './secret-metadata.js'
 import { SecretMutationForm, secretCreateFormSchema, secretUpdateFormSchema } from './secret-mutation-form.js'
 
-const issuePaths = (result: {
-  readonly success: boolean
-  readonly error?: { readonly issues: readonly { readonly path: readonly PropertyKey[] }[] }
-}): readonly string[] => result.error?.issues.map(issue => issue.path.join('.')) ?? []
+/** The form validators are Standard Schema, so the test asks them exactly what TanStack Form asks them. */
+const validate = async (schema: StandardSchemaV1, value: unknown): Promise<StandardSchemaV1.Result<unknown>> => await schema['~standard'].validate(value)
+const issuePaths = (result: StandardSchemaV1.Result<unknown>): readonly string[] =>
+  result.issues?.map(issue => (issue.path ?? []).join('.')) ?? []
+const accepted = (result: StandardSchemaV1.Result<unknown>): boolean => result.issues === undefined
 
 describe('Secret Catalog create form', () => {
-  it('rejects an invalid alias and a manual value that was never entered', () => {
-    const result = secretCreateFormSchema.safeParse({
+  it('rejects an invalid alias and a manual value that was never entered', async () => {
+    const result = await validate(secretCreateFormSchema, {
       ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
       alias: '1BAD',
       valueMode: 'manual',
@@ -17,20 +19,19 @@ describe('Secret Catalog create form', () => {
     expect(issuePaths(result)).toEqual(['alias', 'value'])
   })
 
-  it('reports a missing alias once instead of also failing its format', () => {
-    const result = secretCreateFormSchema.safeParse(SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }))
-    expect(result.error?.issues.map(issue => issue.message)).toEqual(['Enter an alias.'])
+  it('reports a missing alias once instead of also failing its format', async () => {
+    const result = await validate(secretCreateFormSchema, SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }))
+    expect(result.issues?.map(issue => issue.message)).toEqual(['Enter an alias.'])
   })
 
-  it('accepts a generated value with the default environment', () => {
+  it('accepts a generated value with the default environment', async () => {
     expect(
-      secretCreateFormSchema.safeParse({ ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }), alias: 'SYNTHETIC_TOKEN' })
-        .success,
+      accepted(await validate(secretCreateFormSchema, { ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }), alias: 'SYNTHETIC_TOKEN' })),
     ).toBe(true)
   })
 
-  it('rejects metadata that the CLI would read as another flag', () => {
-    const result = secretCreateFormSchema.safeParse({
+  it('rejects metadata that the CLI would read as another flag', async () => {
+    const result = await validate(secretCreateFormSchema, {
       ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
       alias: 'SYNTHETIC',
       tags: '--force',
@@ -102,8 +103,8 @@ describe('Secret Catalog edit form', () => {
     })
   })
 
-  it('rejects an invalid rename', () => {
-    expect(issuePaths(secretUpdateFormSchema.safeParse({ ...defaults, renameTo: '1BAD' }))).toEqual(['renameTo'])
+  it('rejects an invalid rename', async () => {
+    expect(issuePaths(await validate(secretUpdateFormSchema, { ...defaults, renameTo: '1BAD' }))).toEqual(['renameTo'])
   })
 
   it('sends an empty tag list when clearing tags, whatever was typed', () => {
@@ -116,8 +117,8 @@ describe('Secret Catalog edit form', () => {
     expect(input).toEqual({ ...target, value: 'synthetic-value', source: 'https://example.invalid' })
   })
 
-  it('rejects metadata that starts with a dash', () => {
-    expect(issuePaths(secretUpdateFormSchema.safeParse({ ...defaults, name: '-x' }))).toEqual(['name'])
+  it('rejects metadata that starts with a dash', async () => {
+    expect(issuePaths(await validate(secretUpdateFormSchema, { ...defaults, name: '-x' }))).toEqual(['name'])
   })
 })
 

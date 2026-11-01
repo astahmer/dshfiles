@@ -1,7 +1,6 @@
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
-import { z } from 'zod'
 import {
   createInputSchema,
   deleteItemInputSchema,
@@ -24,13 +23,11 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
   },
 ) => defineMethod({ ...options, input: standardSchema(options.input), output: standardSchema(options.output) })
 
-// Keep the five acknowledgements on zod: `z.literal(true)` publishes `const: true` where `Schema.Literal(true)`
-// publishes `enum: [true]`, and the host tool schema snapshot is byte-for-byte.
-const createdOutputSchema = z.object({ created: z.literal(true) })
-const copiedOutputSchema = z.object({ copied: z.literal(true) })
-const updatedOutputSchema = z.object({ updated: z.literal(true) })
-const removedOutputSchema = z.object({ removed: z.literal(true) })
-const deletedOutputSchema = z.object({ deleted: z.literal(true) })
+const createdOutputSchema = Schema.Struct({ created: Schema.Literal(true) })
+const copiedOutputSchema = Schema.Struct({ copied: Schema.Literal(true) })
+const updatedOutputSchema = Schema.Struct({ updated: Schema.Literal(true) })
+const removedOutputSchema = Schema.Struct({ removed: Schema.Literal(true) })
+const deletedOutputSchema = Schema.Struct({ deleted: Schema.Literal(true) })
 
 export const secretCatalogApi = defineApi({
   id: 'secret-catalog',
@@ -38,12 +35,12 @@ export const secretCatalogApi = defineApi({
   methods: {
     list: method({ input: listInputSchema, output: listOutputSchema }),
     reveal: method({ input: revealInputSchema, output: Schema.String.check(Schema.isMaxLength(1_000_000)) }),
-    copy: defineMethod({ input: standardSchema(revealInputSchema), output: copiedOutputSchema }),
+    copy: defineMethod({ input: standardSchema(revealInputSchema), output: standardSchema(copiedOutputSchema) }),
     machine: method({ input: Schema.Struct({}), output: machineOutputSchema }),
-    create: defineMethod({ input: standardSchema(createInputSchema), output: createdOutputSchema }),
-    update: defineMethod({ input: standardSchema(updateInputSchema), output: updatedOutputSchema }),
-    removeAlias: defineMethod({ input: standardSchema(removeAliasInputSchema), output: removedOutputSchema }),
-    deleteItem: defineMethod({ input: standardSchema(deleteItemInputSchema), output: deletedOutputSchema }),
+    create: defineMethod({ input: standardSchema(createInputSchema), output: standardSchema(createdOutputSchema) }),
+    update: defineMethod({ input: standardSchema(updateInputSchema), output: standardSchema(updatedOutputSchema) }),
+    removeAlias: defineMethod({ input: standardSchema(removeAliasInputSchema), output: standardSchema(removedOutputSchema) }),
+    deleteItem: defineMethod({ input: standardSchema(deleteItemInputSchema), output: standardSchema(deletedOutputSchema) }),
   },
 })
 
@@ -59,7 +56,7 @@ export const secretSetupApi = defineApi({
     }),
     create: defineMethod({
       input: standardSchema(createInputSchema),
-      output: createdOutputSchema,
+      output: standardSchema(createdOutputSchema),
       description: 'Store a Secret Catalog alias for an explicit setup flow; manual values never return to the Client.',
     }),
     referenceStatus: defineMethod({

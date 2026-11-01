@@ -4,10 +4,8 @@ import { createMetadataFields, updateMetadataFields } from './secret-arguments-e
 import { secretMetadataSchema } from './secret-metadata.js'
 
 /**
- * The Secret Catalog API contracts whose JSON Schema matches the zod schemas they replace. They are plain Effect
- * schemas: `strictStandardSchema` in `api.ts` publishes them with the closed objects and excess-property rejection
- * zod used to provide. The five `z.literal(true)` acknowledgements stay on zod in `api.ts`: Effect publishes
- * `enum: [true]` where zod publishes `const: true`.
+ * The Secret Catalog API contracts. They are plain Effect schemas; `api.ts` publishes them through `standardSchema`
+ * (closed objects, excess-property rejection) so the Host boundary and the agent tool see one contract.
  */
 
 const cwdSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096)))

@@ -12,7 +12,7 @@ const apiSchemas = () =>
   )
 
 describe('Secret Catalog API JSON schemas', () => {
-  it('byte-matches the pre-Effect contract snapshot', () => {
+  it('byte-matches the recorded contract snapshot', () => {
     expect(JSON.stringify(apiSchemas())).toMatchSnapshot()
   })
 })
