@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import type { SavedPrompt } from './library.js'
@@ -130,7 +131,11 @@ const startHarness = async () => {
   const asHostContext = (value: typeof context): Context => value as unknown as Context
   await plugin.apply(asHostContext(context))
 
-  const call = async <Output>(request: { readonly method: string; readonly schema: z.ZodType<Output>; readonly input?: object }): Promise<Output> => {
+  const call = async <Output>(request: {
+    readonly method: string
+    readonly schema: Schema.ConstraintDecoder<Output>
+    readonly input?: object
+  }): Promise<Output> => {
     const route = [...routes.values()].find(candidate => candidate.path.endsWith(`/${request.method}`))
     if (route === undefined) throw new Error(`No route was registered for ${request.method}.`)
     const response = await route.fetch(
@@ -147,7 +152,7 @@ const startHarness = async () => {
     )
     expect(response.status).toBe(200)
     const parsed = serverResponseSchema.parse(await response.json())
-    return request.schema.parse(parsed.result.value.output)
+    return Schema.decodeUnknownSync(request.schema, { onExcessProperty: 'error' })(parsed.result.value.output)
   }
 
   return {

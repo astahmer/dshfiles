@@ -1,5 +1,6 @@
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { trimmedString, uuidSchema } from './schema.js'
 
 export const PROMPT_LIBRARY_STORAGE_KEY = 'dshfiles.prompt-stash.v1'
 export const PROMPT_LIBRARY_LOCAL_STORAGE_KEY = 'dshfiles.prompt-stash.library-local.v2'
@@ -8,39 +9,42 @@ export const MAX_PROMPT_TITLE_LENGTH = 100
 export const MAX_PROMPT_TEXT_LENGTH = 20_000
 const MAX_LIBRARY_CHARACTERS = 450_000
 
-export const promptSchema = z
-  .object({
-    id: z.string().uuid(),
-    revision: z.string().uuid(),
-    title: z.string().trim().min(1).max(MAX_PROMPT_TITLE_LENGTH),
-    text: z.string().min(1).max(MAX_PROMPT_TEXT_LENGTH),
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strict()
+export const promptSchema = Schema.Struct({
+  id: uuidSchema,
+  revision: uuidSchema,
+  title: trimmedString(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PROMPT_TITLE_LENGTH))),
+  text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PROMPT_TEXT_LENGTH)),
+  updatedAt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
-const librarySchema = z
-  .object({
-    version: z.literal(1),
-    prompts: z.array(promptSchema).max(MAX_PROMPTS),
-  })
-  .strict()
-  .superRefine((library, context) => {
-    const ids = new Set(library.prompts.map(prompt => prompt.id))
-    if (ids.size !== library.prompts.length) {
-      context.addIssue({ code: 'custom', path: ['prompts'], message: 'Prompt ids must be unique.' })
-    }
+export interface SavedPrompt {
+  readonly id: string
+  readonly revision: string
+  readonly title: string
+  readonly text: string
+  readonly updatedAt: number
+}
 
-    const totalCharacters = library.prompts.reduce((total, prompt) => total + prompt.title.length + prompt.text.length, 0)
-    if (totalCharacters > MAX_LIBRARY_CHARACTERS) {
-      context.addIssue({ code: 'custom', path: ['prompts'], message: 'The saved prompt library is too large.' })
-    }
-  })
+export interface PromptLibraryStore {
+  readonly version: 1
+  readonly prompts: readonly SavedPrompt[]
+}
+
+const promptListSchema = Schema.Array(promptSchema).check(Schema.isMaxLength(MAX_PROMPTS))
+
+const libraryChecks = Schema.makeFilter((library: PromptLibraryStore) => {
+  const ids = new Set(library.prompts.map(prompt => prompt.id))
+  if (ids.size !== library.prompts.length) return 'Prompt ids must be unique.'
+
+  const totalCharacters = library.prompts.reduce((total, prompt) => total + prompt.title.length + prompt.text.length, 0)
+  return totalCharacters > MAX_LIBRARY_CHARACTERS ? 'The saved prompt library is too large.' : true
+})
+
+const librarySchema = Schema.Struct({ version: Schema.Literal(1), prompts: promptListSchema }).check(libraryChecks)
 
 /** Drafts once wrote this key too; that payload holds no prompts and must not lock the library as unreadable. */
-const legacyDraftsSchema = z.object({ schemaVersion: z.literal(1), drafts: z.array(z.unknown()) })
+const legacyDraftsSchema = Schema.Struct({ schemaVersion: Schema.Literal(1), drafts: Schema.Array(Schema.Unknown) })
 
-export type SavedPrompt = z.infer<typeof promptSchema>
-export type PromptLibraryStore = z.infer<typeof librarySchema>
 export type PromptLibraryStoredRead =
   | { readonly kind: 'missing'; readonly store: PromptLibraryStore }
   | { readonly kind: 'library'; readonly store: PromptLibraryStore }
@@ -71,9 +75,9 @@ const readPromptLibraryWithSource = (serialized: string | null): PromptLibrarySt
     return { kind: 'invalid' }
   }
 
-  const parsed = librarySchema.safeParse(value)
-  if (parsed.success) return { kind: 'library', store: parsed.data }
-  if (legacyDraftsSchema.safeParse(value).success) return { kind: 'legacy-drafts', store: emptyPromptLibraryStore() }
+  const parsed = Schema.decodeUnknownResult(librarySchema, { onExcessProperty: 'error' })(value)
+  if (parsed._tag === 'Success') return { kind: 'library', store: parsed.success }
+  if (Schema.decodeUnknownResult(legacyDraftsSchema)(value)._tag === 'Success') return { kind: 'legacy-drafts', store: emptyPromptLibraryStore() }
   return { kind: 'invalid' }
 }
 
@@ -97,9 +101,9 @@ const clearStoredPromptLibrary = (input: {
 }
 
 const serializePromptLibrary = (prompts: readonly SavedPrompt[]): string | null => {
-  const parsed = librarySchema.safeParse({ version: 1, prompts })
-  if (!parsed.success) return null
-  return JSON.stringify(parsed.data)
+  const parsed = Schema.decodeUnknownResult(librarySchema, { onExcessProperty: 'error' })({ version: 1, prompts })
+  if (parsed._tag !== 'Success') return null
+  return JSON.stringify(parsed.success)
 }
 
 const writePromptIfCurrent = (prompts: readonly SavedPrompt[], next: SavedPrompt, expectedRevision: string | null): PromptMutation => {

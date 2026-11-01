@@ -1,4 +1,5 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { createShimZodSchema } from './effect-stored-value.js'
 import { legacySavedDraftSchema } from './legacy-saved-draft.js'
 import { MAX_PROMPTS, PromptLibrary, promptSchema, type SavedPrompt } from './library.js'
 
@@ -6,8 +7,8 @@ export const promptStashDomain = defineDomain({
   name: 'prompt_stash',
   version: 1,
   tables: {
-    prompts: { valueSchema: promptSchema, __key: 'prompts' },
-    drafts: { valueSchema: legacySavedDraftSchema, __key: 'drafts' },
+    prompts: { valueSchema: createShimZodSchema(promptSchema), __key: 'prompts' },
+    drafts: { valueSchema: createShimZodSchema(legacySavedDraftSchema), __key: 'drafts' },
   },
 })
 

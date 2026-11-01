@@ -1,11 +1,10 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { dateTimeString, uuidSchema } from './schema.js'
 
-export const legacySavedDraftSchema = z
-  .object({
-    id: z.string().uuid(),
-    title: z.string().min(1).max(120),
-    text: z.string().min(1).max(24_000),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  })
-  .strict()
+export const legacySavedDraftSchema = Schema.Struct({
+  id: uuidSchema,
+  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(24_000)),
+  createdAt: dateTimeString,
+  updatedAt: dateTimeString,
+})

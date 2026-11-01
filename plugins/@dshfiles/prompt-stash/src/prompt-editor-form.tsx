@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { MAX_PROMPT_TEXT_LENGTH, MAX_PROMPT_TITLE_LENGTH } from './library.js'
 import type { PromptEditorInitialValues } from './prompt-library-machine.js'
 
+// The plugin-ui form binding validates with a zod validator, so this form schema stays zod until that boundary accepts Effect Schema.
 const promptEditorFormSchema = z
   .object({
     title: z.string().max(MAX_PROMPT_TITLE_LENGTH),
