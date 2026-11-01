@@ -3,19 +3,20 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
-import { TextInput } from './text-input.js'
 import { localCloneUrlSchema, projectFolderNameSchema, type CloneJob, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
+import { TextInput } from './text-input.js'
 
-const cloneFormSchema = z.object({
+const cloneFormSchema = Schema.Struct({
   repositoryUrl: localCloneUrlSchema,
-  parentPath: z.string().trim().min(1, 'Enter the folder to clone into.'),
+  parentPath: WorkspaceFolderPickerSchema.trimmedText.check(Schema.makeFilter(value => (value.length > 0 ? true : 'Enter the folder to clone into.'))),
   name: projectFolderNameSchema,
 })
 
-type CloneForm = z.input<typeof cloneFormSchema>
-type CloneFormErrors = Partial<Record<keyof CloneForm, string>>
+type CloneForm = typeof cloneFormSchema.Type
+const cloneFormFields: readonly (keyof FormFieldErrors)[] = ['repositoryUrl', 'parentPath', 'name']
 
 /** `https://host/owner/repo.git` → `repo`, so the folder name follows the URL until the user edits it. */
 const folderNameFromUrl = (url: string): string =>
@@ -25,15 +26,6 @@ const folderNameFromUrl = (url: string): string =>
     .filter(part => part.length > 0)
     .at(-1)
     ?.replace(/\.git$/u, '') ?? ''
-
-const formErrors = (error: z.ZodError) => {
-  const errors: CloneFormErrors = {}
-  for (const issue of error.issues) {
-    const key = cloneFormSchema.keyof().safeParse(issue.path[0])
-    if (key.success && errors[key.data] === undefined) errors[key.data] = issue.message
-  }
-  return errors
-}
 
 const phaseLabels = {
   cloning: 'Cloning',
@@ -50,10 +42,10 @@ export const ProjectCloneDialog = (props: {
 }): JSX.Element => {
   const [form, setForm] = useState<CloneForm>({ repositoryUrl: '', parentPath: props.home ?? '~/', name: '' })
   const [nameEdited, setNameEdited] = useState(false)
-  const [errors, setErrors] = useState<CloneFormErrors>({})
+  const [errors, setErrors] = useState<FormFieldErrors>({})
   const [jobId, setJobId] = useState<string | null>(null)
   const start = useMutation({
-    mutationFn: (input: z.output<typeof cloneFormSchema>) => props.api.startClone(input),
+    mutationFn: (input: CloneForm) => props.api.startClone(input),
     onSuccess: job => setJobId(job.id),
   })
   const jobs = useQuery({
@@ -77,9 +69,9 @@ export const ProjectCloneDialog = (props: {
     setErrors({})
   }
   const submit = (): void => {
-    const parsed = cloneFormSchema.safeParse(form)
-    if (!parsed.success) return setErrors(formErrors(parsed.error))
-    start.mutate(parsed.data)
+    const parsed = WorkspaceFolderPickerSchema.validateForm(cloneFormSchema, form)
+    if (!parsed.ok) return setErrors(WorkspaceFolderPickerSchema.fieldMessages(parsed.issues, cloneFormFields))
+    start.mutate(parsed.value)
   }
 
   const running = job?.state === 'running'

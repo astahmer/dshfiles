@@ -44,8 +44,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

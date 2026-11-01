@@ -5,7 +5,10 @@ import { join } from 'node:path'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
 import { localCloneUrlSchema, projectFolderNameSchema } from './project-lifecycle-api.js'
+
+const accepts = (schema: Schema.ConstraintDecoder<string>, value: string): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 import { createCloneJobs, createProject, ProjectLifecycleModel, type CommandRunner, type ProjectLifecycleDeps } from './project-lifecycle.js'
 
 const toolsAvailable = spawnSync('jj', ['--version']).status === 0 && spawnSync('git', ['--version']).status === 0
@@ -34,14 +37,13 @@ const waitFor = async (check: () => boolean): Promise<void> => {
 describe('project lifecycle inputs', () => {
   it('accepts https, ssh, git@ and file:/// URLs and rejects option-like or relative ones', () => {
     for (const url of ['https://github.com/a/b.git', 'ssh://git@host/a/b', 'git@github.com:a/b.git', 'file:///tmp/repo'])
-      expect(localCloneUrlSchema.safeParse(url).success).toBe(true)
-    for (const url of ['--upload-pack=x', '../repo', 'file://host/repo', 'http://plain.example/repo'])
-      expect(localCloneUrlSchema.safeParse(url).success).toBe(false)
+      expect(accepts(localCloneUrlSchema, url)).toBe(true)
+    for (const url of ['--upload-pack=x', '../repo', 'file://host/repo', 'http://plain.example/repo']) expect(accepts(localCloneUrlSchema, url)).toBe(false)
   })
 
   it('accepts one folder name and rejects separators, dot-dot and leading dashes', () => {
-    expect(projectFolderNameSchema.safeParse('my-project_2').success).toBe(true)
-    for (const name of ['a/b', '..', '-rf', '.hidden', '']) expect(projectFolderNameSchema.safeParse(name).success).toBe(false)
+    expect(accepts(projectFolderNameSchema, 'my-project_2')).toBe(true)
+    for (const name of ['a/b', '..', '-rf', '.hidden', '']) expect(accepts(projectFolderNameSchema, name)).toBe(false)
   })
 
   it('reads the last git progress line', () => {

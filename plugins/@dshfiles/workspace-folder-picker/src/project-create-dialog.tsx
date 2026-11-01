@@ -3,18 +3,22 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { useState } from 'react'
-import { z } from 'zod'
 import { projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
 
-const createFormSchema = z.object({
-  parentPath: z.string().trim().min(1, 'Enter the folder to create the project in.'),
+const createFormSchema = Schema.Struct({
+  parentPath: WorkspaceFolderPickerSchema.trimmedText.check(
+    Schema.makeFilter(value => (value.length > 0 ? true : 'Enter the folder to create the project in.')),
+  ),
   name: projectFolderNameSchema,
-  createGitHubRepository: z.boolean(),
+  createGitHubRepository: Schema.Boolean,
 })
 
-type CreateForm = z.input<typeof createFormSchema>
+type CreateForm = typeof createFormSchema.Type
+const createFormFields: readonly (keyof FormFieldErrors)[] = ['parentPath', 'name']
 
 export const ProjectCreateDialog = (props: {
   readonly api: ProjectLifecycleClient
@@ -24,23 +28,22 @@ export const ProjectCreateDialog = (props: {
   readonly onClose: () => void
 }): JSX.Element => {
   const [form, setForm] = useState<CreateForm>({ parentPath: props.home ?? '~/', name: '', createGitHubRepository: false })
-  const [errors, setErrors] = useState<Record<'parentPath' | 'name', string | undefined>>({ parentPath: undefined, name: undefined })
+  const [errors, setErrors] = useState<FormFieldErrors>({})
   const create = useMutation({
-    mutationFn: (input: z.output<typeof createFormSchema>) => props.api.createProject(input),
+    mutationFn: (input: CreateForm) => props.api.createProject(input),
     onSuccess: created => {
       if (created.warning === null) props.onCreated(created.path)
     },
   })
   const change = (patch: Partial<CreateForm>): void => {
     setForm(current => ({ ...current, ...patch }))
-    setErrors({ parentPath: undefined, name: undefined })
+    setErrors({})
     create.reset()
   }
   const submit = (): void => {
-    const parsed = createFormSchema.safeParse(form)
-    if (parsed.success) return create.mutate(parsed.data)
-    const flattened = parsed.error.flatten().fieldErrors
-    setErrors({ parentPath: flattened.parentPath?.[0], name: flattened.name?.[0] })
+    const parsed = WorkspaceFolderPickerSchema.validateForm(createFormSchema, form)
+    if (parsed.ok) return create.mutate(parsed.value)
+    setErrors(WorkspaceFolderPickerSchema.fieldMessages(parsed.issues, createFormFields))
   }
   const created = create.data
 
