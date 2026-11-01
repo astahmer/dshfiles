@@ -17,7 +17,6 @@ import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 import { Context as EffectContext, Duration, Effect, Layer, Schedule, Schema } from 'effect'
-import { z } from 'zod'
 
 import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
 import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
@@ -71,7 +70,7 @@ const textOf = (blocks: readonly { readonly type: string; readonly text?: string
 
 const embedders = new Map<string, Promise<MemoryEmbedder>>()
 
-const listedTitleSchema = z.string().min(1)
+const listedTitleSchema = Schema.String.check(Schema.isMinLength(1))
 
 /** A thread workspace's project scripts, or null outside a project with a lockfile or when they cannot be written. */
 const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceScripts | null> => {
@@ -176,8 +175,8 @@ const hostServices = (ctx: Context): MemoryServices => {
       })
       const fromList = new Map<string, SessionTitleRead>()
       for (const item of listed?.items ?? []) {
-        const title = listedTitleSchema.safeParse(item.projections?.values.title)
-        if (title.success) fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.data, updatedAt: item.updatedAt })
+        const title = Schema.decodeUnknownResult(listedTitleSchema)(item.projections?.values.title)
+        if (title._tag === 'Success') fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.success, updatedAt: item.updatedAt })
       }
       return sessionIds.map(id => fromList.get(id) ?? { sessionId: id, title: undefined, updatedAt: undefined })
     },
@@ -477,23 +476,8 @@ const panelThread = (thread: StoredThread): PanelThread => ({
   citations: thread.uses,
 })
 
-const noteType = z.enum(['user', 'feedback', 'project', 'reference'])
 /** The panel sends every filter field; an empty string means "any". */
-const anyWhenEmpty = (max: number) =>
-  z
-    .string()
-    .max(max)
-    .transform(value => (value.trim() === '' ? undefined : value))
-const notesFilter = z.object({
-  project: anyWhenEmpty(4_096),
-  scope: anyWhenEmpty(256),
-  type: z.union([noteType, z.literal('').transform(() => undefined)]),
-  query: anyWhenEmpty(256),
-  thread: anyWhenEmpty(200),
-  includeInvalid: z.boolean(),
-})
-const noteId = z.number().int().positive()
-const reason = z.string().trim().max(500).optional()
+const emptyToUndefined = (value: string): string | undefined => (value.trim() === '' ? undefined : value)
 
 /** The calling thread for memory's agent tools; a Client or plugin caller searches as no particular thread. */
 const callerOf = (caller: ApiCaller): Caller => {
@@ -595,15 +579,14 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   },
   notes: async ({ input }) => {
     await projectNormalization
-    const filter = notesFilter.parse(input)
     const notes = requireStore()
       .listNotes({
-        project: filter.project,
-        scope: filter.scope,
-        category: filter.type,
-        query: filter.query,
-        thread: filter.thread,
-        includeInvalid: filter.includeInvalid,
+        project: emptyToUndefined(input.project),
+        scope: emptyToUndefined(input.scope),
+        category: input.type === '' ? undefined : input.type,
+        query: emptyToUndefined(input.query),
+        thread: emptyToUndefined(input.thread),
+        includeInvalid: input.includeInvalid,
         limit: 500,
       })
       .map(panelNote)
@@ -611,15 +594,14 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   },
   panelNotes: async ({ input }) => {
     await projectNormalization
-    const filter = notesFilter.parse(input)
     return requireStore()
       .listNotes({
-        project: filter.project,
-        scope: filter.scope,
-        category: filter.type,
-        query: filter.query,
-        thread: filter.thread,
-        includeInvalid: filter.includeInvalid,
+        project: emptyToUndefined(input.project),
+        scope: emptyToUndefined(input.scope),
+        category: input.type === '' ? undefined : input.type,
+        query: emptyToUndefined(input.query),
+        thread: emptyToUndefined(input.thread),
+        includeInvalid: input.includeInvalid,
         includeArchived: true,
         limit: 500,
       })
@@ -628,33 +610,23 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   reviewNotes: ({ input, caller }) =>
     withMemory(active =>
       active.reviewNotes(callerOf(caller), {
-        project: anyWhenEmpty(4_096).parse(input.project),
+        project: emptyToUndefined(input.project),
         afterId: input.afterId,
         limit: input.limit,
       }),
     ),
   noteCounts: async ({ input }) => {
     await projectNormalization
-    return requireStore().noteStatusCounts(anyWhenEmpty(4_096).parse(input.project))
+    return requireStore().noteStatusCounts(emptyToUndefined(input.project))
   },
   createNote: async ({ input }) => {
     await projectNormalization
-    const parsed = z
-      .object({
-        project: z.string().min(1).max(4_096),
-        text: z.string().trim().min(1).max(2_000),
-        type: noteType,
-        scope: z.string().trim().min(1).max(256),
-        confidence: z.enum(['stated', 'inferred']),
-      })
-      .strict()
-      .parse(input)
     const saved = requireStore().addNote({
-      project: parsed.project,
-      text: parsed.text,
-      category: parsed.type,
-      scope: parsed.scope,
-      confidence: parsed.confidence,
+      project: input.project,
+      text: input.text,
+      category: input.type,
+      scope: input.scope,
+      confidence: input.confidence,
       sourceThread: null,
       sourceSeq: null,
       origin: 'panel',
@@ -668,26 +640,23 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   },
   noteHistory: ({ input }) => [
     ...requireStore()
-      .noteHistory(noteId.parse(input.id))
+      .noteHistory(input.id)
       .filter(note => note.archivedAt === null)
       .map(panelNote),
   ],
-  panelNoteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
+  panelNoteHistory: ({ input }) => [...requireStore().noteHistory(input.id).map(panelNote)],
   editNote: ({ input }) => {
-    const parsed = z
-      .object({ id: noteId, text: z.string().trim().min(1).max(2_000), type: noteType.optional(), scope: z.string().trim().min(1).max(256).optional(), reason })
-      .parse(input)
     const updated = requireStore().updateNote({
-      id: parsed.id,
-      text: parsed.text,
-      category: parsed.type,
-      scope: parsed.scope,
-      reason: parsed.reason || 'edited in the Memory panel',
+      id: input.id,
+      text: input.text,
+      category: input.type,
+      scope: input.scope,
+      reason: input.reason || 'edited in the Memory panel',
       sourceThread: null,
       sourceSeq: null,
       origin: 'panel',
     })
-    if (!updated) throw new Error(`Note n:${parsed.id} is no longer valid; refresh the list.`)
+    if (!updated) throw new Error(`Note n:${input.id} is no longer valid; refresh the list.`)
     const record = requireStore()
       .noteHistory(updated.id)
       .find(note => note.id === updated.id)
@@ -695,11 +664,10 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
     return panelNote(record)
   },
   forgetNote: ({ input }) => {
-    const parsed = z.object({ id: noteId, reason }).parse(input)
-    return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
+    return { forgotten: requireStore().forgetNote({ id: input.id, reason: input.reason || 'removed in the Memory panel' }) }
   },
-  archiveNote: ({ input }) => ({ archived: requireStore().archiveNote(noteId.parse(input.id)) }),
-  restoreNote: ({ input }) => ({ restored: requireStore().restoreNote(noteId.parse(input.id)) }),
+  archiveNote: ({ input }) => ({ archived: requireStore().archiveNote(input.id) }),
+  restoreNote: ({ input }) => ({ restored: requireStore().restoreNote(input.id) }),
   citations: ({ input }) => [
     ...requireStore().recentCitations({
       limit: 100,
@@ -707,13 +675,10 @@ const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
       ref: input.ref === undefined || input.ref.length === 0 ? undefined : input.ref,
     }),
   ],
-  rateCitation: ({ input }) => {
-    const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
-    return { rated: requireStore().rateCitation(parsed) }
-  },
+  rateCitation: ({ input }) => ({ rated: requireStore().rateCitation({ id: input.id, rating: input.rating }) }),
   threads: async ({ input }) => {
     await projectNormalization
-    const project = anyWhenEmpty(4_096).parse(input.project)
+    const project = emptyToUndefined(input.project)
     const stored = requireStore().listThreads({ project, limit: 500 }).map(panelThread)
     if (input.includeUndigested !== true) return [...stored]
     const digested = new Set(stored.map(thread => thread.id))

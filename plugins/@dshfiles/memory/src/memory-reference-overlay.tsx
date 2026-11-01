@@ -14,7 +14,7 @@ import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 
 import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryApi, type MemoryPreview, type PanelNote, type PanelThread } from './api.ts'
-import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type MemoryReferencePreviewRequest } from './memory-reference.ts'
+import { MemoryReferenceModel, memoryReferencePreviewEvent, type MemoryReferencePreviewRequest } from './memory-reference.ts'
 import { PanelFormat, noteStatusBadge, noteStatusLabels, originLabels } from './panel-format.ts'
 
 /** A preview the card knows how to draw; `excerpt` is also the shape an older Host leaves it in. */
@@ -407,10 +407,10 @@ export const MemoryReferenceOverlay = (props: {
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = memoryReferencePreviewRequestSchema.safeParse(event.detail)
-      if (!parsed.success) return
-      setAnchor(parsed.data.anchor)
-      setRequest(parsed.data)
+      const request = MemoryReferenceModel.decodePreviewRequest(event.detail)
+      if (request === null) return
+      setAnchor(request.anchor)
+      setRequest(request)
     }
     window.addEventListener(memoryReferencePreviewEvent, open)
     return () => window.removeEventListener(memoryReferencePreviewEvent, open)
