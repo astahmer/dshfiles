@@ -3667,6 +3667,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       react-dom:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
@@ -6918,7 +6921,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(d51331cdb98c1a49a8ce6eacb45d04ed)
+        version: 0.2.1-rc.2(a0a78967c034d117949c2fe8292ea2f3)
       '@deepseek-ai/dsh-llm':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)

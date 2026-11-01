@@ -42,6 +42,7 @@
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "effect": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {

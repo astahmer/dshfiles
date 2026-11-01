@@ -13,10 +13,12 @@ describe('model-effort-picker host entry', () => {
       replace: async () => undefined,
     })
     let routeContextWindow: number | null = 10_000
+    let shouldRejectModelLookup = false
     const routes: string[] = []
     host.ctx.provide('llm', {
       resolveModelInfo: async (provider: string, model: string) => {
         routes.push(`${provider}/${model}`)
+        if (shouldRejectModelLookup) throw new Error('provider-internal-error')
         return { context: routeContextWindow === null ? undefined : { contextWindow: routeContextWindow } }
       },
     })
@@ -35,7 +37,10 @@ describe('model-effort-picker host entry', () => {
       expect(await unknown.json()).toMatchObject({ result: { ok: true, value: { output: null, version: 1 } } })
       const invalid = await host.connection.requestApi({ ...request, input: { provider: 'provider', model: '' } })
       expect(await invalid.json()).toMatchObject({ result: { ok: false, error: { code: 'contract' } } })
-      expect(routes).toEqual(['provider/model', 'provider/unknown-capacity'])
+      shouldRejectModelLookup = true
+      const failed = await host.connection.requestApi({ ...request, input: { provider: 'provider', model: 'failed-lookup' } })
+      expect(await failed.json()).toMatchObject({ result: { ok: false, error: { code: 'model-handoff-failure' } } })
+      expect(routes).toEqual(['provider/model', 'provider/unknown-capacity', 'provider/failed-lookup'])
       await mounted.dispose()
     } finally {
       await host.dispose()
