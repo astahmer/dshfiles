@@ -29,8 +29,7 @@
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

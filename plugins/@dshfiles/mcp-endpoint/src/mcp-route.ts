@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { Effect, Schema } from 'effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
-import { z } from 'zod'
 import type { EndpointStore } from './endpoint-store.js'
 import { isLocalAddress } from './local-address.js'
 import { createMcpServer, type ProjectRow } from './mcp-server.js'
@@ -13,10 +12,14 @@ export const MCP_PATH = '/mcp'
 const MAX_BODY_BYTES = 1_048_576
 const SETTINGS_HINT = 'Open DSH Settings › MCP endpoint'
 
-const jsonBodySchema = z.json()
-type JsonBody = z.infer<typeof jsonBodySchema>
+const jsonBodySchema = Schema.Json
+type JsonBody = typeof jsonBodySchema.Type
 
-const rpcSummarySchema = z.looseObject({ method: z.string().max(100), params: z.looseObject({ name: z.string().max(100).optional() }).optional() })
+/** Only the JSON-RPC method and tool name are read, to name the request span. */
+const rpcSummarySchema = Schema.Struct({
+  method: Schema.String.check(Schema.isMaxLength(100)),
+  params: Schema.optionalKey(Schema.Struct({ name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(100))) })),
+})
 
 class BodyTooLarge extends Error {}
 
@@ -60,8 +63,9 @@ const sameOrigin = (request: IncomingMessage): boolean => {
 
 const describeRpc = (body: JsonBody) => {
   const first = Array.isArray(body) ? body[0] : body
-  const rpc = rpcSummarySchema.safeParse(first).data
-  if (rpc === undefined) return Effect.void
+  const decoded = Schema.decodeUnknownResult(rpcSummarySchema)(first)
+  if (decoded._tag === 'Failure') return Effect.void
+  const rpc = decoded.success
   return Effect.gen(function* () {
     yield* Effect.annotateCurrentSpan('mcp.method.name', rpc.method)
     if (rpc.method === 'tools/call' && rpc.params?.name !== undefined) yield* Effect.annotateCurrentSpan('gen_ai.tool.name', rpc.params.name)
@@ -149,7 +153,7 @@ export const createMcpRoute =
             }
             const text = bodyRead.text
             const parsed = yield* Effect.try({
-              try: () => jsonBodySchema.parse(JSON.parse(text)),
+              try: () => Schema.decodeUnknownSync(jsonBodySchema)(JSON.parse(text)),
               catch: () => new McpRequestFailure({ kind: 'invalid-body' }),
             }).pipe(
               Effect.match({

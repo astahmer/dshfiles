@@ -149,6 +149,13 @@ it('drives threads through MCP tools backed by the sessions API, one span per re
     'stop_turn',
     'wait_for_turn',
   ])
+  const listThreads = tools.tools.find(tool => tool.name === 'list_threads')
+  expect(listThreads?.inputSchema).toMatchObject({
+    type: 'object',
+    properties: { query: { type: 'string', maxLength: 200 }, limit: { type: 'integer', minimum: 1, maximum: 200 } },
+  })
+  const readThread = tools.tools.find(tool => tool.name === 'read_thread')
+  expect(readThread?.inputSchema.required).toEqual(['sessionId'])
 
   const recorder = recordSpans()
   try {
