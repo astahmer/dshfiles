@@ -1,8 +1,25 @@
 import { defineTool } from '@dshfiles/dshx/host'
+import { Effect, Schema } from 'effect'
+import type { HtmlRenderEffectRunner } from './effect-runner.js'
 import { HTML_RENDER_TOOL, HtmlPageLimits, HtmlPageModel, htmlPageThemes } from './html-page.js'
 import type { HtmlPageStore } from './html-page-store.js'
 
-export const createHtmlRenderTool = (pages: HtmlPageStore) =>
+class HtmlRenderFailure extends Schema.TaggedError<HtmlRenderFailure>()('HtmlRenderFailure', { message: Schema.String }) {}
+
+const renderPage = Effect.fn('html page render')(
+  (input: { readonly args: unknown; readonly callId: string; readonly sessionId: string | undefined; readonly pages: HtmlPageStore }) =>
+    Effect.try({
+      try: () => {
+        const parsed = HtmlPageModel.parse(input.args)
+        if (!parsed.ok) throw new HtmlRenderFailure({ message: parsed.error })
+        if (input.sessionId !== undefined) input.pages.remember({ sessionId: input.sessionId, callId: input.callId, page: parsed.page, bytes: parsed.bytes })
+        return { ...parsed.page, bytes: parsed.bytes }
+      },
+      catch: error => (error instanceof HtmlRenderFailure ? error : new HtmlRenderFailure({ message: String(error) })),
+    }),
+)
+
+export const createHtmlRenderTool = (pages: HtmlPageStore, runEffect?: HtmlRenderEffectRunner) =>
   defineTool({
     name: HTML_RENDER_TOOL,
     description: [
@@ -50,9 +67,8 @@ export const createHtmlRenderTool = (pages: HtmlPageStore) =>
     },
     isConcurrencySafe: () => true,
     async execute(args, execution) {
-      const parsed = HtmlPageModel.parse(args)
-      if (!parsed.ok) throw new Error(parsed.error)
-      if (execution.agent !== undefined) pages.remember({ sessionId: execution.agent.id, callId: execution.callId, page: parsed.page, bytes: parsed.bytes })
-      return { ...parsed.page, bytes: parsed.bytes }
+      return (runEffect ?? Effect.runPromise)(renderPage({ args, callId: execution.callId, sessionId: execution.agent?.id, pages }), {
+        signal: execution.signal,
+      })
     },
   })

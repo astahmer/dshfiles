@@ -4,10 +4,12 @@ import type {} from '@deepseek-ai/dsh-fs'
 import type { FsTarget } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
+import { Effect, Schema } from 'effect'
 import { z } from 'zod'
 import { HTML_PREVIEW_TOOL, HtmlPageLimits, HtmlPageModel, htmlPageThemes } from './html-page.js'
 import type { HtmlPageStore } from './html-page-store.js'
 import { RelativeAssets, type AssetReader } from './relative-assets.js'
+import type { HtmlRenderEffectRunner } from './effect-runner.js'
 
 const argsSchema = z.object({
   path: z.string().trim().min(1, 'path is empty; pass an .html file relative to the thread workspace.').max(2048),
@@ -43,8 +45,10 @@ const decodeUtf8 = (bytes: Uint8Array): string | undefined => {
   }
 }
 
+class HtmlPreviewFailure extends Schema.TaggedError<HtmlPreviewFailure>()('HtmlPreviewFailure', { message: Schema.String }) {}
+
 const fail = (message: string): never => {
-  throw new Error(message)
+  throw new HtmlPreviewFailure({ message })
 }
 
 const summary = (value: {
@@ -70,36 +74,18 @@ const summary = (value: {
  * Shows an HTML file of the calling thread's workspace in the same sandboxed card as html_render. Built from the
  * plugin's own context (like apply_patch) so the filesystem services it injects are readable during the call.
  */
-export const createHtmlPreviewTool = (input: { readonly ctx: Context; readonly pages: HtmlPageStore }) =>
-  defineTool({
-    name: HTML_PREVIEW_TOOL,
-    description: [
-      'Show an HTML file from this thread’s workspace to the user as a card in the chat transcript (the same sandboxed, themed card as html_render).',
-      `path is relative to the thread working directory and must stay inside the thread workspace; at most ${HtmlPageModel.formatBytes(HtmlPageLimits.maxHtmlBytes)} after inlining.`,
-      'Relative <link rel="stylesheet" href>, <script src> and <img src> files are inlined; CSS url(), @import, fonts, srcset, fetch and remote URLs are not, and the card has no network. Read-only.',
-    ].join(' '),
-    parameters: {
-      path: { type: 'string', required: true, description: 'The .html file, relative to the thread working directory, e.g. "dist/report.html".' },
-      title: { type: 'string', description: `Card header; defaults to the file name (at most ${String(HtmlPageLimits.maxTitleLength)} characters).` },
-      height: {
-        type: 'integer',
-        description: `Initial card height in pixels, ${String(HtmlPageLimits.minHeight)}–${String(HtmlPageLimits.maxHeight)}; defaults to ${String(HtmlPageLimits.defaultHeight)}.`,
-      },
-      theme: { type: 'string', enum: htmlPageThemes, description: 'auto (default) follows the DSH light/dark theme; light or dark pins the page colours.' },
-    },
-    output: {
-      schema: outputSchema,
-      render: (_args, value) => [{ type: 'text', text: summary(value) }],
-      presentationMeta: (_args, value) => ({ title: value.title, html: value.html, height: value.height, theme: value.theme, path: value.path }),
-    },
-    isConcurrencySafe: () => true,
-    async execute(rawArgs, execution) {
-      const ctx = input.ctx
-      const parsedArgs = argsSchema.safeParse(rawArgs)
+const showHtmlPreview = Effect.fn('html preview show')(function* (input: {
+  readonly input: { readonly ctx: Context; readonly pages: HtmlPageStore; readonly runEffect?: HtmlRenderEffectRunner | undefined }
+  readonly rawArgs: unknown
+  readonly execution: { readonly agent?: Parameters<Context['workingDirectory']['ensure']>[0] | undefined; readonly callId: string }
+}) {
+  return yield* Effect.tryPromise({
+    try: async signal => {
+      const ctx = input.input.ctx
+      const parsedArgs = argsSchema.safeParse(input.rawArgs)
       if (!parsedArgs.success) return fail(parsedArgs.error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; '))
       const args = parsedArgs.data
-      const agent = execution.agent ?? fail('html_preview runs only on behalf of an Agent.')
-      const signal = execution.signal
+      const agent = input.execution.agent ?? fail('html_preview runs only on behalf of an Agent.')
       const cwd = await ctx.workingDirectory.ensure(agent, signal)
       const workspacePath = agent.session.header.cwd ?? cwd
       const workspace = await ctx.fs.resolve(workspacePath, { signal })
@@ -132,7 +118,41 @@ export const createHtmlPreviewTool = (input: { readonly ctx: Context; readonly p
       const displayPath = relative(ctx.fs.processPath(workspace), ctx.fs.processPath(target)) || basename(target.displayPath)
       const page = HtmlPageModel.parse({ title: args.title ?? basename(target.displayPath), html: inlined.html, height: args.height, theme: args.theme })
       if (!page.ok) return fail(page.error.replaceAll('html_render', 'html_preview'))
-      input.pages.remember({ sessionId: agent.id, callId: execution.callId, page: page.page, bytes: page.bytes })
+      input.input.pages.remember({ sessionId: agent.id, callId: input.execution.callId, page: page.page, bytes: page.bytes })
       return { ...page.page, bytes: page.bytes, path: displayPath, inlined: [...inlined.inlined], skipped: [...inlined.skipped] }
+    },
+    catch: error => (error instanceof HtmlPreviewFailure ? error : new HtmlPreviewFailure({ message: error instanceof Error ? error.message : String(error) })),
+  })
+})
+
+export const createHtmlPreviewTool = (input: {
+  readonly ctx: Context
+  readonly pages: HtmlPageStore
+  readonly runEffect?: HtmlRenderEffectRunner | undefined
+}) =>
+  defineTool({
+    name: HTML_PREVIEW_TOOL,
+    description: [
+      'Show an HTML file from this thread’s workspace to the user as a card in the chat transcript (the same sandboxed, themed card as html_render).',
+      `path is relative to the thread working directory and must stay inside the thread workspace; at most ${HtmlPageModel.formatBytes(HtmlPageLimits.maxHtmlBytes)} after inlining.`,
+      'Relative <link rel="stylesheet" href>, <script src> and <img src> files are inlined; CSS url(), @import, fonts, srcset, fetch and remote URLs are not, and the card has no network. Read-only.',
+    ].join(' '),
+    parameters: {
+      path: { type: 'string', required: true, description: 'The .html file, relative to the thread working directory, e.g. "dist/report.html".' },
+      title: { type: 'string', description: `Card header; defaults to the file name (at most ${String(HtmlPageLimits.maxTitleLength)} characters).` },
+      height: {
+        type: 'integer',
+        description: `Initial card height in pixels, ${String(HtmlPageLimits.minHeight)}–${String(HtmlPageLimits.maxHeight)}; defaults to ${String(HtmlPageLimits.defaultHeight)}.`,
+      },
+      theme: { type: 'string', enum: htmlPageThemes, description: 'auto (default) follows the DSH light/dark theme; light or dark pins the page colours.' },
+    },
+    output: {
+      schema: outputSchema,
+      render: (_args, value) => [{ type: 'text', text: summary(value) }],
+      presentationMeta: (_args, value) => ({ title: value.title, html: value.html, height: value.height, theme: value.theme, path: value.path }),
+    },
+    isConcurrencySafe: () => true,
+    async execute(rawArgs, execution) {
+      return (input.runEffect ?? Effect.runPromise)(showHtmlPreview({ input, rawArgs, execution }), { signal: execution.signal })
     },
   })
