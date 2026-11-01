@@ -1,7 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import type { SavedPrompt } from './library.js'
 import { promptStashMutationSchema, promptStashStateSchema } from './library-api.js'
 
@@ -28,13 +27,13 @@ interface FetchRoute {
 interface DomainSpec {
   readonly name: string
   readonly version: number
-  readonly tables: Record<string, { readonly valueSchema: z.ZodType }>
+  readonly tables: Record<string, { readonly valueSchema: unknown }>
 }
 
-const serverResponseSchema = z.object({
-  type: z.literal('server-response'),
-  rpcId: z.string(),
-  result: z.object({ ok: z.literal(true), value: z.object({ version: z.number(), output: z.unknown() }) }),
+const serverResponseSchema = Schema.Struct({
+  type: Schema.Literal('server-response'),
+  rpcId: Schema.String,
+  result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ version: Schema.Number, output: Schema.Unknown }) }),
 })
 
 const prompt = (index: number): SavedPrompt => ({
@@ -151,7 +150,7 @@ const startHarness = async () => {
       }),
     )
     expect(response.status).toBe(200)
-    const parsed = serverResponseSchema.parse(await response.json())
+    const parsed = Schema.decodeUnknownSync(serverResponseSchema)(await response.json())
     return Schema.decodeUnknownSync(request.schema, { onExcessProperty: 'error' })(parsed.result.value.output)
   }
 

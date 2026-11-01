@@ -4,20 +4,19 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { fieldErrorMessages, revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { useEffect, useId, useRef } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { MAX_PROMPT_TEXT_LENGTH, MAX_PROMPT_TITLE_LENGTH } from './library.js'
 import type { PromptEditorInitialValues } from './prompt-library-machine.js'
 
-// The plugin-ui form binding validates with a zod validator, so this form schema stays zod until that boundary accepts Effect Schema.
-const promptEditorFormSchema = z
-  .object({
-    title: z.string().max(MAX_PROMPT_TITLE_LENGTH),
-    text: z
-      .string()
-      .max(MAX_PROMPT_TEXT_LENGTH)
-      .refine(value => value.trim().length > 0, 'Enter prompt text.'),
-  })
-  .strict()
+const promptEditorFormSchema = Schema.Struct({
+  title: Schema.String.check(Schema.isMaxLength(MAX_PROMPT_TITLE_LENGTH)),
+  text: Schema.String.check(
+    Schema.isMaxLength(MAX_PROMPT_TEXT_LENGTH),
+    Schema.makeFilter(value => (value.trim().length > 0 ? true : 'Enter prompt text.')),
+  ),
+})
+
+const promptEditorFormValidator = Schema.toStandardSchemaV1(promptEditorFormSchema, { parseOptions: { onExcessProperty: 'error' } })
 
 export interface PromptEditorSubmission extends PromptEditorInitialValues {
   readonly copy: boolean
@@ -40,7 +39,7 @@ export const PromptEditorForm = (props: PromptEditorFormProps): JSX.Element => {
   const form = useAppForm({
     defaultValues: props.defaultValues,
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: promptEditorFormSchema },
+    validators: { onDynamic: promptEditorFormValidator },
     onSubmit: ({ value }) => props.onSubmit({ ...value, copy: submitAsCopy.current }),
   })
 

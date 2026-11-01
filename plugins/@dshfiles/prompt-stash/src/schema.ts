@@ -6,6 +6,9 @@ const emptyObject = (document: Record<string, unknown>) =>
   (document['type'] === undefined && document['not'] !== undefined) ||
   (document['type'] === 'object' && document['properties'] === undefined && document['additionalProperties'] === false)
 
+/** `Void` is an input that takes no argument: publish it the way a no-argument contract always has. */
+const noInputDocument = { type: 'object', properties: {}, additionalProperties: false }
+
 /**
  * Effect publishes `additionalProperties: true` for a Struct and dshx drops that keyword, while zod published
  * `additionalProperties: false`. Emitting the closed document, and decoding with `onExcessProperty: 'error'`, keeps
@@ -17,6 +20,7 @@ export const strictStandardSchema = <S extends SchemaTypes.ConstraintDecoder<unk
   const document = Schema.toJsonSchemaDocument(schema, { onExcessProperty: 'error' })
 
   const current = (options: Parameters<typeof standardJsonSchema.input>[0]) => {
+    if (schema.ast === Schema.Void.ast) return { ...noInputDocument }
     const built = options.target === 'draft-07' ? JsonSchema.toDocumentDraft07(document) : document
     if (Object.keys(built.definitions).length === 0) return { ...built.schema }
     if (options.target === 'draft-07') return { ...built.schema, definitions: built.definitions }

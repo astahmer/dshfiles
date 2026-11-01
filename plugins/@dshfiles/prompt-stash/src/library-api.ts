@@ -1,7 +1,6 @@
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { z } from 'zod'
 import { MAX_PROMPTS, promptSchema, type SavedPrompt } from './library.js'
 import { strictStandardSchema, uuidSchema } from './schema.js'
 
@@ -41,9 +40,8 @@ export const promptStashApi = defineApi({
   version: 1,
   owner: '@dshfiles/prompt-stash',
   methods: {
-    // `z.void()` publishes no JSON Schema; Effect renders the same input as a nullable document, so this stays zod.
     state: defineMethod({
-      input: z.void(),
+      input: strictStandardSchema(Schema.Void),
       output: strictStandardSchema(promptStashStateSchema),
       description: 'The saved prompt library every browser and plugin shares. Read-only.',
       tool: { name: 'prompt_stash_state', readOnly: true },
