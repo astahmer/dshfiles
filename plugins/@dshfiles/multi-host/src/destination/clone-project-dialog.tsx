@@ -5,21 +5,23 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { Schema } from 'effect'
 import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 import type { LocalProjectFileCandidate, RuntimeSummary } from '../api.js'
 import { multiHostKeys, type MultiHostClient } from './queries.js'
 
 const maxLocalCopyFiles = 128
 const maxLocalCopyBytes = 50 * 1024 * 1024
 
-const cloneDialogFormSchema = z.object({
-  repositoryUrl: z.string().trim().min(1, 'Enter a Git repository URL.'),
-  destinationPath: z.string().trim(),
-  copyLocalFiles: z.boolean(),
-  copyFromPath: z.string().trim(),
-  includeIgnored: z.boolean(),
-})
+const cloneDialogFormSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({
+    repositoryUrl: Schema.Trim.check(Schema.isMinLength(1, { message: 'Enter a Git repository URL.' })),
+    destinationPath: Schema.Trim,
+    copyLocalFiles: Schema.Boolean,
+    copyFromPath: Schema.Trim,
+    includeIgnored: Schema.Boolean,
+  }),
+)
 
 export const CloneProjectDialog = (props: {
   readonly api: MultiHostClient

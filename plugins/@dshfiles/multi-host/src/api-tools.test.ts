@@ -21,7 +21,7 @@ const isRecord = (value: unknown): value is JsonSchemaDocument => typeof value =
 const isJsonSchemaConverter = (value: unknown): value is JsonSchemaConverter =>
   typeof value === 'object' && value !== null && 'input' in value && typeof value.input === 'function'
 
-const jsonSchemaInput = (boundary: ReturnType<typeof standard>): (options: { readonly target: 'draft-2020-12' }) => JsonSchemaDocument => {
+const jsonSchemaInput = (boundary: ReturnType<typeof standard>): ((options: { readonly target: 'draft-2020-12' }) => JsonSchemaDocument) => {
   if (!('jsonSchema' in boundary)) throw new Error('The schema boundary must expose its JSON Schema converter.')
   const converter = boundary.jsonSchema
   if (!isJsonSchemaConverter(converter)) throw new Error('The schema boundary must expose its JSON Schema converter.')
@@ -148,7 +148,7 @@ describe('multi-host tool exposure', () => {
     })
   })
 
-  test('Zod custom session ID tools retain strict runtime validation without a JSON Schema', async () => {
+  test('session ID tools validate strictly and publish their input JSON Schema', async () => {
     const inputs: { readonly schema: ApiSchema | undefined; readonly valid: Readonly<Record<string, unknown>> }[] = [
       { schema: multiHostApi.methods.sessionJjRepositories.input, valid: { sessionId: 'session-1' } },
       {
@@ -161,39 +161,46 @@ describe('multi-host tool exposure', () => {
       if (schema === undefined) throw new Error('The session API must define an input schema.')
       const boundary = standard(schema)
       const inputJsonSchema = jsonSchemaInput(boundary)
-      expect(() => inputJsonSchema({ target: 'draft-2020-12' })).toThrow('Custom types cannot be represented in JSON Schema')
+      expect(inputJsonSchema({ target: 'draft-2020-12' })).toMatchObject({
+        properties: { sessionId: { type: 'string', minLength: 1, maxLength: 256 } },
+        additionalProperties: false,
+      })
       expect('issues' in (await boundary.validate(valid))).toBe(false)
       expect('issues' in (await boundary.validate({ ...valid, sessionId: '' }))).toBe(true)
       expect('issues' in (await boundary.validate({ ...valid, extra: true }))).toBe(true)
     }
   })
 
-  test('thread start preserves the legacy nested model schema boundary', async () => {
+  test('thread start publishes its closed nested model schema', async () => {
     const input = multiHostApi.methods.threadStart.input
     if (input === undefined) throw new Error('The remote thread start API must define an input schema.')
     const boundary = standard(input)
     const inputJsonSchema = jsonSchemaInput(boundary)
     const document = inputJsonSchema({ target: 'draft-2020-12' })
     expect(document).toMatchObject({
-      properties: { model: { type: 'object', required: ['provider', 'model'] } },
+      properties: {
+        model: {
+          anyOf: [{ type: 'object', required: ['provider', 'model'], additionalProperties: false }, { type: 'null' }],
+        },
+      },
       additionalProperties: false,
     })
-    expect(document).not.toHaveProperty('properties.model.additionalProperties')
 
     const valid = {
       runtimeId: 'runtime-1',
       cwd: '/work/project',
       text: ' hello ',
-      model: { provider: 'deepseek', model: 'chat', extra: true },
+      model: { provider: 'deepseek', model: 'chat' },
     }
     const parsed = await boundary.validate(valid)
-    if ('issues' in parsed) throw new Error('The legacy nested model input was rejected.')
+    if ('issues' in parsed) throw new Error('The nested model input was rejected.')
     expect(parsed.value).toEqual({
       runtimeId: 'runtime-1',
       cwd: '/work/project',
       text: 'hello',
       model: { provider: 'deepseek', model: 'chat' },
     })
+    expect('issues' in (await boundary.validate({ ...valid, model: { ...valid.model, extra: true } }))).toBe(true)
     expect('issues' in (await boundary.validate({ ...valid, rootExtra: true }))).toBe(true)
   })
 

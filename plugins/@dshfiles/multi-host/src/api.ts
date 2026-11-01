@@ -1,15 +1,13 @@
 import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { z as legacyZod } from 'zod'
-import { MultiHostSchema } from './schema.js'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
+import { defineApi, method as defineMethod, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
 import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
-import { multiHostApi as baselineZodMultiHostApi } from './api-zod-boundary.js'
+import { MultiHostSchema } from './schema.js'
 
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
   options: Omit<ApiMethodOptions<Input, Output>, 'tool'> & {
@@ -25,8 +23,6 @@ const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 const idSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 const brandedSessionIdSchema = Schema.declare<SessionId>((value): value is SessionId => typeof value === 'string' && value.length > 0 && value.length <= 256)
-// Zod custom input emits no JSON Schema; an Effect declaration would publish one.
-const brandedSessionIdZodSchema = legacyZod.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 export type LocalProjectFileCandidate = {
@@ -187,11 +183,6 @@ const modelSelectionSchema = Schema.Struct({
   model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
 })
-const modelSelectionInputZodSchema = legacyZod.object({
-  provider: legacyZod.string().min(1).max(128),
-  model: legacyZod.string().min(1).max(256),
-  reasoningEffort: legacyZod.string().min(1).max(128).optional(),
-})
 const modelCatalogModelSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -287,59 +278,21 @@ export const jjRepositoriesEffectSchema = Schema.Struct({
   refreshFailed: Schema.optional(Schema.Boolean),
 })
 
-export const jjRevisionSchema = legacyZod
-  .object({
-    changeId: legacyZod.string(),
-    commitId: legacyZod.string(),
-    description: legacyZod.string(),
-    conflict: legacyZod.boolean(),
-  })
-  .strip()
+/**
+ * `@dshfiles/jj-integration` composes these four schemas with Zod in its own contract, so they stay Zod until that
+ * plugin finishes its Effect conversion; the Effect twins above are the contract this bundle publishes.
+ */
+/**
+ * `@dshfiles/jj-integration` composes these with zod in its own contract (z.infer, z.array, .nullable), so they are
+ * published as zod views of the Effect schemas above rather than a second hand-written schema.
+ */
+export const jjRevisionSchema = zodSchemaFromEffect(jjRevisionEffectSchema)
 
-export const jjThreadSchema = legacyZod
-  .object({
-    name: legacyZod.string(),
-    path: legacyZod.string(),
-    workspaceId: legacyZod.string().nullable(),
-    workspaceTitle: legacyZod.string().optional(),
-    sessionIds: legacyZod.array(legacyZod.string()).max(10_000),
-    finished: legacyZod.boolean(),
-    canRebase: legacyZod.boolean().optional(),
-    missing: legacyZod.boolean(),
-    behind: legacyZod.boolean(),
-    behindCount: legacyZod.number().int().nonnegative().optional(),
-    rebasedAt: legacyZod.number().int().nonnegative().optional(),
-    rebasedTipChangeId: legacyZod.string().min(1).max(128).optional(),
-    integrationQueuedAt: legacyZod.number().int().nonnegative().optional(),
-    integrationQueueEvents: legacyZod
-      .array(legacyZod.object({ at: legacyZod.number().int().nonnegative(), kind: legacyZod.enum(['queued', 'unqueued']) }).strict())
-      .max(10_000)
-      .optional(),
-    integrations: legacyZod
-      .array(legacyZod.object({ at: legacyZod.number().int().nonnegative(), tipChangeId: legacyZod.string().min(1).max(128).optional() }).strict())
-      .max(10_000)
-      .optional(),
-    unlanded: legacyZod.array(jjRevisionSchema).max(10_000),
-  })
-  .strip()
+export const jjThreadSchema = zodSchemaFromEffect(jjThreadEffectSchema)
 
-export const jjRepositorySchema = legacyZod
-  .object({
-    repoRoot: legacyZod.string().max(4096),
-    title: legacyZod.string().max(512),
-    workspaceId: legacyZod.string().nullable(),
-    bookmarks: legacyZod.array(legacyZod.string().max(512)).max(10_000).default([]),
-    threads: legacyZod.array(jjThreadSchema).max(10_000),
-  })
-  .strip()
+export const jjRepositorySchema = zodSchemaFromEffect(jjRepositoryEffectSchema)
 
-export const jjRepositoriesSchema = legacyZod
-  .object({
-    repositories: legacyZod.array(jjRepositorySchema).max(200),
-    refreshing: legacyZod.boolean().optional(),
-    refreshFailed: legacyZod.boolean().optional(),
-  })
-  .strip()
+export const jjRepositoriesSchema = zodSchemaFromEffect(jjRepositoriesEffectSchema)
 
 export type JjRevisionView = Schema.Schema.Type<typeof jjRevisionEffectSchema>
 export type JjThreadView = Schema.Schema.Type<typeof jjThreadEffectSchema>
@@ -364,7 +317,9 @@ const nativeValueSchema = Schema.Union([
     ).check(Schema.isMaxLength(10_000)),
   }).pipe(MultiHostSchema.passthrough),
   Schema.Struct({
-    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(MultiHostSchema.passthrough)).check(Schema.isMaxLength(10_000)),
+    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(MultiHostSchema.passthrough)).check(
+      Schema.isMaxLength(10_000),
+    ),
     hasMore: Schema.Boolean,
   }).pipe(MultiHostSchema.passthrough),
   Schema.Struct({ sessionId: sessionIdSchema, agentPreset: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
@@ -442,7 +397,7 @@ export const cloneProjectInputEffectSchema = Schema.Struct({
 
 const profileNameSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u))
 
-const semanticVersionSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-legacyZod.-]+)?$/u))
+const semanticVersionSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u))
 
 const repositorySchema = Schema.Trim.check(
   Schema.isMinLength(1),
@@ -773,20 +728,14 @@ const effectMultiHostApi = defineApi({
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtimeId: Schema.NullOr(idSchema) }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
     }),
-    sessionJjRepositories: defineMethod({
-      input: legacyZod.object({ sessionId: brandedSessionIdZodSchema }).strict(),
+    sessionJjRepositories: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), repositories: jjRepositoriesEffectSchema }), failedSchema]),
       description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
       tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
     }),
-    runtimeFileReferences: defineMethod({
-      input: legacyZod
-        .object({
-          runtimeId: legacyZod.string().min(1).max(64),
-          sessionId: brandedSessionIdZodSchema,
-          query: legacyZod.string().max(4096),
-        })
-        .strict(),
+    runtimeFileReferences: method({
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),
       output: Schema.Union([
         Schema.Struct({ ok: Schema.Literal(true), candidates: Schema.Array(fileReferenceCandidateSchema).check(Schema.isMaxLength(1000)) }),
         failedSchema,
@@ -814,17 +763,14 @@ const effectMultiHostApi = defineApi({
         'Create an empty thread on one remote runtime and open it in the native chat composer. Call only when the user asked to start a thread on that machine.',
       tool: { name: 'multi_host_create_thread', render: compactJson },
     }),
-    threadStart: defineMethod({
-      // Effect emits additionalProperties: false for nested model, absent from the Zod baseline.
-      input: legacyZod
-        .object({
-          runtimeId: legacyZod.string().min(1).max(64),
-          cwd: legacyZod.string().min(1).max(4096),
-          text: legacyZod.string().trim().min(1).max(100_000),
-          agentPreset: legacyZod.string().max(128).optional(),
-          model: modelSelectionInputZodSchema.optional(),
-        })
-        .strict(),
+    threadStart: method({
+      input: Schema.Struct({
+        runtimeId: idSchema,
+        cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+        text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(100_000)),
+        agentPreset: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+        model: Schema.optional(modelSelectionSchema),
+      }),
       output: Schema.Union([
         Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema }),
         Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
@@ -1048,7 +994,7 @@ const effectMultiHostApi = defineApi({
 })
 
 export type EffectMultiHostApi = typeof effectMultiHostApi
-export const multiHostApi = baselineZodMultiHostApi
+export const multiHostApi = effectMultiHostApi
 
 export type HostSummary = Schema.Schema.Type<typeof hostSummarySchema>
 export type ConnectionTestStep = Schema.Schema.Type<typeof connectionTestStepSchema>

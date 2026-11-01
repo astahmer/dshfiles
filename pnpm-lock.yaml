@@ -3854,9 +3854,6 @@ importers:
       ws:
         specifier: 'catalog:'
         version: 8.21.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
@@ -5185,9 +5182,6 @@ importers:
       mime-types:
         specifier: 3.0.2
         version: 3.0.2
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4

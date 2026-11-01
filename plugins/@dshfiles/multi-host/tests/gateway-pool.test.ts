@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Gateway } from '../src/connectors/gateway.js'
 import { createServer, type Server } from 'node:http'
-import { z } from 'zod'
 import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from '../src/schema.js'
 import { connectGateway, GatewayUnavailableError } from '../src/connectors/gateway.js'
@@ -127,7 +126,7 @@ const startRuntimeFixture = async () => {
     })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const port = z.object({ port: z.number() }).parse(server.address()).port
+  const port = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }))(server.address()).port
   const launchUrl = `http://127.0.0.1:${port}/?token=fixture-token-12345678`
   return {
     calls,

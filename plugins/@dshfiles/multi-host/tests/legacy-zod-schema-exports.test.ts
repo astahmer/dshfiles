@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'vitest'
-import { z } from 'zod'
 import { jjRepositoriesSchema, jjRepositorySchema, jjRevisionSchema, jjThreadSchema } from '../src/api.js'
 
 describe('legacy Jujutsu schema exports', () => {
@@ -18,7 +17,7 @@ describe('legacy Jujutsu schema exports', () => {
     const repository = { repoRoot: '/work/project', title: 'project', workspaceId: null, threads: [thread] }
     const repositories = { repositories: [repository] }
 
-    expect(z.array(jjRevisionSchema).parse([revision])).toEqual([revision])
+    expect(jjRevisionSchema.array().parse([revision])).toEqual([revision])
     expect(jjThreadSchema.optional().parse(undefined)).toBeUndefined()
     expect(jjRepositorySchema.parse(repository)).toEqual({ ...repository, bookmarks: [] })
     expect(jjRepositoriesSchema.optional().parse(repositories)).toEqual({ repositories: [{ ...repository, bookmarks: [] }] })

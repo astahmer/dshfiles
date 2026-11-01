@@ -1,6 +1,5 @@
 import { createServer } from 'node:http'
 import { describe, expect, test } from 'vitest'
-import { z } from 'zod'
 import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from '../src/schema.js'
 import type { NativeRpcRequest } from '../src/api.js'
@@ -9,7 +8,7 @@ import { NativeRpcModel } from '../src/native-rpc.js'
 
 describe('native mutation outcome recovery', () => {
   const requestEnvelopeSchema = Schema.Struct({ rpcId: Schema.String }).pipe(MultiHostSchema.passthrough)
-  const addressSchema = z.object({ port: z.number().int().min(0).max(65_535) })
+  const addressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)) })
 
   test('reports an admitted create as unknown after its reply is lost and reconciles without replay', async () => {
     let admittedSessionCount = 0
@@ -55,9 +54,9 @@ describe('native mutation outcome recovery', () => {
       })
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    const address = addressSchema.safeParse(server.address())
-    if (!address.success) throw new Error('The loopback fixture did not bind.')
-    const launchUrl = `http://127.0.0.1:${address.data.port}/?token=fixture-token-12345678`
+    const address = Schema.decodeUnknownResult(addressSchema)(server.address())
+    if (address._tag === 'Failure') throw new Error('The loopback fixture did not bind.')
+    const launchUrl = `http://127.0.0.1:${address.success.port}/?token=fixture-token-12345678`
     const gateway = await connectGateway({
       launchUrl,
       createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }),

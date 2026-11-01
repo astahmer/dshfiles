@@ -2,12 +2,12 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
+import { Schema } from 'effect'
 import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 import type { MultiHostClient } from './queries.js'
 
-const bootstrapFailureSchema = z.object({ message: z.string(), code: z.string().optional() }).strict()
-type BootstrapFailure = z.infer<typeof bootstrapFailureSchema>
+const bootstrapFailureSchema = Schema.Struct({ message: Schema.String, code: Schema.optional(Schema.String) })
+type BootstrapFailure = Schema.Schema.Type<typeof bootstrapFailureSchema>
 
 const createdSessions = new Map<string, string>()
 const sessionCreations = new Map<string, Promise<string>>()
@@ -84,8 +84,8 @@ export const RemoteSessionBootstrap = (props: {
     })()
       .catch(error => {
         if (!active) return
-        const parsed = bootstrapFailureSchema.safeParse(error)
-        setFailure(parsed.success ? parsed.data : { message: errorMessage(error, `Could not start a thread on ${hostName.current}.`) })
+        const parsed = Schema.decodeUnknownResult(bootstrapFailureSchema)(error)
+        setFailure(parsed._tag === 'Success' ? parsed.success : { message: errorMessage(error, `Could not start a thread on ${hostName.current}.`) })
       })
       .finally(() => {
         if (active) setStarting(false)

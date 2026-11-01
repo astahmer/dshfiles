@@ -1,20 +1,23 @@
 import { createServer, type Server } from 'node:http'
+import { Schema } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
-import { z } from 'zod'
 import { createLoopbackForward, reserveLoopbackEndpoint } from '../src/connectors/loopback.js'
 
 const servers: Server[] = []
 const forwards: Array<{ dispose(): Promise<void> }> = []
-const serverAddressSchema = z.object({ address: z.string(), port: z.number().int().min(0).max(65_535) })
+const serverAddressSchema = Schema.Struct({
+  address: Schema.String,
+  port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)),
+})
 
 const listen = async (server: Server): Promise<{ readonly host: string; readonly port: number }> => {
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', resolve)
   })
-  const address = serverAddressSchema.safeParse(server.address())
-  if (!address.success) throw new Error('The synthetic runtime did not bind TCP.')
-  return { host: '127.0.0.1', port: address.data.port }
+  const address = Schema.decodeUnknownResult(serverAddressSchema)(server.address())
+  if (address._tag === 'Failure') throw new Error('The synthetic runtime did not bind TCP.')
+  return { host: '127.0.0.1', port: address.success.port }
 }
 
 afterEach(async () => {
