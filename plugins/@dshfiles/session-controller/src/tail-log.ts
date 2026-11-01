@@ -35,7 +35,7 @@ interface JsonlLogLookup {
 
 /** The projection cache's in-memory record table, private to its class. */
 interface ProjectionCacheTable {
-  requireTable(): { get(id: SessionId): unknown }
+  requireTable(): { get(id: SessionId): object | undefined }
 }
 
 const isJsonlLogLookup = (value: unknown): value is JsonlLogLookup =>

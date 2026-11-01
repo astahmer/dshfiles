@@ -34,11 +34,8 @@ type DraftMetadata = Omit<StoredDraftMetadata, 'sessionId' | 'workspaceId'> & {
 
 const brandedMetadata = (stored: StoredDraftMetadata): DraftMetadata => {
   const { workspaceId, ...rest } = stored
-  return {
-    ...rest,
-    sessionId: brandString<SessionId>(stored.sessionId),
-    ...(workspaceId === undefined ? {} : { workspaceId: brandString<WorkspaceId>(workspaceId) }),
-  }
+  const metadata: DraftMetadata = { ...rest, sessionId: brandString<SessionId>(stored.sessionId) }
+  return workspaceId === undefined ? metadata : { ...metadata, workspaceId: brandString<WorkspaceId>(workspaceId) }
 }
 
 function modelSelectionOf(model: NonNullable<DraftMetadata['model']>): ModelSelection {

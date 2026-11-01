@@ -362,8 +362,6 @@ const sessionActivity = createSessionActivityCache({
   guardCeilingMs: SESSION_ACTIVITY_GUARD_CEILING_MS,
 })
 
-type ThreadIntegrationView = NonNullable<ThreadView['integrations']>[number]
-
 /** A fork's boundary never moves, so one observation per forked Session serves every Turn tail of its conversation. */
 const MAX_FORK_CUT_ENTRIES = 256
 const forkCuts = new Map<string, number>()
@@ -436,9 +434,9 @@ const threadView = (
   const withQueue: ThreadView = integrationQueuedAt === undefined ? withQueueEvents : { ...withQueueEvents, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
   const integrations = IntegrationAttribution.forSession({ records: status.integrations ?? [], sessionId: viewerSessionId, forkCutAt }).map(record => {
-    const visibleRecord: ThreadIntegrationView = { at: record.at }
-    if (record.tipChangeId !== undefined) visibleRecord.tipChangeId = record.tipChangeId
-    return visibleRecord
+    return record.tipChangeId === undefined
+      ? { at: record.at }
+      : { at: record.at, tipChangeId: record.tipChangeId }
   })
   const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt, integrations }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp

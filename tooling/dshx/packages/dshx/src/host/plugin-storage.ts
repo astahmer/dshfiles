@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import { jsonValueSchema } from '../json.js'
 import type { JsonValue } from '../json.js'
 import { PluginApiError } from '../api/common.js'
+import { zodSchemaFromEffect } from '../api/zod-view.js'
 import { PluginStorageContract, type StorageListInput, type StoragePage, type StoredEntry } from '../api/storage.js'
 
 /** The slice of `@deepseek-ai/dsh-storage-domain` this module uses; dshx does not depend on that package. */
@@ -172,6 +173,8 @@ const changeOf = (change: { readonly domain: string; readonly table: string; rea
   return { namespace: change.key.slice(0, separator), key: change.key.slice(separator + 1), deleted: change.operation === 'deleted' }
 }
 
+const toStorageSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) => zodSchemaFromEffect(schema)
+
 export class PluginStorageModel {
   static readonly open = pluginStorage
   static readonly registration = storageRegistration
@@ -185,11 +188,3 @@ export class PluginStorageModel {
  * still validates with zod, so a plugin that migrated its own schemas to Effect
  * passes them through this bridge instead of keeping a zod copy.
  */
-function toStorageSchema<S extends Schema.ConstraintDecoder<unknown>>(schema: S): z.ZodType<S['Type']> {
-  return z.unknown().transform((value, context): S['Type'] => {
-    const decoded = Schema.decodeUnknownResult(schema)(value)
-    if (decoded._tag === 'Success') return decoded.success
-    context.addIssue({ code: 'custom', message: 'Invalid stored value.' })
-    return z.NEVER
-  })
-}
