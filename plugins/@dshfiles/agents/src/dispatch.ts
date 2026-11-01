@@ -1,26 +1,26 @@
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
+import * as Schema from 'effect/Schema'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import { z } from 'zod'
 import { Agents, type Agent } from './agent.js'
 
-const effortSchema = z.object({ id: z.string(), name: z.string() })
-const modelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  reasoning: z.object({ efforts: z.array(effortSchema), defaultEffort: z.string().optional() }).optional(),
+const effortSchema = Schema.Struct({ id: Schema.String, name: Schema.String })
+const modelSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  reasoning: Schema.optional(Schema.Struct({ efforts: Schema.Array(effortSchema), defaultEffort: Schema.optional(Schema.String) })),
 })
-const scheduleEntrySchema = z.object({
-  id: z.string().min(1),
-  sessionId: z.string().min(1),
-  title: z.string().optional(),
-  status: z.enum(['active', 'inactive']),
+const scheduleEntrySchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  sessionId: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.optional(Schema.String),
+  status: Schema.Literals(['active', 'inactive']),
 })
-const scheduleCatalogSchema = z.array(scheduleEntrySchema)
+const scheduleCatalogSchema = Schema.Array(scheduleEntrySchema)
 
-const catalogSchema = z.object({
-  default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }),
-  groups: z.array(z.object({ id: z.string(), name: z.string(), models: z.array(modelSchema) })),
+const catalogSchema = Schema.Struct({
+  default: Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }),
+  groups: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, models: Schema.Array(modelSchema) })),
 })
 
 /** The `sessions.create` arguments a dispatch passes: a workspace, a bare folder, or neither for the Host default. */
@@ -81,7 +81,7 @@ export interface AgentDispatchRequest {
 export class AgentDispatch {
   /** Decode the Host catalog into the rows an agent's route field offers. */
   static catalog(value: ModelCatalog): AgentCatalog {
-    const parsed = catalogSchema.parse(value)
+    const parsed = Schema.decodeUnknownSync(catalogSchema)(value)
     const options = parsed.groups.flatMap(group =>
       group.models.map(model => ({
         key: `${group.id}/${model.id}`,
@@ -123,10 +123,9 @@ export class AgentDispatch {
   }
 
   /** The schedules catalog, narrowed to the threads one agent started; decoded once at the client boundary. */
-  static schedules(value: z.input<typeof scheduleCatalogSchema>, sessionIds: readonly string[]): AgentScheduleRow[] {
+  static schedules(value: typeof scheduleCatalogSchema.Encoded, sessionIds: readonly string[]): AgentScheduleRow[] {
     const wanted = new Set(sessionIds)
-    return scheduleCatalogSchema
-      .parse(value)
+    return Schema.decodeUnknownSync(scheduleCatalogSchema)(value)
       .filter(entry => wanted.has(entry.sessionId))
       .map(entry => ({ id: entry.id, sessionId: entry.sessionId, title: entry.title ?? 'Reminder', status: entry.status }))
   }

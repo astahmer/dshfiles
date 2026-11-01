@@ -6,6 +6,7 @@ const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
 const writeNote = 'May run only when the user asked for that change.'
 const destructiveNote = 'Destructive: requires `confirm: true`, which is never implied by a bare request.'
 
+/** Stays on zod: every output embeds agentSchema, whose `default` keywords and trim constraints Effect does not emit byte-identically. */
 export const agentSnapshotSchema = z
   .object({
     revision: z.number().int().positive(),

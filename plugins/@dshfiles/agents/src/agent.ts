@@ -65,6 +65,7 @@ export const agentDelegationSchema = z
   .default(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))
 
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
+/** Stays on zod: Effect emits no `default` keyword and cannot express the trim-derived minLength/maxLength, so the draft/agent graph keeps its zod contract. */
 export const agentDraftSchema = z
   .object({
     handle: handleSchema,

@@ -1,9 +1,11 @@
+import { Option } from 'effect'
+
 import { AgentAnchorModel } from './agent-anchor.js'
 import {
   agentReferenceMatches,
   agentReferenceLabel,
   agentReferencePreviewEvent,
-  agentReferencePreviewRequestSchema,
+  decodeAgentReferencePreviewRequest,
   type AgentReferenceMatch,
 } from './agent-reference.js'
 
@@ -95,9 +97,9 @@ const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => 
 const previewAgentReference = (handle: string, element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const parsed = agentReferencePreviewRequestSchema.safeParse({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })
-  if (!parsed.success) return false
-  window.dispatchEvent(new CustomEvent(agentReferencePreviewEvent, { detail: parsed.data }))
+  const parsed = decodeAgentReferencePreviewRequest({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })
+  if (Option.isNone(parsed)) return false
+  window.dispatchEvent(new CustomEvent(agentReferencePreviewEvent, { detail: parsed.value }))
   return true
 }
 

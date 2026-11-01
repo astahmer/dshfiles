@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
+import { Option } from 'effect'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { agentReferencePreviewEvent, agentReferencePreviewRequestSchema } from './agent-reference.js'
+import { agentReferencePreviewEvent, decodeAgentReferencePreviewRequest } from './agent-reference.js'
 import { installAgentReferenceLinks } from './agent-reference-links.js'
 
 const handles = new Set(['luna', 'dsh'])
@@ -59,8 +60,8 @@ describe('agent reference links', () => {
     const requests: { readonly handle: string; readonly anchorId: number }[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) requests.push(parsed.data)
+      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      if (Option.isSome(parsed)) requests.push(parsed.value)
     }
     window.addEventListener(agentReferencePreviewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
@@ -81,8 +82,8 @@ describe('agent reference links', () => {
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) handlesSeen.push(parsed.data.handle)
+      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      if (Option.isSome(parsed)) handlesSeen.push(parsed.value.handle)
     }
     window.addEventListener(agentReferencePreviewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })
@@ -107,8 +108,8 @@ describe('agent reference links', () => {
     const handlesSeen: string[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) handlesSeen.push(parsed.data.handle)
+      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      if (Option.isSome(parsed)) handlesSeen.push(parsed.value.handle)
     }
     window.addEventListener(agentReferencePreviewEvent, onRequest)
     const stop = installAgentReferenceLinks({ handles: () => handles })

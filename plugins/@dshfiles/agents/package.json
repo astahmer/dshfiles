@@ -34,6 +34,7 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

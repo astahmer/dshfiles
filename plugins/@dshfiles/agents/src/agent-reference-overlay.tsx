@@ -4,11 +4,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
+import { Option } from 'effect'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AgentAnchorModel } from './agent-anchor.js'
 import { AGENTS_QUERY_ROOT, type Agent, type AgentThread } from './agent.js'
-import { agentReferenceLabel, agentReferencePreviewEvent, agentReferencePreviewRequestSchema, type AgentReferencePreviewRequest } from './agent-reference.js'
+import { agentReferenceLabel, agentReferencePreviewEvent, decodeAgentReferencePreviewRequest, type AgentReferencePreviewRequest } from './agent-reference.js'
 import { installAgentReferenceLinks } from './agent-reference-links.js'
 import { agentsApi } from './api.js'
 
@@ -137,10 +138,10 @@ export const AgentReferenceOverlay = (props: {
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = agentReferencePreviewRequestSchema.safeParse(event.detail)
-      if (!parsed.success) return
-      setAnchor(parsed.data.anchor)
-      setRequest(parsed.data)
+      const parsed = decodeAgentReferencePreviewRequest(event.detail)
+      if (Option.isNone(parsed)) return
+      setAnchor(parsed.value.anchor)
+      setRequest(parsed.value)
     }
     window.addEventListener(agentReferencePreviewEvent, open)
     return () => window.removeEventListener(agentReferencePreviewEvent, open)

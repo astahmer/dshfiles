@@ -1,6 +1,7 @@
+import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { agentReferenceMatches, agentReferencePreviewRequestSchema } from './agent-reference.js'
+import { agentReferenceMatches, decodeAgentReferencePreviewRequest } from './agent-reference.js'
 
 const handles = new Set(['luna', 'dsh'])
 
@@ -34,11 +35,11 @@ describe('agent reference preview request', () => {
   const anchor = { left: 10, top: 20, width: 30, height: 12 }
 
   it('accepts a handle and the anchor the card follows', () => {
-    expect(agentReferencePreviewRequestSchema.safeParse({ handle: 'luna', anchorId: 1, anchor }).success).toBe(true)
+    expect(Option.isSome(decodeAgentReferencePreviewRequest({ handle: 'luna', anchorId: 1, anchor }))).toBe(true)
   })
 
   it('rejects an invalid handle and an anchor outside the document bounds', () => {
-    expect(agentReferencePreviewRequestSchema.safeParse({ handle: '@luna', anchorId: 1, anchor }).success).toBe(false)
-    expect(agentReferencePreviewRequestSchema.safeParse({ handle: 'luna', anchorId: 1, anchor: { ...anchor, top: 200_000 } }).success).toBe(false)
+    expect(Option.isSome(decodeAgentReferencePreviewRequest({ handle: '@luna', anchorId: 1, anchor }))).toBe(false)
+    expect(Option.isSome(decodeAgentReferencePreviewRequest({ handle: 'luna', anchorId: 1, anchor: { ...anchor, top: 200_000 } }))).toBe(false)
   })
 })
