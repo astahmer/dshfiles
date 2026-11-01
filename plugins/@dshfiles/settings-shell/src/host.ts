@@ -5,7 +5,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { decodeJson } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { createSettingsTools, type SearchEntriesStore, type SettingsSurface } from './settings-tools.js'
 import type { SectionEntryRow } from './settings-search.js'
 import { settingsShellApi } from './shell-api.js'
@@ -14,8 +15,8 @@ import { PORTED_FROM, WELCOME_PORTED_FROM } from './upstream.js'
 import { checkDshRelease } from './release-check-host.js'
 import type { DshReleaseStatus } from './release-status.js'
 
-const packageVersionSchema = z.object({ version: z.string() })
-const settingsProviderSchema = z.object({ documentPath: z.string() })
+const packageVersionSchema = Schema.Struct({ version: Schema.String })
+const settingsProviderSchema = Schema.Struct({ documentPath: Schema.String })
 
 /** The Host settings forms, or a readable refusal when the profile serves none. */
 const requireSettings = (ctx: Context): SettingsSurface => {
@@ -81,9 +82,9 @@ export default defineHost({
   apis: [
     settingsShellApi.host({
       documentPath: async ({ ctx }) => {
-        const provider = settingsProviderSchema.safeParse(ctx.get('settings'))
-        if (!provider.success) return { path: null, exists: false }
-        const path = provider.data.documentPath
+        const provider = Schema.decodeUnknownOption(settingsProviderSchema)(ctx.get('settings'))
+        if (Option.isNone(provider)) return { path: null, exists: false }
+        const path = provider.value.documentPath
         // The desktop opener verifies paths against their real location (macOS temp homes sit behind /var → /private/var).
         if (!existsSync(path)) return { path, exists: false }
         return { path: realpathSync(path), exists: true }

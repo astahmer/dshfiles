@@ -10,8 +10,9 @@ import { createActor, fromPromise, waitFor, type ActorRefFrom } from '@dshfiles/
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { defineLocale } from '@dshfiles/dshx/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { useCallback, useEffect, useRef } from 'react'
-import { z } from 'zod'
 import { useObservable } from './use-observable.js'
 import { welcomeNoticeMachine, type WelcomeNoticeScopeState } from './welcome-notice-machine.js'
 
@@ -56,7 +57,7 @@ interface WelcomeState {
   error: string | null
 }
 
-const ackSchema = z.object({ [WELCOME_NOTICE_ACK_FIELD]: z.string() })
+const ackSchema = Schema.Struct({ [WELCOME_NOTICE_ACK_FIELD]: Schema.String })
 
 type WelcomeNoticeActor = ActorRefFrom<typeof welcomeNoticeMachine>
 
@@ -71,11 +72,11 @@ const scopeState = (scope: ConfigForm<unknown>): WelcomeNoticeScopeState => {
   // DSH 0.2.1 dropped the snapshot's explicit `mode`; a scope the Host keeps process-local is the one it never accepts writes for.
   const mode: WelcomeNoticeScopeState['mode'] = snapshot.writable ? 'host' : 'memory'
   if (mode === 'memory') return { mode, status: snapshot.status, acknowledged: false }
-  const parsed = ackSchema.safeParse(snapshot.value)
+  const parsed = Schema.decodeUnknownOption(ackSchema)(snapshot.value)
   return {
     mode,
     status: snapshot.status,
-    acknowledged: snapshot.status === 'ready' && parsed.success && parsed.data[WELCOME_NOTICE_ACK_FIELD] === WELCOME_NOTICE_VERSION,
+    acknowledged: snapshot.status === 'ready' && Option.isSome(parsed) && parsed.value[WELCOME_NOTICE_ACK_FIELD] === WELCOME_NOTICE_VERSION,
   }
 }
 

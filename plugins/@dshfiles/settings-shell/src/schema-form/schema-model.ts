@@ -1,6 +1,9 @@
 import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
+// Keep this schemastery reader on zod: `.catch`, `.default` and `z.coerce` have no parity-preserving Effect equivalent
+// here, and a wrong node parse silently drops settings fields.
+
 /**
  * A plugin's settings, read from the serialized schemastery schema `settings.describe` sends (`schema.toJSON()`: a
  * `refs` table keyed by uid, `uid` naming the root; an object's `dict`, a union's `list` and an array's or dict's

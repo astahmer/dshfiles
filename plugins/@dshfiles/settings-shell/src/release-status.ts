@@ -1,6 +1,9 @@
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
+// Keep this published tree on zod: Effect drops `format: uri` for `.url()` and emits an array's `maxItems` after
+// `items`, so the releaseStatus schema would no longer be byte-identical.
+
 const githubReleaseSchema = z.object({
   tag_name: z.string().min(1).max(255),
   name: z.string().max(255).nullable(),

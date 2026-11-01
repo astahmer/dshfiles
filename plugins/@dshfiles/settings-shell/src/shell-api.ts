@@ -6,6 +6,10 @@ import { dshReleaseStatusSchema } from './release-status.js'
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
 export const settingsPatchSchema = z.record(z.string(), z.json())
 
+// Keep these published contracts on zod: Effect publishes `additionalProperties: true` for a plain object where zod
+// publishes `additionalProperties: false` for `.strict()`, emits `enum` instead of `const` for `.literal()`, and has no
+// `void` or record-of-JSON equivalent.
+
 /** One control a live settings section publishes to search, with the section that opens at it. */
 const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
 

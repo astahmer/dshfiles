@@ -30,6 +30,8 @@ import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
@@ -755,10 +757,10 @@ export default defineClient({
     ctx.effect(() => {
       const onOpenSettings = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
-        const request = openSettingsRequestSchema.safeParse(event.detail ?? {})
-        if (!request.success) return
+        const request = Schema.decodeUnknownOption(openSettingsRequestSchema)(event.detail ?? {})
+        if (Option.isNone(request)) return
         event.preventDefault()
-        openRequest(request.data)
+        openRequest(request.value)
       }
       window.addEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
       return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
