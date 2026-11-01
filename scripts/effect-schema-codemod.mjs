@@ -31,32 +31,84 @@ const walk = async path => {
 }
 
 const replacements = [
+  ['z.string().min($A)', 'Schema.String.check(Schema.isMinLength($A))'],
+  ['z.string().max($A)', 'Schema.String.check(Schema.isMaxLength($A))'],
+  ['z.string().regex($A)', 'Schema.String.check(Schema.isPattern($A))'],
+  ['z.number().int().min($A)', 'Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo($A))'],
+  ['z.number().int().max($A)', 'Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isLessThanOrEqualTo($A))'],
+  ['z.number().int().positive()', 'Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThan(0))'],
+  ['z.number().int().nonnegative()', 'Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))'],
+  ['z.number().min($A)', 'Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo($A))'],
+  ['z.number().max($A)', 'Schema.Number.check(Schema.isFinite()).check(Schema.isLessThanOrEqualTo($A))'],
+  ['z.number().int()', 'Schema.Number.check(Schema.isFinite()).check(Schema.isInt())'],
+  ['z.number().positive()', 'Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThan(0))'],
+  ['z.number().nonnegative()', 'Schema.Number.check(Schema.isFinite()).check(Schema.isGreaterThanOrEqualTo(0))'],
   ['z.object($A)', 'Schema.Struct($A)'],
   ['z.string()', 'Schema.String'],
   ['z.number()', 'Schema.Number.check(Schema.isFinite())'],
+  ['$A.check(Schema.isMinLength($B)).max($C)', '$A.check(Schema.isMinLength($B)).check(Schema.isMaxLength($C))'],
+  ['$A.check(Schema.isMaxLength($B)).min($C)', '$A.check(Schema.isMaxLength($B)).check(Schema.isMinLength($C))'],
+  ['$A.check(Schema.isInt()).min($B)', '$A.check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo($B))'],
+  ['$A.check(Schema.isInt()).max($B)', '$A.check(Schema.isInt()).check(Schema.isLessThanOrEqualTo($B))'],
+  ['$A.check(Schema.isGreaterThanOrEqualTo($B)).max($C)', '$A.check(Schema.isGreaterThanOrEqualTo($B)).check(Schema.isLessThanOrEqualTo($C))'],
+  ['$A.check(Schema.isLessThanOrEqualTo($B)).min($C)', '$A.check(Schema.isLessThanOrEqualTo($B)).check(Schema.isGreaterThanOrEqualTo($C))'],
   ['z.boolean()', 'Schema.Boolean'],
   ['z.array($A)', 'Schema.Array($A)'],
   ['z.enum($A)', 'Schema.Literals($A)'],
-  ['z.literal($A)', 'Schema.Literal($A)'],
-  ['z.union($A)', 'Schema.Union(...$A)'],
+  ['z.union($A)', 'Schema.Union($A)'],
   ['z.discriminatedUnion($A, $B)', 'Schema.Union($B)'],
-  ['z.optional($A)', 'Schema.optional($A)'],
   ['z.nullable($A)', 'Schema.NullOr($A)'],
-  ['z.default($A, $B)', 'Schema.withDecodingDefault($A, () => $B)'],
   ['z.describe($A, $B)', 'Schema.annotate({ description: $B })($A)'],
-  ['$A.optional()', 'Schema.optional($A)'],
   ['$A.nullable()', 'Schema.NullOr($A)'],
-  ['$A.default($B)', 'Schema.withDecodingDefault($A, () => $B)'],
   ['$A.describe($B)', 'Schema.annotate({ description: $B })($A)'],
+  ['$A.strict()', 'Schema.StructWithRest($A, [Schema.Record(Schema.String.check(Schema.makeFilter((key) => !Object.hasOwn($A.fields, key))), Schema.Never)])'],
+  [
+    'z.strictObject($A)',
+    'Schema.StructWithRest(Schema.Struct($A), [Schema.Record(Schema.String.check(Schema.makeFilter((key) => !Object.hasOwn($A, key))), Schema.Never)])',
+  ],
+  ['$A.parse($B)', 'Schema.decodeUnknownSync($A)($B)'],
 ]
 const residualPatterns = [
   ['.refine', '$A.refine($B)', /\.refine\s*\(/],
   ['.superRefine', '$A.superRefine($B)', /\.superRefine\s*\(/],
   ['.transform', '$A.transform($B)', /\.transform\s*\(/],
+  ['.safeParse', '$A.safeParse($B)', /\.safeParse\s*\(/],
+  ['.catch', '$A.catch($B)', /\.catch\s*\(/],
+  ['.optional', '$A.optional()', /\.optional\s*\(/],
+  ['z.optional', 'z.optional($A)', /\bz\s*\.\s*optional\s*\(/],
+  ['.default', '$A.default($B)', /\.default\s*\(/],
+  ['z.default', 'z.default($A, $B)', /\bz\s*\.\s*default\s*\(/],
+  ['.arrayBounds', 'z.array($A).min($B)', /\bz\s*\.\s*array\s*\([\s\S]*?\)\s*\.\s*min\s*\(/],
+  ['.arrayBounds', 'z.array($A).max($B)', /\bz\s*\.\s*array\s*\([\s\S]*?\)\s*\.\s*max\s*\(/],
+  ['z.literal', 'z.literal($A)', /\bz\s*\.\s*literal\s*\(/],
+  ['z.infer', 'z.infer<$A>', /\bz\.(?:infer|input|output)\s*</],
+  ['.arrayBounds', 'Schema.Array($A).check(Schema.isMinLength($B))', /Schema\.Array\s*\([\s\S]*?\)\s*\.check\(Schema\.isMinLength\(/],
+  ['.arrayBounds', 'Schema.Array($A).check(Schema.isMaxLength($B))', /Schema\.Array\s*\([\s\S]*?\)\s*\.check\(Schema\.isMaxLength\(/],
   ['.preprocess', 'z.preprocess($A, $B)', /\bz\s*\.\s*preprocess\s*\(/],
   ['z.custom', 'z.custom($A)', /\bz\s*\.\s*custom\s*\(/],
   ['.passthrough', '$A.passthrough()', /\.passthrough\s*\(/],
+  ['z.record', 'z.record($A)', /\bz\s*\.\s*record\s*\(/],
+  ['.uuid', '$A.uuid()', /\.uuid\s*\(/],
+  ['.url', '$A.url()', /\.url\s*\(/],
+  ['.email', '$A.email()', /\.email\s*\(/],
+  ['.trim', '$A.trim()', /\.trim\s*\(/],
+  ['.nonempty', '$A.nonempty()', /\.nonempty\s*\(/],
+  ['.catchall', '$A.catchall($B)', /\.catchall\s*\(/],
+  ['.min', '$A.min($B)', /\.min\s*\(/],
+  ['.max', '$A.max($B)', /\.max\s*\(/],
+  ['.int', '$A.int()', /\.int\s*\(/],
+  ['.positive', '$A.positive()', /\.positive\s*\(/],
+  ['.nonnegative', '$A.nonnegative()', /\.nonnegative\s*\(/],
+  ['.regex', '$A.regex($B)', /\.regex\s*\(/],
+  ['.extend', '$A.extend($B)', /\.extend\s*\(/],
+  ['.partial', '$A.partial()', /\.partial\s*\(/],
+  ['.readonly', '$A.readonly()', /\.readonly\s*\(/],
+  ['externalSchema', '', /\b\w+Schema\b/],
 ]
+
+const blockedPatterns = residualPatterns.filter(
+  ([name]) => name !== 'externalSchema' && !['.min', '.max', '.int', '.positive', '.nonnegative', '.regex'].includes(name),
+)
 
 const astGrepMatches = (path, pattern, fix = null) => {
   const rule = [
@@ -76,13 +128,30 @@ const astGrepMatches = (path, pattern, fix = null) => {
 const rewriteSource = async (source, fileName, workdir) => {
   const tempPath = resolve(workdir, basename(fileName))
   await writeFile(tempPath, source)
+  const blockedMatches = blockedPatterns.flatMap(([, pattern]) => astGrepMatches(tempPath, pattern)).filter(match => match.text.includes('z.'))
+  const outermostBlocked = blockedMatches.filter(
+    match =>
+      !blockedMatches.some(
+        other => other !== match && other.range.byteOffset.start <= match.range.byteOffset.start && other.range.byteOffset.end >= match.range.byteOffset.end,
+      ),
+  )
   let output = source
+  const retainedSchemas = []
+  for (const [index, match] of outermostBlocked.sort((left, right) => right.range.byteOffset.start - left.range.byteOffset.start).entries()) {
+    const start = Buffer.from(output).subarray(0, match.range.byteOffset.start).toString().length
+    const end = Buffer.from(output).subarray(0, match.range.byteOffset.end).toString().length
+    const placeholder = `__EFFECT_SCHEMA_CODEMOD_RETAINED_${index}__`
+    retainedSchemas.push({ placeholder, source: output.slice(start, end) })
+    output = output.slice(0, start) + placeholder + output.slice(end)
+  }
   let rewriteCount = 0
   for (const [pattern, fix] of replacements) {
     await writeFile(tempPath, output)
     while (true) {
       await writeFile(tempPath, output)
-      const matches = astGrepMatches(tempPath, pattern, fix).filter(match => match.text.includes('z.') || match.text.includes('Schema.'))
+      const matches = astGrepMatches(tempPath, pattern, fix).filter(
+        match => match.text.includes('z.') || match.text.includes('Schema.') || pattern === '$A.extend($B)',
+      )
       const outermost = matches.filter(
         match =>
           !matches.some(
@@ -99,18 +168,34 @@ const rewriteSource = async (source, fileName, workdir) => {
       }
     }
   }
+  for (const retained of retainedSchemas) output = output.replace(retained.placeholder, retained.source)
   if (rewriteCount && /from\s+['"]zod['"]/.test(output) && !/from\s+['"]effect\/Schema['"]/.test(output)) {
     const firstImport = output.match(/^import .*?;?\r?\n/m)?.[0]
     if (firstImport) output = output.replace(firstImport, `${firstImport}import * as Schema from 'effect/Schema'\n`)
   }
+  if (rewriteCount && !/\bz\s*\./.test(output)) output = output.replace(/^import\s*\{\s*z\s*\}\s*from\s*['"]zod['"];?\r?\n/m, '')
   return { output, rewriteCount }
 }
 
 const countResiduals = (source, file) => {
   const results = []
+  for (const imported of source.matchAll(/^\s*import\s+\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/gm)) {
+    for (const binding of imported[1].split(',')) {
+      const importedName = binding
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)[0]
+      if (importedName.endsWith('Schema')) results.push({ name: 'externalSchema', line: source.slice(0, imported.index).split('\n').length })
+    }
+  }
   for (const [name, pattern, fastPattern] of residualPatterns) {
-    if (!fastPattern.test(source)) continue
-    for (const match of astGrepMatches(file, pattern)) {
+    if (name === 'externalSchema' || !fastPattern.test(source)) continue
+    for (const match of astGrepMatches(file, pattern).filter(
+      match =>
+        ['.safeParse', '.catch', '.optional', 'z.optional', '.default', 'z.default', '.arrayBounds'].includes(name) ||
+        match.text.includes('z.') ||
+        match.text.includes('Schema.'),
+    )) {
       results.push({ name, line: match.range.start.line })
     }
   }
@@ -125,11 +210,15 @@ try {
     const source = await readFile(file, 'utf8')
     if (mode !== 'residuals' && /(?:^|[.-])(test|spec|fixtures?)(?:[.-]|$)/i.test(basename(file))) continue
     if (!/\bz\s*\./.test(source) && mode !== 'residuals') continue
-    const { output, rewriteCount } = await rewriteSource(source, file, temporary)
-    await writeFile(resolve(temporary, basename(file)), output)
-    const residuals = countResiduals(output, resolve(temporary, basename(file)))
-    reports.push({ file: relative(root, file), rewrites: rewriteCount, pending: output !== source, residuals })
-    if (mode === 'write' && output !== source) await writeFile(file, output)
+    const { output: candidateOutput, rewriteCount: candidateRewriteCount } = await rewriteSource(source, file, temporary)
+    const temporaryFile = resolve(temporary, basename(file))
+    await writeFile(temporaryFile, candidateOutput)
+    const candidateResiduals = countResiduals(candidateOutput, temporaryFile)
+    const rewrittenOutput = candidateResiduals.length ? source : candidateOutput
+    const rewrittenCount = candidateResiduals.length ? 0 : candidateRewriteCount
+    const residuals = candidateResiduals.length ? countResiduals(source, file) : candidateResiduals
+    reports.push({ file: relative(root, file), rewrites: rewrittenCount, pending: rewrittenOutput !== source, residuals })
+    if (mode === 'write' && rewrittenOutput !== source) await writeFile(file, rewrittenOutput)
   }
 } finally {
   await rm(temporary, { recursive: true, force: true })
