@@ -1,10 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Stream } from 'effect'
-import { effectClient, type EffectApiClient } from './client.js'
+import { effectClient } from './client.js'
 import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
 import { registerEffectApiSchemaConverter } from '../api/schema.js'
-import { ApiProtocolModel, PluginApiError } from '../api/common.js'
+import { PluginApiError } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
   AnyApiEventDefinition,

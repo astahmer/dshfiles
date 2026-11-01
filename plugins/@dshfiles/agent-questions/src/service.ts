@@ -326,7 +326,7 @@ export const createParentQuestionService = (input: {
         if (waitRequest.signal.aborted) onAbort()
         const latest = findByQuestionId(found.table, waitRequest.questionId)
         if (latest === undefined) {
-          waiter.resume(Effect.fail(questionServiceFailure('wait', new Error('Parent question disappeared while waiting.'))))
+          waiter.resume(Effect.fail(questionServiceFailure('wait', 'Parent question disappeared while waiting.')))
         } else if (latest.record.status !== 'pending') {
           waiter.resume(Effect.succeed(outcomeOf(latest.record)))
         }

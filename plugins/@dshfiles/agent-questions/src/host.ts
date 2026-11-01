@@ -784,7 +784,7 @@ const setupHostPlugin = DshxEffect.plugin({
           yield* parentQuestions.close().pipe(Effect.catch(error => Effect.die(error)))
           yield* Effect.tryPromise({
             try: () => closeStorage(context),
-            catch: error => new Error(error instanceof Error ? error.message : String(error)),
+            catch: error => error,
           }).pipe(Effect.catch(error => Effect.die(error)))
         }),
       )

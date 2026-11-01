@@ -44,7 +44,7 @@ const rootLayer = (ctx: CordisContext) =>
         const browseContext = new CordisContext()
         const picker = new BrowseDirectoryPicker(browseContext, { maxEntries: 1_000 })
         const capability = picker.capability()
-        if (capability.kind !== 'browse') throw new Error('The directory browser did not provide its browse capability.')
+        if (capability.kind !== 'browse') throw new ProjectLifecycleFailure({ message: 'The directory browser did not provide its browse capability.' })
         const run: CommandRunner = async input => {
           const handle = ctx.subprocess.spawn({
             argv: [...input.argv],

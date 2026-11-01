@@ -12,6 +12,10 @@
     {
       "name": "effect-antislop",
       "specifier": "./tooling/antislop/effect/oxlint/index.mjs"
+    },
+    {
+      "name": "effect-migration",
+      "specifier": "./tooling/antislop/effect/repo-rules/index.mjs"
     }
   ],
   "categories": {
@@ -51,12 +55,16 @@
       "error",
       {
         "domainPaths": ["tooling/dshx/packages/dshx/src/effect"],
-        "excludePaths": [
-          "tooling/dshx/packages/dshx/src/effect/index.ts",
-          "tooling/dshx/packages/dshx/src/effect/tracer.ts"
-        ]
+        "excludePaths": ["tooling/dshx/packages/dshx/src/effect/index.ts", "tooling/dshx/packages/dshx/src/effect/tracer.ts"]
       }
     ],
+    "effect-migration/no-effect-api-promise-lift": "error",
+    "effect-migration/no-try-catch-around-effect": "error",
+    "effect-migration/require-curried-tagged-error": "error",
+    "effect-migration/no-raw-error-in-effect": "error",
+    "effect-migration/no-unscoped-plugin-timer": "error",
+    "effect-migration/no-run-promise-in-host-handler": "error",
+    "effect-migration/no-cordis-get-outside-root-layer": "error",
     "antislop/no-reflect-apply": "error",
     "antislop/no-reflect-get": "error",
     "antislop/no-passthrough-variable": "error",

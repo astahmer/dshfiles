@@ -58,6 +58,8 @@ const engineOf = (ctx: Context | undefined): SessionSearchEngine | undefined => 
 interface SessionSearchRuntime {
   readonly client: SearchWorkerClient
   readonly nudges: Queue.Queue<void>
+  readonly engine: () => SessionSearchEngine | undefined
+  readonly sessionsRoot: string
 }
 
 class SessionSearch extends EffectContext.Service<SessionSearch, SessionSearchRuntime>()('dshfiles/session-search/Runtime') {}
@@ -82,7 +84,7 @@ const makeLayer = (ctx: Context, rawConfig: unknown): Layer.Layer<SessionSearch,
         ),
         active => Effect.promise(() => active.close()),
       )
-      return { client, nudges }
+      return { client, nudges, engine: () => engineOf(ctx), sessionsRoot: sessionsRoot(ctx) }
     }),
   )
 }
@@ -120,14 +122,14 @@ const { hostApi, ...effectPlugin } = DshxEffect.plugin({
         ),
       )
       if (engine !== undefined) {
-        const owner = engineOf(ctx)
+        const owner = active.engine()
         if (owner === undefined) {
           ctx.logger.error(
             'session-search: another plugin owns the sessionQuery service, so content search stays on it and the owned index is not built; disable the stock @deepseek-ai/dsh-session-query-sqlite row in the profile',
           )
         } else if (owner._client === active.client) {
           yield* Effect.forkScoped(
-            Effect.tryPromise({ try: () => active.client.startIngest(sessionsRoot(ctx)), catch: error => error }).pipe(
+            Effect.tryPromise({ try: () => active.client.startIngest(active.sessionsRoot), catch: error => error }).pipe(
               Effect.catch(error => Effect.sync(() => ctx.logger.warn(`session-search: ingest could not start: ${String(error)}`))),
             ),
           )
@@ -145,9 +147,10 @@ export default defineHost({
   inject: ['sessions', 'sessionPersistence'],
   apis: [
     hostApi(sessionSearchApi, {
-      health: Effect.fn('session search health')(({ ctx }) =>
+      health: Effect.fn('session search health')(() =>
         Effect.gen(function* () {
-          const engine = engineOf(ctx)
+          const active = yield* SessionSearch
+          const engine = active.engine()
           // Another plugin owning the service is the failure this index cannot see from inside: say it, and build nothing.
           if (engine === undefined) return { ...IDLE_HEALTH, ownsService: false }
           const health = yield* Effect.tryPromise({ try: () => engine._client.health(), catch: error => error })
