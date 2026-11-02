@@ -5,7 +5,7 @@ schemas; this one migrates the Host runtime itself. Evidence for every claim bel
 (seven independent reviews with file:line citations, plus the [rubric](reviews/rubric.md) they used and an
 [Effect 4.1 cookbook](reviews/cookbook.md) drawn from `~/.references/{effect-4.1.0,opencode,t3code}`).
 
-**Resume here:** Line tip `kyxrnzzr` holds Phases 0–3, waves A, B, C1–C3 (+jev, memory, session-search rpc), D1, F steps 1–3a + F6, G1, fix1. Running in `eff-w-*`: D2 jj-integration, E multi-host, F2 ai-accounts (pool/routing onward), G2 resource-packs + tweet-context, C4 backlog + plugin-marketplace + preview, dshx2 foundation follow-ups. Integration rules: rebase a finished lane's first revision onto the tip with one destination; never squash a fix into a revision below a running lane's base (it rewrites their base and makes their working copy divergent) — land fixes as new revisions on the tip.
+**Resume here:** Claude credits exhausted 2026-11-02 23:10; work resumed on `opencode-go`/`deepseek-v4.1-flash` and all lanes were stopped. Line tip: `kuvuqnsv` holds Phases 0–3, waves A, B, C1–C3, C4 part, D1, D2, E 5a–5d, F steps 1–3a + 6, G1, G2, fix1, dshx2. Paused with WIP in `eff-w-*`: E multi-host (5e–5f), F2 ai-accounts (usage history, pricing, routes, steps 7–9), C4 backlog/marketplace/preview. Remaining: E + F2 + C4 finish, wave 5 schema cleanup, Phase 6 gates (scratch-DSH journeys, one-span-per-call traces, perf table).
 
 ## Progress
 
