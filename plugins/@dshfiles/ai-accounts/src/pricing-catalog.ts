@@ -1,6 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import * as Schema from 'effect/Schema'
 import { CostEstimateModel, modelPriceSchema, type ModelPrice, type RouteQuote } from './cost-estimate.js'
 import { AiAccountsSchema } from './effect-schema.js'
@@ -14,8 +13,6 @@ import { AiAccountsSchema } from './effect-schema.js'
 export const MODELS_DEV_URL = 'https://models.dev/api.json'
 
 export const DEFAULT_PRICING_PATH = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'pricing.json')
-
-const FETCH_TIMEOUT_MS = 30_000
 
 const nonNegative = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
 
@@ -299,6 +296,10 @@ export interface PricingStatus {
   readonly lastError: string | null
 }
 
+/**
+ * The Promise edge of the pricing service for the code that still reads it through the account runtime: the settings
+ * page asks synchronously, and model chunk pricing cannot suspend.
+ */
 export interface PricingCatalog {
   readonly load: () => Promise<void>
   readonly refresh: () => Promise<PricingStatus>
@@ -306,72 +307,4 @@ export interface PricingCatalog {
   readonly ensureFresh: (maxAgeMs: number) => Promise<void>
   readonly status: () => PricingStatus
   readonly current: () => PricingCache | null
-}
-
-export const createPricingCatalog = (options: {
-  readonly path: string
-  readonly fetch?: typeof fetch
-  readonly now?: () => number
-  readonly url?: string
-}): PricingCatalog => {
-  const now = options.now ?? Date.now
-  const fetchImpl = options.fetch ?? fetch
-  let cache: PricingCache | null = null
-  let lastError: string | null = null
-  let inFlight: Promise<PricingStatus> | null = null
-
-  const status = (): PricingStatus => ({
-    fetchedAt: cache?.fetchedAt ?? null,
-    source: cache?.source ?? options.url ?? MODELS_DEV_URL,
-    modelCount: cache === null ? 0 : Object.values(cache.providers).reduce((sum, models) => sum + Object.keys(models).length, 0),
-    refreshing: inFlight !== null,
-    lastError,
-  })
-
-  const load = async (): Promise<void> => {
-    try {
-      const parsed = AiAccountsSchema.decodeResult(pricingCacheSchema, JSON.parse(await readFile(options.path, 'utf8')))
-      if (parsed._tag === 'Success' && (cache === null || parsed.success.fetchedAt > cache.fetchedAt)) cache = parsed.success
-    } catch {
-      // No cache yet, or an unreadable one: the next refresh writes a fresh file.
-    }
-  }
-
-  const fetchAndStore = async (): Promise<void> => {
-    try {
-      const response = await fetchImpl(options.url ?? MODELS_DEV_URL, {
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: { accept: 'application/json' },
-      })
-      if (!response.ok) throw new Error(`models.dev answered ${String(response.status)}`)
-      const next = PricingCatalogModel.trimModelsDev(await response.json(), now())
-      if (Object.keys(next.providers).length === 0) throw new Error('models.dev returned no priced models')
-      await mkdir(dirname(options.path), { recursive: true })
-      const temporary = `${options.path}.${String(process.pid)}.tmp`
-      await writeFile(temporary, JSON.stringify(next), 'utf8')
-      await rename(temporary, options.path)
-      cache = next
-      lastError = null
-    } catch (cause) {
-      lastError = cause instanceof Error ? cause.message : String(cause)
-    }
-  }
-
-  const refresh = (): Promise<PricingStatus> => {
-    if (inFlight !== null) return inFlight
-    const running = fetchAndStore()
-      .finally(() => {
-        inFlight = null
-      })
-      .then(status)
-    inFlight = running
-    return running
-  }
-
-  const ensureFresh = async (maxAgeMs: number): Promise<void> => {
-    if (cache !== null && now() - cache.fetchedAt < maxAgeMs) return
-    await refresh()
-  }
-
-  return { load, refresh, ensureFresh, status, current: () => cache }
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_PRICING_PATH } from '@dshfiles/ai-accounts/pricing-catalog'
 import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -57,6 +58,7 @@ describe('PricingCatalog', () => {
           'dshx.agent-telemetry.cached': false,
           'dshx.agent-telemetry.accounts': 0,
         })
+        expect(DEFAULT_PRICING_PATH).toContain('pricing.json')
       }),
     ),
   )

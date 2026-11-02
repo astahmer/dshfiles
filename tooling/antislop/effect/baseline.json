@@ -12,12 +12,9 @@
     "plugins/@dshfiles/ai-accounts/src/account-login-service.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-session-service.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-setup-service.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/account-usage.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/request-retry-wait.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/optmem-core/src/engine.ts": 6
   },
@@ -31,7 +28,7 @@
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
-    "plugins/@dshfiles/ai-accounts/src/host.ts": 2,
+    "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
     "plugins/@dshfiles/backlog/src/backlog-panel.tsx": 2,
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,

@@ -1,6 +1,6 @@
 import { isContextWindowExceededError, isQuotaExceededError, type LlmCallConfig, type LlmFailure, type Message } from '@deepseek-ai/dsh-llm'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
-import type { AccountPool } from './account-pool.js'
+import type { AccountPoolView } from './account-pool.js'
 import { decideRecovery, NO_PROGRESS, type FailureKind, type RecoveryPolicy, type RecoveryProgress, type RecoveryStep } from './failure-policy.js'
 import { declaredResetWaitMs, MAX_RESET_WAIT_MS } from './reset-hint.js'
 
@@ -135,7 +135,7 @@ const retryChainKey = (failureKind: FailureKind, provider: string): string => JS
  * conversation, reset whenever a new step fails.
  */
 const createFailureRecovery = (deps: {
-  readonly pool: Pick<AccountPool, 'isHealthy' | 'noteDeclaredReset' | 'noteRateLimited' | 'bindRoute' | 'routeFor' | 'unbind'>
+  readonly pool: Pick<AccountPoolView, 'isHealthy' | 'noteDeclaredReset' | 'noteRateLimited' | 'bindRoute' | 'routeFor' | 'unbind'>
   readonly isAccountRoute: (provider: string) => boolean
   readonly readPolicy: () => RecoveryPolicy
   /** Ordered, compatible, visible accounts that could take over from `from` for `model`; health is checked here. */

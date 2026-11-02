@@ -23,7 +23,6 @@ type CopilotCredentialReader = ReturnType<typeof createCopilotCredentialsService
  */
 
 const MINUTE_MS = 60_000
-const SCHEDULER_CHECK_MS = 60_000
 const PROVIDER_READ_CONCURRENCY = 4
 
 export type AccountUsageReader = (account: AccountProfile, signal: AbortSignal | undefined) => Promise<UsageCard>
@@ -207,75 +206,33 @@ const readUsageHistories = async (
 const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number, bucketMinutes?: number): Promise<readonly QuotaSnapshot[]> =>
   (await readUsageHistories(ctx, [instanceId], sinceMs, bucketMinutes))[0]?.points ?? []
 
-export interface UsageHistoryScheduler {
-  collectNow(): Promise<number>
-  dispose(): void
-}
-
-/** Share one in-flight collection between the manual action and host timer. */
-const createUsageHistoryScheduler = (
-  ctx: Context,
-  readAccounts: () => Promise<AccountsForCollection>,
-  options: {
-    readonly now?: () => number
-    readonly readUsage?: AccountUsageReader
-    readonly resolveCredential?: CredentialValueResolver
-  } = {},
-): UsageHistoryScheduler => {
-  const now = options.now ?? Date.now
-  let disposed = false
-  let inFlight: Promise<number> | null = null
-  let controller: AbortController | null = null
-
-  const collectNow = (): Promise<number> => {
-    if (disposed) return Promise.resolve(0)
-    if (inFlight !== null) return inFlight
-    const currentController = new AbortController()
-    controller = currentController
-    inFlight = (async () => {
-      const source = await readAccounts()
-      const recorded = await collectUsageHistory(
-        ctx,
-        source.accounts,
-        options.readUsage ?? providerReader(source.shadowRoot, options.resolveCredential, createCopilotCredentialsService(ctx.get('credentials')).read),
-        currentController.signal,
-      )
-      if (currentController.signal.aborted) return recorded
-      const settings = await readUsageHistorySettings(ctx)
-      await pruneUsageHistory(ctx, settings.retentionDays)
-      return recorded
-    })().finally(() => {
-      if (controller === currentController) {
-        controller = null
-        inFlight = null
-      }
-    })
-    return inFlight
-  }
-
-  const collectIfDue = async (): Promise<void> => {
-    if (disposed || inFlight !== null || facilityOf(ctx) === undefined) return
+/** One full sweep: read every enabled account, store the readings, then prune past the retention window. */
+const sweepUsageHistory =
+  (
+    ctx: Context,
+    readAccounts: () => Promise<AccountsForCollection>,
+    options: { readonly readUsage?: AccountUsageReader; readonly resolveCredential?: CredentialValueResolver } = {},
+  ) =>
+  async (signal: AbortSignal): Promise<number> => {
+    const source = await readAccounts()
+    const recorded = await collectUsageHistory(
+      ctx,
+      source.accounts,
+      options.readUsage ?? providerReader(source.shadowRoot, options.resolveCredential, createCopilotCredentialsService(ctx.get('credentials')).read),
+      signal,
+    )
+    if (signal.aborted) return recorded
     const settings = await readUsageHistorySettings(ctx)
-    const latestAttempt = settings.lastAttemptAt ?? settings.lastReadAt
-    if (latestAttempt === null || now() - latestAttempt >= settings.intervalMinutes * MINUTE_MS) {
-      await collectNow()
-    }
+    await pruneUsageHistory(ctx, settings.retentionDays)
+    return recorded
   }
 
-  const timer = setInterval(() => {
-    void collectIfDue().catch(() => undefined)
-  }, SCHEDULER_CHECK_MS)
-  void collectIfDue().catch(() => undefined)
-
-  return {
-    collectNow,
-    dispose: () => {
-      if (disposed) return
-      disposed = true
-      clearInterval(timer)
-      controller?.abort()
-    },
-  }
+/** When the next scheduled sweep is due, or `undefined` while storage is unavailable. */
+const nextSweepAt = async (ctx: Context): Promise<number | undefined> => {
+  if (facilityOf(ctx) === undefined) return undefined
+  const settings = await readUsageHistorySettings(ctx)
+  const latestAttempt = settings.lastAttemptAt ?? settings.lastReadAt
+  return latestAttempt === null ? 0 : latestAttempt + settings.intervalMinutes * MINUTE_MS
 }
 
 export const createUsageHistoryService = (ctx: Context) => ({
@@ -286,5 +243,6 @@ export const createUsageHistoryService = (ctx: Context) => ({
   prune: pruneUsageHistory.bind(null, ctx),
   read: readUsageHistory.bind(null, ctx),
   readMany: readUsageHistories.bind(null, ctx),
-  createScheduler: createUsageHistoryScheduler.bind(null, ctx),
+  sweep: sweepUsageHistory.bind(null, ctx),
+  nextSweepAt: nextSweepAt.bind(null, ctx),
 })

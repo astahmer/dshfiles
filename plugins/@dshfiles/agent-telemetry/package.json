@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@effect/platform-node": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { createUsageCache } from './account-usage.js'
 import { createClaudeAccountService } from './claude-account.js'
 
 const deferred = <Value>() => {
@@ -15,19 +14,6 @@ const deferred = <Value>() => {
   return { promise, complete }
 }
 describe('sign-out cache invalidation', () => {
-  it('detaches a pre-sign-out sweep and never lets its late result repopulate the cache', async () => {
-    const old = deferred<string>()
-    const read = vi.fn<() => Promise<string>>().mockReturnValueOnce(old.promise).mockResolvedValue('signed-out')
-    const cache = createUsageCache({ ttlMs: 30_000, timeoutMs: 10_000, read })
-    const before = cache.get()
-    cache.invalidate()
-    expect(await cache.get()).toBe('signed-out')
-    old.complete('old-authenticated-quota')
-    expect(await before).toBe('old-authenticated-quota')
-    expect(cache.latest()).toBe('signed-out')
-    expect(await cache.get()).toBe('signed-out')
-    expect(read).toHaveBeenCalledTimes(2)
-  })
   it('invalidates only the selected Claude directory and ignores its pre-logout in-flight quota', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-session-cache-test-'))
     if (resolve(root) !== root || !root.startsWith(join(tmpdir(), 'dsh-session-cache-test-'))) throw new Error('Unexpected synthetic fixture cleanup target')

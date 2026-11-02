@@ -52,6 +52,10 @@
     "./api": {
       "types": "./src/api.ts",
       "default": "./src/api.ts"
+    },
+    "./pricing-catalog-service": {
+      "types": "./src/pricing-catalog-service.ts",
+      "default": "./src/pricing-catalog-service.ts"
     }
   },
   "scripts": {

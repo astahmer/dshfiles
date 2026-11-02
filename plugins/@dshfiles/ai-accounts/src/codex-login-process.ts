@@ -24,7 +24,29 @@ export type CodexLoginSpawn = (options: {
   readonly env: NodeJS.ProcessEnv
 }) => CodexLoginChild
 
-const spawnOfficial: CodexLoginSpawn = options => {
+/** The slice of `node:child_process.spawn` this adapter uses; a test supplies its own. */
+export type CodexLoginSpawnProcess = (
+  command: string,
+  args: readonly string[],
+  options: {
+    readonly cwd: string
+    readonly env: NodeJS.ProcessEnv
+    readonly shell: false
+    readonly detached: boolean
+    readonly stdio: readonly ['ignore', 'pipe', 'pipe']
+    readonly windowsHide: boolean
+  },
+) => {
+  readonly pid?: number | undefined
+  readonly stdout: { setEncoding(encoding: 'utf8'): void; on(event: 'data', receive: (text: string) => void): void }
+  readonly stderr: { setEncoding(encoding: 'utf8'): void; on(event: 'data', receive: (text: string) => void): void }
+  on(event: 'error', receive: (error: Error) => void): void
+  once(event: 'close', receive: (code: number | null) => void): void
+  kill(signal: 'SIGTERM' | 'SIGKILL'): void
+}
+
+/** The real `node:child_process` adapter over the fixed argv; a test exercises it through an injected `spawn`. */
+export const spawnOfficialCodexLogin = (spawn: CodexLoginSpawnProcess): CodexLoginSpawn => options => {
   const child = spawn(options.executable, options.args, {
     cwd: options.home,
     env: options.env,
@@ -67,6 +89,8 @@ const spawnOfficial: CodexLoginSpawn = options => {
     },
   }
 }
+
+const spawnOfficial: CodexLoginSpawn = spawnOfficialCodexLogin(spawn as CodexLoginSpawnProcess)
 
 const inheritedEnvironment = [
   'PATH',

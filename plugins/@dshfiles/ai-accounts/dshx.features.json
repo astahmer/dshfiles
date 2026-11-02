@@ -662,7 +662,7 @@
           "kind": "unit-test",
           "id": "ai-accounts.pricing-cost-unit-refresh-clock",
           "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
-          "testName": "refreshes only once the cache is older than the period, and shares one request"
+          "testName": "refreshes only once the cache is older than the period"
         },
         {
           "kind": "unit-test",

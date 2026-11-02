@@ -1,9 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AiAccountsConfig } from './account-config.js'
-import type { createAccountPool } from './account-pool.js'
-import type { UsageHistoryScheduler } from './usage-recorder.js'
+import type { AccountPoolView } from './account-pool.js'
 import type { QuotaContinuationService } from './quota-continuation.js'
-import type { AccountsUsage } from './api.js'
+import type { UsageSnapshotPromise } from './usage-snapshot-promise.js'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import type { PricingCatalog } from './pricing-catalog.js'
 import type { CopilotLoginService } from './copilot-login.js'
@@ -15,8 +14,8 @@ import type { ServingAccountService } from './serving-account.js'
 import type { AccountSetupService } from './account-setup-service.js'
 
 interface AccountRuntime {
-  accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
-  scheduler?: UsageHistoryScheduler
+  accounts?: { config: AiAccountsConfig; pool: AccountPoolView }
+  scheduler?: { readonly collectNow: () => Promise<number> }
   quotaContinuations?: QuotaContinuationService
   refreshRoutes?: () => Promise<void>
   /** Accounts the last route build left out (e.g. a refused Codex home), each `instanceId: reason`. */
@@ -24,7 +23,7 @@ interface AccountRuntime {
   refreshModelCatalog?: (instanceId: string) => Promise<void>
   /** Uncurated metadata for editing, including hidden model efforts and native provider defaults. */
   modelCatalogForEditing?: (instanceId: string) => Promise<readonly (LlmResolvedModelInfo & { readonly accountAdditional: boolean })[]>
-  usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; latest(): AccountsUsage | undefined; invalidate(): void }
+  usageCache?: UsageSnapshotPromise
   pricing?: PricingCatalog
   copilotLogin?: CopilotLoginService
   accountLogin?: AccountLoginService
@@ -61,7 +60,6 @@ export const activateAccountRuntime = (ctx: Context): AccountRuntime => {
   runtimes.set(ctx.root, runtime)
   ctx.effect(() => () => {
     runtime.accountSetup?.dispose()
-    runtime.scheduler?.dispose()
     runtime.copilotLogin?.dispose()
     runtime.accountLogin?.dispose()
     runtime.fastMode?.clear()

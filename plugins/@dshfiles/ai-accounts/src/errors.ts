@@ -216,6 +216,16 @@ export class AccountStoreWriteFailed extends Schema.TaggedError<AccountStoreWrit
 }
 
 /** Every failure the account APIs expose to their callers. */
+/** The guarded thread selection refused an automatic model switch, usually because the user picked one meanwhile. */
+export class AutomaticSelectionRefused extends Schema.TaggedError<AutomaticSelectionRefused>()('AutomaticSelectionRefused', {
+  sessionId: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return 'The thread kept its current model selection.'
+  }
+}
+
 export const AccountsWireError = Schema.Union([
   AccountOperationBusy,
   AccountSignInActive,

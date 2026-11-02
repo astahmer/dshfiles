@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { superviseDsh } from './supervise-dsh.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const controller = pathToFileURL(join(root, 'plugins/@dshfiles/thread-sidebar/src/restart.ts')).href
+const controller = pathToFileURL(join(root, 'plugins/@dshfiles/thread-sidebar/src/restart-controller.ts')).href
 
 async function fixture(t, mode) {
   const home = await mkdtemp(join(tmpdir(), 'dsh-supervisor-test-'))

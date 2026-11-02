@@ -1,10 +1,8 @@
 import { activateAccountRuntime } from './account-runtime.js'
 import { AccountCredentialHomeWork } from './account-credential-home-work.js'
-import { createServingAccountService, ServingAccountModel } from './serving-account.js'
+import { createServingAccountService } from './serving-account.js'
 import { servingAccountHostApi } from './serving-account-host.js'
 import { threadAccountHostApi } from './thread-account-host.js'
-import { threadModelApi, threadModelPolicySchema, type ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
-import { ThreadRequestPolicy } from './thread-request-policy.js'
 import { configFromAccountsFile } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
@@ -13,10 +11,13 @@ import { AccountLoginHostModel, accountLoginHostApi, installAccountLogin } from 
 import { accountSessionHostApi } from './account-session-host.js'
 import { closeModelFallbacks, modelFallbackHostApi, modelFallbacksFor } from './model-fallback-host.js'
 import { createModelFallbackRouter } from './model-fallback-router.js'
-import { ModelFallbackModel } from './model-fallback.js'
 import type { ModelFallbackStore } from './model-fallback-store.js'
 import type { FallbackRoute } from './model-fallback-api.js'
-import { createUsageCache, readAccountUsage } from './account-usage.js'
+import { readAccountUsage } from './account-usage.js'
+import { UsageSnapshot } from './usage-snapshot.js'
+import { UsageSnapshotPromiseModel, type UsageSnapshotPromise } from './usage-snapshot-promise.js'
+import { UsageHistorySchedule } from './usage-history-schedule.js'
+import { UsageHistoryPromiseModel } from './usage-history-promise.js'
 import { readCodexUsage } from './usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
@@ -28,7 +29,11 @@ import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
 import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import { modelFastModeHostApi } from './model-fast-mode-host.js'
-import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
+import { DEFAULT_PRICING_PATH } from './pricing-catalog.js'
+import { PricingCatalog } from './pricing-catalog-service.js'
+import { PricingCatalogPromiseModel, type PricingCatalogPromise } from './pricing-catalog-promise.js'
+import { ModelCatalogs } from './model-catalogs.js'
+import { ModelCatalogsPromiseModel, type ModelCatalogsPromise } from './model-catalogs-promise.js'
 import { installCostProjection } from './cost-projection.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { AccountProfilesModel, AccountStore, type AccountStoreFile } from './account-store.js'
@@ -43,12 +48,11 @@ import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { CredentialModel, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
-import { createHostApiClient } from '@dshfiles/dshx/host'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AccountLocks } from './account-locks.js'
 import type { Context } from '@deepseek-ai/cordis'
-import { Duration, Effect, Layer, Schedule, Stream } from 'effect'
+import { Effect, Layer, Stream, SubscriptionRef } from 'effect'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
@@ -58,27 +62,17 @@ import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { GITHUB_COPILOT_KIND } from './provider-routes.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, ReasoningEffortId, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
-import { createAccountPool, creditServedAttempt } from './account-pool.js'
-import { explainSilentRejections } from './silent-rejection.js'
+import { AccountPool } from './account-pool.js'
+import { RequestRouting, type RoutingWorld } from './request-routing.js'
+import { RequestRoutingHooks } from './request-routing-promise.js'
 import { FailureRecoveryModel } from './failure-recovery.js'
-import { isRetryId, retryNotice } from './retry-notice.js'
 import { RequestAccountRouting } from './request-account-routing.js'
-import { RequestRetryWait } from './request-retry-wait.js'
-// Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
-import type { LlmRetryEventData, LlmRetryStartedEventData } from '@deepseek-ai/dsh-llm-retry'
-import type {} from '@dshfiles/request-messages'
-declare module '@deepseek-ai/dsh-session/types' {
-  interface SessionEventMap {
-    'llm/retry': LlmRetryEventData
-    'llm/retry-started': LlmRetryStartedEventData
-  }
-}
 import { randomUUID } from 'node:crypto'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
@@ -104,26 +98,32 @@ import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoute
  * `provider/Drivers/CodexHomeLayout.ts`.
  */
 
-const HOUR_MS = 3_600_000
 /** A Luna Reserve switch outlives a stale usage card for this long, then the card decides again. */
 const LUNA_RESERVE_HOLD_MS = 60 * 60_000
-/** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
-const PRICING_CHECK_MS = 30 * 60_000
 
 interface AccountsHostActivation {
-  readonly refreshPricing: () => void
+  /** What request routing decides with; absent when the Host has no LLM runtime. */
+  readonly world: RoutingWorld | undefined
 }
 
 /**
  * The imperative account Host still being split into services: everything it starts registers its release in
  * `onRelease`, which the plugin Scope runs in reverse order when the plugin unloads.
  */
-const startAccountsHost = (
-  ctx: Context,
-  readSettings: () => AccountSettingsSnapshot,
-  store: AccountStorePromise,
-  onRelease: (release: () => void) => void,
-): AccountsHostActivation => {
+const startAccountsHost = (input: {
+  readonly ctx: Context
+  readonly readSettings: () => AccountSettingsSnapshot
+  readonly store: AccountStorePromise
+  readonly pool: AccountPool['Service']
+  readonly routing: RequestRouting['Service']
+  readonly usage: UsageSnapshotPromise
+  readonly usageHistory: { readonly collectNow: () => Promise<number> }
+  readonly pricing: PricingCatalogPromise
+  readonly modelCatalogs: ModelCatalogsPromise
+  readonly onRelease: (release: () => void) => void
+}): AccountsHostActivation => {
+  const { ctx, readSettings, store, onRelease } = input
+  const pool = input.pool.view
   const resolveCredential = resolveKeyFromContext(ctx)
   const runtime = activateAccountRuntime(ctx)
   const servingAccount = createServingAccountService(ctx)
@@ -210,39 +210,16 @@ const startAccountsHost = (
     readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
   })
   runtime.fastModeUsageHistory = fastModeUsageHistory
-  runtime.scheduler = usageHistory.createScheduler(
-    async () => {
-      const file = await AccountsHostApiModel.accountsFile(ctx, store)
-      return { accounts: file.accounts, shadowRoot: file.shadowRoot }
-    },
-    { resolveCredential },
-  )
+  runtime.scheduler = input.usageHistory
   // 30 s: long enough that the page, footer and edge overlay share one sweep,
   // short enough that a manual reload still feels live.
   onRelease(() => {
-    runtime.scheduler?.dispose()
+    if (runtime.scheduler === input.usageHistory) delete runtime.scheduler
     if (runtime.fastModeUsageHistory === fastModeUsageHistory) delete runtime.fastModeUsageHistory
     void usageHistory.close().catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
     void fastModeUsageHistory.close().catch(() => ctx.logger.warn('ai-accounts: Fast mode usage storage could not close cleanly'))
   })
-  runtime.usageCache = createUsageCache({
-    ttlMs: 30_000,
-    timeoutMs: 30_000,
-    read: signal => AccountsHostApiModel.readAccountsUsage(ctx, store, signal),
-  })
-  ctx.on('credentials/reference-updated', ref => {
-    if (store.current().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
-  })
-  const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
-  runtime.pricing = pricing
-  const refreshPricing = (): void => {
-    const settings = readSettings().pricing
-    if (settings.costEstimates) void pricing.ensureFresh(settings.pricingRefreshHours * HOUR_MS)
-  }
-  void pricing.load().then(refreshPricing)
-  onRelease(() => {
-    if (runtime.pricing === pricing) delete runtime.pricing
-  })
+  runtime.usageCache = input.usage
   installCostProjection(ctx)
   let fallbackStore: ModelFallbackStore | undefined
   void modelFallbacksFor(ctx)
@@ -329,8 +306,7 @@ const startAccountsHost = (
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
   const lunaReserveHolds = new Map<string, number>()
   const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
-  const discoveredModelIds = new Map<string, { readonly route: KeyedRoute; readonly modelIds: readonly string[] }>()
-  const modelCatalogRefreshes = new Map<string, { readonly route: KeyedRoute; readonly controller: AbortController }>()
+  const catalogState = input.modelCatalogs
   const sameKeyedRoute = (candidate: Route | undefined, expected: KeyedRoute): boolean => {
     if (candidate === undefined || !candidate.enabled) return false
     if (expected.kind === COMMANDCODE_KIND) {
@@ -409,7 +385,7 @@ const startAccountsHost = (
           provider: id,
           displayName: route.displayName,
           ...settings.get(id),
-          additionalModelIds: [...(settings.get(id)?.additionalModelIds ?? []), ...(discoveredModelIds.get(id)?.modelIds ?? [])],
+          additionalModelIds: [...(settings.get(id)?.additionalModelIds ?? []), ...(catalogState.discovered(id) ?? [])],
         }),
       ]),
     )
@@ -421,14 +397,7 @@ const startAccountsHost = (
   profiles = buildProfiles(routes, initialFile)
   const reasoningDefaults = buildReasoningDefaults()
 
-  const pool = createAccountPool({
-    distribution: config.distribution,
-    cooldownMs: config.cooldownMs,
-  })
   runtime.accounts = { config, pool }
-  for (const [id, route] of routes) {
-    pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
-  }
 
   const modelForRoute = (provider: string, modelId: string) =>
     profiles
@@ -519,58 +488,11 @@ const startAccountsHost = (
     },
     newRetryId: () => randomUUID(),
   })
-  const activeAccountRoutes = new Map<
-    string,
-    {
-      readonly turn: number
-      readonly step: number
-      readonly provider: string
-      readonly model: string
-      readonly selectionRevision: number
-      accountId: string
-    }
-  >()
-  const retryWait = new RequestRetryWait()
-  runtime.releaseRetryWait = sessionId => retryWait.release(sessionId)
-  onRelease(() => retryWait.dispose())
-  const threadPolicyFor = (agent: Agent) => {
-    const policy = threadModelPolicySchema.safeParse(ctx.sessionProjections.stateOf(agent.session, 'threadModelPolicy'))
-    return policy.success ? policy.data : null
-  }
-  const prefersSelectedProvider = (agent: Agent, provider: string, model: string): boolean => {
-    const policy = threadPolicyFor(agent)
-    return policy?.preferSelectedProvider === true && policy.selection?.provider === provider && policy.selection.model === model
-  }
-  const selectAutomaticModel = async (agent: Agent, selection: ThreadModelSelection, expectedRevision: number): Promise<void> => {
-    if (threadPolicyFor(agent) === null) {
-      // Compatibility with an older controller: there is no thread-switch capability or preferred intent to overwrite.
-      const request = { sessionId: agent.id, provider: selection.provider, model: selection.model }
-      if (selection.reasoningEffort === undefined) await ctx.get('sessionController')?.selectModel(request)
-      else await ctx.get('sessionController')?.selectModel({ ...request, reasoningEffort: selection.reasoningEffort })
-      return
-    }
-    // The check must run inside the native serialized commit, after metadata awaits, not only in this caller.
-    await createHostApiClient(ctx, threadModelApi, '@dshfiles/ai-accounts').select({
-      sessionId: agent.id,
-      selection,
-      expectedRevision,
-      preferSelectedProvider: false,
-    })
-  }
-  const accountForRequest = (options: GenerateOptions): string =>
-    RequestAccountRouting.wireAccountFor({
-      provider: options.provider,
-      model: options.model,
-      purpose: options.purpose,
-      conversationKey: options.sessionId,
-      active: options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId),
-      routes,
-      pool,
-      modelsCompatible,
-    })
+  runtime.releaseRetryWait = input.routing.releaseRetryWait
+  const accountForRequest = (options: GenerateOptions): string => input.routing.wireAccountFor(options, { routes: () => routes, modelsCompatible })
 
   const llm = ctx.get('llm')
-  if (llm === undefined) return { refreshPricing }
+  if (llm === undefined) return { world: undefined }
   const copilotCredentials = createCopilotCredentialsService(ctx.get('credentials'))
 
   const adapter = new EffortPinnedAdapter(
@@ -687,7 +609,7 @@ const startAccountsHost = (
     const profile = editingProfiles.get(instanceId)
     const models = profile?.piProvider?.getModels() ?? []
     const nativeIds = profile === undefined ? new Set<string>() : ProviderProfileModel.nativeModelIdsForProfile(profile)
-    const discoveredIds = new Set(discoveredModelIds.get(instanceId)?.modelIds ?? [])
+    const discoveredIds = new Set(catalogState.discovered(instanceId) ?? [])
     return Promise.all(
       models.map(async model => ({
         ...(await catalogAdapter.resolveModel(instanceId, model.id)),
@@ -765,15 +687,7 @@ const startAccountsHost = (
       registration.dispose()
       modelDiscoveries.delete(id)
     }
-    for (const [id, refresh] of modelCatalogRefreshes) {
-      if (sameKeyedRoute(nextRoutes.get(id), refresh.route)) continue
-      refresh.controller.abort()
-      modelCatalogRefreshes.delete(id)
-    }
-    for (const [id, catalog] of discoveredModelIds) {
-      if (sameKeyedRoute(nextRoutes.get(id), catalog.route)) continue
-      discoveredModelIds.delete(id)
-    }
+    catalogState.retain(({ instanceId, route }) => sameKeyedRoute(nextRoutes.get(instanceId), route))
     for (const [id, route] of enabled) {
       if ((route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND) || modelDiscoveries.has(id)) continue
       registerKeyedDiscovery(id, route)
@@ -802,20 +716,13 @@ const startAccountsHost = (
   const refreshModelCatalog = async (instanceId: string): Promise<void> => {
     const route = routes.get(instanceId)
     if (route === undefined || !route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) return
-    modelCatalogRefreshes.get(instanceId)?.controller.abort()
-    const refresh = { route, controller: new AbortController() }
-    modelCatalogRefreshes.set(instanceId, refresh)
-    try {
-      const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
-      const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
-      const signal = AbortSignal.any([refresh.controller.signal, AbortSignal.timeout(15_000)])
-      const discovered = await llm.discoverModels(settingsNs, discoveryRequest, signal)
-      if (modelCatalogRefreshes.get(instanceId) !== refresh || !sameKeyedRoute(routes.get(instanceId), route)) return
-      discoveredModelIds.set(instanceId, { route, modelIds: discovered.map(model => model.id) })
-      await refreshRoutes()
-    } finally {
-      if (modelCatalogRefreshes.get(instanceId) === refresh) modelCatalogRefreshes.delete(instanceId)
-    }
+    const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
+    const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
+    const modelIds = await catalogState.refresh(instanceId, async signal => (await llm.discoverModels(settingsNs, discoveryRequest, signal)).map(model => model.id))
+    // A route that changed while the fetch ran cannot claim the models it found.
+    if (modelIds === undefined || !sameKeyedRoute(routes.get(instanceId), route)) return
+    catalogState.record({ instanceId, route, modelIds })
+    await refreshRoutes()
   }
   runtime.refreshModelCatalog = refreshModelCatalog
   // Discovered catalogs live in memory only, so without this every restart left
@@ -825,256 +732,25 @@ const startAccountsHost = (
     void refreshModelCatalog(instanceId).catch(() => ctx.logger.warn(`ai-accounts: startup catalog refresh failed for ${instanceId}`))
   }
 
-  const disposers: Array<() => void> = []
-
-  {
-    disposers.push(
-      ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
-        // Credited only after the upstream answers, so a failed attempt is never "used",
-        // and to the account a fail-over put on the wire rather than the chosen route.
-        if (!routes.has(options.provider)) return next()
-        const accountId = accountForRequest(options)
-        const active = options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId)
-        const actualRoute = routes.get(accountId)
-        // Only a routed main Agent step can claim attribution. Side purposes and native requests never can.
-        const attempt = ServingAccountModel.startRequest(servingAccount, options, active, accountId, actualRoute?.kind)
-        const chunks = attempt === undefined ? next() : ServingAccountModel.observe(next(), servingAccount, attempt)
-        return explainSilentRejections(
-          creditServedAttempt(chunks, {
-            pool: {
-              noteServed: accountId => {
-                pool.noteServed(accountId)
-                recovery.noteServed(accountId)
-              },
-            },
-            accountId,
-          }),
-          options,
-        )
-      }),
-    )
-
-    // Per-agent listeners live on the agent's own context so they unwind with
-    // the agent. This plugin also keeps their disposers, so unloading the
-    // plugin releases every agent registration it owns.
-    const perAgent = new Map<string, () => void>()
-    disposers.push(
-      ctx.on('agent/created', async payload => {
-        const agent = payload.agent
-        const id = agent.id
-        perAgent.get(id)?.()
-        const dispose = agent.ctx.effect(() => {
-          const requestPolicy = new ThreadRequestPolicy(agent, () => threadPolicyFor(agent))
-          // Wrap later request selectors so routing sees their final logical provider and model.
-          const offRequest = agent.ctx.on(
-            'agent/request',
-            async ({ turn, step }, next) => {
-              const proposed = await next()
-              if (prefersSelectedProvider(agent, proposed.provider, proposed.model)) fallbackRouter.returnToSelection(id)
-              const fallback = fallbackRouter.routeRequest({ sessionId: id, turn, request: proposed })
-              let request: typeof proposed = proposed
-              if (fallback !== undefined) {
-                // The proposed effort belongs to the route the fallback replaces.
-                const { reasoningEffort: _replacedEffort, ...proposedRest } = proposed
-                request = { ...proposedRest, provider: fallback.provider, model: fallback.model }
-                if (fallback.reasoningEffort !== undefined) request = { ...request, reasoningEffort: ReasoningEffortId(fallback.reasoningEffort) }
-              }
-              const preflight = RequestAccountRouting.selectionPreflight({
-                provider: request.provider,
-                model: request.model,
-                routes,
-                nativeProviders: (llm?.listProviders() ?? []).map(provider => provider.id),
-                offersModel: (provider, model) => modelForRoute(provider, model) !== undefined,
-                pool,
-              })
-              if (preflight.kind === 'unserved') throw RequestAccountRouting.unservedProviderError(request.provider)
-              if (preflight.kind === 'route') {
-                ctx.logger.warn(`ai-accounts: selection names provider "${request.provider}" with no adapter; serving this request from ${preflight.provider}`)
-                request = { ...request, provider: preflight.provider }
-              }
-              if (!routes.has(request.provider)) {
-                activeAccountRoutes.delete(id)
-                servingAccount.forget(id)
-                return request
-              }
-              const distribution = pool.distribution()
-              if (distribution !== 'sticky') pool.bindRoute(id, request.provider, request.provider)
-              const recoverySettings = readSettings().recovery
-              // A fallback chain is the whole fail-over order, so its routes are not spread across accounts.
-              const accountId = RequestAccountRouting.selectTurnAccount({
-                provider: request.provider,
-                model: request.model,
-                conversationKey: id,
-                routes,
-                pool,
-                modelsCompatible,
-                chainWalking: fallbackRouter.walksChain(id),
-                preferSelectedProvider: prefersSelectedProvider(agent, request.provider, request.model),
-                usageOrder: recoverySettings.usageOrder,
-                hiddenAccountIds: recoverySettings.hiddenUsageAccounts,
-              })
-              activeAccountRoutes.set(id, {
-                turn,
-                step,
-                provider: request.provider,
-                model: request.model,
-                accountId,
-                selectionRevision: requestPolicy.revision,
-              })
-              return request
-            },
-            { prepend: true },
-          )
-          const offTurnStopping = agent.ctx.on('agent/turn-stopping', () => {
-            activeAccountRoutes.delete(id)
-            servingAccount.clear(id)
-            const revision = threadPolicyFor(agent)?.revision ?? 0
-            const restored = fallbackRouter.turnEnded(id)
-            if (restored === undefined) return
-            void selectAutomaticModel(agent, ModelFallbackModel.selectionFor(restored), revision).catch((error: unknown) =>
-              ctx.logger.warn(`ai-accounts: thread stayed on its fallback instead of returning to ${restored.provider}: ${String(error)}`),
-            )
-          })
-          const offRequestMessages = agent.ctx.on('agent/request-messages', async ({ turn, step }, next) => {
-            const messages = await next()
-            return recovery.shrinkActive(id, turn, step) ? FailureRecoveryModel.offloadResentImages(messages) : messages
-          })
-          // Prepended so the account policy decides before DSH's provider-wide retry,
-          // which would otherwise spend its retries on an account that is already spent.
-          const offRequestError = agent.ctx.on(
-            'agent/request-error',
-            async ({ turn, step, provider, failure, signal }, next) => {
-              const surface = agent.session.deriveMessages()
-              const active = activeAccountRoutes.get(id)
-              const routedAccountId = active?.turn === turn && active.step === step && active.provider === provider ? active.accountId : undefined
-              const requestProvider = agent.session.requestHeader()?.config.provider ?? provider
-              const action = recovery.recover({
-                conversationKey: id,
-                turn,
-                step,
-                provider,
-                requestProvider,
-                ...(routedAccountId !== undefined && { routedAccountId }),
-                model: agent.session.requestHeader()?.config.model,
-                failure,
-                canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,
-              })
-              if (
-                action.kind === 'retry' &&
-                action.step.kind === 'failover' &&
-                routes.has(action.step.to) &&
-                routedAccountId !== undefined &&
-                active !== undefined
-              ) {
-                active.accountId = action.step.to
-              }
-              if (action.kind === 'pass') return next()
-              if (action.kind === 'give-up') {
-                const decision = action.then === 'dsh' ? await next() : undefined
-                const requestConfig = agent.session.requestHeader()?.config
-                const failedSelection = requestConfig === undefined ? undefined : { provider: requestConfig.provider, model: requestConfig.model }
-                const recovery = FailureRecoveryModel.quotaRecoveryFor({
-                  failureKind: action.failureKind,
-                  rescued: decision !== undefined,
-                  autoRetryDefault: readSettings().quotaRetry.autoRetryDefault,
-                })
-                if (recovery !== undefined) {
-                  await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection, failure.message)
-                }
-                return decision
-              }
-              const userSelectedSinceRequest = (): boolean =>
-                RequestAccountRouting.hasNewPreferredSelection({ requestRevision: active?.selectionRevision, current: threadPolicyFor(agent) })
-              const retainUserSelection = (): void => {
-                pool.unbind(id)
-                fallbackRouter.returnToSelection(id)
-              }
-              if (userSelectedSinceRequest()) {
-                retainUserSelection()
-                return signal.aborted ? undefined : { kind: 'retry' }
-              }
-              const retryId = action.retryId
-              if (!isRetryId(retryId)) return next()
-              const notice = retryNotice(action, {
-                retryId,
-                turn,
-                step,
-                provider: requestProvider,
-                failure,
-                label: target => {
-                  // Chain targets are `provider/model`; account ids never hold a slash.
-                  const slash = target.indexOf('/')
-                  const provider = slash < 0 ? target : target.slice(0, slash)
-                  const name = routes.get(provider)?.displayName ?? provider
-                  return slash < 0 ? name : `${name} · ${target.slice(slash + 1)}`
-                },
-              })
-              ctx.logger.info(`ai-accounts: ${notice.failure.message}`)
-              agent.session.append('llm/retry', notice)
-              const delayMs = action.step.kind === 'retry' || action.step.kind === 'wait' ? action.step.delayMs : 0
-              if (!(await retryWait.wait(id, delayMs, signal))) return undefined
-              if (userSelectedSinceRequest()) {
-                retainUserSelection()
-                return { kind: 'retry' }
-              }
-              agent.session.append('llm/retry-started', { retryId: notice.retryId, turn, step, retry: notice.retry })
-              // The retry re-reads the Session selection, so it opens on the stand-in route and the picker follows.
-              const followed =
-                action.step.kind === 'failover' && !routes.has(action.step.to)
-                  ? chainSelection(fallbackRouter.active(id))
-                  : FailureRecoveryModel.selectionAfter({ action, config: agent.session.requestHeader()?.config })
-              if (followed !== undefined) {
-                await selectAutomaticModel(agent, followed, active?.selectionRevision ?? requestPolicy.revision).catch(() => {
-                  retainUserSelection()
-                  ctx.logger.warn('ai-accounts: automatic retry kept the current thread selection because its guarded update was refused')
-                })
-              }
-              return { kind: 'retry' }
-            },
-            { prepend: true },
-          )
-          agent.ctx.on('agent/disposed', () => {
-            activeAccountRoutes.delete(id)
-            servingAccount.clear(id)
-            recovery.forget(id)
-            fallbackRouter.forget(id)
-          })
-          return () => {
-            activeAccountRoutes.delete(id)
-            servingAccount.clear(id)
-            requestPolicy.dispose()
-            offRequest()
-            offTurnStopping()
-            offRequestError()
-            offRequestMessages()
-          }
-        })
-        perAgent.set(id, () => {
-          dispose()
-          perAgent.delete(id)
-        })
-      }),
-    )
-    disposers.push(
-      ctx.on('agent/disposed', payload => {
-        perAgent.get(payload.agent.id)?.()
-      }),
-    )
-
-    onRelease(() => {
-      if (runtime.refreshRoutes === refreshRoutes) delete runtime.refreshRoutes
-      if (runtime.refreshModelCatalog === refreshModelCatalog) delete runtime.refreshModelCatalog
-      for (const refresh of modelCatalogRefreshes.values()) refresh.controller.abort()
-      modelCatalogRefreshes.clear()
-      discoveredModelIds.clear()
-      for (const registration of modelDiscoveries.values()) registration.dispose()
-      modelDiscoveries.clear()
-      for (const dispose of disposers) dispose()
-      for (const dispose of perAgent.values()) dispose()
-      perAgent.clear()
-    })
+  onRelease(() => {
+    if (runtime.refreshRoutes === refreshRoutes) delete runtime.refreshRoutes
+    if (runtime.refreshModelCatalog === refreshModelCatalog) delete runtime.refreshModelCatalog
+    if (runtime.releaseRetryWait === input.routing.releaseRetryWait) delete runtime.releaseRetryWait
+    for (const registration of modelDiscoveries.values()) registration.dispose()
+    modelDiscoveries.clear()
+  })
+  const world: RoutingWorld = {
+    routes: () => routes,
+    offersModel: (provider, model) => modelForRoute(provider, model) !== undefined,
+    modelsCompatible,
+    nativeProviders: () => llm.listProviders().map(provider => provider.id),
+    fallbackRouter,
+    recovery,
+    servingAccount,
+    recordQuotaFailure: RequestRoutingHooks.recordQuotaFailure(quotaContinuations),
+    selectModel: RequestRoutingHooks.selectModel(ctx),
   }
-  return { refreshPricing }
+  return { world }
 }
 
 const AccountsHostLive = Layer.effectDiscard(
@@ -1082,6 +758,14 @@ const AccountsHostLive = Layer.effectDiscard(
     const host = yield* HostContext
     const accountSettings = yield* AccountSettings
     const store = yield* AccountStorePromiseService
+    const pool = yield* AccountPool
+    const routing = yield* RequestRouting
+    const services = yield* DshxPlugin.detachedContext<never>()
+    const usage = UsageSnapshotPromiseModel.facade(yield* UsageSnapshot, services)
+    const usageHistory = UsageHistoryPromiseModel.facade(yield* UsageHistorySchedule, services)
+    const modelCatalogs = ModelCatalogsPromiseModel.facade(yield* ModelCatalogs, services)
+    const pricingService = yield* PricingCatalog
+    const pricing = PricingCatalogPromiseModel.facade(pricingService, services)
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
     const live = { settings: yield* accountSettings.current }
     yield* DshxPlugin.worker(
@@ -1095,12 +779,18 @@ const AccountsHostLive = Layer.effectDiscard(
       Effect.sync(() => {
         const releases: Array<() => void> = []
         return {
-          started: startAccountsHost(
-            host.ctx,
-            () => live.settings,
+          started: startAccountsHost({
+            ctx: host.ctx,
+            readSettings: () => live.settings,
             store,
-            release => releases.push(release),
-          ),
+            pool,
+            routing,
+            usage,
+            usageHistory,
+            pricing,
+            modelCatalogs,
+            onRelease: release => releases.push(release),
+          }),
           releases,
         }
       }),
@@ -1109,7 +799,22 @@ const AccountsHostLive = Layer.effectDiscard(
           for (const release of activation.releases.toReversed()) release()
         }),
     )
-    yield* DshxPlugin.worker(Effect.repeat(Effect.sync(activation.started.refreshPricing), Schedule.spaced(Duration.millis(PRICING_CHECK_MS))))
+    if (activation.started.world !== undefined) yield* routing.install(activation.started.world)
+  }),
+)
+
+/** The pool starts with every saved account route, with the distribution and cooldown the accounts file names. */
+const AccountPoolLive = Layer.unwrap(
+  Effect.gen(function* () {
+    const store = yield* AccountStore
+    const config = configFromAccountsFile(yield* SubscriptionRef.get(store.snapshot))
+    const accounts = [...ProviderRoutes.buildRoutes(config).routes].map(([id, route]) => ({
+      id,
+      kind: route.kind,
+      label: route.displayName,
+      enabled: route.enabled,
+    }))
+    return AccountPool.layer({ distribution: config.distribution, cooldownMs: config.cooldownMs, accounts })
   }),
 )
 
@@ -1119,7 +824,17 @@ export default DshxPlugin.make({
   settings: [aiAccountsSettings],
   layer: AccountsHostLive.pipe(
     Layer.provideMerge(
-      Layer.mergeAll(AccountLocks.layer, AccountSettings.layer, AccountStorePromiseService.layer.pipe(Layer.provideMerge(AccountStore.layer))).pipe(
+      Layer.mergeAll(
+        RequestRouting.layer,
+        UsageSnapshotPromiseModel.layer,
+        UsageHistoryPromiseModel.layer,
+        PricingCatalog.scheduled().pipe(Layer.provideMerge(PricingCatalog.layer({ path: DEFAULT_PRICING_PATH }))),
+        ModelCatalogs.layer,
+      ).pipe(
+        Layer.provideMerge(AccountPoolLive),
+        Layer.provideMerge(
+          Layer.mergeAll(AccountLocks.layer, AccountSettings.layer, AccountStorePromiseService.layer.pipe(Layer.provideMerge(AccountStore.layer))),
+        ),
         Layer.provideMerge(AccountsPlatformLive),
       ),
     ),
@@ -1127,5 +842,3 @@ export default DshxPlugin.make({
   apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi, accountSessionHostApi, threadAccountHostApi],
   tools: [aiAccountsTool],
 })
-
-const chainSelection = (route: FallbackRoute | undefined) => (route === undefined ? undefined : ModelFallbackModel.selectionFor(route))

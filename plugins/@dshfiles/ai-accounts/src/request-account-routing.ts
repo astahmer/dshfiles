@@ -1,5 +1,5 @@
 import { LlmError } from '@deepseek-ai/dsh-llm'
-import type { AccountPool, Distribution } from './account-pool.js'
+import type { AccountPoolView, Distribution } from './account-pool.js'
 import { CLAUDE_KIND } from './provider-routes.js'
 
 interface RoutableAccount {
@@ -39,7 +39,7 @@ export class RequestAccountRouting {
     readonly model: string
     readonly conversationKey?: string
     readonly routes: ReadonlyMap<string, RoutableAccount>
-    readonly pool: Pick<AccountPool, 'acquire' | 'distribution'>
+    readonly pool: Pick<AccountPoolView, 'acquire' | 'distribution'>
     readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
     readonly now?: number | undefined
   }): string {
@@ -63,7 +63,7 @@ export class RequestAccountRouting {
     readonly model: string | undefined
     readonly conversationKey?: string
     readonly routes: ReadonlyMap<string, RoutableAccount>
-    readonly pool: Pick<AccountPool, 'bindRoute' | 'distribution' | 'isHealthy' | 'routeFor'>
+    readonly pool: Pick<AccountPoolView, 'bindRoute' | 'distribution' | 'isHealthy' | 'routeFor'>
     readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
     readonly usageOrder?: readonly string[]
     readonly hiddenAccountIds?: readonly string[]
@@ -97,7 +97,7 @@ export class RequestAccountRouting {
     readonly model: string
     readonly conversationKey: string
     readonly routes: ReadonlyMap<string, RoutableAccount>
-    readonly pool: Pick<AccountPool, 'acquire' | 'bindRoute' | 'distribution' | 'isHealthy' | 'routeFor'>
+    readonly pool: Pick<AccountPoolView, 'acquire' | 'bindRoute' | 'distribution' | 'isHealthy' | 'routeFor'>
     readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
     readonly chainWalking: boolean
     readonly preferSelectedProvider?: boolean
@@ -144,7 +144,7 @@ export class RequestAccountRouting {
     readonly routes: ReadonlyMap<string, RoutableAccount>
     readonly nativeProviders: readonly string[]
     readonly offersModel: (provider: string, model: string) => boolean
-    readonly pool: Pick<AccountPool, 'isHealthy'>
+    readonly pool: Pick<AccountPoolView, 'isHealthy'>
     readonly now?: number | undefined
   }): { readonly kind: 'served' } | { readonly kind: 'route'; readonly provider: string } | { readonly kind: 'unserved' } {
     if (input.routes.has(input.provider) || input.nativeProviders.includes(input.provider)) return { kind: 'served' }
@@ -174,7 +174,7 @@ export class RequestAccountRouting {
     readonly conversationKey: string | undefined
     readonly active: { readonly provider: string; readonly model: string; readonly accountId: string } | undefined
     readonly routes: ReadonlyMap<string, RoutableAccount>
-    readonly pool: Pick<AccountPool, 'acquire' | 'distribution' | 'routeFor'>
+    readonly pool: Pick<AccountPoolView, 'acquire' | 'distribution' | 'routeFor'>
     readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
     readonly now?: number
   }): string {
