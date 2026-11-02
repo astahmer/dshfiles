@@ -174,6 +174,7 @@
     "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/credential-port": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -216,6 +217,7 @@
     "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@dshfiles/credential-port": ">=0.1.0 <0.2.0",
+    "@effect/platform-node": ">=4.1.0 <5",
     "effect": ">=4.1.0 <5",
     "playwright": ">=1.56.0 <2",
     "react": ">=18 <20",
@@ -289,6 +291,9 @@
       "optional": true
     },
     "@deepseek-ai/dsh-skill": {
+      "optional": true
+    },
+    "@effect/platform-node": {
       "optional": true
     }
   },
