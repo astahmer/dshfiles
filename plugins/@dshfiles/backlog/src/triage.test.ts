@@ -4,10 +4,9 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Jev } from '@dshfiles/jev'
 import { describe, expect, it } from '@effect/vitest'
-import { Clock, Effect, Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 
 import { AiActivity } from './ai-activity.js'
-import { backlogSettingsTestLayer } from './backlog-settings.js'
 import type { BacklogItem } from './item.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
@@ -40,7 +39,7 @@ const triageLayer = (settings: Partial<BacklogSettings>) =>
     Layer.provideMerge(backlogStoreLayer({ settings })),
     Layer.provideMerge(AiActivity.layer),
     Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
-    Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as unknown as Llm['Service']))),
+    Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as never))),
     Layer.provideMerge(Layer.succeed(SecretReferenceResolver, SecretReferenceResolver.of({ resolve: () => Effect.succeedNone, resolveWithLabel: () => Effect.succeedNone }))),
   )
 

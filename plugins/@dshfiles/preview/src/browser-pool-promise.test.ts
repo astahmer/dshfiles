@@ -1,8 +1,9 @@
+import { existsSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PreviewBrowsers } from './browser-pool.js'
+import { PreviewBrowsers } from './browser-pool-promise.js'
 import { previewSettings, type PreviewSettings } from './settings.js'
 
 const PAGE = `<!doctype html><title>Preview fixture</title>
@@ -16,7 +17,13 @@ let server: Server
 let origin = ''
 let requestCount = 0
 let settings: PreviewSettings = previewSettings.schema({})
-const browsers = new PreviewBrowsers({ settings: () => settings })
+const browsers = new PreviewBrowsers({
+  settings: () => settings,
+  touchThread: () => undefined,
+  // The driver's settle deadline is the Host's Effect; a test just awaits the measurement.
+  settle: async work => work.catch(() => undefined),
+  exists: path => existsSync(path),
+})
 
 beforeAll(async () => {
   server = createServer((_request, response) => {

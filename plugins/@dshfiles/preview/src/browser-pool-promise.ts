@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
+import { Effect } from 'effect'
 import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Route } from 'playwright-core'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import type { JsonValue } from '@dshfiles/dshx/json'
@@ -38,8 +38,13 @@ interface ThreadBrowser {
   readonly context: BrowserContext
   readonly pages: Map<string, PreviewPage>
   nextPage: number
-  idleTimer: NodeJS.Timeout | undefined
 }
+
+/** The settings the driver reads on every use, as plain values. */
+export type PreviewSettingsView = PreviewSettings
+
+/** Wait for a page script that may never yield, so the capture goes on without the measurement. */
+export type SettleWaiter = <Value>(work: Promise<Value>) => Promise<Value | undefined>
 
 export class PreviewError extends Error {
   override readonly name = 'PreviewError'
@@ -85,21 +90,21 @@ const MISSING_EXECUTABLE = /Executable doesn't exist at (\S+)/
  * Playwright looks for its browsers under `$HOME`. A launcher or scratch harness that rewrites HOME hides the cache the
  * account installed, so the same path under the account's own home is tried once.
  */
-const accountHomeExecutable = (error: unknown): string | undefined => {
+const accountHomeExecutable = (error: unknown, exists: (path: string) => boolean): string | undefined => {
   if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined || !(error instanceof Error)) return undefined
   const missing = MISSING_EXECUTABLE.exec(error.message)?.[1]
   const accountHome = userInfo().homedir
   if (missing === undefined || accountHome === homedir() || !missing.startsWith(`${homedir()}/`)) return undefined
   const relocated = `${accountHome}${missing.slice(homedir().length)}`
-  return existsSync(relocated) ? relocated : undefined
+  return exists(relocated) ? relocated : undefined
 }
 
-const launchChromium = async (configuredPath: string): Promise<Browser> => {
+const launchChromium = async (configuredPath: string, exists: (path: string) => boolean): Promise<Browser> => {
   if (configuredPath !== '') return chromium.launch({ headless: true, executablePath: configuredPath })
   try {
     return await chromium.launch({ headless: true })
   } catch (error) {
-    const relocated = accountHomeExecutable(error)
+    const relocated = accountHomeExecutable(error, exists)
     if (relocated === undefined) throw error
     return chromium.launch({ headless: true, executablePath: relocated })
   }
@@ -114,12 +119,6 @@ const sandboxShell = (document: string): string =>
     '<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%;display:block}</style>',
     `</head><body><iframe sandbox="allow-scripts" srcdoc="${escapeAttribute(document)}"></iframe></body></html>`,
   ].join('')
-
-const SETTLE_TIMEOUT_MS = 3_000
-
-/** A page script that never yields would hold `evaluate` forever; the capture goes on without the measurement. */
-const settleWithin = <Value>(work: Promise<Value>): Promise<Value | undefined> =>
-  Promise.race([work.catch(() => undefined), new Promise<undefined>(resolve => setTimeout(resolve, SETTLE_TIMEOUT_MS))])
 
 /** JPEG qualities tried in order until the image fits the caller's byte budget. */
 const RENDER_QUALITIES = [75, 55, 35] as const
@@ -137,14 +136,30 @@ export interface RenderHtmlInput {
 const pageSpan = <Result>(name: string, pageId: string | undefined, run: () => Promise<Result>): Promise<Result> =>
   withSpan(name, { kind: 'client', attributes: pageId === undefined ? {} : { 'dshx.preview.page': pageId } }, run)
 
-/** One headless Chromium for the Host, one isolated browser context per thread, closed when the thread goes idle or away. */
+/**
+ * One headless Chromium for the Host, one isolated browser context per thread. The idle close and the settle deadline
+ * are Effects the caller supplies, so this driver owns no timer of its own.
+ */
 export class PreviewBrowsers {
   readonly #settings: () => PreviewSettings
   readonly #threads = new Map<string, ThreadBrowser>()
+  readonly #touchThread: (sessionId: string, idleMinutes: number) => void
+  readonly #settle: SettleWaiter
+  readonly #exists: (path: string) => boolean
   #browser: Promise<Browser> | undefined
 
-  constructor(input: { readonly settings: () => PreviewSettings }) {
+  constructor(input: {
+    readonly settings: () => PreviewSettings
+    /** Called whenever a thread's page is used, so the caller can restart that thread's idle close. */
+    readonly touchThread: (sessionId: string, idleMinutes: number) => void
+    readonly settle: SettleWaiter
+    /** Whether a relocated Playwright executable exists; the Host reads it through FileSystem. */
+    readonly exists: (path: string) => boolean
+  }) {
     this.#settings = input.settings
+    this.#touchThread = input.touchThread
+    this.#settle = input.settle
+    this.#exists = input.exists
   }
 
   #launch(): Promise<Browser> {
@@ -153,7 +168,7 @@ export class PreviewBrowsers {
     const launching = withSpan(
       'preview launch',
       { kind: 'client', attributes: { 'process.executable.name': executablePath === '' ? 'chromium-headless-shell' : 'chromium' } },
-      () => launchChromium(executablePath),
+      () => launchChromium(executablePath, this.#exists),
     )
     const browser = launching.then(
       launched => {
@@ -193,7 +208,7 @@ export class PreviewBrowsers {
     context.setDefaultTimeout(ACTION_TIMEOUT_MS)
     context.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS)
     await context.route('**/*', route => this.#guard(route))
-    const thread: ThreadBrowser = { context, pages: new Map(), nextPage: 1, idleTimer: undefined }
+    const thread: ThreadBrowser = { context, pages: new Map(), nextPage: 1 }
     context.on('close', () => {
       if (this.#threads.get(sessionId) === thread) this.#threads.delete(sessionId)
     })
@@ -201,10 +216,8 @@ export class PreviewBrowsers {
     return thread
   }
 
-  #touch(sessionId: string, thread: ThreadBrowser): void {
-    clearTimeout(thread.idleTimer)
-    thread.idleTimer = setTimeout(() => void this.closeThread(sessionId), this.#settings().idleMinutes * 60_000)
-    thread.idleTimer.unref()
+  #touch(sessionId: string): void {
+    this.#touchThread(sessionId, this.#settings().idleMinutes)
   }
 
   #page(sessionId: string, pageId: string) {
@@ -212,7 +225,7 @@ export class PreviewBrowsers {
     const entry = thread?.pages.get(pageId)
     if (thread === undefined || entry === undefined || entry.page.isClosed())
       throw new PreviewError(`No open preview page ${pageId} in this thread. Call preview_list to see open pages, or preview_open to open one.`)
-    this.#touch(sessionId, thread)
+    this.#touch(sessionId)
     return { thread, entry }
   }
 
@@ -250,7 +263,7 @@ export class PreviewBrowsers {
       const entry: PreviewPage = { id: `p${String(thread.nextPage++)}`, page, openedAt: Date.now(), revealRequestedAt: input.reveal ? Date.now() : null }
       thread.pages.set(entry.id, entry)
       page.on('close', () => thread.pages.delete(entry.id))
-      this.#touch(input.sessionId, thread)
+      this.#touch(input.sessionId)
       const response = await page.goto(url, { waitUntil: 'domcontentloaded' }).catch((error: unknown) => {
         throw new PreviewError(
           `Opened page ${entry.id}, but loading ${url} failed: ${error instanceof Error ? (error.message.split('\n')[0] ?? '') : String(error)}`,
@@ -357,10 +370,10 @@ export class PreviewBrowsers {
           const page = await context.newPage()
           await page.setContent(sandboxShell(input.document), { waitUntil: 'load', timeout: NAVIGATION_TIMEOUT_MS })
           const frame = page.frames().find(candidate => candidate !== page.mainFrame())
-          const contentHeight = frame === undefined ? undefined : await settleWithin(frame.evaluate(() => document.documentElement.scrollHeight))
+          const contentHeight = frame === undefined ? undefined : await this.#settle(frame.evaluate(() => document.documentElement.scrollHeight))
           const height = input.fullPage ? Math.min(input.maxFullPageHeight, Math.max(input.height, contentHeight ?? input.height)) : input.height
           if (height !== input.height) await page.setViewportSize({ width: input.width, height })
-          await settleWithin(page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
+          await this.#settle(page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))))
           for (const quality of RENDER_QUALITIES) {
             const image = await page.screenshot({ type: 'jpeg', quality, timeout: SNAPSHOT_TIMEOUT_MS })
             if (image.byteLength <= input.maxImageBytes) return { image, width: input.width, height }
@@ -388,18 +401,21 @@ export class PreviewBrowsers {
     return Promise.all([...thread.pages.values()].filter(entry => !entry.page.isClosed()).map(entry => this.#summary(entry)))
   }
 
+  /** The same idle close as an Effect, so the caller's forked sleep can await it. */
+  closeThreadEffect(sessionId: string): Effect.Effect<number, never, never> {
+    return Effect.promise(() => this.closeThread(sessionId))
+  }
+
   async closeThread(sessionId: string): Promise<number> {
     const thread = this.#threads.get(sessionId)
     if (thread === undefined) return 0
     this.#threads.delete(sessionId)
-    clearTimeout(thread.idleTimer)
     const count = [...thread.pages.values()].filter(entry => !entry.page.isClosed()).length
     await pageSpan('preview close-thread', undefined, () => thread.context.close()).catch(() => undefined)
     return count
   }
 
   async dispose(): Promise<void> {
-    for (const thread of this.#threads.values()) clearTimeout(thread.idleTimer)
     this.#threads.clear()
     const browser = this.#browser
     this.#browser = undefined

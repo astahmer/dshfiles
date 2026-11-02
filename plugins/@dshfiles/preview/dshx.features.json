@@ -6,9 +6,21 @@
       "id": "preview-browser",
       "title": "Agent preview browser",
       "summary": "Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per thread: preview_open, preview_navigate, preview_snapshot (bounded accessibility text with element refs), preview_screenshot (image), preview_click, preview_type, preview_evaluate (off until the user enables it), preview_reveal, preview_close and preview_list. Top-level navigations are limited to allowed hosts, loopback by default. A thread's pages close after it idles or when it is disposed, and preview_open with reveal (or preview_reveal) shows the URL in the user's browser tab beside the thread.",
-      "surfaces": ["host", "tool"],
+      "surfaces": [
+        "host",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["no-pages", "page-open", "snapshot-truncated", "navigation-blocked", "evaluate-disabled", "page-limit", "launch-failed", "idle-closed"],
+      "states": [
+        "no-pages",
+        "page-open",
+        "snapshot-truncated",
+        "navigation-blocked",
+        "evaluate-disabled",
+        "page-limit",
+        "launch-failed",
+        "idle-closed"
+      ],
       "failureModes": [
         "A top-level navigation to a host outside allowedHosts is refused before loading, and a link or redirect to one is aborted in the browser.",
         "Chromium missing or failing to launch reports how to install the headless shell or set chromiumPath instead of a stack trace.",
@@ -32,26 +44,26 @@
         {
           "kind": "unit-test",
           "id": "preview.browser-actions",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
         },
         {
           "kind": "unit-test",
           "id": "preview.navigation-allowlist",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "refuses a remote host and blocks a link navigation to it"
         },
         {
           "kind": "unit-test",
           "id": "preview.evaluate-opt-in",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "keeps evaluate off until the setting allows it, then bounds its result"
         },
         {
           "kind": "unit-test",
           "id": "preview.thread-isolation",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
-          "testName": "isolates threads and closes a thread’s pages when it ends"
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
+          "testName": "isolates threads and closes a thread\u2019s pages when it ends"
         },
         {
           "kind": "unit-test",
@@ -72,19 +84,19 @@
         {
           "kind": "custom",
           "span": "preview open",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
         },
         {
           "kind": "custom",
           "span": "preview launch",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
         },
         {
           "kind": "custom",
           "span": "preview click",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "opens a loopback page, snapshots it with refs, types and clicks by ref, and records one span per action"
         }
       ]
@@ -92,11 +104,25 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop.",
-      "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
-      "surfaces": ["host", "tool", "client"],
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop.",
+      "reach": [
+        "click button \"Dev servers and previews\"",
+        "expect region \"Dev servers\""
+      ],
+      "surfaces": [
+        "host",
+        "tool",
+        "client"
+      ],
       "configuration": [],
-      "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform"],
+      "states": [
+        "hidden",
+        "listed",
+        "stop-armed",
+        "stopped",
+        "open-in-tab",
+        "unsupported-platform"
+      ],
       "failureModes": [
         "The DSH Host and the processes that launched it are never listed, so their ports can never be stopped from here.",
         "A pid recycled between the list and the stop is refused because the stop re-reads the process table and matches pid and start time.",
@@ -126,7 +152,7 @@
           "kind": "unit-test",
           "id": "preview.dev-server-attribution",
           "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
-          "testName": "attributes a Host job’s descendant to the job owner and an orphan to the thread whose workspace holds it"
+          "testName": "attributes a Host job\u2019s descendant to the job owner and an orphan to the thread whose workspace holds it"
         },
         {
           "kind": "unit-test",
@@ -147,7 +173,7 @@
         {
           "kind": "custom",
           "span": "preview port-probe",
-          "file": "plugins/@dshfiles/preview/src/dev-server-probe.test.ts",
+          "file": "plugins/@dshfiles/preview/src/preview-dev-servers-promise.test.ts",
           "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
         }
       ]
@@ -156,9 +182,15 @@
       "id": "render-html",
       "title": "Offline HTML screenshots for other Host plugins",
       "summary": "The preview-render dshx contract (@dshfiles/preview/render-api) lets another Host plugin screenshot an untrusted HTML document in the preview Chromium: a fresh offline browser context per call with every request aborted, the document in an allow-scripts, opaque-origin srcdoc frame, an optional full-page capture up to 6000 pixels, and a JPEG returned as base64 within the API payload budget. Only plugin callers are served; html-render's html_render_screenshot is the agent tool over it.",
-      "surfaces": ["host"],
+      "surfaces": [
+        "host"
+      ],
       "configuration": [],
-      "states": ["rendering", "captured", "refused"],
+      "states": [
+        "rendering",
+        "captured",
+        "refused"
+      ],
       "failureModes": [
         "A Client or Agent caller is refused: the contract serves other Host plugins only.",
         "An image that stays above the budget at every JPEG quality is refused with how to shrink the capture.",
@@ -180,13 +212,13 @@
         {
           "kind": "unit-test",
           "id": "preview.render-html-offline",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span"
         },
         {
           "kind": "unit-test",
           "id": "preview.render-html-budget",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "refuses a render that stays over the image budget at every quality"
         }
       ],
@@ -198,7 +230,7 @@
         {
           "kind": "custom",
           "span": "preview render-html",
-          "file": "plugins/@dshfiles/preview/src/browser-pool.test.ts",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span"
         }
       ]

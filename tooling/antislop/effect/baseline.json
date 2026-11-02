@@ -19,9 +19,7 @@
     "plugins/@dshfiles/ai-accounts/src/request-retry-wait.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/optmem-core/src/engine.ts": 6,
-    "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
-    "plugins/@dshfiles/preview/src/host.ts": 1
+    "plugins/@dshfiles/optmem-core/src/engine.ts": 6
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
@@ -29,8 +27,7 @@
     "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
-    "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/preview/src/host.ts": 2
+    "plugins/@dshfiles/hmr-gate/src/host.ts": 1
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
