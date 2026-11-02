@@ -117,6 +117,10 @@
     "./ids": {
       "types": "./dist/ids.d.ts",
       "default": "./dist/ids.js"
+    },
+    "./effect/keyed-mutex": {
+      "types": "./dist/effect/keyed-mutex.d.ts",
+      "default": "./dist/effect/keyed-mutex.js"
     }
   },
   "scripts": {
