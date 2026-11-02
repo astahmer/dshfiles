@@ -1,7 +1,7 @@
 import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session'
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { Effect, Layer, Queue, Schema } from 'effect'
@@ -43,28 +43,23 @@ const sessionWarmingApi = defineApi({
 })
 
 /**
- * Feeds agent-loop requests and turn boundaries to SessionWarming in emission order. `llm/stream` is a waterfall
- * whose listener must return `next()`, so both listeners write one queue here instead of going through HostEvents.
+ * Feeds agent-loop requests and turn boundaries to SessionWarming in emission order: both handlers offer to one
+ * unbounded queue synchronously while the Host dispatches.
  */
 const WarmingEvents = Layer.effectDiscard(
   Effect.gen(function* () {
-    const host = yield* HostContext
     const warming = yield* SessionWarming
     const events = yield* Queue.unbounded<WarmingEvent>()
-    yield* Effect.acquireRelease(
-      Effect.sync(() => [
-        host.ctx.on('llm/stream', (options, next) => {
-          if (options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options))
-            Queue.offerUnsafe(events, { kind: 'request', sessionId: String(options.sessionId), request: options })
-          return next()
-        }),
-        host.ctx.on('session/event', (session, event) => {
-          if (event.type === 'turn/start') Queue.offerUnsafe(events, { kind: 'turn-start', sessionId: String(session.header.id) })
-          if (event.type === 'turn/end') Queue.offerUnsafe(events, { kind: 'turn-end', sessionId: String(session.header.id) })
-        }),
-      ]),
-      disposers => Effect.sync(() => disposers.forEach(dispose => dispose())),
+    yield* HostEvents.intercept('llm/stream', ({ args: [options], next }) =>
+      options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options)
+        ? Effect.andThen(Queue.offer(events, { kind: 'request', sessionId: String(options.sessionId), request: options }), next)
+        : next,
     )
+    yield* HostEvents.on('session/event', (session, event) => {
+      if (event.type === 'turn/start') return Effect.asVoid(Queue.offer(events, { kind: 'turn-start', sessionId: String(session.header.id) }))
+      if (event.type === 'turn/end') return Effect.asVoid(Queue.offer(events, { kind: 'turn-end', sessionId: String(session.header.id) }))
+      return Effect.void
+    })
     yield* DshxPlugin.worker(Queue.take(events).pipe(Effect.flatMap(warming.handle), Effect.forever))
   }),
 )

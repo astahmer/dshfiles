@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-llm'
-import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { DshxPlugin, HostContext, HostEvents, hostService } from '@dshfiles/dshx/effect'
 import { Effect, Layer } from 'effect'
 import { installRequestMessages } from './polyfill.ts'
 
@@ -11,10 +11,7 @@ const RequestMessagesPolyfill = Layer.effectDiscard(
     yield* hostService('agents')
     const status = yield* installRequestMessages({ ctx: host.ctx, runtime })
     if (!status.active) host.ctx.logger('request-messages').warn('agent/request-messages is unavailable: %s', status.reason)
-    yield* Effect.acquireRelease(
-      Effect.sync(() => host.ctx.on('request-messages/status', () => status)),
-      dispose => Effect.sync(dispose),
-    )
+    yield* HostEvents.answer('request-messages/status', () => Effect.succeed(status))
   }),
 )
 

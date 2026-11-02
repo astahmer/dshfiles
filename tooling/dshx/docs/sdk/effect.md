@@ -114,12 +114,29 @@ registers a tool for the current Scope, e.g. into one agent's scoped tool runtim
 `on` listens to a Cordis event while the current Scope lives and runs each event in a fiber of a scoped `FiberSet`;
 a defect is logged, never thrown into the emitter. `stream` is the same listener as a `Stream`.
 
+### `HostEvents.intercept(name, handler)` and `HostEvents.answer(name, handler)`
+
+Cordis `waterfall` and `bail` events return a value to the emitter synchronously, so their handlers run with
+`Effect.runSyncExitWith` and must not suspend (a suspending handler is logged like a defect). Both are scoped.
+
+- `intercept` wraps a waterfall such as `llm/stream`: `handler({ args, next })` gets the arguments without the trailing
+  continuation and `next`, the rest of the chain as an Effect that runs at most once. Return `next` (or map it) to pass
+  through, anything else to veto. A failing handler is logged and the chain continues with `next`'s result; an error
+  thrown by the rest of the chain itself still reaches the emitter.
+- `answer` answers a bail event such as `request-messages/status`: the handler's value goes back to the emitter and
+  `undefined` lets the next listener answer. A failing handler is logged and answers `undefined`.
+
+```ts
+yield * HostEvents.intercept('llm/stream', ({ args: [options], next }) => Effect.andThen(Queue.offer(requests, options), next))
+yield * HostEvents.answer('request-messages/status', () => Effect.succeed(status))
+```
+
 ### `DshxPlugin.callback(fn)`
 
 Captures the current services and returns `(...args) => Promise`, for a callback API that must stay Promise (a
 polyfill, a native hook). Capture it once in a layer or `main`, not per call.
 
-`callback`, `HostEvents.on` and `Tool.register` capture their context without the current span, so each later run
+`callback`, `HostEvents.on`, `HostEvents.intercept`, `HostEvents.answer` and `Tool.register` capture their context without the current span, so each later run
 starts its own trace instead of hanging under `plugin activate`. A plugin edge that captures context itself (an
 SDK adapter calling `Effect.runPromiseWith`) uses `DshxPlugin.detachedContext()` for the same reason.
 
