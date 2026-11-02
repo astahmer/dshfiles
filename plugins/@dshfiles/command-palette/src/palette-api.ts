@@ -1,5 +1,6 @@
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type { ReactNode } from 'react'
-import { z } from 'zod'
 
 import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
 
@@ -18,26 +19,28 @@ interface PaletteRegistry {
 }
 
 const isActionLabel = (value: unknown): value is string | (() => string) => typeof value === 'string' || typeof value === 'function'
-const isOptionalAction = (value: unknown): value is ((context: PaletteActionContext) => boolean) | undefined =>
-  value === undefined || typeof value === 'function'
+const isActionCallback = (value: unknown): value is (context: PaletteActionContext) => boolean => typeof value === 'function'
 const isActionRun = (value: unknown): value is PaletteAction['run'] => typeof value === 'function'
 
-const paletteActionSchema = z.object({
-  id: z
-    .string()
-    .trim()
-    .regex(/^@[^/]+\/.+/u)
-    .max(180),
-  label: z.custom<PaletteAction['label']>(isActionLabel),
-  aliases: z.array(z.string().trim().min(1)).max(20).exactOptional(),
-  keys: z.array(z.string().trim().min(1)).max(5).exactOptional(),
-  suggested: z.boolean().exactOptional(),
-  icon: z.custom<ReactNode>().exactOptional(),
-  group: z.enum(['destination', 'command', 'action']).exactOptional(),
-  isAvailable: z.custom<NonNullable<PaletteAction['isAvailable']>>(isOptionalAction).exactOptional(),
-  isSelected: z.custom<NonNullable<PaletteAction['isSelected']>>(isOptionalAction).exactOptional(),
-  run: z.custom<PaletteAction['run']>(isActionRun),
+const actionLabelSchema = Schema.declare<PaletteAction['label']>(isActionLabel)
+const optionalActionCallbackSchema = Schema.declare<(context: PaletteActionContext) => boolean>(isActionCallback)
+const actionRunSchema = Schema.declare<PaletteAction['run']>(isActionRun)
+const reactNodeSchema = Schema.declare<ReactNode>((_value): _value is ReactNode => true)
+
+const paletteActionSchema = Schema.Struct({
+  id: Schema.Trim.check(Schema.isPattern(/^@[^/]+\/.+/u), Schema.isMaxLength(180)),
+  label: actionLabelSchema,
+  aliases: Schema.optionalKey(Schema.Array(Schema.Trim.check(Schema.isMinLength(1))).check(Schema.isMaxLength(20))),
+  keys: Schema.optionalKey(Schema.Array(Schema.Trim.check(Schema.isMinLength(1))).check(Schema.isMaxLength(5))),
+  suggested: Schema.optionalKey(Schema.Boolean),
+  icon: Schema.optionalKey(reactNodeSchema),
+  group: Schema.optionalKey(Schema.Literals(['destination', 'command', 'action'])),
+  isAvailable: Schema.optionalKey(optionalActionCallbackSchema),
+  isSelected: Schema.optionalKey(optionalActionCallbackSchema),
+  run: actionRunSchema,
 })
+
+const recentLimitSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(50))
 
 let paletteRegistry: PaletteRegistry | undefined
 
@@ -76,15 +79,16 @@ const notify = (current: PaletteRegistry): void => {
 
 /** Register a browser-local action and return its lifecycle disposer. */
 const registerPaletteAction = (input: PaletteAction): (() => void) => {
-  const parsed = paletteActionSchema.safeParse(input)
-  if (!parsed.success) throw new Error('Command palette action has an invalid definition.')
+  const parsed = Schema.decodeUnknownOption(paletteActionSchema)(input)
+  if (Option.isNone(parsed)) throw new Error('Command palette action has an invalid definition.')
+  const action = parsed.value
   const current = registry()
-  if (current.actions.has(parsed.data.id)) throw new Error(`Command palette action id is already registered: ${parsed.data.id}`)
-  current.actions.set(parsed.data.id, parsed.data)
+  if (current.actions.has(action.id)) throw new Error(`Command palette action id is already registered: ${action.id}`)
+  current.actions.set(action.id, action)
   notify(current)
   return () => {
-    if (current.actions.get(parsed.data.id) !== parsed.data) return
-    current.actions.delete(parsed.data.id)
+    if (current.actions.get(action.id) !== action) return
+    current.actions.delete(action.id)
     notify(current)
   }
 }
@@ -101,7 +105,7 @@ const subscribePaletteActions = (listener: () => void): (() => void) => {
   return () => current.listeners.delete(onChange)
 }
 const setPaletteRecentLimit = (recentLimit: number): void => {
-  const parsed = z.number().int().min(1).max(50).parse(recentLimit)
+  const parsed = Schema.decodeUnknownSync(recentLimitSchema)(recentLimit)
   const current = registry()
   if (current.recentLimit === parsed) return
   current.recentLimit = parsed

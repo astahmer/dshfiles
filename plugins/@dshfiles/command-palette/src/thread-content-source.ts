@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 
 export type ThreadContentHit = {
   readonly sessionId: string
@@ -37,18 +38,18 @@ export type ThreadContentSearchDeps = {
 
 const memoryOwner = '@dshfiles/memory'
 const memoryApiId = 'dshfiles-memory'
-const finderPage = z.object({
-  hits: z.array(
-    z.object({
-      sessionId: z.string().min(1),
-      snippet: z.string(),
-      title: z.string().optional(),
-      project: z.string().optional(),
-      cwd: z.string().nullable().optional(),
-      updatedAt: z.number().optional(),
-      live: z.boolean().optional(),
-      persisted: z.boolean().optional(),
-      parentSessionId: z.string().nullable().optional(),
+const finderPage = Schema.Struct({
+  hits: Schema.Array(
+    Schema.Struct({
+      sessionId: Schema.String.check(Schema.isMinLength(1)),
+      snippet: Schema.String,
+      title: Schema.optionalKey(Schema.String),
+      project: Schema.optionalKey(Schema.String),
+      cwd: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      updatedAt: Schema.optionalKey(Schema.Number),
+      live: Schema.optionalKey(Schema.Boolean),
+      persisted: Schema.optionalKey(Schema.Boolean),
+      parentSessionId: Schema.optionalKey(Schema.NullOr(Schema.String)),
     }),
   ),
 })
@@ -71,10 +72,10 @@ export const createThreadContentSearch = (deps: ThreadContentSearchDeps) => {
     if (discovered !== null) {
       const answer = await deps
         .callFinder(discovered, { query, project: 'all', limit: 12 }, signal)
-        .then(value => finderPage.safeParse(value))
-        .catch(() => undefined)
-      if (answer?.success === true)
-        return answer.data.hits.flatMap(hit =>
+        .then(value => Schema.decodeUnknownOption(finderPage)(value))
+        .catch(() => Option.none())
+      if (Option.isSome(answer))
+        return answer.value.hits.flatMap(hit =>
           hit.parentSessionId
             ? []
             : [
