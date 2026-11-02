@@ -1,6 +1,7 @@
-import * as Schema from 'effect/Schema'
-import { withSpan } from '@dshfiles/dshx/tracing'
 import { Utf8 } from '@dshfiles/optmem-core'
+import { Clock, Duration, Effect, Option, Random, Schema } from 'effect'
+
+import { FinderInvalidRequest, FinderSearchUnavailable, FinderSessionNotFound, FinderStaleCursor } from './errors.ts'
 
 /** Where one finder hit was observed. A session can be found by several sources at once. */
 export type ThreadFinderSource = 'session-title' | 'session-metadata' | 'session-content' | 'memory-digest' | 'memory-message' | 'memory-note'
@@ -42,15 +43,6 @@ export type ThreadFinderMemoryHit =
       readonly score: number
     }
   | {
-      readonly kind: 'note'
-      readonly noteId: number
-      readonly project: string
-      readonly updatedAt: number
-      readonly text: string
-      readonly sourceThread: string | null
-      readonly score: number
-    }
-  | {
       readonly kind: 'message'
       readonly sessionId: string
       readonly seq: number
@@ -58,6 +50,15 @@ export type ThreadFinderMemoryHit =
       readonly project: string
       readonly updatedAt: number
       readonly text: string
+      readonly score: number
+    }
+  | {
+      readonly kind: 'note'
+      readonly noteId: number
+      readonly project: string
+      readonly updatedAt: number
+      readonly text: string
+      readonly sourceThread: string | null
       readonly score: number
     }
 
@@ -121,7 +122,7 @@ export type ThreadFinderRelations = {
 
 export type ThreadFinderQuery = {
   readonly query: string
-  /** Projects the caller may search; empty means every project the caller is allowed to see. */
+  /** Projects the caller may search; empty means every project the caller is allowed. */
   readonly projects: readonly string[]
   readonly ownProject: string
   readonly limit: number
@@ -132,74 +133,41 @@ export type ThreadFinderQuery = {
   readonly includeNotes?: boolean | undefined
 }
 
-export type ThreadFinderRelatedQuery = {
-  readonly sessionId: string
-  readonly projects: readonly string[]
-  readonly limit: number
-}
+export type ThreadFinderRelatedQuery = { readonly sessionId: string; readonly projects: readonly string[]; readonly limit: number }
 
-export type ThreadFinderErrorCode = 'invalid-request' | 'stale-cursor' | 'not-found' | 'search-unavailable'
+/** A content-search failure carries the backend's own code, which decides whether a retry can help. */
+export type ContentFailure = { readonly code: string; readonly message: string }
 
-/** A typed failure: the caller learns whether to retry, restart the search, or widen its scope. */
-export class ThreadFinderError extends Error {
-  readonly code: ThreadFinderErrorCode
-
-  constructor(code: ThreadFinderErrorCode, message: string) {
-    super(message)
-    this.name = 'ThreadFinderError'
-    this.code = code
-  }
-}
-
-/** The scalar fields the finder logs: identifiers, counts and joined labels, never nested values. */
-export type ThreadFinderLogFields = Readonly<Record<string, string | number>>
-
-export type ThreadFinderLogger = { readonly info: (message: string, fields: ThreadFinderLogFields) => void }
-
-export type ThreadFinderRetry = {
-  readonly attempts: number
-  readonly delaysMs: readonly number[]
-  readonly sleep: (ms: number) => Promise<void>
-}
-
-export type ThreadFinderDeps = {
-  readonly listSessions: (signal?: AbortSignal) => Promise<readonly ThreadFinderRecord[]>
+export type ThreadFinderDeps<R> = {
+  readonly records: readonly ThreadFinderRecord[]
   /**
    * Called when a content attempt missed its deadline, so the Host can reconcile the session-content index in
    * the background without making this caller wait. One background pass makes later pages complete.
    */
-  readonly warmContent?: ((query: string) => void) | undefined
-  /** Raw full-text search over session content. Throws `SessionQueryError` with its own `code`. */
-  readonly searchContent: (
-    request: { readonly query: string; readonly limit: number },
-    signal?: AbortSignal,
-  ) => Promise<{ readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]; readonly hasMore: boolean }>
-  readonly searchMemory: (
-    request: { readonly query: string; readonly limit: number; readonly projects: readonly string[] },
-    signal?: AbortSignal,
-  ) => Promise<readonly ThreadFinderMemoryHit[]>
-  readonly readDigest: (sessionId: string) => Promise<string | null>
+  readonly warmContent?: ((query: string) => Effect.Effect<void, never, R>) | undefined
+  /** Raw full-text search over session content. */
+  readonly searchContent: (request: {
+    readonly query: string
+    readonly limit: number
+  }) => Effect.Effect<{ readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]; readonly hasMore: boolean }, ContentFailure, R>
+  readonly searchMemory: (request: {
+    readonly query: string
+    readonly limit: number
+    readonly projects: readonly string[]
+  }) => Effect.Effect<readonly ThreadFinderMemoryHit[], never, R>
+  readonly readDigest: (sessionId: string) => Effect.Effect<string | null, never, R>
   /**
    * How long one session-content attempt may run before the finder degrades to title, workspace and memory
    * hits. The installed SQLite backend reconciles the whole corpus before answering, which takes minutes on a
    * large or cold history; a palette must never wait for that. `0` waits forever.
    */
   readonly contentDeadlineMs?: number | undefined
-  readonly now?: (() => number) | undefined
-  readonly correlationId?: (() => string) | undefined
-  readonly logger?: ThreadFinderLogger | undefined
-  readonly retry?: Partial<ThreadFinderRetry> | undefined
-  readonly signal?: AbortSignal | undefined
+  readonly retry?: { readonly attempts: number; readonly delaysMs: readonly number[] } | undefined
 }
 
 /** A content search that has not answered by now is reconciling the corpus; the caller needs an answer. */
 const defaultContentDeadlineMs = 1_500
-
-const defaultRetry: ThreadFinderRetry = {
-  attempts: 4,
-  delaysMs: [0, 75, 200, 500],
-  sleep: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
-}
+const defaultRetry = { attempts: 4, delaysMs: [0, 75, 200, 500] }
 
 const cursorVersion = 1
 const snippetBytes = 240
@@ -235,32 +203,18 @@ const overlap = (left: readonly string[], right: readonly string[]): readonly st
 const encodeCursor = (value: { readonly offset: number; readonly stamp: string }): string =>
   Buffer.from(JSON.stringify({ v: cursorVersion, offset: value.offset, stamp: value.stamp }), 'utf8').toString('base64url')
 
-const cursorPayloadSchema = Schema.Struct({
-  v: Schema.Literal(cursorVersion),
-  offset: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-  stamp: Schema.String,
-})
-
-type CursorPayload = { readonly offset: number; readonly stamp: string }
-
-const decodeCursor = (cursor: string): CursorPayload => {
-  try {
-    const parsed = Schema.decodeUnknownSync(cursorPayloadSchema)(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')))
-    return { offset: parsed.offset, stamp: parsed.stamp }
-  } catch {
-    throw new ThreadFinderError('invalid-request', 'The cursor is not one this finder issued; start the search again.')
-  }
-}
-
-const failureCodeSchema = Schema.Struct({ code: Schema.String })
-
-const failureCode = (error: unknown): string => {
-  const parsed = Schema.decodeUnknownResult(failureCodeSchema)(error)
-  return parsed._tag === 'Success' ? parsed.success.code : 'unknown'
-}
+const decodeCursorPayload = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      v: Schema.Literal(cursorVersion),
+      offset: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+      stamp: Schema.String,
+    }),
+  ),
+)
 
 /** The failure contract of the supported full-text backend; anything else is not retried. */
-const isTransientContentFailure = (error: unknown): boolean => failureCode(error) === 'SESSION_QUERY_PERSISTENCE_FAILED'
+const isTransientContentFailure = (failure: ContentFailure): boolean => failure.code === 'SESSION_QUERY_PERSISTENCE_FAILED'
 
 type Candidate = {
   record: ThreadFinderRecord
@@ -319,107 +273,85 @@ const ordered = (candidates: Iterable<Candidate>): readonly Candidate[] =>
       (left.record.sessionId < right.record.sessionId ? -1 : left.record.sessionId > right.record.sessionId ? 1 : 0),
   )
 
+const inScope = (record: ThreadFinderRecord, query: Pick<ThreadFinderQuery, 'projects' | 'availability' | 'createdFrom' | 'createdTo'>): boolean => {
+  if (query.projects.length > 0 && !query.projects.includes(record.project)) return false
+  if (query.availability !== undefined && query.availability.length > 0) {
+    const available = query.availability.some(value => (value === 'live' ? record.live : record.persisted))
+    if (!available) return false
+  }
+  if (query.createdFrom !== undefined && record.createdAt < query.createdFrom) return false
+  if (query.createdTo !== undefined && record.createdAt > query.createdTo) return false
+  return true
+}
+
+const correlationId = Effect.map(Random.nextIntBetween(0, 2 ** 40), value => value.toString(36).padStart(8, '0').slice(-8))
+
+const snippetOf = (record: ThreadFinderRecord): string => (record.title.length > 0 ? record.title : (record.cwd ?? record.sessionId))
+
+const contentSearch = <R>(deps: ThreadFinderDeps<R>, query: string, limit: number) =>
+  Effect.gen(function* () {
+    const startedAt = yield* Clock.currentTimeMillis
+    const elapsed = Effect.map(Clock.currentTimeMillis, at => at - startedAt)
+    const deadlineMs = deps.contentDeadlineMs ?? defaultContentDeadlineMs
+    const retry = deps.retry ?? defaultRetry
+    for (let attempt = 0; attempt < retry.attempts; attempt += 1) {
+      const wait = retry.delaysMs[Math.min(attempt, retry.delaysMs.length - 1)] ?? 0
+      if (attempt > 0 && wait > 0) yield* Effect.sleep(Duration.millis(wait))
+      const search = Effect.result(deps.searchContent({ query, limit }))
+      const answered = deadlineMs > 0 ? yield* Effect.timeoutOption(search, Duration.millis(deadlineMs)) : Option.some(yield* search)
+      // A deadline miss means the index is reconciling the corpus: a retry would only buy another wait.
+      if (Option.isNone(answered)) {
+        if (deps.warmContent !== undefined) yield* deps.warmContent(query)
+        const failure: ThreadFinderDegradation = {
+          source: 'session-content',
+          code: 'SESSION_QUERY_TIMEOUT',
+          message: `Session content search was still reconciling the corpus after ${deadlineMs} ms; these hits come from titles, workspace paths and memory.`,
+          attempts: attempt + 1,
+          elapsedMs: yield* elapsed,
+        }
+        return { hits: [], attempts: attempt + 1, failure }
+      }
+      const outcome = answered.value
+      if (outcome._tag === 'Success') return { hits: outcome.success.hits, attempts: attempt + 1, failure: null }
+      if (!isTransientContentFailure(outcome.failure) || attempt === retry.attempts - 1) {
+        const failure: ThreadFinderDegradation = {
+          source: 'session-content',
+          code: outcome.failure.code,
+          message: outcome.failure.message,
+          attempts: attempt + 1,
+          elapsedMs: yield* elapsed,
+        }
+        return { hits: [], attempts: attempt + 1, failure }
+      }
+    }
+    return yield* new FinderSearchUnavailable({ code: 'not-attempted', attempts: 0 })
+  })
+
 /**
  * Cross-session discovery over supported session reads and memory retrieval.
  *
  * Every hit names its source and evidence, the page is bounded and deduplicated by canonical session id, and a
  * source that failed is reported as a labeled degradation instead of an empty page.
  */
-export const createThreadFinder = (deps: ThreadFinderDeps) => {
-  const now = deps.now ?? Date.now
-  const correlationId = deps.correlationId ?? (() => Math.random().toString(36).slice(2, 10))
-  const retry: ThreadFinderRetry = { ...defaultRetry, ...deps.retry }
-  const log = (fields: ThreadFinderLogFields): void => deps.logger?.info('thread finder', fields)
-
-  const inScope = (record: ThreadFinderRecord, query: Pick<ThreadFinderQuery, 'projects' | 'availability' | 'createdFrom' | 'createdTo'>): boolean => {
-    if (query.projects.length > 0 && !query.projects.includes(record.project)) return false
-    if (query.availability !== undefined && query.availability.length > 0) {
-      const available = query.availability.some(value => (value === 'live' ? record.live : record.persisted))
-      if (!available) return false
-    }
-    if (query.createdFrom !== undefined && record.createdAt < query.createdFrom) return false
-    if (query.createdTo !== undefined && record.createdAt > query.createdTo) return false
-    return true
-  }
-
-  const contentSearch = async (
-    query: string,
-    limit: number,
-  ): Promise<{
-    readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]
-    readonly attempts: number
-    readonly elapsedMs: number
-    readonly failure: ThreadFinderDegradation | null
-  }> => {
-    const startedAt = now()
-    const deadlineMs = deps.contentDeadlineMs ?? defaultContentDeadlineMs
-    for (let attempt = 0; attempt < retry.attempts; attempt += 1) {
-      const wait = retry.delaysMs[Math.min(attempt, retry.delaysMs.length - 1)] ?? 0
-      if (attempt > 0 && wait > 0) await retry.sleep(wait)
-      const deadline = new AbortController()
-      const timer = deadlineMs > 0 ? setTimeout(() => deadline.abort(), deadlineMs) : undefined
-      const signal = deps.signal === undefined ? deadline.signal : AbortSignal.any([deps.signal, deadline.signal])
-      try {
-        const page = await deps.searchContent({ query, limit }, signal)
-        return { hits: page.hits, attempts: attempt + 1, elapsedMs: now() - startedAt, failure: null }
-      } catch (error) {
-        if (deps.signal?.aborted) throw error
-        // A deadline miss means the index is reconciling the corpus: a retry would only buy another wait.
-        if (deadline.signal.aborted) {
-          deps.warmContent?.(query)
-          return {
-            hits: [],
-            attempts: attempt + 1,
-            elapsedMs: now() - startedAt,
-            failure: {
-              source: 'session-content',
-              code: 'SESSION_QUERY_TIMEOUT',
-              message: `Session content search was still reconciling the corpus after ${deadlineMs} ms; these hits come from titles, workspace paths and memory.`,
-              attempts: attempt + 1,
-              elapsedMs: now() - startedAt,
-            },
-          }
-        }
-        if (!isTransientContentFailure(error) || attempt === retry.attempts - 1) {
-          return {
-            hits: [],
-            attempts: attempt + 1,
-            elapsedMs: now() - startedAt,
-            failure: {
-              source: 'session-content',
-              code: failureCode(error),
-              message: error instanceof Error ? error.message : String(error),
-              attempts: attempt + 1,
-              elapsedMs: now() - startedAt,
-            },
-          }
-        }
-      } finally {
-        if (timer !== undefined) clearTimeout(timer)
-      }
-    }
-    throw new ThreadFinderError('search-unavailable', 'Session content search could not be attempted.')
-  }
-
-  const find = async (query: ThreadFinderQuery): Promise<ThreadFinderPage> => {
+const find = <R>(input: { readonly deps: ThreadFinderDeps<R>; readonly query: ThreadFinderQuery }) =>
+  Effect.gen(function* () {
+    const deps = input.deps
+    const query = input.query
     const text = query.query.trim()
-    if (text.length === 0) throw new ThreadFinderError('invalid-request', 'A finder query needs at least one character.')
+    if (text.length === 0) return yield* new FinderInvalidRequest({ reason: 'empty-query' })
     const limit = Math.max(1, Math.min(query.limit, 20))
-    const startedAt = now()
-    const id = correlationId()
-    const records = (await deps.listSessions(deps.signal)).filter(record => inScope(record, query))
+    const startedAt = yield* Clock.currentTimeMillis
+    const id = yield* correlationId
+    const records = deps.records.filter(record => inScope(record, query))
     const byId = new Map(records.map(record => [record.sessionId, record]))
     const stamp = `${records.length}:${records.reduce((newest, record) => Math.max(newest, record.updatedAt), 0)}`
 
     let offset = 0
     if (query.cursor !== undefined && query.cursor.length > 0) {
-      const decoded = decodeCursor(query.cursor)
-      if (decoded.stamp !== stamp)
-        throw new ThreadFinderError(
-          'stale-cursor',
-          'The session corpus changed since that cursor was issued; start the search again to page over current results.',
-        )
-      offset = decoded.offset
+      const decoded = decodeCursorPayload(Buffer.from(query.cursor, 'base64url').toString('utf8'))
+      if (Option.isNone(decoded)) return yield* new FinderInvalidRequest({ reason: 'foreign-cursor' })
+      if (decoded.value.stamp !== stamp) return yield* new FinderStaleCursor({})
+      offset = decoded.value.offset
     }
 
     const needle = normalize(text)
@@ -428,7 +360,7 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     const candidates = new Map<string, Candidate>()
     const notes: ThreadFinderNote[] = []
     const sources = new Set<ThreadFinderSource>()
-    const recency = (updatedAt: number): number => Math.max(0, recencyCeiling - Math.floor((now() - updatedAt) / (24 * hourMs)))
+    const recency = (updatedAt: number): number => Math.max(0, recencyCeiling - Math.floor((startedAt - updatedAt) / (24 * hourMs)))
 
     for (const record of records) {
       const title = normalize(record.title)
@@ -441,10 +373,12 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
       if (title.length > 0 && title === needle) {
         score = 1_000
         evidence.push('exact-title')
-      } else if (needle.length > 2 && title.includes(needle)) {
+      }
+      if (evidence.length === 0 && needle.length > 2 && title.includes(needle)) {
         score = 700
         evidence.push('title-match')
-      } else if (shared.length > 0) {
+      }
+      if (evidence.length === 0 && shared.length > 0) {
         score = Math.round(400 * (shared.length / Math.max(1, Math.min(words.size, titleTerms.size))))
         evidence.push('title-match')
       }
@@ -457,11 +391,10 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
         evidence.push('identifier')
       }
       if (evidence.length === 0) continue
-      const snippet = record.title.length > 0 ? record.title : (record.cwd ?? record.sessionId)
       for (const label of evidence)
         mergeCandidate(candidates, record, {
           score: score + recency(record.updatedAt),
-          snippet,
+          snippet: snippetOf(record),
           source: label === 'identifier' ? 'session-metadata' : 'session-title',
           evidence: label,
         })
@@ -469,24 +402,27 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     }
 
     const contentLimit = Math.min(40, limit * 4)
-    // Content search and memory retrieval are independent: start both, then merge in this fixed order so the ranking
-    // stays deterministic. `Promise.all` attaches its handlers to both, so a rejected source is not an unhandled one.
-    const [content, memoryHits] = await Promise.all([
-      withSpan('thread finder content search', { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }, async span => {
-        const result = await contentSearch(text, contentLimit)
-        span.setAttributes({
-          'dshx.memory.finder.content_hits': result.hits.length,
-          'dshx.memory.finder.content_attempts': result.attempts,
-          'dshx.memory.finder.content_degraded': result.failure !== null,
-        })
-        return result
-      }),
-      withSpan('thread finder memory search', { kind: 'internal', attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }, async span => {
-        const hits = await deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }, deps.signal)
-        span.setAttribute('dshx.memory.finder.memory_hits', hits.length)
-        return hits
-      }),
-    ])
+    // Content search and memory retrieval are independent: run both, then merge in this fixed order so the ranking
+    // stays deterministic.
+    const [content, memoryHits] = yield* Effect.all(
+      [
+        contentSearch(deps, text, contentLimit).pipe(
+          Effect.tap(result =>
+            Effect.annotateCurrentSpan({
+              'dshx.memory.finder.content_hits': result.hits.length,
+              'dshx.memory.finder.content_attempts': result.attempts,
+              'dshx.memory.finder.content_degraded': result.failure !== null,
+            }),
+          ),
+          Effect.withSpan('thread finder content search', { attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }),
+        ),
+        deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }).pipe(
+          Effect.tap(hits => Effect.annotateCurrentSpan('dshx.memory.finder.memory_hits', hits.length)),
+          Effect.withSpan('thread finder memory search', { attributes: { 'dshx.plugin.package': '@dshfiles/memory' } }),
+        ),
+      ],
+      { concurrency: 'unbounded' },
+    )
     if (content.failure === null) sources.add('session-content')
     const contentRank = new Map(content.hits.map((hit, index) => [hit.sessionId, index]))
     for (const hit of content.hits) {
@@ -501,9 +437,10 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
       })
     }
 
-    const memoryRank = new Map(memoryHits.map((hit, index) => [hit.kind === 'note' ? `n:${hit.noteId}` : hit.sessionId, index]))
+    const memoryKey = (hit: ThreadFinderMemoryHit): string => (hit.kind === 'note' ? `n:${hit.noteId}` : hit.sessionId)
+    const memoryRank = new Map(memoryHits.map((hit, index) => [memoryKey(hit), index]))
     for (const hit of memoryHits) {
-      const bonus = Math.round(80 * (1 - (memoryRank.get(hit.kind === 'note' ? `n:${hit.noteId}` : hit.sessionId) ?? 0) / Math.max(1, memoryHits.length)))
+      const bonus = Math.round(80 * (1 - (memoryRank.get(memoryKey(hit)) ?? 0) / Math.max(1, memoryHits.length)))
       if (hit.kind === 'note') {
         if (query.includeNotes !== true) continue
         sources.add('memory-note')
@@ -512,22 +449,13 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
       }
       const record = byId.get(hit.sessionId)
       if (record === undefined) continue
-      if (hit.kind === 'digest') {
-        sources.add('memory-digest')
-        mergeCandidate(candidates, record, {
-          score: 430 + bonus + recency(record.updatedAt),
-          snippet: clip(hit.text, needles),
-          source: 'memory-digest',
-          evidence: 'digest-match',
-        })
-        continue
-      }
-      sources.add('memory-message')
+      const digest = hit.kind === 'digest'
+      sources.add(digest ? 'memory-digest' : 'memory-message')
       mergeCandidate(candidates, record, {
-        score: 410 + bonus + recency(record.updatedAt),
+        score: (digest ? 430 : 410) + bonus + recency(record.updatedAt),
         snippet: clip(hit.text, needles),
-        source: 'memory-message',
-        evidence: 'text-match',
+        source: digest ? 'memory-digest' : 'memory-message',
+        evidence: digest ? 'digest-match' : 'text-match',
       })
     }
 
@@ -537,58 +465,53 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     const degraded = content.failure === null ? [] : [content.failure]
     const diagnostics: ThreadFinderDiagnostics = {
       correlationId: id,
-      elapsedMs: now() - startedAt,
+      elapsedMs: (yield* Clock.currentTimeMillis) - startedAt,
       sources: [...sources],
       attempts: content.attempts,
       scannedSessions: records.length,
       incomplete: degraded.length > 0,
     }
-    log({
-      correlationId: id,
-      queryChars: text.length,
-      hits: hits.length,
-      notes: notes.length,
-      scannedSessions: records.length,
-      attempts: content.attempts,
-      degraded: degraded.map(entry => entry.code).join(',') || 'none',
-      elapsedMs: diagnostics.elapsedMs,
-    })
+    yield* Effect.logInfo(
+      `memory: thread finder ${JSON.stringify({
+        correlationId: id,
+        queryChars: text.length,
+        hits: hits.length,
+        notes: notes.length,
+        scannedSessions: records.length,
+        attempts: content.attempts,
+        degraded: degraded.map(entry => entry.code).join(',') || 'none',
+        elapsedMs: diagnostics.elapsedMs,
+      })}`,
+    )
     if (hits.length === 0 && notes.length === 0 && degraded.length > 0)
-      throw new ThreadFinderError(
-        'search-unavailable',
-        `Session content search is unavailable (${degraded[0]?.code ?? 'unknown'} after ${diagnostics.attempts} attempt(s)) and no session matched by title, workspace, or memory. Retry shortly or narrow the query.`,
-      )
-    return {
+      return yield* new FinderSearchUnavailable({ code: degraded[0]?.code ?? 'unknown', attempts: diagnostics.attempts })
+    const page: ThreadFinderPage = {
       hits,
       notes,
       nextCursor: nextOffset < ranked.length ? encodeCursor({ offset: nextOffset, stamp }) : null,
       degraded,
       diagnostics,
     }
-  }
+    return page
+  })
 
-  const related = async (query: ThreadFinderRelatedQuery): Promise<ThreadFinderRelations> => {
+const related = <R>(input: { readonly deps: ThreadFinderDeps<R>; readonly query: ThreadFinderRelatedQuery }) =>
+  Effect.gen(function* () {
+    const deps = input.deps
+    const query = input.query
     const limit = Math.max(1, Math.min(query.limit, 20))
-    const startedAt = now()
-    const id = correlationId()
-    const records = await deps.listSessions(deps.signal)
-    const scope = records.filter(record => query.projects.length === 0 || query.projects.includes(record.project))
+    const startedAt = yield* Clock.currentTimeMillis
+    const id = yield* correlationId
+    const scope = deps.records.filter(record => query.projects.length === 0 || query.projects.includes(record.project))
     const seed = scope.find(record => record.sessionId === query.sessionId)
-    if (seed === undefined) throw new ThreadFinderError('not-found', `No Session ${JSON.stringify(query.sessionId)} is visible in this scope.`)
+    if (seed === undefined) return yield* new FinderSessionNotFound({ sessionId: query.sessionId })
     const parent = seed.parentSessionId === null ? undefined : scope.find(record => record.sessionId === seed.parentSessionId)
     const children = scope.filter(record => record.parentSessionId === seed.sessionId)
     const explicit = [...(parent === undefined ? [] : [parent]), ...children].map(record =>
-      toHit({
-        record,
-        score: 1_000,
-        snippet: record.title.length > 0 ? record.title : (record.cwd ?? record.sessionId),
-        sources: ['session-metadata'],
-        evidence: ['explicit-lineage'],
-      }),
+      toHit({ record, score: 1_000, snippet: snippetOf(record), sources: ['session-metadata'], evidence: ['explicit-lineage'] }),
     )
     const explicitIds = new Set(explicit.map(hit => hit.sessionId))
-    const seedText = `${seed.title} ${(await deps.readDigest(seed.sessionId).catch(() => null)) ?? ''}`
-    const seedTerms = terms(seedText)
+    const seedTerms = terms(`${seed.title} ${(yield* deps.readDigest(seed.sessionId)) ?? ''}`)
     const seedCwd = normalize(seed.cwd ?? '')
     const inferred: Candidate[] = []
     for (const record of scope) {
@@ -602,36 +525,30 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
       inferred.push({
         record,
         score: (sameWorkspace ? 300 : 100) + Math.round(200 * (shared.length / Math.max(1, seedTerms.length))),
-        snippet: record.title.length > 0 ? record.title : (record.cwd ?? record.sessionId),
+        snippet: snippetOf(record),
         sources: ['session-metadata'],
         evidence,
       })
     }
     const diagnostics: ThreadFinderDiagnostics = {
       correlationId: id,
-      elapsedMs: now() - startedAt,
+      elapsedMs: (yield* Clock.currentTimeMillis) - startedAt,
       sources: ['session-metadata'],
       attempts: 0,
       scannedSessions: scope.length,
       incomplete: false,
     }
-    log({ correlationId: id, operation: 'related', explicit: explicit.length, inferred: inferred.length, elapsedMs: diagnostics.elapsedMs })
-    return {
-      seed: toHit({
-        record: seed,
-        score: 0,
-        snippet: seed.title.length > 0 ? seed.title : (seed.cwd ?? seed.sessionId),
-        sources: ['session-metadata'],
-        evidence: [],
-      }),
+    yield* Effect.logInfo(
+      `memory: thread finder ${JSON.stringify({ correlationId: id, operation: 'related', explicit: explicit.length, inferred: inferred.length, elapsedMs: diagnostics.elapsedMs })}`,
+    )
+    const relations: ThreadFinderRelations = {
+      seed: toHit({ record: seed, score: 0, snippet: snippetOf(seed), sources: ['session-metadata'], evidence: [] }),
       explicit,
       inferred: ordered(inferred).slice(0, limit).map(toHit),
       degraded: [],
       diagnostics,
     }
-  }
+    return relations
+  })
 
-  return { find, related }
-}
-
-export type ThreadFinder = ReturnType<typeof createThreadFinder>
+export const ThreadFinder = { find, related }

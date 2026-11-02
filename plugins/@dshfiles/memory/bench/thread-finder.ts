@@ -8,9 +8,12 @@ import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 
 import { sessionContentHits } from '../src/session-content.ts'
-import { openMemoryStore, type MemoryStore } from '../src/store.ts'
+import { Effect, ManagedRuntime } from 'effect'
+
+import { MemoryRepo } from '../src/memory-repo.ts'
+import { repoLayer } from '../src/testing/memory-store.ts'
 import { createThread } from '../src/testing/session-fixture.ts'
-import { createThreadFinder, type ThreadFinderRecord } from '../src/thread-finder.ts'
+import { ThreadFinder, type ThreadFinderDeps, type ThreadFinderMemoryHit, type ThreadFinderRecord } from '../src/thread-finder.ts'
 
 /**
  * Retrieval benchmark for the unified finder: session only (titles + the installed FTS backend), memory only
@@ -181,27 +184,29 @@ const stablePersistence = (entries: readonly StoredSession[]) => ({
   },
 })
 
-const indexMemory = (store: MemoryStore, entries: readonly Modelled[]): void => {
-  entries.forEach((entry, index) => {
-    store.putThread({
-      id: entry.sessionId,
-      project: entry.project,
-      parent: null,
-      title: entry.title,
-      decision: `Resolved ${entry.identifier}.`,
-      digest: `${entry.title} (${entry.identifier}): ${entry.paraphrase}.`,
-      source: 'trail',
-      lastSeq: 4,
-      updatedAt: now - index * 3_600_000,
-    })
-    store.indexMessages({
-      thread: entry.sessionId,
-      project: entry.project,
-      messages: [{ seq: 1, role: 'user', text: `${entry.paraphrase} ${entry.identifier}`, at: now - index * 3_600_000 }],
-      throughSeq: 1,
-    })
+const indexMemory = (entries: readonly Modelled[]) =>
+  Effect.gen(function* () {
+    const store = yield* MemoryRepo
+    for (const [index, entry] of entries.entries()) {
+      yield* store.putThread({
+        id: entry.sessionId,
+        project: entry.project,
+        parent: null,
+        title: entry.title,
+        decision: `Resolved ${entry.identifier}.`,
+        digest: `${entry.title} (${entry.identifier}): ${entry.paraphrase}.`,
+        source: 'trail',
+        lastSeq: 4,
+        updatedAt: now - index * 3_600_000,
+      })
+      yield* store.indexMessages({
+        thread: entry.sessionId,
+        project: entry.project,
+        messages: [{ seq: 1, role: 'user', text: `${entry.paraphrase} ${entry.identifier}`, at: now - index * 3_600_000 }],
+        throughSeq: 1,
+      })
+    }
   })
-}
 
 const recordsFor = (entries: readonly Modelled[], withTitles: boolean): readonly ThreadFinderRecord[] =>
   entries.map((entry, index) => ({
@@ -227,42 +232,57 @@ const round = (value: number): number => Math.round(value * 100) / 100
 async function main(): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), 'memory-finder-bench-'))
   const entries = corpus()
-  const store = openMemoryStore({ path: join(root, 'memory.db'), now: () => now })
-  indexMemory(store, entries)
+  const runtime = ManagedRuntime.make(repoLayer(join(root, 'memory.db')))
+  const run = <A, E>(effect: Effect.Effect<A, E, MemoryRepo>) => runtime.runPromise(effect)
+  await run(indexMemory(entries))
+  const digestOf = (sessionId: string) =>
+    MemoryRepo.use(store => store.thread(sessionId)).pipe(
+      Effect.map(thread => thread?.digest ?? null),
+      Effect.orDie,
+    )
   const ctx = new Context()
   ctx.provide('sessions', { list: () => [], get: () => undefined })
   ctx.provide('sessionPersistence', stablePersistence(entries.map(stored)))
   await ctx.plugin(SqliteSessionQueryEngine, { path: join(root, 'index.sqlite'), openAt: 'first-search' })
 
   const memoryHits = (query: string, limit: number) =>
-    store.search({ query, projects: [], ownProject: project, limit }).flatMap(hit =>
-      hit.kind === 'thread'
-        ? [
-            {
-              kind: 'digest' as const,
-              sessionId: hit.id,
-              project: hit.project,
-              updatedAt: hit.updatedAt,
-              title: store.thread(hit.id)?.title ?? '',
-              text: store.thread(hit.id)?.digest ?? '',
-              score: hit.score,
-            },
-          ]
-        : hit.kind === 'message'
-          ? [
-              {
-                kind: 'message' as const,
-                sessionId: hit.thread,
-                seq: hit.seq,
-                role: hit.role,
-                project: hit.project,
-                updatedAt: hit.updatedAt,
-                text: store.thread(hit.thread)?.digest ?? '',
-                score: hit.score,
-              },
-            ]
-          : [],
-    )
+    Effect.gen(function* () {
+      const store = yield* MemoryRepo
+      const hits: ThreadFinderMemoryHit[] = []
+      for (const hit of yield* store.search({ query, projects: [], ownProject: project, limit })) {
+        if (hit.kind === 'note') continue
+        const thread = yield* store.thread(hit.kind === 'thread' ? hit.id : hit.thread)
+        if (hit.kind === 'thread') {
+          hits.push({
+            kind: 'digest',
+            sessionId: hit.id,
+            project: hit.project,
+            updatedAt: hit.updatedAt,
+            title: thread?.title ?? '',
+            text: thread?.digest ?? '',
+            score: hit.score,
+          })
+          continue
+        }
+        hits.push({
+          kind: 'message',
+          sessionId: hit.thread,
+          seq: hit.seq,
+          role: hit.role,
+          project: hit.project,
+          updatedAt: hit.updatedAt,
+          text: thread?.digest ?? '',
+          score: hit.score,
+        })
+      }
+      return hits
+    }).pipe(Effect.orDie)
+
+  const contentOf = (request: { readonly query: string; readonly limit: number }) =>
+    Effect.tryPromise({
+      try: async () => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit })),
+      catch: error => ({ code: 'bench', message: error instanceof Error ? error.message : 'content search failed' }),
+    })
 
   const modes = {
     session: { titles: true, content: true, memory: false },
@@ -275,14 +295,12 @@ async function main(): Promise<void> {
   const report: string[] = []
   const failures: string[] = []
   for (const [mode, shape] of Object.entries(modes)) {
-    const finder = createThreadFinder({
-      listSessions: async () => recordsFor(entries, shape.titles),
-      searchContent: shape.content
-        ? async request => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit }))
-        : async () => ({ hits: [], hasMore: false }),
-      searchMemory: shape.memory ? async request => memoryHits(request.query, request.limit) : async () => [],
-      readDigest: async sessionId => store.thread(sessionId)?.digest ?? null,
-    })
+    const deps: ThreadFinderDeps<MemoryRepo> = {
+      records: recordsFor(entries, shape.titles),
+      searchContent: shape.content ? contentOf : () => Effect.succeed({ hits: [], hasMore: false }),
+      searchMemory: shape.memory ? request => memoryHits(request.query, request.limit) : () => Effect.succeed([]),
+      readDigest: digestOf,
+    }
     for (const kind of ['identifier', 'paraphrase', 'title'] as const) {
       const kindQueries = queries.filter(query => query.kind === kind)
       const timings: number[] = []
@@ -290,7 +308,7 @@ async function main(): Promise<void> {
       let hit5 = 0
       for (const query of kindQueries) {
         const started = performance.now()
-        const page = await finder.find({ query: query.query, projects: [project], ownProject: project, limit: 5 })
+        const page = await run(ThreadFinder.find({ deps, query: { query: query.query, projects: [project], ownProject: project, limit: 5 } }))
         timings.push(performance.now() - started)
         const ranked = page.hits.map(hit => hit.sessionId)
         if (ranked.slice(0, 3).includes(query.expected)) hit3 += 1
@@ -316,19 +334,14 @@ async function main(): Promise<void> {
   let relevant = 0
   let returned = 0
   let found = 0
-  const relatedFinder = createThreadFinder({
-    listSessions: async () =>
-      entries.map((entry, index) => ({
-        ...recordsFor([entry], true)[0]!,
-        updatedAt: now - index * 3_600_000,
-        title: entry.title,
-      })),
-    searchContent: async () => ({ hits: [], hasMore: false }),
-    searchMemory: async () => [],
-    readDigest: async sessionId => store.thread(sessionId)?.digest ?? null,
-  })
+  const relatedDeps: ThreadFinderDeps<MemoryRepo> = {
+    records: entries.map((entry, index) => ({ ...recordsFor([entry], true)[0]!, updatedAt: now - index * 3_600_000, title: entry.title })),
+    searchContent: () => Effect.succeed({ hits: [], hasMore: false }),
+    searchMemory: () => Effect.succeed([]),
+    readDigest: digestOf,
+  }
   for (const pair of pairs) {
-    const relations = await relatedFinder.related({ sessionId: pair.seed.sessionId, projects: [project], limit: 5 })
+    const relations = await run(ThreadFinder.related({ deps: relatedDeps, query: { sessionId: pair.seed.sessionId, projects: [project], limit: 5 } }))
     const ids = relations.inferred.map(hit => hit.sessionId)
     returned += ids.length
     if (ids.includes(pair.sibling.sessionId)) {
@@ -342,7 +355,7 @@ async function main(): Promise<void> {
 
   console.log(report.join('\n'))
   await ctx.sessionQuery.close()
-  store.close()
+  await runtime.dispose()
   rmSync(root, { recursive: true, force: true })
   if (failures.length > 0) {
     console.error(`\nFAILED:\n${failures.map(failure => `- ${failure}`).join('\n')}`)

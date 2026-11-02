@@ -1,4 +1,6 @@
-import type { MemoryStore, NoteCategory } from '../store.ts'
+import { Effect } from 'effect'
+
+import { MemoryRepo, type NoteCategory } from '../memory-repo.ts'
 
 /**
  * Months of synthetic memory: digests and notes across projects, each with exact identifiers and topic vocabulary,
@@ -33,13 +35,13 @@ const random = (seed: number) => {
 
 export type RecallQuestion = { readonly kind: 'exact' | 'paraphrase'; readonly query: string; readonly project: string; readonly expected: string }
 
-export const seedSyntheticCorpus = (input: {
-  readonly store: MemoryStore
+export const seedSyntheticCorpus = Effect.fn('memory seed synthetic corpus')(function* (input: {
   readonly items: number
   readonly projects: number
   readonly now: number
   readonly seed?: number
-}) => {
+}) {
+  const store = yield* MemoryRepo
   const next = random(input.seed ?? 7)
   const pick = <Item>(items: readonly Item[]): Item => {
     const item = items[Math.floor(next() * items.length)]
@@ -55,7 +57,7 @@ export const seedSyntheticCorpus = (input: {
     const identifier = `${['INC', 'PRJ', 'ACC', 'TKT'][index % 4]}-${10_000 + index}`
     const updatedAt = input.now - Math.floor(next() * 365) * 86_400_000
     if (index % 3 === 2) {
-      const { note } = input.store.addNote({
+      const { note } = yield* store.addNote({
         project,
         text: `${person} decided ${identifier}: ${topic.words.split(' ').slice(0, 3).join(' ')} handled with option ${index % 7}.`,
         category: pick(categories),
@@ -69,7 +71,7 @@ export const seedSyntheticCorpus = (input: {
       continue
     }
     const id = `session-${String(index).padStart(8, '0')}-0000-4000-8000-000000000000`
-    input.store.putThread({
+    yield* store.putThread({
       id,
       project,
       parent: null,
@@ -89,4 +91,4 @@ export const seedSyntheticCorpus = (input: {
     if (index % 50 === 1) questions.push({ kind: 'paraphrase', query: topic.paraphrase, project, expected: `topic:${topic.words}` })
   }
   return { projects, questions }
-}
+})

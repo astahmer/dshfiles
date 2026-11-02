@@ -2,7 +2,7 @@ import { ToolCallId, createAssistantMessage, createToolResultMessage, createUser
 import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 
 import type { ThreadHeader } from '../digest.ts'
-import type { SessionLog } from '../runtime.ts'
+import type { SessionLog } from '../session-reads-promise.ts'
 
 /** A JSON value as the session log stores it. */
 type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }

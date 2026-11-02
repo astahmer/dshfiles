@@ -38,10 +38,14 @@
     "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
+    "@dshfiles/jev": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/sqlite-store": "workspace:*",
     "@dshfiles/usage": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -65,6 +69,7 @@
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "jsdom": "26.1.0",

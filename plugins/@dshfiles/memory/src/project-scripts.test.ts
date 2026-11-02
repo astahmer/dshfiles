@@ -1,51 +1,50 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
-import { ProjectScripts } from './project-scripts.ts'
 
-const directories: string[] = []
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Path } from 'effect'
 
-afterEach(() => {
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
-})
+import { ensureProjectScripts } from './project-scripts.ts'
+import { platformLayer } from './testing/memory-store.ts'
 
-const scratch = (): string => {
-  const directory = mkdtempSync(join(tmpdir(), 'project-scripts-'))
-  directories.push(directory)
-  return directory
-}
+describe('project scripts', () => {
+  it.effect('writes a project its scripts once, keeps a hand edit, and cleans a workspace but never the checkout itself', () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const base = yield* fs.makeTempDirectoryScoped({ prefix: 'project-scripts-' })
+      const project = path.join(base, 'project')
+      const workspace = path.join(base, 'project-threads', 'thread-abc123')
+      yield* fs.makeDirectory(path.join(project, 'node_modules', 'left-alone'), { recursive: true })
+      yield* fs.makeDirectory(path.join(workspace, 'node_modules', 'pkg'), { recursive: true })
+      yield* fs.makeDirectory(path.join(workspace, 'packages', 'app', 'node_modules', 'pkg'), { recursive: true })
+      yield* fs.writeFileString(path.join(workspace, 'packages', 'app', 'index.ts'), 'kept\n')
+      yield* fs.writeFileString(path.join(project, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+      const root = path.join(base, 'scripts')
 
-it('writes a project its scripts once, keeps a hand edit, and cleans a workspace but never the checkout itself', async () => {
-  const base = scratch()
-  const project = join(base, 'project')
-  const workspace = join(base, 'project-threads', 'thread-abc123')
-  mkdirSync(join(project, 'node_modules', 'left-alone'), { recursive: true })
-  mkdirSync(join(workspace, 'node_modules', 'pkg'), { recursive: true })
-  mkdirSync(join(workspace, 'packages', 'app', 'node_modules', 'pkg'), { recursive: true })
-  writeFileSync(join(workspace, 'packages', 'app', 'index.ts'), 'kept\n')
-  writeFileSync(join(project, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
-  const root = join(base, 'scripts')
+      const scripts = yield* ensureProjectScripts({ root, project })
+      if (scripts === null) return yield* Effect.die(new Error('expected scripts for a pnpm project'))
+      expect(yield* fs.readFileString(scripts.setup)).toContain('pnpm install --frozen-lockfile --prefer-offline')
+      yield* fs.writeFileString(scripts.setup, '#!/bin/sh\necho edited\n')
+      yield* ensureProjectScripts({ root, project })
+      expect(yield* fs.readFileString(scripts.setup)).toBe('#!/bin/sh\necho edited\n')
 
-  const scripts = await ProjectScripts.ensure({ root, project })
-  if (scripts === null) throw new Error('expected scripts for a pnpm project')
-  expect(readFileSync(scripts.setup, 'utf8')).toContain('pnpm install --frozen-lockfile --prefer-offline')
-  writeFileSync(scripts.setup, '#!/bin/sh\necho edited\n')
-  await ProjectScripts.ensure({ root, project })
-  expect(readFileSync(scripts.setup, 'utf8')).toBe('#!/bin/sh\necho edited\n')
+      expect(spawnSync(scripts.cleanup, [workspace]).status).toBe(0)
+      expect(yield* fs.exists(path.join(workspace, 'node_modules'))).toBe(false)
+      expect(yield* fs.exists(path.join(workspace, 'packages', 'app', 'node_modules'))).toBe(false)
+      expect(yield* fs.exists(path.join(workspace, 'packages', 'app', 'index.ts'))).toBe(true)
 
-  expect(spawnSync(scripts.cleanup, [workspace]).status).toBe(0)
-  expect(existsSync(join(workspace, 'node_modules'))).toBe(false)
-  expect(existsSync(join(workspace, 'packages', 'app', 'node_modules'))).toBe(false)
-  expect(existsSync(join(workspace, 'packages', 'app', 'index.ts'))).toBe(true)
+      expect(spawnSync(scripts.cleanup, [project]).status).toBe(1)
+      expect(yield* fs.exists(path.join(project, 'node_modules', 'left-alone'))).toBe(true)
+    }).pipe(Effect.scoped, Effect.provide(platformLayer)),
+  )
 
-  expect(spawnSync(scripts.cleanup, [project]).status).toBe(1)
-  expect(existsSync(join(project, 'node_modules', 'left-alone'))).toBe(true)
-})
-
-it('writes nothing for a project without a lockfile', async () => {
-  const base = scratch()
-  await expect(ProjectScripts.ensure({ root: join(base, 'scripts'), project: base })).resolves.toBeNull()
-  expect(existsSync(join(base, 'scripts'))).toBe(false)
+  it.effect('writes nothing for a project without a lockfile', () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const base = yield* fs.makeTempDirectoryScoped({ prefix: 'project-scripts-' })
+      expect(yield* ensureProjectScripts({ root: path.join(base, 'scripts'), project: base })).toBeNull()
+      expect(yield* fs.exists(path.join(base, 'scripts'))).toBe(false)
+    }).pipe(Effect.scoped, Effect.provide(platformLayer)),
+  )
 })

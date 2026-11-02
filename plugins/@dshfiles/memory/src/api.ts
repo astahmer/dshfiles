@@ -5,7 +5,7 @@ import * as Schema from 'effect/Schema'
 import type { RetrievalStatus } from './embedder.ts'
 import { MemoryGuidance } from './guidance.ts'
 import { MemoryContract, MemorySchema } from './schema.ts'
-import type { DailyUsage, NoteStatusCounts } from './store.ts'
+import type { DailyUsage, NoteStatusCounts } from './memory-repo.ts'
 import type { ThreadFinderPage, ThreadFinderRelations } from './thread-finder.ts'
 
 /** One notable memory action, newest first, for the panel's activity list and analytics. */
