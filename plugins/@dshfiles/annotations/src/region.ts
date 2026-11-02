@@ -1,3 +1,5 @@
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { annotationTargetSchema, type AnnotationSurface, type AnnotationTarget } from './schema.js'
 import { Redaction } from './redact.js'
 import { ElementDescriptor } from './descriptor.js'
@@ -32,7 +34,7 @@ export const describeRegion = ({
   const attributes = Redaction.safeAttributes(element)
   const styles = Redaction.safeStyles(element)
   const text = Redaction.elementText(element)
-  const parsed = annotationTargetSchema.safeParse({
+  const parsed = Schema.decodeUnknownOption(annotationTargetSchema)({
     surface,
     url: Redaction.redactUrl(url),
     selector: ElementDescriptor.elementSelector(element),
@@ -42,5 +44,5 @@ export const describeRegion = ({
     ...(attributes !== undefined && { attributes }),
     ...(styles !== undefined && { styles }),
   })
-  return parsed.success ? parsed.data : null
+  return Option.isSome(parsed) ? parsed.value : null
 }

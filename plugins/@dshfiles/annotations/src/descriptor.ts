@@ -1,3 +1,5 @@
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { annotationTargetSchema, MAX_SELECTOR_CHARS, type AnnotationSurface, type AnnotationTarget } from './schema.js'
 import { Redaction } from './redact.js'
 
@@ -90,13 +92,13 @@ export class ElementDescriptor {
     const text = Redaction.elementText(element)
     const attributes = Redaction.safeAttributes(element)
     const styles = Redaction.safeStyles(element)
-    const parsed = annotationTargetSchema.safeParse({
+    const parsed = Schema.decodeUnknownOption(annotationTargetSchema)({
       ...target,
       ...(text !== undefined && { text }),
       ...(attributes !== undefined && { attributes }),
       ...(styles !== undefined && { styles }),
     })
-    return parsed.success ? parsed.data : null
+    return Option.isSome(parsed) ? parsed.value : null
   }
 
   static matchesTarget = ({ element, target }: { readonly element: Element; readonly target: AnnotationTarget }): boolean => {

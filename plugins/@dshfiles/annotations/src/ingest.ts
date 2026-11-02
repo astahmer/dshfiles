@@ -1,15 +1,14 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { INGEST_RATE_LIMIT, INGEST_RATE_WINDOW_MS, MAX_INGEST_BYTES } from './limits.js'
 import { annotationDraftSchema, type AnnotationDraft, type UnassignedAnnotation } from './schema.js'
 import { ExtensionHttp } from './http.js'
 
-const ingestBodySchema = z
-  .object({
-    drafts: z.array(annotationDraftSchema).min(1).max(8),
-  })
-  .strict()
+const ingestBodySchema = Schema.Struct({
+  drafts: Schema.Array(annotationDraftSchema).check(Schema.isMinLength(1), Schema.isMaxLength(8)),
+})
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-z]{32}$/
@@ -93,12 +92,12 @@ export const createIngestHandler =
       ExtensionHttp.respond({ response, status: 400, body: { error: 'invalid json' } })
       return
     }
-    const body = ingestBodySchema.safeParse(parsed)
-    if (!body.success) {
+    const body = Schema.decodeUnknownOption(ingestBodySchema)(parsed)
+    if (Option.isNone(body)) {
       ExtensionHttp.respond({ response, status: 400, body: { error: 'invalid annotation' } })
       return
     }
-    const accepted = await ingest({ drafts: body.data.drafts, extensionOrigin: origin })
+    const accepted = await ingest({ drafts: body.value.drafts, extensionOrigin: origin })
     ExtensionHttp.respond({ response, status: 202, body: { accepted: accepted.length }, headers: ExtensionHttp.corsFor({ origin, allowed }) })
   }
 

@@ -1,4 +1,6 @@
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { PICK_BINDING, PICK_SOURCE } from './picker-source.js'
 import { annotationTargetSchema, type AnnotationTarget } from './schema.js'
 
@@ -42,13 +44,13 @@ const parsePick = (payload: unknown): PickOutcome => {
   if (typeof parsed !== 'object' || parsed === null) return { ok: false, reason: 'unavailable' }
   const envelope = parsed as Record<string, unknown>
   if (envelope.ok !== true) return { ok: false, reason: 'cancelled' }
-  const target = annotationTargetSchema.safeParse(envelope.target)
+  const target = Schema.decodeUnknownOption(annotationTargetSchema)(envelope.target)
   const point = envelope.point
-  if (!target.success || typeof point !== 'object' || point === null) return { ok: false, reason: 'unavailable' }
+  if (Option.isNone(target) || typeof point !== 'object' || point === null) return { ok: false, reason: 'unavailable' }
   const coordinates = point as Record<string, unknown>
   const x = typeof coordinates.x === 'number' ? coordinates.x : 0
   const y = typeof coordinates.y === 'number' ? coordinates.y : 0
-  return { ok: true, target: target.data, point: { x, y } }
+  return { ok: true, target: target.value, point: { x, y } }
 }
 
 export class ChromeCdp {
