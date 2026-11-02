@@ -1,6 +1,6 @@
 import { createRuleBasedAdapter, type RuleKey } from '@pulls.review/core/analyze'
 import { createPasteSource } from '@pulls.review/core/paste'
-import { Option, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { MAX_FILES, scopeKeySchema, type ReviewFile, type ReviewScope } from './api.js'
 
 /** pulls.review's own rule-based copy, so a scope reads the same here and on the site. */
@@ -13,6 +13,13 @@ const RULE_TEXTS = {
   generated: { label: 'Generated', summary: 'Generated or build output changes.' },
   other: { label: 'Other', summary: "Other changes that don't fit an existing category." },
 } satisfies Record<RuleKey, { readonly label: string; readonly summary: string }>
+
+/** pulls.review could not read or group the patch text. */
+export class PatchGroupingFailed extends Schema.TaggedError<PatchGroupingFailed>()('PatchGroupingFailed', { cause: Schema.optional(Schema.Defect()) }) {
+  override get message(): string {
+    return 'pulls.review could not group this patch.'
+  }
+}
 
 export interface GroupedPatch {
   /** Every file the patch names, before the cap; `clipped` says whether the lists below are shorter. */
@@ -29,12 +36,20 @@ export interface GroupedPatch {
  * adapter: no model call, no token, and the same rules the site uses. The
  * returned lists are capped so one message can carry them; totals stay exact.
  */
-export const groupPatch = async (input: { readonly patch: string; readonly title: string; readonly limit?: number | undefined }): Promise<GroupedPatch> => {
+export const groupPatch = Effect.fn('review patch group')(function* (input: {
+  readonly patch: string
+  readonly title: string
+  readonly limit?: number | undefined
+}): Effect.fn.Return<GroupedPatch, PatchGroupingFailed> {
   const limit = input.limit ?? MAX_FILES
-  const source = createPasteSource(input.patch, input.title)
-  const payload = await source.fetch()
-  const adapter = createRuleBasedAdapter(key => RULE_TEXTS[key])
-  const grouped = await adapter.analyze(payload)
+  const payload = yield* Effect.tryPromise({
+    try: () => createPasteSource(input.patch, input.title).fetch(),
+    catch: cause => new PatchGroupingFailed({ cause }),
+  })
+  const grouped = yield* Effect.tryPromise({
+    try: () => createRuleBasedAdapter(key => RULE_TEXTS[key]).analyze(payload),
+    catch: cause => new PatchGroupingFailed({ cause }),
+  })
   const validFiles = payload.files.filter(file => file.path.length > 0)
   const byPath = new Map(validFiles.map(file => [file.path, file]))
   const files = validFiles.slice(0, limit)
@@ -71,4 +86,4 @@ export const groupPatch = async (input: { readonly patch: string; readonly title
     scopes,
     clipped: validFiles.length > files.length,
   }
-}
+})
