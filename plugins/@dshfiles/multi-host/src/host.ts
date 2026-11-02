@@ -1495,7 +1495,7 @@ function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>
   configuredProfile = MultiHostSchema.decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
   // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
   ctx.inject(['connection', 'webServer'], scoped => {
-    let launchPath: string | undefined
+    let releaseLaunchFile: (() => Promise<void>) | undefined
     let disposed = false
     scoped.effect(() => {
       void (async () => {
@@ -1505,14 +1505,13 @@ function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>
         const connection: ConnectionSurface | undefined = scoped.get('connection')
         const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
         if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-        const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
-        launchPath = written
-        // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
-        process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
+        const published = await RuntimeLaunchFile.publishLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+        if (disposed) return published.release()
+        releaseLaunchFile = published.release
       })().catch(() => undefined)
       return () => {
         disposed = true
-        if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
+        void releaseLaunchFile?.()
       }
     }, 'multi-host: launch file')
   })

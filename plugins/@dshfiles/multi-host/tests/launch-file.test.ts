@@ -10,6 +10,18 @@ afterEach(async () => {
 })
 
 describe('runtime launch file', () => {
+  test('releases its exit listener on every reload', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'multi-host-launch-'))
+    homes.push(home)
+    const exitListenersBefore = process.listenerCount('exit')
+    for (const port of [43125, 43126, 43127]) {
+      const published = await RuntimeLaunchFile.publishLaunchFile({ dshHome: home, launchUrl: `http://127.0.0.1:${port}/?token=reload-token-123456` })
+      await published.release()
+    }
+    expect(process.listenerCount('exit')).toBe(exitListenersBefore)
+    await expect(readFile(RuntimeLaunchFile.launchFilePaths(home)[0], 'utf8')).rejects.toThrow('ENOENT')
+  })
+
   test('round-trips a private launch record and removes only its own', async () => {
     const home = await mkdtemp(join(tmpdir(), 'multi-host-launch-'))
     homes.push(home)

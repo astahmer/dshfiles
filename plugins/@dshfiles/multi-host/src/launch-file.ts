@@ -83,10 +83,24 @@ const removeLaunchFileSync = (path: string): void => {
   }
 }
 
+const publishLaunchFile = async (options: { readonly dshHome: string; readonly launchUrl: string }): Promise<{ readonly release: () => Promise<void> }> => {
+  const path = await writeLaunchFile(options)
+  // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
+  const removeOnExit = () => removeLaunchFileSync(path)
+  process.once('exit', removeOnExit)
+  return {
+    release: () => {
+      process.off('exit', removeOnExit)
+      return removeLaunchFile(path)
+    },
+  }
+}
+
 export class RuntimeLaunchFile {
   static readonly launchFilePaths = launchFilePaths
   static readonly parseRuntimeLaunch = parseRuntimeLaunch
   static readonly writeLaunchFile = writeLaunchFile
   static readonly removeLaunchFile = removeLaunchFile
   static readonly removeLaunchFileSync = removeLaunchFileSync
+  static readonly publishLaunchFile = publishLaunchFile
 }
