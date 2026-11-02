@@ -30,6 +30,7 @@
     "@dshfiles/memory": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -48,6 +49,7 @@
     "@deepseek-ai/dsh-host-plugin-inventory": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
