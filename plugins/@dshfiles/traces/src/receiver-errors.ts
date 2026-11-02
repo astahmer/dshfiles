@@ -24,7 +24,7 @@ export class ReceiverListenFailed extends Schema.TaggedError<ReceiverListenFaile
 
 export class NonLoopbackRefused extends Schema.TaggedError<NonLoopbackRefused>()(
   'NonLoopbackRefused',
-  { host: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { host: Schema.String },
   { dshxWireCode: 'non-loopback-refused' },
 ) {
   override get message(): string {

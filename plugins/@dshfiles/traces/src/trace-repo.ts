@@ -200,7 +200,7 @@ type ClearResult = { readonly removedSpans: number; readonly removedTraces: numb
 
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
   'InvalidCursor',
-  { list: Schema.Literals(['traces', 'logs']), cause: Schema.optional(Schema.Defect()) },
+  { list: Schema.Literals(['traces', 'logs']) },
   { dshxWireCode: 'invalid-cursor' },
 ) {
   override get message(): string {
@@ -210,7 +210,7 @@ export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
 
 export class TraceNotFound extends Schema.TaggedError<TraceNotFound>()(
   'TraceNotFound',
-  { traceId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { traceId: Schema.String },
   { dshxWireCode: 'not-found' },
 ) {
   override get message(): string {
@@ -220,7 +220,7 @@ export class TraceNotFound extends Schema.TaggedError<TraceNotFound>()(
 
 export class MetricNotFound extends Schema.TaggedError<MetricNotFound>()(
   'MetricNotFound',
-  { name: Schema.String, service: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { name: Schema.String, service: Schema.String },
   { dshxWireCode: 'not-found' },
 ) {
   override get message(): string {

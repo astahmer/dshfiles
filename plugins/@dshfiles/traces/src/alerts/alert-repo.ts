@@ -53,7 +53,7 @@ export class AlertDb extends Context.Service<AlertDb, SqlClient.SqlClient>()('@d
 
 export class AlertRuleNotFound extends Schema.TaggedError<AlertRuleNotFound>()(
   'AlertRuleNotFound',
-  { id: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { id: Schema.String },
   { dshxWireCode: 'not-found' },
 ) {
   override get message(): string {
@@ -63,7 +63,7 @@ export class AlertRuleNotFound extends Schema.TaggedError<AlertRuleNotFound>()(
 
 export class AlertRuleLimitReached extends Schema.TaggedError<AlertRuleLimitReached>()(
   'AlertRuleLimitReached',
-  { limit: Schema.Int, cause: Schema.optional(Schema.Defect()) },
+  { limit: Schema.Int },
   { dshxWireCode: 'too-many-rules' },
 ) {
   override get message(): string {
