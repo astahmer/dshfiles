@@ -1,12 +1,17 @@
 import { lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
+import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from 'vitest'
 import { createServer } from 'vite'
 import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 57, apiMethods: 449, apiToolBindings: 308, apiToolSchemas: 73, definedTools: 28, tools: 101 }
+const expectedCounts = { hostBundles: 57, apiMethods: 449, apiToolBindings: 308, apiToolSchemas: 307, definedTools: 28, tools: 335 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -121,6 +126,11 @@ const collectHostToolSchemas = async () => {
   const scratchRoot = await mkdtemp(join(repositoryRoot, '.dshx-host-tool-schemas-'))
   const aliases = await workspaceAliases(pluginRoot, projects)
   const host = await createTestHost()
+  await host.ctx.plugin(LocalSubprocessRuntime)
+  await host.ctx.plugin(Storage)
+  await host.ctx.plugin(StorageJson, { root: join(scratchRoot, '.storage') })
+  await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+  await host.ctx.plugin(LocalAttachmentStore, { dshHome: join(scratchRoot, '.home') })
   const viteServer = await createServer({
     root: repositoryRoot,
     configFile: false,
@@ -204,7 +214,10 @@ const collectHostToolSchemas = async () => {
       const plugin = builtModule.__dshxSchemaPlugin
       if (plugin === undefined) throw new Error(`Missing schema-only Host plugin export for ${resolved.packageId}.`)
       try {
-        await host.ctx.plugin(plugin)
+        // Declarations never run setup: wait only for the injected services this Host provides, so a plugin that also
+        // needs a session or web service still registers its tools and APIs.
+        const inject = getArrayProperty(plugin, 'inject').filter(name => typeof name === 'string' && host.ctx.get(name) !== undefined)
+        await host.ctx.plugin({ ...plugin, inject })
       } catch (error) {
         throw new Error(`Could not mount schema declarations from ${resolved.packageId}: ${String(error)}`)
       }
