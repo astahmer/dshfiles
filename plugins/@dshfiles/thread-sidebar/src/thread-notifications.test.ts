@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { test } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
-import { z } from 'zod'
 import {
   createThreadNotificationClaimer,
   DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
@@ -134,7 +134,7 @@ test('system delivery proceeds when the browser refuses the deduplication ledger
     },
     removeItem: () => undefined,
   }
-  const ledger = createStoredValue({ key: 'notification-test', schema: z.array(z.string()), fallback: [], storage: () => storage })
+  const ledger = createStoredValue({ key: 'notification-test', schema: zodSchemaFromEffect(Schema.mutable(Schema.Array(Schema.String))), fallback: [], storage: () => storage })
   const claim = createThreadNotificationClaimer(ledger)
   const route = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
     ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,

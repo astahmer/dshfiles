@@ -1,9 +1,9 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { SubagentRouteLabelModel } from './route-label.js'
 import type { ThreadSidebarModelRoute } from './projection-types.js'
 import { SchemaHelpers } from '../schema-helpers.js'
-import { toZodSchema } from '../effect-stored-value.js'
 
 const routeLabelSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(193)))
 
@@ -27,7 +27,7 @@ export const routeLabelFromAssistantEvent = (event: { readonly type: string; rea
 
 export const threadSidebarModelRouteProjection = {
   key: 'threadSidebarModelRoute',
-  stateSchema: toZodSchema(routeLabelSchema),
+  stateSchema: zodSchemaFromEffect(routeLabelSchema),
   init: () => null,
   apply: (state, event) => {
     if (event.type === 'session/end-seed' && event.data.inherited === true) return null
@@ -35,6 +35,6 @@ export const threadSidebarModelRouteProjection = {
     const routeLabel = routeLabelFromAssistantEvent(event)
     return routeLabel === undefined ? state : routeLabel
   },
-  wire: { viewSchema: toZodSchema(routeLabelSchema), view: state => state },
+  wire: { viewSchema: zodSchemaFromEffect(routeLabelSchema), view: state => state },
   stateVersion: 1,
 } satisfies ProjectionDefinition<'threadSidebarModelRoute', ThreadSidebarModelRoute>

@@ -1,15 +1,6 @@
-import * as Result from 'effect/Result'
-import * as Schema from 'effect/Schema'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
-
-export const toZodSchema = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(schema: ValueSchema): z.ZodType<ValueSchema['Type']> =>
-  z.unknown().transform((value, context): ValueSchema['Type'] => {
-    const decoded = Schema.decodeUnknownResult(schema)(value)
-    if (Result.isSuccess(decoded)) return decoded.success
-    context.addIssue({ code: 'custom', message: 'Invalid stored value.' })
-    return z.NEVER
-  })
+import * as Schema from 'effect/Schema'
 
 export const createEffectStoredValue = <ValueSchema extends Schema.ConstraintDecoder<unknown>, Fallback>(options: {
   readonly key: string
@@ -19,5 +10,5 @@ export const createEffectStoredValue = <ValueSchema extends Schema.ConstraintDec
 }) =>
   createStoredValue({
     ...options,
-    schema: toZodSchema(options.schema),
+    schema: zodSchemaFromEffect(options.schema),
   })

@@ -1,3 +1,4 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import * as Schema from 'effect/Schema'
 import {
@@ -9,13 +10,12 @@ import {
   type ThreadAttentionView,
 } from './attention-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
-import { toZodSchema } from './effect-stored-value.js'
 
 export const threadAttentionDomain = defineDomain({
   name: 'thread_attention',
   version: 1,
   tables: {
-    sessions: { valueSchema: toZodSchema(threadAttentionViewSchema), __key: 'sessions' },
+    sessions: { valueSchema: zodSchemaFromEffect(threadAttentionViewSchema), __key: 'sessions' },
   },
 })
 
