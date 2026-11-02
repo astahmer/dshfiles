@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
     "@effect/vitest": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

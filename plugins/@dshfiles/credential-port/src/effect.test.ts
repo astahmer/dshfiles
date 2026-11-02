@@ -1,5 +1,7 @@
 import { it } from '@effect/vitest'
-import { Duration, Effect, Exit, Fiber, Result, Schema } from 'effect'
+import { Context as CordisContext } from '@deepseek-ai/cordis'
+import { HostContext } from '@dshfiles/dshx/effect/host-context'
+import { Duration, Effect, Exit, Fiber, Layer, Option, Result, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { describe, expect } from 'vitest'
 import { parseSecretReference } from './secret-reference.js'
@@ -59,11 +61,11 @@ describe('SecretReferenceResolverService', () => {
       })
       const fallback = yield* resolver.resolve({ referenceText: '', environmentValue: 'environment-value' })
 
-      expect(resolved).toEqual({ value: 'catalog-value', label: 'secret:API_KEY@dev' })
-      expect(fallback).toBe('environment-value')
+      expect(resolved).toEqual(Option.some({ value: 'catalog-value', label: 'secret:API_KEY@dev' }))
+      expect(fallback).toEqual(Option.some('environment-value'))
     }).pipe(
       Effect.provide(
-        SecretReferenceResolverService.layer({
+        SecretReferenceResolverService.layerTest({
           resolve: async input => {
             expect(input).toMatchObject({ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null })
             expect(input.signal).toBeInstanceOf(AbortSignal)
@@ -89,7 +91,7 @@ describe('SecretReferenceResolverService', () => {
       expect(resolutionSignal?.aborted).toBe(true)
     }).pipe(
       Effect.provide(
-        SecretReferenceResolverService.layer({
+        SecretReferenceResolverService.layerTest({
           resolve: input => {
             const signal = input.signal
             resolutionSignal = signal
@@ -109,22 +111,44 @@ describe('SecretReferenceResolverService', () => {
 
       expect(Result.isFailure(invalid) ? invalid.failure._tag : null).toBe('InvalidSecretReferenceError')
       expect(Result.isFailure(unavailable) ? unavailable.failure._tag : null).toBe('SecretCatalogUnavailableError')
-    }).pipe(Effect.provide(SecretReferenceResolverService.layer(undefined))),
+    }).pipe(Effect.provide(SecretReferenceResolverService.layerTest(undefined))),
   )
 
-  it.effect('maps a catalog rejection to a TaggedError without including its cause', () =>
+  it.effect('maps a catalog rejection to a TaggedError that keeps its cause but never the value', () =>
     Effect.gen(function* () {
       const resolver = yield* SecretReferenceResolverService
-      const result = yield* Effect.result(resolver.resolve({ referenceText: 'secret:API_KEY', environmentValue: undefined }))
+      const result = yield* Effect.result(resolver.resolve({ referenceText: 'secret:API_KEY@dev', environmentValue: 'env-secret-value' }))
 
       expect(Result.isFailure(result) ? result.failure._tag : null).toBe('SecretCatalogResolutionError')
-      expect(JSON.stringify(result)).not.toContain('sensitive')
+      const failure = Result.isFailure(result) ? result.failure : undefined
+      expect(failure?._tag === 'SecretCatalogResolutionError' ? [failure.alias, failure.environment, failure.cause] : null).toEqual([
+        'API_KEY',
+        'dev',
+        new Error('provider detail'),
+      ])
+      expect(failure?.message).toContain('secret:API_KEY@dev')
+      expect(JSON.stringify(result)).not.toContain('env-secret-value')
     }).pipe(
       Effect.provide(
-        SecretReferenceResolverService.layer({
-          resolve: async () => Promise.reject(new Error('sensitive provider detail')),
+        SecretReferenceResolverService.layerTest({
+          resolve: async () => Promise.reject(new Error('provider detail')),
         }),
       ),
     ),
+  )
+
+  it.effect('reads the Secret Catalog from the Host on every call', () =>
+    Effect.gen(function* () {
+      const ctx = new CordisContext()
+      const resolver = yield* Effect.provide(
+        SecretReferenceResolverService,
+        SecretReferenceResolverService.layer.pipe(Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx, packageId: '@test/credentials' })))),
+      )
+      const before = yield* Effect.result(resolver.resolve({ referenceText: 'secret:API_KEY', environmentValue: undefined }))
+      expect(Result.isFailure(before) ? before.failure._tag : null).toBe('SecretCatalogUnavailableError')
+
+      ctx.provide('secretCatalogValues', { resolve: async () => 'catalog-value' })
+      expect(yield* resolver.resolve({ referenceText: 'secret:API_KEY', environmentValue: undefined })).toEqual(Option.some('catalog-value'))
+    }),
   )
 })
