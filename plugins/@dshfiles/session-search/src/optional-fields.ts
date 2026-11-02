@@ -1,7 +1,7 @@
 /**
  * `exactOptionalPropertyTypes` forbids assigning an explicit `undefined` to an optional property, while boundary
- * decoders (zod objects over SQLite rows and log lines) legitimately produce that shape. One narrow helper keeps the
- * optional-field spread out of every decoder.
+ * decoders (SQLite rows and log lines) legitimately produce that shape. One narrow helper keeps the optional-field
+ * spread out of every decoder.
  */
 
 type DefinedShape<Shape> = {

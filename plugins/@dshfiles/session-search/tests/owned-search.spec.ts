@@ -13,7 +13,7 @@ import { homedir, loadavg, tmpdir } from 'node:os'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { basename, join, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { FrameLog } from '../src/frame-log.js'
 import { SessionSearchEngine } from '../src/engine.js'
@@ -71,11 +71,11 @@ process.on('SIGTERM', () => {
 })
 `
 
-const probeReadingSchema = z.object({ samples: z.number(), maxRttMs: z.number(), p99RttMs: z.number(), gapsOverBudget: z.number() })
-type ProbeReading = z.infer<typeof probeReadingSchema>
+const probeReadingSchema = Schema.Struct({ samples: Schema.Number, maxRttMs: Schema.Number, p99RttMs: Schema.Number, gapsOverBudget: Schema.Number })
+type ProbeReading = typeof probeReadingSchema.Type
 
-const sessionIdRowSchema = z.object({ id: z.string() })
-const storedSessionIdRowSchema = z.object({ session_id: z.string() })
+const sessionIdRowSchema = Schema.Struct({ id: Schema.String })
+const storedSessionIdRowSchema = Schema.Struct({ session_id: Schema.String })
 
 const startProbe = async (socketPath: string) => {
   await rm(socketPath, { force: true })
@@ -98,7 +98,7 @@ const startProbe = async (socketPath: string) => {
       await new Promise(resolveClose => server.close(() => resolveClose()))
       await rm(socketPath, { force: true })
       const parsed = decodeJsonSafe(probeReadingSchema, output || 'null')
-      return parsed.success ? parsed.data : { samples: 0, maxRttMs: -1, p99RttMs: -1, gapsOverBudget: -1 }
+      return parsed._tag === 'Success' ? parsed.success : { samples: 0, maxRttMs: -1, p99RttMs: -1, gapsOverBudget: -1 }
     },
   }
 }
@@ -110,7 +110,7 @@ const stockIndexedSessions = (): ReadonlySet<string> => {
       database
         .prepare('SELECT id FROM persisted_sessions')
         .all()
-        .map(row => sessionIdRowSchema.parse(row).id),
+        .map(row => Schema.decodeUnknownSync(sessionIdRowSchema)(row).id),
     )
   } catch {
     return new Set()
@@ -165,7 +165,7 @@ const stockSessionIds = (query: string, sessionIds: ReadonlySet<string>): readon
     const rows = database
       .prepare(`SELECT DISTINCT session_id FROM persisted_docs WHERE persisted_docs MATCH ? AND session_id IN (${placeholders}) LIMIT 200`)
       .all(query, ...known)
-    return rows.map(row => storedSessionIdRowSchema.parse(row).session_id)
+    return rows.map(row => Schema.decodeUnknownSync(storedSessionIdRowSchema)(row).session_id)
   } catch {
     return []
   } finally {
