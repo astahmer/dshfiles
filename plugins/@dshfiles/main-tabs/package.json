@@ -40,7 +40,7 @@
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

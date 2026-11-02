@@ -14,7 +14,7 @@ import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { createPortal } from 'react-dom'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
@@ -41,7 +41,7 @@ import './client.css'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
-const threadTabKeepRequestSchema = z.object({ sessionId: z.string().min(1) }).strict()
+const threadTabKeepRequestSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)) })
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
@@ -104,9 +104,12 @@ const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void =>
  * the caller falls back to `uiWorkspace.openSession` only when this plugin is absent or switched off.
  */
 const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
-const openThreadRequestSchema = z.object({ sessionId: z.string().min(1), newTab: z.boolean() })
+const openThreadRequestSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), newTab: Schema.Boolean })
 const REPLACE_THREAD_TAB_EVENT = 'dshfiles:replace-thread-tab'
-const replaceThreadTabRequestSchema = z.object({ sourceSessionId: z.string().min(1), sessionId: z.string().min(1) }).strict()
+const replaceThreadTabRequestSchema = Schema.Struct({
+  sourceSessionId: Schema.String.check(Schema.isMinLength(1)),
+  sessionId: Schema.String.check(Schema.isMinLength(1)),
+})
 
 export default defineClient({
   name: '@dshfiles/main-tabs',
@@ -170,19 +173,21 @@ export default defineClient({
 
     ctx.effect(() => {
       const onOpenThread = (event: Event): void => {
-        const request = event instanceof CustomEvent ? openThreadRequestSchema.safeParse(event.detail) : undefined
-        if (request?.success !== true || !requestThreadTab(request.data.sessionId, request.data.newTab)) return
+        if (!(event instanceof CustomEvent)) return
+        const decoded = Schema.decodeUnknownResult(openThreadRequestSchema)(event.detail)
+        if (decoded._tag === 'Failure' || !requestThreadTab(decoded.success.sessionId, decoded.success.newTab)) return
         event.preventDefault()
       }
       const onReplaceThreadTab = (event: Event): void => {
-        const request = event instanceof CustomEvent ? replaceThreadTabRequestSchema.safeParse(event.detail) : undefined
-        if (request?.success !== true || !actor.getSnapshot().matches('on')) return
+        if (!(event instanceof CustomEvent)) return
+        const decoded = Schema.decodeUnknownResult(replaceThreadTabRequestSchema, { onExcessProperty: 'error' })(event.detail)
+        if (decoded._tag === 'Failure' || !actor.getSnapshot().matches('on')) return
         const snapshot = actor.getSnapshot()
         const set = snapshot.context.sets[snapshot.context.scopeKey]
-        const sourceId = tabIdOf({ kind: 'thread', sessionId: request.data.sourceSessionId })
-        if (!set?.tabs.some(tab => tab.id === sourceId) || !ctx.sessions.list.getSnapshot().ids.some(id => id === request.data.sessionId)) return
+        const sourceId = tabIdOf({ kind: 'thread', sessionId: decoded.success.sourceSessionId })
+        if (!set?.tabs.some(tab => tab.id === sourceId) || !ctx.sessions.list.getSnapshot().ids.some(id => id === decoded.success.sessionId)) return
         event.preventDefault()
-        actor.send({ type: 'thread.replace', sourceSessionId: request.data.sourceSessionId, sessionId: request.data.sessionId })
+        actor.send({ type: 'thread.replace', sourceSessionId: decoded.success.sourceSessionId, sessionId: decoded.success.sessionId })
       }
       window.addEventListener(OPEN_THREAD_EVENT, onOpenThread)
       window.addEventListener(REPLACE_THREAD_TAB_EVENT, onReplaceThreadTab)
@@ -195,9 +200,9 @@ export default defineClient({
     ctx.effect(() => {
       const keepThreadTab = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
-        const request = threadTabKeepRequestSchema.safeParse(event.detail)
-        if (!request.success) return
-        actor.send({ type: 'thread.keep', sessionId: request.data.sessionId })
+        const decoded = Schema.decodeUnknownResult(threadTabKeepRequestSchema, { onExcessProperty: 'error' })(event.detail)
+        if (decoded._tag === 'Failure') return
+        actor.send({ type: 'thread.keep', sessionId: decoded.success.sessionId })
       }
       window.addEventListener(THREAD_TAB_KEEP_EVENT, keepThreadTab)
       return () => window.removeEventListener(THREAD_TAB_KEEP_EVENT, keepThreadTab)

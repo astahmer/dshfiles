@@ -1,7 +1,7 @@
 import { ShortcutKeys } from '@deepseek-ai/dsh-client-ui-primitives'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Component, useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { MainTabsTranslate } from './locales.js'
 import { watchStartSearchFocus } from './start-search-focus.js'
 
@@ -44,7 +44,7 @@ interface PanelIconProps {
 }
 
 // The sidebar renders these with its owner props `{ size, active }`; every registered glyph is a plain function component.
-const panelIconSchema = z.custom<ComponentType<PanelIconProps>>(value => value instanceof Function)
+const panelIconSchema = Schema.declare((value): value is ComponentType<PanelIconProps> => typeof value === 'function')
 
 interface IconBoundaryState {
   readonly failed: boolean
@@ -62,9 +62,9 @@ class IconBoundary extends Component<{ readonly fallback: ReactNode; readonly ch
 
 /** A panel's own sidebar glyph, or the fallback when it is not a plain component or fails to render outside the sidebar. */
 export const PanelIcon = (props: { readonly glyph: unknown; readonly fallback: ReactNode }): ReactElement => {
-  const parsed = panelIconSchema.safeParse(props.glyph)
-  if (!parsed.success) return <>{props.fallback}</>
-  const Glyph = parsed.data
+  const parsed = Schema.decodeUnknownResult(panelIconSchema)(props.glyph)
+  if (parsed._tag === 'Failure') return <>{props.fallback}</>
+  const Glyph = parsed.success
   return (
     <IconBoundary fallback={props.fallback}>
       <Glyph size={22} active={false} />
