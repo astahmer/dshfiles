@@ -18,6 +18,8 @@
     "tooling/antislop/repo-rules/fixtures/**",
     "tooling/antislop/tests/oxlint/**",
     "tooling/antislop/effect/repo-rules/fixtures/**",
+    "plugins/@dshfiles/multi-host/tests/fixtures/**",
+    "tooling/dshx/packages/dshx/bench/**",
     "tooling/antislop/effect/tests/oxlint/**",
   ],
   // Foreign binaries the hand-run scripts call: ffmpeg is installed on the Host, and bddgen/vitest come

@@ -97,7 +97,6 @@ catalog:
   effect: 4.1.0
   '@effect/vitest': 4.1.0
   '@effect/platform-node': 4.1.0
-  '@effect/platform-node-shared': 4.1.0
   '@effect/sql-sqlite-node': 4.1.0
   execa: 10.0.1
   hono: 4.13.13
