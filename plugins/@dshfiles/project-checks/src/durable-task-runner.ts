@@ -1,252 +1,243 @@
-import { setTimeout as delay } from 'node:timers/promises'
-import { Schema } from 'effect'
-import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.ts'
-import type { DurableTaskExecutionStore } from './durable-task-store.ts'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { Cause, Clock, Context, Effect, Exit, Fiber, FiberMap, Layer, Option, Queue, Ref, Schedule, Semaphore, Stream, SubscriptionRef } from 'effect'
+import { DurableTaskStore } from './durable-task-store.ts'
+import { DurableTaskModel, type DurableTask } from './durable-tasks.ts'
+import {
+  HandlerUnavailable,
+  IdempotencyKeyConflict,
+  RetryNotAllowed,
+  RetryNotConfirmed,
+  TaskHistoryFull,
+  TaskNotFound,
+  TasksStopping,
+  TaskStoreUnavailable,
+} from './errors.ts'
 
 export type DurableTaskResult = { readonly status: 'succeeded' | 'failed' | 'cancelled' | 'timed-out' | 'unknown'; readonly exitCode: number | null }
 
-export type DurableTaskTable = DurableTaskExecutionStore
-
-export interface DurableTaskRunnerOptions {
-  readonly table: DurableTaskTable
-  readonly now?: () => number
-  readonly newAttemptId: () => string
-  readonly validate: (task: DurableTask) => Promise<{ readonly runnable: boolean; readonly safeReplay: boolean }>
-  readonly findReceipt: (taskId: string, attemptId: string) => Promise<DurableTaskResult | null>
-  readonly run: (input: {
-    readonly task: DurableTask
-    readonly attemptId: string
-    readonly signal: AbortSignal
-    readonly progress: (progress: DurableTask['attempts'][number]['progress']) => Promise<void>
-  }) => Promise<DurableTaskResult>
-  readonly onFailure: (error: unknown) => void
+export interface TaskValidation {
+  readonly runnable: boolean
+  readonly safeReplay: boolean
 }
 
-const MAX_DURABLE_TASKS = 1_000
+type Progress = DurableTask['attempts'][number]['progress']
 
-export class DurableTaskRunner {
-  private readonly options: DurableTaskRunnerOptions
-  private readonly active = new Map<string, AbortController>()
-  private readonly claimed = new Set<string>()
-  private readonly workers = new Map<string, Promise<void>>()
-  private readonly pending = new Set<string>()
-  private stopping = false
-  private admission: Promise<void> = Promise.resolve()
+const CANCEL_POLL = Schedule.spaced('200 millis')
+const MAX_LISTED_TASKS = 100
+const RECOVERABLE = new Set<DurableTask['status']>(['queued', 'running', 'cancel-requested', 'unknown'])
 
-  constructor(options: DurableTaskRunnerOptions) {
-    this.options = options
+/** What a durable task does: the plugin runs a configured action; tests run a plain effect. Interruption cancels `run`. */
+export class DurableTaskHandler extends Context.Service<
+  DurableTaskHandler,
+  {
+    readonly newAttemptId: Effect.Effect<string>
+    readonly validate: (task: DurableTask) => Effect.Effect<TaskValidation>
+    readonly findReceipt: (taskId: string, attemptId: string) => Effect.Effect<Option.Option<DurableTaskResult>>
+    readonly run: (input: {
+      readonly task: DurableTask
+      readonly attemptId: string
+      readonly progress: (progress: Progress) => Effect.Effect<void>
+    }) => Effect.Effect<DurableTaskResult>
   }
+>()('@dshfiles/project-checks/DurableTaskHandler') {}
 
-  async recover(): Promise<void> {
-    for (const [taskId, saved] of this.options.table.entries()) {
-      const task = Schema.decodeUnknownSync(durableTaskSchema)(saved)
-      if (task.id !== taskId) throw new Error('Durable Project Checks task key does not match its record identity.')
-      if (task.status === 'queued' || task.status === 'running' || task.status === 'cancel-requested' || task.status === 'unknown') this.launch(taskId)
-    }
+/**
+ * The durable Project Checks queue: one worker fiber takes task ids from a `Queue` and runs one at a time under the
+ * cross-process worker claim. Each running attempt lives in a `FiberMap`, so a cancel interrupts it (and its scoped
+ * process); a cancel written by another Host reaches it through a 200 ms poll of the store.
+ */
+export class DurableTasks extends Context.Service<
+  DurableTasks,
+  {
+    readonly enqueue: (task: DurableTask) => Effect.Effect<DurableTask, TasksStopping | IdempotencyKeyConflict | TaskHistoryFull | TaskStoreUnavailable>
+    readonly get: (taskId: string) => Effect.Effect<Option.Option<DurableTask>, TaskStoreUnavailable>
+    readonly list: (sessionId: string) => Effect.Effect<ReadonlyArray<DurableTask>, TaskStoreUnavailable>
+    readonly cancel: (taskId: string) => Effect.Effect<DurableTask, TaskNotFound | TaskStoreUnavailable>
+    readonly retry: (input: {
+      readonly taskId: string
+      readonly confirmPossibleDuplicate: boolean
+    }) => Effect.Effect<DurableTask, TasksStopping | RetryNotConfirmed | HandlerUnavailable | RetryNotAllowed | TaskNotFound | TaskStoreUnavailable>
+    /** Completes once every admitted task has settled. */
+    readonly awaitIdle: Effect.Effect<void>
   }
+>()('@dshfiles/project-checks/DurableTasks') {
+  static readonly layer = Layer.effect(
+    DurableTasks,
+    Effect.gen(function* () {
+      const store = yield* DurableTaskStore
+      const handler = yield* DurableTaskHandler
+      const queue = yield* Queue.unbounded<string>()
+      const running = yield* FiberMap.make<string, DurableTaskResult>()
+      const admission = yield* Semaphore.make(1)
+      const outstanding = yield* SubscriptionRef.make(0)
+      const stopping = yield* Ref.make(false)
 
-  async enqueue(task: DurableTask): Promise<DurableTask> {
-    return this.withAdmission(async () => {
-      if (this.stopping) throw new Error('Durable Project Checks runner is stopping.')
-      const stored = await this.options.table.createIfAbsent(task, MAX_DURABLE_TASKS)
-      if (stored.sessionId !== task.sessionId || stored.actionId !== task.actionId || stored.actionFingerprint !== task.actionFingerprint) {
-        throw new Error('That idempotency key is already bound to a different Project Checks action.')
-      }
-      this.launch(task.id)
-      return stored
-    })
-  }
+      const updateNow = (taskId: string, change: (current: DurableTask, now: number) => DurableTask) =>
+        Effect.flatMap(Clock.currentTimeMillis, now => store.update(taskId, current => change(current, now)))
 
-  get(taskId: string): DurableTask | undefined {
-    const task = this.options.table.get(taskId)
-    return task === undefined ? undefined : Schema.decodeUnknownSync(durableTaskSchema)(task)
-  }
-
-  async list(sessionId: string): Promise<readonly DurableTask[]> {
-    return [...this.options.table.entries()]
-      .map(([, task]) => Schema.decodeUnknownSync(durableTaskSchema)(task))
-      .filter(task => task.sessionId === sessionId)
-      .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
-      .slice(0, 100)
-  }
-
-  async cancel(taskId: string): Promise<DurableTask> {
-    const task = await this.options.table.update(taskId, current => DurableTaskModel.cancel(current, this.now()))
-    if (task.status === 'cancel-requested' || task.status === 'cancelled')
-      this.active.get(taskId)?.abort(new Error('Project Checks task cancellation requested.'))
-    return task
-  }
-
-  async retry(taskId: string, confirmPossibleDuplicate: boolean): Promise<DurableTask> {
-    return this.withAdmission(async () => {
-      if (!confirmPossibleDuplicate) throw new Error('Confirm possible duplicate effects before retrying this task.')
-      const validation = await this.validateTask(taskId)
-      if (!validation.runnable) throw new Error('The configured Project Checks handler changed or is unavailable.')
-      let retryable = false
-      const task = await this.options.table.update(taskId, current => {
-        retryable = current.status === 'unknown' || current.status === 'failed' || current.status === 'timed-out' || current.status === 'cancelled'
-        return DurableTaskModel.retry(current, this.now())
+      const launch = Effect.fnUntraced(function* (taskId: string) {
+        if (yield* Ref.get(stopping)) return
+        yield* SubscriptionRef.update(outstanding, count => count + 1)
+        yield* Queue.offer(queue, taskId)
       })
-      if (!retryable) throw new Error('Only failed, cancelled, timed-out or unknown tasks can be retried.')
-      this.launch(taskId)
-      return task
-    })
-  }
 
-  async waitForIdle(): Promise<void> {
-    while (this.workers.size > 0) await Promise.all(this.workers.values())
-  }
+      const failIfStopping = Effect.flatMap(Ref.get(stopping), isStopping => (isStopping ? Effect.fail(new TasksStopping()) : Effect.void))
 
-  async close(): Promise<void> {
-    this.stopping = true
-    this.pending.clear()
-    const now = this.now()
-    for (const [taskId, controller] of this.active) {
-      if (this.claimed.has(taskId)) await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, now))
-      controller.abort(new Error('Project Checks Host is stopping.'))
-    }
-    await this.waitForIdle()
-  }
+      const watchCancellation = (taskId: string) =>
+        store.get(taskId).pipe(
+          Effect.map(task => Option.exists(task, current => current.status === 'cancel-requested')),
+          Effect.repeat({ schedule: CANCEL_POLL, until: requested => requested }),
+          Effect.catchCause(cause => Effect.logWarning('Project Checks cancellation state became unavailable', cause)),
+          Effect.andThen(FiberMap.remove(running, taskId)),
+        )
 
-  private launch(taskId: string): void {
-    if (this.stopping || this.workers.has(taskId) || this.pending.has(taskId)) return
-    if (this.workers.size >= 1) {
-      this.pending.add(taskId)
-      return
-    }
-    const worker = this.runTask(taskId)
-      .catch(error => this.options.onFailure(error))
-      .finally(() => {
-        if (this.workers.get(taskId) === worker) this.workers.delete(taskId)
-        this.active.delete(taskId)
-        const next = this.pending.values().next().value
-        if (next !== undefined) {
-          this.pending.delete(next)
-          this.launch(next)
+      const settleAttempt = Effect.fnUntraced(function* (taskId: string, attemptId: string, exit: Exit.Exit<DurableTaskResult>) {
+        if (Exit.isSuccess(exit)) {
+          const result = exit.value
+          yield* updateNow(taskId, (current, now) =>
+            result.status === 'unknown'
+              ? DurableTaskModel.unknown(current, now)
+              : DurableTaskModel.finish(current, { attemptId, status: result.status, exitCode: result.exitCode, now }),
+          )
+          return
         }
-      })
-    this.workers.set(taskId, worker)
-  }
-
-  private async runTask(taskId: string): Promise<void> {
-    const controller = new AbortController()
-    this.active.set(taskId, controller)
-    try {
-      await this.options.table.withWorkerClaim(controller.signal, async () => {
-        this.claimed.add(taskId)
-        try {
-          await this.runClaimedTask(taskId, controller)
-        } finally {
-          this.claimed.delete(taskId)
+        if (!Cause.hasInterruptsOnly(exit.cause)) {
+          yield* Effect.logError('Project Checks task attempt failed', exit.cause)
+          yield* updateNow(taskId, DurableTaskModel.unknown)
+          return
         }
+        yield* updateNow(taskId, (current, now) =>
+          current.status === 'cancel-requested'
+            ? DurableTaskModel.finish(current, { attemptId, status: 'cancelled', exitCode: null, now })
+            : DurableTaskModel.unknown(current, now),
+        )
       })
-    } catch (error) {
-      if (!controller.signal.aborted) this.options.onFailure(error)
-    }
-  }
 
-  private async runClaimedTask(taskId: string, controller: AbortController): Promise<void> {
-    let task = this.options.table.get(taskId)
-    if (task === undefined || DurableTaskModel.isTerminal(task.status)) return
-    let cancellationWasRequested = task.status === 'cancel-requested'
-    if (task.status === 'running' || cancellationWasRequested) {
-      task = await this.options.table.update(taskId, current => {
-        if (current.status === 'cancel-requested') cancellationWasRequested = true
-        return DurableTaskModel.unknown(current, this.now())
+      const runAttempt = Effect.fnUntraced(function* (task: DurableTask, attemptId: string) {
+        const progress = (value: Progress) =>
+          updateNow(task.id, (current, now) => DurableTaskModel.progress(current, { attemptId, progress: value, now })).pipe(Effect.orDie, Effect.asVoid)
+        const attempt = yield* FiberMap.run(running, task.id, handler.run({ task, attemptId, progress }))
+        yield* Effect.forkScoped(watchCancellation(task.id))
+        const exit = yield* Fiber.await(attempt)
+        yield* settleAttempt(task.id, attemptId, exit)
+      }, Effect.scoped)
+
+      const recordInterruptedOwner = Effect.fnUntraced(function* (task: DurableTask) {
+        const cancellationWasRequested = task.status === 'cancel-requested'
+        const interrupted = yield* updateNow(task.id, DurableTaskModel.unknown)
+        const attempt = interrupted.attempts.at(-1)
+        if (attempt === undefined) return { task: interrupted, cancellationWasRequested }
+        const receipt = yield* handler.findReceipt(task.id, attempt.id)
+        if (Option.isNone(receipt) || receipt.value.status === 'unknown') return { task: interrupted, cancellationWasRequested }
+        const status = receipt.value.status
+        const reconciled = yield* updateNow(task.id, (current, now) =>
+          DurableTaskModel.reconcile(current, { attemptId: attempt.id, status, exitCode: receipt.value.exitCode, now }),
+        )
+        return { task: reconciled, cancellationWasRequested }
       })
-      const interruptedAttempt = task.attempts[task.attempts.length - 1]
-      const receipt = interruptedAttempt === undefined ? null : await this.options.findReceipt(taskId, interruptedAttempt.id)
-      const receiptStatus = receipt?.status
-      if (interruptedAttempt !== undefined && receipt !== null && receiptStatus !== undefined && receiptStatus !== 'unknown') {
-        task = await this.options.table.update(taskId, current =>
-          DurableTaskModel.reconcile(current, {
-            attemptId: interruptedAttempt.id,
-            status: receiptStatus,
-            exitCode: receipt.exitCode,
-            now: this.now(),
+
+      const runClaimedTask = Effect.fn('project-checks task run')(function* (taskId: string) {
+        const stored = yield* store.get(taskId)
+        if (Option.isNone(stored) || DurableTaskModel.isTerminal(stored.value.status)) return
+        let task = stored.value
+        let cancellationWasRequested = false
+        if (task.status === 'running' || task.status === 'cancel-requested') {
+          const recovered = yield* recordInterruptedOwner(task)
+          task = recovered.task
+          cancellationWasRequested = recovered.cancellationWasRequested
+        }
+        if (task.status === 'unknown') {
+          const validation = yield* handler.validate(task)
+          if (!validation.runnable) {
+            yield* updateNow(taskId, (current, now) => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now }))
+            return
+          }
+          if (!validation.safeReplay || cancellationWasRequested) return
+          task = yield* updateNow(taskId, DurableTaskModel.retry)
+        }
+        if (task.status !== 'queued') return
+        const validation = yield* handler.validate(task)
+        if (!validation.runnable) {
+          yield* updateNow(taskId, (current, now) => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now }))
+          return
+        }
+        const attemptId = yield* handler.newAttemptId
+        task = yield* updateNow(taskId, (current, now) => DurableTaskModel.begin(current, { attemptId, now }))
+        if (task.status !== 'running') return
+        if (yield* Ref.get(stopping)) {
+          yield* updateNow(taskId, DurableTaskModel.unknown)
+          return
+        }
+        yield* runAttempt(task, attemptId).pipe(
+          Effect.onInterrupt(() =>
+            updateNow(taskId, DurableTaskModel.unknown).pipe(Effect.andThen(FiberMap.remove(running, taskId)), Effect.ignore({ log: 'Warn' })),
+          ),
+        )
+      })
+
+      const runTask = (taskId: string) =>
+        Effect.scoped(Effect.andThen(store.claimWorker, runClaimedTask(taskId))).pipe(
+          Effect.catchCause(cause => (Cause.hasInterruptsOnly(cause) ? Effect.interrupt : Effect.logError('Project Checks task failed', cause))),
+          Effect.ensuring(SubscriptionRef.update(outstanding, count => Math.max(0, count - 1))),
+        )
+
+      yield* DshxPlugin.worker(Effect.forever(Effect.flatMap(Queue.take(queue), runTask)))
+      yield* Effect.addFinalizer(() => Ref.set(stopping, true))
+
+      for (const task of yield* store.all) if (RECOVERABLE.has(task.status)) yield* launch(task.id)
+
+      const enqueue = Effect.fn('project-checks task enqueue')(function* (task: DurableTask) {
+        return yield* admission.withPermit(
+          Effect.gen(function* () {
+            yield* failIfStopping
+            const stored = yield* store.createIfAbsent({ task })
+            if (stored.sessionId !== task.sessionId || stored.actionId !== task.actionId || stored.actionFingerprint !== task.actionFingerprint)
+              return yield* new IdempotencyKeyConflict({ reason: 'other-action' })
+            yield* launch(task.id)
+            return stored
           }),
         )
-      }
-    }
-    if (task.status === 'unknown') {
-      const validation = await this.options.validate(task)
-      if (!validation.runnable) {
-        await this.options.table.update(taskId, current => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now: this.now() }))
-        return
-      }
-      if (!validation.safeReplay || cancellationWasRequested) return
-      task = await this.options.table.update(taskId, current => DurableTaskModel.retry(current, this.now()))
-    }
-    if (task.status !== 'queued') return
-    const validation = await this.options.validate(task)
-    if (!validation.runnable) {
-      await this.options.table.update(taskId, current => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now: this.now() }))
-      return
-    }
-    const attemptId = this.options.newAttemptId()
-    task = await this.options.table.update(taskId, current => DurableTaskModel.begin(current, { attemptId, now: this.now() }))
-    if (task.status !== 'running') return
-    if (this.stopping || controller.signal.aborted) {
-      await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, this.now()))
-      return
-    }
-    const progress = async (value: DurableTask['attempts'][number]['progress']): Promise<void> => {
-      await this.options.table.update(taskId, current => DurableTaskModel.progress(current, { attemptId, progress: value, now: this.now() }))
-    }
-    const monitor = new AbortController()
-    const cancellationWatcher = this.watchCancellation(taskId, controller, monitor.signal).catch(error => {
-      this.options.onFailure(error)
-      controller.abort(new Error('Project Checks cancellation state became unavailable.'))
-    })
-    try {
-      const result = await this.options.run({ task, attemptId, signal: controller.signal, progress })
-      await this.options.table.update(taskId, current =>
-        result.status === 'unknown'
-          ? DurableTaskModel.unknown(current, this.now())
-          : DurableTaskModel.finish(current, { attemptId, status: result.status, exitCode: result.exitCode, now: this.now() }),
+      })
+
+      const list = Effect.fn('project-checks tasks list')(function* (sessionId: string) {
+        const tasks = yield* store.all
+        return tasks
+          .filter(task => task.sessionId === sessionId)
+          .toSorted((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
+          .slice(0, MAX_LISTED_TASKS)
+      })
+
+      const cancel = Effect.fn('project-checks task cancel')(function* (taskId: string) {
+        const task = yield* updateNow(taskId, DurableTaskModel.cancel)
+        if (task.status === 'cancel-requested' || task.status === 'cancelled') yield* FiberMap.remove(running, taskId)
+        return task
+      })
+
+      const retry = Effect.fn('project-checks task retry')(function* (input: { readonly taskId: string; readonly confirmPossibleDuplicate: boolean }) {
+        return yield* admission.withPermit(
+          Effect.gen(function* () {
+            yield* failIfStopping
+            if (!input.confirmPossibleDuplicate) return yield* new RetryNotConfirmed()
+            const current = yield* store.get(input.taskId)
+            if (Option.isNone(current)) return yield* new TaskNotFound({ taskId: input.taskId })
+            const validation = yield* handler.validate(current.value)
+            if (!validation.runnable) return yield* new HandlerUnavailable({ taskId: input.taskId })
+            const status = current.value.status
+            if (status !== 'unknown' && status !== 'failed' && status !== 'timed-out' && status !== 'cancelled') return yield* new RetryNotAllowed({ status })
+            const task = yield* updateNow(input.taskId, DurableTaskModel.retry)
+            yield* launch(input.taskId)
+            return task
+          }),
+        )
+      })
+
+      const awaitIdle = SubscriptionRef.changes(outstanding).pipe(
+        Stream.filter(count => count === 0),
+        Stream.take(1),
+        Stream.runDrain,
       )
-    } catch (error) {
-      await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, this.now()))
-      this.options.onFailure(error)
-    } finally {
-      monitor.abort()
-      await cancellationWatcher
-    }
-  }
 
-  private async watchCancellation(taskId: string, controller: AbortController, signal: AbortSignal): Promise<void> {
-    while (!signal.aborted && !controller.signal.aborted) {
-      try {
-        await delay(200, undefined, { signal })
-      } catch {
-        return
-      }
-      if (this.options.table.get(taskId)?.status === 'cancel-requested') controller.abort(new Error('Project Checks task cancellation requested.'))
-    }
-  }
-
-  private async validateTask(taskId: string): Promise<{ readonly runnable: boolean; readonly safeReplay: boolean }> {
-    const task = this.options.table.get(taskId)
-    if (task === undefined) throw new Error('No durable Project Checks task with that id.')
-    return this.options.validate(Schema.decodeUnknownSync(durableTaskSchema)(task))
-  }
-
-  private async withAdmission<Result>(work: () => Promise<Result>): Promise<Result> {
-    const previous = this.admission
-    let release = (): void => undefined
-    const locked = new Promise<void>(resolve => {
-      release = resolve
-    })
-    this.admission = previous.then(() => locked)
-    await previous
-    try {
-      return await work()
-    } finally {
-      release()
-    }
-  }
-
-  private now(): number {
-    return this.options.now?.() ?? Date.now()
-  }
+      return DurableTasks.of({ enqueue, get: store.get, list, cancel, retry, awaitIdle })
+    }),
+  )
 }

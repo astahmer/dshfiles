@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import type { RemoteHost } from './core.js'
 
 const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
@@ -103,13 +104,9 @@ export interface StepResult {
   readonly failure: 'cancelled' | 'timed-out' | 'spawn-failed' | null
 }
 
-export type LocalGitRunner = (input: {
-  readonly args: readonly string[]
-  readonly timeoutMs: number
-  readonly signal: AbortSignal | undefined
-}) => Promise<StepResult>
+export type LocalGitRunner = (input: { readonly args: readonly string[]; readonly timeoutMs: number }) => Effect.Effect<StepResult>
 
-export type PeerShellRunner = (input: { readonly command: string; readonly timeoutMs: number; readonly signal: AbortSignal | undefined }) => Promise<StepResult>
+export type PeerShellRunner = (input: { readonly command: string; readonly timeoutMs: number }) => Effect.Effect<StepResult>
 
 export type PeerFailureCode =
   | 'peer-snapshot-unavailable'
@@ -132,7 +129,6 @@ export interface PeerActionRun {
   readonly revision: string
   readonly changeId: string
   readonly action: { readonly command: string; readonly args: readonly string[]; readonly timeoutMs: number }
-  readonly signal?: AbortSignal | undefined
   readonly runLocalGit: LocalGitRunner
   readonly runPeerShell: PeerShellRunner
 }
@@ -177,67 +173,61 @@ const stepCode = ({ step, result }: { readonly step: string; readonly result: St
  * Copies the working-copy revision to the peer, runs one action there, and proves the peer stayed
  * on that exact revision. Any deviation is reported instead of trusted.
  */
-const runPeerSnapshot = async (input: PeerActionRun): Promise<PeerRunOutcome> => {
-  const { remote, revision, changeId, signal } = input
-  const bookmark = snapshotBookmark(changeId)
-  const peerJj = async (args: readonly string[], timeoutMs = BOOKKEEPING_TIMEOUT_MS): Promise<StepResult> =>
-    input.runPeerShell({ command: buildPeerJjCommand({ workspace: remote.workspace, args }), timeoutMs, signal })
-  const peerCommand = async (args: readonly string[], timeoutMs: number): Promise<StepResult> =>
-    input.runPeerShell({ command: buildPeerCommand({ workspace: remote.workspace, toolchain: remote.toolchain, args }), timeoutMs, signal })
+const peerFailure = (code: PeerFailureCode, message: string): PeerRunOutcome => ({ ok: false, code, message })
 
-  const bookmarkStep = await input.runLocalGit({
+const runPeerSnapshot = Effect.fn('project-checks peer run')(function* (input: PeerActionRun) {
+  const { remote, revision, changeId } = input
+  const bookmark = snapshotBookmark(changeId)
+  const peerJj = (args: readonly string[], timeoutMs = BOOKKEEPING_TIMEOUT_MS): Effect.Effect<StepResult> =>
+    input.runPeerShell({ command: buildPeerJjCommand({ workspace: remote.workspace, args }), timeoutMs })
+  const peerCommand = (args: readonly string[], timeoutMs: number): Effect.Effect<StepResult> =>
+    input.runPeerShell({ command: buildPeerCommand({ workspace: remote.workspace, toolchain: remote.toolchain, args }), timeoutMs })
+
+  const bookmarkStep = yield* input.runLocalGit({
     args: bookmarkSetArgs(changeId),
     timeoutMs: BOOKKEEPING_TIMEOUT_MS,
-    signal,
   })
   if (bookmarkStep.failure !== null || bookmarkStep.code !== 0) {
-    return {
-      ok: false,
-      code: stepCode({ step: 'push', result: bookmarkStep }),
-      message: failureMessage({ step: `Snapshot bookmark to ${remote.id}`, result: bookmarkStep }),
-    }
+    return peerFailure(stepCode({ step: 'push', result: bookmarkStep }), failureMessage({ step: `Snapshot bookmark to ${remote.id}`, result: bookmarkStep }))
   }
 
   // jj only creates a new remote bookmark for a tracked one; tracking is idempotent and the push
   // below reports the actionable error when the remote is misconfigured.
-  await input.runLocalGit({
+  yield* input.runLocalGit({
     args: bookmarkTrackArgs({ changeId, gitRemote: remote.gitRemote }),
     timeoutMs: BOOKKEEPING_TIMEOUT_MS,
-    signal,
   })
 
-  const push = await input.runLocalGit({
+  const push = yield* input.runLocalGit({
     args: pushBookmarkArgs({ gitRemote: remote.gitRemote, changeId }),
     timeoutMs: PUSH_TIMEOUT_MS,
-    signal,
   })
   if (push.failure !== null || push.code !== 0) {
-    return { ok: false, code: stepCode({ step: 'push', result: push }), message: failureMessage({ step: `Snapshot push to ${remote.id}`, result: push }) }
+    return peerFailure(stepCode({ step: 'push', result: push }), failureMessage({ step: `Snapshot push to ${remote.id}`, result: push }))
   }
 
   // Read the peer's materialized revision before fetching: a fetch may rebase its working copy onto
   // the new snapshot, which would hide which files the check is about to change.
-  const previousRevision = parseRevision((await peerJj(peerRevisionArgs())).stdout)
+  const previousRevision = parseRevision((yield* peerJj(peerRevisionArgs())).stdout)
 
-  const fetch = await peerJj(peerFetchArgs(remote.peerRemote), SSH_TIMEOUT_MS)
+  const fetch = yield* peerJj(peerFetchArgs(remote.peerRemote), SSH_TIMEOUT_MS)
   if (fetch.failure !== null || fetch.code !== 0) {
-    return { ok: false, code: stepCode({ step: 'fetch', result: fetch }), message: failureMessage({ step: `Peer fetch on ${remote.id}`, result: fetch }) }
+    return peerFailure(stepCode({ step: 'fetch', result: fetch }), failureMessage({ step: `Peer fetch on ${remote.id}`, result: fetch }))
   }
 
-  await peerJj(peerForgetArgs(bookmark))
+  yield* peerJj(peerForgetArgs(bookmark))
 
-  const edit = await peerJj(peerEditArgs(revision), SSH_TIMEOUT_MS)
+  const edit = yield* peerJj(peerEditArgs(revision), SSH_TIMEOUT_MS)
   if (edit.failure !== null || edit.code !== 0) {
-    return { ok: false, code: stepCode({ step: 'edit', result: edit }), message: failureMessage({ step: `Peer checkout on ${remote.id}`, result: edit }) }
+    return peerFailure(stepCode({ step: 'edit', result: edit }), failureMessage({ step: `Peer checkout on ${remote.id}`, result: edit }))
   }
 
-  const materialized = parseRevision((await peerJj(peerRevisionArgs())).stdout)
+  const materialized = parseRevision((yield* peerJj(peerRevisionArgs())).stdout)
   if (materialized !== revision) {
-    return {
-      ok: false,
-      code: 'peer-revision-mismatch',
-      message: `Peer ${remote.id} checked out ${materialized?.slice(0, 12) ?? 'no revision'} instead of ${revision.slice(0, 12)}`,
-    }
+    return peerFailure(
+      'peer-revision-mismatch',
+      `Peer ${remote.id} checked out ${materialized?.slice(0, 12) ?? 'no revision'} instead of ${revision.slice(0, 12)}`,
+    )
   }
 
   if (remote.install !== undefined) {
@@ -246,53 +236,46 @@ const runPeerSnapshot = async (input: PeerActionRun): Promise<PeerRunOutcome> =>
         ? true
         : previousRevision === revision
           ? false
-          : await hasChangedPaths({ peerJj, previousRevision, revision, paths: remote.install.whenPaths })
+          : yield* hasChangedPaths({ peerJj, previousRevision, revision, paths: remote.install.whenPaths })
     if (changed) {
-      const install = await peerCommand(remote.install.command, remote.install.timeoutMs)
+      const install = yield* peerCommand(remote.install.command, remote.install.timeoutMs)
       if (install.failure !== null || install.code !== 0) {
-        return {
-          ok: false,
-          code: stepCode({ step: 'install', result: install }),
-          message: failureMessage({ step: `Peer install on ${remote.id}`, result: install }),
-        }
+        return peerFailure(stepCode({ step: 'install', result: install }), failureMessage({ step: `Peer install on ${remote.id}`, result: install }))
       }
     }
   }
 
-  const run = await peerCommand([input.action.command, ...input.action.args], input.action.timeoutMs)
-  if (run.failure === 'cancelled') return { ok: false, code: 'peer-cancelled', message: failureMessage({ step: `Peer run on ${remote.id}`, result: run }) }
-  if (run.failure === 'timed-out') return { ok: false, code: 'peer-timeout', message: failureMessage({ step: `Peer run on ${remote.id}`, result: run }) }
+  const run = yield* peerCommand([input.action.command, ...input.action.args], input.action.timeoutMs)
+  if (run.failure === 'cancelled') return peerFailure('peer-cancelled', failureMessage({ step: `Peer run on ${remote.id}`, result: run }))
+  if (run.failure === 'timed-out') return peerFailure('peer-timeout', failureMessage({ step: `Peer run on ${remote.id}`, result: run }))
   if (run.failure === 'spawn-failed') {
-    return { ok: false, code: 'peer-unreachable', message: failureMessage({ step: `Peer run on ${remote.id}`, result: run }) }
+    return peerFailure('peer-unreachable', failureMessage({ step: `Peer run on ${remote.id}`, result: run }))
   }
 
-  const afterRevision = parseRevision((await peerJj(peerRevisionArgs())).stdout)
+  const afterRevision = parseRevision((yield* peerJj(peerRevisionArgs())).stdout)
   if (run.code === 0 && afterRevision !== revision) {
-    return {
-      ok: false,
-      code: 'peer-source-changed',
-      message: `Peer ${remote.id} working copy moved to ${afterRevision?.slice(0, 12) ?? 'no revision'} while the check ran`,
-    }
+    return peerFailure('peer-source-changed', `Peer ${remote.id} working copy moved to ${afterRevision?.slice(0, 12) ?? 'no revision'} while the check ran`)
   }
 
-  return { ok: true, exitCode: run.code, stdout: run.stdout, stderr: run.stderr }
-}
+  const succeeded: PeerRunOutcome = { ok: true, exitCode: run.code, stdout: run.stdout, stderr: run.stderr }
+  return succeeded
+})
 
-const hasChangedPaths = async ({
+const hasChangedPaths = Effect.fnUntraced(function* ({
   peerJj,
   previousRevision,
   revision,
   paths,
 }: {
-  readonly peerJj: (args: readonly string[], timeoutMs?: number) => Promise<StepResult>
+  readonly peerJj: (args: readonly string[], timeoutMs?: number) => Effect.Effect<StepResult>
   readonly previousRevision: string
   readonly revision: string
   readonly paths: readonly string[]
-}): Promise<boolean> => {
-  const diff = await peerJj(peerDiffArgs({ previousRevision, revision, paths }))
+}) {
+  const diff = yield* peerJj(peerDiffArgs({ previousRevision, revision, paths }))
   if (diff.failure !== null || diff.code !== 0) return true
   return diff.stdout.trim().length > 0
-}
+})
 
 export class PeerSnapshotModel {
   static readonly sshOptions = SSH_OPTIONS

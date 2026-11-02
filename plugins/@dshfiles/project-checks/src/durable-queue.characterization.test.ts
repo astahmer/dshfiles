@@ -2,77 +2,40 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
-import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
-import { Schema } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
-import { DurableTaskRunner, type DurableTaskResult } from './durable-task-runner.js'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { HostContext } from '@dshfiles/dshx/effect'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Ref, Schedule, Scope } from 'effect'
+import { DurableTasks, type DurableTaskResult } from './durable-task-runner.js'
 import { DurableTaskStore } from './durable-task-store.js'
-import { durableTaskSchema, type DurableTask } from './durable-tasks.js'
-import { runManagedProcess } from './managed-process.js'
+import { DurableTaskModel } from './durable-tasks.js'
+import { Executables } from './host-promise.js'
+import { ProcessRunner } from './managed-process.js'
+import { DurableTestLayers } from './test-fixtures/durable-layers.js'
 
-// The durable queue's observable contract on a real SQLite store and real processes, pinned before it becomes a
-// Queue + FiberMap worker (mid-hosts review, "Durable queue").
+const { queuedTask, store: storeLayer, taskStatus, tasks: tasksLayer } = DurableTestLayers
 
-const cleanups: Array<() => Promise<void>> = []
-afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
-})
+// The durable queue's observable contract on a real SQLite store and real processes: one task at a time, a cancel
+// interrupts the attempt and its process group, close leaves a claimed task unknown, a second Host recovers.
 
-const scratchRoot = async (): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'project-checks-queue-'))
-  cleanups.push(() => rm(root, { recursive: true, force: true }))
-  return root
-}
+const scratchRoot = Effect.acquireRelease(
+  Effect.promise(() => mkdtemp(join(tmpdir(), 'project-checks-queue-'))),
+  root => Effect.promise(() => rm(root, { recursive: true, force: true })),
+)
 
-const openStore = async (root: string): Promise<DurableTaskStore> => {
-  const store = await DurableTaskStore.open({ root })
-  cleanups.push(async () => store.close())
-  return store
-}
-
-const queuedTask = (letter: string, createdAt: number): DurableTask =>
-  Schema.decodeUnknownSync(durableTaskSchema)({
-    id: letter.repeat(64),
-    idempotencyKey: `00000000-0000-4000-8000-00000000000${createdAt}`,
-    sessionId: 'queue-session',
-    actionId: 'test',
-    handlerVersion: 1,
-    actionFingerprint: 'f'.repeat(64),
-    cwd: '/tmp/project',
-    status: 'queued',
-    attempts: [],
-    createdAt,
-    updatedAt: createdAt,
-    errorCode: null,
-  })
+const task = (letter: string, createdAt: number) =>
+  queuedTask({ id: letter.repeat(64), idempotencyKey: `00000000-0000-4000-8000-00000000000${createdAt}`, sessionId: 'queue-session', createdAt })
 
 let attemptCounter = 0
-const makeRunner = (input: {
-  readonly table: DurableTaskStore
-  readonly run: (task: DurableTask, signal: AbortSignal) => Promise<DurableTaskResult>
-}): DurableTaskRunner => {
-  const runner = new DurableTaskRunner({
-    table: input.table,
-    newAttemptId: () => `00000000-0000-4000-9000-${String((attemptCounter += 1)).padStart(12, '0')}`,
-    validate: async () => ({ runnable: true, safeReplay: false }),
-    findReceipt: async () => null,
-    run: ({ task, signal }) => input.run(task, signal),
-    onFailure: error => {
-      throw error
-    },
-  })
-  cleanups.push(() => runner.close())
-  return runner
-}
+const attemptIds = () => `00000000-0000-4000-9000-${String((attemptCounter += 1)).padStart(12, '0')}`
 
-const gate = () => {
-  let open: () => void = () => undefined
-  const opened = new Promise<void>(resolve => {
-    open = resolve
+const build = <ROut, E>(layer: Layer.Layer<ROut, E>) =>
+  Effect.gen(function* () {
+    const scope = yield* Scope.make()
+    const services = yield* Layer.buildWithScope(layer, scope)
+    return { services, close: Scope.close(scope, Exit.void) }
   })
-  return { opened, open }
-}
 
 const isAlive = (pid: number): boolean => {
   try {
@@ -83,228 +46,287 @@ const isAlive = (pid: number): boolean => {
   }
 }
 
-const subprocessRuntime = async (): Promise<SubprocessRuntime> => {
-  const host: TestHost = await createTestHost()
-  cleanups.push(() => host.dispose())
-  await host.ctx.plugin(LocalSubprocessRuntime)
-  const runtime = host.ctx.get('subprocess')
-  if (runtime === undefined) throw new Error('The local subprocess runtime did not register.')
-  return runtime
-}
+const eventually = <A>(read: Effect.Effect<A>, accept: (value: A) => boolean) =>
+  read.pipe(Effect.repeat({ schedule: Schedule.spaced('25 millis'), until: accept }), Effect.timeout('10 seconds'))
+
+const grandchildPid = (pidFile: string) =>
+  Effect.promise(() =>
+    readFile(pidFile, 'utf8').then(
+      text => Number(text.trim()),
+      () => 0,
+    ),
+  )
+
+const processRunner = Effect.gen(function* () {
+  const host = yield* Effect.acquireRelease(
+    Effect.promise(() => createTestHost()),
+    created => Effect.promise(() => created.dispose()),
+  )
+  yield* Effect.promise(() => host.ctx.plugin(LocalSubprocessRuntime))
+  const services = yield* Layer.build(
+    ProcessRunner.layer.pipe(
+      Layer.provide(Layer.mergeAll(DshChildProcessSpawner.layer, Executables.layer)),
+      Layer.provide(HostContext.layer({ ctx: host.ctx, packageId: '@dshfiles/project-checks' })),
+    ),
+  )
+  return Context.get(services, ProcessRunner)
+})
 
 /** Runs `sleep 30` in the background of a shell and records the grandchild's pid, so group termination is observable. */
-const sleeperRun = (input: { readonly subprocess: SubprocessRuntime; readonly root: string; readonly pidFile: string }) => {
-  const started = gate()
-  const run = async (_task: DurableTask, signal: AbortSignal): Promise<DurableTaskResult> => {
-    const running = runManagedProcess({
-      subprocess: input.subprocess,
-      command: 'sh',
-      args: ['-c', `sleep 30 & echo $! > '${input.pidFile}'; wait`],
-      cwd: input.root,
-      timeoutMs: 60_000,
-      signal,
+const sleeperRun = Effect.fnUntraced(function* (input: { readonly root: string; readonly pidFile: string }) {
+  const runner = yield* processRunner
+  const started = yield* Deferred.make<void>()
+  const run = () =>
+    Effect.gen(function* () {
+      yield* Deferred.succeed(started, undefined)
+      const result = yield* runner.run({ command: 'sh', args: ['-c', `sleep 30 & echo $! > '${input.pidFile}'; wait`], cwd: input.root, timeoutMs: 60_000 })
+      if (result.failure !== null) return { status: 'unknown', exitCode: null } satisfies DurableTaskResult
+      return { status: result.exitCode === 0 ? 'succeeded' : 'failed', exitCode: result.exitCode } satisfies DurableTaskResult
     })
-    started.open()
-    const result = await running
-    if (result.failure === 'cancelled') return { status: 'cancelled', exitCode: null }
-    if (result.failure !== null) return { status: 'unknown', exitCode: null }
-    return { status: result.exitCode === 0 ? 'succeeded' : 'failed', exitCode: result.exitCode }
-  }
-  return { run, started: started.opened }
-}
-
-const grandchildPid = async (pidFile: string): Promise<number> => {
-  try {
-    return Number((await readFile(pidFile, 'utf8')).trim())
-  } catch {
-    return 0
-  }
-}
+  return { run, started: Deferred.await(started) }
+})
 
 describe('durable Project Checks queue characterization', () => {
-  it('runs one task at a time, in admission order', async () => {
-    const store = await openStore(await scratchRoot())
-    const events: string[] = []
-    const first = gate()
-    const runner = makeRunner({
-      table: store,
-      run: async task => {
-        const letter = task.id.slice(0, 1)
-        events.push(`start ${letter}`)
-        if (letter === 'a') await first.opened
-        events.push(`end ${letter}`)
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
-    await runner.enqueue(queuedTask('a', 1))
-    await runner.enqueue(queuedTask('b', 2))
-    await runner.enqueue(queuedTask('c', 3))
-    await expect.poll(() => events).toEqual(['start a'])
-    expect([runner.get('b'.repeat(64))?.status, runner.get('c'.repeat(64))?.status]).toEqual(['queued', 'queued'])
-    first.open()
-    await runner.waitForIdle()
-    expect(events).toEqual(['start a', 'end a', 'start b', 'end b', 'start c', 'end c'])
-    expect(['a', 'b', 'c'].map(letter => runner.get(letter.repeat(64))?.status)).toEqual(['succeeded', 'succeeded', 'succeeded'])
-  })
+  it.live('runs one task at a time, in admission order', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const events = yield* Ref.make<ReadonlyArray<string>>([])
+      const first = yield* Deferred.make<void>()
+      const queue = yield* build(
+        tasksLayer(root, {
+          attemptIds,
+          run: ({ task: current }) =>
+            Effect.gen(function* () {
+              const letter = current.id.slice(0, 1)
+              yield* Ref.update(events, list => [...list, `start ${letter}`])
+              if (letter === 'a') yield* Deferred.await(first)
+              yield* Ref.update(events, list => [...list, `end ${letter}`])
+              return { status: 'succeeded', exitCode: 0 } satisfies DurableTaskResult
+            }),
+        }),
+      )
+      const tasks = Context.get(queue.services, DurableTasks)
+      yield* tasks.enqueue(task('a', 1))
+      yield* tasks.enqueue(task('b', 2))
+      yield* tasks.enqueue(task('c', 3))
+      yield* eventually(Ref.get(events), list => list.length === 1)
+      expect(yield* Ref.get(events)).toEqual(['start a'])
+      const statuses = yield* Effect.forEach(['b', 'c'], letter => taskStatus(letter.repeat(64))).pipe(Effect.provide(queue.services))
+      expect(statuses).toEqual(['queued', 'queued'])
+      yield* Deferred.succeed(first, undefined)
+      yield* tasks.awaitIdle
+      expect(yield* Ref.get(events)).toEqual(['start a', 'end a', 'start b', 'end b', 'start c', 'end c'])
+      const settled = yield* Effect.forEach(['a', 'b', 'c'], letter => taskStatus(letter.repeat(64))).pipe(Effect.provide(queue.services))
+      expect(settled).toEqual(['succeeded', 'succeeded', 'succeeded'])
+      yield* queue.close
+    }).pipe(Effect.scoped),
+  )
 
-  it('cancelling a queued task behind a running one settles it as cancelled and never runs it', async () => {
-    const store = await openStore(await scratchRoot())
-    const ran: string[] = []
-    const first = gate()
-    const runner = makeRunner({
-      table: store,
-      run: async task => {
-        ran.push(task.id.slice(0, 1))
-        if (task.id.startsWith('a')) await first.opened
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
-    await runner.enqueue(queuedTask('a', 1))
-    await runner.enqueue(queuedTask('b', 2))
-    await expect.poll(() => ran).toEqual(['a'])
-    expect((await runner.cancel('b'.repeat(64))).status).toBe('cancelled')
-    first.open()
-    await runner.waitForIdle()
-    expect(ran).toEqual(['a'])
-    expect(runner.get('b'.repeat(64))).toMatchObject({ status: 'cancelled', attempts: [] })
-  })
+  it.live('cancelling a queued task behind a running one settles it as cancelled and never runs it', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const ran = yield* Ref.make<ReadonlyArray<string>>([])
+      const first = yield* Deferred.make<void>()
+      const queue = yield* build(
+        tasksLayer(root, {
+          attemptIds,
+          run: ({ task: current }) =>
+            Effect.gen(function* () {
+              yield* Ref.update(ran, list => [...list, current.id.slice(0, 1)])
+              if (current.id.startsWith('a')) yield* Deferred.await(first)
+              return { status: 'succeeded', exitCode: 0 } satisfies DurableTaskResult
+            }),
+        }),
+      )
+      const tasks = Context.get(queue.services, DurableTasks)
+      yield* tasks.enqueue(task('a', 1))
+      yield* tasks.enqueue(task('b', 2))
+      yield* eventually(Ref.get(ran), list => list.length === 1)
+      expect((yield* tasks.cancel('b'.repeat(64))).status).toBe('cancelled')
+      yield* Deferred.succeed(first, undefined)
+      yield* tasks.awaitIdle
+      expect(yield* Ref.get(ran)).toEqual(['a'])
+      expect(yield* tasks.get('b'.repeat(64))).toMatchObject({ value: { status: 'cancelled', attempts: [] } })
+      yield* queue.close
+    }).pipe(Effect.scoped),
+  )
 
-  it('cancelling a running task terminates its real process group and records the task as cancelled', async () => {
-    const root = await scratchRoot()
-    const store = await openStore(root)
-    const pidFile = join(root, 'sleeper.pid')
-    const sleeper = sleeperRun({ subprocess: await subprocessRuntime(), root, pidFile })
-    const runner = makeRunner({ table: store, run: sleeper.run })
-    await runner.enqueue(queuedTask('a', 1))
-    await sleeper.started
-    await expect.poll(() => grandchildPid(pidFile)).toBeGreaterThan(0)
-    const pid = await grandchildPid(pidFile)
-    expect(isAlive(pid)).toBe(true)
+  it.live(
+    'cancelling a running task terminates its real process group and records the task as cancelled',
+    () =>
+      Effect.gen(function* () {
+        const root = yield* scratchRoot
+        const pidFile = join(root, 'sleeper.pid')
+        const sleeper = yield* sleeperRun({ root, pidFile })
+        const queue = yield* build(tasksLayer(root, { attemptIds, run: sleeper.run }))
+        const tasks = Context.get(queue.services, DurableTasks)
+        yield* tasks.enqueue(task('a', 1))
+        yield* sleeper.started
+        const pid = yield* eventually(grandchildPid(pidFile), value => value > 0)
+        expect(isAlive(pid)).toBe(true)
 
-    expect((await runner.cancel('a'.repeat(64))).status).toBe('cancel-requested')
-    await runner.waitForIdle()
+        expect((yield* tasks.cancel('a'.repeat(64))).status).toBe('cancel-requested')
+        yield* tasks.awaitIdle
 
-    expect(runner.get('a'.repeat(64))).toMatchObject({ status: 'cancelled', attempts: [{ status: 'cancelled' }] })
-    await expect.poll(() => isAlive(pid), { timeout: 5_000 }).toBe(false)
-  }, 20_000)
+        expect(yield* tasks.get('a'.repeat(64))).toMatchObject({ value: { status: 'cancelled', attempts: [{ status: 'cancelled' }] } })
+        yield* eventually(
+          Effect.sync(() => isAlive(pid)),
+          alive => !alive,
+        )
+        yield* queue.close
+      }).pipe(Effect.scoped),
+    20_000,
+  )
 
-  it('a cancel written through another store connection reaches the running process within the 200 ms poll', async () => {
-    const root = await scratchRoot()
-    const store = await openStore(root)
-    const pidFile = join(root, 'sleeper.pid')
-    const sleeper = sleeperRun({ subprocess: await subprocessRuntime(), root, pidFile })
-    const runner = makeRunner({ table: store, run: sleeper.run })
-    await runner.enqueue(queuedTask('a', 1))
-    await sleeper.started
-    await expect.poll(() => grandchildPid(pidFile)).toBeGreaterThan(0)
-    const pid = await grandchildPid(pidFile)
+  it.live(
+    'a cancel written through another store connection reaches the running process within the 200 ms poll',
+    () =>
+      Effect.gen(function* () {
+        const root = yield* scratchRoot
+        const pidFile = join(root, 'sleeper.pid')
+        const sleeper = yield* sleeperRun({ root, pidFile })
+        const queue = yield* build(tasksLayer(root, { attemptIds, run: sleeper.run }))
+        const tasks = Context.get(queue.services, DurableTasks)
+        yield* tasks.enqueue(task('a', 1))
+        yield* sleeper.started
+        const pid = yield* eventually(grandchildPid(pidFile), value => value > 0)
 
-    const otherHostStore = await openStore(root)
-    const otherHost = makeRunner({ table: otherHostStore, run: async () => ({ status: 'succeeded', exitCode: 0 }) })
-    expect((await otherHost.cancel('a'.repeat(64))).status).toBe('cancel-requested')
+        const otherHost = yield* build(storeLayer(root))
+        const requested = yield* Context.get(otherHost.services, DurableTaskStore).update('a'.repeat(64), current =>
+          DurableTaskModel.cancel(current, Date.now()),
+        )
+        expect(requested.status).toBe('cancel-requested')
 
-    await runner.waitForIdle()
-    expect(store.get('a'.repeat(64))).toMatchObject({ status: 'cancelled', attempts: [{ status: 'cancelled' }] })
-    await expect.poll(() => isAlive(pid), { timeout: 5_000 }).toBe(false)
-  }, 20_000)
+        yield* tasks.awaitIdle
+        expect(yield* tasks.get('a'.repeat(64))).toMatchObject({ value: { status: 'cancelled', attempts: [{ status: 'cancelled' }] } })
+        yield* eventually(
+          Effect.sync(() => isAlive(pid)),
+          alive => !alive,
+        )
+        yield* otherHost.close
+        yield* queue.close
+      }).pipe(Effect.scoped),
+    20_000,
+  )
 
-  it('closing the runner marks a claimed running task unknown and stops its process', async () => {
-    const root = await scratchRoot()
-    const store = await openStore(root)
-    const pidFile = join(root, 'sleeper.pid')
-    const sleeper = sleeperRun({ subprocess: await subprocessRuntime(), root, pidFile })
-    const runner = makeRunner({ table: store, run: sleeper.run })
-    await runner.enqueue(queuedTask('a', 1))
-    await runner.enqueue(queuedTask('b', 2))
-    await sleeper.started
-    await expect.poll(() => grandchildPid(pidFile)).toBeGreaterThan(0)
-    const pid = await grandchildPid(pidFile)
+  it.live(
+    'closing the runner marks a claimed running task unknown and stops its process',
+    () =>
+      Effect.gen(function* () {
+        const root = yield* scratchRoot
+        const pidFile = join(root, 'sleeper.pid')
+        const sleeper = yield* sleeperRun({ root, pidFile })
+        const queue = yield* build(tasksLayer(root, { attemptIds, run: sleeper.run }))
+        const tasks = Context.get(queue.services, DurableTasks)
+        yield* tasks.enqueue(task('a', 1))
+        yield* tasks.enqueue(task('b', 2))
+        yield* sleeper.started
+        const pid = yield* eventually(grandchildPid(pidFile), value => value > 0)
 
-    await runner.close()
+        yield* queue.close
 
-    expect(store.get('a'.repeat(64))?.status).toBe('unknown')
-    expect(store.get('b'.repeat(64))?.status).toBe('queued')
-    await expect.poll(() => isAlive(pid), { timeout: 5_000 }).toBe(false)
-    await expect(runner.enqueue(queuedTask('c', 3))).rejects.toThrow('Durable Project Checks runner is stopping.')
-  }, 20_000)
+        const reopened = yield* build(storeLayer(root))
+        const statuses = yield* Effect.forEach(['a', 'b'], letter => taskStatus(letter.repeat(64))).pipe(Effect.provide(reopened.services))
+        expect(statuses).toEqual(['unknown', 'queued'])
+        yield* eventually(
+          Effect.sync(() => isAlive(pid)),
+          alive => !alive,
+        )
+        const refused = yield* Effect.flip(tasks.enqueue(task('c', 3)))
+        expect(refused.message).toBe('Durable Project Checks runner is stopping.')
+        yield* reopened.close
+      }).pipe(Effect.scoped),
+    20_000,
+  )
 
-  it('a second Host opening the store after close recovers queued work and leaves the interrupted task unknown', async () => {
-    const root = await scratchRoot()
-    const first = await DurableTaskStore.open({ root })
-    await first.createIfAbsent(queuedTask('a', 1), 1_000)
-    await first.update('a'.repeat(64), task => ({ ...task, status: 'running', attempts: [] }))
-    await first.createIfAbsent(queuedTask('b', 2), 1_000)
-    first.close()
+  it.live('a second Host opening the store after close recovers queued work and leaves the interrupted task unknown', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const first = yield* build(storeLayer(root))
+      const firstStore = Context.get(first.services, DurableTaskStore)
+      yield* firstStore.createIfAbsent({ task: task('a', 1) })
+      yield* firstStore.update('a'.repeat(64), current => ({ ...current, status: 'running', attempts: [] }))
+      yield* firstStore.createIfAbsent({ task: task('b', 2) })
+      yield* first.close
 
-    const store = await openStore(root)
-    const ran: string[] = []
-    const runner = makeRunner({
-      table: store,
-      run: async task => {
-        ran.push(task.id.slice(0, 1))
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
-    await runner.recover()
-    await runner.waitForIdle()
-    expect(ran).toEqual(['b'])
-    expect(store.get('a'.repeat(64))?.status).toBe('unknown')
-    expect(store.get('b'.repeat(64))?.status).toBe('succeeded')
-  })
+      const ran = yield* Ref.make<ReadonlyArray<string>>([])
+      const queue = yield* build(
+        tasksLayer(root, {
+          attemptIds,
+          run: ({ task: current }) =>
+            Ref.update(ran, list => [...list, current.id.slice(0, 1)]).pipe(Effect.as({ status: 'succeeded', exitCode: 0 } satisfies DurableTaskResult)),
+        }),
+      )
+      yield* Context.get(queue.services, DurableTasks).awaitIdle
+      expect(yield* Ref.get(ran)).toEqual(['b'])
+      const statuses = yield* Effect.forEach(['a', 'b'], letter => taskStatus(letter.repeat(64))).pipe(Effect.provide(queue.services))
+      expect(statuses).toEqual(['unknown', 'succeeded'])
+      yield* queue.close
+    }).pipe(Effect.scoped),
+  )
 })
 
 describe('durable task worker claim (SQLite BEGIN IMMEDIATE)', () => {
-  it('a second claimant waits while the claim is held and proceeds once it is released', async () => {
-    const root = await scratchRoot()
-    const holder = await openStore(root)
-    const waiter = await openStore(root)
-    const events: string[] = []
-    const release = gate()
-    const held = holder.withWorkerClaim(new AbortController().signal, async () => {
-      events.push('holder in')
-      await release.opened
-      events.push('holder out')
-    })
-    await expect.poll(() => events).toEqual(['holder in'])
-    const waiting = waiter.withWorkerClaim(new AbortController().signal, async () => {
-      events.push('waiter in')
-    })
-    await new Promise(resolve => setTimeout(resolve, 150))
-    expect(events).toEqual(['holder in'])
-    release.open()
-    await Promise.all([held, waiting])
-    expect(events).toEqual(['holder in', 'holder out', 'waiter in'])
-  })
+  it.live('a second claimant waits while the claim is held and proceeds once it is released', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const holder = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const waiter = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const events = yield* Ref.make<ReadonlyArray<string>>([])
+      const release = yield* Deferred.make<void>()
+      const held = yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* holder.claimWorker
+          yield* Ref.update(events, list => [...list, 'holder in'])
+          yield* Deferred.await(release)
+          yield* Ref.update(events, list => [...list, 'holder out'])
+        }),
+      ).pipe(Effect.forkChild)
+      yield* eventually(Ref.get(events), list => list.length === 1)
+      const waiting = yield* Effect.scoped(
+        Effect.andThen(
+          waiter.claimWorker,
+          Ref.update(events, list => [...list, 'waiter in']),
+        ),
+      ).pipe(Effect.forkChild)
+      yield* Effect.sleep('150 millis')
+      expect(yield* Ref.get(events)).toEqual(['holder in'])
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(held)
+      yield* Fiber.join(waiting)
+      expect(yield* Ref.get(events)).toEqual(['holder in', 'holder out', 'waiter in'])
+    }).pipe(Effect.scoped),
+  )
 
-  it('aborting a waiting claimant rejects with the abort reason and never runs its work', async () => {
-    const root = await scratchRoot()
-    const holder = await openStore(root)
-    const waiter = await openStore(root)
-    const release = gate()
-    const held = holder.withWorkerClaim(new AbortController().signal, () => release.opened)
-    await new Promise(resolve => setTimeout(resolve, 20))
-    const controller = new AbortController()
-    let ran = false
-    const waiting = waiter.withWorkerClaim(controller.signal, async () => {
-      ran = true
-    })
-    await new Promise(resolve => setTimeout(resolve, 80))
-    controller.abort(new Error('claim wait cancelled'))
-    await expect(waiting).rejects.toThrow()
-    expect(ran).toBe(false)
-    release.open()
-    await held
-  })
+  it.live('interrupting a waiting claimant never runs its work', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const holder = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const waiter = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const release = yield* Deferred.make<void>()
+      const claimed = yield* Deferred.make<void>()
+      const held = yield* Effect.scoped(Effect.andThen(holder.claimWorker, Effect.andThen(Deferred.succeed(claimed, undefined), Deferred.await(release)))).pipe(
+        Effect.forkChild,
+      )
+      yield* Deferred.await(claimed)
+      const ran = yield* Ref.make(false)
+      const waiting = yield* Effect.scoped(Effect.andThen(waiter.claimWorker, Ref.set(ran, true))).pipe(Effect.forkChild)
+      yield* Effect.sleep('80 millis')
+      yield* Fiber.interrupt(waiting)
+      expect(yield* Ref.get(ran)).toBe(false)
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(held)
+    }).pipe(Effect.scoped),
+  )
 
-  it('a claim whose work throws is released for the next claimant', async () => {
-    const root = await scratchRoot()
-    const first = await openStore(root)
-    const second = await openStore(root)
-    await expect(
-      first.withWorkerClaim(new AbortController().signal, async () => {
-        throw new Error('work failed')
-      }),
-    ).rejects.toThrow('work failed')
-    await expect(second.withWorkerClaim(new AbortController().signal, async () => 'claimed')).resolves.toBe('claimed')
-  })
+  it.live('a claim whose work fails is released for the next claimant', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const first = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const second = Context.get((yield* build(storeLayer(root))).services, DurableTaskStore)
+      const failed = yield* Effect.flip(Effect.scoped(Effect.andThen(first.claimWorker, Effect.fail('work failed'))))
+      expect(failed).toBe('work failed')
+      expect(yield* Effect.scoped(Effect.as(second.claimWorker, 'claimed'))).toBe('claimed')
+    }).pipe(Effect.scoped),
+  )
 })

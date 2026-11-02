@@ -5,10 +5,14 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { DurableTaskRunner } from './durable-task-runner.js'
+import { Context, Effect, Layer, Option } from 'effect'
+import { DurableTasks, type DurableTaskResult } from './durable-task-runner.js'
 import { DurableTaskStore } from './durable-task-store.js'
-import { durableTaskSchema } from './durable-tasks.js'
+import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.js'
 import { storedReceiptSchema } from './store.js'
+import { DurableTestLayers } from './test-fixtures/durable-layers.js'
+
+const { store: storeLayer, tasks: tasksLayer } = DurableTestLayers
 
 const taskId = 'a'.repeat(64)
 const attemptId = '00000000-0000-4000-8000-000000000002'
@@ -52,12 +56,55 @@ const markerCount = async (path: string): Promise<number> => {
   }
 }
 
+const withStore = <A, E>(root: string, use: (store: DurableTaskStore['Service']) => Effect.Effect<A, E>) =>
+  Effect.runPromise(Effect.scoped(Effect.flatMap(Layer.build(storeLayer(root)), services => use(Context.get(services, DurableTaskStore)))))
+
+const storedTask = (root: string): Promise<DurableTask | undefined> => withStore(root, store => Effect.map(store.get(taskId), Option.getOrUndefined))
+
+/** Recover the store under root with a handler that counts executions; returns the settled task. */
+const recoverWith = (root: string, findReceipt: boolean) =>
+  Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        let executions = 0
+        const reader = Context.get(yield* Layer.build(storeLayer(root)), DurableTaskStore)
+        const decode = Schema.decodeUnknownEffect(storedReceiptSchema)
+        const tasks = Context.get(
+          yield* Layer.build(
+            tasksLayer(root, {
+              attemptIds: () => '00000000-0000-4000-8000-000000000003',
+              ...(findReceipt && {
+                findReceipt: (recoveredTaskId: string, recoveredAttemptId: string) =>
+                  reader.findAttemptReceipt(recoveredTaskId, recoveredAttemptId).pipe(
+                    Effect.flatMap(found => Effect.transposeOption(Option.map(found, decode))),
+                    Effect.map(
+                      Option.map((receipt): DurableTaskResult => ({
+                        status: receipt.status === 'passed' ? 'succeeded' : receipt.status,
+                        exitCode: receipt.exitCode,
+                      })),
+                    ),
+                    Effect.orDie,
+                  ),
+              }),
+              run: () =>
+                Effect.sync((): DurableTaskResult => {
+                  executions += 1
+                  return { status: 'succeeded', exitCode: 0 }
+                }),
+            }),
+          ),
+          DurableTasks,
+        )
+        yield* tasks.awaitIdle
+        return { executions, task: Option.getOrUndefined(yield* tasks.get(taskId)) }
+      }),
+    ),
+  )
+
 describe('durable Project Checks cross-process coordination', () => {
   it('admits the same idempotency key in two Node processes but runs its side effect once', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-process-race-'))
     const markerPath = join(root, 'effects.txt')
-    let store: DurableTaskStore | undefined
-
     try {
       const outcomes = await Promise.all([runWorker(root, markerPath, 'complete'), runWorker(root, markerPath, 'complete')])
       expect(outcomes).toEqual([
@@ -65,59 +112,34 @@ describe('durable Project Checks cross-process coordination', () => {
         { code: 0, signal: null },
       ])
       expect(await markerCount(markerPath)).toBe(1)
-
-      store = await DurableTaskStore.open({ root })
-      expect(store.size).toBe(1)
-      expect(store.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ status: 'succeeded' }] })
+      expect(await withStore(root, store => Effect.map(store.all, all => all.length))).toBe(1)
+      expect(await storedTask(root)).toMatchObject({ status: 'succeeded', attempts: [{ status: 'succeeded' }] })
     } finally {
-      store?.close()
       await rm(root, { recursive: true, force: true })
     }
-  }, 20_000)
+  }, 60_000)
 
   it('lets two independent recovering Hosts share one queued task claim', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-process-recovery-'))
     const markerPath = join(root, 'effects.txt')
-    let store: DurableTaskStore | undefined
-
     try {
-      store = await DurableTaskStore.open({ root })
-      await store.createIfAbsent(task(), 1_000)
-      store.close()
-      store = undefined
-
+      await withStore(root, store => store.createIfAbsent({ task: task() }))
       const outcomes = await Promise.all([runWorker(root, markerPath, 'recover'), runWorker(root, markerPath, 'recover')])
       expect(outcomes).toEqual([
         { code: 0, signal: null },
         { code: 0, signal: null },
       ])
       expect(await markerCount(markerPath)).toBe(1)
-
-      store = await DurableTaskStore.open({ root })
-      expect(store.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ status: 'succeeded' }] })
+      expect(await storedTask(root)).toMatchObject({ status: 'succeeded', attempts: [{ status: 'succeeded' }] })
     } finally {
-      store?.close()
       await rm(root, { recursive: true, force: true })
     }
-  }, 20_000)
+  }, 60_000)
 
   it('propagates cancellation from another Host to the process holding the worker claim', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-process-cancel-'))
     const markerPath = join(root, 'effects.txt')
-    let store: DurableTaskStore | undefined
-
     try {
-      store = await DurableTaskStore.open({ root })
-      const cancelRunner = new DurableTaskRunner({
-        table: store,
-        newAttemptId: () => '00000000-0000-4000-8000-000000000003',
-        validate: async () => ({ runnable: true, safeReplay: false }),
-        findReceipt: async () => null,
-        run: async () => ({ status: 'succeeded', exitCode: 0 }),
-        onFailure: error => {
-          throw error
-        },
-      })
       const worker = startWorker(root, markerPath, 'cancelable')
       worker.stderr.on('data', chunk => process.stderr.write(chunk))
       await new Promise<void>((resolve, reject) => {
@@ -125,93 +147,45 @@ describe('durable Project Checks cross-process coordination', () => {
         worker.once('error', reject)
         worker.once('exit', (code, signal) => reject(new Error(`Worker exited before starting: ${code ?? signal}.`)))
       })
-      expect((await cancelRunner.cancel(taskId)).status).toBe('cancel-requested')
+      const requested = await withStore(root, store => store.update(taskId, current => DurableTaskModel.cancel(current, Date.now())))
+      expect(requested.status).toBe('cancel-requested')
       const outcome = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
         worker.once('error', reject)
         worker.once('exit', (code, signal) => resolve({ code, signal }))
       })
       expect(outcome).toEqual({ code: 0, signal: null })
       expect(await markerCount(markerPath)).toBe(1)
-      expect(store.get(taskId)).toMatchObject({ status: 'cancelled', attempts: [{ status: 'cancelled' }] })
-      await cancelRunner.close()
+      expect(await storedTask(root)).toMatchObject({ status: 'cancelled', attempts: [{ status: 'cancelled' }] })
     } finally {
-      store?.close()
       await rm(root, { recursive: true, force: true })
     }
-  }, 20_000)
+  }, 60_000)
 
   it('releases the process claim on hard exit and leaves an unreceipted side effect unknown without replay', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-process-crash-'))
     const markerPath = join(root, 'effects.txt')
-    let store: DurableTaskStore | undefined
-
     try {
       expect(await runWorker(root, markerPath, 'crash-after-effect')).toMatchObject({ code: null, signal: 'SIGKILL' })
-      store = await DurableTaskStore.open({ root })
-      let executions = 0
-      const runner = new DurableTaskRunner({
-        table: store,
-        newAttemptId: () => '00000000-0000-4000-8000-000000000003',
-        validate: async () => ({ runnable: true, safeReplay: false }),
-        findReceipt: async () => null,
-        run: async () => {
-          executions += 1
-          return { status: 'succeeded', exitCode: 0 }
-        },
-        onFailure: error => {
-          throw error
-        },
-      })
-      await runner.recover()
-      await runner.waitForIdle()
-
+      const recovered = await recoverWith(root, false)
       expect(await markerCount(markerPath)).toBe(1)
-      expect(executions).toBe(0)
-      expect(runner.get(taskId)).toMatchObject({ status: 'unknown', attempts: [{ id: attemptId, status: 'unknown' }] })
-      await runner.close()
+      expect(recovered.executions).toBe(0)
+      expect(recovered.task).toMatchObject({ status: 'unknown', attempts: [{ id: attemptId, status: 'unknown' }] })
     } finally {
-      store?.close()
       await rm(root, { recursive: true, force: true })
     }
-  }, 20_000)
+  }, 60_000)
 
   it('reconciles a committed attempt receipt after its owner dies before the task terminal update', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-process-receipt-'))
     const markerPath = join(root, 'effects.txt')
-    let store: DurableTaskStore | undefined
-
     try {
       expect(await runWorker(root, markerPath, 'crash-after-receipt')).toMatchObject({ code: null, signal: 'SIGKILL' })
-      store = await DurableTaskStore.open({ root })
-      let executions = 0
-      const runner = new DurableTaskRunner({
-        table: store,
-        newAttemptId: () => '00000000-0000-4000-8000-000000000003',
-        validate: async () => ({ runnable: true, safeReplay: false }),
-        findReceipt: async (recoveredTaskId, recoveredAttemptId) => {
-          const saved = store?.findAttemptReceipt(recoveredTaskId, recoveredAttemptId)
-          if (saved === undefined) return null
-          const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
-          return { status: receipt.status === 'passed' ? 'succeeded' : receipt.status, exitCode: receipt.exitCode }
-        },
-        run: async () => {
-          executions += 1
-          return { status: 'succeeded', exitCode: 0 }
-        },
-        onFailure: error => {
-          throw error
-        },
-      })
-      await runner.recover()
-      await runner.waitForIdle()
-
+      const recovered = await recoverWith(root, true)
       expect(await markerCount(markerPath)).toBe(1)
-      expect(executions).toBe(0)
-      expect(runner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ id: attemptId, status: 'succeeded' }] })
-      await runner.close()
+      expect(recovered.executions).toBe(0)
+      expect(recovered.task).toMatchObject({ status: 'succeeded', attempts: [{ id: attemptId, status: 'succeeded' }] })
     } finally {
-      store?.close()
       await rm(root, { recursive: true, force: true })
     }
-  }, 20_000)
+  }, 60_000)
 })

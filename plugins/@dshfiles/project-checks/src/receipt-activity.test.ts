@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { Schema } from 'effect'
+import { describe, expect, it } from 'vitest'
+import { Effect, Schema } from 'effect'
 import { ProjectChecksActivityModel, projectChecksActivityEventSchema } from './receipt-activity.js'
 import type { StoredReceipt } from './store.js'
 
@@ -59,34 +59,17 @@ describe('Project Checks activity summary', () => {
 
   it('waits for durable receipt persistence before publishing and keeps projection failures optional', async () => {
     const order: string[] = []
-    const publish = vi.fn(() => {
-      order.push('activity')
-      expect(order).toEqual(['receipt'])
-    })
-    await ProjectChecksActivityModel.persistAndEmit({
-      receipt,
-      persist: async () => {
-        order.push('receipt')
-      },
-      emit: publish,
-    })
-    expect(publish).toHaveBeenCalledTimes(1)
+    const publish = () => Effect.sync(() => order.push('activity'))
+    await Effect.runPromise(ProjectChecksActivityModel.persistAndEmit({ receipt, persist: Effect.sync(() => order.push('receipt')), emit: publish }))
+    expect(order).toEqual(['receipt', 'activity'])
 
-    await expect(
-      ProjectChecksActivityModel.persistAndEmit({
-        receipt,
-        persist: async () => {
-          throw new Error('storage unavailable')
-        },
-        emit: publish,
-      }),
-    ).rejects.toThrow('storage unavailable')
-    expect(publish).toHaveBeenCalledTimes(1)
+    const failed = await Effect.runPromise(
+      Effect.flip(ProjectChecksActivityModel.persistAndEmit({ receipt, persist: Effect.fail('storage unavailable'), emit: publish })),
+    )
+    expect(failed).toBe('storage unavailable')
+    expect(order).toEqual(['receipt', 'activity'])
 
-    expect(() =>
-      ProjectChecksActivityModel.emit(receipt, () => {
-        throw new Error('timeline unavailable')
-      }),
-    ).not.toThrow()
+    await Effect.runPromise(ProjectChecksActivityModel.publish({ receipt: { ...receipt, startedAt: -1 }, emit: publish }))
+    expect(order).toEqual(['receipt', 'activity'])
   })
 })

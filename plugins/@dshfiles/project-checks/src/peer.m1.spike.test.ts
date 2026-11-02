@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { remoteHostSchema } from './core.js'
 import { runProcess } from './process-runner.js'
 import { PeerSnapshotModel, type PeerShellRunner } from './remote.js'
 
 const spike = process.env.DSH_PEER_SPIKE === '1'
 const repoCwd = process.cwd()
-const runPeerSnapshot = PeerSnapshotModel.run
+const runPeerSnapshot = (input: Parameters<typeof PeerSnapshotModel.run>[0]) => Effect.runPromise(PeerSnapshotModel.run(input))
 
 const jj = async (args: readonly string[]): Promise<string> => (await runProcess({ file: 'jj', args, cwd: repoCwd, timeoutMs: 60_000 })).stdout.trim()
 
@@ -32,10 +32,10 @@ describe.skipIf(!spike)('peer host spike', () => {
       },
     })
 
-  const runLocalGit = async ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }) =>
-    runProcess({ file: 'jj', args, cwd: repoCwd, timeoutMs })
-  const runPeerShell: PeerShellRunner = async ({ command, timeoutMs }) =>
-    runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, configuredPeer().sshTarget, command], cwd: repoCwd, timeoutMs })
+  const runLocalGit = ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }) =>
+    Effect.promise(() => runProcess({ file: 'jj', args, cwd: repoCwd, timeoutMs }))
+  const runPeerShell: PeerShellRunner = ({ command, timeoutMs }) =>
+    Effect.promise(() => runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, configuredPeer().sshTarget, command], cwd: repoCwd, timeoutMs }))
 
   it('runs the real repo check on M1 and keeps the revision identity', async () => {
     const remote = configuredPeer()
@@ -83,8 +83,8 @@ describe.skipIf(!spike)('peer host spike', () => {
 
   it('surfaces an unreachable peer as a protocol failure', async () => {
     const remote = configuredPeer()
-    const missingHost: PeerShellRunner = async ({ command, timeoutMs }) =>
-      runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, 'dsh-peer.invalid', command], cwd: repoCwd, timeoutMs })
+    const missingHost: PeerShellRunner = ({ command, timeoutMs }) =>
+      Effect.promise(() => runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, 'dsh-peer.invalid', command], cwd: repoCwd, timeoutMs }))
     const outcome = await runPeerSnapshot({
       remote: { ...remote, sshTarget: 'dsh-peer.invalid' },
       revision: await jj(['log', '--no-graph', '-r', '@', '--template', 'commit_id']),

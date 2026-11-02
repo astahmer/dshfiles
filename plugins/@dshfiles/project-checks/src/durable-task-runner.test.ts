@@ -1,190 +1,132 @@
-import { describe, expect, it } from 'vitest'
-import { Schema } from 'effect'
-import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.js'
-import { DurableTaskRunner, type DurableTaskResult, type DurableTaskTable } from './durable-task-runner.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Deferred, Effect, Exit, Layer, Ref, Scope } from 'effect'
+import { DurableTasks, type DurableTaskResult } from './durable-task-runner.js'
+import { DurableTaskStore } from './durable-task-store.js'
+import { DurableTaskModel, type DurableTask } from './durable-tasks.js'
+import { DurableTestLayers } from './test-fixtures/durable-layers.js'
+
+const { queuedTask, store: storeLayer, tasks: tasksLayer } = DurableTestLayers
 
 const taskId = 'a'.repeat(64)
 const firstAttemptId = '00000000-0000-4000-8000-000000000002'
 const nextAttemptId = '00000000-0000-4000-8000-000000000003'
 
-const queuedTask = (): DurableTask =>
-  Schema.decodeUnknownSync(durableTaskSchema)({
-    id: taskId,
-    idempotencyKey: '00000000-0000-4000-8000-000000000001',
-    sessionId: 'session-a',
-    actionId: 'test',
-    handlerVersion: 1,
-    actionFingerprint: 'b'.repeat(64),
-    cwd: '/work/project',
-    status: 'queued',
-    attempts: [],
-    createdAt: 1,
-    updatedAt: 1,
-    errorCode: null,
-  })
+const task = () => queuedTask({ id: taskId, idempotencyKey: '00000000-0000-4000-8000-000000000001', sessionId: 'session-a', createdAt: 1 })
+const interruptedTask = (): DurableTask => DurableTaskModel.begin(task(), { attemptId: firstAttemptId, now: 2 })
+const succeeded: DurableTaskResult = { status: 'succeeded', exitCode: 0 }
 
-const makeTable = (): DurableTaskTable => {
-  const rows = new Map<string, DurableTask>()
-  return {
-    get: key => rows.get(key),
-    entries: () => rows.entries(),
-    keys: () => rows.keys(),
-    get size() {
-      return rows.size
-    },
-    createIfAbsent: async task => {
-      const existing = rows.get(task.id)
-      if (existing !== undefined) return existing
-      rows.set(task.id, task)
-      return task
-    },
-    withWorkerClaim: async (_signal, work) => work(),
-    put: async (key, value) => {
-      rows.set(key, value)
-    },
-    update: async (key, update) => {
-      const current = rows.get(key)
-      if (current === undefined) throw new Error('missing row')
-      const next = update(current)
-      rows.set(key, next)
-      return next
-    },
-    delete: async key => rows.delete(key),
+const scratchRoot = Effect.acquireRelease(
+  Effect.promise(() => mkdtemp(join(tmpdir(), 'project-checks-runner-'))),
+  root => Effect.promise(() => rm(root, { recursive: true, force: true })),
+)
+
+/** Writes `rows` straight into a fresh store, the way a crashed Host would have left them. */
+const seed = Effect.fnUntraced(function* (root: string, rows: ReadonlyArray<DurableTask>) {
+  const scope = yield* Scope.make()
+  const store = Context.get(yield* Layer.buildWithScope(storeLayer(root), scope), DurableTaskStore)
+  for (const row of rows) {
+    yield* store.createIfAbsent({ task: { ...row, status: 'queued', attempts: [] } })
+    yield* store.update(row.id, () => row)
   }
+  yield* Scope.close(scope, Exit.void)
+})
+
+const attemptIds = () => {
+  let issued = 0
+  return () => (issued++ === 0 ? firstAttemptId : nextAttemptId)
 }
 
-const makeRunner = (input: {
-  readonly table: DurableTaskTable
-  readonly safeReplay?: boolean
-  readonly run?: (task: DurableTask, signal: AbortSignal) => Promise<DurableTaskResult>
-  readonly findReceipt?: (taskId: string, attemptId: string) => Promise<DurableTaskResult | null>
-}): DurableTaskRunner => {
-  let nextId = input.table.get(taskId)?.attempts.length ?? 0
-  return new DurableTaskRunner({
-    table: input.table,
-    newAttemptId: () => (nextId++ === 0 ? firstAttemptId : nextAttemptId),
-    validate: async () => ({ runnable: true, safeReplay: input.safeReplay ?? false }),
-    findReceipt: input.findReceipt ?? (async () => null),
-    run: async ({ task, signal }) => (input.run === undefined ? { status: 'succeeded', exitCode: 0 } : input.run(task, signal)),
-    onFailure: error => {
-      throw error
-    },
-  })
-}
-
-const interruptedTask = (): DurableTask => DurableTaskModel.begin(queuedTask(), { attemptId: firstAttemptId, now: 2 })
+const queue = (root: string, handler: Parameters<typeof tasksLayer>[1]) =>
+  Effect.map(Layer.build(tasksLayer(root, handler)), services => Context.get(services, DurableTasks))
 
 describe('durable Project Checks task runner', () => {
-  it('deduplicates concurrent dispatches in the owning Host process', async () => {
-    const table = makeTable()
-    let release: () => void = () => undefined
-    const running = new Promise<void>(resolve => {
-      release = resolve
-    })
-    let executions = 0
-    const runner = makeRunner({
-      table,
-      run: async () => {
-        executions += 1
-        await running
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
+  it.live('deduplicates concurrent dispatches in the owning Host process', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const release = yield* Deferred.make<void>()
+      const executions = yield* Ref.make(0)
+      const tasks = yield* queue(root, {
+        attemptIds: attemptIds(),
+        run: () => Ref.update(executions, count => count + 1).pipe(Effect.andThen(Deferred.await(release)), Effect.as(succeeded)),
+      })
+      const [first, duplicate] = yield* Effect.all([tasks.enqueue(task()), tasks.enqueue(task())], { concurrency: 2 })
+      expect(first.id).toBe(duplicate.id)
+      yield* Deferred.succeed(release, undefined)
+      yield* tasks.awaitIdle
+      expect(yield* Ref.get(executions)).toBe(1)
+      expect(yield* tasks.get(taskId)).toMatchObject({ value: { status: 'succeeded', attempts: [{ number: 1, status: 'succeeded' }] } })
+    }).pipe(Effect.scoped),
+  )
 
-    const [first, duplicate] = await Promise.all([runner.enqueue(queuedTask()), runner.enqueue(queuedTask())])
-    expect(first.id).toBe(duplicate.id)
-    release()
-    await runner.waitForIdle()
+  it.live('leaves an interrupted side effect unknown and does not replay it by default', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      yield* seed(root, [interruptedTask()])
+      const executions = yield* Ref.make(0)
+      const tasks = yield* queue(root, { attemptIds: attemptIds(), run: () => Ref.update(executions, count => count + 1).pipe(Effect.as(succeeded)) })
+      yield* tasks.awaitIdle
+      expect(yield* tasks.get(taskId)).toMatchObject({ value: { status: 'unknown', attempts: [{ status: 'unknown' }] } })
+      expect(yield* Ref.get(executions)).toBe(0)
+    }).pipe(Effect.scoped),
+  )
 
-    expect(executions).toBe(1)
-    expect(runner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ number: 1, status: 'succeeded' }] })
-  })
+  it.live('does not replay a crash-interrupted task after cancellation was requested', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      yield* seed(root, [DurableTaskModel.cancel(interruptedTask(), 3)])
+      const executions = yield* Ref.make(0)
+      const tasks = yield* queue(root, {
+        attemptIds: attemptIds(),
+        validate: () => Effect.succeed({ runnable: true, safeReplay: true }),
+        run: () => Ref.update(executions, count => count + 1).pipe(Effect.as(succeeded)),
+      })
+      yield* tasks.awaitIdle
+      expect(yield* tasks.get(taskId)).toMatchObject({ value: { status: 'unknown', attempts: [{ status: 'unknown' }] } })
+      expect(yield* Ref.get(executions)).toBe(0)
+    }).pipe(Effect.scoped),
+  )
 
-  it('leaves an interrupted side effect unknown and does not replay it by default', async () => {
-    const table = makeTable()
-    await table.put(taskId, interruptedTask())
-    let previousEffectCount = 1
-    let executions = 0
-    const runner = makeRunner({
-      table,
-      run: async () => {
-        executions += 1
-        previousEffectCount += 1
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
+  it.live('retries an interrupted action only when its profile policy declares read-only', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      yield* seed(root, [interruptedTask()])
+      const tasks = yield* queue(root, { attemptIds: () => nextAttemptId, validate: () => Effect.succeed({ runnable: true, safeReplay: true }) })
+      yield* tasks.awaitIdle
+      expect(yield* tasks.get(taskId)).toMatchObject({
+        value: { status: 'succeeded', attempts: [{ id: firstAttemptId }, { id: nextAttemptId, status: 'succeeded' }] },
+      })
+    }).pipe(Effect.scoped),
+  )
 
-    await runner.recover()
+  it.live('requires explicit duplicate-effect acknowledgement and records a new attempt identity', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      yield* seed(root, [DurableTaskModel.unknown(interruptedTask(), 3)])
+      const tasks = yield* queue(root, { attemptIds: () => nextAttemptId })
+      yield* tasks.awaitIdle
+      const refused = yield* Effect.flip(tasks.retry({ taskId, confirmPossibleDuplicate: false }))
+      expect(refused.message).toMatch(/Confirm possible duplicate effects/u)
+      yield* tasks.retry({ taskId, confirmPossibleDuplicate: true })
+      yield* tasks.awaitIdle
+      const retried = yield* tasks.get(taskId)
+      expect(retried._tag === 'Some' ? retried.value.attempts.map(attempt => attempt.id) : []).toEqual([firstAttemptId, nextAttemptId])
+    }).pipe(Effect.scoped),
+  )
 
-    expect(runner.get(taskId)).toMatchObject({ status: 'unknown', attempts: [{ status: 'unknown' }] })
-    expect(executions).toBe(0)
-    expect(previousEffectCount).toBe(1)
-  })
-
-  it('does not replay a crash-interrupted task after cancellation was requested', async () => {
-    const table = makeTable()
-    await table.put(taskId, DurableTaskModel.cancel(interruptedTask(), 3))
-    let executions = 0
-    const runner = makeRunner({
-      table,
-      safeReplay: true,
-      run: async () => {
-        executions += 1
-        return { status: 'succeeded', exitCode: 0 }
-      },
-    })
-
-    await runner.recover()
-    await runner.waitForIdle()
-
-    expect(runner.get(taskId)).toMatchObject({ status: 'unknown', attempts: [{ status: 'unknown' }] })
-    expect(executions).toBe(0)
-  })
-
-  it('retries an interrupted action only when its profile policy declares read-only', async () => {
-    const table = makeTable()
-    await table.put(taskId, interruptedTask())
-    const runner = makeRunner({ table, safeReplay: true })
-
-    await runner.recover()
-    await runner.waitForIdle()
-
-    expect(runner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ id: firstAttemptId }, { id: nextAttemptId, status: 'succeeded' }] })
-  })
-
-  it('requires explicit duplicate-effect acknowledgement and records a new attempt identity', async () => {
-    const table = makeTable()
-    await table.put(taskId, DurableTaskModel.unknown(interruptedTask(), 3))
-    const runner = makeRunner({ table })
-
-    await expect(runner.retry(taskId, false)).rejects.toThrow(/Confirm possible duplicate effects/u)
-    await runner.retry(taskId, true)
-    await runner.waitForIdle()
-
-    expect(runner.get(taskId)?.attempts.map(attempt => attempt.id)).toEqual([firstAttemptId, nextAttemptId])
-  })
-
-  it('cancels a running process through its signal and records its confirmed result', async () => {
-    const table = makeTable()
-    let started: () => void = () => undefined
-    const runStarted = new Promise<void>(resolve => {
-      started = resolve
-    })
-    const runner = makeRunner({
-      table,
-      run: async (_task, signal) => {
-        started()
-        return new Promise(resolve => {
-          signal.addEventListener('abort', () => resolve({ status: 'cancelled', exitCode: null }), { once: true })
-        })
-      },
-    })
-    await runner.enqueue(queuedTask())
-    await runStarted
-    const cancel = await runner.cancel(taskId)
-    await runner.waitForIdle()
-
-    expect(cancel.status).toBe('cancel-requested')
-    expect(runner.get(taskId)?.status).toBe('cancelled')
-  })
+  it.live('cancels a running attempt by interrupting it and records the cancellation', () =>
+    Effect.gen(function* () {
+      const root = yield* scratchRoot
+      const started = yield* Deferred.make<void>()
+      const tasks = yield* queue(root, { attemptIds: attemptIds(), run: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)) })
+      yield* tasks.enqueue(task())
+      yield* Deferred.await(started)
+      const cancel = yield* tasks.cancel(taskId)
+      yield* tasks.awaitIdle
+      expect(cancel.status).toBe('cancel-requested')
+      expect(yield* tasks.get(taskId)).toMatchObject({ value: { status: 'cancelled' } })
+    }).pipe(Effect.scoped),
+  )
 })

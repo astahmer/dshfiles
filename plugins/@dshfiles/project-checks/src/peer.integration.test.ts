@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,7 +10,7 @@ import { runProcess } from './process-runner.js'
 import { PeerSnapshotModel, type PeerShellRunner } from './remote.js'
 
 const exec = promisify(execFile)
-const runPeerSnapshot = PeerSnapshotModel.run
+const runPeerSnapshot = (input: Parameters<typeof PeerSnapshotModel.run>[0]) => Effect.runPromise(PeerSnapshotModel.run(input))
 
 const jj = async (cwd: string, args: readonly string[]): Promise<string> => {
   const { stdout } = await exec('jj', [...args], { cwd, maxBuffer: 4 * 1024 * 1024 })
@@ -41,9 +41,9 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
   let remote: RemoteHost
   let firstRevision = ''
 
-  const runPeer: PeerShellRunner = async ({ command, timeoutMs }) => runProcess({ file: 'sh', args: ['-c', command], cwd: root, timeoutMs })
-  const runLocalGit = async ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }) =>
-    runProcess({ file: 'jj', args, cwd: local, timeoutMs })
+  const runPeer: PeerShellRunner = ({ command, timeoutMs }) => Effect.promise(() => runProcess({ file: 'sh', args: ['-c', command], cwd: root, timeoutMs }))
+  const runLocalGit = ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }) =>
+    Effect.promise(() => runProcess({ file: 'jj', args, cwd: local, timeoutMs }))
 
   beforeAll(async () => {
     // jj refuses to push a commit without an author, and a CI runner has no jj identity of its own.
@@ -188,7 +188,8 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
       changeId: await jj(local, ['log', '--no-graph', '-r', '@', '--template', 'change_id']),
       action: { command: process.execPath, args: ['-e', 'process.stdout.write("ok")'], timeoutMs: 30_000 },
       runLocalGit,
-      runPeerShell: async () => ({ code: null, stdout: '', stderr: 'ssh: connect to host peer-host port 22: Connection refused', failure: 'spawn-failed' }),
+      runPeerShell: () =>
+        Effect.succeed({ code: null, stdout: '', stderr: 'ssh: connect to host peer-host port 22: Connection refused', failure: 'spawn-failed' }),
     })
     expect(outcome.ok).toBe(false)
     if (!outcome.ok) {

@@ -34,6 +34,9 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/sqlite-store": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -55,6 +58,7 @@
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "react": "catalog:",
