@@ -39,6 +39,8 @@
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
+    "@dshfiles/jev": "workspace:*",
+    "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
@@ -47,6 +49,7 @@
     "@dshfiles/usage": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -72,6 +75,7 @@
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-workspace": "catalog:",
     "@dshfiles/jj-integration": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@lexical/history": "catalog:",
     "@lexical/plain-text": "catalog:",
     "@types/node": "22.20.5",

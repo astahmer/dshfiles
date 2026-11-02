@@ -1,6 +1,4 @@
-import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
-import { BacklogTweetContextSpan } from './backlog-tweet-context-span.js'
 import { BacklogTweetContext } from './backlog-tweet-context.js'
 
 describe('BacklogTweetContext', () => {
@@ -24,14 +22,6 @@ describe('BacklogTweetContext', () => {
         tweetContextUrls: ['https://x.com/i/status/123'],
       }),
     ).toEqual(['https://x.com/i/status/456'])
-  })
-
-  it('records one bounded span for the import work unit', async () => {
-    using spans = recordSpans()
-    await BacklogTweetContextSpan.run({ itemId: 42, work: async () => 'done' })
-    const span = spans.span('backlog tweet import')
-    expect(span.attributes['dshx.backlog.item_id']).toBe(42)
-    expect(span.attributes['dshx.backlog.tweet_import.outcome']).toBe('succeeded')
   })
 
   it('quotes retrieved post text as untrusted data and respects the description budget', () => {

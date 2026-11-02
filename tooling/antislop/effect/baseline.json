@@ -18,7 +18,6 @@
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/request-retry-wait.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
-    "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/optmem-core/src/engine.ts": 6,
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
@@ -30,7 +29,6 @@
     "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
-    "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2

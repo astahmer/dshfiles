@@ -1,27 +1,35 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Deferred, Effect, Fiber } from 'effect'
 
-import { createAiActivityTracker } from './ai-activity.js'
+import { AiActivity } from './ai-activity.js'
 
 describe('AI activity tracking', () => {
-  it('stays active until every concurrent task finishes', async () => {
-    const tracker = createAiActivityTracker()
-    let finishFirst: () => void = () => undefined
-    let finishSecond: () => void = () => undefined
-    const first = tracker.track(() => new Promise<void>(resolve => (finishFirst = resolve)))
-    const second = tracker.track(() => new Promise<void>(resolve => (finishSecond = resolve)))
+  it.layer(AiActivity.layer)(it => {
+    it.effect('stays active until every concurrent task finishes', () =>
+      Effect.gen(function* () {
+        const activity = yield* AiActivity
+        const finishFirst = yield* Deferred.make<void>()
+        const finishSecond = yield* Deferred.make<void>()
+        const first = yield* Effect.forkChild(activity.track(Deferred.await(finishFirst)), { startImmediately: true })
+        const second = yield* Effect.forkChild(activity.track(Deferred.await(finishSecond)), { startImmediately: true })
 
-    expect(tracker.isActive()).toBe(true)
-    finishFirst()
-    await first
-    expect(tracker.isActive()).toBe(true)
-    finishSecond()
-    await second
-    expect(tracker.isActive()).toBe(false)
-  })
+        expect(yield* activity.isActive).toBe(true)
+        yield* Deferred.succeed(finishFirst, undefined)
+        yield* Fiber.join(first)
+        expect(yield* activity.isActive).toBe(true)
+        yield* Deferred.succeed(finishSecond, undefined)
+        yield* Fiber.join(second)
+        expect(yield* activity.isActive).toBe(false)
+      }),
+    )
 
-  it('clears activity when the work fails', async () => {
-    const tracker = createAiActivityTracker()
-    await expect(tracker.track(async () => Promise.reject(new Error('failed')))).rejects.toThrow('failed')
-    expect(tracker.isActive()).toBe(false)
+    it.effect('clears activity when the work fails', () =>
+      Effect.gen(function* () {
+        const activity = yield* AiActivity
+        const error = yield* Effect.flip(activity.track(Effect.fail('failed')))
+        expect(error).toBe('failed')
+        expect(yield* activity.isActive).toBe(false)
+      }),
+    )
   })
 })

@@ -1,4 +1,5 @@
-import type { TriageQuestion } from './triage.js'
+import { Effect } from 'effect'
+import type { JevAsk, TriageQuestion } from './triage.js'
 
 export type ReplyRoute = 'reply' | 'thread'
 export type ReplyRouteSource = 'jev' | 'keywords'
@@ -10,6 +11,7 @@ export interface ReplyRouteResult {
 }
 
 export const threadWorthyQuestion: TriageQuestion = {
+  name: 'reply-routing',
   instructions: 'Should this message start a separate work thread, rather than be handled as a short answer or discussion reply on the existing backlog item?',
   criteria: {
     true: 'The user asks for code changes, implementation, debugging, investigation, a multi-step task, or other work that benefits from a dedicated thread',
@@ -38,21 +40,12 @@ export class ReplyRouting {
     return keywordDecision(text)
   }
 
-  static async classify(input: {
-    readonly text: string
-    readonly jev?: ((request: { readonly question: TriageQuestion; readonly text: string }) => Promise<number>) | undefined
-    readonly threshold?: number | undefined
-  }): Promise<ReplyRouteResult> {
-    if (input.jev === undefined) return keywordDecision(input.text)
-    try {
-      const confidence = await input.jev({ question: threadWorthyQuestion, text: input.text })
-      return {
-        route: confidence >= (input.threshold ?? 0.72) ? 'thread' : 'reply',
-        confidence,
-        source: 'jev',
-      }
-    } catch {
-      return keywordDecision(input.text)
-    }
+  static classify(input: { readonly text: string; readonly jev?: JevAsk | undefined; readonly threshold?: number | undefined }): Effect.Effect<ReplyRouteResult> {
+    if (input.jev === undefined) return Effect.succeed(keywordDecision(input.text))
+    return input.jev({ question: threadWorthyQuestion, text: input.text }).pipe(
+      Effect.map((confidence): ReplyRouteResult => ({ route: confidence >= (input.threshold ?? 0.72) ? 'thread' : 'reply', confidence, source: 'jev' })),
+      Effect.catch(error => Effect.as(Effect.logDebug('backlog reply routing: Jev failed, using keywords', error), keywordDecision(input.text))),
+      Effect.withSpan('backlog reply classify'),
+    )
   }
 }

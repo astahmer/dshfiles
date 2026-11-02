@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
 
 import { ReplyRouting, threadWorthyQuestion } from './reply-routing.js'
 
@@ -10,25 +11,28 @@ describe('backlog reply routing', () => {
     expect(ReplyRouting.keywords('Thanks, that makes sense')).toMatchObject({ route: 'reply', source: 'keywords' })
   })
 
-  it('uses Jev confidence and sends the intended decision question', async () => {
-    const jev = vi.fn(async ({ question }: { readonly question: typeof threadWorthyQuestion; readonly text: string }) => {
-      expect(question).toBe(threadWorthyQuestion)
-      return 0.86
-    })
+  it.effect('uses Jev confidence and sends the intended decision question', () =>
+    Effect.gen(function* () {
+      const asked: unknown[] = []
+      const result = yield* ReplyRouting.classify({
+        text: 'Fix the flaky test',
+        jev: request => Effect.sync(() => asked.push(request.question)).pipe(Effect.as(0.86)),
+      })
+      expect(result).toMatchObject({ route: 'thread', source: 'jev', confidence: 0.86 })
+      expect(asked).toEqual([threadWorthyQuestion])
+    }),
+  )
 
-    await expect(ReplyRouting.classify({ text: 'Fix the flaky test', jev })).resolves.toMatchObject({ route: 'thread', source: 'jev', confidence: 0.86 })
-    expect(jev).toHaveBeenCalledOnce()
-  })
+  it.effect('keeps low confidence as a reply and uses keywords when Jev fails', () =>
+    Effect.gen(function* () {
+      expect(yield* ReplyRouting.classify({ text: 'Could you explain this?', jev: () => Effect.succeed(0.42) })).toMatchObject({ route: 'reply', source: 'jev' })
+      expect(yield* ReplyRouting.classify({ text: 'Please fix this', jev: () => Effect.fail('offline') })).toMatchObject({ route: 'thread', source: 'keywords' })
+    }),
+  )
 
-  it('keeps low confidence as a reply and uses keywords when Jev fails', async () => {
-    await expect(ReplyRouting.classify({ text: 'Could you explain this?', jev: async () => 0.42 })).resolves.toMatchObject({ route: 'reply', source: 'jev' })
-    await expect(ReplyRouting.classify({ text: 'Please fix this', jev: async () => Promise.reject(new Error('offline')) })).resolves.toMatchObject({
-      route: 'thread',
-      source: 'keywords',
-    })
-  })
-
-  it('honors a configured Jev threshold', async () => {
-    await expect(ReplyRouting.classify({ text: 'Please fix this', jev: async () => 0.7, threshold: 0.8 })).resolves.toMatchObject({ route: 'reply' })
-  })
+  it.effect('honors a configured Jev threshold', () =>
+    Effect.gen(function* () {
+      expect(yield* ReplyRouting.classify({ text: 'Please fix this', jev: () => Effect.succeed(0.7), threshold: 0.8 })).toMatchObject({ route: 'reply' })
+    }),
+  )
 })

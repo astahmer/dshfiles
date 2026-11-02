@@ -4,10 +4,12 @@
     "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node", "@dshfiles/dshx/client/env"]
   },
+  "files": ["src/client-entry.tsx"],
   "include": ["src"]
 }
