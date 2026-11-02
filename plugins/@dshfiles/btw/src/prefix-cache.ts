@@ -1,14 +1,14 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 
-const usageSchema = z.object({
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number().optional(),
-  cacheWriteTokens: z.number().optional(),
+const usageSchema = Schema.Struct({
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cacheReadTokens: Schema.optional(Schema.Number),
+  cacheWriteTokens: Schema.optional(Schema.Number),
 })
-const streamUsageSchema = z.object({ chunk: z.object({ type: z.literal('usage'), usage: usageSchema }) })
-const eventSchema = z.object({ type: z.string(), data: z.unknown() })
-const assistantSchema = z.object({ usage: usageSchema.optional(), stream: z.array(z.unknown()).optional() })
+const streamUsageSchema = Schema.Struct({ chunk: Schema.Struct({ type: Schema.Literal('usage'), usage: usageSchema }) })
+const eventSchema = Schema.Struct({ type: Schema.String, data: Schema.Unknown })
+const assistantSchema = Schema.Struct({ usage: Schema.optional(usageSchema), stream: Schema.optional(Schema.Array(Schema.Unknown)) })
 
 export interface PrefixCacheReading {
   /** Uncached input, cache reads and cache writes of the side chat's first model request. */
@@ -28,17 +28,17 @@ export class PrefixCache {
   static firstRequestAfterFork(events: readonly unknown[]): PrefixCacheReading | undefined {
     let afterSeed = false
     for (const raw of events) {
-      const event = eventSchema.safeParse(raw)
-      if (!event.success) continue
-      if (event.data.type === 'session/end-seed') afterSeed = true
-      if (!afterSeed || event.data.type !== 'assistant/message') continue
-      const message = assistantSchema.safeParse(event.data.data)
-      if (!message.success) return undefined
+      const event = Schema.decodeUnknownOption(eventSchema)(raw)
+      if (Option.isNone(event)) continue
+      if (event.value.type === 'session/end-seed') afterSeed = true
+      if (!afterSeed || event.value.type !== 'assistant/message') continue
+      const message = Schema.decodeUnknownOption(assistantSchema)(event.value.data)
+      if (Option.isNone(message)) return undefined
       const usage =
-        message.data.usage ??
-        message.data.stream?.flatMap(entry => {
-          const parsed = streamUsageSchema.safeParse(entry)
-          return parsed.success ? [parsed.data.chunk.usage] : []
+        message.value.usage ??
+        message.value.stream?.flatMap(entry => {
+          const parsed = Schema.decodeUnknownOption(streamUsageSchema)(entry)
+          return Option.isSome(parsed) ? [parsed.value.chunk.usage] : []
         })[0]
       if (usage === undefined) return undefined
       const cacheReadTokens = usage.cacheReadTokens ?? 0
