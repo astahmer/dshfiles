@@ -2,7 +2,7 @@ import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JobEvent, JobView } from '@deepseek-ai/dsh-jobs'
 import type { JobChunk } from '@deepseek-ai/dsh-jobs/view'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { hostServiceChanges } from '@dshfiles/dshx/effect'
+import { DshxPlugin, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option, Queue, Stream, SubscriptionRef } from 'effect'
 
 /**
@@ -83,6 +83,7 @@ export class LiveJobs extends Context.Service<
       yield* registry.changes.pipe(
         Stream.switchMap(current => followRegistry({ state, registry: current })),
         Stream.runDrain,
+        DshxPlugin.detached,
         Effect.forkScoped,
       )
       return LiveJobs.of({ state: SubscriptionRef.get(state), changes: SubscriptionRef.changes(state) })

@@ -1,3 +1,4 @@
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Clock, Context, Duration, Effect, Layer, Option, Ref, Schedule, Schema } from 'effect'
 import { HttpClient, HttpClientRequest } from 'effect/http'
 import { DEFAULT_OTLP_SERVICE_NAME, type OtlpMetricsRequest } from './otel-metrics.js'
@@ -211,6 +212,7 @@ export class OtlpExporter extends Context.Service<OtlpExporter, { readonly state
 
         yield* Effect.sleep(interval).pipe(
           Effect.andThen(exportOnce.pipe(Effect.tapError(recordFailure), Effect.retry(backoff), Effect.repeat(Schedule.spaced(interval)))),
+          DshxPlugin.detached,
           Effect.forkScoped,
         )
         return OtlpExporter.of({ state: Ref.get(state) })

@@ -77,7 +77,7 @@ const LiveCalls = Layer.effectDiscard(
   }),
 )
 
-const IndexingLoop = Layer.effectDiscard(Effect.forkScoped(Indexer.use(indexer => indexer.pass).pipe(Effect.repeat(Schedule.spaced(INDEX_INTERVAL)))))
+const IndexingLoop = Layer.effectDiscard(DshxPlugin.worker(Indexer.use(indexer => indexer.pass).pipe(Effect.repeat(Schedule.spaced(INDEX_INTERVAL)))))
 
 /** The OTLP exporter, when the environment or the Host's own receiver names a destination; off otherwise. */
 const Exporter = Layer.unwrap(

@@ -7,7 +7,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -20,7 +19,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -33,7 +31,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -46,7 +43,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -59,7 +55,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -72,7 +67,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -85,7 +79,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -98,8 +91,7 @@
     "childProcess": 5,
     "nodeFs": 20,
     "globalFetch": 0,
-    "causelessErrors": 0,
-    "testMocks": 116,
+    "testMocks": 82,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -111,7 +103,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -124,7 +115,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -137,7 +127,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -150,7 +139,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -163,7 +151,6 @@
     "childProcess": 0,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 1,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -176,7 +163,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -189,7 +175,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 2,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -202,7 +187,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -215,7 +199,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -228,7 +211,6 @@
     "childProcess": 0,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -241,7 +223,6 @@
     "childProcess": 1,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -254,7 +235,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -267,7 +247,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -280,7 +259,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -293,7 +271,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -306,7 +283,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 2,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -319,7 +295,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -332,8 +307,7 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
-    "testMocks": 1,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -345,7 +319,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -358,7 +331,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -367,11 +339,10 @@
     "layerEmpty": 1,
     "promiseAdapters": 4,
     "moduleState": 1,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 1,
-    "causelessErrors": 1,
     "testMocks": 23,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -380,11 +351,10 @@
     "layerEmpty": 0,
     "promiseAdapters": 29,
     "moduleState": 6,
-    "timers": 3,
+    "timers": 2,
     "childProcess": 0,
     "nodeFs": 4,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 1,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -397,7 +367,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -410,7 +379,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -419,11 +387,10 @@
     "layerEmpty": 1,
     "promiseAdapters": 48,
     "moduleState": 3,
-    "timers": 8,
+    "timers": 5,
     "childProcess": 2,
     "nodeFs": 9,
     "globalFetch": 2,
-    "causelessErrors": 1,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -436,7 +403,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -449,7 +415,6 @@
     "childProcess": 0,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 14,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 4
@@ -462,7 +427,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -475,7 +439,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -488,7 +451,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -501,7 +463,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 1,
     "testMocks": 1,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 5
@@ -514,7 +475,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -527,7 +487,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -540,7 +499,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -553,7 +511,6 @@
     "childProcess": 1,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -566,8 +523,7 @@
     "childProcess": 0,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 0,
-    "testMocks": 22,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -579,7 +535,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -592,7 +547,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 1,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -605,7 +559,6 @@
     "childProcess": 0,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 1
@@ -618,7 +571,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -631,7 +583,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -644,7 +595,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -657,7 +607,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -666,11 +615,10 @@
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -683,7 +631,18 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/sqlite-store": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -696,7 +655,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -709,7 +667,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -722,8 +679,7 @@
     "childProcess": 1,
     "nodeFs": 3,
     "globalFetch": 0,
-    "causelessErrors": 0,
-    "testMocks": 19,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -735,7 +691,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -748,7 +703,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -761,7 +715,6 @@
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 2,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -774,7 +727,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -787,7 +739,6 @@
     "childProcess": 1,
     "nodeFs": 1,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -800,7 +751,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 2,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -813,7 +763,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -826,7 +775,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -839,7 +787,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -852,7 +799,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -865,7 +811,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -878,7 +823,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -891,7 +835,6 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0

@@ -44,6 +44,7 @@ const IndexingLoop = Layer.effectDiscard(
           Schedule.modifyDelay(step => Effect.succeed(step.input ? INDEX_INTERVAL : CATCH_UP_DELAY)),
         ),
       ),
+      DshxPlugin.detached,
       Effect.forkScoped,
     )
   }),
@@ -60,6 +61,7 @@ const ChangeEvents = Layer.effectDiscard(
           Effect.catchTag('PublishEventError', error => Effect.logWarning('background-jobs: board change event refused', error.message)),
         ),
       ),
+      DshxPlugin.detached,
       Effect.forkScoped,
     )
   }),

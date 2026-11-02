@@ -19,19 +19,20 @@ const debtMetrics = [
   { key: 'childProcess', label: 'child_process' },
   { key: 'nodeFs', label: 'node:fs' },
   { key: 'globalFetch', label: 'fetch' },
-  { key: 'causelessErrors', label: 'TaggedError w/o cause' },
   { key: 'testMocks', label: 'Host test mocks' },
   { key: 'runOutsideEdges', label: 'run*' },
   { key: 'syncDecodeInEffect', label: 'decodeUnknownSync in Effect' },
 ]
 const infoMetrics = [
   { key: 'taggedErrors', label: 'TaggedError' },
+  { key: 'causelessErrors', label: 'TaggedError w/o cause' },
   { key: 'effectVitestFiles', label: '@effect/vitest tests' },
   { key: 'services', label: 'Context.Service' },
 ]
 
 const skippedDirectories = new Set(['node_modules', 'dist', '.turbo', 'coverage'])
 const testFilePattern = /\.(?:test|spec)\.[cm]?tsx?$/u
+const clientTestPattern = /\.tsx$|\.client\.(?:test|spec)\./u
 const globalCallees = new Set(['fetch', 'Promise', 'import', 'setTimeout', 'setInterval', 'queueMicrotask', 'structuredClone'])
 const nonCalleeWords = new Set(['async', 'await', 'function', 'new', 'return', 'void', 'typeof'])
 
@@ -72,6 +73,29 @@ const stripComments = source => {
 }
 
 const count = (source, pattern) => [...source.matchAll(pattern)].length
+
+/** The source with string and template literal contents blanked, so code embedded as text (a browser script) is not counted. */
+const withoutLiterals = source => {
+  let output = ''
+  let quote
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index]
+    if (quote === undefined) {
+      if (character === "'" || character === '"' || character === '`') quote = character
+      output += character
+      continue
+    }
+    if (character === '\\') {
+      index += 1
+      continue
+    }
+    if (character === quote) {
+      quote = undefined
+      output += character
+    }
+  }
+  return output
+}
 
 const runtimeImports = source => {
   const imports = new Map()
@@ -144,7 +168,7 @@ const hostMetrics = (source, file) => {
     layerEmpty: count(source, /\bLayer\.empty\b/gu),
     promiseAdapters: promiseEdge ? 0 : promiseAdapters(source),
     moduleState: count(source, /^(?:export\s+)?(?:let|var)\s/gmu) + count(source, /\bnew\s+WeakMap\s*<\s*(?:[\w$]+\.)?Context\b/gu),
-    timers: count(source, /(?<![\w$.])(?:globalThis\.)?(?:setTimeout|setInterval)\s*\(/gu),
+    timers: count(withoutLiterals(source), /(?<![\w$.])(?:globalThis\.)?(?:setTimeout|setInterval)\s*\(/gu),
     childProcess: importsModule(source, new Set(['node:child_process', 'child_process'])),
     nodeFs: importsModule(source, new Set(['node:fs', 'node:fs/promises', 'fs', 'fs/promises'])),
     globalFetch: count(source, /(?<![\w$.])fetch\s*\(/gu),
@@ -172,6 +196,7 @@ const auditPlugin = (pluginDirectory, hosts) => {
   let hostFileCount = 0
   for (const file of listFiles(pluginDirectory)) {
     if (testFilePattern.test(file)) {
+      if (clientTestPattern.test(file)) continue
       const testsHost = runtimeImportTargets({ repositoryRoot, file }).some(target => hosts.has(target))
       if (testsHost) addInto(metrics, testMetrics(stripComments(readFileSync(file, 'utf8'))))
       continue

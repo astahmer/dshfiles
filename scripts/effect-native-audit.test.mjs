@@ -28,6 +28,7 @@ export const decode = Effect.gen(function* () {
   return Schema.decodeUnknownSync(Schema.String)(yield* load)
 })
 // setTimeout(() => undefined, 1) is only a comment
+export const shim = String.raw\`setTimeout(() => undefined, 1)\`
 setTimeout(() => undefined, 1)
 Effect.runPromise(load)
 spawn('jj')
@@ -43,6 +44,7 @@ const fixture = {
   'plugins/@dshfiles/alpha/src/native/vendored.ts': 'let vendored = 0\n',
   'plugins/@dshfiles/alpha/src/store.test.ts':
     "import { it } from '@effect/vitest'\nimport { vi } from 'vitest'\nimport { loadStore } from './store.js'\nvi.mock('node:fs')\nvi.useFakeTimers()\nit('loads', () => loadStore())\n",
+  'plugins/@dshfiles/alpha/src/store.client.test.tsx': "import { vi } from 'vitest'\nimport { loadStore } from './store.js'\nvi.fn(loadStore)\n",
   'plugins/@dshfiles/alpha/src/widget.test.ts': "import { vi } from 'vitest'\nimport './widget.js'\nvi.fn()\n",
   'plugins/@dshfiles/beta/dshx.config.ts': "export default defineConfig({ host: { entry: 'src/host.ts' } })\n",
   'plugins/@dshfiles/beta/src/host.ts': "import { Effect } from 'effect'\nexport const value = Effect.succeed(1)\n",
@@ -87,7 +89,7 @@ test('scores only Host files reachable from the host entry and tests that exerci
       services: 1,
     })
     assert.equal(alpha.hostFileCount, 2)
-    assert.equal(alpha.score, 13)
+    assert.equal(alpha.score, 12)
     const beta = JSON.parse(result.stdout).plugins.find(row => row.plugin === '@dshfiles/beta')
     assert.equal(beta.score, 0)
   }))
@@ -97,8 +99,8 @@ test('prints a table with a total row', () =>
     audit(root, '--update')
     const result = audit(root)
     assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /\| @dshfiles\/alpha +\| +13 \|/u)
-    assert.match(result.stdout, /\| TOTAL +\| +13 \|/u)
+    assert.match(result.stdout, /\| @dshfiles\/alpha +\| +12 \|/u)
+    assert.match(result.stdout, /\| TOTAL +\| +12 \|/u)
   }))
 
 test('fails when a metric grows past the baseline and passes again once it improves', () =>
