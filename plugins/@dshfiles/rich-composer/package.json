@@ -74,6 +74,7 @@
     "@deepseek-ai/dsh-workspace": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@lexical/history": "catalog:",
     "@lexical/plain-text": "catalog:",
     "@lexical/text": "catalog:",
