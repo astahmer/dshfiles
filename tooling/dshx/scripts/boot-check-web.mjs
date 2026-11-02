@@ -9,6 +9,7 @@
  * from the checked-in `profiles/web` seed, not the live profile, so a cached pass depends only on the repository.
  */
 
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
@@ -21,6 +22,20 @@ const dshxDist = resolve(workspace, 'tooling/dshx/packages/dshx/dist')
 const { prepareComposedBootProfile } = await import(resolve(dshxDist, 'project/boot-profile.js'))
 const { checkClientBoot } = await import(resolve(dshxDist, 'project/client-boot-check.js'))
 const sourceProfileRoot = resolve(workspace, 'profiles/web')
+
+/**
+ * The CLI a boot needs: the workspace root's bin, then the plugin's own. A CI runner has neither on PATH, and the
+ * check must not depend on the caller's shell.
+ */
+const workspaceDshExecutable = () => {
+  const candidate = resolve(workspace, 'node_modules/.bin/dsh')
+  return existsSync(candidate) ? candidate : undefined
+}
+
+const localDshExecutable = pluginDirectory => {
+  const candidates = [resolve(workspace, 'node_modules/.bin/dsh'), resolve(pluginDirectory, 'node_modules/.bin/dsh')]
+  return candidates.find(candidate => existsSync(candidate))
+}
 
 const pinnedNode = async () => {
   const pinned = (await readFile(resolve(workspace, '.node-version'), 'utf8')).trim()
@@ -75,6 +90,7 @@ const bootAlone = async plugin => {
       port: 0,
       dshHome: profile.homeRoot,
       profileRoot: profile.profileRoot,
+      executable: localDshExecutable(plugin.dir),
       expectedBundles: profile.expectedBundles,
       expectedClientEntries: plugin.hasClient ? [plugin.id] : [],
     })
@@ -95,6 +111,7 @@ const bootComposed = async (plugins, ignoredIds, includeSourceProfileBundles = t
       port: 0,
       dshHome: profile.homeRoot,
       profileRoot: profile.profileRoot,
+      executable: workspaceDshExecutable(),
       expectedBundles: profile.expectedBundles,
       expectedClientEntries: plugins.filter(plugin => plugin.hasClient && !ignoredIds.has(plugin.id)).map(plugin => plugin.id),
     })
