@@ -6,8 +6,11 @@
     "test:boot": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shortcuts.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/shortcuts/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/shortcuts/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
@@ -27,8 +30,11 @@
     "test:e2e": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shortcuts.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/shortcuts/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/shortcuts/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",

@@ -7,9 +7,12 @@
       "dependsOn": [],
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__apply-patch.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/apply-patch/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/apply-patch/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
         "$TURBO_ROOT$/profiles/web/**",
         "$TURBO_ROOT$/tooling/dshx/package.json",
