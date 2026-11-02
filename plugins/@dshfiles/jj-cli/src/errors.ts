@@ -16,6 +16,7 @@ export class JjSpawnFailed extends Schema.TaggedError<JjSpawnFailed>()('JjSpawnF
 export class JjTimedOut extends Schema.TaggedError<JjTimedOut>()('JjTimedOut', {
   verb: Schema.String,
   timeoutMillis: Schema.Number,
+  cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return `jj ${this.verb} did not finish within ${String(this.timeoutMillis)} ms and was stopped.`
@@ -25,6 +26,7 @@ export class JjTimedOut extends Schema.TaggedError<JjTimedOut>()('JjTimedOut', {
 export class JjOutputTruncated extends Schema.TaggedError<JjOutputTruncated>()('JjOutputTruncated', {
   verb: Schema.String,
   maxBytes: Schema.Number,
+  cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return `jj ${this.verb} printed more than ${String(this.maxBytes)} bytes.`
