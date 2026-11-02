@@ -58,6 +58,24 @@ const JSON_PATH = fileURLToPath(new URL('../../json.js', import.meta.url))
 const EFFECT_PATH = fileURLToPath(new URL('../../effect/index.js', import.meta.url))
 const EFFECT_SERVICES_PATH = fileURLToPath(new URL('../../effect/services.js', import.meta.url))
 const HOST_GENERATION_PATH = fileURLToPath(new URL('../../host/generation.js', import.meta.url))
+const VIRTUAL_HOST_REEXPORT_PREFIX = '\0virtual:dshx-host-reexport:'
+
+/** Public dshx subpaths a Host bundle inlines whole: the ids schemas and each standard Effect service. */
+const DSHX_REEXPORTED_MODULES: ReadonlyMap<string, string> = new Map([
+  ['@dshfiles/dshx/ids', fileURLToPath(new URL('../../ids.js', import.meta.url))],
+  ...[
+    'child-process-spawner',
+    'communication',
+    'host-apis',
+    'host-context',
+    'host-terminal',
+    'keyed-mutex',
+    'llm',
+    'plugin-storage',
+    'settings',
+    'storage-domain',
+  ].map((name): readonly [string, string] => [`@dshfiles/dshx/effect/${name}`, fileURLToPath(new URL(`../../effect/${name}.js`, import.meta.url))]),
+])
 
 /** Opt-in in-process Host replacement: publish immutable generations behind a stable wrapper. */
 export interface HostGenerationBuild {
@@ -118,6 +136,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
     enforce: 'pre',
     resolveId(source) {
       if (source === VIRTUAL_HOST_ENTRY) return VIRTUAL_HOST_ENTRY
+      if (DSHX_REEXPORTED_MODULES.has(source)) return `${VIRTUAL_HOST_REEXPORT_PREFIX}${source}`
       return VIRTUAL_DSHX_PUBLIC_MODULES.get(source) ?? null
     },
     load(id) {
@@ -152,6 +171,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           '',
         ].join('\n')
       }
+      const reexported = id.startsWith(VIRTUAL_HOST_REEXPORT_PREFIX) ? DSHX_REEXPORTED_MODULES.get(id.slice(VIRTUAL_HOST_REEXPORT_PREFIX.length)) : undefined
+      if (reexported !== undefined) return `export * from ${JSON.stringify(reexported)}\n`
       if (id === VIRTUAL_HOST_EFFECT_PUBLIC) return `export * from ${JSON.stringify(EFFECT_PATH)}\n`
       if (id === VIRTUAL_HOST_EFFECT_SERVICES_PUBLIC) return `export * from ${JSON.stringify(EFFECT_SERVICES_PATH)}\n`
       if (id === `${VIRTUAL_HOST_PUBLIC}-api`) {
@@ -343,7 +364,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     })
   }
   const external = (source: string): boolean => {
-    if (VIRTUAL_DSHX_PUBLIC_MODULES.has(source)) return false
+    if (VIRTUAL_DSHX_PUBLIC_MODULES.has(source) || DSHX_REEXPORTED_MODULES.has(source)) return false
     const bundled = bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
     return !bundled && HostCompilerGuards.isHostExternal(source)
   }
