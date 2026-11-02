@@ -1,5 +1,8 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { parseSecretReference, secretScopeSchema } from '@dshfiles/credential-port'
+import { parseSecretReference } from '@dshfiles/credential-port'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
+import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -52,13 +55,13 @@ const isBacklogJevField = (element: Element): boolean => {
 
 const targetOf = (element: HTMLInputElement | HTMLTextAreaElement): SecretSetupTarget => {
   const cwd = element.dataset.secretCwd
-  const parsedScope = secretScopeSchema.safeParse(element.dataset.secretScope)
+  const parsedScope = Schema.decodeUnknownOption(secretScopeSchemaEffect)(element.dataset.secretScope)
   const target: SecretSetupTarget = {
     cwd: cwd === undefined || cwd === '' ? null : cwd,
   }
   if (element.dataset.secretAlias !== undefined) target.suggestedAlias = element.dataset.secretAlias
   if (element.dataset.secretEnvironment !== undefined) target.environment = element.dataset.secretEnvironment
-  if (parsedScope.success) target.scope = parsedScope.data
+  if (Option.isSome(parsedScope)) target.scope = parsedScope.value
   return target
 }
 

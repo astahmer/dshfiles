@@ -1,4 +1,7 @@
-import { formatSecretReference, parseSecretReference, secretScopeSchema, type SecretScope } from '@dshfiles/credential-port'
+import { formatSecretReference, parseSecretReference, type SecretScope } from '@dshfiles/credential-port'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
+import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { SecretCliError } from './secret-cli-runner.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import type { SecretCatalogOperations } from './secret-operations.js'
@@ -24,8 +27,10 @@ const elsewhereIn = async (input: {
         return []
       }
       return rows.flatMap(row => {
-        const scope = secretScopeSchema.safeParse(row.scope)
-        return row.alias === input.alias && scope.success && scope.data !== 'global' ? [{ scope: scope.data, folder, environment: row.environment }] : []
+        const scope = Schema.decodeUnknownOption(secretScopeSchemaEffect)(row.scope)
+        return row.alias === input.alias && Option.isSome(scope) && scope.value !== 'global'
+          ? [{ scope: scope.value, folder, environment: row.environment }]
+          : []
       })
     }),
   )
@@ -83,17 +88,17 @@ export const checkSecretReference = async (input: {
   }
   if (matches.length === 0) {
     const aliasScopes = [...new Set(sameAlias.map(row => row.scope))]
-    const owningScope = aliasScopes.length === 1 ? secretScopeSchema.safeParse(aliasScopes[0]) : null
-    return { ...named, state: 'environment-missing', environments, writeScope: owningScope?.success === true ? owningScope.data : writeScope }
+    const owningScope = aliasScopes.length === 1 ? Schema.decodeUnknownOption(secretScopeSchemaEffect)(aliasScopes[0]) : null
+    return { ...named, state: 'environment-missing', environments, writeScope: owningScope !== null && Option.isSome(owningScope) ? owningScope.value : writeScope }
   }
   if (matches.length > 1) return { ...named, state: 'ambiguous', environments, scopes }
 
-  const scope = secretScopeSchema.safeParse(matches[0]?.scope)
-  if (!scope.success) return { ...named, state: 'ambiguous', environments, scopes }
-  const found = { ...named, scope: scope.data, writeScope: scope.data, environments, scopes }
+  const scope = Schema.decodeUnknownOption(secretScopeSchemaEffect)(matches[0]?.scope)
+  if (Option.isNone(scope)) return { ...named, state: 'ambiguous', environments, scopes }
+  const found = { ...named, scope: scope.value, writeScope: scope.value, environments, scopes }
   let value: string
   try {
-    value = await input.operations.reveal(reference.alias, scope.data, input.cwd, reference.environment, input.signal)
+    value = await input.operations.reveal(reference.alias, scope.value, input.cwd, reference.environment, input.signal)
   } catch (error) {
     if (input.signal?.aborted === true) throw error
     const state = cliState(error)

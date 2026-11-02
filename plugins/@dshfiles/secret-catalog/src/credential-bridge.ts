@@ -1,6 +1,9 @@
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { secretScopeSchema, type SecretCatalogCredentialBridge, type SecretCatalogKeyOption, type SecretScope } from '@dshfiles/credential-port'
+import type { SecretCatalogCredentialBridge, SecretCatalogKeyOption, SecretScope } from '@dshfiles/credential-port'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
+import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import type { SecretCatalogOperations } from './secret-operations.js'
 
 export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption }
@@ -15,8 +18,8 @@ const sourceCwdFor = (scope: SecretScope, cwd: string | null): string | null => 
 const uniqueRows = async (operations: Pick<SecretCatalogOperations, 'list'>, cwd: string | null, signal?: AbortSignal) => {
   const rows = await operations.list(cwd, signal)
   const scopedRows = rows.flatMap(row => {
-    const scope = secretScopeSchema.safeParse(row.scope)
-    return scope.success ? [{ row, scope: scope.data }] : []
+    const scope = Schema.decodeUnknownOption(secretScopeSchemaEffect)(row.scope)
+    return Option.isSome(scope) ? [{ row, scope: scope.value }] : []
   })
   const counts = new Map<string, number>()
   for (const entry of scopedRows) {
