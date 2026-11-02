@@ -2,14 +2,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import { LoginIntentInactive } from './errors.js'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { Api } from '@dshfiles/dshx/effect'
-import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
+import { accountRuntime, AccountLoginIntentModel } from './account-runtime.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { accountStoreService, type AccountStoreFile } from './account-store.js'
 import { accountLoginMetadata, aiAccountsLoginApi, type AccountLoginState } from './account-login-api.js'
 import { createAccountLoginService, type AccountLoginAccount } from './account-login-service.js'
 import { createCodexLoginFiles } from './codex-login-files.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
-import { effectHandler } from './host-effect.js'
+import { effectHandler, lockedHandler } from './host-effect.js'
 
 export class AccountLoginHostModel {
   static readonly accountsFromFile = (file: AccountStoreFile): AccountLoginAccount[] =>
@@ -52,15 +52,20 @@ const loginFor = (ctx: Context) => {
 }
 
 export const accountLoginHostApi = Api.bind(aiAccountsLoginApi, {
-  begin: effectHandler(aiAccountsLoginApi, 'begin', ({ ctx, input, caller }) => {
-    const account =
-      accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ??
-      accountStoreService.readAccountFileSync().accounts.find(candidate => candidate.instanceId === input.instanceId)
-    return AccountSessionWorkModel.run(ctx, account === undefined ? [input.instanceId] : accountSessionRelatedIds(account), async () => {
+  begin: lockedHandler(
+    aiAccountsLoginApi,
+    'begin',
+    ({ ctx, input }) => {
+      const account =
+        accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ??
+        accountStoreService.readAccountFileSync().accounts.find(candidate => candidate.instanceId === input.instanceId)
+      return account === undefined ? [input.instanceId] : accountSessionRelatedIds(account)
+    },
+    async ({ ctx, input, caller }) => {
       if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new LoginIntentInactive({ instanceId: input.instanceId })
       return AccountLoginHostModel.forCaller(await loginFor(ctx).begin(input.instanceId, input.replaceExisting), caller)
-    })
-  }),
+    },
+  ),
   status: effectHandler(aiAccountsLoginApi, 'status', ({ ctx, input, caller }) =>
     AccountLoginHostModel.forCaller(loginFor(ctx).state(input.instanceId), caller),
   ),

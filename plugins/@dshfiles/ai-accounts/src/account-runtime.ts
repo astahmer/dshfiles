@@ -1,5 +1,4 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { AccountOperationBusy } from './errors.js'
 import type { AiAccountsConfig } from './account-config.js'
 import type { createAccountPool } from './account-pool.js'
 import type { UsageHistoryScheduler } from './usage-recorder.js'
@@ -36,27 +35,6 @@ interface AccountRuntime {
   fastMode?: FastModeService
   fastModeUsageHistory?: FastModeUsageHistoryService
   servingAccount?: ServingAccountService
-}
-
-/** One lock owner for credential mutations and saved-account edits. Reads and other accounts stay concurrent. */
-export class AccountSessionWorkModel {
-  private static readonly locks = new WeakMap<Context, Set<string>>()
-  static readonly isLocked = (ctx: Context, instanceId: string): boolean => AccountSessionWorkModel.locks.get(ctx.root)?.has(instanceId) === true
-  static readonly run = async <Result>(ctx: Context, ids: readonly string[], work: () => Promise<Result>): Promise<Result> => {
-    let held = AccountSessionWorkModel.locks.get(ctx.root)
-    if (held === undefined) {
-      held = new Set()
-      AccountSessionWorkModel.locks.set(ctx.root, held)
-    }
-    const selected = [...new Set(ids)]
-    if (selected.some(id => held.has(id))) throw new AccountOperationBusy({ instanceIds: selected.filter(id => held.has(id)) })
-    for (const id of selected) held.add(id)
-    try {
-      return await work()
-    } finally {
-      for (const id of selected) held.delete(id)
-    }
-  }
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

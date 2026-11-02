@@ -1,10 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { AccountSignInActive } from './errors.js'
-import { accountRuntime, AccountSessionWorkModel } from './account-runtime.js'
+import { accountRuntime } from './account-runtime.js'
+import { AccountLocks } from './account-locks.js'
+import { Effect } from 'effect'
 import { accountStoreService } from './account-store.js'
 import { Api } from '@dshfiles/dshx/effect'
 import { aiAccountsSessionApi } from './account-session-api.js'
-import { effectHandler } from './host-effect.js'
+import { effectHandler, lockedHandler } from './host-effect.js'
 import { createAccountSessionService, type AccountSessionService } from './account-session-service.js'
 import { CopilotCredentialModel } from './copilot-credentials.js'
 import { AccountHomePolicy } from './account-home-policy.js'
@@ -89,25 +91,31 @@ const serviceFor = (ctx: Context): AccountSessionService => {
   })
   return service
 }
+const readCapability = effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input }) => serviceFor(ctx).capability(input.instanceId))
+
 export const accountSessionHostApi = Api.bind(aiAccountsSessionApi, {
-  capability: effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input }) =>
-    AccountSessionWorkModel.isLocked(ctx, input.instanceId)
-      ? {
-          instanceId: input.instanceId,
-          available: false,
-          reason: 'An account operation is already running. Wait for it to finish before signing out.',
-          credentialScope: null,
-        }
-      : serviceFor(ctx).capability(input.instanceId),
-  ),
-  signOut: effectHandler(aiAccountsSessionApi, 'signOut', ({ ctx, input }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  capability: Effect.fn('ai accounts capability')(function* (input, call) {
+    const locks = yield* AccountLocks
+    if (yield* locks.isLocked(input.instanceId))
+      return {
+        instanceId: input.instanceId,
+        available: false,
+        reason: 'An account operation is already running. Wait for it to finish before signing out.',
+        credentialScope: null,
+      }
+    return yield* readCapability(input, call)
+  }),
+  signOut: lockedHandler(
+    aiAccountsSessionApi,
+    'signOut',
+    ({ input }) => [input.instanceId],
+    async ({ ctx, input }) => {
       // Join any cancelled Codex subprocess that is still exiting. Never cancel a live attempt ourselves.
       const file = await accountStoreService.readAccountFile()
       const account = file.accounts.find(candidate => candidate.instanceId === input.instanceId)
       if (account !== undefined && busy(ctx, account)) throw new AccountSignInActive({ instanceId: input.instanceId })
       await accountRuntime(ctx)?.accountLogin?.settledAccount(input.instanceId)
       return serviceFor(ctx).signOut(input)
-    }),
+    },
   ),
 })

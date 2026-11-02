@@ -44,6 +44,7 @@ import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { AccountsPlatformLive } from './platform-layer.js'
+import { AccountLocks } from './account-locks.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { Duration, Effect, Layer, Schedule } from 'effect'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -1089,7 +1090,7 @@ export default DshxPlugin.make({
   name: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
   settings: [aiAccountsHostSettings],
-  layer: AccountsHostLive.pipe(Layer.provideMerge(AccountsPlatformLive)),
+  layer: AccountsHostLive.pipe(Layer.provideMerge(Layer.mergeAll(AccountsPlatformLive, AccountLocks.layer))),
   apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi, accountSessionHostApi, threadAccountHostApi],
   tools: [aiAccountsTool],
 })

@@ -13,7 +13,7 @@ import type { CopilotLoginState } from './api.js'
 
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { SecretCatalogCredentialBridge, SecretCatalogValues } from '@dshfiles/credential-port'
-import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
+import { accountRuntime, AccountLoginIntentModel } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
 import {
@@ -41,7 +41,7 @@ import { PricingCatalogModel } from './pricing-catalog.js'
 import { AccountSettingsModel } from './settings.js'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { Api } from '@dshfiles/dshx/effect'
-import { effectHandler } from './host-effect.js'
+import { effectHandler, lockedHandler } from './host-effect.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -120,8 +120,11 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
       return { available: false, items: [] }
     }
   }),
-  importSecretCatalogKey: effectHandler(aiAccountsApi, 'importSecretCatalogKey', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  importSecretCatalogKey: lockedHandler(
+    aiAccountsApi,
+    'importSecretCatalogKey',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx }) => {
       const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
       if (account === undefined || account.kind === 'codex') throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'not-keyed' })
       if (!isKeyEnvName(account.apiKeyEnv)) throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'invalid-key-env' })
@@ -136,21 +139,26 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
         replaceExisting: input.replaceExisting,
       })
       accountRuntime(ctx)?.usageCache?.invalidate()
-      return { imported: true, apiKeyEnv: account.apiKeyEnv }
-    }),
+      return { imported: true, apiKeyEnv: account.apiKeyEnv } satisfies { readonly imported: true; readonly apiKeyEnv: string }
+    },
   ),
   createSetupAccount: effectHandler(aiAccountsApi, 'createSetupAccount', () => {
     throw new SetupMethodRetired()
   }),
-  prepareAccountConnection: effectHandler(aiAccountsApi, 'prepareAccountConnection', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(ctx, input.existingInstanceId === undefined ? [] : [input.existingInstanceId], () => setupFor(ctx).prepare(input)),
+  prepareAccountConnection: lockedHandler(
+    aiAccountsApi,
+    'prepareAccountConnection',
+    ({ input }) => (input.existingInstanceId === undefined ? [] : [input.existingInstanceId]),
+    ({ input, ctx }) => setupFor(ctx).prepare(input),
   ),
   getAccountConnection: effectHandler(aiAccountsApi, 'getAccountConnection', ({ input, ctx }) => setupFor(ctx).get(input.operationId)),
-  configureAccountConnection: effectHandler(aiAccountsApi, 'configureAccountConnection', ({ input, ctx }) => {
-    const { operationId, ...configuration } = input
-    const account = setupFor(ctx).get(operationId).account
-    const ids =
-      account === null
+  configureAccountConnection: lockedHandler(
+    aiAccountsApi,
+    'configureAccountConnection',
+    ({ input, ctx }) => {
+      const { operationId, ...configuration } = input
+      const account = setupFor(ctx).get(operationId).account
+      return account === null
         ? []
         : [
             ...accountSessionRelatedIds(account),
@@ -161,8 +169,12 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
               apiKeyEnv: configuration.apiKeyEnv ?? account.apiKeyEnv,
             }),
           ]
-    return AccountSessionWorkModel.run(ctx, ids, () => setupFor(ctx).configure(operationId, configuration))
-  }),
+    },
+    ({ input, ctx }) => {
+      const { operationId, ...configuration } = input
+      return setupFor(ctx).configure(operationId, configuration)
+    },
+  ),
   stageAccountConnectionKey: effectHandler(aiAccountsApi, 'stageAccountConnectionKey', ({ input, ctx, caller }) => {
     if (caller.kind !== 'client') throw new BrowserOnlyCredential()
     return setupFor(ctx).stageKey(input.operationId, input.value)
@@ -185,36 +197,46 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     }
     return setup.stageKey(input.operationId, value)
   }),
-  completeAccountConnection: effectHandler(aiAccountsApi, 'completeAccountConnection', ({ input, ctx }) => {
-    const account = setupFor(ctx).get(input.operationId).account
-    return AccountSessionWorkModel.run(ctx, account === null ? [] : accountSessionRelatedIds(account), () => setupFor(ctx).complete(input.operationId))
-  }),
+  completeAccountConnection: lockedHandler(
+    aiAccountsApi,
+    'completeAccountConnection',
+    ({ input, ctx }) => {
+      const account = setupFor(ctx).get(input.operationId).account
+      return account === null ? [] : accountSessionRelatedIds(account)
+    },
+    ({ input, ctx }) => setupFor(ctx).complete(input.operationId),
+  ),
   discardAccountConnection: effectHandler(aiAccountsApi, 'discardAccountConnection', async ({ input, ctx }) => {
     await setupFor(ctx).discard(input.operationId)
     return { discarded: true } satisfies { readonly discarded: true }
   }),
-  save: effectHandler(aiAccountsApi, 'save', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(
-      ctx,
-      [...accountSessionRelatedIds(input.draft), ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId])],
-      async () => {
-        await accountStoreService.upsertAccount(input.draft, input.previousInstanceId, true)
-        accountRuntime(ctx)?.usageCache?.invalidate()
-        await refreshRoutes(ctx)
-        return accountsFile(ctx)
-      },
-    ),
+  save: lockedHandler(
+    aiAccountsApi,
+    'save',
+    ({ input }) => [...accountSessionRelatedIds(input.draft), ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId])],
+    async ({ input, ctx }) => {
+      await accountStoreService.upsertAccount(input.draft, input.previousInstanceId, true)
+      accountRuntime(ctx)?.usageCache?.invalidate()
+      await refreshRoutes(ctx)
+      return accountsFile(ctx)
+    },
   ),
-  remove: effectHandler(aiAccountsApi, 'remove', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  remove: lockedHandler(
+    aiAccountsApi,
+    'remove',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx }) => {
       await accountStoreService.removeAccount(input.instanceId)
       accountRuntime(ctx)?.usageCache?.invalidate()
       await refreshRoutes(ctx)
       return accountsFile(ctx)
-    }),
+    },
   ),
-  removeCustomModel: effectHandler(aiAccountsApi, 'removeCustomModel', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  removeCustomModel: lockedHandler(
+    aiAccountsApi,
+    'removeCustomModel',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx }) => {
       const account = (await accountStoreService.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
       if (account === undefined) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
       const patch = ModelCurationModel.removeAdditionalModel({ account, modelId: input.modelId })
@@ -222,7 +244,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
       await accountStoreService.upsertAccount({ ...account, ...patch }, undefined, true)
       await refreshRoutes(ctx)
       return { removed: true, instanceId: input.instanceId, modelId: input.modelId }
-    }),
+    },
   ),
   moveAccount: effectHandler(aiAccountsApi, 'moveAccount', async ({ input, ctx }) => {
     await accountStoreService.moveAccount(input.instanceId, input.direction)
@@ -240,11 +262,14 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     return accountsFile(ctx)
   }),
   identity: effectHandler(aiAccountsApi, 'identity', async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId)),
-  beginCopilotLogin: effectHandler(aiAccountsApi, 'beginCopilotLogin', ({ input, ctx, caller }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  beginCopilotLogin: lockedHandler(
+    aiAccountsApi,
+    'beginCopilotLogin',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx, caller }) => {
       if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new LoginIntentInactive({ instanceId: input.instanceId })
       return AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId), caller)
-    }),
+    },
   ),
   copilotLoginStatus: effectHandler(aiAccountsApi, 'copilotLoginStatus', async ({ input, ctx, caller }) =>
     AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
@@ -255,8 +280,11 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     else copilotLoginFor(ctx).cancel(input.instanceId)
     return { cancelled: true } satisfies { readonly cancelled: true }
   }),
-  signOutCopilot: effectHandler(aiAccountsApi, 'signOutCopilot', ({ input, ctx }) =>
-    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+  signOutCopilot: lockedHandler(
+    aiAccountsApi,
+    'signOutCopilot',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx }) => {
       const login = copilotLoginFor(ctx)
       if (
         !AccountLoginIntentModel.owns(ctx, input.instanceId) ||
@@ -266,8 +294,8 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
         throw new AccountSignInActive({ instanceId: input.instanceId })
       await login.signOut(input.instanceId)
       accountRuntime(ctx)?.usageCache?.invalidate()
-      return { signedOut: true }
-    }),
+      return { signedOut: true } satisfies { readonly signedOut: true }
+    },
   ),
   catalog: effectHandler(aiAccountsApi, 'catalog', async ({ input, ctx }) => {
     await refreshRoutes(ctx)
