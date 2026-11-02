@@ -1,4 +1,4 @@
-import type { Gateway } from './connectors/gateway.js'
+import type { Gateway } from './legacy-runtime-promise.js'
 
 /** One live connection per runtime, shared by every caller until it idles out or its transport drops. */
 type PoolEntry = {

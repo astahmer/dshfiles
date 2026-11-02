@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from '../src/schema.js'
 import type { NativeRpcRequest } from '../src/api.js'
-import { connectGateway } from '../src/connectors/gateway.js'
+import { openGateway } from './fixtures/gateway-runtime.js'
 import { NativeRpcModel } from '../src/native-rpc.js'
 
 describe('native mutation outcome recovery', () => {
@@ -57,10 +57,7 @@ describe('native mutation outcome recovery', () => {
     const address = Schema.decodeUnknownResult(addressSchema)(server.address())
     if (address._tag === 'Failure') throw new Error('The loopback fixture did not bind.')
     const launchUrl = `http://127.0.0.1:${address.success.port}/?token=fixture-token-12345678`
-    const gateway = await connectGateway({
-      launchUrl,
-      createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }),
-    })
+    const gateway = (await openGateway(launchUrl)).promiseGateway
     try {
       const createRequest: NativeRpcRequest = {
         namespace: 'session',

@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import type { Gateway } from '../src/connectors/gateway.js'
+import type { Gateway } from '../src/legacy-runtime-promise.js'
 import { createServer, type Server } from 'node:http'
 import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from '../src/schema.js'
-import { connectGateway, GatewayUnavailableError } from '../src/connectors/gateway.js'
+import { LegacyRuntime } from '../src/legacy-runtime-promise.js'
+import { openGateway } from './fixtures/gateway-runtime.js'
 import { createGatewayPool } from '../src/gateway-pool.js'
 import { NativeRpcModel } from '../src/native-rpc.js'
 
@@ -131,7 +132,7 @@ const startRuntimeFixture = async () => {
   return {
     calls,
     state,
-    connect: () => connectGateway({ launchUrl, createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }) }),
+    connect: async () => (await openGateway(launchUrl)).promiseGateway,
     close: () => new Promise<void>(resolve => server.close(() => resolve())),
   }
 }
@@ -143,7 +144,7 @@ describe('gateway pool against a loopback runtime', () => {
     const runtime = await startRuntimeFixture()
     let connections = 0
     const pool = createGatewayPool({
-      isTransportFailure: error => error instanceof GatewayUnavailableError && transportCodes.has(error.code),
+      isTransportFailure: error => transportCodes.has(LegacyRuntime.failureOf(error).code),
       connect: async () => {
         connections += 1
         return runtime.connect()

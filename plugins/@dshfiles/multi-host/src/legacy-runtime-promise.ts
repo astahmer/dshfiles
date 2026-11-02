@@ -1,5 +1,7 @@
-import { Cause, type Context, Effect, Exit, Scope } from 'effect'
-import { GatewayUnavailableError } from './connectors/gateway.js'
+import type { JsonValue } from '@dshfiles/dshx/platform'
+import { Cause, type Context, Effect, Exit, Schema, SchemaAST, Scope, Stream } from 'effect'
+import { Connectors } from './connectors/connectors.js'
+import type { Gateway as EffectGateway } from './connectors/gateway.js'
 import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity } from './identity.js'
 import { LaunchFile } from './launch-file.js'
@@ -12,7 +14,50 @@ import type { Ssh } from './ssh.js'
  * The Effect services the remaining Promise handlers reach while the Host moves onto `DshxPlugin.make`; installed for
  * the plugin activation and removed with it.
  */
-export type LegacyServices = Ssh | MultiHostPaths | HostDirectory | RemoteThreads | RuntimeIdentity | LaunchFile
+export type LegacyServices = Ssh | MultiHostPaths | HostDirectory | RemoteThreads | RuntimeIdentity | LaunchFile | Connectors
+
+export class GatewayUnavailableError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'GatewayUnavailableError'
+  }
+}
+
+export type GatewayOutcome = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly code: string; readonly message: string }
+
+/** The Promise shape the pool, the session source and the remaining handlers still use. */
+export type Gateway = {
+  readonly origin: string
+  readonly launchUrl: string
+  readonly closed: Promise<void>
+  run(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
+  runSafe(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<GatewayOutcome>
+  api(method: string, input?: JsonValue, signal?: AbortSignal): Promise<unknown>
+  pluginApi(target: {
+    readonly packageId: string
+    readonly apiId: string
+    readonly version: number
+  }): (method: string, input?: JsonValue, signal?: AbortSignal) => Promise<unknown>
+  follow(endpoint: string, args: unknown, timeoutMs: number, signal?: AbortSignal): Promise<readonly unknown[]>
+  stream(endpoint: string, args: unknown, signal: AbortSignal): AsyncIterable<unknown>
+  dispose(): Promise<void>
+}
+
+const wireCodeAt = SchemaAST.resolveAt<string>('dshxWireCode')
+
+/** The code and message a value handler reports for a failure: a remote failure keeps the runtime's own code. */
+const failureOf = (error: unknown): { readonly code: string; readonly message: string } => {
+  if (typeof error === 'object' && error !== null && Schema.isSchema(error.constructor) && error instanceof Error) {
+    if ('code' in error && typeof error.code === 'string') return { code: error.code, message: error.message }
+    const code = wireCodeAt(error.constructor.ast)
+    if (code !== undefined) return { code, message: error.message }
+  }
+  if (error instanceof Error && 'code' in error && typeof error.code === 'string') return { code: error.code, message: error.message }
+  return { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
+}
 
 const installed: { services: Context.Context<LegacyServices> | undefined } = { services: undefined }
 
@@ -60,12 +105,6 @@ const open = async <A, E>(
 const directory = <A, E>(body: (service: HostDirectory['Service']) => Effect.Effect<A, E>) => run(HostDirectory.use(body))
 const threads = <A, E>(body: (service: RemoteThreads['Service']) => Effect.Effect<A, E>) => run(RemoteThreads.use(body))
 
-export class LegacyRuntime {
-  static readonly install = install
-  static readonly run = run
-  static readonly open = open
-}
-
 export class HostDirectoryStore {
   static readonly readDirectory = () => directory(service => service.read)
   static readonly listHosts = () => directory(service => service.listHosts)
@@ -86,6 +125,67 @@ export class RemoteThreadStore {
   static readonly forget = (match: { readonly runtimeId: string; readonly sessionId?: string | undefined }) => threads(service => service.forget(match))
 }
 
-export const readOrCreateRuntimeIdentity = () => run(RuntimeIdentity.use(service => service.current))
+const readOrCreateRuntimeIdentity = () => run(RuntimeIdentity.use(service => service.current))
 
-export const publishLaunchFile = (launchUrl: string) => open(LaunchFile.use(service => service.publish(launchUrl)))
+const publishLaunchFile = (launchUrl: string) => open(LaunchFile.use(service => service.publish(launchUrl)))
+
+const aborted = (signal: AbortSignal) =>
+  Effect.callback<void>(resume => {
+    if (signal.aborted) return resume(Effect.void)
+    const onAbort = () => resume(Effect.void)
+    signal.addEventListener('abort', onAbort, { once: true })
+    return Effect.sync(() => signal.removeEventListener('abort', onAbort))
+  })
+
+/** Gateway effects need no services, so they run whether or not the plugin installed its own. */
+const runStandalone = async <A, E>(effect: Effect.Effect<A, E>, signal?: AbortSignal): Promise<A> => {
+  const exit = await Effect.runPromiseExit(effect, signal === undefined ? undefined : { signal })
+  if (Exit.isSuccess(exit)) return exit.value
+  throw thrown(exit.cause)
+}
+
+const toPromiseGateway = (input: { readonly gateway: EffectGateway; readonly close: () => Promise<void> }): Gateway => {
+  const gateway = input.gateway
+  const runNative = (namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal) =>
+    runStandalone(gateway.run({ namespace, method, args }), signal)
+  const pluginApi: Gateway['pluginApi'] = target => {
+    const call = gateway.pluginApi(target)
+    return (method, value, signal) => runStandalone(call(method, value), signal)
+  }
+  return {
+    origin: gateway.origin,
+    launchUrl: gateway.launchUrl,
+    closed: Effect.runPromise(gateway.closed),
+    run: runNative,
+    runSafe: (namespace, method, args, signal) =>
+      runNative(namespace, method, args, signal).then(
+        (value): GatewayOutcome => ({ ok: true, value }),
+        (error: unknown): GatewayOutcome => ({ ok: false, ...failureOf(error) }),
+      ),
+    api: (method, value, signal) => runStandalone(gateway.api(method, value), signal),
+    pluginApi,
+    follow: (endpoint, args, timeoutMs, signal) => runStandalone(gateway.follow({ endpoint, args, timeout: timeoutMs }), signal),
+    stream: (endpoint, args, signal) => Stream.toAsyncIterable(gateway.stream({ endpoint, args }).pipe(Stream.interruptWhen(aborted(signal)))),
+    dispose: input.close,
+  }
+}
+
+/** A gateway to a recorded runtime with the old Promise shape; `dispose` closes its connection Scope. */
+const connectRuntime = async (input: Parameters<Connectors['Service']['connect']>[0], signal?: AbortSignal): Promise<Gateway> => {
+  const opened = await open(
+    Connectors.use(connectors => connectors.connect(input)),
+    signal,
+  )
+  return toPromiseGateway({ gateway: opened.value, close: opened.close })
+}
+
+export class LegacyRuntime {
+  static readonly install = install
+  static readonly run = run
+  static readonly open = open
+  static readonly failureOf = failureOf
+  static readonly toPromiseGateway = toPromiseGateway
+  static readonly connectRuntime = connectRuntime
+  static readonly readOrCreateRuntimeIdentity = readOrCreateRuntimeIdentity
+  static readonly publishLaunchFile = publishLaunchFile
+}

@@ -24,10 +24,9 @@ import {
   type RuntimeStatus,
   type SessionSummary,
 } from './api.js'
-import { connectLocal } from './connectors/local.js'
 import { SshConnector } from './connectors/ssh.js'
 import { ConnectorKindMismatch, HostNotFound, OriginPortExhausted, RuntimeNotFound } from './errors.js'
-import { HostDirectoryStore, LegacyRuntime, publishLaunchFile, readOrCreateRuntimeIdentity, RemoteThreadStore } from './legacy-runtime-promise.js'
+import { GatewayUnavailableError, type Gateway, HostDirectoryStore, LegacyRuntime, RemoteThreadStore } from './legacy-runtime-promise.js'
 import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity as RuntimeIdentityService } from './identity.js'
 import { LaunchFile } from './launch-file.js'
@@ -37,8 +36,7 @@ import { NodeServices } from '@effect/platform-node'
 import { Ssh, shellQuote } from './ssh.js'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { ConfigProvider, SchemaAST } from 'effect'
-import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
+import { ConfigProvider } from 'effect'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
@@ -65,7 +63,9 @@ import { RemoteRuntime } from './remote-runtime.js'
 import { RemoteCheckout } from './remote-checkout.js'
 import { listSshConfigHosts } from './ssh-config.js'
 import { reduceTranscript } from './transcript.js'
-import { reserveLoopbackEndpoint } from './connectors/loopback.js'
+import { Loopback } from './connectors/loopback.js'
+import { Connectors } from './connectors/connectors.js'
+import { FetchHttpClient } from 'effect/http'
 import { callNativeRpc } from './native-rpc.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
@@ -220,7 +220,7 @@ const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
 })
 const resourceProbeLimiter = ResourceSnapshotModel.createResourceProbeLimiter(4)
 
-const connectRuntime = async ({
+const connectRuntime = ({
   host,
   runtime,
   signal,
@@ -230,29 +230,20 @@ const connectRuntime = async ({
   readonly runtime: RuntimeRecord
   readonly signal?: AbortSignal | undefined
   readonly originPort?: number
-}): Promise<Gateway> => {
-  if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
-    return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort !== undefined && { originPort }), signal })
-  if (runtime.locator.kind === 'ssh' && host.connector.kind === 'ssh')
-    return LegacyRuntime.open(
-      SshConnector.connect({ sshTarget: host.connector.sshTarget, remoteHome: runtime.locator.remoteHome, ...(originPort !== undefined && { originPort }) }),
-      signal,
-    ).then(opened => ({ ...opened.value, dispose: opened.close }))
-  throw new GatewayUnavailableError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
-}
+}): Promise<Gateway> => LegacyRuntime.connectRuntime({ host, runtime, originPort }, signal)
 
 const allocateRuntimeOriginPort = async (runtimeId: string, occupiedPorts: readonly number[]): Promise<number> => {
   const unavailable = new Set(occupiedPorts)
   for (let attempt = 0; attempt < 20_000; attempt += 1) {
     const port = runtimeOriginPort(runtimeId, [...unavailable])
-    try {
-      const endpoint = await reserveLoopbackEndpoint(port)
-      endpoint.release()
-      return port
-    } catch (error) {
-      if (!(error instanceof GatewayUnavailableError) || error.code !== 'loopback-address-unavailable') throw error
-      unavailable.add(port)
-    }
+    const free = await LegacyRuntime.run(
+      Loopback.reserve(port).pipe(
+        Effect.as(true),
+        Effect.catchTag('LoopbackUnavailable', () => Effect.succeed(false)),
+      ),
+    )
+    if (free) return port
+    unavailable.add(port)
   }
   throw new OriginPortExhausted()
 }
@@ -300,21 +291,7 @@ const verifyPinnedIdentity = async (gateway: Gateway, runtime: RuntimeRecord): P
   return current
 }
 
-const wireCodeOf = SchemaAST.resolveAt<string>('dshxWireCode')
-
-const safeFailure = (error: unknown): { readonly code: string; readonly message: string } => {
-  if (typeof error === 'object' && error !== null && Schema.isSchema(error.constructor)) {
-    const code = wireCodeOf(error.constructor.ast)
-    if (code !== undefined && error instanceof Error) return { code, message: error.message }
-  }
-  if (error instanceof GatewayUnavailableError || error instanceof GatewayRequestError || error instanceof IdentityMismatchError) {
-    return { code: error.code, message: error.message }
-  }
-  if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
-    return { code: error.code, message: 'The runtime request failed. Check the host status and reconnect if needed.' }
-  }
-  return { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
-}
+const safeFailure = (error: unknown): { readonly code: string; readonly message: string } => LegacyRuntime.failureOf(error)
 
 const failureCode = (error: unknown): string => safeFailure(error).code
 
@@ -572,7 +549,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
 }
 
 const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
-  identity: async () => readOrCreateRuntimeIdentity(),
+  identity: async () => LegacyRuntime.readOrCreateRuntimeIdentity(),
   resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
   resourcePool: async () => readResourcePool(),
   list: async () => {
@@ -1502,7 +1479,12 @@ const effectHandlers = {
 const effectPlugin = DshxEffect.plugin({
   layer: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) =>
     Layer.mergeAll(
-      Ssh.layer.pipe(Layer.provide(DshChildProcessSpawner.layer), Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/multi-host' }))),
+      Connectors.layer.pipe(
+        Layer.provide(FetchHttpClient.layer),
+        Layer.provideMerge(Ssh.layer),
+        Layer.provide(DshChildProcessSpawner.layer),
+        Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/multi-host' })),
+      ),
       Layer.mergeAll(HostDirectory.layer, RemoteThreads.layer, RuntimeIdentityService.layer({ configuredProfile: config?.profile }), LaunchFile.layer).pipe(
         Layer.provideMerge(MultiHostPaths.layer),
       ),
@@ -1548,7 +1530,7 @@ function setupHost(ctx: Context): void {
         const connection: ConnectionSurface | undefined = scoped.get('connection')
         const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
         if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-        const published = await publishLaunchFile(launchUrl)
+        const published = await LegacyRuntime.publishLaunchFile(launchUrl)
         if (disposed) return published.close()
         releaseLaunchFile = published.close
       })().catch(() => undefined)

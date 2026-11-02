@@ -1,9 +1,9 @@
-import { Effect, type Scope } from 'effect'
+import { Effect } from 'effect'
 import { RuntimeNotRunning } from '../errors.js'
 import { RuntimeLaunchFile } from '../launch-file.js'
 import { Ssh, shellQuote } from '../ssh.js'
-import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
-import { reserveLoopbackEndpoint } from './loopback.js'
+import { connectGateway } from './gateway.js'
+import { Loopback } from './loopback.js'
 
 const remoteLaunch = Effect.fnUntraced(function* (input: { readonly sshTarget: string; readonly remoteHome: string }) {
   const ssh = yield* Ssh
@@ -17,38 +17,19 @@ const remoteLaunch = Effect.fnUntraced(function* (input: { readonly sshTarget: s
   return launch
 })
 
-const gatewayFailure = (cause: unknown): GatewayUnavailableError =>
-  cause instanceof GatewayUnavailableError
-    ? cause
-    : new GatewayUnavailableError('gateway-unreachable', 'Could not reach the runtime through its recorded connector.')
-
 /** The remote launch file, a loopback `-L` forward to its port, then the authenticated gateway through that forward. */
 const connect = Effect.fnUntraced(function* (input: { readonly sshTarget: string; readonly remoteHome: string; readonly originPort?: number | undefined }) {
   const ssh = yield* Ssh
   const launch = yield* remoteLaunch(input)
-  const endpoint = yield* Effect.tryPromise({ try: () => reserveLoopbackEndpoint(input.originPort), catch: gatewayFailure })
+  const endpoint = yield* Loopback.reserve(input.originPort)
   const tunnel = yield* ssh.tunnel({ sshTarget: input.sshTarget, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port })
   const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
-  const closed = Effect.runPromise(tunnel.closed)
-  return yield* Effect.tryPromise({
-    try: signal =>
-      connectGateway({
-        launchUrl: localLaunchUrl,
-        signal,
-        createTransport: async origin => ({
-          origin: origin.origin,
-          launchUrl: localLaunchUrl,
-          closed,
-          dispose: async () => undefined,
-        }),
-      }),
-    catch: gatewayFailure,
+  return yield* connectGateway({
+    launchUrl: localLaunchUrl,
+    transport: origin => Effect.succeed({ origin: origin.origin, launchUrl: localLaunchUrl, closed: tunnel.closed }),
   }).pipe(
     // SSH and the forward worked, so nothing listens behind the launch file: DSH there stopped without removing it.
-    Effect.catchIf(
-      error => error.code === 'gateway-unreachable',
-      () => Effect.fail(new RuntimeNotRunning({ reason: 'closed-port' })),
-    ),
+    Effect.catchTag('GatewayUnreachable', () => Effect.fail(new RuntimeNotRunning({ reason: 'closed-port' }))),
   )
 })
 
@@ -78,11 +59,7 @@ const discoverHomes = Effect.fnUntraced(function* (input: { readonly sshTarget: 
 })
 
 export class SshConnector {
-  static readonly connect: (input: {
-    readonly sshTarget: string
-    readonly remoteHome: string
-    readonly originPort?: number | undefined
-  }) => Effect.Effect<Gateway, unknown, Ssh | Scope.Scope> = connect
+  static readonly connect = connect
   static readonly probe = probe
   static readonly discoverHomes = discoverHomes
 }

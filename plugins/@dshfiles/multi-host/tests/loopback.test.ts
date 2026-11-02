@@ -1,7 +1,15 @@
 import { createServer, type Server } from 'node:http'
-import { Schema } from 'effect'
+import { Effect, Exit, Schema, Scope } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
-import { createLoopbackForward, reserveLoopbackEndpoint } from '../src/connectors/loopback.js'
+import { Loopback } from '../src/connectors/loopback.js'
+
+const createLoopbackForward = async (input: { readonly target: URL; readonly originPort?: number }) => {
+  const scope = Effect.runSync(Scope.make())
+  const endpoint = await Effect.runPromise(Scope.provide(scope)(Loopback.forward(input)))
+  return { ...endpoint, dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)) }
+}
+
+const reserveLoopbackEndpoint = () => Effect.runPromise(Loopback.reserve())
 
 const servers: Server[] = []
 const forwards: Array<{ dispose(): Promise<void> }> = []

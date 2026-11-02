@@ -18,7 +18,7 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionSourcePayload, type MirroredSessionSource } from '@dshfiles/session-source-port'
-import type { Gateway } from './connectors/gateway.js'
+import type { Gateway } from './legacy-runtime-promise.js'
 import type { PooledGateway } from './gateway-pool.js'
 
 /** The Session a runtime owns for one address; a subagent address names its child Session. */

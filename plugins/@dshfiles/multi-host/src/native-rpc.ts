@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from './schema.js'
 import { jsonValueSchema, nativeRpcResultSchema, type NativeRpcRequest, type NativeRpcResult } from './api.js'
-import type { Gateway } from './connectors/gateway.js'
+import type { Gateway } from './legacy-runtime-promise.js'
 
 const isMutation = (request: NativeRpcRequest): boolean =>
   request.namespace === 'session' ? ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(request.method) : true

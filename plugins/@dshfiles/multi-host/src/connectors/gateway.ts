@@ -1,451 +1,68 @@
-import { randomUUID } from 'node:crypto'
-import * as Schema from 'effect/Schema'
-import { MultiHostSchema } from '../schema.js'
 import { Buffer } from 'node:buffer'
-import { WebSocket } from 'ws'
+import { randomUUID } from 'node:crypto'
 import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
-import { traceparent, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
+import type { JsonValue } from '@dshfiles/dshx/platform'
+import { Cause, Duration, Effect, Option, Queue, Schema, type Scope, Stream } from 'effect'
+import { Cookies, FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
+import { WebSocket } from 'ws'
+import {
+  ApiUnreachable,
+  AuthenticationExpired,
+  AuthenticationFailed,
+  GatewayHttpError,
+  GatewayUnreachable,
+  InvalidEndpoint,
+  InvalidResponse,
+  InvalidRuntimeLocator,
+  RemoteApiFailed,
+  RemoteRequestFailed,
+  RequestTooLarge,
+  ResponseTooLarge,
+  RuntimeNotReady,
+  StreamClosed,
+  StreamEnded,
+  StreamFailed,
+  StreamOverflow,
+  StreamTimedOut,
+  StreamUnreachable,
+  failureCodeOf,
+  type GatewayRequestError,
+  type GatewayStreamError,
+  type PluginApiError,
+} from '../errors.js'
 
 const maxNativeResponseBytes = 32 * 1024 * 1024
 const maxNativeRequestBytes = 48 * 1024 * 1024
 const maxStreamFrameBytes = 2 * 1024 * 1024
+const maxFollowFrames = 256
 
-const nativeResponseSchema = Schema.Struct({
+const passthrough = <S extends Schema.Struct.Fields>(fields: S) => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+
+const nativeResponseSchema = passthrough({
   type: Schema.Literal('server-response'),
   rpcId: Schema.String,
   result: Schema.Union([
-    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }).pipe(MultiHostSchema.passthrough),
-    Schema.Struct({
+    passthrough({ ok: Schema.Literal(true), value: Schema.Unknown }),
+    passthrough({
       ok: Schema.Literal(false),
-      error: Schema.Struct({
-        code: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
-        message: Schema.String.check(Schema.isMaxLength(8192)),
-      }).pipe(MultiHostSchema.passthrough),
-    }).pipe(MultiHostSchema.passthrough),
+      error: passthrough({ code: Schema.optional(Schema.String.check(Schema.isMaxLength(128))), message: Schema.String.check(Schema.isMaxLength(8192)) }),
+    }),
   ]),
-}).pipe(MultiHostSchema.passthrough)
+})
+const decodeNativeResponse = Schema.decodeUnknownOption(Schema.fromJsonString(nativeResponseSchema))
 
-const streamFrameSchema = Schema.Struct({
+const streamFrameSchema = passthrough({
   streamId: Schema.String,
   type: Schema.Literals(['item', 'error', 'end']),
   value: Schema.optional(Schema.Unknown),
   error: Schema.optional(Schema.Struct({ code: Schema.optional(Schema.String), message: Schema.optional(Schema.String) })),
-}).pipe(MultiHostSchema.passthrough)
+})
+const decodeStreamFrame = Schema.decodeUnknownOption(Schema.fromJsonString(streamFrameSchema))
+const snapshotTypeSchema = Schema.Struct({ type: Schema.Literals(['baseline', 'snapshot']) })
+const isSnapshot = Schema.is(snapshotTypeSchema)
 
-export type Gateway = {
-  readonly origin: string
-  readonly launchUrl: string
-  /** Settles when the transport underneath (an SSH tunnel) went away on its own. */
-  readonly closed: Promise<void>
-  run(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
-  runSafe(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<GatewayOutcome>
-  api(method: string, input?: import('@dshfiles/dshx/platform').JsonValue, signal?: AbortSignal): Promise<unknown>
-  /** Call another plugin's dshx API on the connected runtime. */
-  pluginApi(target: {
-    readonly packageId: string
-    readonly apiId: string
-    readonly version: number
-  }): (method: string, input?: import('@dshfiles/dshx/platform').JsonValue, signal?: AbortSignal) => Promise<unknown>
-  follow(endpoint: string, args: unknown, timeoutMs: number, signal?: AbortSignal): Promise<readonly unknown[]>
-  /**
-   * Open one long-lived stream and yield every item until it ends, fails, or the signal aborts. The `follow` helper is
-   * the bounded variant used for one snapshot read; a Session mirror needs the stream itself.
-   */
-  stream(endpoint: string, args: unknown, signal: AbortSignal): AsyncIterable<unknown>
-  dispose(): Promise<void>
-}
-
-export type GatewayOutcome = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly code: string; readonly message: string }
-
-export class GatewayRequestError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'GatewayRequestError'
-  }
-}
-
-export class GatewayUnavailableError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'GatewayUnavailableError'
-  }
-}
-
-interface GatewayTransport {
-  readonly origin: string
-  readonly launchUrl?: string
-  readonly closed?: Promise<void>
-  dispose(): Promise<void>
-}
-
-export const connectGateway = async ({
-  launchUrl,
-  createTransport,
-  signal,
-}: {
-  readonly launchUrl: string
-  readonly createTransport: (origin: URL, signal?: AbortSignal) => Promise<GatewayTransport>
-  readonly signal?: AbortSignal | undefined
-}): Promise<Gateway> => {
-  const parsedLaunch = loopbackLaunchUrl(launchUrl)
-  const transport = await createTransport(new URL(parsedLaunch.origin), signal)
-  const runtimeLaunchUrl = transport.launchUrl ?? launchUrl
-  const runtimeLaunch = loopbackLaunchUrl(runtimeLaunchUrl)
-  let exchange: Response
-  try {
-    exchange = await fetch(runtimeLaunch.origin + '/?token=' + encodeURIComponent(runtimeLaunch.token), {
-      redirect: 'manual',
-      ...(signal !== undefined && { signal }),
-    })
-  } catch {
-    await transport.dispose()
-    if (signal?.aborted) throw new GatewayUnavailableError('cancelled', 'The runtime connection was cancelled.')
-    throw new GatewayUnavailableError('gateway-unreachable', 'Could not reach the runtime through its recorded connector.')
-  }
-  if (exchange.status !== 303 && exchange.status !== 302) {
-    await transport.dispose()
-    if (exchange.status === 401 || exchange.status === 403) {
-      throw new GatewayUnavailableError('authentication-failed', 'The runtime rejected its saved launch credential.')
-    }
-    throw new GatewayUnavailableError('runtime-not-ready', 'The runtime did not complete its authenticated launch handoff.')
-  }
-  const cookie = exchange.headers
-    .getSetCookie()
-    .map(item => item.split(';', 1)[0])
-    .filter(Boolean)
-    .join('; ')
-  if (!cookie) {
-    await transport.dispose()
-    throw new GatewayUnavailableError('authentication-failed', 'The runtime did not issue an authenticated session cookie.')
-  }
-  let disposed = false
-  const onAbort = (): void => {
-    void dispose()
-  }
-  const dispose = async (): Promise<void> => {
-    if (disposed) return
-    disposed = true
-    signal?.removeEventListener('abort', onAbort)
-    await transport.dispose()
-  }
-  signal?.addEventListener('abort', onAbort, { once: true })
-  if (signal?.aborted) {
-    await dispose()
-    throw new GatewayUnavailableError('cancelled', 'The runtime connection was cancelled.')
-  }
-  const pluginApi: Gateway['pluginApi'] = target => createDshxApiCaller({ origin: transport.origin, cookie, ...target })
-  const closed = new Promise<void>(resolve => {
-    void transport.closed?.then(resolve)
-  })
-  return {
-    origin: transport.origin,
-    launchUrl: runtimeLaunchUrl,
-    closed,
-    run: async (namespace, method, args, callSignal) => {
-      const result = await attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal })
-      if (!result.ok) {
-        if (result.code === 'gateway-unreachable') throw new GatewayUnavailableError(result.code, result.message)
-        throw new GatewayRequestError(result.code, result.message)
-      }
-      return result.value
-    },
-    runSafe: (namespace, method, args, callSignal) => attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal }),
-    api: pluginApi({ packageId: '@dshfiles/multi-host', apiId: 'multi-host', version: 1 }),
-    pluginApi,
-    follow: (endpoint, args, timeoutMs, callSignal) =>
-      followOnce({ origin: transport.origin, cookie, endpoint, args, timeoutMs, signal: callSignal ?? signal }),
-    stream: (endpoint, args, callSignal) =>
-      streamFrames({ origin: transport.origin, cookie, endpoint, args, signal: AbortSignal.any([callSignal, signal].filter(item => item !== undefined)) }),
-    dispose,
-  }
-}
-
-const followOnce = async ({
-  origin,
-  cookie,
-  endpoint,
-  args,
-  timeoutMs,
-  signal,
-}: {
-  readonly origin: string
-  readonly cookie: string
-  readonly endpoint: string
-  readonly args: unknown
-  readonly timeoutMs: number
-  readonly signal?: AbortSignal | undefined
-}): Promise<readonly unknown[]> => {
-  if (!/^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/.test(endpoint)) {
-    throw new GatewayUnavailableError('invalid-endpoint', 'The requested runtime stream endpoint is invalid.')
-  }
-  const url = new URL('/api/remote.mux', origin)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  const streamId = randomUUID()
-  const socket = new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: maxStreamFrameBytes, headers: { cookie, origin } })
-  return new Promise((resolve, reject) => {
-    const collected: unknown[] = []
-    let opened = false
-    let settled = false
-    let timeout: ReturnType<typeof setTimeout>
-    let absoluteTimeout: ReturnType<typeof setTimeout>
-    const finish = (error?: GatewayUnavailableError): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      clearTimeout(absoluteTimeout)
-      signal?.removeEventListener('abort', onAbort)
-      socket.removeAllListeners()
-      // terminate() during the handshake emits 'error' on the next tick; with no listener left that would crash the Host.
-      socket.on('error', () => undefined)
-      if (socket.readyState === WebSocket.OPEN) {
-        if (error === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
-        socket.close()
-      } else if (socket.readyState === WebSocket.CONNECTING) {
-        socket.terminate()
-      }
-      if (error !== undefined) reject(error)
-      else resolve(collected)
-    }
-    const onAbort = (): void => finish(new GatewayUnavailableError('cancelled', 'The runtime stream request was cancelled.'))
-    const timeoutError = (): GatewayUnavailableError =>
-      new GatewayUnavailableError('stream-timeout', endpoint + ' did not return a snapshot within its time limit.')
-    const resetTimeout = (): void => {
-      clearTimeout(timeout)
-      timeout = setTimeout(() => finish(timeoutError()), timeoutMs)
-    }
-    timeout = setTimeout(() => finish(timeoutError()), timeoutMs)
-    absoluteTimeout = setTimeout(() => finish(timeoutError()), Math.min(Math.max(timeoutMs, 1), 30_000))
-    signal?.addEventListener('abort', onAbort, { once: true })
-    if (signal?.aborted) {
-      onAbort()
-      return
-    }
-    socket.once('open', () => {
-      opened = true
-      socket.send(JSON.stringify({ type: 'open', streamId, endpoint, payload: { args } }))
-      resetTimeout()
-    })
-    socket.on('message', data => {
-      const chunk = Array.isArray(data) ? Buffer.concat(data) : data
-      const text = typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : Buffer.from(chunk).toString('utf8')
-      let raw: unknown
-      try {
-        raw = JSON.parse(text)
-      } catch {
-        finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent invalid JSON.'))
-        return
-      }
-      const frame = MultiHostSchema.safeDecode(streamFrameSchema, raw)
-      if (!frame.success) {
-        finish(new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.'))
-        return
-      }
-      if (frame.data.streamId !== streamId) return
-      resetTimeout()
-      if (collected.length >= 256) {
-        finish(new GatewayUnavailableError('stream-overflow', 'The runtime stream sent too many frames before its snapshot.'))
-        return
-      }
-      if (frame.data.type === 'error') {
-        finish(new GatewayUnavailableError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'The runtime stream failed.'))
-        return
-      }
-      if (frame.data.type === 'end') {
-        if (collected.length === 0) finish(new GatewayUnavailableError('stream-ended', 'The runtime stream ended before its snapshot arrived.'))
-        else finish()
-        return
-      }
-      collected.push(frame.data.value)
-      const value = frame.data.value
-      if (typeof value === 'object' && value !== null && 'type' in value && ['baseline', 'snapshot'].includes(String(value.type))) finish()
-    })
-    socket.once('error', () => finish(new GatewayUnavailableError('stream-unreachable', 'Could not open the runtime stream.')))
-    socket.once('close', () => {
-      if (settled) return
-      if (opened && collected.length > 0) finish()
-      else finish(new GatewayUnavailableError('stream-closed', 'The runtime stream closed before returning a snapshot.'))
-    })
-  })
-}
-
-const streamFrames = async function* ({
-  origin,
-  cookie,
-  endpoint,
-  args,
-  signal,
-}: {
-  readonly origin: string
-  readonly cookie: string
-  readonly endpoint: string
-  readonly args: unknown
-  readonly signal: AbortSignal
-}): AsyncIterable<unknown> {
-  if (!/^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/.test(endpoint)) {
-    throw new GatewayUnavailableError('invalid-endpoint', 'The requested runtime stream endpoint is invalid.')
-  }
-  const url = new URL('/api/remote.mux', origin)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  const streamId = randomUUID()
-  const socket = new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: maxStreamFrameBytes, headers: { cookie, origin } })
-  const items: unknown[] = []
-  let failure: GatewayUnavailableError | undefined
-  let ended = false
-  let wake: (() => void) | undefined
-  const notify = (): void => {
-    wake?.()
-    wake = undefined
-  }
-  const close = (): void => {
-    socket.removeAllListeners()
-    if (socket.readyState === WebSocket.OPEN) {
-      if (!ended && failure === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
-      socket.close()
-    } else if (socket.readyState === WebSocket.CONNECTING) socket.terminate()
-  }
-  const onAbort = (): void => {
-    failure = new GatewayUnavailableError('cancelled', 'The runtime stream request was cancelled.')
-    notify()
-  }
-  signal.addEventListener('abort', onAbort, { once: true })
-  socket.once('open', () => socket.send(JSON.stringify({ type: 'open', streamId, endpoint, payload: { args } })))
-  socket.on('message', data => {
-    const chunk = Array.isArray(data) ? Buffer.concat(data) : data
-    const text = typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : Buffer.from(chunk).toString('utf8')
-    let raw: unknown
-    try {
-      raw = JSON.parse(text)
-    } catch {
-      failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent invalid JSON.')
-      notify()
-      return
-    }
-    const frame = MultiHostSchema.safeDecode(streamFrameSchema, raw)
-    if (!frame.success) {
-      failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.')
-      notify()
-      return
-    }
-    if (frame.data.streamId !== streamId) return
-    if (frame.data.type === 'error') {
-      failure = new GatewayUnavailableError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'The runtime stream failed.')
-      notify()
-      return
-    }
-    if (frame.data.type === 'end') {
-      ended = true
-      notify()
-      return
-    }
-    items.push(frame.data.value)
-    notify()
-  })
-  socket.once('error', () => {
-    failure = new GatewayUnavailableError('stream-unreachable', 'Could not open the runtime stream.')
-    notify()
-  })
-  socket.once('close', () => {
-    ended = true
-    notify()
-  })
-  try {
-    while (true) {
-      while (items.length > 0) yield items.shift()
-      if (failure !== undefined) throw failure
-      if (ended || signal.aborted) return
-      await new Promise<void>(resolve => {
-        wake = resolve
-        if (items.length > 0 || failure !== undefined || ended || signal.aborted) {
-          wake = undefined
-          resolve()
-        }
-      })
-    }
-  } finally {
-    signal.removeEventListener('abort', onAbort)
-    close()
-  }
-}
-
-type RunRequest = {
-  readonly origin: string
-  readonly cookie: string
-  readonly namespace: string
-  readonly method: string
-  readonly args: Record<string, unknown>
-  readonly signal?: AbortSignal | undefined
-}
-
-/** One span per native runtime request: endpoint and outcome code only, never the arguments or the reply. */
-const attemptRun = (request: RunRequest): Promise<GatewayOutcome> => {
-  if (!tracingEnabled()) return attemptUntracedRun(request)
-  return withSpan(
-    `${request.namespace}/${request.method}`,
-    {
-      kind: 'client',
-      attributes: { 'rpc.system': 'dsh-native', 'rpc.service': request.namespace, 'rpc.method': request.method, 'dshx.plugin.package': '@dshfiles/multi-host' },
-    },
-    async span => {
-      const outcome = await attemptUntracedRun(request)
-      span.setAttribute('multi_host.outcome', outcome.ok ? 'ok' : outcome.code)
-      if (!outcome.ok) span.setStatus('error', outcome.code)
-      return outcome
-    },
-  )
-}
-
-const attemptUntracedRun = async ({ origin, cookie, namespace, method, args, signal }: RunRequest): Promise<GatewayOutcome> => {
-  if (!/^[A-Za-z][A-Za-z0-9-]*$/.test(namespace) || !/^[A-Za-z][A-Za-z0-9-]*$/.test(method)) {
-    return { ok: false, code: 'invalid-endpoint', message: 'The requested runtime API endpoint is invalid.' }
-  }
-  const rpcId = randomUUID()
-  const requestBody = JSON.stringify({ type: 'client-request', rpcId, method: namespace + '/' + method, payload: { args } })
-  if (Buffer.byteLength(requestBody, 'utf8') > maxNativeRequestBytes) {
-    return { ok: false, code: 'request-too-large', message: 'The runtime API request exceeded the 48 MB transport limit.' }
-  }
-  const headers = new Headers({ 'content-type': 'application/json', cookie })
-  const parent = traceparent()
-  if (parent !== undefined) headers.set('traceparent', parent)
-  let response: Response
-  try {
-    response = await fetch(origin + '/api/' + encodeURIComponent(namespace) + '/' + encodeURIComponent(method), {
-      method: 'POST',
-      redirect: 'error',
-      headers,
-      body: requestBody,
-      ...(signal !== undefined && { signal }),
-    })
-  } catch {
-    if (signal?.aborted) return { ok: false, code: 'cancelled', message: 'The runtime API request was cancelled.' }
-    return { ok: false, code: 'gateway-unreachable', message: 'Could not reach the runtime API through its connector.' }
-  }
-  if (response.status === 401)
-    return { ok: false, code: 'authentication-expired', message: 'The runtime rejected its authenticated session; reconnect and verify its identity.' }
-  if (!response.ok)
-    return { ok: false, code: 'gateway-http-error', message: 'The runtime API returned HTTP ' + response.status + ' for ' + namespace + '/' + method + '.' }
-  let body: unknown
-  try {
-    body = JSON.parse(await boundedResponseText(response, maxNativeResponseBytes))
-  } catch {
-    return { ok: false, code: 'invalid-response', message: 'The runtime API returned invalid JSON.' }
-  }
-  const parsed = MultiHostSchema.safeDecode(nativeResponseSchema, body)
-  if (!parsed.success || parsed.data.rpcId !== rpcId) {
-    return { ok: false, code: 'invalid-response', message: 'The runtime API returned an invalid RPC envelope.' }
-  }
-  if (parsed.data.result.ok) return { ok: true, value: parsed.data.result.value }
-  return {
-    ok: false,
-    code: parsed.data.result.error.code ?? 'remote-error',
-    message: sanitizeRemoteMessage(parsed.data.result.error.message),
-  }
-}
+const endpointPattern = /^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/
+const segmentPattern = /^[A-Za-z][A-Za-z0-9-]*$/
 
 const sanitizeRemoteMessage = (message: string): string =>
   message
@@ -453,21 +70,234 @@ const sanitizeRemoteMessage = (message: string): string =>
     .replace(/(authorization|cookie)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
     .slice(0, 1000)
 
-const boundedResponseText = async (response: Response, maxBytes: number): Promise<string> => {
-  if (response.body === null) return ''
-  const reader = response.body.getReader()
-  const chunks: Buffer[] = []
-  let length = 0
-  while (true) {
-    const result = await reader.read()
-    if (result.done) break
-    const chunk = Buffer.from(result.value)
-    length += chunk.byteLength
-    if (length > maxBytes) {
-      await reader.cancel()
-      throw new GatewayUnavailableError('response-too-large', 'The runtime API response exceeded the allowed size.')
-    }
-    chunks.push(chunk)
-  }
-  return Buffer.concat(chunks).toString('utf8')
+/** What a connector provides under the gateway: an origin that reaches the runtime, for the gateway's Scope. */
+export interface GatewayTransport {
+  readonly origin: string
+  readonly launchUrl?: string
+  /** Completes when the transport went away on its own (an SSH tunnel that exited). */
+  readonly closed: Effect.Effect<void>
 }
+
+export interface PluginApiTarget {
+  readonly packageId: string
+  readonly apiId: string
+  readonly version: number
+}
+
+export interface NativeRequest {
+  readonly namespace: string
+  readonly method: string
+  readonly args: Record<string, unknown>
+}
+
+export interface StreamRequest {
+  readonly endpoint: string
+  readonly args: unknown
+}
+
+/** One authenticated connection to a DSH runtime; it lives as long as the Scope it was opened in. */
+export interface Gateway {
+  readonly origin: string
+  readonly launchUrl: string
+  readonly closed: Effect.Effect<void>
+  /** One native runtime request; a failure the runtime reports is `RemoteRequestFailed` with its own code. */
+  readonly run: (request: NativeRequest) => Effect.Effect<unknown, GatewayRequestError>
+  /** This plugin's own API on the connected runtime. */
+  readonly api: (method: string, input?: JsonValue) => Effect.Effect<unknown, PluginApiError>
+  /** Another plugin's dshx API on the connected runtime. */
+  readonly pluginApi: (target: PluginApiTarget) => (method: string, input?: JsonValue) => Effect.Effect<unknown, PluginApiError>
+  /** Read one stream until its first snapshot (or baseline) frame and return every frame up to it. */
+  readonly follow: (request: StreamRequest & { readonly timeout: Duration.Input }) => Effect.Effect<readonly unknown[], GatewayStreamError>
+  /** Every item of one long-lived stream until it ends; interrupting the consumer cancels it on the runtime. */
+  readonly stream: (request: StreamRequest) => Stream.Stream<unknown, GatewayStreamError>
+}
+
+const textOf = (data: WebSocket.RawData): string => {
+  if (Array.isArray(data)) return Buffer.concat(data).toString('utf8')
+  if (Buffer.isBuffer(data)) return data.toString('utf8')
+  return Buffer.from(data).toString('utf8')
+}
+
+/** The frames of one mux stream; a socket that closes after opening fails with `StreamClosed`. */
+const frames = (input: { readonly origin: string; readonly cookie: string; readonly request: StreamRequest }) =>
+  Stream.callback<unknown, GatewayStreamError>(queue =>
+    Effect.gen(function* () {
+      if (!endpointPattern.test(input.request.endpoint)) return yield* new InvalidEndpoint()
+      const url = new URL('/api/remote.mux', input.origin)
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      const streamId = randomUUID()
+      const state = { settled: false }
+      const settle = (cause: Cause.Cause<GatewayStreamError | Cause.Done>): void => {
+        if (state.settled) return
+        state.settled = true
+        Queue.failCauseUnsafe(queue, cause)
+      }
+      yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const socket = new WebSocket(url, {
+            handshakeTimeout: 10_000,
+            maxPayload: maxStreamFrameBytes,
+            headers: { cookie: input.cookie, origin: input.origin },
+          })
+          socket.once('open', () =>
+            socket.send(JSON.stringify({ type: 'open', streamId, endpoint: input.request.endpoint, payload: { args: input.request.args } })),
+          )
+          socket.on('message', data => {
+            const frame = decodeStreamFrame(textOf(data))
+            if (Option.isNone(frame)) return settle(Cause.fail(new InvalidResponse()))
+            if (frame.value.streamId !== streamId) return
+            if (frame.value.type === 'error') {
+              return settle(
+                Cause.fail(
+                  new StreamFailed({
+                    code: (frame.value.error?.code ?? 'stream-error').slice(0, 128),
+                    detail: sanitizeRemoteMessage(frame.value.error?.message ?? 'The runtime stream failed.'),
+                  }),
+                ),
+              )
+            }
+            if (frame.value.type === 'end') return settle(Cause.fail(Cause.Done()))
+            Queue.offerUnsafe(queue, frame.value.value)
+          })
+          socket.once('error', () => settle(Cause.fail(new StreamUnreachable())))
+          socket.once('close', () => settle(Cause.fail(new StreamClosed())))
+          return socket
+        }),
+        socket =>
+          Effect.sync(() => {
+            const cancelled = !state.settled
+            state.settled = true
+            socket.removeAllListeners()
+            // terminate() during the handshake emits 'error' on the next tick; with no listener that would crash the Host.
+            socket.on('error', () => undefined)
+            if (socket.readyState === WebSocket.OPEN) {
+              if (cancelled) socket.send(JSON.stringify({ type: 'cancel', streamId }))
+              socket.close()
+              return
+            }
+            if (socket.readyState === WebSocket.CONNECTING) socket.terminate()
+          }),
+      )
+    }),
+  )
+
+/** The body as text, failing as soon as it grows past `maxBytes` instead of buffering it whole. */
+const boundedText = <E>(input: { readonly stream: Stream.Stream<Uint8Array, E>; readonly maxBytes: number }) =>
+  Stream.runFoldEffect(
+    Stream.mapError(input.stream, (): ResponseTooLarge | InvalidResponse => new InvalidResponse()),
+    () => ({ chunks: new Array<Uint8Array>(), bytes: 0 }),
+    (state, chunk) => {
+      const bytes = state.bytes + chunk.byteLength
+      if (bytes > input.maxBytes) return Effect.fail(new ResponseTooLarge())
+      state.chunks.push(chunk)
+      return Effect.succeed({ chunks: state.chunks, bytes })
+    },
+  ).pipe(Effect.map(state => Buffer.concat(state.chunks).toString('utf8')))
+
+const pluginApiError = (cause: unknown): PluginApiError => {
+  const code = cause instanceof Error && 'code' in cause && typeof cause.code === 'string' ? cause.code : 'api-unreachable'
+  if (code === 'api-unreachable') return new ApiUnreachable({ cause })
+  if (code === 'authentication-expired') return new AuthenticationExpired()
+  return new RemoteApiFailed({ code: code.slice(0, 128), cause })
+}
+
+/**
+ * Authenticate through the runtime's tokenized launch URL over `transport`, then return the gateway. The transport and
+ * every stream the gateway opens live in the caller's Scope.
+ */
+export const connectGateway = Effect.fn('multi-host gateway connect')(function* <E, R>(input: {
+  readonly launchUrl: string
+  readonly transport: (origin: URL) => Effect.Effect<GatewayTransport, E, R | Scope.Scope>
+}) {
+  const client = yield* HttpClient.HttpClient
+  const launch = yield* Effect.try({ try: () => loopbackLaunchUrl(input.launchUrl), catch: () => new InvalidRuntimeLocator() })
+  const transport = yield* input.transport(new URL(launch.origin))
+  const runtimeLaunchUrl = transport.launchUrl ?? input.launchUrl
+  const runtimeLaunch = yield* Effect.try({ try: () => loopbackLaunchUrl(runtimeLaunchUrl), catch: () => new InvalidRuntimeLocator() })
+  const exchange = yield* client.get(`${runtimeLaunch.origin}/?token=${encodeURIComponent(runtimeLaunch.token)}`).pipe(
+    Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'manual' }),
+    Effect.mapError(cause => new GatewayUnreachable({ cause })),
+  )
+  if (exchange.status === 401 || exchange.status === 403) return yield* new AuthenticationFailed()
+  if (exchange.status !== 303 && exchange.status !== 302) return yield* new RuntimeNotReady()
+  if (Cookies.isEmpty(exchange.cookies)) return yield* new AuthenticationFailed()
+  const cookie = Cookies.toCookieHeader(exchange.cookies)
+  const origin = transport.origin
+
+  /** One span per native runtime request: endpoint and outcome code only, never the arguments or the reply. */
+  const run = (request: NativeRequest): Effect.Effect<unknown, GatewayRequestError> =>
+    Effect.gen(function* () {
+      if (!segmentPattern.test(request.namespace) || !segmentPattern.test(request.method)) return yield* new InvalidEndpoint()
+      const rpcId = randomUUID()
+      const body = JSON.stringify({ type: 'client-request', rpcId, method: `${request.namespace}/${request.method}`, payload: { args: request.args } })
+      if (Buffer.byteLength(body, 'utf8') > maxNativeRequestBytes) return yield* new RequestTooLarge()
+      const response = yield* client
+        .execute(
+          HttpClientRequest.post(`${origin}/api/${encodeURIComponent(request.namespace)}/${encodeURIComponent(request.method)}`).pipe(
+            HttpClientRequest.setHeader('cookie', cookie),
+            HttpClientRequest.bodyText(body, 'application/json'),
+          ),
+        )
+        .pipe(
+          Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'error' }),
+          Effect.mapError(cause => new GatewayUnreachable({ cause })),
+        )
+      if (response.status === 401) return yield* new AuthenticationExpired()
+      if (response.status < 200 || response.status >= 300)
+        return yield* new GatewayHttpError({ endpoint: `${request.namespace}/${request.method}`, status: response.status })
+      const text = yield* boundedText({ stream: response.stream, maxBytes: maxNativeResponseBytes })
+      const envelope = decodeNativeResponse(text)
+      if (Option.isNone(envelope) || envelope.value.rpcId !== rpcId) return yield* new InvalidResponse()
+      const result = envelope.value.result
+      if (result.ok) return result.value
+      return yield* new RemoteRequestFailed({ code: result.error.code ?? 'remote-error', detail: sanitizeRemoteMessage(result.error.message) })
+    }).pipe(
+      Effect.tap(() => Effect.annotateCurrentSpan('multi_host.outcome', 'ok')),
+      Effect.tapError(error => Effect.annotateCurrentSpan('multi_host.outcome', failureCodeOf(error))),
+      Effect.withSpan(`${request.namespace}/${request.method}`, {
+        kind: 'client',
+        attributes: {
+          'rpc.system': 'dsh-native',
+          'rpc.service': request.namespace,
+          'rpc.method': request.method,
+          'dshx.plugin.package': '@dshfiles/multi-host',
+        },
+      }),
+    )
+
+  const pluginApi = (target: PluginApiTarget) => {
+    const call = createDshxApiCaller({ origin, cookie, ...target })
+    return (method: string, input?: JsonValue) => Effect.tryPromise({ try: signal => call(method, input, signal), catch: pluginApiError })
+  }
+
+  const follow = Effect.fn('multi-host stream follow')(function* (request: StreamRequest & { readonly timeout: Duration.Input }) {
+    const collected: unknown[] = []
+    const timedOut = () => new StreamTimedOut({ endpoint: request.endpoint })
+    const absolute = Duration.min(Duration.max(Duration.fromInputUnsafe(request.timeout), Duration.millis(1)), Duration.seconds(30))
+    yield* frames({ origin, cookie, request }).pipe(
+      Stream.timeoutOrElse({ duration: request.timeout, orElse: () => Stream.fail(timedOut()) }),
+      Stream.runForEachWhile(value =>
+        Effect.suspend(() => {
+          if (collected.length >= maxFollowFrames) return Effect.fail(new StreamOverflow())
+          collected.push(value)
+          return Effect.succeed(!isSnapshot(value))
+        }),
+      ),
+      Effect.catchTag('StreamClosed', error => (collected.length > 0 ? Effect.void : Effect.fail(error))),
+      Effect.timeoutOrElse({ duration: absolute, orElse: () => Effect.fail(timedOut()) }),
+    )
+    if (collected.length === 0) return yield* new StreamEnded()
+    return collected
+  })
+
+  return {
+    origin,
+    launchUrl: runtimeLaunchUrl,
+    closed: transport.closed,
+    run,
+    api: pluginApi({ packageId: '@dshfiles/multi-host', apiId: 'multi-host', version: 1 }),
+    pluginApi,
+    follow,
+    stream: request => frames({ origin, cookie, request }).pipe(Stream.catchTag('StreamClosed', () => Stream.empty)),
+  } satisfies Gateway
+})

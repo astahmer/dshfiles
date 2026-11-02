@@ -3,9 +3,10 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect, Exit, ManagedRuntime, Schema, Scope } from 'effect'
+import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from 'effect'
+import { FetchHttpClient, HttpClient } from 'effect/http'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import type { Gateway } from '../src/connectors/gateway.js'
+import { LegacyRuntime, type Gateway } from '../src/legacy-runtime-promise.js'
 import { SshConnector } from '../src/connectors/ssh.js'
 import { LaunchFile } from '../src/launch-file.js'
 import { dataRunner } from './fixtures/data-runtime.js'
@@ -30,11 +31,11 @@ const scratch = async (prefix: string): Promise<string> => {
   return directory
 }
 
-const runtime = ManagedRuntime.make(sshLayer)
+const runtime = ManagedRuntime.make(Layer.mergeAll(sshLayer, FetchHttpClient.layer))
 const data = dataRunner({ DSH_HOME: '/nonexistent/multi-host-ssh-test' })
 const writeLaunchFile = (input: { readonly dshHome: string; readonly launchUrl: string }) => data.run(LaunchFile.use(launchFile => launchFile.write(input)))
 
-const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
+const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | HttpClient.HttpClient | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
   exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
 
 const run = (input: SshRun, signal?: AbortSignal) =>
@@ -55,7 +56,7 @@ const connect = async (input: { readonly sshTarget: string; readonly remoteHome:
     await runtime.runPromise(Scope.close(scope, exit))
     throw new Error(exitCode(exit))
   }
-  return { ...exit.value, dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)) }
+  return LegacyRuntime.toPromiseGateway({ gateway: exit.value, close: () => runtime.runPromise(Scope.close(scope, Exit.void)) })
 }
 
 const logLines = async (): Promise<string[]> => {

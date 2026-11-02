@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Schema, SchemaAST } from 'effect'
 
 export class SshTargetInvalid extends Schema.TaggedError<SshTargetInvalid>()('SshTargetInvalid', {}, { dshxWireCode: 'invalid-ssh-target' }) {
   override get message(): string {
@@ -262,6 +262,225 @@ export class ProfileMismatch extends Schema.TaggedError<ProfileMismatch>()(
   }
 }
 
+export class GatewayUnreachable extends Schema.TaggedError<GatewayUnreachable>()(
+  'GatewayUnreachable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'gateway-unreachable' },
+) {
+  override get message(): string {
+    return 'Could not reach the runtime through its recorded connector.'
+  }
+}
+
+export class AuthenticationFailed extends Schema.TaggedError<AuthenticationFailed>()('AuthenticationFailed', {}, { dshxWireCode: 'authentication-failed' }) {
+  override get message(): string {
+    return 'The runtime rejected its saved launch credential.'
+  }
+}
+
+export class RuntimeNotReady extends Schema.TaggedError<RuntimeNotReady>()('RuntimeNotReady', {}, { dshxWireCode: 'runtime-not-ready' }) {
+  override get message(): string {
+    return 'The runtime did not complete its authenticated launch handoff.'
+  }
+}
+
+export class AuthenticationExpired extends Schema.TaggedError<AuthenticationExpired>()(
+  'AuthenticationExpired',
+  {},
+  { dshxWireCode: 'authentication-expired' },
+) {
+  override get message(): string {
+    return 'The runtime rejected its authenticated session; reconnect and verify its identity.'
+  }
+}
+
+export class GatewayHttpError extends Schema.TaggedError<GatewayHttpError>()(
+  'GatewayHttpError',
+  { endpoint: Schema.String, status: Schema.Number },
+  { dshxWireCode: 'gateway-http-error' },
+) {
+  override get message(): string {
+    return `The runtime API returned HTTP ${this.status} for ${this.endpoint}.`
+  }
+}
+
+export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
+  'InvalidResponse',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'invalid-response' },
+) {
+  override get message(): string {
+    return 'The runtime replied outside the expected contract.'
+  }
+}
+
+export class RequestTooLarge extends Schema.TaggedError<RequestTooLarge>()('RequestTooLarge', {}, { dshxWireCode: 'request-too-large' }) {
+  override get message(): string {
+    return 'The runtime API request exceeded the 48 MB transport limit.'
+  }
+}
+
+export class ResponseTooLarge extends Schema.TaggedError<ResponseTooLarge>()('ResponseTooLarge', {}, { dshxWireCode: 'response-too-large' }) {
+  override get message(): string {
+    return 'The runtime API response exceeded the allowed size.'
+  }
+}
+
+export class InvalidEndpoint extends Schema.TaggedError<InvalidEndpoint>()('InvalidEndpoint', {}, { dshxWireCode: 'invalid-endpoint' }) {
+  override get message(): string {
+    return 'The requested runtime endpoint is invalid.'
+  }
+}
+
+/** A failure the remote runtime reported for one request; `code` is the runtime's own code. */
+export class RemoteRequestFailed extends Schema.TaggedError<RemoteRequestFailed>()(
+  'RemoteRequestFailed',
+  { code: Schema.String.check(Schema.isMaxLength(128)), detail: Schema.String.check(Schema.isMaxLength(1_000)) },
+  { dshxWireCode: 'remote-request-failed' },
+) {
+  override get message(): string {
+    return this.detail
+  }
+}
+
+export class StreamTimedOut extends Schema.TaggedError<StreamTimedOut>()('StreamTimedOut', { endpoint: Schema.String }, { dshxWireCode: 'stream-timeout' }) {
+  override get message(): string {
+    return `${this.endpoint} did not return a snapshot within its time limit.`
+  }
+}
+
+export class StreamUnreachable extends Schema.TaggedError<StreamUnreachable>()('StreamUnreachable', {}, { dshxWireCode: 'stream-unreachable' }) {
+  override get message(): string {
+    return 'Could not open the runtime stream.'
+  }
+}
+
+export class StreamClosed extends Schema.TaggedError<StreamClosed>()('StreamClosed', {}, { dshxWireCode: 'stream-closed' }) {
+  override get message(): string {
+    return 'The runtime stream closed before returning a snapshot.'
+  }
+}
+
+export class StreamEnded extends Schema.TaggedError<StreamEnded>()('StreamEnded', {}, { dshxWireCode: 'stream-ended' }) {
+  override get message(): string {
+    return 'The runtime stream ended before its snapshot arrived.'
+  }
+}
+
+export class StreamOverflow extends Schema.TaggedError<StreamOverflow>()('StreamOverflow', {}, { dshxWireCode: 'stream-overflow' }) {
+  override get message(): string {
+    return 'The runtime stream sent too many frames before its snapshot.'
+  }
+}
+
+/** A failure frame the remote runtime sent on a stream; `code` is the runtime's own code. */
+export class StreamFailed extends Schema.TaggedError<StreamFailed>()(
+  'StreamFailed',
+  { code: Schema.String.check(Schema.isMaxLength(128)), detail: Schema.String.check(Schema.isMaxLength(1_000)) },
+  { dshxWireCode: 'stream-error' },
+) {
+  override get message(): string {
+    return this.detail
+  }
+}
+
+export class ApiUnreachable extends Schema.TaggedError<ApiUnreachable>()(
+  'ApiUnreachable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'api-unreachable' },
+) {
+  override get message(): string {
+    return 'The runtime request failed. Check the host status and reconnect if needed.'
+  }
+}
+
+/** A plugin API on the remote runtime failed; `code` is that API's own code. */
+export class RemoteApiFailed extends Schema.TaggedError<RemoteApiFailed>()(
+  'RemoteApiFailed',
+  { code: Schema.String.check(Schema.isMaxLength(128)), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'remote-api-failed' },
+) {
+  override get message(): string {
+    return 'The runtime request failed. Check the host status and reconnect if needed.'
+  }
+}
+
+export class LoopbackUnavailable extends Schema.TaggedError<LoopbackUnavailable>()(
+  'LoopbackUnavailable',
+  { port: Schema.Number },
+  { dshxWireCode: 'loopback-address-unavailable' },
+) {
+  override get message(): string {
+    return 'The runtime loopback origin is unavailable on this machine.'
+  }
+}
+
+export class LoopbackForwardUnavailable extends Schema.TaggedError<LoopbackForwardUnavailable>()(
+  'LoopbackForwardUnavailable',
+  {},
+  { dshxWireCode: 'loopback-forward-unavailable' },
+) {
+  override get message(): string {
+    return 'The isolated local runtime listener could not be created.'
+  }
+}
+
+export class InvalidRuntimeLocator extends Schema.TaggedError<InvalidRuntimeLocator>()(
+  'InvalidRuntimeLocator',
+  {},
+  { dshxWireCode: 'invalid-runtime-locator' },
+) {
+  override get message(): string {
+    return 'The runtime locator is invalid; a local runtime must use a tokenized HTTP loopback launch URL.'
+  }
+}
+
+export class IdentityUnavailable extends Schema.TaggedError<IdentityUnavailable>()(
+  'IdentityUnavailable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'identity-unavailable' },
+) {
+  override get message(): string {
+    return 'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.'
+  }
+}
+
+export class IdentityInvalid extends Schema.TaggedError<IdentityInvalid>()('IdentityInvalid', {}, { dshxWireCode: 'identity-invalid' }) {
+  override get message(): string {
+    return 'The connected runtime returned an identity outside the supported contract.'
+  }
+}
+
+export class RuntimeIncompatible extends Schema.TaggedError<RuntimeIncompatible>()('RuntimeIncompatible', {}, { dshxWireCode: 'runtime-incompatible' }) {
+  override get message(): string {
+    return 'The connected runtime does not report a supported DSH 0.2 protocol version.'
+  }
+}
+
+export class RuntimeCapabilityMissing extends Schema.TaggedError<RuntimeCapabilityMissing>()(
+  'RuntimeCapabilityMissing',
+  {},
+  { dshxWireCode: 'runtime-capability-missing' },
+) {
+  override get message(): string {
+    return 'The connected runtime does not provide the required workspace, session, and agent capabilities.'
+  }
+}
+
+export class IdentityMismatch extends Schema.TaggedError<IdentityMismatch>()(
+  'IdentityMismatch',
+  { reason: Schema.Literals(['unpinned', 'changed', 'home', 'selected-home', 'other-host']) },
+  { dshxWireCode: 'identity-mismatch' },
+) {
+  override get message(): string {
+    if (this.reason === 'unpinned') return 'This runtime has no pinned identity. Re-register it before use.'
+    if (this.reason === 'home') return 'The connected runtime home does not match its registered SSH home.'
+    if (this.reason === 'selected-home') return 'The connected runtime home does not match the SSH home you selected.'
+    if (this.reason === 'other-host') return 'This runtime identity is already registered under a different host.'
+    return 'The connected runtime identity changed. Verify the host and runtime before reconnecting.'
+  }
+}
+
 /** What ssh's own stderr says went wrong with the connection, before the remote command ran. */
 export type SshConnectionError = SshHostKeyRejected | SshAuthenticationFailed | SshHostUnresolved | SshUnreachable
 
@@ -274,3 +493,44 @@ export type SshTunnelError = SshTargetInvalid | SshUnavailable | SshConnectionEr
 export type DirectoryReadError = DirectoryPathInvalid | DirectoryUnreadable | DirectoryCorrupt | DirectoryVersionUnsupported
 
 export type DirectoryWriteError = DirectoryReadError | DirectoryWriteFailed | DirectoryRecordInvalid
+
+/** Failures that mean the connection itself is gone, so the next call should open a fresh one. */
+export const TransportFailure = Schema.Union([GatewayUnreachable, AuthenticationExpired, StreamUnreachable, StreamClosed, ApiUnreachable])
+export type TransportFailure = typeof TransportFailure.Type
+export const isTransportFailure = Schema.is(TransportFailure)
+
+export type GatewayRequestError =
+  | TransportFailure
+  | GatewayHttpError
+  | InvalidResponse
+  | RequestTooLarge
+  | ResponseTooLarge
+  | InvalidEndpoint
+  | RemoteRequestFailed
+
+export type GatewayStreamError =
+  | StreamUnreachable
+  | StreamClosed
+  | StreamEnded
+  | StreamOverflow
+  | StreamTimedOut
+  | StreamFailed
+  | InvalidResponse
+  | InvalidEndpoint
+
+export type PluginApiError = ApiUnreachable | AuthenticationExpired | RemoteApiFailed
+
+export type GatewayConnectError = GatewayUnreachable | AuthenticationFailed | RuntimeNotReady | InvalidRuntimeLocator
+
+export type RuntimeIdentityCheckError = IdentityUnavailable | IdentityInvalid | RuntimeIncompatible | RuntimeCapabilityMissing | IdentityMismatch
+
+const wireCodeAt = SchemaAST.resolveAt<string>('dshxWireCode')
+
+/**
+ * The code a value-returning handler reports for a failure: the runtime's own code for a remote failure, otherwise
+ * the class's wire code.
+ */
+export const failureCodeOf = (error: { readonly _tag: string }): string => {
+  if (error instanceof RemoteRequestFailed || error instanceof StreamFailed || error instanceof RemoteApiFailed) return error.code
+  return (Schema.isSchema(error.constructor) ? wireCodeAt(error.constructor.ast) : undefined) ?? error._tag
+}

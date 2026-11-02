@@ -1,21 +1,23 @@
 import { createConnection } from 'node:net'
-import { Effect, Exit, ManagedRuntime, Scope } from 'effect'
+import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect'
+import { FetchHttpClient, HttpClient } from 'effect/http'
+import { LegacyRuntime } from '../src/legacy-runtime-promise.js'
 import { afterAll, describe, expect, test } from 'vitest'
 import { SshConnector } from '../src/connectors/ssh.js'
 import { createGatewayPool } from '../src/gateway-pool.js'
 import type { Ssh } from '../src/ssh.js'
 import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
 
-const runtime = ManagedRuntime.make(sshLayer)
+const runtime = ManagedRuntime.make(Layer.mergeAll(sshLayer, FetchHttpClient.layer))
 afterAll(() => runtime.dispose())
 
-const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
+const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | HttpClient.HttpClient | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
   exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
 
 const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }) => {
   const scope = await runtime.runPromise(Scope.make())
   const gateway = await runtime.runPromise(Scope.provide(scope)(SshConnector.connect(input)))
-  return { ...gateway, dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)) }
+  return LegacyRuntime.toPromiseGateway({ gateway, close: () => runtime.runPromise(Scope.close(scope, Exit.void)) })
 }
 
 const localSshdListening = (): Promise<boolean> =>
