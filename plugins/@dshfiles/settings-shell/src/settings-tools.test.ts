@@ -1,7 +1,7 @@
-import { PluginApiError } from '@dshfiles/dshx/api'
-import { describe, expect, test } from 'vitest'
-import type { SectionEntryRow } from './settings-search.js'
-import { createSettingsTools, type SettingsRow, type SettingsSurface, type SettingsUnsetOp } from './settings-tools.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Effect, Layer } from 'effect'
+import { NativeSettings, type SettingsRow, type SettingsSurface, type SettingsUnsetOp } from './native-settings-promise.js'
+import { SettingsTools } from './settings-tools.js'
 
 const row = (ns: string, value: SettingsRow['value'], overrides: Partial<SettingsRow> = {}): SettingsRow => ({
   ns,
@@ -11,6 +11,7 @@ const row = (ns: string, value: SettingsRow['value'], overrides: Partial<Setting
   ...overrides,
 })
 
+/** The Host settings forms are external to the plugin; each test supplies the surface they would serve. */
 const createSurface = (overrides: Partial<SettingsSurface> = {}): SettingsSurface => ({
   writable: true,
   describe: () => [row('agent-loop', { maxRounds: 3 }, { revision: 7 }), row('ui-theme', { mode: 'dark' })],
@@ -19,117 +20,153 @@ const createSurface = (overrides: Partial<SettingsSurface> = {}): SettingsSurfac
   ...overrides,
 })
 
-const noEntries = { read: () => [], replace: () => {} }
-const tools = (surface: SettingsSurface) => createSettingsTools({ settings: () => surface, searchEntries: noEntries })
+const toolsFor = (surface: SettingsSurface | undefined) =>
+  Effect.map(Layer.build(SettingsTools.layer.pipe(Layer.provide(NativeSettings.layerFrom(() => surface)))), Context.get(SettingsTools))
 
 describe('settings tools: list', () => {
-  test('lists namespaces without their values and adds one on request', () => {
-    const surface = createSurface()
+  it.effect('lists namespaces without their values and adds one on request', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface())
+        const all = yield* tools.list({})
+        expect(all.writable).toBe(true)
+        expect(all.namespaces).toEqual([
+          { namespace: 'agent-loop', revision: 7, autoGenerate: true, secretFields: 0 },
+          { namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0 },
+        ])
+        expect((yield* tools.list({ namespace: 'ui-theme' })).namespaces).toEqual([
+          { namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0, value: '{"mode":"dark"}' },
+        ])
+      }),
+    ),
+  )
 
-    const all = tools(surface).list({ input: {} })
-    expect(all.writable).toBe(true)
-    expect(all.namespaces).toEqual([
-      { namespace: 'agent-loop', revision: 7, autoGenerate: true, secretFields: 0 },
-      { namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0 },
-    ])
+  it.effect('filters by query and refuses an unknown namespace by name', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface())
+        expect((yield* tools.list({ query: 'THEME' })).namespaces.map(entry => entry.namespace)).toEqual(['ui-theme'])
+        const unknown = yield* Effect.flip(tools.list({ namespace: 'nope' }))
+        expect(unknown._tag).toBe('SettingsNamespaceUnknown')
+        expect(unknown.message).toMatch(/Known namespaces include agent-loop, ui-theme/)
+      }),
+    ),
+  )
 
-    const one = tools(surface).list({ input: { namespace: 'ui-theme' } })
-    expect(one.namespaces).toEqual([{ namespace: 'ui-theme', revision: 4, autoGenerate: true, secretFields: 0, value: '{"mode":"dark"}' }])
-  })
+  it.effect('searches the section entries the browser last published, only for a query', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface())
+        const developerTools = { sectionId: 'general', sectionLabel: 'General', id: 'developer-tools', title: 'Show coding view', keywords: 'devtools' }
+        expect(yield* tools.publishSearchEntries([developerTools])).toEqual({ count: 1 })
+        expect(yield* tools.list({ query: 'DEVTOOLS' })).toEqual({ writable: true, namespaces: [], entries: [developerTools] })
+        expect((yield* tools.list({})).entries).toBeUndefined()
+        expect((yield* tools.list({ query: 'theme' })).entries).toBeUndefined()
+        yield* tools.publishSearchEntries([])
+        expect((yield* tools.list({ query: 'devtools' })).entries).toBeUndefined()
+      }),
+    ),
+  )
 
-  test('filters by query and refuses an unknown namespace by name', () => {
-    const surface = createSurface()
-    expect(
-      tools(surface)
-        .list({ input: { query: 'THEME' } })
-        .namespaces.map(entry => entry.namespace),
-    ).toEqual(['ui-theme'])
-    expect(() => tools(surface).list({ input: { namespace: 'nope' } })).toThrow(/Known namespaces include agent-loop, ui-theme/)
-  })
+  it.effect('omits a value too large for the model and reports it', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface({ describe: () => [row('ai-accounts', { blob: 'x'.repeat(70 * 1024) })] }))
+        expect((yield* tools.list({ namespace: 'ai-accounts' })).namespaces[0]).toEqual({
+          namespace: 'ai-accounts',
+          revision: 4,
+          autoGenerate: true,
+          secretFields: 0,
+          valueTooLarge: true,
+        })
+      }),
+    ),
+  )
 
-  test('searches the section entries the browser last published, only for a query', () => {
-    let published: readonly SectionEntryRow[] = []
-    const searchEntries = { read: () => published, replace: (entries: readonly SectionEntryRow[]) => (published = entries) }
-    const withEntries = createSettingsTools({ settings: () => createSurface(), searchEntries })
-    const developerTools = { sectionId: 'general', sectionLabel: 'General', id: 'developer-tools', title: 'Show coding view', keywords: 'devtools' }
-    expect(withEntries.publishSearchEntries({ input: { entries: [developerTools] } })).toEqual({ count: 1 })
-    expect(withEntries.list({ input: { query: 'DEVTOOLS' } })).toEqual({ writable: true, namespaces: [], entries: [developerTools] })
-    expect(withEntries.list({ input: {} }).entries).toBeUndefined()
-    expect(withEntries.list({ input: { query: 'theme' } }).entries).toBeUndefined()
-    withEntries.publishSearchEntries({ input: { entries: [] } })
-    expect(withEntries.list({ input: { query: 'devtools' } }).entries).toBeUndefined()
-  })
-
-  test('omits a value too large for the model and reports it', () => {
-    const surface = createSurface({
-      describe: () => [row('ai-accounts', { blob: 'x'.repeat(70 * 1024) })],
-    })
-    expect(tools(surface).list({ input: { namespace: 'ai-accounts' } }).namespaces[0]).toEqual({
-      namespace: 'ai-accounts',
-      revision: 4,
-      autoGenerate: true,
-      secretFields: 0,
-      valueTooLarge: true,
-    })
-  })
+  it.effect('refuses every call when the Host serves no settings service', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(undefined)
+        expect(yield* Effect.flip(tools.list({}))).toMatchObject({ _tag: 'SettingsServiceMissing', message: 'This Host serves no settings service.' })
+      }),
+    ),
+  )
 })
 
 describe('settings tools: write', () => {
-  test('merges a patch at the revision the descriptor reported', async () => {
-    const writes: Array<{ ns: string; patch: object; revision: number | undefined }> = []
-    const surface = createSurface({
-      update: async (ns, patch, revision) => {
-        writes.push({ ns, patch, revision })
-      },
-    })
+  it.effect('merges a patch at the revision the descriptor reported', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const writes: Array<{ ns: string; patch: object; revision: number | undefined }> = []
+        const tools = yield* toolsFor(
+          createSurface({
+            update: async (ns, patch, revision) => {
+              writes.push({ ns, patch, revision })
+            },
+          }),
+        )
+        expect(yield* tools.set({ namespace: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 } })).toEqual({
+          namespace: 'agent-loop',
+          applied: ['maxRounds', 'stalledRounds'],
+          revision: 7,
+        })
+        expect(writes).toEqual([{ ns: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 }, revision: 7 }])
+      }),
+    ),
+  )
 
-    expect(await tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 } } })).toEqual({
-      namespace: 'agent-loop',
-      applied: ['maxRounds', 'stalledRounds'],
-      revision: 7,
-    })
-    expect(writes).toEqual([{ ns: 'agent-loop', patch: { maxRounds: 5, stalledRounds: 2 }, revision: 7 }])
-  })
+  it.effect('resets one field with a path op instead of restating the section', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const ops: Array<{ ns: string; ops: readonly SettingsUnsetOp[]; revision: number | undefined }> = []
+        const tools = yield* toolsFor(
+          createSurface({
+            mutate: async (ns, operations, revision) => {
+              ops.push({ ns, ops: operations, revision })
+            },
+          }),
+        )
+        expect(yield* tools.unset({ namespace: 'ui-theme', path: ['mode'] })).toEqual({ namespace: 'ui-theme', path: ['mode'] })
+        expect(ops).toEqual([{ ns: 'ui-theme', ops: [{ op: 'unset', path: ['mode'] }], revision: 4 }])
+      }),
+    ),
+  )
 
-  test('resets one field with a path op instead of restating the section', async () => {
-    const ops: Array<{ ns: string; ops: readonly SettingsUnsetOp[]; revision: number | undefined }> = []
-    const surface = createSurface({
-      mutate: async (ns, operations, revision) => {
-        ops.push({ ns, ops: operations, revision })
-      },
-    })
+  it.effect('refuses to write when the profile is read-only', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface({ writable: false }))
+        expect((yield* Effect.flip(tools.set({ namespace: 'ui-theme', patch: { mode: 'light' } })))._tag).toBe('SettingsReadOnly')
+      }),
+    ),
+  )
 
-    expect(await tools(surface).unset({ input: { namespace: 'ui-theme', path: ['mode'] } })).toEqual({
-      namespace: 'ui-theme',
-      path: ['mode'],
-    })
-    expect(ops).toEqual([{ ns: 'ui-theme', ops: [{ op: 'unset', path: ['mode'] }], revision: 4 }])
-  })
+  it.effect('turns a lost revision race into a readable conflict', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const conflict = Object.assign(new Error('agent-loop changed'), { code: 'SETTINGS_CONFLICT' })
+        const tools = yield* toolsFor(createSurface({ update: async () => Promise.reject(conflict) }))
+        const failed = yield* Effect.flip(tools.set({ namespace: 'agent-loop', patch: { maxRounds: 2 } }))
+        expect(failed._tag).toBe('SettingsWriteConflict')
+        expect(failed.message).toBe('agent-loop changed since it was read; read it again with settings_list and retry.')
+      }),
+    ),
+  )
 
-  test('refuses to write when the profile is read-only', async () => {
-    const surface = createSurface({ writable: false })
-    await expect(tools(surface).set({ input: { namespace: 'ui-theme', patch: { mode: 'light' } } })).rejects.toSatisfy(
-      error => error instanceof PluginApiError && error.code === 'settings-read-only',
-    )
-  })
-
-  test('turns a lost revision race into a readable conflict', async () => {
-    const conflict = Object.assign(new Error('agent-loop changed'), { code: 'SETTINGS_CONFLICT' })
-    const surface = createSurface({ update: async () => Promise.reject(conflict) })
-    await expect(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 2 } } })).rejects.toSatisfy(
-      error => error instanceof PluginApiError && error.code === 'settings-conflict',
-    )
-  })
-
-  test('passes a schema rejection through as the Host message', async () => {
-    const rejected = Object.assign(new Error('maxRounds: expected a number'), { code: 'EINVALID' })
-    const surface = createSurface({ update: async () => Promise.reject(rejected) })
-    await expect(tools(surface).set({ input: { namespace: 'agent-loop', patch: { maxRounds: 'many' } } })).rejects.toThrow('maxRounds: expected a number')
-  })
+  it.effect('passes a schema rejection through as the Host message', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const rejected = Object.assign(new Error('maxRounds: expected a number'), { code: 'EINVALID' })
+        const tools = yield* toolsFor(createSurface({ update: async () => Promise.reject(rejected) }))
+        const failed = yield* Effect.flip(tools.set({ namespace: 'agent-loop', patch: { maxRounds: 'many' } }))
+        expect(failed).toMatchObject({ _tag: 'SettingsWriteRejected', message: 'maxRounds: expected a number' })
+      }),
+    ),
+  )
 })
 
 describe('settings-shell tool exposure', () => {
-  test('exposes the release check and settings read, merge and reset tools', async () => {
+  it('exposes the release check and settings read, merge and reset tools', async () => {
     const { settingsShellApi } = await import('./shell-api.js')
     const tools = Object.values(settingsShellApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name)).toEqual(['dsh_release_status', 'settings_list', 'settings_set', 'settings_unset'])

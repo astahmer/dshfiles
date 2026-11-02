@@ -1,7 +1,10 @@
-import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import { checkDshRelease } from './release-check-host.js'
-import { fetchDshReleaseStatus, releaseStatusFromGitHub } from './release-status.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Effect, Layer, Schema, Tracer } from 'effect'
+import { FetchHttpClient } from 'effect/http'
+import { TestClock } from 'effect/testing'
+import { InstalledVersions } from './installed-versions.js'
+import { ReleaseCheck } from './release-check.js'
+import { githubReleasesJson, releaseStatusFromGitHub } from './release-status.js'
 
 const githubRelease = (input: { readonly tag: string; readonly body?: string; readonly draft?: boolean }) => ({
   tag_name: input.tag,
@@ -16,7 +19,7 @@ describe('DSH GitHub release status', () => {
   it('lists releases after the installed version and keeps their links on GitHub', () => {
     const status = releaseStatusFromGitHub({
       currentVersion: '0.2.1-rc.1',
-      response: [githubRelease({ tag: 'dsh-v0.2.1-rc.2' }), githubRelease({ tag: 'dsh-v0.2.1-rc.1' })],
+      releases: [githubRelease({ tag: 'dsh-v0.2.1-rc.2' }), githubRelease({ tag: 'dsh-v0.2.1-rc.1' })],
     })
 
     expect(status.available).toBe(true)
@@ -27,14 +30,14 @@ describe('DSH GitHub release status', () => {
 
   it('does not claim an update when the installed tag is missing or current', () => {
     const releases = [githubRelease({ tag: 'dsh-v0.2.1-rc.2' }), githubRelease({ tag: 'dsh-v0.2.1-rc.1' })]
-    expect(releaseStatusFromGitHub({ currentVersion: '0.2.1-rc.2', response: releases })).toMatchObject({ available: false, comparisonKnown: true })
-    expect(releaseStatusFromGitHub({ currentVersion: '0.2.1-custom', response: releases })).toMatchObject({ available: false, comparisonKnown: false })
+    expect(releaseStatusFromGitHub({ currentVersion: '0.2.1-rc.2', releases })).toMatchObject({ available: false, comparisonKnown: true })
+    expect(releaseStatusFromGitHub({ currentVersion: '0.2.1-custom', releases })).toMatchObject({ available: false, comparisonKnown: false })
   })
 
   it('extracts bounded English release highlights without exposing HTML', () => {
     const status = releaseStatusFromGitHub({
       currentVersion: '0.2.1-rc.1',
-      response: [
+      releases: [
         githubRelease({
           tag: 'dsh-v0.2.1-rc.2',
           body: '<h3 id="cn-release">新增功能</h3>\n- 忽略中文\n<h3 id="en-release">New Features</h3>\n- Add **plugin updates** with `hot reload`. by @contributor',
@@ -46,32 +49,95 @@ describe('DSH GitHub release status', () => {
     expect(status.releases[0]?.highlights).toEqual([{ section: 'New Features', text: 'Add plugin updates with hot reload.' }])
   })
 
-  it('uses a fixed GitHub endpoint, rejects redirects and bounds the response', async () => {
-    const called: RequestInit[] = []
-    const fetcher: typeof fetch = async (_input, init) => {
-      called.push(init ?? {})
-      return new Response(JSON.stringify([githubRelease({ tag: 'dsh-v0.2.1-rc.2' })]), { status: 200 })
-    }
-    const status = await fetchDshReleaseStatus({ currentVersion: '0.2.1-rc.2', fetch: fetcher, signal: new AbortController().signal })
-
-    expect(status.latestVersion).toBe('0.2.1-rc.2')
-    expect(called[0]?.redirect).toBe('error')
-    expect(called[0]?.headers).toMatchObject({ accept: 'application/vnd.github+json' })
-  })
-
-  it('records a dsh release check span with whether an update exists', async () => {
-    using recorder = recordSpans()
-    const fetcher: typeof fetch = async () =>
-      new Response(JSON.stringify([githubRelease({ tag: 'dsh-v0.2.1-rc.2' }), githubRelease({ tag: 'dsh-v0.2.1-rc.1' })]), { status: 200 })
-    await checkDshRelease({ currentVersion: '0.2.1-rc.1', fetch: fetcher, signal: new AbortController().signal })
-    expect(recorder.span('dsh release check').attributes).toEqual({
-      'server.address': 'api.github.com',
-      'dshx.settings-shell.available': true,
-      'dshx.settings-shell.releases': 1,
-    })
-  })
-
   it('rejects malformed release payloads', () => {
-    expect(() => releaseStatusFromGitHub({ currentVersion: '0.2.1', response: [{ tag_name: 'not valid' }] })).toThrow()
+    expect(Schema.decodeUnknownResult(githubReleasesJson)(JSON.stringify([{ tag_name: 'not valid' }]))._tag).toBe('Failure')
   })
+})
+
+/** GitHub is external to the plugin: each test answers the releases request with a fixed response. */
+const answering = (respond: () => Response) => {
+  const requests: Array<{ readonly url: string; readonly init: RequestInit }> = []
+  const fetcher: typeof fetch = async (input, init) => {
+    requests.push({ url: input instanceof Request ? input.url : String(input), init: init ?? {} })
+    return respond()
+  }
+  return { requests, fetcher }
+}
+
+const releasesResponse = (tags: readonly string[]) => new Response(JSON.stringify(tags.map(tag => githubRelease({ tag }))), { status: 200 })
+
+const releaseCheck = Effect.map(
+  Layer.build(
+    ReleaseCheck.layer.pipe(
+      Layer.provide(Layer.succeed(InstalledVersions, InstalledVersions.of({ dsh: '0.2.1-rc.1', upstream: null, welcome: null }))),
+      Layer.provide(FetchHttpClient.layer),
+    ),
+  ),
+  Context.get(ReleaseCheck),
+)
+
+const checkWith = (fetcher: typeof fetch) => (check: ReleaseCheck['Service']) => Effect.provideService(check.status, FetchHttpClient.Fetch, fetcher)
+
+describe('ReleaseCheck', () => {
+  it.effect('uses a fixed GitHub endpoint, rejects redirects and caches a result for an hour', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const github = answering(() => releasesResponse(['dsh-v0.2.1-rc.2', 'dsh-v0.2.1-rc.1']))
+        const run = checkWith(github.fetcher)(yield* releaseCheck)
+
+        expect((yield* run).latestVersion).toBe('0.2.1-rc.2')
+        expect(github.requests).toHaveLength(1)
+        expect(github.requests[0]?.url).toBe('https://api.github.com/repos/deepseek-ai/deepseek-harness/releases?per_page=100')
+        expect(github.requests[0]?.init.redirect).toBe('error')
+        expect(new Headers(github.requests[0]?.init.headers).get('accept')).toBe('application/vnd.github+json')
+
+        yield* TestClock.adjust('59 minutes')
+        yield* run
+        expect(github.requests).toHaveLength(1)
+        yield* TestClock.adjust('1 minute')
+        yield* run
+        expect(github.requests).toHaveLength(2)
+      }),
+    ),
+  )
+
+  it.effect('records a dsh release check span with whether an update exists', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const spans: Tracer.NativeSpan[] = []
+        const tracer = Tracer.make({
+          span: options => {
+            const span = new Tracer.NativeSpan(options)
+            spans.push(span)
+            return span
+          },
+        })
+        const github = answering(() => releasesResponse(['dsh-v0.2.1-rc.2', 'dsh-v0.2.1-rc.1']))
+        yield* Effect.withTracer(checkWith(github.fetcher)(yield* releaseCheck), tracer)
+        const span = spans.find(candidate => candidate.name === 'dsh release check')
+        expect(span?.kind).toBe('client')
+        expect(Object.fromEntries(span?.attributes ?? [])).toEqual({
+          'server.address': 'api.github.com',
+          'dshx.settings-shell.available': true,
+          'dshx.settings-shell.releases': 1,
+        })
+      }),
+    ),
+  )
+
+  it.effect('refuses an error status, an oversized body and a malformed payload without caching the failure', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const check = yield* releaseCheck
+        const failed = yield* Effect.flip(checkWith(answering(() => new Response('{}', { status: 503 })).fetcher)(check))
+        expect(failed).toMatchObject({ _tag: 'ReleaseCheckFailed', reason: 'status', status: 503 })
+
+        const oversized = yield* Effect.flip(checkWith(answering(() => new Response('x'.repeat(1_000_001), { status: 200 })).fetcher)(check))
+        expect(oversized.reason).toBe('too-large')
+
+        const malformed = yield* Effect.flip(checkWith(answering(() => new Response('[{"tag_name":"x"}]', { status: 200 })).fetcher)(check))
+        expect(malformed.reason).toBe('malformed')
+      }),
+    ),
+  )
 })

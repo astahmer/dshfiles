@@ -1,4 +1,3 @@
-import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import * as Schema from 'effect/Schema'
 
 const githubReleaseSchema = Schema.Struct({
@@ -34,9 +33,9 @@ export const dshReleaseStatusSchema = Schema.Struct({
 export type ReleaseInfo = typeof releaseInfoSchema.Type
 export type DshReleaseStatus = typeof dshReleaseStatusSchema.Type
 
-const RELEASES_URL = 'https://api.github.com/repos/deepseek-ai/deepseek-harness/releases?per_page=100'
+export const RELEASES_URL = 'https://api.github.com/repos/deepseek-ai/deepseek-harness/releases?per_page=100'
 const RELEASE_PAGE_URL = 'https://github.com/deepseek-ai/deepseek-harness/releases/tag/'
-const RESPONSE_LIMIT_BYTES = 1_000_000
+export const RESPONSE_LIMIT_BYTES = 1_000_000
 const RELEASE_VERSION_PATTERN = /^(?:dsh-)?v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)(?:\+[0-9A-Za-z.-]+)?$/u
 
 const releaseVersion = (tag: string): string | undefined => RELEASE_VERSION_PATTERN.exec(tag)?.[1]
@@ -97,9 +96,13 @@ const versionedRelease = (release: typeof githubReleaseSchema.Type): ReleaseInfo
   }
 }
 
-export const releaseStatusFromGitHub = (input: { readonly currentVersion: string | null; readonly response: unknown }): DshReleaseStatus => {
-  const payload = Schema.decodeUnknownSync(Schema.Array(githubReleaseSchema).check(Schema.isMaxLength(100)))(input.response)
-  const releases = payload.flatMap((release): ReleaseInfo[] => {
+/** One page of the GitHub Releases API, as JSON text; unknown fields are ignored. */
+export const githubReleasesJson = Schema.fromJsonString(Schema.Array(githubReleaseSchema).check(Schema.isMaxLength(100)))
+
+export type GitHubRelease = typeof githubReleaseSchema.Type
+
+export const releaseStatusFromGitHub = (input: { readonly currentVersion: string | null; readonly releases: readonly GitHubRelease[] }): DshReleaseStatus => {
+  const releases = input.releases.flatMap((release): ReleaseInfo[] => {
     const parsed = versionedRelease(release)
     return parsed === undefined ? [] : [parsed]
   })
@@ -114,45 +117,4 @@ export const releaseStatusFromGitHub = (input: { readonly currentVersion: string
     comparisonKnown,
     releases: currentIndex > 0 ? releases.slice(0, currentIndex) : [],
   }
-}
-
-export const fetchDshReleaseStatus = async (input: {
-  readonly currentVersion: string | null
-  readonly fetch: typeof globalThis.fetch
-  readonly signal: AbortSignal
-}): Promise<DshReleaseStatus> => {
-  const signal = AbortSignal.any([input.signal, AbortSignal.timeout(10_000)])
-  const response = await input.fetch(RELEASES_URL, {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': 'dshfiles-settings-shell' },
-    redirect: 'error',
-    signal,
-  })
-  if (!response.ok) throw new Error(`GitHub Releases returned HTTP ${response.status}.`)
-  const contentLength = Number(response.headers.get('content-length') ?? 0)
-  if (contentLength > RESPONSE_LIMIT_BYTES) throw new Error('GitHub Releases response exceeded the size limit.')
-  const reader = response.body?.getReader()
-  if (reader === undefined) throw new Error('GitHub Releases returned an empty response.')
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    while (true) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      size += chunk.value.byteLength
-      if (size > RESPONSE_LIMIT_BYTES) {
-        await reader.cancel()
-        throw new Error('GitHub Releases response exceeded the size limit.')
-      }
-      chunks.push(chunk.value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return releaseStatusFromGitHub({ currentVersion: input.currentVersion, response: decodeJson(jsonValueSchema, new TextDecoder().decode(bytes)) })
 }
