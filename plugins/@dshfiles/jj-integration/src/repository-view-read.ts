@@ -1,4 +1,4 @@
-import { ThreadError } from './threads.js'
+import { ThreadError } from './threads-promise.js'
 
 export const readRepositoryView = async <Value>(input: {
   readonly read: () => Promise<Value>

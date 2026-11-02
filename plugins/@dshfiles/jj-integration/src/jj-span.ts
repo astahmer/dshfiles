@@ -1,5 +1,5 @@
 import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
-import type { JjExecutor } from './threads.js'
+import type { JjExecutor } from './auto-fetch.js'
 
 /** jj flags whose next argument is a value (a path, an operation id, a template) and must stay out of span attributes. */
 const JJ_VALUE_FLAGS = [

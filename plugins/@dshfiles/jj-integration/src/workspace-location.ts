@@ -1,4 +1,5 @@
-import { ThreadError, type ThreadLocation } from './threads.js'
+import type { ThreadLocation } from './thread-workspace-model.js'
+import { ThreadError } from './threads-promise.js'
 
 export const locateOrMissing = async (locate: () => Promise<ThreadLocation>): Promise<ThreadLocation | undefined> => {
   try {

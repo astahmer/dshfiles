@@ -2,18 +2,17 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { JjFilesystem } from './jj-filesystem.js'
-import { createThreads, type JjExecutor, type JjResult } from './threads.js'
+import { ThreadWorkspacesTestSupport, type JjExecutor, type JjResult } from './thread-workspaces-test-support.js'
 
-const ok = (stdout: string): JjResult => ({ exitCode: 0, stdout, stdoutLossy: false, stderr: '' })
+const ok = (stdout: string): JjResult => ({ exitCode: 0, stdout, stderr: '' })
 
 const roots: string[] = []
 
 const createRoot = async (): Promise<{ readonly repoRoot: string; readonly directory: string }> => {
   const repoRoot = await mkdtemp(join(tmpdir(), 'jj-threads-list-'))
-  const directory = join(repoRoot, 'threads')
+  const directory = `${repoRoot}-threads`
   await mkdir(directory, { recursive: true })
-  roots.push(repoRoot)
+  roots.push(repoRoot, directory)
   return { repoRoot, directory }
 }
 
@@ -35,13 +34,7 @@ const threadsFor = (names: readonly string[]) => {
     return ok('')
   }
   return {
-    threads: createThreads({
-      filesystem: JjFilesystem,
-      executor,
-      bookmark: () => 'main',
-      threadsDirectory: repoRoot => join(repoRoot, 'threads'),
-      gitWorktree: async () => undefined,
-    }),
+    threads: ThreadWorkspacesTestSupport.promiseThreads({ executor }),
     maximumConcurrent: () => maximumConcurrent,
     logReads: () => logReads,
   }

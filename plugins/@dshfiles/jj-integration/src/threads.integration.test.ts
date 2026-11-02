@@ -4,26 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Schema } from 'effect'
-import { JjFilesystem } from './jj-filesystem.js'
-import { JsonText } from './json-text.js'
-import { createThreads, ThreadWorkspaceModel, type JjExecutor } from './threads.js'
+import { ThreadWorkspaceModel } from './thread-workspace-model.js'
+import { ThreadWorkspacesTestSupport, type JjExecutor } from './thread-workspaces-test-support.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
 const executor: JjExecutor = async ({ args, cwd }) => {
   const result = spawnSync('jj', ['--color=never', '--no-pager', ...args], { cwd, encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
-  return { exitCode: result.status ?? 1, stdout: result.stdout, stdoutLossy: false, stderr: result.stderr }
+  return { exitCode: result.status ?? 1, stdout: result.stdout, stderr: result.stderr }
 }
-
-type TestThreadOptions = Omit<Parameters<typeof createThreads>[0], 'filesystem' | 'gitWorktree'>
-const createTestThreads = (options: TestThreadOptions) =>
-  createThreads({
-    ...options,
-    filesystem: JjFilesystem,
-    gitWorktree: async (repoRoot, args) => {
-      execFileSync('git', ['-C', repoRoot, 'worktree', ...args], { stdio: 'ignore' })
-    },
-  })
 
 const jj = (cwd: string, ...args: string[]): string =>
   execFileSync('jj', ['--color=never', '--no-pager', ...args], {
@@ -43,7 +32,7 @@ const fullChangeIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignor
 describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   let root: string
   let repo: string
-  const threads = createTestThreads({ executor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+  const threads = ThreadWorkspacesTestSupport.promiseThreads({ executor })
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'jj-threads-')))
@@ -184,7 +173,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       if (!input.args.includes('list')) return result
       return { ...result, stdout: `${result.stdout}"unknown-root"\tnull\n` }
     }
-    const listing = createTestThreads({ executor: withUnknownRoot, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+    const listing = ThreadWorkspacesTestSupport.promiseThreads({ executor: withUnknownRoot })
 
     const names = (await listing.secondaryWorkspaces(repo)).map(workspace => workspace.name)
 
@@ -311,7 +300,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       await spareReleased
       return result
     }
-    const gatedThreads = createTestThreads({ executor: gatedExecutor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+    const gatedThreads = ThreadWorkspacesTestSupport.promiseThreads({ executor: gatedExecutor })
     const thread = await gatedThreads.provision(repo)
     await spareAdded
 
@@ -328,8 +317,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const first = await threads.provision(repo)
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
     await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
-    const spareText = JsonText.decodeEffect(Schema.Record(Schema.String, Schema.String), readFileSync(spares, 'utf8'))
-    const spareName = spareText?.success === true ? spareText.data.main : undefined
+    const spareName = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)))(readFileSync(spares, 'utf8')).main
     if (spareName === undefined) throw new Error('expected a spare for main')
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([first.name])
 
@@ -403,13 +391,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     writeFileSync(join(target.path, 'feature.txt'), 'feature\n')
     jj(target.path, 'describe', '-m', 'feat: target only')
     const invocations: { readonly cwd: string; readonly command: string }[] = []
-    const focusedThreads = createTestThreads({
+    const focusedThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: async input => {
         invocations.push({ cwd: input.cwd, command: input.args[1] ?? '' })
         return executor(input)
       },
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     const status = await focusedThreads.status(repo, target.name)
@@ -554,6 +540,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
   it('renders a compact graph of the thread, configured bookmark, origin bookmark, and default workspace', async () => {
     const thread = await threads.provision(repo)
+    // The spare for the next thread is checked out in the background; it records its own operation.
+    await expect.poll(() => existsSync(join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')), { timeout: 20_000 }).toBe(true)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
     jj(thread.path, 'describe', '-m', 'feat: graph preview')
     jj(repo, 'git', 'remote', 'add', 'origin', join(repo, '.git'))
@@ -852,10 +840,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       if (input.args.includes('bookmark') && input.args.includes('move')) controller.abort()
       return result
     }
-    const guardedThreads = createTestThreads({
+    const guardedThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: abortAfterMoveExecutor,
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     const outcome = await guardedThreads.landVerified({
@@ -884,10 +870,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       const result = await executor(input)
       return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdoutLossy: true } : result
     }
-    const guardedThreads = createTestThreads({
+    const guardedThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: lossyExecutor,
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     await expect(
@@ -912,10 +896,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       const result = await executor(input)
       return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdout: 'malformed\\tmetadata\\n' } : result
     }
-    const guardedThreads = createTestThreads({
+    const guardedThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: malformedExecutor,
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     await expect(
@@ -951,7 +933,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const [status] = await threads.list(repo)
     const tipChangeId = changeIdAt(repo, 'main')
     expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number), rebasedTipChangeId: tipChangeId })
-    const reloaded = createTestThreads({ executor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+    const reloaded = ThreadWorkspacesTestSupport.promiseThreads({ executor })
     expect((await reloaded.list(repo))[0]?.rebasedAt).toBe(status?.rebasedAt)
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
@@ -996,8 +978,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       revision: landedCommitId,
     })
     const synced = spawnSync(command, args, { encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
-    const syncOutput = JsonText.decodeEffect(Schema.Unknown, synced.stdout)
-    expect(syncOutput?.success === true ? syncOutput.data : undefined).toMatchObject({
+    expect(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(synced.stdout)).toMatchObject({
       ok: true,
       data: { status: 'synced', to: landedCommitId, kept: [{ description: '' }], changedFiles: ['feature.txt'] },
     })
@@ -1013,13 +994,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
     jj(thread.path, 'describe', '-m', 'feat: add feature')
     const invocations: string[][] = []
-    const observedThreads = createTestThreads({
+    const observedThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: async input => {
         invocations.push([...input.args])
         return executor(input)
       },
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
     const location = await threads.locate(thread.path)
     const threadName = location.threadName
@@ -1072,13 +1051,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const busy = await threads.provision(repo)
     writeFileSync(join(busy.path, 'draft.txt'), 'draft\n')
     const calls: string[][] = []
-    const measuredThreads = createTestThreads({
+    const measuredThreads = ThreadWorkspacesTestSupport.promiseThreads({
       executor: async input => {
         calls.push([...input.args])
         return executor(input)
       },
-      bookmark: () => 'main',
-      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     const result = await measuredThreads.discardMany({ repoRoot: repo, names: [first.name, second.name, busy.name], force: false })

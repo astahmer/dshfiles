@@ -1,15 +1,15 @@
-import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { JjFilesystem } from './jj-filesystem.js'
-import { createThreads, ThreadWorkspaceModel, type JjExecutor } from './threads.js'
+import { ThreadWorkspaceModel } from './thread-workspace-model.js'
+import { ThreadWorkspacesTestSupport, type JjExecutor } from './thread-workspaces-test-support.js'
 
 /**
  * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jj-int a/e):
  * one repository's mutations run strictly in order while different repositories land in parallel, and a shared view
- * read never carries any one caller's abort signal.
+ * read keeps running for its other callers when one of them is interrupted.
  */
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -18,18 +18,7 @@ const env = { ...process.env, JJ_CONFIG: '' }
 interface RecordedCall {
   readonly args: readonly string[]
   readonly cwd: string
-  readonly signalled: boolean
 }
-
-const runJj = (args: readonly string[], cwd: string): Promise<{ exitCode: number; stdout: string; stdoutLossy: boolean; stderr: string }> =>
-  new Promise(resolvePromise => {
-    const child = spawn('jj', ['--color=never', '--no-pager', ...args], { cwd, env })
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', chunk => (stdout += String(chunk)))
-    child.stderr.on('data', chunk => (stderr += String(chunk)))
-    child.on('close', code => resolvePromise({ exitCode: code ?? 1, stdout, stdoutLossy: false, stderr }))
-  })
 
 const jj = (cwd: string, ...args: string[]): string =>
   execFileSync('jj', ['--color=never', '--no-pager', ...args], { cwd, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -54,19 +43,13 @@ const deferred = () => {
 describe.skipIf(!jjAvailable)('thread landing serialization against real jj', () => {
   let root: string
   let calls: RecordedCall[]
-  const executor: JjExecutor = input => {
-    calls.push({ args: input.args, cwd: input.cwd, signalled: input.signal !== undefined })
-    return runJj(input.args, input.cwd)
+  let beforeCall: (input: RecordedCall) => Promise<void> = async () => undefined
+  const executor: JjExecutor = async input => {
+    calls.push({ args: input.args, cwd: input.cwd })
+    await beforeCall(input)
+    return ThreadWorkspacesTestSupport.spawnJj(input)
   }
-  const threads = createThreads({
-    executor,
-    filesystem: JjFilesystem,
-    bookmark: () => 'main',
-    threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
-    gitWorktree: async (repoRoot, args) => {
-      execFileSync('git', ['-C', repoRoot, 'worktree', ...args], { stdio: 'ignore' })
-    },
-  })
+  const threads = ThreadWorkspacesTestSupport.promiseThreads({ executor })
 
   const describedThread = async (repo: string, file: string) => {
     const provisioned = await threads.provision(repo)
@@ -80,6 +63,7 @@ describe.skipIf(!jjAvailable)('thread landing serialization against real jj', ()
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'jj-land-serial-')))
     calls = []
+    beforeCall = async () => undefined
   })
 
   afterEach(() => {
@@ -166,28 +150,46 @@ describe.skipIf(!jjAvailable)('thread landing serialization against real jj', ()
     expect(phases).toEqual(['queued', 'validating', 'rebasing'])
   })
 
-  it('shares one in-flight view read between callers and never passes a caller signal to it', async () => {
+  it('answers the other caller of a view read when one caller is interrupted', async () => {
     const repo = join(root, 'repo-a')
     initRepository(repo)
     calls = []
-    const aborted = new AbortController()
-    aborted.abort()
+    const readStarted = deferred()
+    const readGate = deferred()
+    beforeCall = async input => {
+      if (input.args.join(' ') !== '--ignore-working-copy root') return
+      readStarted.release()
+      await readGate.promise
+    }
+    const interrupted = new AbortController()
 
-    const [first, second] = await Promise.all([threads.locate(repo, aborted.signal), threads.locate(repo)])
+    const first = threads.locate(repo, interrupted.signal)
+    const second = threads.locate(repo)
+    await readStarted.promise
+    interrupted.abort()
+    readGate.release()
 
-    expect(first).toEqual(second)
-    const rootReads = calls.filter(call => call.args.join(' ') === '--ignore-working-copy root')
-    expect(rootReads).toHaveLength(1)
-    expect(rootReads.every(call => !call.signalled)).toBe(true)
+    const [firstOutcome, secondOutcome] = await Promise.allSettled([first, second])
+    expect(firstOutcome.status).toBe('rejected')
+    expect(secondOutcome).toMatchObject({ status: 'fulfilled', value: { repoRoot: repo, workspaceRoot: repo } })
   })
 
-  it('passes the caller signal to mutations, which are never cached', async () => {
+  it('shares one view read between concurrent callers', async () => {
+    const repo = join(root, 'repo-a')
+    initRepository(repo)
+    calls = []
+    const [first, second] = await Promise.all([threads.locate(repo), threads.locate(repo)])
+    expect(first).toEqual(second)
+    expect(calls.filter(call => call.args.join(' ') === '--ignore-working-copy root')).toHaveLength(1)
+  })
+
+  it('runs every mutation as its own jj process, never from the view cache', async () => {
     const repo = join(root, 'repo-a')
     initRepository(repo)
     const thread = await describedThread(repo, 'first.txt')
     calls = []
-    await threads.landAt(thread, { signal: new AbortController().signal })
-    const rebase = calls.find(call => call.args[0] === 'rebase')
-    expect(rebase?.signalled).toBe(true)
+    await threads.snapshotFiles(thread.workspaceRoot)
+    await threads.snapshotFiles(thread.workspaceRoot)
+    expect(calls.filter(call => call.args.join(' ') === 'util snapshot')).toHaveLength(2)
   })
 })

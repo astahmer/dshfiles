@@ -6,7 +6,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AutoFetchModel, createAutoFetchScheduler, type FetchOutcome } from './auto-fetch.js'
 import { defaultJjIntegrationSettings } from './settings.js'
-import type { JjExecutor } from './threads.js'
+import type { JjExecutor } from './auto-fetch.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 const env = { ...process.env, JJ_CONFIG: '', JJ_USER: 'Test', JJ_EMAIL: 'test@example.com' }

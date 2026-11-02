@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ThreadError } from './threads.js'
-import type { ThreadLocation } from './threads.js'
+import { ThreadError } from './threads-promise.js'
+import type { ThreadLocation } from './thread-workspace-model.js'
 import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
 const location: ThreadLocation = { repoRoot: '/repo', workspaceRoot: '/repo', threadName: undefined }

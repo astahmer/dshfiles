@@ -137,6 +137,7 @@ const start = async (
   const sessions = new Map<string, SessionState>()
   const workspaces: RegisteredWorkspace[] = []
   let settings: Partial<JjIntegrationSettings> = { ...options.settings }
+  let settingsRevision = 1
 
   const runProcess = (spec: SpawnSpec) => {
     let stdout = ''
@@ -180,6 +181,15 @@ const start = async (
     })
     return {
       done,
+      stdout: child.stdout,
+      stderr: child.stderr,
+      terminate: () => {
+        child.kill('SIGTERM')
+      },
+      waitForExit: async () => {
+        await done
+        return true
+      },
       collected: {
         get stdout() {
           return collected(stdout)
@@ -271,7 +281,7 @@ const start = async (
   })
   host.ctx.provide('settings', {
     configure: () => () => undefined,
-    describe: () => [{ ns: 'jj-integration', value: settings }],
+    describe: () => [{ ns: 'jj-integration', value: settings, revision: settingsRevision }],
     update: async () => undefined,
     replace: async () => undefined,
   })
@@ -322,8 +332,12 @@ const start = async (
     api,
     wire,
     runTool,
+    /** Commits a new settings revision and announces it, as DSH does after a settings write. */
     setSettings: (next: Partial<JjIntegrationSettings>) => {
       settings = { ...next }
+      settingsRevision += 1
+      // SAFETY: SettingsNamespace is a type-only brand over the namespace string.
+      host.ctx.emit('settings/document-updated', 'jj-integration' as never, settingsRevision)
     },
     setSession: (sessionId: string, state: SessionState) => {
       sessions.set(sessionId, state)

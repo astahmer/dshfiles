@@ -1,6 +1,13 @@
 import { withSpan } from '@dshfiles/dshx/tracing'
 import type { JjIntegrationSettings } from './settings.js'
-import type { JjExecutor } from './threads.js'
+export interface JjResult {
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stdoutLossy: boolean
+  readonly stderr: string
+}
+
+export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
 
 type AutoFetchSettings = JjIntegrationSettings['autoFetch']
 

@@ -74,7 +74,18 @@ import { IntegrationRecovery } from './integration-recovery.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
-import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
+import { ThreadWorkspaceModel } from './thread-workspace-model.js'
+import { ThreadWorkspaces, type ThreadLocation, type ThreadStatus } from './thread-workspaces.js'
+import { ThreadError, threadsBridge, type Threads } from './threads-promise.js'
+import type { JjExecutor } from './auto-fetch.js'
+import { Jj, JjViewReads } from '@dshfiles/jj-cli'
+import { HostContext } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
+import { Duration } from 'effect'
+import { Executables } from './executables-promise.js'
+import { JjSettingsLive } from './jj-settings.js'
+import { RepoLocks } from './repo-locks.js'
 import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
 /**
@@ -1551,12 +1562,23 @@ const vcsProvider = VcsProviders.contract('@dshfiles/jj-integration').host({
   restore: async ({ input, signal }) => ({ previous: await requireThreads().restoreFiles(input.path, input.snapshot, signal) }),
 })
 
+const ThreadWorkspacesLive = ThreadWorkspaces.layer.pipe(
+  Layer.provideMerge(JjViewReads.layer),
+  Layer.provideMerge(Jj.layerWith({ timeout: Duration.millis(JJ_TIMEOUT_MS), maxStdoutBytes: MAX_OUTPUT, maxStderrBytes: MAX_STDERR })),
+  Layer.provideMerge(Layer.mergeAll(RepoLocks.layer, Executables.layer, JjSettingsLive, DshChildProcessSpawner.layer, NodeFileSystem.layer, NodePath.layer)),
+)
+
 const effectPlugin = DshxEffect.plugin({
-  layer: context => Layer.succeed(JjIntegrationHostServices, makeJjHostServices(context)),
+  layer: context =>
+    Layer.merge(
+      Layer.succeed(JjIntegrationHostServices, makeJjHostServices(context)),
+      ThreadWorkspacesLive.pipe(Layer.provide(HostContext.layer({ ctx: context, packageId: '@dshfiles/jj-integration' }))),
+    ),
   setup: context =>
     Effect.gen(function* () {
       const services = yield* JjIntegrationHostServices
-      yield* setupHost(context, services)
+      const bridged = yield* threadsBridge
+      yield* setupHost(context, services, bridged)
     }),
 })
 
@@ -1812,29 +1834,8 @@ const ownedSettings = jjIntegrationSettings.host({
   },
 })
 
-const setupHostLifecycle = (context: Context, services: JjHostServices): AsyncIterable<() => Promise<void>> => {
-  threads = createThreads({
-    filesystem: services.filesystem,
-    executor: createExecutor(context),
-    bookmark: () => readSettings().bookmark,
-    threadsDirectory,
-    gitWorktree: async (repoRoot, args) =>
-      withSpan('git worktree', { kind: 'client', attributes: { 'process.executable.name': 'git', 'process.command.verb': 'worktree' } }, async span => {
-        const executable = await services.subprocess.resolveExecutable('git')
-        const handle = services.subprocess.spawn({
-          argv: [executable, '-C', repoRoot, 'worktree', ...args],
-          cwd: repoRoot,
-          stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
-          graceMs: 1_500,
-        })
-        const outcome = await handle.done
-        span.setAttributes({ 'process.exit.code': outcome.exitCode ?? 'unknown' })
-        if (outcome.exitCode !== 0) {
-          span.setStatus('error', `exit ${String(outcome.exitCode)}`)
-          throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
-        }
-      }),
-  })
+const setupHostLifecycle = (context: Context, services: JjHostServices, bridged: Threads): AsyncIterable<() => Promise<void>> => {
+  threads = bridged
   const projectChecks = createHostApiClient(context, projectChecksApi, '@dshfiles/jj-integration')
   const handleVerifiedTurn = async (verifiedTurn: ProjectChecksVerifiedTurn): Promise<void> => {
     if (verifiedTurn.signal.aborted) return
@@ -2163,11 +2164,11 @@ const setupHostLifecycle = (context: Context, services: JjHostServices): AsyncIt
   }
 }
 
-const setupHost = Effect.fn('jj-integration setup')((context: Context, services: JjHostServices) =>
+const setupHost = Effect.fn('jj-integration setup')((context: Context, services: JjHostServices, bridged: Threads) =>
   Effect.acquireRelease(
     Effect.sync(() => {
       hostServices = services
-      return setupHostLifecycle(context, services)
+      return setupHostLifecycle(context, services, bridged)
     }),
     lifecycle =>
       Effect.tryPromise({

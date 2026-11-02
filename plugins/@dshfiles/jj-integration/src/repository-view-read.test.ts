@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { ThreadError } from './threads.js'
+import { ThreadError } from './threads-promise.js'
 import { readRepositoryView } from './repository-view-read.js'
 
 describe('repository view reads', () => {
