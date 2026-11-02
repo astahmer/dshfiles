@@ -125,6 +125,7 @@ export const openCdp = Effect.fn('annotations open cdp')(function* (input: { rea
   const cdp: Cdp = {
     send: (method, params) =>
       Effect.callback<unknown, CdpUnavailable>(resume => {
+        // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: nextId advances before the release finalizer reads this request's id.
         const id = nextId
         nextId += 1
         pending.set(id, resume)

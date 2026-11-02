@@ -43,6 +43,7 @@
         "excludePaths": [
           "plugins/@dshfiles/plugin-ui/src/components/ui/**",
           "tooling/dshx/packages/**/src/**/index.ts",
+          "tooling/dshx/packages/dshx/src/effect/plugin.ts",
           "tooling/dshx/scripts/**",
           "tooling/dshx/e2e/support/**",
           "**/test/**",
@@ -53,6 +54,13 @@
     ],
     "effect-antislop/no-catch-if-tagged-error": "error",
     "effect-antislop/no-silent-error-swallow": "error",
+    "effect-antislop/no-sequential-effect-yield-in-loop": [
+      "error",
+      {
+        "domainPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
     "effect-antislop/no-service-flat-map-facade": "error",
     "effect-antislop/no-untyped-readable-stream-error": "error",
     "effect-migration/no-effect-unstable-import": "error",
