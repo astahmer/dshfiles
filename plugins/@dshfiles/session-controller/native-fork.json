@@ -29,6 +29,7 @@
     "src/native/list.ts",
     "src/native/client/sessions/manager.ts",
     "src/native/client/contract/sessions.ts",
-    "src/native/client/sessions/service.ts"
+    "src/native/client/sessions/service.ts",
+    "src/native/model-selection-projection.ts"
   ]
 }
