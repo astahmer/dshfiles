@@ -29,8 +29,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

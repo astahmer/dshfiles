@@ -1,54 +1,52 @@
+// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
+import '@dshfiles/dshx/effect'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { defineApi, method, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { createHostApiClient, listApis } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const matchSchema = z
-  .object({
-    /** Short provider-chosen name of the version-control system, such as `jj` or `git`. */
-    vcs: z.string().min(1).max(32),
-    /** Higher wins when several providers claim one path: a jj repository colocated with git is jj's. */
-    priority: z.number().int().min(0).max(1000),
-    repoRoot: z.string().min(1),
-    workspaceRoot: z.string().min(1),
-    /** Whether the path is a workspace this provider created to isolate a thread. */
-    isolated: z.boolean(),
-  })
-  .strict()
+const matchSchema = Schema.Struct({
+  /** Short provider-chosen name of the version-control system, such as `jj` or `git`. */
+  vcs: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  /** Higher wins when several providers claim one path: a jj repository colocated with git is jj's. */
+  priority: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1000)),
+  repoRoot: Schema.String.check(Schema.isMinLength(1)),
+  workspaceRoot: Schema.String.check(Schema.isMinLength(1)),
+  /** Whether the path is a workspace this provider created to isolate a thread. */
+  isolated: Schema.Boolean,
+})
 
 const methods = {
   detect: method({
-    input: z.object({ path: z.string().min(1) }).strict(),
-    output: z.object({ match: matchSchema.nullable() }).strict(),
+    input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+    output: Schema.Struct({ match: Schema.NullOr(matchSchema) }),
     description: 'Whether this provider manages the repository holding a path, and where its root and current workspace are. Read-only.',
   }),
   provision: method({
-    input: z
-      .object({
-        workspaceId: z.string().min(1),
-        /** Omitted: the provider's own default (jj-integration's `isolateByDefault`). */
-        isolate: z.boolean().optional(),
-        base: z.string().min(1).max(256).optional(),
-      })
-      .strict(),
-    output: z.object({ workspaceId: z.string().min(1), isolated: z.boolean() }).strict(),
+    input: Schema.Struct({
+      workspaceId: Schema.String.check(Schema.isMinLength(1)),
+      /** Omitted: the provider's own default (jj-integration's `isolateByDefault`). */
+      isolate: Schema.optional(Schema.Boolean),
+      base: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+    }),
+    output: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), isolated: Schema.Boolean }),
     description:
       'Where a new thread starts: an isolated workspace created from the repository of a DSH workspace, or the project checkout unchanged when isolation is off or unavailable.',
   }),
   snapshot: method({
-    input: z.object({ path: z.string().min(1) }).strict(),
-    output: z.object({ snapshot: z.string().min(1).max(512) }).strict(),
+    input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+    output: Schema.Struct({ snapshot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)) }),
     description: 'Record the files of the workspace at a path and return an opaque token restore accepts. Does not change any file.',
   }),
   restore: method({
-    input: z.object({ path: z.string().min(1), snapshot: z.string().min(1).max(512) }).strict(),
-    output: z.object({ previous: z.string().min(1).max(512) }).strict(),
+    input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), snapshot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)) }),
+    output: Schema.Struct({ previous: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)) }),
     description: 'Put the files of the workspace at a path back to a snapshot; returns a snapshot of what they were, so the restore can be reversed.',
   }),
 }
 
 type VcsProviderMethods = typeof methods
-export type VcsMatch = z.infer<typeof matchSchema>
+export type VcsMatch = typeof matchSchema.Type
 
 const contracts = new Map<string, ApiContract<VcsProviderMethods>>()
 
