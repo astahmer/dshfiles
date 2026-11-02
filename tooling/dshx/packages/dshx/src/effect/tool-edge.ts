@@ -96,7 +96,7 @@ export const toDefinition = <Input extends InputSchema, Output, R>(
     },
     execute: async (args, execution) => {
       const runtime = await runtimeFor(execution.signal)
-      const call: ToolCall = { callId: execution.callId, agent: execution.agent, sessionId: execution.agent?.id }
+      const call: ToolCall = { callId: execution.callId, agent: execution.agent, sessionId: execution.agent?.id, nested: execution.parent !== undefined }
       const exit = await runtime.run(callProgram(tool, takesInput ? args : undefined, call), { signal: execution.signal })
       if (exit._tag === 'Success') return exit.value ?? null
       throw failureThrown({ tool: tool.name, cause: exit.cause, log: runtime.log })

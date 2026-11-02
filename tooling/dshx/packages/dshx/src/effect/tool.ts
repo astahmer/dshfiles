@@ -11,6 +11,8 @@ export interface ToolCall {
   readonly callId: string
   readonly agent: ToolRunContext['agent']
   readonly sessionId: string | undefined
+  /** Dispatched by another tool (Code Mode's run_code) rather than requested by the model directly. */
+  readonly nested: boolean
 }
 
 /** The input schema of an Effect tool: decoding needs no services. */
