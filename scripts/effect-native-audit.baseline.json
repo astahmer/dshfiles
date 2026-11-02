@@ -710,12 +710,12 @@
   "@dshfiles/traces": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
-    "moduleState": 4,
-    "timers": 4,
+    "moduleState": 0,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 2,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "testMocks": 2,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
