@@ -70,7 +70,10 @@ describe('SessionLogIndex', () => {
 
     it.effect('records a usage index span with the files and rows of one pass', () =>
       Effect.gen(function* () {
-        const recorder = yield* Effect.acquireRelease(Effect.sync(recordSpans), spans => Effect.sync(() => spans.stop()))
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans.stop()),
+        )
         yield* indexAll(FIXTURES).pipe(Effect.provide(tracerLayer))
         expect(recorder.span('usage index').attributes).toEqual({ 'dshx.usage.files': 3, 'dshx.usage.rows': 238 })
       }).pipe(Effect.provide(indexTest())),

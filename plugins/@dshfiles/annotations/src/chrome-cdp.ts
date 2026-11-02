@@ -1,5 +1,6 @@
 import { Duration, Effect, Option, Queue, Schema, type Scope } from 'effect'
 import { HttpClient } from 'effect/http'
+import { pluginAttributes } from '@dshfiles/dshx/tracing'
 import { PICK_BINDING, PICK_SOURCE } from './picker-source.js'
 import { annotationTargetSchema, type AnnotationTarget } from './schema.js'
 
@@ -164,12 +165,14 @@ export const listPages = Effect.fn('annotations list cdp pages')(function* (inpu
     Effect.map(Option.flatMap(decodePageList)),
     Effect.orElseSucceed(() => Option.none<typeof PageList.Type>()),
   )
-  return Option.getOrElse(targets, () => []).flatMap((target): CdpPage[] => {
+  const pages = Option.getOrElse(targets, () => []).flatMap((target): CdpPage[] => {
     const url = typeof target.url === 'string' ? target.url : ''
     if (target.type !== 'page' || typeof target.webSocketDebuggerUrl !== 'string' || typeof target.id !== 'string') return []
     if (!/^(https?|file):/i.test(url)) return []
     return [{ id: target.id, title: typeof target.title === 'string' && target.title.length > 0 ? target.title : url, url, wsUrl: target.webSocketDebuggerUrl }]
   })
+  yield* Effect.annotateCurrentSpan(pluginAttributes({ plugin: 'annotations', attributes: { pages: pages.length } }))
+  return pages
 })
 
 /**

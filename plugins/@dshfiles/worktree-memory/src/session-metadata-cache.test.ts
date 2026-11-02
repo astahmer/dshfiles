@@ -1,5 +1,7 @@
+import { tracerLayer } from '@dshfiles/dshx/effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
-import { Context, Deferred, Effect, Layer, Ref, Tracer } from 'effect'
+import { Context, Deferred, Effect, Layer, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
 import { HostDirectory } from './host-edge-promise.js'
 import type { KnownSession } from './process-table.js'
@@ -31,17 +33,6 @@ const directoryAnswering = (answer: Effect.Effect<readonly KnownSession[] | unde
     return { metadata, loads: Ref.get(loads) }
   })
 
-const recordSpanNames = () => {
-  const names: string[] = []
-  const tracer = Tracer.make({
-    span: options => {
-      names.push(options.name)
-      return new Tracer.NativeSpan(options)
-    },
-  })
-  return { names, trace: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.withTracer(effect, tracer) }
-}
-
 describe('SessionMetadata', () => {
   it.effect('returns the current value without waiting and coalesces a refresh', () =>
     Effect.scoped(
@@ -50,13 +41,20 @@ describe('SessionMetadata', () => {
         const pending = yield* Deferred.make<readonly KnownSession[] | undefined>()
         const { metadata, loads } = yield* directoryAnswering(Deferred.await(pending))
 
-        const recorder = recordSpanNames()
-        expect(yield* recorder.trace(metadata.current)).toEqual([])
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans.stop()),
+        )
+        expect(yield* metadata.current.pipe(Effect.provide(tracerLayer))).toEqual([])
         expect(yield* metadata.current).toEqual([])
 
         yield* Deferred.succeed(pending, [session])
         yield* metadata.refresh
-        expect(recorder.names).toContain('worktree-memory list sessions')
+        expect(recorder.named('worktree-memory list sessions')).toHaveLength(1)
+        expect(recorder.span('worktree-memory list sessions').attributes).toEqual({
+          'dshx.worktree-memory.loaded': true,
+          'dshx.worktree-memory.sessions': 1,
+        })
 
         expect(yield* metadata.current).toEqual([session])
         expect(yield* loads).toBe(1)

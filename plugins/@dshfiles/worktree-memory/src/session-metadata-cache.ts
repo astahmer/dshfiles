@@ -1,3 +1,4 @@
+import { pluginAttributes } from '@dshfiles/dshx/tracing'
 import { Clock, Context, Effect, FiberHandle, Layer, Ref } from 'effect'
 import { HostDirectory } from './host-edge-promise.js'
 import type { KnownSession } from './process-table.js'
@@ -31,6 +32,9 @@ export class SessionMetadata extends Context.Service<
 
       const load = Effect.gen(function* () {
         const sessions = yield* directory.sessions
+        yield* Effect.annotateCurrentSpan(
+          pluginAttributes({ plugin: 'worktree-memory', attributes: { loaded: sessions !== undefined, sessions: sessions?.length ?? 0 } }),
+        )
         const now = yield* Clock.currentTimeMillis
         yield* Ref.update(cached, current =>
           sessions === undefined ? { ...current, refreshAt: now + FAILURE_TTL_MS } : { value: sessions, refreshAt: now + SUCCESS_TTL_MS },

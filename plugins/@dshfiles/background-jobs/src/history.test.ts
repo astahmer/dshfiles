@@ -74,7 +74,10 @@ describe('job history index', () => {
     it.effect('records a background-jobs history pass span with the files it read', () =>
       Effect.gen(function* () {
         const index = yield* historyIndex(yield* scratchSessions)
-        const recorder = yield* Effect.acquireRelease(Effect.sync(recordSpans), spans => Effect.sync(() => spans.stop()))
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans.stop()),
+        )
         yield* index.pass.pipe(Effect.provide(tracerLayer))
         expect(recorder.span('background-jobs history pass').attributes).toEqual({
           'dshx.background-jobs.files': 1,

@@ -191,7 +191,10 @@ describe('OtlpExporter', () => {
 
   it.effect('retains the custom export span through the Effect loop', () =>
     Effect.gen(function* () {
-      const recorder = yield* Effect.acquireRelease(Effect.sync(recordSpans), spans => Effect.sync(() => spans.stop()))
+      const recorder = yield* Effect.acquireRelease(
+        Effect.sync(() => recordSpans()),
+        spans => Effect.sync(() => spans.stop()),
+      )
       const collector = yield* collectorTest()
       yield* startExporter({ http: collector.layer }).pipe(Effect.provide(tracerLayer))
       yield* recordJev(1)

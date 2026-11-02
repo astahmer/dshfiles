@@ -2,7 +2,7 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { flushTracing } from '@dshfiles/dshx/tracing'
+import { flushTracing, pluginAttributes } from '@dshfiles/dshx/tracing'
 import { Context, Duration, Effect, Layer, Queue, Ref, Schedule } from 'effect'
 
 const RELOAD_EVERY = Duration.minutes(5)
@@ -34,6 +34,9 @@ export class PricingCatalog extends Context.Service<
           yield* Effect.promise(() => catalog.load())
           const file = yield* Effect.option(accounts.read())
           if (file._tag === 'Some') yield* Ref.set(kinds, new Map(file.value.accounts.map(account => [account.instanceId, account.kind] as const)))
+          yield* Effect.annotateCurrentSpan(
+            pluginAttributes({ plugin: 'agent-telemetry', attributes: { cached: catalog.current() !== null, accounts: (yield* Ref.get(kinds)).size } }),
+          )
         }).pipe(Effect.withSpan('agent telemetry pricing reload'))
 
         yield* DshxPlugin.worker(Effect.repeat(reload, Schedule.spaced(RELOAD_EVERY)))

@@ -1,5 +1,7 @@
+import { tracerLayer } from '@dshfiles/dshx/effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
-import { Context, Effect, Layer, Schema, Tracer } from 'effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { TestClock } from 'effect/testing'
 import { InstalledVersions } from './installed-versions.js'
@@ -104,19 +106,16 @@ describe('ReleaseCheck', () => {
   it.effect('records a dsh release check span with whether an update exists', () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const spans: Tracer.NativeSpan[] = []
-        const tracer = Tracer.make({
-          span: options => {
-            const span = new Tracer.NativeSpan(options)
-            spans.push(span)
-            return span
-          },
-        })
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans.stop()),
+        )
         const github = answering(() => releasesResponse(['dsh-v0.2.1-rc.2', 'dsh-v0.2.1-rc.1']))
-        yield* Effect.withTracer(checkWith(github.fetcher)(yield* releaseCheck), tracer)
-        const span = spans.find(candidate => candidate.name === 'dsh release check')
-        expect(span?.kind).toBe('client')
-        expect(Object.fromEntries(span?.attributes ?? [])).toEqual({
+        yield* checkWith(github.fetcher)(yield* releaseCheck).pipe(Effect.provide(tracerLayer))
+        expect(recorder.named('dsh release check')).toHaveLength(1)
+        const span = recorder.span('dsh release check')
+        expect(span.kind).toBe('client')
+        expect(span.attributes).toEqual({
           'server.address': 'api.github.com',
           'dshx.settings-shell.available': true,
           'dshx.settings-shell.releases': 1,
