@@ -105,7 +105,7 @@
           "kind": "unit-test",
           "id": "background-jobs.history.malformed-state",
           "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
-          "testName": "keeps the durable record when a state file is malformed"
+          "testName": "rebuilds from the logs when the state file is malformed"
         }
       ],
       "telemetry": [
