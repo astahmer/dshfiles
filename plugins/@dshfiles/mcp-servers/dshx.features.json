@@ -343,12 +343,5 @@
       "reach": ["click button \"MCP Servers: Servers\"", "expect checkbox \"Select all servers\""]
     }
   ],
-  "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/catalog.ts",
-      "tracedBy": "mcp registry search",
-      "reason": "Pure Registry URL and row parsing; RegistrySearch (src/registry-search.ts) runs the request inside its mcp registry search span."
-    }
-  ]
+  "kind": "bundle"
 }

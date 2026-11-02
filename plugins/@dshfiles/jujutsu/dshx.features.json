@@ -815,12 +815,5 @@
       ]
     }
   ],
-  "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/jujutsu-commands.ts",
-      "tracedBy": "jj <verb>",
-      "reason": "Every jj spawn goes through the @dshfiles/jj-cli Jj service, which opens one jj <verb> client span per run."
-    }
-  ]
+  "kind": "bundle"
 }
