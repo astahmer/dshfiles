@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import * as Schema from 'effect/Schema'
+import { Schema } from 'effect'
 import { urlString } from './schema.js'
 
 const MAX_CONTEXT_POSTS = 13
@@ -29,13 +29,6 @@ const outputSchema = Schema.Struct({
   warnings: Schema.Array(Schema.String.check(Schema.isMaxLength(500))).check(Schema.isMaxLength(64)),
 })
 
-/** The Host boundary validates through Standard Schema: unknown keys stay rejected, and the JSON Schema still publishes. */
-const standardSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) => {
-  const validated = Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })
-  const documented = Schema.toStandardJSONSchemaV1(schema)
-  return { ...validated, '~standard': { ...validated['~standard'], jsonSchema: documented['~standard'].jsonSchema } }
-}
-
 export const tweetContextBacklogOutputSchema = outputSchema
 
 export const tweetContextBacklogApi = defineApi({
@@ -44,8 +37,8 @@ export const tweetContextBacklogApi = defineApi({
   owner: '@dshfiles/tweet-context',
   methods: {
     retrieve: method({
-      input: standardSchema(Schema.Struct({ url: urlString })),
-      output: standardSchema(outputSchema),
+      input: Schema.Struct({ url: urlString }),
+      output: outputSchema,
       description:
         'Retrieve bounded public tweet text and saved image references for a Backlog item. Sends the post ID to FxEmbed, returns up to 13 post records and 8 image references capped at 16 MiB total. Host integration only; not an Agent tool.',
     }),
