@@ -25,8 +25,10 @@ export const sshLayer = Ssh.layer.pipe(Layer.provide(spawnerLayer))
 const wireCodeAt = SchemaAST.resolveAt<string>('dshxWireCode')
 
 /** The wire code an exposed error class declares, as a caller of the Host API would read it. */
-export const wireCode = (error: unknown): string | undefined =>
-  typeof error === 'object' && error !== null && Schema.isSchema(error.constructor) ? wireCodeAt(error.constructor.ast) : undefined
+export const wireCode = (error: unknown): string | undefined => {
+  if (!(error instanceof Error) || !Schema.isSchema(error.constructor)) return undefined
+  return wireCodeAt(error.constructor.ast)
+}
 
 /** `cancelled` for an interrupted run, the failure's wire code, or `no-error`. */
 export const exitCode = (exit: Exit.Exit<unknown, unknown>): string => {

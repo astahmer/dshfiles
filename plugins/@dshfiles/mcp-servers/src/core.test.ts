@@ -10,10 +10,9 @@ import { createQuickPanelContribution, SessionQuickPanels } from './quick-panel.
 
 type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
 
-const acceptsDraft = (value: unknown): boolean => {
-  const schema = typeof value === 'object' && value !== null && 'transport' in value && value.transport === 'stdio' ? stdioDraftSchema : httpDraftSchema
-  return Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
-}
+const draftSchema = Schema.Union([stdioDraftSchema, httpDraftSchema])
+
+const acceptsDraft = (value: unknown): boolean => Schema.decodeUnknownResult(draftSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const server = (overrides: Partial<StoredStdioServer> = {}): StoredStdioServer => ({
   id: 'one',
