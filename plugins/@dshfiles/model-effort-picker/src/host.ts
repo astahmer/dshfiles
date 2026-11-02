@@ -1,43 +1,44 @@
-import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-llm'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { Llm, type LlmRoute } from '@dshfiles/dshx/effect/llm'
 import { Context, Effect, Layer, Schema } from 'effect'
 import { modelHandoffApi } from './model-handoff-api.js'
 import { modelEffortPickerSettings } from './settings.js'
 
-class ModelHandoffFailure extends Schema.TaggedError<ModelHandoffFailure>()('ModelHandoffFailure', {
-  message: Schema.String,
-}) {}
+class ModelHandoffFailure extends Schema.TaggedError<ModelHandoffFailure>()(
+  'ModelHandoffFailure',
+  { provider: Schema.String, model: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'model-handoff-failure' },
+) {
+  override get message(): string {
+    return 'Could not resolve model context capacity.'
+  }
+}
 
-class ModelHandoffRuntime extends Context.Service<ModelHandoffRuntime, { readonly resolveModelInfo: CordisContext['llm']['resolveModelInfo'] }>()(
-  '@dshfiles/model-effort-picker/Runtime',
-) {}
-
-const rootLayer = (ctx: CordisContext) =>
-  Layer.succeed(ModelHandoffRuntime, {
-    resolveModelInfo: (provider, model) => ctx.llm.resolveModelInfo(provider, model),
-  })
-
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({ layer: rootLayer, setup: () => Effect.void })
-
-const modelHandoffHost = hostApi(modelHandoffApi, {
-  contextWindow: Effect.fn('model handoff context window')(({ input }) =>
+/** The context capacity a provider/model route advertises, for the handoff estimate. */
+class ModelContextWindows extends Context.Service<
+  ModelContextWindows,
+  { readonly read: (route: LlmRoute) => Effect.Effect<number | null, ModelHandoffFailure> }
+>()('@dshfiles/model-effort-picker/ModelContextWindows') {
+  static readonly layer = Layer.effect(
+    ModelContextWindows,
     Effect.gen(function* () {
-      const runtime = yield* ModelHandoffRuntime
-      const model = yield* Effect.tryPromise({
-        try: () => runtime.resolveModelInfo(input.provider, input.model),
-        catch: () => new ModelHandoffFailure({ message: 'Could not resolve model context capacity.' }),
+      const llm = yield* Llm
+      return ModelContextWindows.of({
+        read: Effect.fn('model context window read')(function* (route: LlmRoute) {
+          const info = yield* llm
+            .modelInfo(route)
+            .pipe(Effect.mapError(cause => new ModelHandoffFailure({ provider: route.provider, model: route.model, cause })))
+          return info.context?.contextWindow ?? null
+        }),
       })
-      return model.context?.contextWindow ?? null
     }),
-  ),
-})
+  )
+}
 
-export default defineHost({
-  ...effectPlugin,
+export default DshxPlugin.make({
   name: '@dshfiles/model-effort-picker',
   inject: ['llm'],
-  apis: [modelHandoffHost],
   settings: [modelEffortPickerSettings],
+  layer: ModelContextWindows.layer.pipe(Layer.provide(Llm.layer)),
+  apis: [Api.bind(modelHandoffApi, { contextWindow: input => ModelContextWindows.use(windows => windows.read(input)) })],
 })
