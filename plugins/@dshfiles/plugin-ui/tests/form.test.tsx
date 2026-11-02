@@ -1,14 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { useAppForm } from '../src/form.js'
 
 afterEach(cleanup)
 
-const schema = z.object({ name: z.string().min(1, 'Name is required'), transport: z.enum(['stdio', 'http']) })
+const serverSchema = Schema.Struct({
+  name: Schema.String.check(Schema.isMinLength(1, { message: 'Name is required' })),
+  transport: Schema.Literals(['stdio', 'http']),
+})
+const schema = Schema.toStandardSchemaV1(serverSchema)
 
-const ServerForm = (props: { readonly onSubmit: (value: z.infer<typeof schema>) => void }): JSX.Element => {
-  const defaultValues: z.infer<typeof schema> = { name: '', transport: 'stdio' }
+const ServerForm = (props: { readonly onSubmit: (value: typeof serverSchema.Type) => void }): JSX.Element => {
+  const defaultValues: typeof serverSchema.Type = { name: '', transport: 'stdio' }
   const form = useAppForm({
     defaultValues,
     validators: { onChange: schema },

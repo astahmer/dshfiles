@@ -1,10 +1,23 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { createStoredValue } from '../src/hooks/stored-value.js'
 
 const KEY = 'plugin-ui.test.stored'
-const countSchema = z.object({ count: z.number().int() })
+
+type ParseResult<Value> = { readonly success: true; readonly data: Value } | { readonly success: false }
+
+const countSchema = {
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the decode boundary: the schema parses the stored JSON value.
+  safeParse: (value: unknown): ParseResult<{ count: number }> => {
+    const count = typeof value === 'object' && value !== null && 'count' in value ? value.count : undefined
+    return typeof count === 'number' && Number.isInteger(count) ? { success: true, data: { count } } : { success: false }
+  },
+}
+
+const stringSchema = {
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the decode boundary: the schema parses the stored JSON value.
+  safeParse: (value: unknown): ParseResult<string> => (typeof value === 'string' ? { success: true, data: value } : { success: false }),
+}
 
 afterEach(() => localStorage.clear())
 
@@ -19,7 +32,7 @@ describe('createStoredValue', () => {
 
   it('accepts a legacy bare string when the schema takes strings', () => {
     localStorage.setItem(KEY, '/repo/path')
-    expect(createStoredValue({ key: KEY, schema: z.string(), fallback: '' }).get()).toBe('/repo/path')
+    expect(createStoredValue({ key: KEY, schema: stringSchema, fallback: '' }).get()).toBe('/repo/path')
   })
 
   it('persists valid writes and rejects invalid ones', () => {
