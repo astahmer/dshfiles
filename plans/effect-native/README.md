@@ -5,19 +5,19 @@ schemas; this one migrates the Host runtime itself. Evidence for every claim bel
 (seven independent reviews with file:line citations, plus the [rubric](reviews/rubric.md) they used and an
 [Effect 4.1 cookbook](reviews/cookbook.md) drawn from `~/.references/{effect-4.1.0,opencode,t3code}`).
 
-**Resume here:** Phases 0, 1 and 2.1–2.3 run as parallel lanes in workspaces `eff-{phase0,edge,tracer,services,lint,sqlite,jjcli}` on `lomurmxs`; integrate them into this thread line, then start Phase 3.
+**Resume here:** Phases 0–2 are integrated on this thread line (dshx suite 1080/1080). Wave lanes `eff-w-{exemplar,a1,a2,a3,b1,b2}` run on `nuomvtnm`; characterization lanes `eff-char-{accounts,vcs}` on `zvqzvqts`. Integrate each by rebasing onto the line tip, regenerate both ratchet baselines, then dispatch waves B (mcp-servers, project-checks, session-controller), C, D, E, F, G.
 
 ## Progress
 
-| Phase                       | Status      |
-| --------------------------- | ----------- |
-| 0 — Stop the bleeding       | in progress |
-| 1 — Foundation v2 (dshx)    | in progress |
-| 2 — Shared libraries        | in progress |
-| 3 — Exemplar + scaffold     | not started |
-| 4 — Plugin waves            | not started |
-| 5 — Schema cleanup          | not started |
-| 6 — Gates and stabilization | not started |
+| Phase                       | Status                                        |
+| --------------------------- | --------------------------------------------- |
+| 0 — Stop the bleeding       | done                                          |
+| 1 — Foundation v2 (dshx)    | done                                          |
+| 2 — Shared libraries        | done (2.4 Jev, 2.5 createStoredValue pending) |
+| 3 — Exemplar + scaffold     | in progress                                   |
+| 4 — Plugin waves            | in progress (A, B)                            |
+| 5 — Schema cleanup          | not started                                   |
+| 6 — Gates and stabilization | not started                                   |
 
 ## Context: what the previous wave delivered
 
