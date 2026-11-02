@@ -13,6 +13,9 @@ import { ApiProtocolModel } from '../api/common.js'
 import { PluginInactive, type PluginRuntime } from './plugin-runtime.js'
 import { thrownForApi } from './wire-error.js'
 
+export { ApiContractError, ApiRemoteError, ApiTransportError, ApiUnavailableError, client } from './client.js'
+export type { ApiCallFailure, DeclaredError, TypedApiClient } from './client.js'
+
 /** Who made one API call. The call's AbortSignal is not here: an abort interrupts the handler fiber. */
 export interface ApiCall {
   readonly caller: ApiCaller
