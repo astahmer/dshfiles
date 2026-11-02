@@ -6,6 +6,7 @@ import { DshxEffect } from '@dshfiles/dshx/effect'
 import { Cause, Context as EffectContext, Duration, Effect, Layer, Queue, Schedule, Schema, Scope } from 'effect'
 import { backgroundJobsApi } from './api.js'
 import { HistoryIndex } from './history.js'
+import { killJob } from './kill-job.js'
 import { JobsBoard } from './service.js'
 
 const INDEX_INTERVAL_MS = 30_000
@@ -23,10 +24,6 @@ interface JobsRuntime {
 }
 
 class BackgroundJobs extends EffectContext.Service<BackgroundJobs, JobsRuntime>()('dshfiles/background-jobs/BackgroundJobs') {}
-
-export class JobNotFound extends Schema.TaggedError<JobNotFound>()('JobNotFound', {
-  message: Schema.String,
-}) {}
 
 const makeLayer = (context: Context): Layer.Layer<BackgroundJobs, never, never> =>
   Layer.effect(
@@ -107,9 +104,6 @@ const { hostApi, ...plugin } = DshxEffect.plugin({
     }),
 })
 
-const missingJob = (error: unknown): JobNotFound =>
-  new JobNotFound({ message: error instanceof Error ? error.message : 'No such job is retained on this Host.' })
-
 export default defineHost({
   ...plugin,
   name: '@dshfiles/background-jobs',
@@ -127,12 +121,11 @@ export default defineHost({
           return active.board.output({ jobId: input.jobId, from: input.from ?? 0 })
         }),
       ),
-      kill: Effect.fn('background-jobs kill')(({ input }) =>
+      kill: ({ input }) =>
         Effect.gen(function* () {
           const active = yield* BackgroundJobs
-          return yield* Effect.try({ try: () => active.board.kill({ jobId: input.jobId }), catch: missingJob })
+          return yield* killJob({ board: active.board, jobId: input.jobId })
         }),
-      ),
       wait: Effect.fn('background-jobs wait')(({ input }) =>
         Effect.gen(function* () {
           const active = yield* BackgroundJobs

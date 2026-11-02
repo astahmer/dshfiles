@@ -54,6 +54,17 @@ describe('job history index', () => {
     expect(index.indexing).toMatchObject({ caughtUp: true, historyRows: 2 })
   })
 
+  it('waits for an in-flight pass instead of returning before indexing', async () => {
+    const { root, statePath } = await setup()
+    const index = new HistoryIndex({ root, statePath })
+    await index.load()
+    const scheduledPass = index.pass()
+    await index.pass()
+    expect(index.historyRows).toHaveLength(2)
+    expect(index.indexing.active).toBe(false)
+    await scheduledPass
+  })
+
   it('records a background-jobs history pass span with the files it read', async () => {
     const { root, statePath } = await setup()
     const index = new HistoryIndex({ root, statePath })

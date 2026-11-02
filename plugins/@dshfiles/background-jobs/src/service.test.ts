@@ -180,7 +180,7 @@ describe('background jobs board', () => {
     expect(board.kill({ jobId: 'bash-now' })).toEqual({ jobId: 'bash-now', outcome: 'requested' })
     expect(registry.calls.some(call => call.startsWith('kill:bash-now:session-dddd:'))).toBe(true)
     expect(board.kill({ jobId: 'bash-done' })).toEqual({ jobId: 'bash-done', outcome: 'already-finished' })
-    expect(() => board.kill({ jobId: 'missing' })).toThrow()
+    expect(board.kill({ jobId: 'missing' })).toBeNull()
   })
 
   it('waits for the selected job to settle with an interruptible Effect sleep', async () => {

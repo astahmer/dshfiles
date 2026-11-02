@@ -269,9 +269,9 @@ export class JobsBoard {
     }
   }
 
-  kill({ jobId }: { readonly jobId: string }): JobKill {
+  kill({ jobId }: { readonly jobId: string }): JobKill | null {
     const row = this.rows().find(candidate => candidate.id === jobId)
-    if (row === undefined) throw new Error('No such job is retained on this Host.')
+    if (row === undefined) return null
     const registry = this.registry
     if (registry === null || !row.live) return { jobId, outcome: 'already-finished' }
     return { jobId, outcome: registry.kill(JobId(jobId), row.owner === null ? undefined : SessionId(row.owner), KILL_REASON) }

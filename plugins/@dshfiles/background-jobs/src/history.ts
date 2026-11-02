@@ -89,6 +89,7 @@ export class HistoryIndex implements JobHistorySource {
   private readonly startedAt: number
   private startedPassAt = 0
   private active = false
+  private passes: Promise<void> = Promise.resolve()
   private lastIndexedAt: number | null = null
   private lastError: string | null = null
   private caughtUp = false
@@ -137,8 +138,14 @@ export class HistoryIndex implements JobHistorySource {
     }
   }
 
-  async pass(): Promise<void> {
-    if (this.active) return
+  /** Queue behind an in-flight pass, so a refresh reports an index at least as fresh as its request. */
+  pass(): Promise<void> {
+    const run = this.passes.then(() => this.runPass())
+    this.passes = run
+    return run
+  }
+
+  private async runPass(): Promise<void> {
     this.active = true
     try {
       await withSpan('background-jobs history pass', {}, async span => {
