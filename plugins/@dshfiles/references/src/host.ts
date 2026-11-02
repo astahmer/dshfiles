@@ -1,57 +1,26 @@
-// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
-import '@dshfiles/dshx/effect'
-import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-storage-domain'
-import { defineApi, method, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { defineCommand, defineHost, definePromptContext, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
-import { Option, Schema } from 'effect'
-import { rm } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { References, type Reference, type ReferenceStore } from './references.js'
+import type {} from '@deepseek-ai/dsh-system-prompt'
+import { defineApi, method, type ApiCaller } from '@dshfiles/dshx/api'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { defineCommand, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
+import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
+import { Effect, Layer, Option, Schema } from 'effect'
+import { References, type Reference, type ReferenceDraft } from './references.js'
 
-let hostContext: Context | undefined
-/** Resolved once the storage domain opened, so the prompt context can read attachments synchronously. */
-let store: ReferenceStore | undefined
-/** One store per Host process: API handlers receive other Cordis contexts, and a second store would clobber rows. */
-let opening: Promise<ReferenceStore> | undefined
-
-const storeOf = (): Promise<ReferenceStore> => {
-  if (opening !== undefined) return opening
-  const storage = hostContext?.get('storageDomain')
-  if (storage === undefined) {
-    return Promise.reject(new PluginApiError('DSH storage is unavailable, so references cannot be kept; restart DSH and retry.', { code: 'storage-missing' }))
+class NoSession extends Schema.TaggedError<NoSession>()('NoSession', { cause: Schema.optional(Schema.Defect()) }, { dshxWireCode: 'no-session' }) {
+  override get message(): string {
+    return 'Pass the sessionId to attach to; only an agent call defaults to its own Session.'
   }
-  const started = storage.open(References.domain).then(domain => {
-    const opened = References.store({ references: domain.table('references'), attachments: domain.table('attachments') })
-    store = opened
-    return opened
-  })
-  opening = started
-  void started.catch(() => {
-    if (opening === started) opening = undefined
-  })
-  return started
 }
 
-const clonesDirectory = (): string => join(process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'), 'references')
+const callerSession = (input: { readonly sessionId?: string | undefined }, caller: ApiCaller): string | undefined =>
+  input.sessionId ?? (caller.kind === 'agent' ? caller.sessionId : undefined)
 
-const saveReference = async (input: {
-  readonly name: string
-  readonly source: string
-  readonly ref?: string | undefined
-  readonly description?: string | undefined
-}): Promise<Reference> => {
-  const reference = await References.prepare({ ...input, clonesDirectory: clonesDirectory() })
-  await (await storeOf()).save(reference)
-  return reference
-}
-
-const sessionOf = (input: { readonly sessionId?: string | undefined }, caller: ApiCaller): string => {
-  const sessionId = input.sessionId ?? (caller.kind === 'agent' ? caller.sessionId : undefined)
-  if (sessionId === undefined)
-    throw new PluginApiError('Pass the sessionId to attach to; only an agent call defaults to its own Session.', { code: 'no-session' })
-  return sessionId
+const sessionOf = (input: { readonly sessionId?: string | undefined }, caller: ApiCaller) => {
+  const sessionId = callerSession(input, caller)
+  return sessionId === undefined ? Effect.fail(new NoSession({})) : Effect.succeed(sessionId)
 }
 
 const describe = (reference: Reference): string =>
@@ -120,92 +89,113 @@ const referencesApi = defineApi({
   },
 })
 
-const attachedNames = async (sessionId: string): Promise<string[]> => (await storeOf()).attached(sessionId).map(reference => reference.name)
-
-const api = referencesApi.host({
-  list: async ({ input, caller }) => {
-    const sessionId = input.sessionId ?? (caller.kind === 'agent' ? caller.sessionId : undefined)
-    return { references: (await storeOf()).list(), attached: sessionId === undefined ? [] : await attachedNames(sessionId) }
-  },
-  save: ({ input }) => saveReference(input),
-  remove: async ({ input }) => {
-    const reference = (await storeOf()).get(input.name)
-    if (reference?.kind === 'git') await rm(reference.path, { recursive: true, force: true })
-    return { removed: await (await storeOf()).remove(input.name) }
-  },
-  attach: async ({ input, caller }) => {
-    const sessionId = sessionOf(input, caller)
-    if ((await storeOf()).get(input.name) === undefined) {
-      throw new PluginApiError(`No reference is named ${input.name}; save it first or list the saved ones.`, { code: 'unknown-reference' })
-    }
-    await (await storeOf()).attach(sessionId, input.name)
-    return { attached: await attachedNames(sessionId) }
-  },
-  detach: async ({ input, caller }) => {
-    const sessionId = sessionOf(input, caller)
-    await (await storeOf()).detach(sessionId, input.name)
-    return { attached: await attachedNames(sessionId) }
-  },
-})
+const attachedNames = (sessionId: string) =>
+  References.use(references => Effect.map(references.attached(sessionId), attached => attached.map(entry => entry.name)))
 
 const USAGE = 'Usage: /reference · /reference attach <name> · /reference detach <name> · /reference save <name> <directory-or-git-url> [ref]'
 
-const referenceCommand = defineCommand({
-  name: 'reference',
-  description: 'List, attach, detach or save named outside directories and git repositories for this thread.',
-  input: { hint: 'attach <name> · detach <name> · save <name> <directory-or-git-url> [ref]' },
-  handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
-    const [verb, name, source, ref, ...rest] = invocation.rawInput
-      .trim()
-      .split(/\s+/u)
-      .filter(part => part.length > 0)
-    const sessionId = String(invocation.agent.id)
-    try {
-      if (verb === undefined) {
-        const attached = await attachedNames(sessionId)
-        const lines = (await storeOf()).list().map(reference => `${attached.includes(reference.name) ? '● ' : '○ '}${describe(reference)}`)
-        return { kind: 'success', text: lines.length === 0 ? `No saved references. ${USAGE}` : lines.join('\n') }
-      }
-      const parsedName = Schema.decodeUnknownOption(References.nameSchema)(name)
-      if (Option.isNone(parsedName)) return { kind: 'error', text: USAGE }
-      if (verb === 'attach' && source === undefined) {
-        if ((await storeOf()).get(parsedName.value) === undefined) return { kind: 'error', text: `No reference is named ${parsedName.value}. ${USAGE}` }
-        await (await storeOf()).attach(sessionId, parsedName.value)
-        return { kind: 'success', text: `Attached ${parsedName.value}. Attached now: ${(await attachedNames(sessionId)).join(', ')}.` }
-      }
-      if (verb === 'detach' && source === undefined) {
-        const detached = await (await storeOf()).detach(sessionId, parsedName.value)
-        return detached
-          ? { kind: 'success', text: `Detached ${parsedName.value}.` }
-          : { kind: 'error', text: `${parsedName.value} is not attached to this thread.` }
-      }
-      if (verb === 'save' && source !== undefined && rest.length === 0) {
-        const reference = await saveReference({ name: parsedName.value, source, ref })
-        await (await storeOf()).attach(sessionId, reference.name)
-        return { kind: 'success', text: `Saved and attached ${describe(reference)}.` }
-      }
-      return { kind: 'error', text: USAGE }
-    } catch (error) {
-      return { kind: 'error', text: error instanceof Error ? error.message : String(error) }
-    }
-  },
+const runCommand = Effect.fn('references command')(function* (invocation: CommandInvocation) {
+  const references = yield* References
+  const [verb, name, source, ref, ...rest] = invocation.rawInput
+    .trim()
+    .split(/\s+/u)
+    .filter(part => part.length > 0)
+  const sessionId = String(invocation.agent.id)
+  const success = (text: string): CommandResult => ({ kind: 'success', text })
+  const failure = (text: string): CommandResult => ({ kind: 'error', text })
+  if (verb === undefined) {
+    const attached = yield* attachedNames(sessionId)
+    const lines = (yield* references.list).map(reference => `${attached.includes(reference.name) ? '● ' : '○ '}${describe(reference)}`)
+    return success(lines.length === 0 ? `No saved references. ${USAGE}` : lines.join('\n'))
+  }
+  const parsedName = Schema.decodeUnknownOption(References.nameSchema)(name)
+  if (Option.isNone(parsedName)) return failure(USAGE)
+  if (verb === 'attach' && source === undefined) {
+    const attached = yield* references.attach(sessionId, parsedName.value).pipe(Effect.option)
+    if (Option.isNone(attached)) return failure(`No reference is named ${parsedName.value}. ${USAGE}`)
+    return success(`Attached ${parsedName.value}. Attached now: ${(yield* attachedNames(sessionId)).join(', ')}.`)
+  }
+  if (verb === 'detach' && source === undefined) {
+    return (yield* references.detach(sessionId, parsedName.value))
+      ? success(`Detached ${parsedName.value}.`)
+      : failure(`${parsedName.value} is not attached to this thread.`)
+  }
+  if (verb === 'save' && source !== undefined && rest.length === 0) {
+    const draft: ReferenceDraft = { name: parsedName.value, source, ref }
+    const reference = yield* references.save(draft)
+    yield* references.attach(sessionId, reference.name)
+    return success(`Saved and attached ${describe(reference)}.`)
+  }
+  return failure(USAGE)
 })
 
-const attachedContext = definePromptContext({
-  name: 'dshfiles-references:attached',
-  order: 200,
-  interpolate: false,
-  text: assembly => (store === undefined || assembly.agent === undefined ? '' : References.promptText(store.attached(String(assembly.agent.id)))),
-})
+/** `/reference` stays a Promise command handler; it runs in the plugin's services and answers every failure as text. */
+const referenceCommand = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const commands = yield* hostService('commands')
+    const handler = yield* DshxPlugin.callback((invocation: CommandInvocation) =>
+      runCommand(invocation).pipe(Effect.catch(error => Effect.succeed<CommandResult>({ kind: 'error', text: error.message }))),
+    )
+    const command = defineCommand({
+      name: 'reference',
+      description: 'List, attach, detach or save named outside directories and git repositories for this thread.',
+      input: { hint: 'attach <name> · detach <name> · save <name> <directory-or-git-url> [ref]' },
+      handler,
+    })
+    yield* Effect.acquireRelease(
+      Effect.sync(() => commands.register(command)),
+      dispose => Effect.sync(dispose),
+    )
+  }),
+)
 
-export default defineHost({
+/** The attached references' paths and origins in every model request of the Session; the assembly is synchronous. */
+const attachedContext = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const systemPrompt = yield* hostService('systemPrompt')
+    const references = yield* References
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        systemPrompt.context({
+          name: 'dshfiles-references:attached',
+          order: 200,
+          interpolate: false,
+          text: assembly => (assembly.agent === undefined ? '' : References.promptText(references.attachedNow(String(assembly.agent.id)))),
+        }),
+      ),
+      dispose => Effect.sync(dispose),
+    )
+  }),
+)
+
+const library = References.layer.pipe(Layer.provide(Layer.mergeAll(StorageDomain.layer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer)))
+
+export default DshxPlugin.make({
   name: '@dshfiles/references',
-  inject: ['storageDomain'],
-  commands: [referenceCommand],
-  prompts: [attachedContext],
-  apis: [api],
-  setup: (ctx: Context) => {
-    hostContext = ctx
-    void storeOf().catch(error => ctx.logger.warn('references: %s', error instanceof Error ? error.message : String(error)))
-  },
+  inject: ['storageDomain', 'subprocess', 'commands', 'systemPrompt'],
+  layer: Layer.mergeAll(referenceCommand, attachedContext).pipe(Layer.provideMerge(library)),
+  apis: [
+    Api.bind(referencesApi, {
+      list: (input, call) =>
+        Effect.gen(function* () {
+          const references = yield* References
+          const sessionId = callerSession(input, call.caller)
+          return { references: yield* references.list, attached: sessionId === undefined ? [] : yield* attachedNames(sessionId) }
+        }),
+      save: input => References.use(references => references.save(input)),
+      remove: input => References.use(references => Effect.map(references.remove(input.name), removed => ({ removed }))),
+      attach: (input, call) =>
+        Effect.gen(function* () {
+          const sessionId = yield* sessionOf(input, call.caller)
+          yield* References.use(references => references.attach(sessionId, input.name))
+          return { attached: yield* attachedNames(sessionId) }
+        }),
+      detach: (input, call) =>
+        Effect.gen(function* () {
+          const sessionId = yield* sessionOf(input, call.caller)
+          yield* References.use(references => references.detach(sessionId, input.name))
+          return { attached: yield* attachedNames(sessionId) }
+        }),
+    }),
+  ],
 })
