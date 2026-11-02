@@ -46,6 +46,9 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
     runProcess({ file: 'jj', args, cwd: local, timeoutMs })
 
   beforeAll(async () => {
+    // jj refuses to push a commit without an author, and a CI runner has no jj identity of its own.
+    process.env.JJ_USER ??= 'Peer Check'
+    process.env.JJ_EMAIL ??= 'peer-check@example.invalid'
     root = await mkdtemp(join(tmpdir(), 'peer-check-'))
     local = join(root, 'local')
     peer = join(root, 'peer')
