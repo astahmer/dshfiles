@@ -49,15 +49,6 @@ class InternalApiError extends Error {
   }
 }
 
-function stableHash(value: string): string {
-  let hash = 2166136261
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0')
-}
-
 /** The first few Standard Schema issues as `path: message`, so a caller (often the agent) can fix its input. */
 function describeIssues(issues: readonly StandardSchemaV1.Issue[]): string {
   if (issues.length === 0) return ''
@@ -109,18 +100,6 @@ export class ApiProtocolModel {
 
   /** Key-sorted JSON of a call input, so equal inputs written in another key order share one fingerprint. */
   static readonly stableJson = (value: unknown): string => formatStableJson(value)
-
-  static apiChannel(packageId: string, apiId: string): string {
-    return `/dshx-${stableHash(`${packageId}\0${apiId}`)}`
-  }
-
-  /** The one browser event stream of a DSH process, below Connection's authenticated `/api` channel. */
-  static readonly eventsPath = '/api/dshx-events'
-
-  /** `<channel>/<event>`: the key a browser subscribes to, unique per owner, API and event. */
-  static eventKey(owner: string, apiId: string, event: string): string {
-    return `${ApiProtocolModel.apiChannel(owner, apiId).slice(1)}/${event}`
-  }
 
   static jsonBytes(value: unknown): number {
     if (value === undefined) return 0

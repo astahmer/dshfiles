@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiEventClientPayload, ApiEventStatus } from './types.js'
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel } from './runtime.js'
+import { ApiChannelModel } from './channel.js'
 
 interface EventSourceLike {
   readonly readyState: number
@@ -84,7 +85,7 @@ const open = (hub: EventHub): void => {
   }
   hub.missing = false
   hub.catalog = undefined
-  const source = new EventSourceClass(ApiProtocolModel.eventsPath.slice(1))
+  const source = new EventSourceClass(ApiChannelModel.eventsPath.slice(1))
   hub.source = source
   source.onmessage = message => receive(hub, message.data)
   source.onerror = () => {
@@ -125,7 +126,7 @@ const subscribeApiEvent = <
   const definition = target?.contract.events?.[event]
   if (target === undefined || definition === undefined) throw new TypeError(`API client has no event ${JSON.stringify(event)}.`)
   const hub = eventHub()
-  const key = ApiProtocolModel.eventKey(target.owner, target.contract.id, event)
+  const key = ApiChannelModel.eventKey(target.owner, target.contract.id, event)
   let status: ApiEventStatus | undefined
   let active = true
   const subscriber: Subscriber = {

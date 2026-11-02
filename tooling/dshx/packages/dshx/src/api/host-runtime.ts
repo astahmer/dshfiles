@@ -27,6 +27,7 @@ import { TraceparentModel } from '../tracing/traceparent.js'
 import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
 import { PluginStorageModel } from '../host/plugin-storage.js'
 import { PluginStorageContract } from './storage.js'
+import { ApiChannelModel } from './channel.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -525,7 +526,7 @@ async function mountApi(
   const registry = apiRegistry(ctx)
   const key = apiKey(packageId, contract.id)
   if (registry.apis.has(key)) throw new Error(`API ${contract.id} of ${packageId} is already served in this process.`)
-  const channel = ApiProtocolModel.apiChannel(packageId, contract.id)
+  const channel = ApiChannelModel.apiChannel(packageId, contract.id)
   const root = ctx.root ?? ctx
   const owners = channelOwners.get(root) ?? new Map<string, string>()
   const owner = `${packageId}:${contract.id}`

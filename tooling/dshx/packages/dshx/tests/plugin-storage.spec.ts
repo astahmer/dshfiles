@@ -9,7 +9,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { apiKey, apiRegistry } from '../src/api/registry.js'
 import { PluginStorageContract } from '../src/api/storage.js'
@@ -119,7 +119,7 @@ const leadingHost = async () => {
 describe('the storage API the registry leader serves', () => {
   it('lets a browser read what the Host half wrote, and publishes each change', async () => {
     const { context, host, routes, browser } = await leadingHost()
-    expect(routes.has(ApiProtocolModel.eventsPath)).toBe(true)
+    expect(routes.has(ApiChannelModel.eventsPath)).toBe(true)
     const writes: unknown[] = []
     context.on('domain/changed', change => void writes.push(PluginStorageModel.changeOf(change)))
     await PluginStorageModel.open(host as never, '@acme/plugin').set('prefs', { theme: 'dark' })

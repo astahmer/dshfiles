@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { z } from 'zod'
+import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { ApiProtocolModel } from '../../../packages/dshx/src/api/common.js'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
@@ -22,7 +23,7 @@ const rpcResultSchema = z.object({
 
 /** One sessions API call exactly as another plugin's browser half makes it: a Connection RPC from the signed-in page. */
 const callSessions = async (page: Page, method: string, input: unknown): Promise<unknown> => {
-  const endpoint = `${ApiProtocolModel.apiChannel('@dshfiles/session-controller', 'sessions').slice(1)}/${method}`
+  const endpoint = `${ApiChannelModel.apiChannel('@dshfiles/session-controller', 'sessions').slice(1)}/${method}`
   const body = await page.evaluate(
     async request => {
       const response = await fetch(`/api/${request.endpoint}`, {

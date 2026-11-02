@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineApi, event, method } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { DshxEffect } from '../src/effect/index.js'
 import { createHostApiClient, defineHost } from '../src/host/index.js'
@@ -307,7 +307,7 @@ describe('@dshfiles/dshx/effect', () => {
     const browser = ApiRuntimeModel.createClient({ get: () => ({ rpc: { call: vi.fn() } }) }, notesApi, '@test/viewer')
     const collected = Effect.runFork(Stream.runCollect(Stream.take(DshxEffect.events(browser, 'changed'), 2)))
     await vi.waitFor(() => expect(sources).toHaveLength(1))
-    const key = ApiProtocolModel.eventKey('@test/notes', 'notes', 'changed')
+    const key = ApiChannelModel.eventKey('@test/notes', 'notes', 'changed')
     const send = (
       value:
         | { readonly type: 'catalog'; readonly events: readonly string[] }

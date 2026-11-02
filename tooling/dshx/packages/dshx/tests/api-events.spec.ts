@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineApi, event, method } from '../src/api/index.js'
 import { ApiClientEventsModel } from '../src/api/client-events.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { HostApiEventsModel } from '../src/api/host-events.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
@@ -69,16 +69,14 @@ describe('Host API events', () => {
   it('streams the event catalog, then each published event, to every connected browser', async () => {
     const fixture = hostFixture()
     await registerApi(fixture.context as never, '@acme/jobs', jobsApi.host({ board: () => ({ rows: 0 }) }))
-    await vi.waitFor(() => expect(fixture.routes.has(ApiProtocolModel.eventsPath)).toBe(true))
+    await vi.waitFor(() => expect(fixture.routes.has(ApiChannelModel.eventsPath)).toBe(true))
     const controller = new AbortController()
-    const response = await fixture.routes
-      .get(ApiProtocolModel.eventsPath)!
-      .fetch(new Request('http://localhost/api/dshx-events', { signal: controller.signal }))
+    const response = await fixture.routes.get(ApiChannelModel.eventsPath)!.fetch(new Request('http://localhost/api/dshx-events', { signal: controller.signal }))
     expect(response.headers.get('content-type')).toBe('text/event-stream')
     const next = readFrames(response)
-    const key = ApiProtocolModel.eventKey('@acme/jobs', 'jobs', 'changed')
+    const key = ApiChannelModel.eventKey('@acme/jobs', 'jobs', 'changed')
     // The registry leader also serves plugin storage, whose `changed` event joins the catalog.
-    expect(await next()).toEqual({ type: 'catalog', events: [key, ApiProtocolModel.eventKey('@dshfiles/dshx', 'storage', 'changed')] })
+    expect(await next()).toEqual({ type: 'catalog', events: [key, ApiChannelModel.eventKey('@dshfiles/dshx', 'storage', 'changed')] })
 
     await HostApiEventsModel.publish(fixture.context as never, jobsApi, 'changed', { running: 3 })
     expect(await next()).toEqual({ type: 'event', key, version: 2, data: { running: 3 } })
@@ -140,7 +138,7 @@ const subscribe = () => {
 }
 
 describe('browser API events', () => {
-  const key = ApiProtocolModel.eventKey('@acme/jobs', 'jobs', 'changed')
+  const key = ApiChannelModel.eventKey('@acme/jobs', 'jobs', 'changed')
 
   afterEach(() => {
     vi.unstubAllGlobals()

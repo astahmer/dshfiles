@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
 import { registerApi } from '../src/api/host-runtime.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import {
   commandAttributes,
   contentSize,
@@ -604,7 +604,7 @@ const routeFixture = () => {
     payload: { readonly version: number; readonly input: { readonly alias: string } },
     traceparent?: string,
   ): Promise<void> => {
-    const endpoint = `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${methodName}`
+    const endpoint = `${ApiChannelModel.apiChannel(packageId, apiId).slice(1)}/${methodName}`
     const route = routes.get(`/api/${endpoint}`)
     if (route === undefined) throw new Error(`no route for ${endpoint}`)
     const headers = new Headers({ 'content-type': 'application/json' })

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { defineHost } from '../src/host/index.js'
 import { createTestHost, type TestHost } from '../src/testing/index.js'
@@ -282,6 +282,6 @@ describe('browser traces ingest', () => {
     expect(serverSpan.traceId).toBe(root.traceId)
     expect(serverSpan.parentSpanId).toBe(clientSpan.spanId)
     expect(serverSpan.attributes).toMatchObject({ 'dshx.api.caller': 'client', 'dshx.api.outcome': 'ok' })
-    expect(ApiProtocolModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)).toMatch(/^\/dshx-/u)
+    expect(ApiChannelModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)).toMatch(/^\/dshx-/u)
   })
 })

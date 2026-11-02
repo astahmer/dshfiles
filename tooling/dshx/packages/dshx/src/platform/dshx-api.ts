@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { ApiProtocolModel } from '../api/common.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { withUnknownProperties } from '../schema.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, DshPlatformLaunchUrl } from './client.js'
+import { ApiChannelModel } from '../api/channel.js'
 
 const responseSchema = withUnknownProperties({
   type: Schema.Literal('server-response'),
@@ -36,7 +36,7 @@ const safeMessage = (message: string): string => message.replace(/([?&]token=)[^
 
 /** Calls one versioned DSHX Host API using an existing authenticated native session. */
 export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version, fetch: request = fetch }: DshxApiCallerOptions): DshxApiCall => {
-  const channel = ApiProtocolModel.apiChannel(packageId, apiId)
+  const channel = ApiChannelModel.apiChannel(packageId, apiId)
   const tracer = TracerModel.process()
   const call: DshxApiCall = async (method, input, signal) => {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(method)) throw new DshPlatformError('invalid-method', 'DSHX API method names must be plain identifiers.')
