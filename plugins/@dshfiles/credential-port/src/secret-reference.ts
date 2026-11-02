@@ -1,20 +1,7 @@
-import { z } from 'zod'
 import type { SecretScope } from './index.js'
 
 /** The environment a reference without `@env` means; Secret Catalog writes `prod` when the user does not choose one. */
 export const DEFAULT_SECRET_ENVIRONMENT = 'prod'
-
-export const secretAliasSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/, 'Start with a letter or _, then use letters, digits, _ or -.')
-
-export const secretEnvironmentSchema = z
-  .string()
-  .min(1)
-  .max(256)
-  .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, _ or -.')
 
 export interface SecretReference {
   readonly alias: string
@@ -40,32 +27,6 @@ export const parseSecretReference = (text: string): SecretReference | null => {
 /** The canonical text for a reference: no `@env` suffix for the default environment. */
 export const formatSecretReference = (reference: SecretReference): string =>
   reference.environment === DEFAULT_SECRET_ENVIRONMENT ? `secret:${reference.alias}` : `secret:${reference.alias}@${reference.environment}`
-
-export const secretReferenceSchema = z
-  .string()
-  .max(4096)
-  .transform((text, context) => {
-    const reference = parseSecretReference(text)
-    if (reference === null) {
-      context.addIssue({ code: 'custom', message: 'Use secret:ALIAS or secret:ALIAS@ENV.' })
-      return z.NEVER
-    }
-    return reference
-  })
-
-export const secretCredentialLabelSchema = z
-  .string()
-  .max(400)
-  .transform((text, context) => {
-    const reference = parseSecretReference(text)
-    if (reference !== null) return formatSecretReference(reference)
-    if (text.startsWith('env:')) {
-      const variableName = secretAliasSchema.safeParse(text.slice('env:'.length))
-      if (variableName.success) return text
-    }
-    context.addIssue({ code: 'custom', message: 'Use a secret reference or env:VARIABLE_NAME label.' })
-    return z.NEVER
-  })
 
 /** One reference resolved for a folder: `project`/`local` aliases come from that folder's config, `global` needs none. */
 export interface SecretReferenceResolution {

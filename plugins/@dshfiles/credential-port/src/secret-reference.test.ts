@@ -1,8 +1,9 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { secretReferenceTextSchemaEffect } from './effect.js'
 import {
   formatSecretReference,
   parseSecretReference,
-  secretReferenceSchema,
   SecretReferenceResolver,
   type SecretReferenceResolution,
 } from './secret-reference.js'
@@ -32,8 +33,8 @@ describe('secret references', () => {
   })
 
   it('validates a reference schema into its alias and environment', () => {
-    expect(secretReferenceSchema.parse('secret:TOKEN@staging')).toEqual({ alias: 'TOKEN', environment: 'staging' })
-    expect(secretReferenceSchema.safeParse('TOKEN').success).toBe(false)
+    expect(parseSecretReference(Schema.decodeUnknownSync(secretReferenceTextSchemaEffect)('secret:TOKEN@staging'))).toEqual({ alias: 'TOKEN', environment: 'staging' })
+    expect(Schema.is(secretReferenceTextSchemaEffect)('TOKEN')).toBe(false)
   })
 })
 
