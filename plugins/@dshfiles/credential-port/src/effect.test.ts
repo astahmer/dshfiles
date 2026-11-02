@@ -28,21 +28,23 @@ describe('credential port Effect schemas', () => {
     }
 
     for (const text of ['', 'API_KEY', 'secret:', 'secret:1BAD', 'secret:A B', 'secret:A@', 'secret:A@b@c']) {
-      expect(() => decodeReferenceText(text)).toThrow()
+      expect(() => decodeReferenceText(text)).toThrow('Expected a string matching the RegExp ^\\s*secret:[A-Za-z_][A-Za-z0-9_-]*(?:@[A-Za-z0-9_-]+)?\\s*$')
       expect(parseSecretReference(text)).toBeNull()
     }
 
     expect(decodeAlias('A')).toBe('A')
-    expect(() => decodeAlias('1BAD')).toThrow()
+    expect(() => decodeAlias('1BAD')).toThrow('Expected a string matching the RegExp ^[A-Za-z_][A-Za-z0-9_-]*$')
     expect(decodeEnvironment('dev-1')).toBe('dev-1')
-    expect(() => decodeEnvironment('bad env')).toThrow()
+    expect(() => decodeEnvironment('bad env')).toThrow('Expected a string matching the RegExp ^[A-Za-z0-9_-]+$')
     expect(decodeScope('project')).toBe('project')
-    expect(() => decodeScope('workspace')).toThrow()
+    expect(() => decodeScope('workspace')).toThrow('Expected "global" | "project" | "local"')
     expect(decodeCredentialLabel('env:API_KEY')).toBe('env:API_KEY')
     expect(decodeCredentialLabel(' secret:API_KEY ')).toBe(' secret:API_KEY ')
     expect(decodeCanonicalCredentialLabel(' secret:API_KEY@prod ')).toBe('secret:API_KEY')
     expect(decodeCanonicalCredentialLabel('env:API_KEY')).toBe('env:API_KEY')
-    expect(() => decodeCredentialLabel('env:1BAD')).toThrow()
+    expect(() => decodeCredentialLabel('env:1BAD')).toThrow(
+      'Expected a string matching the RegExp ^(?:\\s*secret:[A-Za-z_][A-Za-z0-9_-]*(?:@[A-Za-z0-9_-]+)?\\s*|env:[A-Za-z_][A-Za-z0-9_-]{0,127})$',
+    )
   })
 })
 
