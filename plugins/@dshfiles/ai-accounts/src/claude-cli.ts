@@ -429,6 +429,8 @@ export class ClaudeCliSessions {
     // The CLI prefers an API key from the environment over its login, which would bill the API organization instead.
     delete environment['ANTHROPIC_API_KEY']
     delete environment['ANTHROPIC_AUTH_TOKEN']
+    // Without a label `claude -p` reports `sdk-cli`, which drains the 5-hour window ~1.8x faster per token (anthropics/claude-code#97074).
+    environment['CLAUDE_CODE_ENTRYPOINT'] = 'dsh'
     const args = [
       '-p',
       '--input-format',

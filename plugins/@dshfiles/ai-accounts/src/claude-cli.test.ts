@@ -125,7 +125,7 @@ it('preserves native OAuth/cloud environment and drops API keys', async () => {
   const executable = join(directory, 'claude')
   const fake = FAKE_CLAUDE.replace(
     "'echo ' + process.pid + ': ' + text",
-    'JSON.stringify({ config: process.env.CLAUDE_CONFIG_DIR, oauth: process.env.CLAUDE_CODE_OAUTH_TOKEN, cloud: process.env.CLAUDE_CODE_USE_VERTEX, key: process.env.ANTHROPIC_API_KEY, bearer: process.env.ANTHROPIC_AUTH_TOKEN })',
+    'JSON.stringify({ config: process.env.CLAUDE_CONFIG_DIR, oauth: process.env.CLAUDE_CODE_OAUTH_TOKEN, cloud: process.env.CLAUDE_CODE_USE_VERTEX, key: process.env.ANTHROPIC_API_KEY, bearer: process.env.ANTHROPIC_AUTH_TOKEN, entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT })',
   )
   writeFileSync(executable, fake)
   chmodSync(executable, 0o755)
@@ -134,6 +134,7 @@ it('preserves native OAuth/cloud environment and drops API keys', async () => {
   vi.stubEnv('CLAUDE_CODE_USE_VERTEX', 'synthetic-cloud')
   vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-unrelated-key')
   vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'synthetic-unrelated-bearer')
+  vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', 'claude-desktop')
   try {
     const cli = new ClaudeCliSessions({ configDir: () => join(homedir(), '.claude'), executable })
     sessions.push(cli)
@@ -141,7 +142,7 @@ it('preserves native OAuth/cloud environment and drops API keys', async () => {
     if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
     const context = normalizeContext({ systemPrompt: 'Synthetic.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
     const reply = await finished(cli.stream(model, context, { sessionId: 'synthetic-env' }))
-    expect(JSON.parse(textOf(reply))).toEqual({ oauth: 'synthetic-oauth', cloud: 'synthetic-cloud' })
+    expect(JSON.parse(textOf(reply))).toEqual({ oauth: 'synthetic-oauth', cloud: 'synthetic-cloud', entrypoint: 'dsh' })
   } finally {
     vi.unstubAllEnvs()
   }
