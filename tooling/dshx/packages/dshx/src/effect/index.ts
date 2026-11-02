@@ -30,8 +30,8 @@ export class PublishEventError extends Schema.TaggedError<PublishEventError>()('
   event: Schema.String,
 }) {}
 
-type EffectHandlers<Methods extends Record<string, AnyApiMethodDefinition>, R> = {
-  readonly [K in keyof Methods]: (context: ApiHandlerContext<ApiHostInput<Methods[K]>>) => Effect.Effect<ApiHostOutput<Methods[K]>, unknown, R>
+type EffectHandlers<Methods extends Record<string, AnyApiMethodDefinition>, R, E> = {
+  readonly [K in keyof Methods]: (context: ApiHandlerContext<ApiHostInput<Methods[K]>>) => Effect.Effect<ApiHostOutput<Methods[K]>, E, R>
 }
 
 type HostOptions<R> = [R] extends [never]
@@ -100,9 +100,9 @@ const settle = <A, E>(exit: Exit.Exit<A, E>): A => {
 }
 
 /** Serve a contract from handlers that return Effects; the call's AbortSignal interrupts the handler fiber. */
-const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDefinition>, R>(
+const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDefinition>, R, E>(
   contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
-  handlers: EffectHandlers<Methods, R>,
+  handlers: EffectHandlers<Methods, R, E>,
   runtimeForContext: (ctx: Context) => AnyManagedRuntime | undefined,
   requirePluginRuntime: boolean,
 ): ApiHostRegistration<Methods> => {
@@ -127,9 +127,9 @@ const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDef
   return contract.host(promised as Parameters<ApiContract<Methods>['host']>[0])
 }
 
-const host = <const Methods extends Record<string, AnyApiMethodDefinition>, R = never>(
+const host = <const Methods extends Record<string, AnyApiMethodDefinition>, E, R = never>(
   contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
-  handlers: EffectHandlers<Methods, R>,
+  handlers: EffectHandlers<Methods, R, E>,
   ...[options]: HostOptions<R>
 ): ApiHostRegistration<Methods> =>
   registerEffectHost(
@@ -162,9 +162,9 @@ const plugin = <Config, E, R>(options: {
   readonly layer: Layer.Layer<R, E, never> | ((ctx: Context, config: Config) => Layer.Layer<R, E, never>)
   readonly setup: (ctx: Context, config: Config) => Effect.Effect<void, E, R | Scope.Scope>
 }) => ({
-  hostApi: <const Methods extends Record<string, AnyApiMethodDefinition>>(
+  hostApi: <const Methods extends Record<string, AnyApiMethodDefinition>, HandlerError>(
     contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
-    handlers: EffectHandlers<Methods, R>,
+    handlers: EffectHandlers<Methods, R, HandlerError>,
   ): ApiHostRegistration<Methods> => registerEffectHost(contract, handlers, ctx => pluginRuntimes.get(ctx), true),
   setup: async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
     const layer = typeof options.layer === 'function' ? options.layer(ctx, config) : options.layer
