@@ -284,6 +284,8 @@ export const resolveRouteQuote = (input: {
 }
 
 export class PricingCatalogModel {
+  /** The pricing.json document AI Accounts writes; readers decode the file with it instead of loading a catalog. */
+  static readonly cacheSchema = pricingCacheSchema
   static readonly trimModelsDev = trimModelsDev
   static readonly parsePricingOverride = parsePricingOverride
   static readonly resolveRouteQuote = resolveRouteQuote
