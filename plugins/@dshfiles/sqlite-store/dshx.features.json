@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "sqlite-store-open",
+      "title": "One SqlClient layer for a plugin-owned SQLite file",
+      "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["fresh", "adopted", "migrated", "newer-schema", "migration-failed"],
+      "failureModes": [
+        "A failing migration rolls back every pending migration of that open and fails with SqliteMigrationFailed; the file keeps its previous schema.",
+        "A file migrated by a newer build, or a legacy user_version past the known one, fails with SqliteStoreVersionUnsupported instead of writing to a schema this build does not know.",
+        "A directory, file or pragma that cannot be prepared fails with SqliteStoreOpenFailed naming the step."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.fresh",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "migrates a fresh file into a private directory with private sidecars"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.legacy-user-version",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "adopts a legacy user_version without re-running its migrations"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.rollback",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "rolls back the whole pending batch when a migration fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.newer-schema",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "refuses a file migrated by a newer build"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.two-databases",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "serves two databases from one layer under their own keys"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "sqlite-store open",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "emits no statement spans by default while keeping the caller span"
+        }
+      ]
+    }
+  ]
+}
