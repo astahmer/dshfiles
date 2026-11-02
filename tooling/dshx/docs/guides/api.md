@@ -9,21 +9,21 @@
 ## Define a contract
 
 ```ts
-import { defineApi, method } from "@dshfiles/dshx/api";
+import { defineApi, method } from '@dshfiles/dshx/api'
 
 export interface Status {
-  readonly project: string;
-  readonly requestCount: number;
+  readonly project: string
+  readonly requestCount: number
 }
 
 export const statusApi = defineApi({
-  id: "status",
+  id: 'status',
   version: 1,
   methods: {
     get: method<void, Status>(),
     refresh: method<{ readonly force?: boolean }, Status>(),
   },
-});
+})
 ```
 
 `id` is a stable single segment containing letters, numbers, `.`, `_`, or `-`; `/` is rejected. `version` is a positive integer. Contracts are browser-safe and may be imported by both Host and Client source.
@@ -42,28 +42,28 @@ method<ClientInput, ClientOutput>(): ApiMethodDefinition<
 `method({ input, output })` accepts `@standard-schema/spec` v1 schemas. `InferInput` and `InferOutput` create four distinct stages:
 
 ```ts
-ApiMethodDefinition<ClientInput, HostInput, HostOutput, ClientOutput>;
+ApiMethodDefinition<ClientInput, HostInput, HostOutput, ClientOutput>
 ```
 
 ```ts
-import { z } from "zod";
-import { defineApi, method } from "@dshfiles/dshx/api";
+import { z } from 'zod'
+import { defineApi, method } from '@dshfiles/dshx/api'
 
 const input = z.object({
-  force: z.enum(["yes", "no"]).transform((value) => value === "yes"),
-});
+  force: z.enum(['yes', 'no']).transform(value => value === 'yes'),
+})
 
 const output = z.object({
-  startedAt: z.date().transform((value) => value.toISOString()),
-});
+  startedAt: z.date().transform(value => value.toISOString()),
+})
 
 export const runtimeApi = defineApi({
-  id: "runtime",
+  id: 'runtime',
   version: 1,
   methods: {
     refresh: method({ input, output }),
   },
-});
+})
 ```
 
 In this example the Client sends `{ force: 'yes' | 'no' }`, the Host handler receives `{ force: boolean }`, the handler returns `{ startedAt: Date }`, and the Client receives `{ startedAt: string }`.
@@ -79,28 +79,28 @@ The Client does not run the schemas again. Validation issues, a missing Standard
 ## Implement every method on the Host
 
 ```ts
-import { defineHost } from "@dshfiles/dshx/host";
-import { statusApi } from "./status-api.js";
+import { defineHost } from '@dshfiles/dshx/host'
+import { statusApi } from './status-api.js'
 
-let requestCount = 0;
+let requestCount = 0
 
 const statusHost = statusApi.host({
   async get({ ctx, signal }) {
-    signal.throwIfAborted();
-    return { project: String(ctx), requestCount: ++requestCount };
+    signal.throwIfAborted()
+    return { project: String(ctx), requestCount: ++requestCount }
   },
   async refresh({ input, signal }) {
-    signal.throwIfAborted();
+    signal.throwIfAborted()
     return {
-      project: input.force ? "refreshed" : "ready",
+      project: input.force ? 'refreshed' : 'ready',
       requestCount: ++requestCount,
-    };
+    }
   },
-});
+})
 
 export default defineHost({
   apis: [statusHost],
-});
+})
 ```
 
 Each handler receives `{ input, ctx, signal, peer, caller }`; `caller` says whether a Client, another Host plugin or the agent made the call (see [One registry](#one-registry-other-plugins-clients-and-the-agent)). `.host()` requires exactly the contract's method keys: missing and extra handlers are type errors and are also rejected at runtime. `authority` defaults to `loopback`; pass `{ authority: 'trusted-host' }` only when the official Connection policy requires it.
@@ -123,17 +123,17 @@ handlers with `defineApi()` and `defineHost()` rather than registering raw
 ## Imperative Client calls
 
 ```tsx
-import { useApi } from "@dshfiles/dshx/client";
-import { statusApi } from "./status-api.js";
+import { useApi } from '@dshfiles/dshx/client'
+import { statusApi } from './status-api.js'
 
 function Controls() {
-  const api = useApi(statusApi);
+  const api = useApi(statusApi)
 
   async function refresh(signal: AbortSignal) {
-    const current = await api.get();
-    const cancellable = await api.get(undefined, { signal });
-    const next = await api.refresh({ force: true }, { signal });
-    return { current, cancellable, next };
+    const current = await api.get()
+    const cancellable = await api.get(undefined, { signal })
+    const next = await api.refresh({ force: true }, { signal })
+    return { current, cancellable, next }
   }
 
   // ...
@@ -145,9 +145,7 @@ Every method uses `(input, options)`. For a no-input method, pass `undefined` be
 `api.safe.<method>()` returns a discriminated result instead of throwing:
 
 ```ts
-type ApiCallResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: ApiError };
+type ApiCallResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ApiError }
 ```
 
 ## Read-only methods share in-flight requests
@@ -172,16 +170,16 @@ for without that head-of-line blocking.
 ## `useApiQuery`
 
 ```tsx
-const status = useApiQuery(statusApi, "get", {
+const status = useApiQuery(statusApi, 'get', {
   enabled: true,
   signal,
-});
+})
 
-const refresh = useApiQuery(statusApi, "refresh", {
+const refresh = useApiQuery(statusApi, 'refresh', {
   input: { force: true },
   enabled,
   signal,
-});
+})
 ```
 
 Input methods require `input`; no-input methods omit it. The result is a strict union:
@@ -189,26 +187,26 @@ Input methods require `input`; no-input methods omit it. The result is a strict 
 ```ts
 type ApiQueryResult<T> =
   | {
-      status: "pending";
-      fetchStatus: "idle" | "fetching" | "paused";
-      data: undefined;
-      error: null;
-      refetch(): void;
+      status: 'pending'
+      fetchStatus: 'idle' | 'fetching' | 'paused'
+      data: undefined
+      error: null
+      refetch(): void
     }
   | {
-      status: "success";
-      fetchStatus: "idle" | "fetching" | "paused";
-      data: T;
-      error: null;
-      refetch(): void;
+      status: 'success'
+      fetchStatus: 'idle' | 'fetching' | 'paused'
+      data: T
+      error: null
+      refetch(): void
     }
   | {
-      status: "error";
-      fetchStatus: "idle";
-      data: T | undefined;
-      error: ApiError;
-      refetch(): void;
-    };
+      status: 'error'
+      fetchStatus: 'idle'
+      data: T | undefined
+      error: ApiError
+      refetch(): void
+    }
 ```
 
 - Refresh keeps the last successful `data`.
@@ -225,23 +223,23 @@ A contract may declare events next to its methods. The Host publishes them; ever
 instead of polling.
 
 ```ts
-import { defineApi, event, method } from "@dshfiles/dshx/api";
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 
 export const jobsApi = defineApi({
-  id: "jobs",
+  id: 'jobs',
   version: 1,
-  owner: "@acme/jobs",
+  owner: '@acme/jobs',
   methods: { board: method({ output: boardSchema, readOnly: true }) },
   events: {
-    changed: event({ schema: z.object({ running: z.number() }).strict(), description: "The job board changed." }),
+    changed: event({ schema: z.object({ running: z.number() }).strict(), description: 'The job board changed.' }),
   },
-});
+})
 ```
 
 ```ts
 // Host: anywhere you hold the plugin's Context, once the API is served
-import { publishApiEvent } from "@dshfiles/dshx/host";
-await publishApiEvent(ctx, jobsApi, "changed", { running: 3 });
+import { publishApiEvent } from '@dshfiles/dshx/host'
+await publishApiEvent(ctx, jobsApi, 'changed', { running: 3 })
 ```
 
 ```tsx
@@ -300,11 +298,11 @@ Any other thrown value stays generic on the Client (`remoteCode: 'internal'`, "A
 
 Every API a dshx Host serves joins one process-wide registry. The same contract, handler and schemas then serve three callers:
 
-| Caller | How it calls | Transport |
-| --- | --- | --- |
-| A browser Client (any plugin) | `useApi(contract)` / `useApiQuery(contract, ...)` | Connection RPC |
-| Another Host plugin | `createHostApiClient(ctx, contract, packageId)` | in process, through the owner's dispatch |
-| The agent | a native tool, only for methods with `tool` | `ctx.tools` pipeline (policy, guards, approval) |
+| Caller                        | How it calls                                      | Transport                                       |
+| ----------------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| A browser Client (any plugin) | `useApi(contract)` / `useApiQuery(contract, ...)` | Connection RPC                                  |
+| Another Host plugin           | `createHostApiClient(ctx, contract, packageId)`   | in process, through the owner's dispatch        |
+| The agent                     | a native tool, only for methods with `tool`       | `ctx.tools` pipeline (policy, guards, approval) |
 
 Set `owner` on a contract that other packages import, and give methods a `description` so they are discoverable:
 
@@ -348,7 +346,7 @@ const notes = await connectDshxApiClient(notesApi) // url: DSHX_URL or the recor
 const note = await notes.get({ id: 'a' })
 ```
 
-`connectDshxApiClient(contract, { url?, origin?, cookie?, fetch? })` is the Node-side SDK client for one dshx API: the same methods, `.safe` results and `ApiError` kinds as a Client's `useApi` client, so `isApiOwnerMissing` and `DshxEffect.client` work unchanged. It exchanges the tokenized launch URL for a session cookie (`url`, else `DSHX_URL`, else `~/.dsh/runtime/web-url`), then posts to the API's Connection routes; with `origin` it skips that exchange and calls an already-authenticated session. The contract must declare `owner`. Schemas run on the Host as for any caller; the handler sees `caller: { kind: 'client' }`. It needs Node's `fetch` and is not for the browser, which uses `useApi`.
+`connectDshxApiClient(contract, { url?, origin?, cookie?, fetch? })` is the Node-side SDK client for one dshx API: the same methods, `.safe` results and `ApiError` kinds as a Client's `useApi` client, so `isApiOwnerMissing` and `Api.client` from `@dshfiles/dshx/effect` work unchanged. It exchanges the tokenized launch URL for a session cookie (`url`, else `DSHX_URL`, else `~/.dsh/runtime/web-url`), then posts to the API's Connection routes; with `origin` it skips that exchange and calls an already-authenticated session. The contract must declare `owner`. Schemas run on the Host as for any caller; the handler sees `caller: { kind: 'client' }`. It needs Node's `fetch` and is not for the browser, which uses `useApi`.
 
 Against the in-process Host from `@dshfiles/dshx/testing`, pass its Connection's fetch:
 

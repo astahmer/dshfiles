@@ -1,83 +1,194 @@
 # Effect in dshx
 
-Effect is an opt-in authoring API for owned Host code. DSH core remains Promise-based: Cordis setup, hooks, agent tools, and the native tool protocol continue to receive and return Promises. dshx owns the Effect-to-Promise adapters at those boundaries. Existing Promise APIs, exports, and plugin registrations remain supported and unchanged.
+DSH core stays Promise-based: Cordis activation, agent tools, hooks and the Connection protocol take and return
+Promises. A Host plugin written in Effect is one layer graph built from a single `HostContext`, and dshx owns the only
+Promise edge: `DshxPlugin.make`. Plugins never call `Effect.runPromise`, `runFork` or `runSync` themselves.
 
-## Decisions
+Import everything from `@dshfiles/dshx/effect`; `effect` is pinned to exactly `4.1.0` (and `@effect/vitest` to the
+same release). Effect 4.1 has no `effect/unstable/*`, `Layer.scoped`, `Effect.forkDaemon` or `Effect.catchAll`: use
+`effect/process`, `effect/http`, `effect/sql`, `Layer.effect`, `Effect.forkDetach`, `Effect.catch` / `catchCause`.
 
-| Topic | Decision | Boundary |
-| --- | --- | --- |
-| Version | Pin `effect` to exact `4.1.0` in the workspace catalog; dshx peers require `>=4.1.0 <5`. Any adopted `@effect/*` runtime package must be pinned to the same `4.1.0` release. | `pnpm-workspace.yaml`, dshx package manifest |
-| Runtime lifetime | Use one `ManagedRuntime` per plugin instance. `DshxEffect.plugin({ layer, setup })` adds the dshx tracer, serves that runtime to `DshxEffect.host` handlers in the same Cordis context, and disposes its `Scope` and runtime on unload/reload. No process-global runtime. | Plugin root setup |
-| Tracing | Bridge through dshx's `TracerModel`; do not install another exporter. Effect spans use the existing dshx OTLP exporter and recorder, so they retain `api-dispatch` / `agent-tool` parents and show up in the `traces` plugin. | `DshxEffect.tracerLayer` and default plugin setup |
-| Span names and data | Name work-unit spans `<subject> <verb>`. Record bounded identities, counts, and failure types only; never arguments, results, secret values, prompts, or error messages. | Effect handlers and domain functions |
-| Errors | Use one `Schema.TaggedError` per expected failure kind. Existing dshx mapping converts `_tag` to the remote kebab-case code; defects remain internal. | API boundary |
-| Services | Use `Context.Service` classes and `Layer`. Read Cordis `ctx.get(...)` only in the plugin's root Layer, where Promise adapters can be constructed. | Layer construction |
-| Promise edge | Keep `runPromise` and Promise conversion in dshx adapters, plugin registration, fork boundaries, and tests. Effect domain code composes Effects and never runs its own fibers as Promises. | `effect-antislop/no-domain-effect-run` is an error under `src/effect/**`, excluding only the API Promise boundary and tracer bridge. Valid/invalid Oxlint fixtures pin this behavior. |
-| Schemas | Standard Schema remains the interop point. Effect Schema and zod can coexist per API; Effect discriminated unions are projected from `anyOf` to the native tool `oneOf` subset, while validation remains at the contract boundary. | `defineApi` / JSON Schema projection |
-| Tests | Use `@effect/vitest` (`it.effect`, `it.layer`) for Effect tests. Exercise real implementations and scratch Layers; do not mock the Effect service being tested. | `tests/effect.spec.ts` includes `it.effect`; `@effect/vitest` is pinned to 4.1.0. |
-| Cancellation | Pass the Host call's `AbortSignal` into `runPromiseExit`; interruption cancels the handler fiber. Scoped child processes must be interrupted and reaped. | `DshxEffect.host` and platform adapters |
+## Standards
 
-## Current API
+| Area        | Rule                                                                                                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Imports     | Named imports from `effect`, `effect/process`, `effect/http`, `effect/sql`; no star or aliased imports.                                                                                                                                                  |
+| Service     | `class X extends Context.Service<X, {…}>()('@dshfiles/<plugin>/X')` with `static readonly layer = Layer.effect(X, make)`; `make` is an `Effect.gen` that `yield*`s its dependencies; methods are `Effect.fn('<subject> <verb>')`. No deps as parameters. |
+| Edge        | `HostContext` is the only holder of the Cordis `ctx`; `ctx.get` / `ctx.on` appear only in dshx edge layers. `DshxPlugin.make` runs effects; plugins do not.                                                                                              |
+| Lifetime    | One `Scope` per plugin activation, closed by the one Cordis disposer. Background work is `main`, or `Effect.forkScoped` inside a layer (`Layer.effectDiscard`). No `ctx.effect` disposers beside it, no `void p.then`.                                   |
+| Errors      | One `Schema.TaggedError` per failure kind with bounded attributes, `cause: Schema.optional(Schema.Defect())` when wrapping, a message built from attributes. Wire exposure is opt-in with `dshxWireCode`. Handle with `Effect.catchTags`.                |
+| Concurrency | `Semaphore`, `Queue`, `PubSub`, `FiberMap`, `FiberSet`, `Cache`, `SubscriptionRef`, `Deferred`, `Schedule`. No `setTimeout`, promise chains, AbortController plumbing or polling in Host code.                                                           |
+| Tracing     | One server span per API call (the dispatch span); `Effect.fn` spans for work units; attributes are identities and counts.                                                                                                                                |
+| Schema      | Decode once at the boundary with `decodeUnknownEffect`; hoist compiled codecs; `Schema.Class` for domain records; no per-plugin wrapper modules.                                                                                                         |
+| Tests       | `@effect/vitest` `it.effect` / `it.layer` over real layers; `TestClock` for every schedule; no mocks, fake timers or sleeps.                                                                                                                             |
 
-The public Promise API remains the baseline. Import the opt-in helpers from `@dshfiles/dshx/effect`:
+## A plugin
 
 ```ts
-import { Context, Effect, Layer, Schema } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { defineHost } from '@dshfiles/dshx/host'
+import { Api, DshxPlugin, Tool } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer, Ref, Schema } from 'effect'
 
-class Greeting extends Context.Service<Greeting, { readonly prefix: string }>()('example/Greeting') {}
-class Missing extends Schema.TaggedError<Missing>()('Missing', { message: Schema.String }) {}
+class NoteNotFound extends Schema.TaggedError<NoteNotFound>()('NoteNotFound', { id: Schema.String }, { dshxWireCode: 'note-not-found' }) {
+  override get message(): string {
+    return `No note ${this.id}.`
+  }
+}
 
-const greetingApi = defineApi({
-  id: 'greeting',
+class Notes extends Context.Service<Notes, { readonly get: (id: string) => Effect.Effect<string, NoteNotFound> }>()('@dshfiles/notes/Notes') {
+  static readonly layer = Layer.effect(
+    Notes,
+    Effect.gen(function* () {
+      const notes = yield* Ref.make(new Map<string, string>())
+      return Notes.of({
+        get: Effect.fn('notes get')(function* (id) {
+          const text = (yield* Ref.get(notes)).get(id)
+          if (text === undefined) return yield* new NoteNotFound({ id })
+          return text
+        }),
+      })
+    }),
+  )
+}
+
+const notesApi = defineApi({
+  id: 'notes',
   version: 1,
-  methods: { hello: method<{ readonly name: string }, string>() },
+  methods: { get: method({ input: Schema.Struct({ id: Schema.String }), output: Schema.String }) },
 })
 
-const { hostApi, ...greetingPlugin } = DshxEffect.plugin({
-  layer: Layer.succeed(Greeting, { prefix: 'Hello' }),
-  setup: () => Effect.void,
-})
-
-export default defineHost({
-  ...greetingPlugin,
-  apis: [
-    hostApi(greetingApi, {
-      hello: ({ input }) => Effect.gen(function*() {
-        const greeting = yield* Greeting
-        if (input.name === '') return yield* Effect.fail(new Missing({ message: 'Name required' }))
-        return `${greeting.prefix} ${input.name}`
-      }),
+export default DshxPlugin.make({
+  name: '@dshfiles/notes',
+  layer: Notes.layer,
+  apis: [Api.bind(notesApi, { get: input => Notes.use(notes => notes.get(input.id)) })],
+  tools: [
+    Tool.make({
+      name: 'notes_get',
+      description: 'Read one note. Read-only.',
+      input: Schema.Struct({ id: Schema.String }),
+      readOnly: true,
+      execute: input => Notes.use(notes => notes.get(input.id)),
     }),
   ],
 })
 ```
 
-`DshxEffect.plugin` owns one `ManagedRuntime` and `Scope` for that plugin instance. Use the returned `hostApi(contract, handlers)` helper (destructured from the plugin setup options before spreading them into `defineHost`) to type handlers against that Layer and select its runtime for the same Cordis context. `DshxEffect.host(contract, handlers, { runtime })` remains available for explicit composition; a service-free handler can omit the runtime. The call's `AbortSignal` interrupts the running fiber. A tagged typed failure becomes the existing Promise API error; defects are not sent as remote failures. Effect Schema values can be passed directly to `method` and `event` when the Effect adapter has been imported; the adapter supplies both Standard Schema validation and Standard JSON Schema. It omits only explicit `additionalProperties: true`, which is semantically the same as the existing zod projector's absence.
+### `DshxPlugin.make({ name, inject?, Config?, settings?, layer, main?, apis?, tools? })`
 
-`DshxEffect.setup(program)` is a smaller Scope-only adapter for plugins that do not need a shared service Layer. Use `DshxEffect.client(promiseClient)` to create Effect-returning API methods, `DshxEffect.events(client, event)` for a cancellable event Stream, and `DshxEffect.publish(ctx, contract, event, payload)` on the Host. Stream publication composes through `Stream.runForEach` and `DshxEffect.publish`.
+Returns a `defineHost` definition: default-export it. On activation it builds
+`Layer.provideMerge(layer, Layer.mergeAll(HostContext.layer, tracerLayer))` with `Layer.buildWithScope` into one
+`Scope`, so the dshx tracer also covers layer construction. `layer` may be a function of the decoded `Config` (an
+Effect Schema, validated by the Loader and decoded again here). `main` is forked into the Scope after the build and
+interrupted on unload. The Cordis disposer closes the Scope; finalizers run in reverse order.
 
-`DshxEffect.tracerLayer` is available for explicit `ManagedRuntime` construction. `DshxEffect.plugin` and `DshxEffect.setup` install it automatically. The bridge maps Effect parentage into dshx's `AsyncLocalStorage` while evaluating Effect primitives, and maps an active dshx span to an Effect `ExternalSpan`. Thus Promise work nested in Effect and Effect work nested in Promise spans retain the same trace. It delegates to dshx's recorder/exporter; it is not an OTLP exporter and does not require `@effect/opentelemetry`.
+A failing build closes the Scope, logs `Cause.pretty` under `dshx:plugin` and rejects activation with a
+`PluginActivationError` whose `cause` is the Cause. The type checker refuses handlers, tools and a `main` that need a
+service the layer does not build.
 
-## Migration constraints
+`apis` and `tools` stay in the definition, so the registry, the tool-schema snapshot and `inject` see them. Each call
+runs with `Effect.runPromiseExitWith(services)` of the active plugin: a call that arrives before activation finishes
+waits for it, a call after unload is refused as `unavailable`. A definition has one activation at a time.
 
-- Keep Promise exports, `defineApi`, `defineHost`, tool handlers, and native DSH contracts intact. Effect is an opt-in alternate implementation, not a parallel RPC/tool transport.
-- Keep `api-dispatch`, `agent-tool`, and custom telemetry contracts accurate. Tests use `recordSpans()` to prove the actual recorded child relationships.
-- Keep the tool schema projector unchanged to repair schema differences. Add annotations to individual schemas only when a pre-change snapshot demonstrates the exact correction needed.
-- Do not import Effect into vendored native forks. An owned delta may call a dshx helper through its Promise adapter.
-- Do not migrate any plugin as part of the foundation. Pilot/plugin migrations are separate isolated threads after this foundation is integrated.
+### `Api.bind(contract, handlers)` and `Api.handlers(contract, handlers)`
 
-## Phase 1 checklist
+Handlers are `(input, call) => Effect`. `input` is the decoded contract input; `call` carries `caller` and `peer`.
+There is no AbortSignal: an aborted call interrupts the handler fiber. `Api.handlers` types a handler map declared
+apart from `bind`.
 
-| Deliverable | State |
-| --- | --- |
-| `DshxEffect.plugin` with per-instance `ManagedRuntime` and scoped disposal | implemented |
-| `DshxEffect.host` default runtime, explicit runtime compatibility, AbortSignal interruption | implemented |
-| Host service Layers and Effect Schema `defineApi` conversion | plugin `Layer` + context-bound typed API handlers and direct Effect Schema conversion implemented; named Host service adapters pending |
-| dshx tracer bridge and both-direction parentage test | implemented |
-| Event/publish helpers; Promise APIs unchanged | existing and retained |
-| Tool-schema JSON dump and committed pre-Effect snapshot | collected; the fixture remains unchanged by this migration, and the contract delta is reported separately |
-| `effect-host` scaffold template | implemented; generates a typed API/tool, plugin `Layer`, and `effect@4.1.0` dependency |
-| Focused tests, package typecheck and targeted zod/Effect tool-schema parity | validated; the legacy built-bundle snapshot differs in documented Effect JSON Schema output |
+### `Tool.make({ name, description, input, output?, readOnly?, render?, execute })` and `Tool.register`
+
+`input` is an Effect Schema, published to the model as a closed JSON Schema and decoded strictly before `execute`
+(`Schema.Void` means no arguments). `output`, when given, encodes the result to JSON. An abort interrupts the fiber.
+The agent reads an exposed failure's message (invalid arguments included); any other failure reads
+`<tool> failed. See Host diagnostics.` and its Cause is logged under `dshx:tool`. `Tool.register(tool, { tools? })`
+registers a tool for the current Scope, e.g. into one agent's scoped tool runtime while that agent runs.
+
+### `HostEvents.on(name, handler)` and `HostEvents.stream(name)`
+
+`on` listens to a Cordis event while the current Scope lives and runs each event in a fiber of a scoped `FiberSet`;
+a defect is logged, never thrown into the emitter. `stream` is the same listener as a `Stream`.
+
+### `DshxPlugin.callback(fn)`
+
+Captures the current services and returns `(...args) => Promise`, for a callback API that must stay Promise (a
+polyfill, a native hook). Capture it once in a layer or `main`, not per call.
+
+### `HostContext`, `hostService(name)`
+
+`HostContext` holds the Cordis `ctx` and `packageId` of the activation. `hostService('tools')` reads one Cordis service
+and fails with `HostServiceMissing` when the Host does not provide it. Only dshx edge layers use them; domain services
+depend on typed services instead.
+
+## Errors on the wire
+
+| Handler outcome                                                                          | Caller sees                                                                                         |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Interruption only (the caller aborted, or the plugin unloaded mid-call)                  | `aborted`                                                                                           |
+| A failure whose class has `{ dshxWireCode: 'code' }`, or a `PluginApiError`              | `remote` with that code, the error's message and its JSON-encoded fields as `remoteDetails`         |
+| An unannotated `TaggedError` failure                                                     | its kebab-case tag as the code, for compatibility only; the Host warns once per tag to annotate it  |
+| A defect (`Effect.die`, `orDie` on a `SchemaError`, a thrown exception) or anything else | `internal` with `API handler failed. See Host diagnostics.`; the Host logs `Cause.pretty`, redacted |
+
+Annotate the error class, not the handler: `Schema.TaggedError<X>()('X', fields, { dshxWireCode: 'x' })`, as
+`effect/http-api` annotates `httpApiStatus`. The codes `aborted`, `bad-request`, `contract` and `internal` are reserved.
+
+## Calling an API
+
+`Api.client({ contract, api, errors? })` wraps a Promise client (`createHostApiClient` on the Host, the Client's
+`createApiClient`). Every call fails with one of `ApiTransportError`, `ApiUnavailableError` (`ownerMissing` when the
+owner is not loaded), `ApiContractError` or `ApiRemoteError` (`code`, message, `details`). A remote failure whose
+details decode into one of `errors` fails with that class instead. Interrupting the fiber aborts the call, an aborted
+call interrupts the fiber, and a non-ApiError throw is a defect.
+
+## Schemas
+
+An Effect Schema passed to `method` or `event` becomes a strict Standard Schema without any import: decoding rejects
+unknown keys (`onExcessProperty: 'error'`) and the published JSON Schema closes every object
+(`additionalProperties: false`). An empty Struct publishes the closed empty object; `Schema.Void` publishes
+`type: null`, which agent tools read as "no arguments". A Standard Schema adapter you pass yourself is used as is.
+
+## Tracing
+
+dshx bridges Effect spans into its own tracer, recorder and exporter (`tracerLayer`); do not add
+`@effect/opentelemetry`. `DshxPlugin.make` provides the tracer once, under the layer build. Every API call has exactly
+one server span, the dispatch span `<api id>/<method>`; handler and service `Effect.fn` spans are its descendants.
+
+## Testing
+
+Use `@effect/vitest` and real layers. A domain service that needs no Host is tested with `it.layer(Service.layer)`.
+Test the edge (`DshxPlugin.make`, `Api.bind`, `Tool.make`) against a real in-memory Host: build `createTestHost()`
+from `@dshfiles/dshx/testing` inside `Layer.effect` with `Effect.acquireRelease`, mount the definition, and call it
+through `createHostApiClient` or `host.tools.execute`. A layer that reads `HostContext` gets
+`HostContext.layer({ ctx: host.ctx, packageId })`. Never mock the service under test.
+
+```ts
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+
+describe('Notes', () => {
+  it.layer(Notes.layer)(it => {
+    it.effect('fails with NoteNotFound', () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Notes.use(notes => notes.get('missing')))
+        expect(error.id).toBe('missing')
+      }),
+    )
+  })
+})
+```
+
+`create-dshx --template effect-host` scaffolds this shape: `DshxPlugin.make`, one service, one annotated error and an
+`it.layer` test, with `effect` and `@effect/vitest` pinned to `4.1.0`.
+
+## The deprecated `DshxEffect` namespace
+
+`DshxEffect.plugin`, `host`, `setup`, `client`, `events`, `publish` and `tracerLayer` keep working while plugins move.
+They run on the same activation edge, wire mapping and tracer, with no runtime registry. Replace them as follows and
+delete the namespace when its callers reach zero.
+
+| Deprecated                                        | Replacement                                                     |
+| ------------------------------------------------- | --------------------------------------------------------------- |
+| `DshxEffect.plugin({ layer, setup })` + `hostApi` | `DshxPlugin.make({ layer, main, apis: [Api.bind(...)] })`       |
+| `DshxEffect.host(contract, handlers)`             | `Api.bind(contract, handlers)` inside `DshxPlugin.make`         |
+| `DshxEffect.setup(program)`                       | `DshxPlugin.make({ layer, main })`                              |
+| `DshxEffect.client(api)` (`ApiCallError`)         | `Api.client({ contract, api })`                                 |
+| `Effect.runPromise` at a tool `execute`           | `Tool.make` in `DshxPlugin.make({ tools })`, or `Tool.register` |
