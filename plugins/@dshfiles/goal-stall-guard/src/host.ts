@@ -76,7 +76,7 @@ const stallGuard = (threshold: number) =>
       const host = yield* GoalHost
       const detector = StallDetector({ threshold })
       const pendingPauses = yield* Queue.unbounded<PendingPause>()
-      yield* Effect.forkScoped(Effect.forever(Queue.take(pendingPauses).pipe(Effect.flatMap(pauseStalled))))
+      yield* DshxPlugin.worker(Effect.forever(Queue.take(pendingPauses).pipe(Effect.flatMap(pauseStalled))))
       yield* HostEvents.on('session/event', (session, event) =>
         Effect.sync(() => {
           switch (event.type) {

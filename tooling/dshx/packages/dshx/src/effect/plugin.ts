@@ -11,7 +11,7 @@ import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
 import { hostLoggerLayer } from './host-logger.js'
 
-export { detachedContext } from './detached.js'
+export { detached, detachedContext } from './detached.js'
 import type { AnyEffectTool } from './tool.js'
 import { toDefinition } from './tool-edge.js'
 import { tracerLayer } from './tracer.js'

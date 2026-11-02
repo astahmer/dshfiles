@@ -1,5 +1,6 @@
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { flushTracing } from '@dshfiles/dshx/tracing'
 import { Context, Duration, Effect, Layer, Queue, Ref, Schedule } from 'effect'
@@ -35,13 +36,14 @@ export class PricingCatalog extends Context.Service<
           if (file._tag === 'Some') yield* Ref.set(kinds, new Map(file.value.accounts.map(account => [account.instanceId, account.kind] as const)))
         }).pipe(Effect.withSpan('agent telemetry pricing reload'))
 
-        yield* Effect.forkScoped(Effect.repeat(reload, Schedule.spaced(RELOAD_EVERY)))
-        yield* Queue.take(misses).pipe(
-          Effect.andThen(reload),
-          Effect.andThen(Effect.sleep(MISS_RETRY_AFTER)),
-          Effect.andThen(Queue.takeAll(misses)),
-          Effect.forever,
-          Effect.forkScoped,
+        yield* DshxPlugin.worker(Effect.repeat(reload, Schedule.spaced(RELOAD_EVERY)))
+        yield* DshxPlugin.worker(
+          Queue.take(misses).pipe(
+            Effect.andThen(reload),
+            Effect.andThen(Effect.sleep(MISS_RETRY_AFTER)),
+            Effect.andThen(Queue.takeAll(misses)),
+            Effect.forever,
+          ),
         )
 
         return PricingCatalog.of({

@@ -83,11 +83,11 @@ const Maintenance = Layer.effectDiscard(
       discard: true,
     })
     const reportFailure = (task: string) => (cause: unknown) => Effect.logWarning(`agent-communication: ${task} failed`, cause)
-    yield* Effect.forkScoped(
+    yield* DshxPlugin.worker(
       recurringTask({ run: unread.refresh, interval: Duration.millis(UnreadNudgeRules.refreshIntervalMs), onFailure: reportFailure('unread count refresh') }),
     )
     if (ownsBridge)
-      yield* Effect.forkScoped(
+      yield* DshxPlugin.worker(
         recurringTask({ run: workspaceTopicCleanup, interval: workspaceTopicCleanupInterval, onFailure: reportFailure('workspace topic maintenance') }),
       )
   }),

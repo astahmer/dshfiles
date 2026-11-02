@@ -4,7 +4,7 @@ import type { JobEvent, JobView } from '@deepseek-ai/dsh-jobs'
 import { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-workspace'
-import { HostContext } from '@dshfiles/dshx/effect'
+import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Context, Duration, Effect, Layer, Option, Queue, Ref, Schema } from 'effect'
 import type { KnownSession, KnownWorkspace, LiveJob } from './process-table.js'
 
@@ -89,7 +89,7 @@ export class JobTracker extends Context.Service<
           return next
         })
       }
-      yield* Queue.take(updates).pipe(Effect.flatMap(apply), Effect.forever, Effect.forkScoped)
+      yield* DshxPlugin.worker(Queue.take(updates).pipe(Effect.flatMap(apply), Effect.forever))
 
       yield* Effect.acquireRelease(
         Effect.sync(() =>

@@ -1,3 +1,4 @@
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { type Cause, Context, Deferred, Duration, Effect, Exit, Fiber, Layer, Queue, Schema, Stream } from 'effect'
 import { ActivityStore, type ActivityStateWriteFailed, type ActivityStoreReadError, type IngestResult } from './activity-store.js'
 import { ActivityTimelineCondensation } from './condensation.js'
@@ -107,6 +108,7 @@ const make = Effect.gen(function* () {
   const consumer = yield* Stream.fromQueue(queue).pipe(
     Stream.groupedWithin(INGEST_BATCH_LIMIT, INGEST_BATCH_DELAY),
     Stream.runForEach(flush),
+    DshxPlugin.detached,
     Effect.forkScoped,
   )
   yield* Effect.addFinalizer(() => Queue.end(queue).pipe(Effect.andThen(Fiber.join(consumer))))

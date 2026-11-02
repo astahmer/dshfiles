@@ -50,7 +50,7 @@ const SessionHooks = Layer.effectDiscard(
       }
       yield* Ref.update(lastSeq, current => new Map(current).set(event.sessionId, event.seq))
     })
-    yield* Queue.take(observed).pipe(Effect.flatMap(handle), Effect.forever, Effect.forkScoped)
+    yield* DshxPlugin.worker(Queue.take(observed).pipe(Effect.flatMap(handle), Effect.forever))
 
     const whenReady = yield* DshxPlugin.callback((sessionId: string) =>
       Effect.gen(function* () {

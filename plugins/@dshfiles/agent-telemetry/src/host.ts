@@ -22,10 +22,7 @@ const SpanCoordinator = Layer.effectDiscard(
     const pricing = yield* PricingCatalog
     const settings = yield* TelemetrySettings
     const captureMode = yield* Ref.make((yield* settings.get).captureContent)
-    yield* settings.changes.pipe(
-      Stream.runForEach(value => Ref.set(captureMode, value.captureContent)),
-      Effect.forkScoped,
-    )
+    yield* DshxPlugin.worker(settings.changes.pipe(Stream.runForEach(value => Ref.set(captureMode, value.captureContent))))
     const logger = host.ctx.logger('agent-telemetry')
 
     const coordinator = createCoordinator({
