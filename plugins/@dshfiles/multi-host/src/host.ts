@@ -75,7 +75,9 @@ const sessionRowSchema = Schema.Struct({
   // The remote list names a thread through its title projection; an untitled thread reports null there.
   projections: Schema.optional(
     Schema.Struct({
-      values: Schema.optional(Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(MultiHostSchema.passthrough)),
+      values: Schema.optional(
+        Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(MultiHostSchema.passthrough),
+      ),
     }).pipe(MultiHostSchema.passthrough),
   ),
 }).pipe(MultiHostSchema.passthrough)
@@ -97,7 +99,9 @@ const workspaceRowSchema = Schema.Struct({
   sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000))),
 }).pipe(MultiHostSchema.passthrough)
 const workspaceCreatedSchema = Schema.Struct({
-  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(MultiHostSchema.passthrough),
+  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(
+    MultiHostSchema.passthrough,
+  ),
 }).pipe(MultiHostSchema.passthrough)
 const workspaceContainerSchema = Schema.Struct({
   items: Schema.optional(Schema.Unknown),
@@ -111,7 +115,9 @@ const fileReferenceCandidatesSchema = Schema.Array(
   Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
 ).check(Schema.isMaxLength(1000))
 const modelCatalogSchema = Schema.Struct({
-  default: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
+  default: Schema.optional(
+    Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
+  ),
   routableProviders: Schema.optional(Schema.Array(Schema.String)),
   groups: Schema.Array(
     Schema.Struct({
@@ -124,7 +130,9 @@ const modelCatalogSchema = Schema.Struct({
           description: Schema.optional(Schema.String),
           reasoning: Schema.optional(
             Schema.Struct({
-              efforts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
+              efforts: Schema.Array(
+                Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
+              ),
               defaultEffort: Schema.optional(Schema.String),
             }).pipe(MultiHostSchema.passthrough),
           ),
@@ -880,7 +888,8 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     try {
       const listing = await withRuntime(
         input.runtimeId,
-        async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
+        async gateway =>
+          MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
         { mutation: false },
       )
       return {
@@ -928,9 +937,13 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
       const host = await HostDirectoryStore.findHost(runtime.hostId)
       if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
-      const listing = await withRuntime(input.runtimeId, async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)), {
-        mutation: false,
-      })
+      const listing = await withRuntime(
+        input.runtimeId,
+        async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)),
+        {
+          mutation: false,
+        },
+      )
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
       let archive: Buffer | undefined
       if (input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0) {

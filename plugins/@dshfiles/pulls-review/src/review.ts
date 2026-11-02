@@ -97,8 +97,8 @@ const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResul
       signal: input.signal,
       outputLimit: MAX_PATCH_CHARS,
     })
-    const baseLabel = exactRange ? input.fromChangeId ?? '' : base
-    const headLabel = exactRange ? input.toChangeId ?? '' : HEAD_REVISION
+    const baseLabel = exactRange ? (input.fromChangeId ?? '') : base
+    const headLabel = exactRange ? (input.toChangeId ?? '') : HEAD_REVISION
     const range = `${baseLabel}..${headLabel}`
     const grouped = await groupPatch({ patch: diff.stdout, title: range })
     return {

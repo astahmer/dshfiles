@@ -22,10 +22,7 @@ export class EffectHostServiceError extends Schema.TaggedError<EffectHostService
   operation: Schema.String,
 }) {}
 
-const failed = (
-  service: EffectHostServiceError['service'],
-  operation: string,
-): EffectHostServiceError => new EffectHostServiceError({ service, operation })
+const failed = (service: EffectHostServiceError['service'], operation: string): EffectHostServiceError => new EffectHostServiceError({ service, operation })
 
 export class PluginStorage extends Context.Service<
   PluginStorage,
@@ -87,13 +84,11 @@ export class Subprocess extends Context.Service<
         terminalEnvironment: () =>
           Effect.tryPromise({ try: signal => runtime.terminalEnvironment(signal), catch: () => failed('subprocess', 'terminal-environment') }),
         spawnScoped: spec =>
-          Effect.acquireRelease(
-            Effect.try({ try: () => runtime.spawn(spec), catch: () => failed('subprocess', 'spawn') }),
-            handle =>
-              Effect.sync(() => handle.terminate()).pipe(
-                Effect.andThen(Effect.tryPromise({ try: () => handle.waitForExit(), catch: () => failed('subprocess', 'wait-for-exit') }).pipe(Effect.orDie)),
-                Effect.asVoid,
-              ),
+          Effect.acquireRelease(Effect.try({ try: () => runtime.spawn(spec), catch: () => failed('subprocess', 'spawn') }), handle =>
+            Effect.sync(() => handle.terminate()).pipe(
+              Effect.andThen(Effect.tryPromise({ try: () => handle.waitForExit(), catch: () => failed('subprocess', 'wait-for-exit') }).pipe(Effect.orDie)),
+              Effect.asVoid,
+            ),
           ),
         spawnTerminalScoped: spec =>
           Effect.acquireRelease(
@@ -133,13 +128,21 @@ export class Communication extends Context.Service<
     readonly principal: CommunicationClient['principal']
     listAgents(): Effect.Effect<Awaited<ReturnType<CommunicationClient['listAgents']>>, EffectHostServiceError>
     listTopics(): Effect.Effect<Awaited<ReturnType<CommunicationClient['listTopics']>>, EffectHostServiceError>
-    diagnostics(input?: Parameters<CommunicationClient['diagnostics']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['diagnostics']>>, EffectHostServiceError>
-    subscribe(input: Parameters<CommunicationClient['subscribe']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['subscribe']>>, EffectHostServiceError>
-    unsubscribe(topic: Parameters<CommunicationClient['unsubscribe']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['unsubscribe']>>, EffectHostServiceError>
+    diagnostics(
+      input?: Parameters<CommunicationClient['diagnostics']>[0],
+    ): Effect.Effect<Awaited<ReturnType<CommunicationClient['diagnostics']>>, EffectHostServiceError>
+    subscribe(
+      input: Parameters<CommunicationClient['subscribe']>[0],
+    ): Effect.Effect<Awaited<ReturnType<CommunicationClient['subscribe']>>, EffectHostServiceError>
+    unsubscribe(
+      topic: Parameters<CommunicationClient['unsubscribe']>[0],
+    ): Effect.Effect<Awaited<ReturnType<CommunicationClient['unsubscribe']>>, EffectHostServiceError>
     publish(input: Parameters<CommunicationClient['publish']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['publish']>>, EffectHostServiceError>
     send(input: Parameters<CommunicationClient['send']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['send']>>, EffectHostServiceError>
     inbox(input?: Parameters<CommunicationClient['inbox']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['inbox']>>, EffectHostServiceError>
-    acknowledge(messageId: Parameters<CommunicationClient['acknowledge']>[0]): Effect.Effect<Awaited<ReturnType<CommunicationClient['acknowledge']>>, EffectHostServiceError>
+    acknowledge(
+      messageId: Parameters<CommunicationClient['acknowledge']>[0],
+    ): Effect.Effect<Awaited<ReturnType<CommunicationClient['acknowledge']>>, EffectHostServiceError>
   }
 >()('@dshfiles/dshx/effect/Communication') {
   static layer(client: CommunicationClient) {
@@ -173,9 +176,7 @@ export interface SettingsReadFactory<Value extends object> {
 }
 
 const makeSettingsRead = <Value extends object>(namespace: string): SettingsReadFactory<Value> => {
-  class SettingsReadService extends Context.Service<SettingsReadTag<Value>, SettingsReadShape<Value>>()(
-    `@dshfiles/dshx/effect/SettingsRead/${namespace}`,
-  ) {}
+  class SettingsReadService extends Context.Service<SettingsReadTag<Value>, SettingsReadShape<Value>>()(`@dshfiles/dshx/effect/SettingsRead/${namespace}`) {}
 
   return {
     Tag: SettingsReadService,

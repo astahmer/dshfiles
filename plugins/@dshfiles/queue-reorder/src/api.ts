@@ -61,7 +61,10 @@ export const queueApi = defineApi({
     // Added after the first release: a Host started before it answers with an unknown-endpoint error.
     readFile: method({
       input: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)), attachment: queueFileAttachmentSchema }),
-      output: Schema.Struct({ name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)), data: Schema.String.check(Schema.isMaxLength(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4)) }),
+      output: Schema.Struct({
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+        data: Schema.String.check(Schema.isMaxLength(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4)),
+      }),
     }),
   },
 })

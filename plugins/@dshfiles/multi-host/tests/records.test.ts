@@ -40,21 +40,31 @@ describe('multi-host record schemas', () => {
 
   test('accepts tokenized HTTP launch URLs only on loopback', () => {
     expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, localRuntime.locator).success).toBe(true)
-    expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://remote.example/?token=token_value-123456' }).success).toBe(false)
+    expect(
+      MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://remote.example/?token=token_value-123456' }).success,
+    ).toBe(false)
     expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://127.0.0.1:3199/?token=short' }).success).toBe(false)
     expect(
-      MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://127.0.0.1:3199/?token=token_value-123456&next=https://outside.invalid' })
-        .success,
+      MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, {
+        kind: 'local',
+        launchUrl: 'http://127.0.0.1:3199/?token=token_value-123456&next=https://outside.invalid',
+      }).success,
     ).toBe(false)
-    expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'https://127.0.0.1:3199/?token=token_value-123456' }).success).toBe(false)
+    expect(
+      MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'https://127.0.0.1:3199/?token=token_value-123456' }).success,
+    ).toBe(false)
   })
 
   test('rejects shell-shaped SSH targets and remote paths; the legacy unit field is optional', () => {
     expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
     expect(MultiHostSchema.safeDecodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: 'deploy@machine.example' }).success).toBe(true)
     expect(MultiHostSchema.safeDecodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: 'deploy@machine; touch /tmp/pwned' }).success).toBe(false)
-    expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime@blue.service', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
-    expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: "dsh'; id #", remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(false)
+    expect(
+      MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime@blue.service', remoteHome: '/home/deploy/.dsh/blue' }).success,
+    ).toBe(true)
+    expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: "dsh'; id #", remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(
+      false,
+    )
     expect(MultiHostSchema.safeDecodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime', remoteHome: '/home/deploy/../root' }).success).toBe(false)
   })
 
@@ -76,7 +86,11 @@ describe('multi-host record schemas', () => {
 
     const orphaned = MultiHostSchema.safeDecodeStrict(runtimeRecordSchema, { ...localRuntime, hostId: 'missing' })
     expect(orphaned.success).toBe(true)
-    const orphanDirectory = MultiHostSchema.safeDecodeStrict(hostDirectorySchema, { schemaVersion: 2, hosts: [firstHost], runtimes: [{ ...localRuntime, hostId: 'missing' }] })
+    const orphanDirectory = MultiHostSchema.safeDecodeStrict(hostDirectorySchema, {
+      schemaVersion: 2,
+      hosts: [firstHost],
+      runtimes: [{ ...localRuntime, hostId: 'missing' }],
+    })
     expect(orphanDirectory.success).toBe(false)
   })
 
@@ -95,7 +109,12 @@ describe('multi-host record schemas', () => {
       runtimes: [first, { ...first, id: '20000000-0000-4000-8000-000000000001' }],
     })
     expect(duplicateOrigin.success).toBe(false)
-    const retiredOrigin = MultiHostSchema.safeDecodeStrict(hostDirectorySchema, { schemaVersion: 2, hosts: [firstHost], runtimes: [first], retiredPorts: [firstPort] })
+    const retiredOrigin = MultiHostSchema.safeDecodeStrict(hostDirectorySchema, {
+      schemaVersion: 2,
+      hosts: [firstHost],
+      runtimes: [first],
+      retiredPorts: [firstPort],
+    })
     expect(retiredOrigin.success).toBe(false)
   })
 })

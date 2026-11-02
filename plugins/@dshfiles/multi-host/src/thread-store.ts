@@ -61,7 +61,10 @@ const listRemoteThreads = async (): Promise<readonly RemoteThread[]> => {
 
 const recordRemoteThread = (thread: RemoteThread): Promise<RemoteThread> =>
   update(threads => ({
-    next: [...threads.filter(item => !(item.runtimeId === thread.runtimeId && item.sessionId === thread.sessionId)), MultiHostSchema.decodeStrict(remoteThreadSchema, thread)],
+    next: [
+      ...threads.filter(item => !(item.runtimeId === thread.runtimeId && item.sessionId === thread.sessionId)),
+      MultiHostSchema.decodeStrict(remoteThreadSchema, thread),
+    ],
     result: thread,
   }))
 

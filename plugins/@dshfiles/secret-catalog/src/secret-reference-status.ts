@@ -89,7 +89,12 @@ export const checkSecretReference = async (input: {
   if (matches.length === 0) {
     const aliasScopes = [...new Set(sameAlias.map(row => row.scope))]
     const owningScope = aliasScopes.length === 1 ? Schema.decodeUnknownOption(secretScopeSchemaEffect)(aliasScopes[0]) : null
-    return { ...named, state: 'environment-missing', environments, writeScope: owningScope !== null && Option.isSome(owningScope) ? owningScope.value : writeScope }
+    return {
+      ...named,
+      state: 'environment-missing',
+      environments,
+      writeScope: owningScope !== null && Option.isSome(owningScope) ? owningScope.value : writeScope,
+    }
   }
   if (matches.length > 1) return { ...named, state: 'ambiguous', environments, scopes }
 

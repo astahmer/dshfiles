@@ -34,7 +34,13 @@ import {
   type ThreadViewSettings,
   WORKING_VIEW_ID,
 } from './thread-view-preferences.js'
-import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_GROUPS, THREAD_STATUS_FILTER_OPTIONS, type ThreadStatusFilter } from './thread-view.js'
+import {
+  THREAD_GROUP_BY_OPTIONS,
+  THREAD_SOURCE_FILTER_OPTIONS,
+  THREAD_STATUS_FILTER_GROUPS,
+  THREAD_STATUS_FILTER_OPTIONS,
+  type ThreadStatusFilter,
+} from './thread-view.js'
 
 export type ThreadSidebarTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
 

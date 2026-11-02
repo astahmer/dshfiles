@@ -2,16 +2,24 @@ import * as Schema from 'effect/Schema'
 import { MultiHostSchema } from './schema.js'
 import type { ModelSelection, TranscriptEntry } from './api.js'
 
-const eventSchema = Schema.Struct({ type: Schema.String, seq: Schema.Number.check(Schema.isFinite(), Schema.isInt()), data: Schema.Unknown }).pipe(MultiHostSchema.passthrough)
+const eventSchema = Schema.Struct({ type: Schema.String, seq: Schema.Number.check(Schema.isFinite(), Schema.isInt()), data: Schema.Unknown }).pipe(
+  MultiHostSchema.passthrough,
+)
 const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(MultiHostSchema.passthrough)
-const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)
-const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(MultiHostSchema.passthrough)
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }).pipe(
+  MultiHostSchema.passthrough,
+)
+const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(
+  MultiHostSchema.passthrough,
+)
 const userMessageSchema = Schema.Struct({
   content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))),
   source: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)),
 }).pipe(MultiHostSchema.passthrough)
 const assistantSchema = Schema.Struct({ message: messageSchema }).pipe(MultiHostSchema.passthrough)
-const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)
+const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(
+  MultiHostSchema.passthrough,
+)
 const toolArgumentsSchema = Schema.Struct({
   command: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
@@ -22,10 +30,14 @@ const toolResultSchema = Schema.Struct({
     MultiHostSchema.passthrough,
   ),
 }).pipe(MultiHostSchema.passthrough)
-const turnEndSchema = Schema.Struct({ reason: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)) }).pipe(MultiHostSchema.passthrough)
+const turnEndSchema = Schema.Struct({ reason: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)) }).pipe(
+  MultiHostSchema.passthrough,
+)
 const titleSchema = Schema.Struct({ title: Schema.String }).pipe(MultiHostSchema.passthrough)
 const requestHeaderSchema = Schema.Struct({
-  header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }).pipe(MultiHostSchema.passthrough) }).pipe(MultiHostSchema.passthrough),
+  header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }).pipe(MultiHostSchema.passthrough) }).pipe(
+    MultiHostSchema.passthrough,
+  ),
 }).pipe(MultiHostSchema.passthrough)
 
 const maxText = 8_000

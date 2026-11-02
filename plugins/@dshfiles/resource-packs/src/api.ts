@@ -11,7 +11,10 @@ import {
   storedPackSchema,
 } from './model.js'
 
-const identity = { resourceId: Schema.String.check(Schema.isUUID()), expectedRevision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)) }
+const identity = {
+  resourceId: Schema.String.check(Schema.isUUID()),
+  expectedRevision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+}
 const attachmentIdentity = { ...identity, packId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }
 const writeNote =
   'Call only when the user asked, or to record this thread’s explicitly authorized work. This edits local metadata only; it never changes native content or executes an agent.'
@@ -37,7 +40,12 @@ export const resourcePacksApi = defineApi({
           limit: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200))),
         }),
       ),
-      output: openSchema(Schema.Struct({ resources: Schema.Array(resourceSchema), total: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)) })),
+      output: openSchema(
+        Schema.Struct({
+          resources: Schema.Array(resourceSchema),
+          total: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+        }),
+      ),
       description:
         'List registered resource metadata, optionally filtered by text, kind or attached pack. Native file contents and conversations are never read. Read-only.',
       tool: { name: 'resource_packs_list', readOnly: true },

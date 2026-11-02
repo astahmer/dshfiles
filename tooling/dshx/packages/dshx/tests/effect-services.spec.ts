@@ -34,9 +34,7 @@ const storageContext = async () => {
 
 const serviceFailure = { _tag: 'EffectHostServiceError' as const }
 
-class CordisContextService extends EffectContext.Service<CordisContextService, { readonly context: CordisContext }>()(
-  'dshx/effect/test/CordisContext',
-) {}
+class CordisContextService extends EffectContext.Service<CordisContextService, { readonly context: CordisContext }>()('dshx/effect/test/CordisContext') {}
 
 describe('@dshfiles/dshx/effect/services', () => {
   it('builds the plugin Layer from its actual Cordis setup context', async () => {
@@ -70,19 +68,23 @@ describe('@dshfiles/dshx/effect/services', () => {
     })
 
     await expect(Effect.runPromise(Effect.provide(program, layer))).resolves.toMatchObject({ value: { value: 1 } })
-    await expect(Effect.runPromise(Effect.provide(Effect.gen(function* () {
-      const storage = yield* PluginStorage
-      return yield* storage.set('', 'invalid key')
-    }), layer))).rejects.toMatchObject({ ...serviceFailure, service: 'plugin-storage', operation: 'set' })
+    await expect(
+      Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const storage = yield* PluginStorage
+            return yield* storage.set('', 'invalid key')
+          }),
+          layer,
+        ),
+      ),
+    ).rejects.toMatchObject({ ...serviceFailure, service: 'plugin-storage', operation: 'set' })
   })
 
   it('makes Host API methods Effect calls with the Promise contract unchanged', async () => {
     const host = await createTestHost()
     const statusApi = defineApi({ id: 'status', version: 1, owner: '@test/status', methods: { read: method<void, string>() } })
-    await host.mount(
-      defineHost({ apis: [DshxEffect.host(statusApi, { read: () => Effect.succeed('ready') })] }),
-      { packageId: '@test/status' },
-    )
+    await host.mount(defineHost({ apis: [DshxEffect.host(statusApi, { read: () => Effect.succeed('ready') })] }), { packageId: '@test/status' })
     const promiseClient = createHostApiClient(host.ctx, statusApi, '@test/caller')
     const effectCall = Effect.gen(function* () {
       const client = yield* HostApiClient
@@ -122,13 +124,27 @@ describe('@dshfiles/dshx/effect/services', () => {
       principal: { kind: 'external', id: 'effect-test' },
       listAgents: async () => [],
       listTopics: async () => [],
-      diagnostics: async () => { throw new Error('unused') },
-      subscribe: async () => { throw new Error('unused') },
-      unsubscribe: async () => { throw new Error('unused') },
-      publish: async () => { throw new Error('unused') },
-      send: async () => { throw new Error('unused') },
-      inbox: async () => { throw new Error('unused') },
-      acknowledge: async () => { throw new Error('unused') },
+      diagnostics: async () => {
+        throw new Error('unused')
+      },
+      subscribe: async () => {
+        throw new Error('unused')
+      },
+      unsubscribe: async () => {
+        throw new Error('unused')
+      },
+      publish: async () => {
+        throw new Error('unused')
+      },
+      send: async () => {
+        throw new Error('unused')
+      },
+      inbox: async () => {
+        throw new Error('unused')
+      },
+      acknowledge: async () => {
+        throw new Error('unused')
+      },
     }
     const readTopics = Effect.gen(function* () {
       const communication = yield* Communication
@@ -149,7 +165,11 @@ describe('@dshfiles/dshx/effect/services', () => {
 
   it('types synchronous SettingsScope getter failures at the boundary', async () => {
     const settingsTag = SettingsRead.make<{ readonly enabled: boolean }>('test-settings')
-    const layer = settingsTag.layer({ get: () => { throw new Error('not serialized') } })
+    const layer = settingsTag.layer({
+      get: () => {
+        throw new Error('not serialized')
+      },
+    })
     const read = Effect.gen(function* () {
       const settings = yield* settingsTag.Tag
       return yield* settings.get()
@@ -171,7 +191,9 @@ describe('@dshfiles/dshx/effect/services', () => {
       control: undefined,
       collected: {},
       done: Promise.resolve({ exitCode: 0, signal: null }),
-      terminate: () => { terminated = true },
+      terminate: () => {
+        terminated = true
+      },
       waitForExit: async () => {
         waited = true
         return true
@@ -181,7 +203,9 @@ describe('@dshfiles/dshx/effect/services', () => {
       resolveExecutable: async command => command,
       terminalEnvironment: async () => ({ platform: 'posix' }),
       spawn: (_spec: SubprocessSpawnSpec) => handle,
-      spawnTerminal: async () => { throw new Error('unused') },
+      spawnTerminal: async () => {
+        throw new Error('unused')
+      },
     }
     const spec: SubprocessSpawnSpec = {
       argv: ['test'],
@@ -189,10 +213,12 @@ describe('@dshfiles/dshx/effect/services', () => {
       stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' },
       graceMs: 10,
     }
-    const run = Effect.scoped(Effect.gen(function* () {
-      const subprocess = yield* Subprocess
-      yield* subprocess.spawnScoped(spec)
-    }))
+    const run = Effect.scoped(
+      Effect.gen(function* () {
+        const subprocess = yield* Subprocess
+        yield* subprocess.spawnScoped(spec)
+      }),
+    )
     await Effect.runPromise(Effect.provide(run, Subprocess.layer(runtime)))
     expect(terminated).toBe(true)
     expect(waited).toBe(true)

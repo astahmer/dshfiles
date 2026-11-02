@@ -164,9 +164,7 @@ export const projectChecksApi = defineApi({
       tool: { name: 'project_checks_run', render: compactJson },
     }),
     dispatch: method({
-      input: exactSchema(
-        Schema.Struct({ sessionId: Schema.optionalKey(sessionIdSchema), actionId: actionIdSchema, idempotencyKey: uuidSchema }),
-      ),
+      input: exactSchema(Schema.Struct({ sessionId: Schema.optionalKey(sessionIdSchema), actionId: actionIdSchema, idempotencyKey: uuidSchema })),
       output: openSchema(durableTaskViewSchema),
       description:
         'Durably dispatch one configured local project action and return its task record. This creates work and may execute a process; call only when the user asked. Reuse the same idempotencyKey to safely repeat dispatch after a lost response.',

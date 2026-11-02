@@ -86,6 +86,8 @@ describe('authoritative API validation', () => {
       properties: [{ id: 'note', label: 'Note', type: 'text' }],
     })
     expect(await call('registerPack', { definition })).toMatchObject({ result: { ok: true, value: { output: { owner: 'user' } } } })
-    expect(Schema.decodeUnknownSync(errorResponse)(await call('registerPack', { definition: { ...definition, id: 'tracking' } })).result.error.code).toBe('owner-conflict')
+    expect(Schema.decodeUnknownSync(errorResponse)(await call('registerPack', { definition: { ...definition, id: 'tracking' } })).result.error.code).toBe(
+      'owner-conflict',
+    )
   })
 })

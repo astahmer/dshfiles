@@ -171,7 +171,9 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
         ),
       )
     }
-    return completeHostOrder(completeRuntimePorts(MultiHostSchema.decode(hostDirectorySchema, { schemaVersion: 2, hosts, runtimes }, { onExcessProperty: 'error' })))
+    return completeHostOrder(
+      completeRuntimePorts(MultiHostSchema.decode(hostDirectorySchema, { schemaVersion: 2, hosts, runtimes }, { onExcessProperty: 'error' })),
+    )
   }
 
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')

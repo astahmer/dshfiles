@@ -13,9 +13,7 @@
         "description": "Maximum matches to load, from 1 to 5."
       }
     },
-    "required": [
-      "query"
-    ]
+    "required": ["query"]
   },
   "output": {
     "schema": {
@@ -36,28 +34,17 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "loaded",
-                  "already_loaded",
-                  "unavailable"
-                ]
+                "enum": ["loaded", "already_loaded", "unavailable"]
               }
             },
-            "required": [
-              "name",
-              "status"
-            ]
+            "required": ["name", "status"]
           }
         },
         "remainingDeferred": {
           "type": "integer"
         }
       },
-      "required": [
-        "query",
-        "tools",
-        "remainingDeferred"
-      ]
+      "required": ["query", "tools", "remainingDeferred"]
     }
   }
 }

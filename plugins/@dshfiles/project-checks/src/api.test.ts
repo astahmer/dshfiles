@@ -46,9 +46,9 @@ describe('rebased candidate verification contract', () => {
         expectedRevision: 'b'.repeat(40),
       }),
     ).toBe(true)
-    expect(
-      Schema.is(candidateVerificationInputSchema)({ sessionId: 'session-1', turn: 2, sourceRevision: 'main', expectedRevision: 'b'.repeat(40) }),
-    ).toBe(false)
+    expect(Schema.is(candidateVerificationInputSchema)({ sessionId: 'session-1', turn: 2, sourceRevision: 'main', expectedRevision: 'b'.repeat(40) })).toBe(
+      false,
+    )
     expect(Schema.decodeUnknownSync(completionAuthorizationResultSchema)({ status: 'authorized' })).toEqual({ status: 'authorized' })
     expect(Schema.decodeUnknownSync(candidateVerificationResultSchema)({ status: 'passed', prompt: null })).toEqual({ status: 'passed', prompt: null })
     expect(Schema.is(candidateVerificationResultSchema)({ status: 'failed', prompt: 'x'.repeat(2_049) })).toBe(false)

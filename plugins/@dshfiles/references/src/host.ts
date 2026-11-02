@@ -57,7 +57,11 @@ const sessionOf = (input: { readonly sessionId?: string | undefined }, caller: A
 const describe = (reference: Reference): string =>
   `${reference.name} · ${reference.path}${reference.kind === 'git' ? ` (${reference.source}${reference.ref === null ? '' : ` @ ${reference.ref}`})` : ''}`
 
-const sessionInput = Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Session to change; defaults to the calling agent’s own Session.' }))
+const sessionInput = Schema.optional(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({
+    description: 'Session to change; defaults to the calling agent’s own Session.',
+  }),
+)
 
 const referencesApi = defineApi({
   id: 'references',
@@ -80,7 +84,9 @@ const referencesApi = defineApi({
       input: Schema.Struct({
         name: References.nameSchema,
         source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)).annotate({ description: 'Absolute directory path (or ~/…) or git URL.' }),
-        ref: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Branch or tag to clone a git reference at.' })),
+        ref: Schema.optional(
+          Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Branch or tag to clone a git reference at.' }),
+        ),
         description: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
       }),
       output: References.referenceSchema,

@@ -52,7 +52,7 @@ describe('create-dshx', () => {
       peerDependencies: Record<string, string>
     }
     expect(host).toContain("import { DshxEffect } from '@dshfiles/dshx/effect'")
-    expect(host).toContain("const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })")
+    expect(host).toContain('const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })')
     expect(host).toContain("apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })]")
     expect(manifest.devDependencies.effect).toBe('4.1.0')
     expect(manifest.peerDependencies.effect).toBe('^4.1.0')

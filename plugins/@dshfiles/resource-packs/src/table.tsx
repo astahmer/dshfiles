@@ -26,7 +26,8 @@ function PropertyCell(props: {
   onOpenReference: (ref: ResourceRef) => void
 }): JSX.Element {
   if (props.property.type === 'reference') {
-    if (Schema.is(resourceRefSchema)(props.value)) return <ReferenceCell reference={props.value} resources={props.resources} onOpenReference={props.onOpenReference} />
+    if (Schema.is(resourceRefSchema)(props.value))
+      return <ReferenceCell reference={props.value} resources={props.resources} onOpenReference={props.onOpenReference} />
   }
   if (props.property.type === 'references') {
     const references = ResourceUiModel.references(props.value)

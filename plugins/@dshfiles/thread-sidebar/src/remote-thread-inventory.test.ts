@@ -16,10 +16,9 @@ const status = {
 
 test('only probes runtimes that own started-here threads', () => {
   const runtimes = [{ id: 'runtime-a' }, { id: 'runtime-b' }, { id: 'runtime-c' }]
-  expect(RemoteThreadInventoryModel.runtimesWithStartedThreads(runtimes, [{ runtimeId: 'runtime-c' }, { runtimeId: 'runtime-a' }, { runtimeId: 'runtime-c' }])).toEqual([
-    runtimes[0],
-    runtimes[2],
-  ])
+  expect(
+    RemoteThreadInventoryModel.runtimesWithStartedThreads(runtimes, [{ runtimeId: 'runtime-c' }, { runtimeId: 'runtime-a' }, { runtimeId: 'runtime-c' }]),
+  ).toEqual([runtimes[0], runtimes[2]])
   expect(RemoteThreadInventoryModel.runtimesWithStartedThreads(runtimes, [])).toEqual([])
 })
 

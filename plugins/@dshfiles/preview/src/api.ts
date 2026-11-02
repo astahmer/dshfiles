@@ -76,7 +76,9 @@ export const previewApi = defineApi({
     navigate: method({
       input: Schema.Struct({
         pageId: pageIdField,
-        url: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048))).annotate({ description: 'Address to load in the page.' }),
+        url: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048))).annotate({
+          description: 'Address to load in the page.',
+        }),
         action: Schema.optionalKey(Schema.Literals(['back', 'forward', 'reload'])).annotate({ description: 'History action, used instead of url.' }),
         sessionId: sessionIdField,
       }).check(

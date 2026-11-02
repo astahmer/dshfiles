@@ -92,10 +92,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "provider",
-                        "model"
-                      ]
+                      "required": ["provider", "model"]
                     },
                     {
                       "type": "null"
@@ -129,11 +126,7 @@
                   "properties": {
                     "messaging": {
                       "type": "string",
-                      "enum": [
-                        "any",
-                        "listed",
-                        "none"
-                      ]
+                      "enum": ["any", "listed", "none"]
                     },
                     "handles": {
                       "type": "array",
@@ -147,11 +140,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "messaging",
-                    "handles",
-                    "subagents"
-                  ]
+                  "required": ["messaging", "handles", "subagents"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -208,10 +197,7 @@
             }
           }
         },
-        "required": [
-          "revision",
-          "agents"
-        ]
+        "required": ["revision", "agents"]
       },
       "toolInput": {
         "type": "null"
@@ -258,10 +244,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "provider",
-                    "model"
-                  ]
+                  "required": ["provider", "model"]
                 },
                 "memoryScope": {
                   "type": "string"
@@ -274,11 +257,7 @@
                   "properties": {
                     "messaging": {
                       "type": "string",
-                      "enum": [
-                        "any",
-                        "listed",
-                        "none"
-                      ]
+                      "enum": ["any", "listed", "none"]
                     },
                     "handles": {
                       "type": "array",
@@ -290,11 +269,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "messaging",
-                    "handles",
-                    "subagents"
-                  ]
+                  "required": ["messaging", "handles", "subagents"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -336,10 +311,7 @@
             }
           }
         },
-        "required": [
-          "revision",
-          "agents"
-        ]
+        "required": ["revision", "agents"]
       }
     },
     {
@@ -358,9 +330,7 @@
             "pattern": "^[a-z][a-z0-9-]{0,31}$"
           }
         },
-        "required": [
-          "handle"
-        ]
+        "required": ["handle"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -435,10 +405,7 @@
                             ]
                           }
                         },
-                        "required": [
-                          "provider",
-                          "model"
-                        ]
+                        "required": ["provider", "model"]
                       },
                       {
                         "type": "null"
@@ -472,11 +439,7 @@
                     "properties": {
                       "messaging": {
                         "type": "string",
-                        "enum": [
-                          "any",
-                          "listed",
-                          "none"
-                        ]
+                        "enum": ["any", "listed", "none"]
                       },
                       "handles": {
                         "type": "array",
@@ -490,11 +453,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "messaging",
-                      "handles",
-                      "subagents"
-                    ]
+                    "required": ["messaging", "handles", "subagents"]
                   },
                   "enabled": {
                     "type": "boolean"
@@ -555,9 +514,7 @@
             ]
           }
         },
-        "required": [
-          "agent"
-        ]
+        "required": ["agent"]
       },
       "toolInput": {
         "type": "object",
@@ -566,9 +523,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "handle"
-        ]
+        "required": ["handle"]
       },
       "toolOutput": {
         "type": "object",
@@ -607,10 +562,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "provider",
-                  "model"
-                ]
+                "required": ["provider", "model"]
               },
               "memoryScope": {
                 "type": "string"
@@ -623,11 +575,7 @@
                 "properties": {
                   "messaging": {
                     "type": "string",
-                    "enum": [
-                      "any",
-                      "listed",
-                      "none"
-                    ]
+                    "enum": ["any", "listed", "none"]
                   },
                   "handles": {
                     "type": "array",
@@ -639,11 +587,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "messaging",
-                  "handles",
-                  "subagents"
-                ]
+                "required": ["messaging", "handles", "subagents"]
               },
               "enabled": {
                 "type": "boolean"
@@ -684,9 +628,7 @@
             ]
           }
         },
-        "required": [
-          "agent"
-        ]
+        "required": ["agent"]
       }
     },
     {
@@ -740,15 +682,11 @@
                   ]
                 }
               },
-              "required": [
-                "id"
-              ]
+              "required": ["id"]
             }
           }
         },
-        "required": [
-          "presets"
-        ]
+        "required": ["presets"]
       }
     },
     {
@@ -822,10 +760,7 @@
                         ]
                       }
                     },
-                    "required": [
-                      "provider",
-                      "model"
-                    ]
+                    "required": ["provider", "model"]
                   },
                   {
                     "type": "null"
@@ -851,11 +786,7 @@
                 "properties": {
                   "messaging": {
                     "type": "string",
-                    "enum": [
-                      "any",
-                      "listed",
-                      "none"
-                    ]
+                    "enum": ["any", "listed", "none"]
                   },
                   "handles": {
                     "type": "array",
@@ -869,30 +800,16 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "messaging",
-                  "handles"
-                ]
+                "required": ["messaging", "handles"]
               },
               "enabled": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "handle",
-              "name",
-              "glyph",
-              "description",
-              "instructions",
-              "preset",
-              "route",
-              "enabled"
-            ]
+            "required": ["handle", "name", "glyph", "description", "instructions", "preset", "route", "enabled"]
           }
         },
-        "required": [
-          "agent"
-        ]
+        "required": ["agent"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -902,9 +819,7 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "applied"
-                ]
+                "enum": ["applied"]
               },
               "revision": {
                 "type": "integer",
@@ -980,10 +895,7 @@
                               ]
                             }
                           },
-                          "required": [
-                            "provider",
-                            "model"
-                          ]
+                          "required": ["provider", "model"]
                         },
                         {
                           "type": "null"
@@ -1017,11 +929,7 @@
                       "properties": {
                         "messaging": {
                           "type": "string",
-                          "enum": [
-                            "any",
-                            "listed",
-                            "none"
-                          ]
+                          "enum": ["any", "listed", "none"]
                         },
                         "handles": {
                           "type": "array",
@@ -1035,11 +943,7 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "messaging",
-                        "handles",
-                        "subagents"
-                      ]
+                      "required": ["messaging", "handles", "subagents"]
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1162,10 +1066,7 @@
                             ]
                           }
                         },
-                        "required": [
-                          "provider",
-                          "model"
-                        ]
+                        "required": ["provider", "model"]
                       },
                       {
                         "type": "null"
@@ -1199,11 +1100,7 @@
                     "properties": {
                       "messaging": {
                         "type": "string",
-                        "enum": [
-                          "any",
-                          "listed",
-                          "none"
-                        ]
+                        "enum": ["any", "listed", "none"]
                       },
                       "handles": {
                         "type": "array",
@@ -1217,11 +1114,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "messaging",
-                      "handles",
-                      "subagents"
-                    ]
+                    "required": ["messaging", "handles", "subagents"]
                   },
                   "enabled": {
                     "type": "boolean"
@@ -1277,21 +1170,14 @@
                 ]
               }
             },
-            "required": [
-              "kind",
-              "revision",
-              "agents",
-              "agent"
-            ]
+            "required": ["kind", "revision", "agents", "agent"]
           },
           {
             "type": "object",
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "limit"
-                ]
+                "enum": ["limit"]
               },
               "revision": {
                 "type": "integer",
@@ -1367,10 +1253,7 @@
                               ]
                             }
                           },
-                          "required": [
-                            "provider",
-                            "model"
-                          ]
+                          "required": ["provider", "model"]
                         },
                         {
                           "type": "null"
@@ -1404,11 +1287,7 @@
                       "properties": {
                         "messaging": {
                           "type": "string",
-                          "enum": [
-                            "any",
-                            "listed",
-                            "none"
-                          ]
+                          "enum": ["any", "listed", "none"]
                         },
                         "handles": {
                           "type": "array",
@@ -1422,11 +1301,7 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "messaging",
-                        "handles",
-                        "subagents"
-                      ]
+                      "required": ["messaging", "handles", "subagents"]
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1483,11 +1358,7 @@
                 }
               }
             },
-            "required": [
-              "kind",
-              "revision",
-              "agents"
-            ]
+            "required": ["kind", "revision", "agents"]
           }
         ]
       },
@@ -1528,10 +1399,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "provider",
-                  "model"
-                ]
+                "required": ["provider", "model"]
               },
               "memoryScope": {
                 "type": "string"
@@ -1544,11 +1412,7 @@
                 "properties": {
                   "messaging": {
                     "type": "string",
-                    "enum": [
-                      "any",
-                      "listed",
-                      "none"
-                    ]
+                    "enum": ["any", "listed", "none"]
                   },
                   "handles": {
                     "type": "array",
@@ -1560,30 +1424,16 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "messaging",
-                  "handles"
-                ]
+                "required": ["messaging", "handles"]
               },
               "enabled": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "handle",
-              "name",
-              "glyph",
-              "description",
-              "instructions",
-              "preset",
-              "route",
-              "enabled"
-            ]
+            "required": ["handle", "name", "glyph", "description", "instructions", "preset", "route", "enabled"]
           }
         },
-        "required": [
-          "agent"
-        ]
+        "required": ["agent"]
       },
       "toolOutput": {
         "oneOf": [
@@ -1592,9 +1442,7 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "applied"
-                ]
+                "enum": ["applied"]
               },
               "revision": {
                 "type": "integer"
@@ -1635,10 +1483,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "provider",
-                        "model"
-                      ]
+                      "required": ["provider", "model"]
                     },
                     "memoryScope": {
                       "type": "string"
@@ -1651,11 +1496,7 @@
                       "properties": {
                         "messaging": {
                           "type": "string",
-                          "enum": [
-                            "any",
-                            "listed",
-                            "none"
-                          ]
+                          "enum": ["any", "listed", "none"]
                         },
                         "handles": {
                           "type": "array",
@@ -1667,11 +1508,7 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "messaging",
-                        "handles",
-                        "subagents"
-                      ]
+                      "required": ["messaging", "handles", "subagents"]
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1746,10 +1583,7 @@
                         "type": "string"
                       }
                     },
-                    "required": [
-                      "provider",
-                      "model"
-                    ]
+                    "required": ["provider", "model"]
                   },
                   "memoryScope": {
                     "type": "string"
@@ -1762,11 +1596,7 @@
                     "properties": {
                       "messaging": {
                         "type": "string",
-                        "enum": [
-                          "any",
-                          "listed",
-                          "none"
-                        ]
+                        "enum": ["any", "listed", "none"]
                       },
                       "handles": {
                         "type": "array",
@@ -1778,11 +1608,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "messaging",
-                      "handles",
-                      "subagents"
-                    ]
+                    "required": ["messaging", "handles", "subagents"]
                   },
                   "enabled": {
                     "type": "boolean"
@@ -1823,21 +1649,14 @@
                 ]
               }
             },
-            "required": [
-              "kind",
-              "revision",
-              "agents",
-              "agent"
-            ]
+            "required": ["kind", "revision", "agents", "agent"]
           },
           {
             "type": "object",
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "limit"
-                ]
+                "enum": ["limit"]
               },
               "revision": {
                 "type": "integer"
@@ -1878,10 +1697,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "provider",
-                        "model"
-                      ]
+                      "required": ["provider", "model"]
                     },
                     "memoryScope": {
                       "type": "string"
@@ -1894,11 +1710,7 @@
                       "properties": {
                         "messaging": {
                           "type": "string",
-                          "enum": [
-                            "any",
-                            "listed",
-                            "none"
-                          ]
+                          "enum": ["any", "listed", "none"]
                         },
                         "handles": {
                           "type": "array",
@@ -1910,11 +1722,7 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "messaging",
-                        "handles",
-                        "subagents"
-                      ]
+                      "required": ["messaging", "handles", "subagents"]
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1956,11 +1764,7 @@
                 }
               }
             },
-            "required": [
-              "kind",
-              "revision",
-              "agents"
-            ]
+            "required": ["kind", "revision", "agents"]
           }
         ]
       }
@@ -1982,15 +1786,10 @@
           },
           "confirm": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "handle",
-          "confirm"
-        ]
+        "required": ["handle", "confirm"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1998,11 +1797,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "applied",
-              "built-in",
-              "missing"
-            ]
+            "enum": ["applied", "built-in", "missing"]
           },
           "revision": {
             "type": "integer",
@@ -2078,10 +1873,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "provider",
-                        "model"
-                      ]
+                      "required": ["provider", "model"]
                     },
                     {
                       "type": "null"
@@ -2115,11 +1907,7 @@
                   "properties": {
                     "messaging": {
                       "type": "string",
-                      "enum": [
-                        "any",
-                        "listed",
-                        "none"
-                      ]
+                      "enum": ["any", "listed", "none"]
                     },
                     "handles": {
                       "type": "array",
@@ -2133,11 +1921,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "messaging",
-                    "handles",
-                    "subagents"
-                  ]
+                  "required": ["messaging", "handles", "subagents"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2194,11 +1978,7 @@
             }
           }
         },
-        "required": [
-          "kind",
-          "revision",
-          "agents"
-        ]
+        "required": ["kind", "revision", "agents"]
       },
       "toolInput": {
         "type": "object",
@@ -2208,26 +1988,17 @@
           },
           "confirm": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "handle",
-          "confirm"
-        ]
+        "required": ["handle", "confirm"]
       },
       "toolOutput": {
         "type": "object",
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "applied",
-              "built-in",
-              "missing"
-            ]
+            "enum": ["applied", "built-in", "missing"]
           },
           "revision": {
             "type": "integer"
@@ -2268,10 +2039,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "provider",
-                    "model"
-                  ]
+                  "required": ["provider", "model"]
                 },
                 "memoryScope": {
                   "type": "string"
@@ -2284,11 +2052,7 @@
                   "properties": {
                     "messaging": {
                       "type": "string",
-                      "enum": [
-                        "any",
-                        "listed",
-                        "none"
-                      ]
+                      "enum": ["any", "listed", "none"]
                     },
                     "handles": {
                       "type": "array",
@@ -2300,11 +2064,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "messaging",
-                    "handles",
-                    "subagents"
-                  ]
+                  "required": ["messaging", "handles", "subagents"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2346,11 +2106,7 @@
             }
           }
         },
-        "required": [
-          "kind",
-          "revision",
-          "agents"
-        ]
+        "required": ["kind", "revision", "agents"]
       }
     },
     {
@@ -2379,10 +2135,7 @@
                     "maxLength": 200
                   }
                 },
-                "required": [
-                  "sessionId",
-                  "title"
-                ]
+                "required": ["sessionId", "title"]
               },
               {
                 "type": "null"
@@ -2390,9 +2143,7 @@
             ]
           }
         },
-        "required": [
-          "handle"
-        ]
+        "required": ["handle"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2472,10 +2223,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "provider",
-                        "model"
-                      ]
+                      "required": ["provider", "model"]
                     },
                     {
                       "type": "null"
@@ -2509,11 +2257,7 @@
                   "properties": {
                     "messaging": {
                       "type": "string",
-                      "enum": [
-                        "any",
-                        "listed",
-                        "none"
-                      ]
+                      "enum": ["any", "listed", "none"]
                     },
                     "handles": {
                       "type": "array",
@@ -2527,11 +2271,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "messaging",
-                    "handles",
-                    "subagents"
-                  ]
+                  "required": ["messaging", "handles", "subagents"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2588,10 +2328,7 @@
             }
           }
         },
-        "required": [
-          "revision",
-          "agents"
-        ]
+        "required": ["revision", "agents"]
       }
     },
     {
@@ -2610,9 +2347,7 @@
             "pattern": "^[a-z][a-z0-9-]{0,31}$"
           }
         },
-        "required": [
-          "handle"
-        ]
+        "required": ["handle"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2642,18 +2377,11 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "sessionId",
-                "handle",
-                "title",
-                "startedAt"
-              ]
+              "required": ["sessionId", "handle", "title", "startedAt"]
             }
           }
         },
-        "required": [
-          "threads"
-        ]
+        "required": ["threads"]
       },
       "toolInput": {
         "type": "object",
@@ -2662,9 +2390,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "handle"
-        ]
+        "required": ["handle"]
       },
       "toolOutput": {
         "type": "object",
@@ -2687,18 +2413,11 @@
                   "type": "integer"
                 }
               },
-              "required": [
-                "sessionId",
-                "handle",
-                "title",
-                "startedAt"
-              ]
+              "required": ["sessionId", "handle", "title", "startedAt"]
             }
           }
         },
-        "required": [
-          "threads"
-        ]
+        "required": ["threads"]
       }
     },
     {
@@ -2714,9 +2433,7 @@
             "maxLength": 256
           }
         },
-        "required": [
-          "sessionId"
-        ]
+        "required": ["sessionId"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2791,10 +2508,7 @@
                             ]
                           }
                         },
-                        "required": [
-                          "provider",
-                          "model"
-                        ]
+                        "required": ["provider", "model"]
                       },
                       {
                         "type": "null"
@@ -2828,11 +2542,7 @@
                     "properties": {
                       "messaging": {
                         "type": "string",
-                        "enum": [
-                          "any",
-                          "listed",
-                          "none"
-                        ]
+                        "enum": ["any", "listed", "none"]
                       },
                       "handles": {
                         "type": "array",
@@ -2846,11 +2556,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "messaging",
-                      "handles",
-                      "subagents"
-                    ]
+                    "required": ["messaging", "handles", "subagents"]
                   },
                   "enabled": {
                     "type": "boolean"
@@ -2911,9 +2617,7 @@
             ]
           }
         },
-        "required": [
-          "agent"
-        ]
+        "required": ["agent"]
       }
     }
   ]

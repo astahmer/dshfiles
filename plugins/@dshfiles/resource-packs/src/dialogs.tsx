@@ -39,7 +39,10 @@ export function MutationError(props: { error: Error | null }): JSX.Element | nul
 export function AddResourceDialog(props: { api: ResourcePacksClient; onClose: () => void; onCreated: (resource: ResourceRecord) => void }): JSX.Element {
   const mutation = useMutation({
     mutationFn: async (value: { provider: string; kind: string; id: string; label: string }) =>
-      props.api.registerResource({ ref: Schema.decodeUnknownSync(resourceRefSchema)({ provider: value.provider, kind: value.kind, id: value.id }), label: value.label }),
+      props.api.registerResource({
+        ref: Schema.decodeUnknownSync(resourceRefSchema)({ provider: value.provider, kind: value.kind, id: value.id }),
+        label: value.label,
+      }),
     onSuccess: props.onCreated,
   })
   const form = useAppForm({

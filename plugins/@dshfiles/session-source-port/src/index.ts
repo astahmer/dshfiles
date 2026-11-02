@@ -165,9 +165,7 @@ const acceptedShape = passthrough(Schema.Struct({ accepted: Schema.Literal(true)
 const sessionPromptValueSchema = wirePayload<SessionPromptValue>(acceptedShape)
 const sessionCancelValueSchema = wirePayload<SessionCancelValue>(acceptedShape)
 const sessionUpdateQueueValueSchema = wirePayload<SessionUpdateQueueValue>(acceptedShape)
-const modelSelectionShape = passthrough(
-  Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }),
-)
+const modelSelectionShape = passthrough(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }))
 const sessionSelectModelValueSchema = wirePayload<SessionSelectModelValue>(passthrough(Schema.Struct({ selected: modelSelectionShape })))
 const projectionsShape = Schema.Union([
   Schema.Null,
@@ -187,9 +185,7 @@ export class SessionSourcePayload {
    * @returns the rows the browser's Session model reads.
    */
   static summaries(value: unknown): readonly SessionSummary[] {
-    return Schema.decodeUnknownSync(
-      passthrough(Schema.Struct({ items: Schema.Array(sessionSummarySchema).check(Schema.isMaxLength(10_000)) })),
-    )(value).items
+    return Schema.decodeUnknownSync(passthrough(Schema.Struct({ items: Schema.Array(sessionSummarySchema).check(Schema.isMaxLength(10_000)) })))(value).items
   }
 
   /**

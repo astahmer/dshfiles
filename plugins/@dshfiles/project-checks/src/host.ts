@@ -1052,9 +1052,12 @@ const hostApi = makeHostApi(projectChecksApi, {
 
 const setupHost = (ctx: Context, config: ProjectChecksConfig): void => {
   ctx.on('dshfiles/activity/backfill', payload => {
-    const parsed = Schema.decodeUnknownResult(Schema.Struct({ since: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))) }), {
-      onExcessProperty: 'error',
-    })(payload)
+    const parsed = Schema.decodeUnknownResult(
+      Schema.Struct({ since: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))) }),
+      {
+        onExcessProperty: 'error',
+      },
+    )(payload)
     if (parsed._tag === 'Failure') return undefined
     void readStoredReceiptsAfter(ctx, parsed.success.since ?? 0)
       .then(receipts => {

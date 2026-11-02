@@ -112,7 +112,8 @@ export class ResourceValidation {
   // oxlint-disable-next-line antislop/no-unknown-parameters -- Submitted patches and SQLite JSON are parsed here before any domain checks or persistence.
   static parseValues(definition: PackDefinition, input: unknown, caller?: ApiCaller, owner?: string): PropertyValues {
     const result = Schema.decodeUnknownResult(propertyValuesSchema, { onExcessProperty: 'error' })(input)
-    if (result._tag === 'Failure') return ResourceValidation.refuse('invalid-value', 'Invalid property values. Use the declared property types and bounded values.')
+    if (result._tag === 'Failure')
+      return ResourceValidation.refuse('invalid-value', 'Invalid property values. Use the declared property types and bounded values.')
     if (caller !== undefined) ResourceValidation.assertPayloadSize(result.success, 64 * 1024, 'The property patch')
     for (const [id, value] of Object.entries(result.success)) {
       const property = definition.properties.find(property => property.id === id)

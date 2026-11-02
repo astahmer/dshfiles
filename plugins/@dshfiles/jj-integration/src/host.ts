@@ -1819,25 +1819,21 @@ const setupHostLifecycle = (context: Context, services: JjHostServices): AsyncIt
     bookmark: () => readSettings().bookmark,
     threadsDirectory,
     gitWorktree: async (repoRoot, args) =>
-      withSpan(
-        'git worktree',
-        { kind: 'client', attributes: { 'process.executable.name': 'git', 'process.command.verb': 'worktree' } },
-        async span => {
-          const executable = await services.subprocess.resolveExecutable('git')
-          const handle = services.subprocess.spawn({
-            argv: [executable, '-C', repoRoot, 'worktree', ...args],
-            cwd: repoRoot,
-            stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
-            graceMs: 1_500,
-          })
-          const outcome = await handle.done
-          span.setAttributes({ 'process.exit.code': outcome.exitCode ?? 'unknown' })
-          if (outcome.exitCode !== 0) {
-            span.setStatus('error', `exit ${String(outcome.exitCode)}`)
-            throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
-          }
-        },
-      ),
+      withSpan('git worktree', { kind: 'client', attributes: { 'process.executable.name': 'git', 'process.command.verb': 'worktree' } }, async span => {
+        const executable = await services.subprocess.resolveExecutable('git')
+        const handle = services.subprocess.spawn({
+          argv: [executable, '-C', repoRoot, 'worktree', ...args],
+          cwd: repoRoot,
+          stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
+          graceMs: 1_500,
+        })
+        const outcome = await handle.done
+        span.setAttributes({ 'process.exit.code': outcome.exitCode ?? 'unknown' })
+        if (outcome.exitCode !== 0) {
+          span.setStatus('error', `exit ${String(outcome.exitCode)}`)
+          throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
+        }
+      }),
   })
   const projectChecks = createHostApiClient(context, projectChecksApi, '@dshfiles/jj-integration')
   const handleVerifiedTurn = async (verifiedTurn: ProjectChecksVerifiedTurn): Promise<void> => {

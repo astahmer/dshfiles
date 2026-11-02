@@ -24,8 +24,7 @@ const conversationSchema = Schema.Struct({
 })
 
 // The schema only proves the shape; the guard hands back the live controller so its methods keep their `this`.
-const isConversation = (value: unknown): value is DraftUploads & ConversationWithInput =>
-  Option.isSome(Schema.decodeUnknownOption(conversationSchema)(value))
+const isConversation = (value: unknown): value is DraftUploads & ConversationWithInput => Option.isSome(Schema.decodeUnknownOption(conversationSchema)(value))
 
 const isDraftAttachmentId = (value: string): value is DraftAttachmentId => value.length > 0
 

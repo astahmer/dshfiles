@@ -18,15 +18,14 @@ const spanAttribute = (value: unknown): SpanAttributeValue | undefined => {
 const effectSpan = (options: Parameters<Tracer.Tracer['span']>[0]): Tracer.Span => {
   const activeTracer = TracerModel.process()
   const parent = Option.getOrUndefined(options.parent)
-  const parentContext = parent === undefined ? undefined : spanContexts.get(parent) ?? { traceId: parent.traceId, spanId: parent.spanId }
+  const parentContext = parent === undefined ? undefined : (spanContexts.get(parent) ?? { traceId: parent.traceId, spanId: parent.spanId })
   const dshxSpan = activeTracer.startSpan(options.name, {
     kind: options.kind,
     ...(options.root ? { parent: null } : parentContext === undefined ? {} : { parent: parentContext }),
   })
   const dshxContext = dshxSpan.context ?? parentContext ?? activeTracer.activeContext()
-  const effectParent = dshxContext === undefined
-    ? Option.none<Tracer.AnySpan>()
-    : Option.some(Tracer.externalSpan({ traceId: dshxContext.traceId, spanId: dshxContext.spanId }))
+  const effectParent =
+    dshxContext === undefined ? Option.none<Tracer.AnySpan>() : Option.some(Tracer.externalSpan({ traceId: dshxContext.traceId, spanId: dshxContext.spanId }))
   const native = new Tracer.NativeSpan({ ...options, parent: effectParent })
   const span: Tracer.Span = {
     _tag: 'Span',
@@ -73,6 +72,4 @@ const tracer = Tracer.make({
 
 export const tracerLayer = Layer.succeed(Tracer.Tracer, tracer)
 
-export const provideDshxTracer = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-  Effect.provideService(effect, Tracer.Tracer, tracer)
-
+export const provideDshxTracer = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => Effect.provideService(effect, Tracer.Tracer, tracer)

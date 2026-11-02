@@ -10,7 +10,9 @@ const eventSchema = Schema.Struct({
   data: Schema.Unknown,
 }).pipe(MultiHostSchema.passthrough)
 const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(MultiHostSchema.passthrough)
-const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))) }).pipe(MultiHostSchema.passthrough)
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))) }).pipe(
+  MultiHostSchema.passthrough,
+)
 const userMessageSchema = Schema.Struct({
   source: Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough),
   content: Schema.Array(textBlockSchema).check(Schema.isMaxLength(512)),

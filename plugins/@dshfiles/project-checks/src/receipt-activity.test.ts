@@ -49,7 +49,12 @@ describe('Project Checks activity summary', () => {
     })
     expect(JSON.stringify(event)).not.toMatch(/command|args|stdout|stderr|environment|prompt/i)
     expect(Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({ ...event, version: 2 })._tag === 'Success').toBe(false)
-    expect(Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({ ...event, value: { ...event.value, stdout: 'private output' } })._tag === 'Success').toBe(false)
+    expect(
+      Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({
+        ...event,
+        value: { ...event.value, stdout: 'private output' },
+      })._tag === 'Success',
+    ).toBe(false)
   })
 
   it('waits for durable receipt persistence before publishing and keeps projection failures optional', async () => {

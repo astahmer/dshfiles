@@ -55,7 +55,9 @@ export const remoteHostSchema = Schema.Struct({
     .pipe(Schema.withDecodingDefaultKey(Effect.succeed('origin'))),
   workspace: absolutePath(2048, 'Use an absolute peer checker workspace path.'),
   /** Prefix that pins the peer toolchain for action and install commands, e.g. ['mise', 'exec', 'node@22.23.3', '--']. */
-  toolchain: Schema.Array(shellWord).check(Schema.isMaxLength(8)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  toolchain: Schema.Array(shellWord)
+    .check(Schema.isMaxLength(8))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   install: Schema.optionalKey(
     Schema.Struct({
       command: Schema.Array(shellWord).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
@@ -94,15 +96,23 @@ const configCheck = Schema.makeFilter((value: typeof projectChecksConfigShape.Ty
 })
 
 const projectChecksConfigShape = Schema.Struct({
-  actions: Schema.Array(projectActionSchema).check(Schema.isMaxLength(32)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  actions: Schema.Array(projectActionSchema)
+    .check(Schema.isMaxLength(32))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   maxVerificationAttempts: intBetween(1, 2).pipe(Schema.withDecodingDefaultKey(Effect.succeed(2))),
-  remotes: Schema.Array(remoteHostSchema).check(Schema.isMaxLength(8)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  remotes: Schema.Array(remoteHostSchema)
+    .check(Schema.isMaxLength(8))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   load: loadPolicySchema,
 })
 
 export const projectChecksConfigSchema = projectChecksConfigShape
   .check(configCheck)
-  .pipe(Schema.withDecodingDefault(Effect.succeed({ actions: [], maxVerificationAttempts: 2, remotes: [], load: { localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 } })))
+  .pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed({ actions: [], maxVerificationAttempts: 2, remotes: [], load: { localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 } }),
+    ),
+  )
 
 export type ProjectAction = typeof projectActionSchema.Type
 export type RemoteHost = typeof remoteHostSchema.Type
@@ -133,8 +143,7 @@ export class ProjectChecksModel {
     const failed = failures
       .slice(0, 6)
       .map(
-        item =>
-          `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`,
+        item => `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`,
       )
       .join(', ')
     const extra = failures.length > 6 ? `, and ${failures.length - 6} more` : ''

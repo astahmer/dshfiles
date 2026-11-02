@@ -4,14 +4,7 @@ import * as Schema from 'effect/Schema'
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
 const jsonValueSchema: Schema.ConstraintDecoder<JsonValue> = Schema.suspend(() =>
-  Schema.Union([
-    Schema.String,
-    Schema.Number,
-    Schema.Boolean,
-    Schema.Null,
-    Schema.Array(jsonValueSchema),
-    Schema.Record(Schema.String, jsonValueSchema),
-  ]),
+  Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null, Schema.Array(jsonValueSchema), Schema.Record(Schema.String, jsonValueSchema)]),
 )
 
 /**
@@ -106,8 +99,16 @@ export type SearchMatch = typeof searchMatchSchema.Type
 
 export const workerRequestSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('search-sessions'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), request: sessionSearchRequestSchema }),
-  Schema.Struct({ kind: Schema.Literal('search-events'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), request: sessionEventSearchRequestSchema }),
-  Schema.Struct({ kind: Schema.Literal('ingest'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), root: Schema.String.check(Schema.isMinLength(1)) }),
+  Schema.Struct({
+    kind: Schema.Literal('search-events'),
+    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+    request: sessionEventSearchRequestSchema,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('ingest'),
+    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+    root: Schema.String.check(Schema.isMinLength(1)),
+  }),
   Schema.Struct({ kind: Schema.Literal('health'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
   Schema.Struct({ kind: Schema.Literal('nudge'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
   Schema.Struct({ kind: Schema.Literal('close'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),

@@ -65,7 +65,10 @@ export type SummaryFailureReason = typeof summaryFailureReasonSchema.Type
 export const summarizeResultSchema = Schema.Union([
   Schema.Struct({
     status: Schema.Literal('ok'),
-    route: Schema.Struct({ provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)), model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)) }),
+    route: Schema.Struct({
+      provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+      model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+    }),
     summaries: Schema.Record(Schema.String, Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(600))).check(
       Schema.makeFilter(record => (Object.keys(record).every(key => scopeKeys.some(scopeKey => scopeKey === key)) ? true : 'Unknown review scope key.')),
     ),

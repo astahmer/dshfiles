@@ -142,7 +142,12 @@ export class ResourceStore {
         ResourceValidation.assertCompatible(previous.definition, definition)
       }
       const now = Date.now()
-      const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })({ definition, owner, createdAt: previous?.createdAt ?? now, updatedAt: now })
+      const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })({
+        definition,
+        owner,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now,
+      })
       this.db.prepare('INSERT INTO packs(id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json').run(definition.id, JSON.stringify(pack))
       // Added null fields must not inflate an existing attached or detached resource beyond its budget.
       if (previous !== undefined && previous.definition.properties.length !== definition.properties.length) {

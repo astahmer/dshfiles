@@ -336,11 +336,14 @@ export default defineHost({
   setup: ctx => {
     setThreadActionsContext(ctx)
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
-    ctx.effect(() => () => {
-      if (pendingRestart?.ctx !== ctx) return
-      clearInterval(pendingRestart.timer)
-      pendingRestart = undefined
-    }, 'thread-sidebar: pending restart timer')
+    ctx.effect(
+      () => () => {
+        if (pendingRestart?.ctx !== ctx) return
+        clearInterval(pendingRestart.timer)
+        pendingRestart = undefined
+      },
+      'thread-sidebar: pending restart timer',
+    )
     // One durable attention record per session, written where the turn actually ends, so every browser,
     // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
     ctx.effect(() => {

@@ -56,11 +56,7 @@
                 "maximum": 65535
               }
             },
-            "required": [
-              "lanEnabled",
-              "bindAddress",
-              "port"
-            ],
+            "required": ["lanEnabled", "bindAddress", "port"],
             "additionalProperties": false
           },
           "active": {
@@ -84,12 +80,7 @@
                 }
               }
             },
-            "required": [
-              "host",
-              "port",
-              "localhostEnabled",
-              "urls"
-            ],
+            "required": ["host", "port", "localhostEnabled", "urls"],
             "additionalProperties": false
           },
           "addresses": {
@@ -105,17 +96,10 @@
                 },
                 "family": {
                   "type": "string",
-                  "enum": [
-                    "IPv4",
-                    "IPv6"
-                  ]
+                  "enum": ["IPv4", "IPv6"]
                 }
               },
-              "required": [
-                "address",
-                "interfaceName",
-                "family"
-              ],
+              "required": ["address", "interfaceName", "family"],
               "additionalProperties": false
             }
           },
@@ -145,10 +129,7 @@
                 ]
               }
             },
-            "required": [
-              "host",
-              "port"
-            ],
+            "required": ["host", "port"],
             "additionalProperties": false
           },
           "pendingRestart": {
@@ -156,11 +137,7 @@
           },
           "integration": {
             "type": "string",
-            "enum": [
-              "managed",
-              "needs-setup",
-              "unsupported"
-            ]
+            "enum": ["managed", "needs-setup", "unsupported"]
           },
           "unavailableReason": {
             "anyOf": [
@@ -173,17 +150,7 @@
             ]
           }
         },
-        "required": [
-          "revision",
-          "writable",
-          "saved",
-          "active",
-          "addresses",
-          "cliOverrides",
-          "pendingRestart",
-          "integration",
-          "unavailableReason"
-        ],
+        "required": ["revision", "writable", "saved", "active", "addresses", "cliOverrides", "pendingRestart", "integration", "unavailableReason"],
         "additionalProperties": false
       },
       "toolInput": {
@@ -214,11 +181,7 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "lanEnabled",
-              "bindAddress",
-              "port"
-            ],
+            "required": ["lanEnabled", "bindAddress", "port"],
             "additionalProperties": false
           },
           "active": {
@@ -240,12 +203,7 @@
                 }
               }
             },
-            "required": [
-              "host",
-              "port",
-              "localhostEnabled",
-              "urls"
-            ],
+            "required": ["host", "port", "localhostEnabled", "urls"],
             "additionalProperties": false
           },
           "addresses": {
@@ -261,17 +219,10 @@
                 },
                 "family": {
                   "type": "string",
-                  "enum": [
-                    "IPv4",
-                    "IPv6"
-                  ]
+                  "enum": ["IPv4", "IPv6"]
                 }
               },
-              "required": [
-                "address",
-                "interfaceName",
-                "family"
-              ],
+              "required": ["address", "interfaceName", "family"],
               "additionalProperties": false
             }
           },
@@ -285,10 +236,7 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "host",
-              "port"
-            ],
+            "required": ["host", "port"],
             "additionalProperties": false
           },
           "pendingRestart": {
@@ -296,27 +244,13 @@
           },
           "integration": {
             "type": "string",
-            "enum": [
-              "managed",
-              "needs-setup",
-              "unsupported"
-            ]
+            "enum": ["managed", "needs-setup", "unsupported"]
           },
           "unavailableReason": {
             "type": "string"
           }
         },
-        "required": [
-          "revision",
-          "writable",
-          "saved",
-          "active",
-          "addresses",
-          "cliOverrides",
-          "pendingRestart",
-          "integration",
-          "unavailableReason"
-        ],
+        "required": ["revision", "writable", "saved", "active", "addresses", "cliOverrides", "pendingRestart", "integration", "unavailableReason"],
         "additionalProperties": false
       }
     },
@@ -345,9 +279,7 @@
           },
           "localhostEnabled": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "port": {
             "type": "integer",
@@ -360,12 +292,7 @@
             "maximum": 9007199254740991
           }
         },
-        "required": [
-          "lanEnabled",
-          "bindAddress",
-          "port",
-          "expectedRevision"
-        ],
+        "required": ["lanEnabled", "bindAddress", "port", "expectedRevision"],
         "additionalProperties": false
       },
       "output": {
@@ -411,11 +338,7 @@
                 "maximum": 65535
               }
             },
-            "required": [
-              "lanEnabled",
-              "bindAddress",
-              "port"
-            ],
+            "required": ["lanEnabled", "bindAddress", "port"],
             "additionalProperties": false
           },
           "active": {
@@ -439,12 +362,7 @@
                 }
               }
             },
-            "required": [
-              "host",
-              "port",
-              "localhostEnabled",
-              "urls"
-            ],
+            "required": ["host", "port", "localhostEnabled", "urls"],
             "additionalProperties": false
           },
           "addresses": {
@@ -460,17 +378,10 @@
                 },
                 "family": {
                   "type": "string",
-                  "enum": [
-                    "IPv4",
-                    "IPv6"
-                  ]
+                  "enum": ["IPv4", "IPv6"]
                 }
               },
-              "required": [
-                "address",
-                "interfaceName",
-                "family"
-              ],
+              "required": ["address", "interfaceName", "family"],
               "additionalProperties": false
             }
           },
@@ -500,10 +411,7 @@
                 ]
               }
             },
-            "required": [
-              "host",
-              "port"
-            ],
+            "required": ["host", "port"],
             "additionalProperties": false
           },
           "pendingRestart": {
@@ -511,11 +419,7 @@
           },
           "integration": {
             "type": "string",
-            "enum": [
-              "managed",
-              "needs-setup",
-              "unsupported"
-            ]
+            "enum": ["managed", "needs-setup", "unsupported"]
           },
           "unavailableReason": {
             "anyOf": [
@@ -528,17 +432,7 @@
             ]
           }
         },
-        "required": [
-          "revision",
-          "writable",
-          "saved",
-          "active",
-          "addresses",
-          "cliOverrides",
-          "pendingRestart",
-          "integration",
-          "unavailableReason"
-        ],
+        "required": ["revision", "writable", "saved", "active", "addresses", "cliOverrides", "pendingRestart", "integration", "unavailableReason"],
         "additionalProperties": false
       },
       "toolInput": {
@@ -552,9 +446,7 @@
           },
           "localhostEnabled": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "port": {
             "type": "integer"
@@ -563,12 +455,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "lanEnabled",
-          "bindAddress",
-          "port",
-          "expectedRevision"
-        ],
+        "required": ["lanEnabled", "bindAddress", "port", "expectedRevision"],
         "additionalProperties": false
       },
       "toolOutput": {
@@ -596,11 +483,7 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "lanEnabled",
-              "bindAddress",
-              "port"
-            ],
+            "required": ["lanEnabled", "bindAddress", "port"],
             "additionalProperties": false
           },
           "active": {
@@ -622,12 +505,7 @@
                 }
               }
             },
-            "required": [
-              "host",
-              "port",
-              "localhostEnabled",
-              "urls"
-            ],
+            "required": ["host", "port", "localhostEnabled", "urls"],
             "additionalProperties": false
           },
           "addresses": {
@@ -643,17 +521,10 @@
                 },
                 "family": {
                   "type": "string",
-                  "enum": [
-                    "IPv4",
-                    "IPv6"
-                  ]
+                  "enum": ["IPv4", "IPv6"]
                 }
               },
-              "required": [
-                "address",
-                "interfaceName",
-                "family"
-              ],
+              "required": ["address", "interfaceName", "family"],
               "additionalProperties": false
             }
           },
@@ -667,10 +538,7 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "host",
-              "port"
-            ],
+            "required": ["host", "port"],
             "additionalProperties": false
           },
           "pendingRestart": {
@@ -678,27 +546,13 @@
           },
           "integration": {
             "type": "string",
-            "enum": [
-              "managed",
-              "needs-setup",
-              "unsupported"
-            ]
+            "enum": ["managed", "needs-setup", "unsupported"]
           },
           "unavailableReason": {
             "type": "string"
           }
         },
-        "required": [
-          "revision",
-          "writable",
-          "saved",
-          "active",
-          "addresses",
-          "cliOverrides",
-          "pendingRestart",
-          "integration",
-          "unavailableReason"
-        ],
+        "required": ["revision", "writable", "saved", "active", "addresses", "cliOverrides", "pendingRestart", "integration", "unavailableReason"],
         "additionalProperties": false
       }
     },
@@ -717,14 +571,7 @@
         "properties": {
           "state": {
             "type": "string",
-            "enum": [
-              "starting",
-              "native-loopback",
-              "forwarding",
-              "disabled",
-              "stopped",
-              "failed"
-            ]
+            "enum": ["starting", "native-loopback", "forwarding", "disabled", "stopped", "failed"]
           },
           "upstreamOrigin": {
             "anyOf": [
@@ -753,10 +600,7 @@
               "properties": {
                 "host": {
                   "type": "string",
-                  "enum": [
-                    "127.0.0.1",
-                    "::1"
-                  ]
+                  "enum": ["127.0.0.1", "::1"]
                 },
                 "port": {
                   "type": "integer",
@@ -764,20 +608,12 @@
                   "maximum": 65535
                 }
               },
-              "required": [
-                "host",
-                "port"
-              ],
+              "required": ["host", "port"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "state",
-          "upstreamOrigin",
-          "localhostOrigin",
-          "listeners"
-        ],
+        "required": ["state", "upstreamOrigin", "localhostOrigin", "listeners"],
         "additionalProperties": false
       },
       "toolInput": {
@@ -788,14 +624,7 @@
         "properties": {
           "state": {
             "type": "string",
-            "enum": [
-              "starting",
-              "native-loopback",
-              "forwarding",
-              "disabled",
-              "stopped",
-              "failed"
-            ]
+            "enum": ["starting", "native-loopback", "forwarding", "disabled", "stopped", "failed"]
           },
           "upstreamOrigin": {
             "type": "string"
@@ -810,29 +639,18 @@
               "properties": {
                 "host": {
                   "type": "string",
-                  "enum": [
-                    "127.0.0.1",
-                    "::1"
-                  ]
+                  "enum": ["127.0.0.1", "::1"]
                 },
                 "port": {
                   "type": "integer"
                 }
               },
-              "required": [
-                "host",
-                "port"
-              ],
+              "required": ["host", "port"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "state",
-          "upstreamOrigin",
-          "localhostOrigin",
-          "listeners"
-        ],
+        "required": ["state", "upstreamOrigin", "localhostOrigin", "listeners"],
         "additionalProperties": false
       }
     }

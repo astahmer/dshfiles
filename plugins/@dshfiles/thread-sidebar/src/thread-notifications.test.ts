@@ -134,7 +134,12 @@ test('system delivery proceeds when the browser refuses the deduplication ledger
     },
     removeItem: () => undefined,
   }
-  const ledger = createStoredValue({ key: 'notification-test', schema: zodSchemaFromEffect(Schema.mutable(Schema.Array(Schema.String))), fallback: [], storage: () => storage })
+  const ledger = createStoredValue({
+    key: 'notification-test',
+    schema: zodSchemaFromEffect(Schema.mutable(Schema.Array(Schema.String))),
+    fallback: [],
+    storage: () => storage,
+  })
   const claim = createThreadNotificationClaimer(ledger)
   const route = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
     ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,

@@ -137,9 +137,7 @@ describe('trusted project actions', () => {
 
     it('requires an enabled remote for a hard remote target but allows auto without one', () => {
       expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }] })).toBe(false)
-      expect(
-        acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] }),
-      ).toBe(false)
+      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] })).toBe(false)
       expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] })).toBe(true)
       expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'auto' } }] })).toBe(true)
     })

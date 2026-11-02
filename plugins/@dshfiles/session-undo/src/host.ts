@@ -77,7 +77,7 @@ const rootLayer = (ctx: Context) =>
               const projected = await controller().projections({ sessionId: SessionId(input.from) }, AbortSignal.timeout(30_000))
               const values = projected?.kind === 'sequenced' ? projected.values : projected?.values
               const selection = Option.getOrNull(Schema.decodeUnknownOption(projectedSelectionSchema)(values?.modelSelection))
-              const chosen = selection === null ? null : selection.next ?? selection.lastUsed
+              const chosen = selection === null ? null : (selection.next ?? selection.lastUsed)
               if (chosen === null) return
               const route = { sessionId: SessionId(input.to), provider: chosen.provider, model: chosen.model }
               await controller().selectModel(chosen.reasoningEffort === undefined ? route : { ...route, reasoningEffort: chosen.reasoningEffort })

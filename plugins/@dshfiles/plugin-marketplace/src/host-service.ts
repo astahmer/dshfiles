@@ -58,16 +58,16 @@ const hubCardSchema = Schema.Struct({
   author: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(120)))),
   stars: Schema.optionalKey(Schema.NullOr(statsSchema)),
   updated: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(40)))),
-  publisher: Schema.optionalKey(
-    Schema.NullOr(Schema.Struct({ avatarUrl: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048)))) })),
-  ),
+  publisher: Schema.optionalKey(Schema.NullOr(Schema.Struct({ avatarUrl: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048)))) }))),
 })
 
 export const hubListResponseSchema = Schema.Struct({
   items: Schema.Array(hubCardSchema).check(Schema.isMaxLength(PAGE_SIZE)),
   nextCursor: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
   // Older Framework Hub deployments remain readable during a rolling update.
-  categories: Schema.Array(hubCategorySchema).check(Schema.isMaxLength(100)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  categories: Schema.Array(hubCategorySchema)
+    .check(Schema.isMaxLength(100))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   total: Schema.optionalKey(statsSchema),
 })
 

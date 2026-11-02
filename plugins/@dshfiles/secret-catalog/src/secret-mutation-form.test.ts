@@ -5,8 +5,7 @@ import { SecretMutationForm, secretCreateFormSchema, secretUpdateFormSchema } fr
 
 /** The form validators are Standard Schema, so the test asks them exactly what TanStack Form asks them. */
 const validate = async (schema: StandardSchemaV1, value: unknown): Promise<StandardSchemaV1.Result<unknown>> => await schema['~standard'].validate(value)
-const issuePaths = (result: StandardSchemaV1.Result<unknown>): readonly string[] =>
-  result.issues?.map(issue => (issue.path ?? []).join('.')) ?? []
+const issuePaths = (result: StandardSchemaV1.Result<unknown>): readonly string[] => result.issues?.map(issue => (issue.path ?? []).join('.')) ?? []
 const accepted = (result: StandardSchemaV1.Result<unknown>): boolean => result.issues === undefined
 
 describe('Secret Catalog create form', () => {
@@ -26,7 +25,12 @@ describe('Secret Catalog create form', () => {
 
   it('accepts a generated value with the default environment', async () => {
     expect(
-      accepted(await validate(secretCreateFormSchema, { ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }), alias: 'SYNTHETIC_TOKEN' })),
+      accepted(
+        await validate(secretCreateFormSchema, {
+          ...SecretMutationForm.secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
+          alias: 'SYNTHETIC_TOKEN',
+        }),
+      ),
     ).toBe(true)
   })
 

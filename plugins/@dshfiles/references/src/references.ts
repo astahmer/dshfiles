@@ -22,7 +22,10 @@ const referenceSchema = Schema.Struct({
   createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 })
 
-const attachmentSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)), names: Schema.Array(nameSchema).check(Schema.isMaxLength(32)) })
+const attachmentSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  names: Schema.Array(nameSchema).check(Schema.isMaxLength(32)),
+})
 
 export type Reference = typeof referenceSchema.Type
 type Attachment = typeof attachmentSchema.Type

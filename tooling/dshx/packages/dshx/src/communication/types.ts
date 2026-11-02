@@ -1,7 +1,9 @@
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
-const strictStruct = <const Fields extends Schema.Struct.Fields & { readonly [Key in keyof Fields]: Schema.ConstraintDecoder<unknown, never> }>(fields: Fields) => {
+const strictStruct = <const Fields extends Schema.Struct.Fields & { readonly [Key in keyof Fields]: Schema.ConstraintDecoder<unknown, never> }>(
+  fields: Fields,
+) => {
   const struct = Schema.Struct(fields).check(
     Schema.makeFilter(value =>
       Object.keys(value).every(key => Object.prototype.hasOwnProperty.call(fields, key)) ? true : 'Unexpected properties are not allowed.',
