@@ -17,6 +17,8 @@
     "plugins/@dshfiles/project-checks/src/test-fixtures/**",
     "tooling/antislop/repo-rules/fixtures/**",
     "tooling/antislop/tests/oxlint/**",
+    "tooling/antislop/effect/repo-rules/fixtures/**",
+    "tooling/antislop/effect/tests/oxlint/**",
   ],
   // Foreign binaries the hand-run scripts call: ffmpeg is installed on the Host, and bddgen/vitest come
   // from the tooling/dshx workspace the scripts are executed from.
@@ -116,6 +118,17 @@
       // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-client-ui-plugin-manager"],
+    },
+    "plugins/@dshfiles/html-render": {
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // The preview journey renders this fixture tree through a tool call; index.html loads preview.js and preview.css.
+      "ignore": ["fixtures/**"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/preview": {
+      // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
     "plugins/@dshfiles/shared-runtime": {
       "entry": ["dshx.config.ts", "src/client.ts!"],
