@@ -263,6 +263,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/jev": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/jj-cli": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -349,13 +361,13 @@
   },
   "@dshfiles/memory": {
     "layerEmpty": 0,
-    "promiseAdapters": 29,
-    "moduleState": 6,
-    "timers": 2,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 4,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "testMocks": 1,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -553,15 +565,15 @@
   },
   "@dshfiles/session-search": {
     "layerEmpty": 0,
-    "promiseAdapters": 5,
+    "promiseAdapters": 0,
     "moduleState": 0,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 1,
+    "nodeFs": 0,
     "globalFetch": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
-    "syncDecodeInEffect": 1
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/session-source-port": {
     "layerEmpty": 0,
