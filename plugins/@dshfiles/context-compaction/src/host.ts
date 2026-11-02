@@ -5,15 +5,16 @@ import type {} from '@deepseek-ai/dsh-llm'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { Context, Effect, Layer, Schema } from 'effect'
-import { z } from 'zod'
 import { serializedMessageBytes, summarizeInChunks } from './chunked-summary.js'
 
 const FALLBACK_CONTEXT_WINDOW = 32_768
 const MAX_INPUT_BYTES = 64_000
 const SUMMARY_PROMPT_RESERVE = 4_096
 const MIN_CONTEXT_RESERVE = 4_096
-const compactionConfigSchema = z.object({ maxTokens: z.number().int().positive().default(8_192) }).strict()
-type PluginConfig = z.infer<typeof compactionConfigSchema>
+const compactionConfigSchema = Schema.Struct({
+  maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
+})
+type PluginConfig = typeof compactionConfigSchema.Type
 type CompactionConfig = BasicCompactionEngine['config']
 type SummarizeInput = Parameters<BasicCompactionEngine['summarize']>[0]
 type CompactionAgent = Parameters<BasicCompactionEngine['summarize']>[1]
@@ -133,5 +134,5 @@ const compactionPlugin = DshxEffect.plugin<PluginConfig, ContextCompactionFailur
 export default defineHost({
   name: '@dshfiles/context-compaction',
   Config: compactionConfigSchema,
-  setup: (ctx: CordisContext, config: unknown) => compactionPlugin.setup(ctx, compactionConfigSchema.parse(config)),
+  setup: (ctx: CordisContext, config: unknown) => compactionPlugin.setup(ctx, Schema.decodeUnknownSync(compactionConfigSchema, { onExcessProperty: 'error' })(config)),
 })
