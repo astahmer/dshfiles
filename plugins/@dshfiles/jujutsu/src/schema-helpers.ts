@@ -30,8 +30,7 @@ export class SchemaHelpers {
     getDefault: () => Default,
   ): Schema.withDecodingDefaultType<S, never> => Schema.withDecodingDefaultType<S, never>(Effect.sync(getDefault))(schema)
 
-  static readonly decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] =>
-    Schema.decodeUnknownSync(schema)(input)
+  static readonly decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
 
   static readonly decodeSafe = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): SafeDecodeResult<S['Type']> => {
     const result = Schema.decodeUnknownResult(schema)(input)

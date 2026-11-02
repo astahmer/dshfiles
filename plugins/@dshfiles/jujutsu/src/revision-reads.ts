@@ -22,10 +22,7 @@ const fileStatsRowSchema = Schema.Struct({
       deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     }),
   ).check(Schema.isMaxLength(20_000)),
-  conflicts: SchemaHelpers.withDecodedDefault(
-    Schema.Array(Schema.String.check(Schema.isMaxLength(2048))).check(Schema.isMaxLength(20_000)),
-    () => [],
-  ),
+  conflicts: SchemaHelpers.withDecodedDefault(Schema.Array(Schema.String.check(Schema.isMaxLength(2048))).check(Schema.isMaxLength(20_000)), () => []),
 })
 
 const editTimeRowSchema = Schema.Struct({

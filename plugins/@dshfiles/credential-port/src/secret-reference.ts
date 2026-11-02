@@ -78,9 +78,7 @@ export class SecretReferenceResolver {
     const reference = parseSecretReference(input.referenceText)
     if (reference !== null) {
       if (input.values === undefined) throw new Error('The Secret Catalog plugin is not loaded, so the bound secret reference cannot be resolved.')
-      const value = await input.values.resolve(
-        input.signal === undefined ? { reference, cwd: null } : { reference, cwd: null, signal: input.signal },
-      )
+      const value = await input.values.resolve(input.signal === undefined ? { reference, cwd: null } : { reference, cwd: null, signal: input.signal })
       return { value, label: formatSecretReference(reference) }
     }
     if (input.referenceText.trim() !== '') throw new Error('The bound key is not a secret:ALIAS or secret:ALIAS@env reference.')

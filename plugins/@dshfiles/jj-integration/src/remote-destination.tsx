@@ -76,7 +76,9 @@ export const RemoteDestinationChips = (props: {
     retry: false,
     queryFn: async ({ signal }) => {
       const result = await api.runtimePluginCall({ runtimeId: destination.runtimeId, method: 'projects', input: {} }, { signal })
-      return result.ok ? Schema.decodeUnknownOption(remoteProjectsSchema)(result.value).pipe(option => option._tag === 'Some' ? option.value.projects : undefined) : undefined
+      return result.ok
+        ? Schema.decodeUnknownOption(remoteProjectsSchema)(result.value).pipe(option => (option._tag === 'Some' ? option.value.projects : undefined))
+        : undefined
     },
   })
   const remoteWorkspaceIds = (status.data?.ok === true ? status.data.workspaces : []).map(workspace => workspace.workspaceId).sort()

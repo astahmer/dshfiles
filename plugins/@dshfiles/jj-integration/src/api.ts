@@ -80,7 +80,11 @@ const cleanupRequestSchema = Schema.Struct({
 
 /** Optional path for operations targeting the current thread workspace by default. */
 const threadPathInputSchema = Schema.Struct({
-  path: Schema.optional(Schema.String.check(Schema.isMinLength(1)).pipe(Schema.annotate({ description: 'Thread workspace path; defaults to this Session’s working directory or its on-demand isolated workspace.' }))),
+  path: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1)).pipe(
+      Schema.annotate({ description: 'Thread workspace path; defaults to this Session’s working directory or its on-demand isolated workspace.' }),
+    ),
+  ),
 })
 
 const cleanupWorkspaceSchema = Schema.Struct({
@@ -301,7 +305,11 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     land: method({
-      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), sessionId: Schema.optional(Schema.String), bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
+      input: Schema.Struct({
+        path: Schema.String.check(Schema.isMinLength(1)),
+        sessionId: Schema.optional(Schema.String),
+        bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+      }),
       output: landResultSchema,
       description:
         'Rebase the thread at a path: move its described revisions onto the selected bookmark (the configured bookmark by default) and advance it. Never pushes. Refuses while any Session working in that jj workspace is running or waiting for input, and names them; the calling agent may rebase its own thread once it resolved a handed-back problem.',
@@ -396,8 +404,21 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     discardMany: method({
-      input: Schema.Struct({ paths: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1), Schema.isMaxLength(100)), force: Schema.Boolean, confirm: Schema.Literal(true) }),
-      output: Schema.Struct({ results: Schema.Array(Schema.Struct({ path: Schema.String, status: Schema.Literals(['discarded', 'has-work', 'error']), revisions: Schema.Array(jjRevisionEffectSchema), error: Schema.NullOr(Schema.String) })) }),
+      input: Schema.Struct({
+        paths: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+        force: Schema.Boolean,
+        confirm: Schema.Literal(true),
+      }),
+      output: Schema.Struct({
+        results: Schema.Array(
+          Schema.Struct({
+            path: Schema.String,
+            status: Schema.Literals(['discarded', 'has-work', 'error']),
+            revisions: Schema.Array(jjRevisionEffectSchema),
+            error: Schema.NullOr(Schema.String),
+          }),
+        ),
+      }),
       description:
         'Remove up to 100 specified thread workspaces in one request. Each target follows jj_thread_discard rules: with force false, unlanded revisions are kept; force true abandons them. Requires confirm: true as explicit opt-in, and force: true only when the user explicitly authorized abandoning unlanded work. Each target reports its own result and failures do not prevent later targets. Call only when the user asked to remove these workspaces.',
       tool: {

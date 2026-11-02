@@ -374,7 +374,9 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (options.captureContent()) {
       tool.span.setAttribute(
         'gen_ai.tool.call.result',
-        GenAi.serializeCaptured(GenAi.mapContent(resultBlock === undefined ? data.message.content : Schema.decodeUnknownSync(GenAi.contentBlocks)(resultBlock.content))),
+        GenAi.serializeCaptured(
+          GenAi.mapContent(resultBlock === undefined ? data.message.content : Schema.decodeUnknownSync(GenAi.contentBlocks)(resultBlock.content)),
+        ),
       )
     }
     const isError = data.error !== undefined || resultBlock?.isError === true

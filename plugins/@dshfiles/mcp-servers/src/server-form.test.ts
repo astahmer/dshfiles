@@ -13,7 +13,9 @@ const issueFields = (values: Parameters<typeof McpServerFormModel.parseServerFor
 const formIssueFields = (values: ServerFormValues): readonly (PropertyKey | undefined)[] => {
   const result = Schema.decodeUnknownResult(McpServerFormModel.serverFormSchema)(values)
   if (result._tag === 'Success') return []
-  return SchemaIssue.makeFormatterStandardSchemaV1()(result.failure.issue).issues.map(issue => issue.path?.[0]).map(segment => (typeof segment === 'object' && segment !== null ? segment.key : segment))
+  return SchemaIssue.makeFormatterStandardSchemaV1()(result.failure.issue)
+    .issues.map(issue => issue.path?.[0])
+    .map(segment => (typeof segment === 'object' && segment !== null ? segment.key : segment))
 }
 
 describe('server editor form', () => {

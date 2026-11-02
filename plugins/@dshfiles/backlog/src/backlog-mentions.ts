@@ -15,8 +15,7 @@ const refSchema = Schema.Struct({
   title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars)),
 })
 
-const decodeRef = (ref: string): typeof refSchema.Type | null =>
-  Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(refSchema))(ref))
+const decodeRef = (ref: string): typeof refSchema.Type | null => Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(refSchema))(ref))
 
 /** The text after `@b:`/`@backlog:`, the whole query for plain `@`, or undefined while another source's scope is typed. */
 const scopedQuery = (query: string): { readonly text: string; readonly scoped: boolean } | undefined => {

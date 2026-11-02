@@ -195,7 +195,8 @@ const readComposerContext = async (
     if (separator < 1 || separator === value.length - 1) return []
     return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
   })
-  const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => SchemaHelpers.decode(workspaceNameSchema, value))
+  const workspaceNames =
+    workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => SchemaHelpers.decode(workspaceNameSchema, value))
   return {
     repository: {
       root,

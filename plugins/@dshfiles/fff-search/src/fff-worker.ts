@@ -55,9 +55,7 @@ const evictIdle = setInterval(() => {
 }, IDLE_INDEX_MS / 3)
 evictIdle.unref()
 
-const answer = async (
-  request: typeof FffSearch.workerRequest.Type,
-): Promise<typeof FffSearch.grepOutcome.Type | typeof FffSearch.globOutcome.Type | null> => {
+const answer = async (request: typeof FffSearch.workerRequest.Type): Promise<typeof FffSearch.grepOutcome.Type | typeof FffSearch.globOutcome.Type | null> => {
   if (request.kind === 'warm') {
     indexFor(request.root)
     return null

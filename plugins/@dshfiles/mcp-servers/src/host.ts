@@ -536,9 +536,7 @@ const { hostApi, setup: effectSetup } = DshxEffect.plugin({
       const servers = parseStoredConfig(config)
       let manuallyDisconnected = disconnectionsByRoot.get(root)
       if (manuallyDisconnected === undefined) {
-        manuallyDisconnected = new Set(
-          preferencesFrom(config).connectOnStartup ? [] : servers.map(server => server.id),
-        )
+        manuallyDisconnected = new Set(preferencesFrom(config).connectOnStartup ? [] : servers.map(server => server.id))
         disconnectionsByRoot.set(root, manuallyDisconnected)
       }
       const runtime = new ManagerRuntime(ctx, manuallyDisconnected)

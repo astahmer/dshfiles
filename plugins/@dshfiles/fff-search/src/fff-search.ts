@@ -84,7 +84,9 @@ export class FffSearch {
     if (options.inside === '') return { root: options.workingDirectory }
     if (!options.isFile) return { root: options.workingDirectory, directory: options.inside }
     const slash = options.inside.lastIndexOf('/')
-    return slash === -1 ? { root: options.workingDirectory, file: options.inside } : { root: options.workingDirectory, directory: options.inside.slice(0, slash), file: options.inside }
+    return slash === -1
+      ? { root: options.workingDirectory, file: options.inside }
+      : { root: options.workingDirectory, directory: options.inside.slice(0, slash), file: options.inside }
   }
 
   static #refuseWorkspaceAncestor(options: { root: string; workingDirectory: string; path: string }): void {

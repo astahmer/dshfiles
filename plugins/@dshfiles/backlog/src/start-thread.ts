@@ -7,9 +7,7 @@ const modelSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.optionalKey(Schema.String),
-  reasoning: Schema.optionalKey(
-    Schema.Struct({ efforts: Schema.Array(effortSchema), defaultEffort: Schema.optionalKey(Schema.String) }),
-  ),
+  reasoning: Schema.optionalKey(Schema.Struct({ efforts: Schema.Array(effortSchema), defaultEffort: Schema.optionalKey(Schema.String) })),
 })
 const catalogSchema = Schema.Struct({
   default: Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }),

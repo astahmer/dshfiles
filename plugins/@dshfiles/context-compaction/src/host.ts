@@ -134,5 +134,6 @@ const compactionPlugin = DshxEffect.plugin<PluginConfig, ContextCompactionFailur
 export default defineHost({
   name: '@dshfiles/context-compaction',
   Config: { '~standard': Schema.toStandardSchemaV1(compactionConfigSchema)['~standard'] },
-  setup: (ctx: CordisContext, config: unknown) => compactionPlugin.setup(ctx, Schema.decodeUnknownSync(compactionConfigSchema, { onExcessProperty: 'error' })(config)),
+  setup: (ctx: CordisContext, config: unknown) =>
+    compactionPlugin.setup(ctx, Schema.decodeUnknownSync(compactionConfigSchema, { onExcessProperty: 'error' })(config)),
 })

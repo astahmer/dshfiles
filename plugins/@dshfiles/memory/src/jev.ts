@@ -4,7 +4,12 @@ import * as Schema from 'effect/Schema'
 
 const answerSchema = Schema.Struct({
   model: Schema.String,
-  answers: Schema.Struct({ verdict: Schema.Struct({ type: Schema.Literal('noul'), noul: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)) }) }),
+  answers: Schema.Struct({
+    verdict: Schema.Struct({
+      type: Schema.Literal('noul'),
+      noul: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+    }),
+  }),
   usage: Schema.optional(
     Schema.Struct({
       input_tokens: Schema.optional(

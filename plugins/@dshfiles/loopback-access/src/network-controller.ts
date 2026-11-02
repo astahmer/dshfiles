@@ -10,12 +10,7 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { LoopbackAccess } from './access.js'
 import { networkSaveSchema, type NetworkAddress, type NetworkForm, type NetworkSnapshot } from './network-api.js'
-import {
-  NETWORK_SETTINGS_NAMESPACE,
-  NetworkPreferencesModel,
-  type NetworkPreferences,
-  type NetworkStartupValues,
-} from './network-preferences.js'
+import { NETWORK_SETTINGS_NAMESPACE, NetworkPreferencesModel, type NetworkPreferences, type NetworkStartupValues } from './network-preferences.js'
 import { LoopbackSchema } from './schema.js'
 
 const rawObject = Schema.Record(Schema.String, Schema.Unknown)

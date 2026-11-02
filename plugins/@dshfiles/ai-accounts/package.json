@@ -65,12 +65,12 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
-    "effect": "catalog:",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
+    "effect": "catalog:",
     "react-dom": "catalog:",
     "yaml": "2.9.1",
     "zod": "catalog:"

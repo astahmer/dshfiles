@@ -46,9 +46,7 @@ const repositorySchema = Schema.Struct({
       deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     }),
   ),
-  files: Schema.Array(
-    Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(2048)), status: fileStatusSchema }),
-  ).check(Schema.isMaxLength(500)),
+  files: Schema.Array(Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(2048)), status: fileStatusSchema })).check(Schema.isMaxLength(500)),
   filesTruncated: Schema.Boolean,
   localBookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(200)),
   remoteBookmarks: Schema.optionalKey(

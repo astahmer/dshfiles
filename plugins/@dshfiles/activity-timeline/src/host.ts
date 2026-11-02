@@ -78,8 +78,7 @@ const { hostApi, ...effectPlugin } = DshxEffect.plugin({
           recordActivity(() => verificationReceiptActivity(receipt))
           return undefined
         }
-        if (event.kind === 'communication-activity')
-          recordActivity(() => communicationActivity(event.value as Parameters<typeof communicationActivity>[0]))
+        if (event.kind === 'communication-activity') recordActivity(() => communicationActivity(event.value as Parameters<typeof communicationActivity>[0]))
         if (event.kind === 'communication-message') recordActivity(() => communicationMessageSafe(event.value))
         if (event.kind === 'integration') recordActivity(() => integrationActivity(event.value as Parameters<typeof integrationActivity>[0]))
         if (event.kind === 'backlog') {

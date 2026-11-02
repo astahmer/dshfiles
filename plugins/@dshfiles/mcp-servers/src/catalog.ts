@@ -128,10 +128,11 @@ const registryRemoteOf = (value: unknown): RegistryRemote | undefined => {
 }
 
 const metadataOf = (item: RegistryServer): readonly RegistryMetadata[] => Object.values(item._meta ?? {}).map(registryMetadataOf)
-const remotesOf = (item: RegistryServer): readonly RegistryRemote[] => (item.remotes ?? []).flatMap(remote => {
-  const parsed = registryRemoteOf(remote)
-  return parsed === undefined ? [] : [parsed]
-})
+const remotesOf = (item: RegistryServer): readonly RegistryRemote[] =>
+  (item.remotes ?? []).flatMap(remote => {
+    const parsed = registryRemoteOf(remote)
+    return parsed === undefined ? [] : [parsed]
+  })
 
 const safeHttps = (value: string | undefined): string | null => {
   if (value === undefined || value.length > 2048) return null

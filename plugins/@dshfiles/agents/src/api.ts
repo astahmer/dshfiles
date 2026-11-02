@@ -12,7 +12,12 @@ export const agentSnapshotSchema = Schema.Struct({
 })
 
 export const agentSaveResultSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('applied'), revision: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)), agents: Schema.Array(agentSchema), agent: agentSchema }),
+  Schema.Struct({
+    kind: Schema.Literal('applied'),
+    revision: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+    agents: Schema.Array(agentSchema),
+    agent: agentSchema,
+  }),
   Schema.Struct({ kind: Schema.Literal('limit'), revision: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)), agents: Schema.Array(agentSchema) }),
 ])
 

@@ -27,7 +27,10 @@ const commentInputSchema = Schema.Struct({
     .annotate({ description: 'Images or files the comment carries: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.' }),
 }).check(Schema.makeFilter(input => (commentHasBody(input) ? undefined : 'A comment needs text or at least one attachment.')))
 const fileOutputSchema = Schema.Union([
-  Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ dataUrl: Schema.String.check(Schema.isMinLength(1)), path: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }) }),
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    value: Schema.Struct({ dataUrl: Schema.String.check(Schema.isMinLength(1)), path: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
+  }),
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
 ])
 const speechStatusSchema = Schema.Struct({
@@ -116,12 +119,10 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 )
 
 const listInputSchema = Schema.Struct({
-  query: Schema.String.check(Schema.isMaxLength(500))
-    .pipe(Schema.optional)
-    .annotate({
-      description:
-        'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent has:thread|revision|url updated:<7d updated:>30d. Results rank by relevance and say which fields matched.',
-    }),
+  query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
+    description:
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent has:thread|revision|url updated:<7d updated:>30d. Results rank by relevance and say which fields matched.',
+  }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),
   project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
@@ -131,9 +132,7 @@ const listInputSchema = Schema.Struct({
     .pipe(Schema.optional)
     .annotate({ description: 'Several absolute project paths; null includes items outside any project, and an empty array applies no project filter.' }),
   tag: Schema.String.check(Schema.isMaxLength(60)).pipe(Schema.optional),
-  actor: actorFilterSchema
-    .pipe(Schema.optional)
-    .annotate({ description: '`user`, `system` or `agent:<sessionId>`. Empty means no actor filter.' }),
+  actor: actorFilterSchema.pipe(Schema.optional).annotate({ description: '`user`, `system` or `agent:<sessionId>`. Empty means no actor filter.' }),
   freshness: Schema.Literals(['active', 'all', ...BacklogItems.freshnessStates])
     .pipe(Schema.optional)
     .annotate({ description: '`active` (default) hides dormant and archived items, like the feed; `all` includes them.' }),
@@ -151,15 +150,14 @@ const listOutputSchema = Schema.Struct({
 
 const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').slice(0, 240)
 
-const renderItemPreview = (item: typeof detailSchema.Type['item']): string => {
+const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => {
   const body = previewText(item.body)
   const status = `${item.kind} · ${item.status}`
   const project = item.project === null ? '' : ` · ${item.project}`
   return [`b:${String(item.id)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
 }
 
-const renderDetailPreview = (result: typeof detailResultSchema.Type): string =>
-  result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.'
+const renderDetailPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.')
 
 const renderCreatedPreview = (detail: typeof detailSchema.Type): string => renderItemPreview(detail.item)
 
@@ -356,7 +354,8 @@ export const backlogApi = defineApi({
           .pipe(Schema.optional),
         pinned: Schema.Boolean.pipe(Schema.optional),
         attention: BacklogItems.attentionSchema.pipe(Schema.optional).annotate({
-          description: '`needs-input` asks the user for a decision, `blocked` and `waiting` flag stalled work; `none` clears it. Pair it with a comment saying what is needed.',
+          description:
+            '`needs-input` asks the user for a decision, `blocked` and `waiting` flag stalled work; `none` clears it. Pair it with a comment saying what is needed.',
         }),
         snoozedUntil: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))
           .pipe(Schema.optional)
@@ -410,11 +409,10 @@ export const backlogApi = defineApi({
         reasoningEffort: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(60))
           .pipe(Schema.optional)
           .annotate({ description: 'Effort for that model, when its adapter advertises one.' }),
-        message: Schema.String.check(Schema.isMaxLength(4_000))
-          .pipe(Schema.optional)
-          .annotate({
-            description: "The thread's first message; the items' own headings by default. An agent's identity and instructions are prepended when `agent` is named.",
-          }),
+        message: Schema.String.check(Schema.isMaxLength(4_000)).pipe(Schema.optional).annotate({
+          description:
+            "The thread's first message; the items' own headings by default. An agent's identity and instructions are prepended when `agent` is named.",
+        }),
       }),
       output: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), linked: Schema.Array(idSchema), missing: Schema.Array(idSchema) }),
       description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every selected item's full description, all current replies in order, and every item- and reply-level attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,

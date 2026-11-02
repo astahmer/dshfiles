@@ -48,16 +48,9 @@ const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a
 const revisionRefSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{4,64}|[k-z]{4,32})$/))
 const remoteNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/))
 const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
-export const workspaceNameSchema = Schema.String.check(
-  Schema.isMinLength(1),
-  Schema.isMaxLength(64),
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
-)
+export const workspaceNameSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
-const pathListSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024))).check(
-  Schema.isMinLength(1),
-  Schema.isMaxLength(100),
-)
+const pathListSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024))).check(Schema.isMinLength(1), Schema.isMaxLength(100))
 
 const mutationSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('describe'), commitId: commitIdSchema, message: Schema.String.check(Schema.isMaxLength(4000)) }),
@@ -388,9 +381,9 @@ export const jujutsuApi = defineApi({
     editTimes: method({
       input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
       output: Schema.Struct({
-        revisions: Schema.Array(
-          Schema.Struct({ commitId: commitIdSchema, editedAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))) }),
-        ).check(Schema.isMaxLength(100)),
+        revisions: Schema.Array(Schema.Struct({ commitId: commitIdSchema, editedAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))) })).check(
+          Schema.isMaxLength(100),
+        ),
       }),
       description:
         "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",

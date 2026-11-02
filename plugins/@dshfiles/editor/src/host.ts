@@ -23,8 +23,7 @@ interface LiveSessions {
  * store's own reference: `z.object` would hand back a copy whose `get` runs without the store as `this`.
  */
 const liveSessionsSchema = Schema.declare<LiveSessions>(
-  (value): value is LiveSessions =>
-    typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function',
+  (value): value is LiveSessions => typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function',
 )
 
 class SessionWorkspaceMissing extends Schema.TaggedError<SessionWorkspaceMissing>()('SessionWorkspaceMissing', {
@@ -36,9 +35,12 @@ class EditorWorkspaceWriteFailure extends Schema.TaggedError<EditorWorkspaceWrit
   message: Schema.String,
 }) {}
 
-class EditorHostServices extends EffectContext.Service<EditorHostServices, {
-  readonly sessionRoot: (sessionId: string) => Effect.Effect<string, unknown>
-}>()('dshfiles/editor/EditorHostServices') {}
+class EditorHostServices extends EffectContext.Service<
+  EditorHostServices,
+  {
+    readonly sessionRoot: (sessionId: string) => Effect.Effect<string, unknown>
+  }
+>()('dshfiles/editor/EditorHostServices') {}
 
 const editorPlugin = DshxEffect.plugin({
   layer: (ctx: Context) => {
@@ -57,7 +59,8 @@ const editorPlugin = DshxEffect.plugin({
             const stored = yield* Effect.tryPromise({ try: () => persistence.stat(id), catch: error => error })
             storedRoot = stored?.header?.cwd
           }
-          if (storedRoot === undefined) return yield* Effect.fail(new SessionWorkspaceMissing({ message: 'This session has no workspace directory to save into.' }))
+          if (storedRoot === undefined)
+            return yield* Effect.fail(new SessionWorkspaceMissing({ message: 'This session has no workspace directory to save into.' }))
           return storedRoot
         }),
       ),
@@ -80,17 +83,16 @@ const editorHostApi = editorPlugin.hostApi(editorApi, {
       const host = yield* EditorHostServices
       const root = yield* host.sessionRoot(sessionId)
       return yield* Effect.tryPromise({
-        try: () => writeWorkspaceFile({
-          root,
-          path: input.path,
-          text: input.text,
-          expectedSha256: input.expectedSha256,
-          overwrite: input.overwrite ?? false,
-          maxBytes: MAX_SAVE_BYTES,
-        }),
-        catch: error => error instanceof WorkspaceWriteError
-          ? new EditorWorkspaceWriteFailure({ code: error.code, message: error.message })
-          : error,
+        try: () =>
+          writeWorkspaceFile({
+            root,
+            path: input.path,
+            text: input.text,
+            expectedSha256: input.expectedSha256,
+            overwrite: input.overwrite ?? false,
+            maxBytes: MAX_SAVE_BYTES,
+          }),
+        catch: error => (error instanceof WorkspaceWriteError ? new EditorWorkspaceWriteFailure({ code: error.code, message: error.message }) : error),
       })
     }).pipe(
       Effect.mapError(error => {

@@ -173,7 +173,10 @@ export const registryEntrySchema = Schema.Struct({
 
 /** A stored field that resets to its default instead of failing the row it belongs to. */
 const resettable = <S extends Schema.Top>(schema: S, value: S['Type'] & S['Encoded']) =>
-  schema.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(value))), Schema.withDecodingDefaultKey(Effect.succeed(value)))
+  schema.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(value))),
+    Schema.withDecodingDefaultKey(Effect.succeed(value)),
+  )
 
 /** The four manager preferences, stored beside the server list in the Loader row; each field falls back on its own. */
 export const preferencesSchema = Schema.Struct({

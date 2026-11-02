@@ -434,9 +434,7 @@ const threadView = (
   const withQueue: ThreadView = integrationQueuedAt === undefined ? withQueueEvents : { ...withQueueEvents, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
   const integrations = IntegrationAttribution.forSession({ records: status.integrations ?? [], sessionId: viewerSessionId, forkCutAt }).map(record => {
-    return record.tipChangeId === undefined
-      ? { at: record.at }
-      : { at: record.at, tipChangeId: record.tipChangeId }
+    return record.tipChangeId === undefined ? { at: record.at } : { at: record.at, tipChangeId: record.tipChangeId }
   })
   const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt, integrations }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp

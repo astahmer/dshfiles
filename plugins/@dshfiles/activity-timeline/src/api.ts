@@ -6,13 +6,19 @@ const pageInputSchema = Schema.Struct({
   sources: Schema.optional(Schema.Array(activitySourceSchema).check(Schema.isMaxLength(4)).annotate({ description: 'Only events from these sources.' })),
   levels: Schema.optional(Schema.Array(activityLevelSchema).check(Schema.isMaxLength(3)).annotate({ description: 'Only events at these levels.' })),
   sessionId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Only events for one Session id.' })),
-  correlationId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)).annotate({ description: 'Only events sharing one correlation id.' })),
+  correlationId: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)).annotate({ description: 'Only events sharing one correlation id.' }),
+  ),
   search: Schema.optional(
-    Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)).annotate({ description: 'Case-insensitive literal search over event type, summary, and detail.' }),
+    Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)).annotate({
+      description: 'Case-insensitive literal search over event type, summary, and detail.',
+    }),
   ),
   detailed: Schema.optional(Schema.Boolean.annotate({ description: 'Return every retained event without condensation.' })),
   cursor: Schema.optional(
-    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Opaque cursor from a previous page; omit for the newest page.' }),
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({
+      description: 'Opaque cursor from a previous page; omit for the newest page.',
+    }),
   ),
   limit: Schema.optional(
     Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200)).annotate({
@@ -44,7 +50,13 @@ export const activityTimelineApi = defineApi({
       tool: { name: 'activity_timeline_page', readOnly: true, render: compactJson },
     }),
     attention: method({
-      input: Schema.Struct({ limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)).annotate({ description: 'Maximum events, 1 to 100; defaults to 20.' })) }),
+      input: Schema.Struct({
+        limit: Schema.optional(
+          Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)).annotate({
+            description: 'Maximum events, 1 to 100; defaults to 20.',
+          }),
+        ),
+      }),
       output: Schema.Struct({ events: Schema.Array(activityEventSchema).check(Schema.isMaxLength(100)) }),
       description:
         'List retained events that need human attention (agent errors, blocked or failed integrations, missing workspaces, failed communication tool calls). Read-only.',
@@ -65,7 +77,11 @@ export const activityTimelineApi = defineApi({
     related: method({
       input: Schema.Struct({
         eventId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
-        limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)).annotate({ description: 'Maximum events, 1 to 100; defaults to 50.' })),
+        limit: Schema.optional(
+          Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)).annotate({
+            description: 'Maximum events, 1 to 100; defaults to 50.',
+          }),
+        ),
       }),
       output: Schema.Struct({ events: Schema.Array(activityEventSchema).check(Schema.isMaxLength(100)) }),
       description: 'List retained events correlated with one activity event id. Read-only.',

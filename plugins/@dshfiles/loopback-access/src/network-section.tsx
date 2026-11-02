@@ -50,9 +50,7 @@ export const NetworkPreferences = (props: {
   const draftSchema = Schema.Struct({
     lanEnabled: networkFormSchema.fields.lanEnabled,
     bindAddress: networkFormSchema.fields.bindAddress,
-    port: Schema.String.check(
-      Schema.makeFilter((value: string) => (/^\d+$/u.test(value) && Number(value) <= 65_535 ? undefined : t('invalidPort'))),
-    ),
+    port: Schema.String.check(Schema.makeFilter((value: string) => (/^\d+$/u.test(value) && Number(value) <= 65_535 ? undefined : t('invalidPort')))),
   }).check(
     Schema.makeFilter((value: { readonly lanEnabled: boolean; readonly bindAddress: string | null }) =>
       value.lanEnabled && !snapshot.addresses.some(item => item.address === value.bindAddress)

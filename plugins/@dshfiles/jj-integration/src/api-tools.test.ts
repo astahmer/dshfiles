@@ -80,7 +80,9 @@ describe('jj-integration tool exposure', () => {
     expect(jjIntegrationApi.methods.discardMany.description).toContain('force: true only when the user explicitly authorized')
     expect(await validate(schema, { paths: ['/work/thread-abc123'], force: false })).toBe(true)
     expect(await validate(schema, { paths: ['/work/thread-abc123'], force: false, confirm: true })).toBe(false)
-    expect(await validate(schema, { paths: Array.from({ length: 101 }, (_, index) => `/work/thread-${String(index)}`), force: false, confirm: true })).toBe(true)
+    expect(await validate(schema, { paths: Array.from({ length: 101 }, (_, index) => `/work/thread-${String(index)}`), force: false, confirm: true })).toBe(
+      true,
+    )
   })
 
   test('manual integration accepts an optional non-empty bookmark target', async () => {

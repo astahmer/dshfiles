@@ -25,7 +25,7 @@ const serverFormValuesSchema = Schema.Struct({
 })
 
 /** The form edits mutable fields, so the decoded `readonly` struct is widened for the form store. */
-export type ServerFormValues = { -readonly [Key in keyof typeof serverFormValuesSchema.Type]: typeof serverFormValuesSchema.Type[Key] }
+export type ServerFormValues = { -readonly [Key in keyof typeof serverFormValuesSchema.Type]: (typeof serverFormValuesSchema.Type)[Key] }
 type ServerFormField = keyof ServerFormValues
 
 interface ServerFormIssue {
@@ -169,7 +169,12 @@ export class McpServerFormModel {
   }
 
   /** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
-  static readonly catalogServerDraft = (input: { readonly name: string; readonly url: string; readonly oauth: boolean; readonly taken: readonly string[] }): ServerDraft => ({
+  static readonly catalogServerDraft = (input: {
+    readonly name: string
+    readonly url: string
+    readonly oauth: boolean
+    readonly taken: readonly string[]
+  }): ServerDraft => ({
     id: '',
     name: input.name,
     serverName: McpServerFormModel.uniqueServerName({ title: input.name, taken: input.taken }),

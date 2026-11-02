@@ -93,35 +93,35 @@ export const HeroWorkspacePicker = (
   if (destination.kind === 'runtime') {
     const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
     const hostName = directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'
-  const remoteNotice = ((): JSX.Element | null => {
-    if (bootstrapRemoteSession) {
-      return (
-        <RemoteSessionBootstrap
-          api={multiHost}
-          runtimeId={destination.runtimeId}
-          hostName={hostName}
-          cwd={destination.folder}
-          prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
-          onStarted={props.services.openSession}
-        />
-      )
-    }
-    if (currentSessionId !== undefined && currentSessionOwner.isError) {
-      return (
-        <p role="alert" className="dshx:text-xs dshx:text-destructive">
-          Could not verify whether this thread is remote ({errorMessage(currentSessionOwner.error, 'unknown error')}). Reload the page to retry.
-        </p>
-      )
-    }
-    if (currentSessionId !== undefined && !currentSessionOwner.isSuccess) {
-      return (
-        <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
-          Checking the current thread&apos;s host…
-        </p>
-      )
-    }
-    return null
-  })()
+    const remoteNotice = ((): JSX.Element | null => {
+      if (bootstrapRemoteSession) {
+        return (
+          <RemoteSessionBootstrap
+            api={multiHost}
+            runtimeId={destination.runtimeId}
+            hostName={hostName}
+            cwd={destination.folder}
+            prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
+            onStarted={props.services.openSession}
+          />
+        )
+      }
+      if (currentSessionId !== undefined && currentSessionOwner.isError) {
+        return (
+          <p role="alert" className="dshx:text-xs dshx:text-destructive">
+            Could not verify whether this thread is remote ({errorMessage(currentSessionOwner.error, 'unknown error')}). Reload the page to retry.
+          </p>
+        )
+      }
+      if (currentSessionId !== undefined && !currentSessionOwner.isSuccess) {
+        return (
+          <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+            Checking the current thread&apos;s host…
+          </p>
+        )
+      }
+      return null
+    })()
 
     return (
       // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).

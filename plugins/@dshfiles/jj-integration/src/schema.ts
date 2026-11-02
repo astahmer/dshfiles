@@ -107,8 +107,10 @@ export const strictStandardSchema = <S extends SchemaTypes.ConstraintDecoder<unk
       ...standardSchema['~standard'],
       jsonSchema: {
         ...standardJsonSchema,
-        input: (options: JsonSchemaOptions) => publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.input(options), document, options)))),
-        output: (options: JsonSchemaOptions) => publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.output(options), document, options)))),
+        input: (options: JsonSchemaOptions) =>
+          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.input(options), document, options)))),
+        output: (options: JsonSchemaOptions) =>
+          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.output(options), document, options)))),
       },
     },
   }

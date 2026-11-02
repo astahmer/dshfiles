@@ -11,15 +11,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 
 import { AgentFocusModel } from './agent-focus.js'
-import {
-  AGENT_DELEGATION_UNRESTRICTED,
-  agentLimits,
-  Agents,
-  AGENTS_QUERY_ROOT,
-  type Agent,
-  type AgentDraft,
-  type AgentThread,
-} from './agent.js'
+import { AGENT_DELEGATION_UNRESTRICTED, agentLimits, Agents, AGENTS_QUERY_ROOT, type Agent, type AgentDraft, type AgentThread } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 

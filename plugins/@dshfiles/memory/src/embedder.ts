@@ -23,8 +23,7 @@ export type RetrievalStatus = {
 const embedderSchema = Schema.Struct({ model: Schema.String.check(Schema.isMinLength(1)), embed: Schema.instanceOf(Function) })
 const providerModuleSchema = Schema.Struct({ default: Schema.instanceOf(Function) })
 
-const vectorListSchema = (expected: number) =>
-  Schema.Array(Schema.instanceOf(Float32Array)).check(Schema.isMinLength(expected), Schema.isMaxLength(expected))
+const vectorListSchema = (expected: number) => Schema.Array(Schema.instanceOf(Float32Array)).check(Schema.isMinLength(expected), Schema.isMaxLength(expected))
 
 export class EmbeddingProviders {
   /** Loads the provider module and builds its embedder; rejects with a readable reason. */

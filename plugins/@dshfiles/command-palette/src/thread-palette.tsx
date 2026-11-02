@@ -47,9 +47,9 @@ export interface ThreadPaletteCopy {
   /** Accessible name of the search box; the dialog's description is only linked, not a name. */
   readonly searchLabel: string
   readonly sessionNotFound: string
-      readonly unassigned: string
-    readonly working: string
-    readonly idle: string
+  readonly unassigned: string
+  readonly working: string
+  readonly idle: string
 
   readonly prefixHint: string
   readonly viewAll: string

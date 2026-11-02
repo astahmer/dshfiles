@@ -240,13 +240,17 @@ const noteInput = Schema.Struct({
     description:
       'repo (default), global, path:<subpath>, or agent:<handle> for a scope only that agent’s threads read. Do not widen a one-off request into a global rule.',
   }),
-  confidence: Schema.optional(Schema.Literals(['stated', 'inferred'])).annotate({ description: 'stated: the user said it; inferred: you concluded it. Default stated.' }),
+  confidence: Schema.optional(Schema.Literals(['stated', 'inferred'])).annotate({
+    description: 'stated: the user said it; inferred: you concluded it. Default stated.',
+  }),
   id: Schema.optional(Schema.String.check(Schema.isMaxLength(40))).annotate({ description: 'Note id (n:<id>) for update and forget.' }),
   reason: Schema.optional(Schema.String.check(Schema.isMaxLength(500))).annotate({ description: 'Why the note is updated or forgotten (required for both).' }),
 })
 
 const daysInput = Schema.Struct({
-  days: Schema.optional(integer.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(365))).annotate({ description: 'Activity window in days; default 30.' }),
+  days: Schema.optional(integer.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(365))).annotate({
+    description: 'Activity window in days; default 30.',
+  }),
 })
 
 export const memoryApi = defineApi({
@@ -309,7 +313,10 @@ export const memoryApi = defineApi({
       tool: { name: 'memory_projects', readOnly: true, render: compactJson },
     }),
     startBlock: MemoryContract.method({
-      input: Schema.Struct({ cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4_096)), scope: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))) }),
+      input: Schema.Struct({
+        cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4_096)),
+        scope: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
+      }),
       output: Schema.Struct({ project: Schema.String, text: Schema.String }),
       description:
         'The memory block a new thread started in this folder gets now, and the project it is filed under. Empty when memory is off or has nothing for the project. Read-only.',
@@ -339,9 +346,7 @@ ${output.text}`,
       input: Schema.Struct({
         project: Schema.String.check(Schema.isMaxLength(4_096)),
         afterId: Schema.optional(recordId),
-        limit: integer
-          .check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(50))
-          .pipe(Schema.withDecodingDefaultKey(Effect.succeed(25))),
+        limit: integer.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(50)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(25))),
       }),
       output: Schema.Struct({
         results: Schema.Array(
@@ -408,7 +413,8 @@ ${output.text}`,
     archiveNote: MemoryContract.method({
       input: Schema.Struct({ id: recordId }),
       output: Schema.Struct({ archived: Schema.Boolean }),
-      description: 'Archive one note without deleting it. It remains visible in the Memory panel but is excluded from memory tools. Call only when the user asked to archive that note.',
+      description:
+        'Archive one note without deleting it. It remains visible in the Memory panel but is excluded from memory tools. Call only when the user asked to archive that note.',
       tool: { name: 'memory_archive_note', render: compactJson },
     }),
     restoreNote: MemoryContract.method({
