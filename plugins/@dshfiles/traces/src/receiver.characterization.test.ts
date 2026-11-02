@@ -158,7 +158,7 @@ describe('receiver request rejections', () => {
       body: 'not gzip',
       status: 400,
     },
-  ])('$name is $ReceiverHarness.status with a JSON error body', ({ path, headers, body, status: expected }) =>
+  ])('$name is $status with a JSON error body', ({ path, headers, body, status: expected }) =>
     Effect.gen(function* () {
       yield* ReceiverHarness.untilState('listening')
       const response = yield* ReceiverHarness.post(yield* ReceiverHarness.boundUrl(path), { headers, body })
@@ -236,7 +236,7 @@ describe('receiver forwarding', () => {
     }).pipe(Effect.scoped, Effect.provide(ReceiverHarness.receiverLayer({ mode: 'both' }))),
   )
 
-  it.live('a non-2xx upstream answer is a forward failure naming the ReceiverHarness.status and origin', () =>
+  it.live('a non-2xx upstream answer is a forward failure naming the status and origin', () =>
     Effect.gen(function* () {
       const server = createServer((request, response) => {
         request.resume()
@@ -282,7 +282,7 @@ describe('receiver forwarding', () => {
     }).pipe(Effect.scoped, Effect.provide(ReceiverHarness.receiverLayer({ mode: 'both' }))),
   )
 
-  it.live('a forward URL that is not http(s) is reported in the ReceiverHarness.status message and forwards nothing', () =>
+  it.live('a forward URL that is not http(s) is reported in the status message and forwards nothing', () =>
     Effect.gen(function* () {
       yield* ReceiverHarness.untilState('listening')
       expect(yield* ReceiverHarness.status).toMatchObject({ message: 'The forward URL must be an http(s) URL.', forward: { url: null } })

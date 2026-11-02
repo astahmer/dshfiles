@@ -115,7 +115,7 @@ describe('OTLP/HTTP receiver', () => {
     }).pipe(Effect.provide(ReceiverHarness.receiverLayer())),
   )
 
-  it.live('reports a port held by another process and keeps the rest of the ReceiverHarness.status', () =>
+  it.live('reports a port held by another process and keeps the rest of the status', () =>
     Effect.gen(function* () {
       const busy = yield* upstream
       yield* ReceiverHarness.updateSettings({ mode: 'plugin', port: busy.port })

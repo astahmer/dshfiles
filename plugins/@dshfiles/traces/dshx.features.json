@@ -130,7 +130,7 @@
         {
           "kind": "unit-test",
           "id": "traces.store-retention",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "drops whole traces past the age and span limits, and clears everything"
         },
         {
@@ -143,7 +143,7 @@
           "kind": "unit-test",
           "id": "traces.receiver-state-change",
           "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
-          "testName": "reports listening with its bound port, then disabled, so the Host can publish and withdraw its address"
+          "testName": "reports starting, listening with its bound port, then disabled, so the Host can publish and withdraw its address"
         },
         {
           "kind": "unit-test",
@@ -211,25 +211,25 @@
         {
           "kind": "unit-test",
           "id": "traces.store-list",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "lists traces newest first with root, duration, counts, services and session"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-filters",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "filters by service, operation, status, duration, time, text and session"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-paging",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "pages with a cursor and rejects a forged one"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-tree",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "returns one trace as a depth-first tree with offsets and resource attributes"
         },
         {
@@ -292,19 +292,19 @@
         {
           "kind": "unit-test",
           "id": "traces.store-session-summary",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "counts every span of the session traces, model and tool calls, and tokens from model calls only"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-session-empty",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "is empty for an unknown session and reports no tokens without usage attributes"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-session-logs",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "finds the logs of a session through its traces or its dsh.session.id attribute"
         }
       ],
@@ -367,13 +367,13 @@
         {
           "kind": "unit-test",
           "id": "traces.store-log-search",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "searches logs by service, severity, text, attribute, trace and span, newest first with paging"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-log-retention",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "drops the oldest logs past the count limit and expired ones by age"
         }
       ],
@@ -410,13 +410,13 @@
         {
           "kind": "unit-test",
           "id": "traces.store-stats",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "summarizes services and operations over a window"
         },
         {
           "kind": "unit-test",
           "id": "traces.store-error-groups",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "groups errors by service, operation, type and message shape"
         },
         {
@@ -462,7 +462,7 @@
         {
           "kind": "unit-test",
           "id": "traces.store-service-map",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "maps calls between services from cross-service parent and child spans"
         },
         {
@@ -531,7 +531,7 @@
         {
           "kind": "unit-test",
           "id": "traces.store-metric-series",
-          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "file": "plugins/@dshfiles/traces/src/trace-repo.test.ts",
           "testName": "lists metrics and charts a cumulative counter as its increase, per attribute set"
         }
       ],
