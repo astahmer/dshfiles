@@ -354,7 +354,8 @@
       "description": "List the configured Codex and OpenCode Go accounts: their model routes, whether each holds a login, and how the pool currently spreads requests.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
