@@ -148,6 +148,9 @@
         "scripts/browser-cost.mjs",
         "scripts/sidebar-scale-bench.mjs",
       ],
+      // zod is imported by packages/dshx (its Effect→zod bridge), which resolves it through this workspace root the
+      // same way the built Host bundles do at runtime.
+      "ignoreDependencies": ["zod"],
     },
     "tooling/dshx/packages/dshx": {
       "entry": [
