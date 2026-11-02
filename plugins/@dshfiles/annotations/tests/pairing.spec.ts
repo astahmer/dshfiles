@@ -19,8 +19,8 @@ afterEach(async () => {
 })
 
 const start = async ({ allowedOrigins = [origin], windowMs = 60_000 }: { allowedOrigins?: readonly string[]; windowMs?: number } = {}) => {
-  const pairing = createPairing({ token: () => token, windowMs })
-  const handler = createPairHandler({ pairing, allowedOrigins: () => allowedOrigins })
+  const pairing = createPairing({ windowMs })
+  const handler = createPairHandler({ pairing, token: async () => token, allowedOrigins: () => allowedOrigins })
   const server = createServer((request, response) => handler(request, response))
   servers.push(server)
   await new Promise<void>(resolve => {
@@ -59,11 +59,11 @@ describe('pairing', () => {
 
   it('expires the window on its own', async () => {
     let clock = 1_000
-    const pairing = createPairing({ token: () => token, now: () => clock, windowMs: 1_000 })
+    const pairing = createPairing({ now: () => clock, windowMs: 1_000 })
     pairing.arm()
     clock += 2_000
     expect(pairing.status().armed).toBe(false)
-    expect(pairing.take()).toBeUndefined()
+    expect(pairing.take()).toBe(false)
   })
 
   it('answers the extension preflight with CORS headers', async () => {

@@ -5,11 +5,18 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { type Cdp, ChromeCdp } from '../src/chrome-cdp.js'
-import { ChromeLaunch } from '../src/chrome-launch.js'
+import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest'
+import { Duration, Effect, Fiber, Schedule, Schema } from 'effect'
+import { FetchHttpClient } from 'effect/http'
+import { type Cdp, choosePage, dispatchClick, endpointOf, listPages, openCdp, pickOnPage } from '../src/chrome-cdp.js'
 
-const CHROME = process.env.CHROME_PATH ?? ChromeLaunch.chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '' })
+const knownChromes = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+]
+const CHROME = process.env.CHROME_PATH ?? knownChromes.find(candidate => existsSync(candidate))
 const PAGE = '<title>Pick fixture</title><h1>Fixture</h1><button id="save" aria-label="Save changes">Save</button>'
 
 let chrome: ChildProcessWithoutNullStreams | undefined
@@ -67,60 +74,49 @@ afterAll(async () => {
   if (profileDir.length > 0) await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
-const waitForPicker = async ({ cdp }: { cdp: Cdp }): Promise<void> => {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const result = (await cdp.send('Runtime.evaluate', {
-      expression: 'window.__dshAnnotationPicking === true',
-      returnByValue: true,
-    })) as { readonly result?: { readonly value?: unknown } }
-    if (result.result?.value === true) return
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-  throw new Error('picker never armed')
-}
+const Evaluated = Schema.Struct({ result: Schema.optional(Schema.Struct({ value: Schema.optional(Schema.Unknown) })) })
+const evaluate = (cdp: Cdp, expression: string) =>
+  Effect.map(cdp.send('Runtime.evaluate', { expression, returnByValue: true }), result => Schema.decodeUnknownSync(Evaluated)(result).result?.value)
 
-const buttonCenter = async ({ cdp }: { cdp: Cdp }): Promise<{ x: number; y: number }> => {
-  const result = (await cdp.send('Runtime.evaluate', {
-    expression: 'JSON.stringify(document.getElementById("save").getBoundingClientRect())',
-    returnByValue: true,
-  })) as { readonly result?: { readonly value?: string } }
-  const rect = JSON.parse(result.result?.value ?? '{}') as { x?: number; y?: number; width?: number; height?: number }
-  return { x: Math.round((rect.x ?? 0) + (rect.width ?? 0) / 2), y: Math.round((rect.y ?? 0) + (rect.height ?? 0) / 2) }
-}
+const waitForPicker = (cdp: Cdp) =>
+  evaluate(cdp, 'window.__dshAnnotationPicking === true').pipe(
+    Effect.repeat({ until: armed => armed === true, schedule: Schedule.spaced(Duration.millis(100)) }),
+    Effect.timeout(Duration.seconds(4)),
+  )
+
+const Rect = Schema.fromJsonString(Schema.Struct({ x: Schema.Number, y: Schema.Number, width: Schema.Number, height: Schema.Number }))
+const buttonCenter = (cdp: Cdp) =>
+  Effect.map(evaluate(cdp, 'JSON.stringify(document.getElementById("save").getBoundingClientRect())'), value => {
+    const rect = Schema.decodeUnknownSync(Rect)(value)
+    return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }
+  })
 
 describe.skipIf(CHROME === undefined || !existsSync(CHROME))('chrome cdp picker', () => {
-  it('lists the page and returns the clicked element', async () => {
-    if (!started) throw new Error('chrome did not start')
-    let pages = await ChromeCdp.listPages({ endpoint: ChromeCdp.endpointOf({ port }) })
-    for (let attempt = 0; attempt < 40 && pages.length === 0; attempt += 1) {
-      await new Promise(resolve => setTimeout(resolve, 250))
-      pages = await ChromeCdp.listPages({ endpoint: ChromeCdp.endpointOf({ port }) })
-    }
-    expect(pages.length).toBeGreaterThan(0)
-    const page = pages[0]
-    if (page === undefined) throw new Error('no page')
-
-    const cdp = await ChromeCdp.openCdp({ wsUrl: page.wsUrl })
-    try {
-      const picking = ChromeCdp.pickOnPage({ page, timeoutMs: 15_000 })
-      await waitForPicker({ cdp })
-      const center = await buttonCenter({ cdp })
-      const base = { x: center.x, y: center.y, button: 'left', clickCount: 1 }
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...base })
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...base })
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...base })
-
-      const outcome = await picking
-      expect(outcome.ok).toBe(true)
-      if (!outcome.ok) return
-      expect(outcome.target.selector).toBe('#save')
-      expect(outcome.target.text).toBe('Save changes')
-      expect(outcome.target.surface).toBe('external')
-      expect(outcome.target.url).toBe(pageUrl)
-    } finally {
-      cdp.close()
-    }
-  }, 30_000)
+  it.live(
+    'lists the page and returns the clicked element',
+    () =>
+      Effect.gen(function* () {
+        if (!started) return yield* Effect.die('chrome did not start')
+        const pages = yield* listPages({ endpoint: endpointOf({ port }) }).pipe(
+          Effect.repeat({ until: found => found.length > 0, schedule: Schedule.spaced(Duration.millis(250)) }),
+          Effect.timeout(Duration.seconds(10)),
+        )
+        const page = pages[0]
+        if (page === undefined) return yield* Effect.die('no page')
+        const cdp = yield* openCdp({ wsUrl: page.wsUrl })
+        const picking = yield* Effect.forkChild(pickOnPage({ page, timeout: Duration.seconds(15) }))
+        yield* waitForPicker(cdp)
+        yield* dispatchClick({ cdp, ...(yield* buttonCenter(cdp)) })
+        const outcome = yield* Fiber.join(picking)
+        expect(outcome.ok).toBe(true)
+        if (!outcome.ok) return
+        expect(outcome.target.selector).toBe('#save')
+        expect(outcome.target.text).toBe('Save changes')
+        expect(outcome.target.surface).toBe('external')
+        expect(outcome.target.url).toBe(pageUrl)
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
+    30_000,
+  )
 })
 
 describe('choosePage', () => {
@@ -133,15 +129,15 @@ describe('choosePage', () => {
 
   it('prefers the focused tab', () => {
     const pages = [page('a'), page('b')]
-    expect(ChromeCdp.choosePage({ pages, focusedId: 'b' })?.id).toBe('b')
+    expect(choosePage({ pages, focusedId: 'b' })?.id).toBe('b')
   })
 
   it('falls back to the first tab when focus is unknown', () => {
-    expect(ChromeCdp.choosePage({ pages: [page('a'), page('b')] })?.id).toBe('a')
-    expect(ChromeCdp.choosePage({ pages: [page('a')], focusedId: 'gone' })?.id).toBe('a')
+    expect(choosePage({ pages: [page('a'), page('b')] })?.id).toBe('a')
+    expect(choosePage({ pages: [page('a')], focusedId: 'gone' })?.id).toBe('a')
   })
 
   it('returns nothing for no pages', () => {
-    expect(ChromeCdp.choosePage({ pages: [] })).toBeUndefined()
+    expect(choosePage({ pages: [] })).toBeUndefined()
   })
 })

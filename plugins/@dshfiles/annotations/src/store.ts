@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { StorageDomain, type StorageDomainWriteFailed } from '@dshfiles/dshx/effect/storage-domain'
+import { Clock, Context, Effect, Layer, Option, Ref, Schema, Semaphore } from 'effect'
 import {
   MAX_ANNOTATIONS_PER_SESSION,
   MAX_THREAD_MESSAGES,
@@ -13,8 +15,8 @@ import {
   type AnnotationDraft,
   type AnnotationMeta,
   type AnnotationOrigin,
-  type AnnotationStatus,
   type AnnotationStaleReason,
+  type AnnotationStatus,
   type UnassignedAnnotation,
 } from './schema.js'
 
@@ -29,295 +31,363 @@ export const annotationsDomain = defineDomain({
   },
 })
 
-export type AnnotationTable = KvTable<string, Annotation>
-export type UnassignedTable = KvTable<string, UnassignedAnnotation>
-export type MetaTable = KvTable<string, AnnotationMeta>
+/** No annotation (or intake item) with that id in that Session. */
+export class AnnotationNotFound extends Schema.TaggedError<AnnotationNotFound>()('AnnotationNotFound', {
+  id: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `No annotation ${this.id} in this Session.`
+  }
+}
+
+/** The caller resolved a revision that is no longer current. */
+export class AnnotationRevisionConflict extends Schema.TaggedError<AnnotationRevisionConflict>()('AnnotationRevisionConflict', {
+  id: Schema.String,
+  expected: Schema.Number,
+  actual: Schema.Number,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `Annotation ${this.id} changed since revision ${this.expected}; read it again.`
+  }
+}
+
+/** The annotation is already resolved or dismissed. */
+export class AnnotationClosed extends Schema.TaggedError<AnnotationClosed>()('AnnotationClosed', {
+  id: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `Annotation ${this.id} is already closed.`
+  }
+}
+
+/** The Session holds the maximum number of open annotations. */
+export class AnnotationLimitReached extends Schema.TaggedError<AnnotationLimitReached>()(
+  'AnnotationLimitReached',
+  { sessionId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'annotations-limit' },
+) {
+  override get message(): string {
+    return `This Session already holds ${MAX_ANNOTATIONS_PER_SESSION} open annotations; resolve or dismiss some first.`
+  }
+}
+
+export type StoreFailure = AnnotationNotFound | AnnotationRevisionConflict | AnnotationClosed | AnnotationLimitReached
 
 const META_KEY = 'meta'
 const CLOSED: readonly AnnotationStatus[] = ['resolved', 'dismissed']
 
-export type StoreFailure = 'missing' | 'revision' | 'limit' | 'status'
-export type StoreResult<Value> = { readonly ok: true; readonly value: Value } | { readonly ok: false; readonly error: StoreFailure }
-
-const recordKey = ({ sessionId, id }: { readonly sessionId: string; readonly id: string }): string => `${sessionId}\u0000${id}`
+const recordKey = (input: { readonly sessionId: string; readonly id: string }): string => `${input.sessionId}\u0000${input.id}`
 
 const newerRevision = (current: number, now: number): number => Math.max(current + 1, now)
 
-const nextToken = (): string => randomBytes(32).toString('base64url')
+const nextToken = Effect.sync(() => randomBytes(32).toString('base64url'))
 
-export interface AnnotationStore {
-  token(): string
-  rotateToken(): Promise<string>
-  list(input: { readonly sessionId: string; readonly statuses?: readonly AnnotationStatus[]; readonly limit?: number }): Annotation[]
-  counts(sessionId: string): AnnotationCounts
-  create(input: {
+const byCreation = (left: Annotation, right: Annotation) => left.createdAt - right.createdAt || left.id.localeCompare(right.id)
+
+const nextIdFor = (existing: readonly Annotation[]): string => {
+  const highest = existing.reduce((maximum, record) => {
+    const numeric = Number.parseInt(record.id.slice('ann_'.length), 10)
+    return Number.isNaN(numeric) ? maximum : Math.max(maximum, numeric)
+  }, 0)
+  return `ann_${highest + 1}`
+}
+
+const logWriteFailure = (error: StorageDomainWriteFailed) => Effect.logWarning('Annotations write failed', { table: error.table, operation: error.operation })
+
+export interface AnnotationStoreShape {
+  readonly token: Effect.Effect<string>
+  readonly rotateToken: Effect.Effect<string>
+  readonly list: (input: {
+    readonly sessionId: string
+    readonly statuses?: readonly AnnotationStatus[]
+    readonly limit?: number
+  }) => Effect.Effect<Annotation[]>
+  readonly counts: (sessionId: string) => Effect.Effect<AnnotationCounts>
+  readonly create: (input: {
     readonly sessionId: string
     readonly drafts: readonly AnnotationDraft[]
     readonly origin: AnnotationOrigin
-  }): Promise<StoreResult<Annotation[]>>
-  ack(input: { readonly sessionId: string; readonly ids: readonly string[] }): Promise<StoreResult<Annotation[]>>
-  resolve(input: {
+  }) => Effect.Effect<Annotation[], AnnotationLimitReached>
+  readonly ack: (input: { readonly sessionId: string; readonly ids: readonly string[] }) => Effect.Effect<Annotation[], AnnotationNotFound>
+  readonly resolve: (input: {
     readonly sessionId: string
     readonly id: string
     readonly revision: number
     readonly summary?: string
     readonly resolvedBy: 'human' | 'agent'
-  }): Promise<StoreResult<Annotation>>
-  dismiss(input: { readonly sessionId: string; readonly id: string; readonly reason: string }): Promise<StoreResult<Annotation>>
-  markStale(input: { readonly sessionId: string; readonly id: string; readonly reason: AnnotationStaleReason }): Promise<StoreResult<Annotation>>
-  reply(input: { readonly sessionId: string; readonly id: string; readonly body: string; readonly role: 'human' | 'agent' }): Promise<StoreResult<Annotation>>
-  intake(): UnassignedAnnotation[]
-  ingest(input: { readonly drafts: readonly AnnotationDraft[]; readonly extensionOrigin: string }): Promise<UnassignedAnnotation[]>
-  attach(input: { readonly sessionId: string; readonly ids: readonly string[] }): Promise<StoreResult<Annotation[]>>
-  flush(): Promise<void>
+  }) => Effect.Effect<Annotation, AnnotationNotFound | AnnotationRevisionConflict>
+  readonly dismiss: (input: {
+    readonly sessionId: string
+    readonly id: string
+    readonly reason: string
+  }) => Effect.Effect<Annotation, AnnotationNotFound | AnnotationClosed>
+  readonly markStale: (input: {
+    readonly sessionId: string
+    readonly id: string
+    readonly reason: AnnotationStaleReason
+  }) => Effect.Effect<Annotation, AnnotationNotFound | AnnotationClosed>
+  readonly reply: (input: {
+    readonly sessionId: string
+    readonly id: string
+    readonly body: string
+    readonly role: 'human' | 'agent'
+  }) => Effect.Effect<Annotation, AnnotationNotFound>
+  readonly intake: Effect.Effect<UnassignedAnnotation[]>
+  readonly ingest: (input: { readonly drafts: readonly AnnotationDraft[]; readonly extensionOrigin: string }) => Effect.Effect<UnassignedAnnotation[]>
+  readonly attach: (input: {
+    readonly sessionId: string
+    readonly ids: readonly string[]
+  }) => Effect.Effect<Annotation[], AnnotationNotFound | AnnotationLimitReached>
 }
 
-export const createAnnotationStore = ({
-  annotations,
-  unassigned,
-  meta,
-  now = Date.now,
-  reportError = (error: unknown) =>
-    console.error('Annotations write failed', {
-      error: error instanceof Error ? error.message.slice(0, 200) : String(error),
-    }),
-}: {
-  readonly annotations: AnnotationTable
-  readonly unassigned: UnassignedTable
-  readonly meta: MetaTable
-  readonly now?: () => number
-  readonly reportError?: (error: unknown) => void
-}): AnnotationStore => {
-  const records = new Map<string, Annotation>(annotations.entries())
-  const waiting = new Map<string, UnassignedAnnotation>(unassigned.entries())
-  let state: AnnotationMeta = meta.get(META_KEY) ?? {
-    schemaVersion: 1,
-    token: nextToken(),
-    tokenCreatedAt: now(),
-    sequence: 0,
-  }
+/**
+ * Annotations per Session plus extension feedback waiting for a Session, kept in memory and written through to the
+ * `annotations` storage domain. The domain is open for the layer's Scope; a failed write is logged and the in-memory
+ * state stays authoritative until the next write, as before.
+ */
+export class AnnotationStore extends Context.Service<AnnotationStore, AnnotationStoreShape>()('@dshfiles/annotations/AnnotationStore') {
+  static readonly layer = Layer.effect(
+    AnnotationStore,
+    Effect.gen(function* () {
+      const storage = yield* StorageDomain
+      const domain = yield* storage.open(annotationsDomain)
+      const annotationsTable = domain.table('annotations')
+      const unassignedTable = domain.table('unassigned')
+      const metaTable = domain.table('meta')
+      const records = yield* Ref.make<ReadonlyMap<string, Annotation>>(new Map((yield* annotationsTable.entries).map(([key, value]) => [key, value])))
+      const waiting = yield* Ref.make<ReadonlyMap<string, UnassignedAnnotation>>(new Map((yield* unassignedTable.entries).map(([key, value]) => [key, value])))
+      const storedMeta = yield* metaTable.get(META_KEY)
+      const initialMeta: AnnotationMeta = Option.isSome(storedMeta)
+        ? storedMeta.value
+        : { schemaVersion: 1, token: yield* nextToken, tokenCreatedAt: yield* Clock.currentTimeMillis, sequence: 0 }
+      const meta = yield* Ref.make(initialMeta)
+      const writes = yield* Semaphore.make(1)
 
-  const guard = async (write: () => Promise<unknown>): Promise<void> => {
-    try {
-      await write()
-    } catch (error) {
-      reportError(error)
-    }
-  }
+      const persistMeta = Effect.flatMap(Ref.get(meta), state => metaTable.put(META_KEY, state)).pipe(
+        Effect.catchTag('StorageDomainWriteFailed', logWriteFailure),
+      )
+      yield* persistMeta
+      yield* Effect.addFinalizer(() => persistMeta)
 
-  const persistMeta = async (): Promise<void> => {
-    await guard(() => meta.put(META_KEY, state))
-  }
+      const sessionRecords = (sessionId: string) =>
+        Effect.map(Ref.get(records), all =>
+          Array.from(all.values())
+            .filter(record => record.sessionId === sessionId)
+            .sort(byCreation),
+        )
 
-  const sessionRecords = (sessionId: string): Annotation[] =>
-    Array.from(records.values())
-      .filter(record => record.sessionId === sessionId)
-      .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
+      const storeRecord = (record: Annotation) =>
+        Ref.update(records, all => new Map(all).set(recordKey(record), record)).pipe(
+          Effect.andThen(annotationsTable.put(recordKey(record), record)),
+          Effect.catchTag('StorageDomainWriteFailed', logWriteFailure),
+        )
 
-  const countsFor = (sessionId: string): AnnotationCounts => {
-    const counts = { pending: 0, acknowledged: 0, stale: 0, resolved: 0, dismissed: 0 }
-    for (const record of records.values()) {
-      if (record.sessionId !== sessionId) continue
-      counts[record.status] += 1
-    }
-    return counts
-  }
+      const removeRecord = (record: Annotation) =>
+        Ref.update(records, all => {
+          const next = new Map(all)
+          next.delete(recordKey(record))
+          return next
+        }).pipe(Effect.andThen(annotationsTable.delete(recordKey(record))), Effect.asVoid, Effect.catchTag('StorageDomainWriteFailed', logWriteFailure))
 
-  const storeRecord = async (record: Annotation): Promise<void> => {
-    records.set(recordKey(record), record)
-    await guard(() => annotations.put(recordKey(record), record))
-  }
+      const removeWaiting = (id: string) =>
+        Ref.update(waiting, all => {
+          const next = new Map(all)
+          next.delete(id)
+          return next
+        }).pipe(Effect.andThen(unassignedTable.delete(id)), Effect.asVoid, Effect.catchTag('StorageDomainWriteFailed', logWriteFailure))
 
-  const removeRecord = async (record: Annotation): Promise<void> => {
-    records.delete(recordKey(record))
-    await guard(() => annotations.delete(recordKey(record)))
-  }
+      const find = (input: { readonly sessionId: string; readonly id: string }) =>
+        Effect.flatMap(Ref.get(records), all => {
+          const record = all.get(recordKey(input))
+          return record === undefined ? Effect.fail(new AnnotationNotFound({ id: input.id })) : Effect.succeed(record)
+        })
 
-  const ensureCapacity = async ({ sessionId, incoming }: { readonly sessionId: string; readonly incoming: number }): Promise<boolean> => {
-    const existing = sessionRecords(sessionId)
-    if (existing.length + incoming <= MAX_ANNOTATIONS_PER_SESSION) return true
-    const needed = existing.length + incoming - MAX_ANNOTATIONS_PER_SESSION
-    const closed = existing.filter(record => CLOSED.includes(record.status)).slice(0, needed)
-    for (const record of closed) await removeRecord(record)
-    return sessionRecords(sessionId).length + incoming <= MAX_ANNOTATIONS_PER_SESSION
-  }
+      const ensureCapacity = Effect.fnUntraced(function* (input: { readonly sessionId: string; readonly incoming: number }) {
+        const existing = yield* sessionRecords(input.sessionId)
+        if (existing.length + input.incoming <= MAX_ANNOTATIONS_PER_SESSION) return
+        const needed = existing.length + input.incoming - MAX_ANNOTATIONS_PER_SESSION
+        yield* Effect.forEach(existing.filter(record => CLOSED.includes(record.status)).slice(0, needed), removeRecord, { discard: true })
+        if ((yield* sessionRecords(input.sessionId)).length + input.incoming > MAX_ANNOTATIONS_PER_SESSION)
+          return yield* new AnnotationLimitReached({ sessionId: input.sessionId })
+      })
 
-  const nextIdFor = (sessionId: string): string => {
-    const highest = sessionRecords(sessionId).reduce((maximum, record) => {
-      const numeric = Number.parseInt(record.id.slice('ann_'.length), 10)
-      return Number.isNaN(numeric) ? maximum : Math.max(maximum, numeric)
-    }, 0)
-    return `ann_${highest + 1}`
-  }
-
-  const createRecords = async ({
-    sessionId,
-    drafts,
-    origin,
-  }: {
-    readonly sessionId: string
-    readonly drafts: readonly AnnotationDraft[]
-    readonly origin: AnnotationOrigin
-  }): Promise<StoreResult<Annotation[]>> => {
-    if (!(await ensureCapacity({ sessionId, incoming: drafts.length }))) return { ok: false, error: 'limit' }
-    const created: Annotation[] = []
-    for (const draft of drafts) {
-      const timestamp = now()
-      const record: Annotation = {
-        id: nextIdFor(sessionId),
-        sessionId,
-        revision: 1,
-        status: 'pending',
-        kind: draft.kind,
-        target: draft.target,
-        note: draft.note,
-        thread: [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        origin,
-        ...(draft.intent !== undefined && { intent: draft.intent }),
-        ...(draft.severity !== undefined && { severity: draft.severity }),
-      }
-      await storeRecord(record)
-      created.push(record)
-    }
-    return { ok: true, value: created }
-  }
-
-  const mutate = async (record: Annotation, update: Partial<Annotation>): Promise<Annotation> => {
-    const timestamp = now()
-    const next: Annotation = { ...record, ...update, revision: newerRevision(record.revision, timestamp), updatedAt: timestamp }
-    await storeRecord(next)
-    return next
-  }
-
-  const find = ({ sessionId, id }: { readonly sessionId: string; readonly id: string }): Annotation | undefined => records.get(recordKey({ sessionId, id }))
-
-  return {
-    token: () => state.token,
-
-    rotateToken: async () => {
-      state = { ...state, token: nextToken(), tokenCreatedAt: now(), sequence: state.sequence + 1 }
-      await persistMeta()
-      return state.token
-    },
-
-    list: ({ sessionId, statuses, limit }) => {
-      const allowed = statuses === undefined ? undefined : new Set(statuses)
-      const rows = sessionRecords(sessionId).filter(record => allowed === undefined || allowed.has(record.status))
-      return rows.slice(0, limit ?? 200)
-    },
-
-    counts: countsFor,
-
-    create: createRecords,
-
-    ack: async ({ sessionId, ids }) => {
-      const acknowledged: Annotation[] = []
-      for (const id of ids) {
-        const record = find({ sessionId, id })
-        if (record === undefined) return { ok: false, error: 'missing' }
-        if (record.status !== 'pending' && record.status !== 'stale') continue
-        acknowledged.push(await mutate(record, { status: 'acknowledged' }))
-      }
-      return { ok: true, value: acknowledged }
-    },
-
-    resolve: async ({ sessionId, id, revision, summary, resolvedBy }) => {
-      const record = find({ sessionId, id })
-      if (record === undefined) return { ok: false, error: 'missing' }
-      if (record.revision !== revision) return { ok: false, error: 'revision' }
-      const resolution = { revision, ...(summary !== undefined && { summary }) }
-      return {
-        ok: true,
-        value: await mutate(record, {
-          status: 'resolved',
-          resolvedAt: now(),
-          resolvedBy,
-          resolution,
-        }),
-      }
-    },
-
-    dismiss: async ({ sessionId, id, reason }) => {
-      const record = find({ sessionId, id })
-      if (record === undefined) return { ok: false, error: 'missing' }
-      if (CLOSED.includes(record.status)) return { ok: false, error: 'status' }
-      const message = { id: `msg_${record.thread.length + 1}`, role: 'human' as const, body: `Dismissed: ${reason}`, at: now() }
-      return {
-        ok: true,
-        value: await mutate(record, {
-          status: 'dismissed',
-          resolvedAt: now(),
-          resolvedBy: 'human',
-          resolution: { revision: record.revision, summary: reason },
-          thread: [...record.thread, message].slice(-MAX_THREAD_MESSAGES),
-        }),
-      }
-    },
-
-    markStale: async ({ sessionId, id, reason }) => {
-      const record = find({ sessionId, id })
-      if (record === undefined) return { ok: false, error: 'missing' }
-      if (CLOSED.includes(record.status)) return { ok: false, error: 'status' }
-      if (record.status === 'stale' && record.target.staleReason === reason) return { ok: true, value: record }
-      return {
-        ok: true,
-        value: await mutate(record, {
-          status: 'stale',
-          target: { ...record.target, staleReason: reason },
-        }),
-      }
-    },
-
-    reply: async ({ sessionId, id, body, role }) => {
-      const record = find({ sessionId, id })
-      if (record === undefined) return { ok: false, error: 'missing' }
-      const message = { id: `msg_${record.thread.length + 1}`, role, body, at: now() }
-      return { ok: true, value: await mutate(record, { thread: [...record.thread, message].slice(-MAX_THREAD_MESSAGES) }) }
-    },
-
-    intake: () => Array.from(waiting.values()).sort((left, right) => left.receivedAt - right.receivedAt),
-
-    ingest: async ({ drafts, extensionOrigin }) => {
-      const accepted: UnassignedAnnotation[] = []
-      for (const draft of drafts) {
-        if (waiting.size >= MAX_UNASSIGNED) {
-          const oldest = Array.from(waiting.values()).sort((left, right) => left.receivedAt - right.receivedAt)[0]
-          if (oldest !== undefined) {
-            waiting.delete(oldest.id)
-            await guard(() => unassigned.delete(oldest.id))
+      const createRecords = Effect.fnUntraced(function* (input: {
+        readonly sessionId: string
+        readonly drafts: readonly AnnotationDraft[]
+        readonly origin: AnnotationOrigin
+      }) {
+        yield* ensureCapacity({ sessionId: input.sessionId, incoming: input.drafts.length })
+        const created: Annotation[] = []
+        for (const draft of input.drafts) {
+          const timestamp = yield* Clock.currentTimeMillis
+          const record: Annotation = {
+            id: nextIdFor(yield* sessionRecords(input.sessionId)),
+            sessionId: input.sessionId,
+            revision: 1,
+            status: 'pending',
+            kind: draft.kind,
+            target: draft.target,
+            note: draft.note,
+            thread: [],
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            origin: input.origin,
+            ...(draft.intent !== undefined && { intent: draft.intent }),
+            ...(draft.severity !== undefined && { severity: draft.severity }),
           }
+          yield* storeRecord(record)
+          created.push(record)
         }
-        state = { ...state, sequence: state.sequence + 1 }
-        const item: UnassignedAnnotation = {
-          id: `ext_${state.sequence}`,
-          draft: { ...draft, target: { ...draft.target, surface: 'external' } },
-          receivedAt: now(),
-          extensionOrigin,
-        }
-        waiting.set(item.id, item)
-        await guard(() => unassigned.put(item.id, item))
-        accepted.push(item)
-      }
-      await persistMeta()
-      return accepted
-    },
+        return created
+      })
 
-    attach: async ({ sessionId, ids }) => {
-      const attached: Annotation[] = []
-      for (const id of ids) {
-        const pending = waiting.get(id)
-        if (pending === undefined) return { ok: false, error: 'missing' }
-        const created = await createRecords({ sessionId, drafts: [pending.draft], origin: 'extension' })
-        if (!created.ok) return { ok: false, error: created.error }
-        waiting.delete(id)
-        await guard(() => unassigned.delete(id))
-        attached.push(...created.value)
-      }
-      return { ok: true, value: attached }
-    },
+      const mutate = Effect.fnUntraced(function* (record: Annotation, update: Partial<Annotation>) {
+        const timestamp = yield* Clock.currentTimeMillis
+        const next: Annotation = { ...record, ...update, revision: newerRevision(record.revision, timestamp), updatedAt: timestamp }
+        yield* storeRecord(next)
+        return next
+      })
 
-    flush: persistMeta,
-  }
+      const openRecord = (input: { readonly sessionId: string; readonly id: string }) =>
+        Effect.flatMap(find(input), record => (CLOSED.includes(record.status) ? Effect.fail(new AnnotationClosed({ id: input.id })) : Effect.succeed(record)))
+
+      const serialized = <A, E>(effect: Effect.Effect<A, E>) => writes.withPermit(effect)
+
+      return AnnotationStore.of({
+        token: Effect.map(Ref.get(meta), state => state.token),
+
+        rotateToken: serialized(
+          Effect.gen(function* () {
+            const token = yield* nextToken
+            const now = yield* Clock.currentTimeMillis
+            yield* Ref.update(meta, state => ({ ...state, token, tokenCreatedAt: now, sequence: state.sequence + 1 }))
+            yield* persistMeta
+            return token
+          }),
+        ),
+
+        list: Effect.fn('annotations store list')(function* (input) {
+          const allowed = input.statuses === undefined ? undefined : new Set(input.statuses)
+          const rows = (yield* sessionRecords(input.sessionId)).filter(record => allowed === undefined || allowed.has(record.status))
+          return rows.slice(0, input.limit ?? 200)
+        }),
+
+        counts: Effect.fn('annotations store counts')(function* (sessionId) {
+          const counts = { pending: 0, acknowledged: 0, stale: 0, resolved: 0, dismissed: 0 }
+          for (const record of yield* sessionRecords(sessionId)) counts[record.status] += 1
+          return counts
+        }),
+
+        create: input => serialized(createRecords(input)).pipe(Effect.withSpan('annotations store create')),
+
+        ack: input =>
+          serialized(
+            Effect.gen(function* () {
+              const acknowledged: Annotation[] = []
+              // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- the first missing id fails the whole acknowledgement, in request order.
+              for (const id of input.ids) {
+                const record = yield* find({ sessionId: input.sessionId, id })
+                if (record.status !== 'pending' && record.status !== 'stale') continue
+                acknowledged.push(yield* mutate(record, { status: 'acknowledged' }))
+              }
+              return acknowledged
+            }),
+          ).pipe(Effect.withSpan('annotations store acknowledge')),
+
+        resolve: input =>
+          serialized(
+            Effect.gen(function* () {
+              const record = yield* find(input)
+              if (record.revision !== input.revision)
+                return yield* new AnnotationRevisionConflict({ id: input.id, expected: input.revision, actual: record.revision })
+              return yield* mutate(record, {
+                status: 'resolved',
+                resolvedAt: yield* Clock.currentTimeMillis,
+                resolvedBy: input.resolvedBy,
+                resolution: { revision: input.revision, ...(input.summary !== undefined && { summary: input.summary }) },
+              })
+            }),
+          ).pipe(Effect.withSpan('annotations store resolve')),
+
+        dismiss: input =>
+          serialized(
+            Effect.gen(function* () {
+              const record = yield* openRecord(input)
+              const now = yield* Clock.currentTimeMillis
+              const message = { id: `msg_${record.thread.length + 1}`, role: 'human' as const, body: `Dismissed: ${input.reason}`, at: now }
+              return yield* mutate(record, {
+                status: 'dismissed',
+                resolvedAt: now,
+                resolvedBy: 'human',
+                resolution: { revision: record.revision, summary: input.reason },
+                thread: [...record.thread, message].slice(-MAX_THREAD_MESSAGES),
+              })
+            }),
+          ).pipe(Effect.withSpan('annotations store dismiss')),
+
+        markStale: input =>
+          serialized(
+            Effect.gen(function* () {
+              const record = yield* openRecord(input)
+              if (record.status === 'stale' && record.target.staleReason === input.reason) return record
+              return yield* mutate(record, { status: 'stale', target: { ...record.target, staleReason: input.reason } })
+            }),
+          ).pipe(Effect.withSpan('annotations store mark stale')),
+
+        reply: input =>
+          serialized(
+            Effect.gen(function* () {
+              const record = yield* find(input)
+              const message = { id: `msg_${record.thread.length + 1}`, role: input.role, body: input.body, at: yield* Clock.currentTimeMillis }
+              return yield* mutate(record, { thread: [...record.thread, message].slice(-MAX_THREAD_MESSAGES) })
+            }),
+          ).pipe(Effect.withSpan('annotations store reply')),
+
+        intake: Effect.map(Ref.get(waiting), all => Array.from(all.values()).sort((left, right) => left.receivedAt - right.receivedAt)),
+
+        ingest: input =>
+          serialized(
+            Effect.gen(function* () {
+              const accepted: UnassignedAnnotation[] = []
+              for (const draft of input.drafts) {
+                const current = yield* Ref.get(waiting)
+                if (current.size >= MAX_UNASSIGNED) {
+                  const oldest = Array.from(current.values()).sort((left, right) => left.receivedAt - right.receivedAt)[0]
+                  if (oldest !== undefined) yield* removeWaiting(oldest.id)
+                }
+                const sequence = (yield* Ref.updateAndGet(meta, state => ({ ...state, sequence: state.sequence + 1 }))).sequence
+                const item: UnassignedAnnotation = {
+                  id: `ext_${sequence}`,
+                  draft: { ...draft, target: { ...draft.target, surface: 'external' } },
+                  receivedAt: yield* Clock.currentTimeMillis,
+                  extensionOrigin: input.extensionOrigin,
+                }
+                yield* Ref.update(waiting, all => new Map(all).set(item.id, item))
+                yield* unassignedTable.put(item.id, item).pipe(Effect.catchTag('StorageDomainWriteFailed', logWriteFailure))
+                accepted.push(item)
+              }
+              yield* persistMeta
+              return accepted
+            }),
+          ).pipe(Effect.withSpan('annotations store ingest')),
+
+        attach: input =>
+          serialized(
+            Effect.gen(function* () {
+              const attached: Annotation[] = []
+              for (const id of input.ids) {
+                const pending = (yield* Ref.get(waiting)).get(id)
+                if (pending === undefined) return yield* new AnnotationNotFound({ id })
+                attached.push(...(yield* createRecords({ sessionId: input.sessionId, drafts: [pending.draft], origin: 'extension' })))
+                yield* removeWaiting(id)
+              }
+              return attached
+            }),
+          ).pipe(Effect.withSpan('annotations store attach')),
+      })
+    }),
+  )
 }

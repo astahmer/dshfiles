@@ -1,11 +1,10 @@
-import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
 import { connect } from 'node:net'
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
-import { withSpan } from '@dshfiles/dshx/tracing'
-import { ChromeCdp } from './chrome-cdp.js'
+import { Context, Duration, Effect, Exit, FileSystem, Layer, Option, Schedule, Schema, Scope, SynchronizedRef } from 'effect'
+import { HttpClient } from 'effect/http'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
+import { endpointOf } from './chrome-cdp.js'
 
 const MAC_PATHS = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium']
 const LINUX_NAMES = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
@@ -15,173 +14,212 @@ const WINDOWS_PATHS = [
   'C:\\Program Files\\Chromium\\Application\\chrome.exe',
 ]
 
-const onPath = ({ name, pathValue }: { readonly name: string; readonly pathValue: string }): string | undefined => {
-  for (const directory of pathValue.split(delimiter)) {
-    if (directory.length === 0) continue
-    const candidate = join(directory, name)
-    if (existsSync(candidate)) return candidate
+const launchFailures = {
+  'no-executable': () => 'No Chrome or Chromium found. Set its path in the annotations settings.',
+  'no-free-port': (port: number) => `No free debugging port between ${port} and ${port + 19}.`,
+  exited: () => 'Chrome exited right after launch. Quit any window already using that profile and try again.',
+  'no-debugging-port': () => 'Chrome did not open a debugging port in time.',
+} as const
+
+/** The picker browser could not be started. */
+export class ChromeLaunchFailed extends Schema.TaggedError<ChromeLaunchFailed>()(
+  'ChromeLaunchFailed',
+  {
+    reason: Schema.Literals(['no-executable', 'no-free-port', 'exited', 'no-debugging-port']),
+    port: Schema.Number,
+    cause: Schema.optional(Schema.Defect()),
+  },
+  { dshxWireCode: 'annotations-host-error' },
+) {
+  override get message(): string {
+    return launchFailures[this.reason](this.port)
   }
-  return undefined
 }
 
 export interface LaunchedChrome {
-  readonly pid: number
   readonly port: number
   readonly endpoint: string
 }
 
-let running: LaunchedChrome | undefined
+const VersionInfo = Schema.Struct({ webSocketDebuggerUrl: Schema.String })
+const decodeVersionInfo = Schema.decodeUnknownOption(VersionInfo)
+
+/**
+ * A configured path wins; otherwise the platform's usual install locations and PATH.
+ * Nothing here guesses a browser for a platform it does not know.
+ */
+export const chromeExecutable = Effect.fn('annotations find chrome')(function* (input: {
+  readonly platform: string
+  readonly pathValue?: string
+  readonly configured?: string
+}) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const exists = (path: string) => fileSystem.exists(path).pipe(Effect.orElseSucceed(() => false))
+  const chosen = (input.configured ?? '').trim()
+  if (chosen.length > 0) return (yield* exists(chosen)) ? Option.some(chosen) : Option.none<string>()
+  const candidates = input.platform === 'darwin' ? MAC_PATHS : input.platform === 'win32' ? WINDOWS_PATHS : LINUX_NAMES
+  const searchesPath = input.platform !== 'win32' && input.platform !== 'darwin'
+  const directories = (input.pathValue ?? '').split(delimiter).filter(directory => directory.length > 0)
+  for (const candidate of candidates) {
+    if (yield* exists(candidate)) return Option.some(candidate)
+    if (!searchesPath) continue
+    for (const directory of directories) if (yield* exists(join(directory, candidate))) return Option.some(join(directory, candidate))
+  }
+  return Option.none<string>()
+})
+
+export const defaultProfileDir = (input: { readonly dshHome: string | undefined }): string =>
+  join(input.dshHome === undefined || input.dshHome.length === 0 ? join(homedir(), '.dsh') : input.dshHome, 'plugins', 'annotations', 'chrome-profile')
+
+export const chromeArguments = (input: {
+  readonly port: number
+  readonly profileDir: string
+  readonly startUrl?: string | undefined
+  readonly headless?: boolean | undefined
+}): string[] => [
+  `--remote-debugging-port=${input.port}`,
+  `--user-data-dir=${input.profileDir}`,
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-features=Translate',
+  // A fresh user-data-dir otherwise triggers macOS's "Keychain Not Found" dialog and
+  // blocks the window before any page exists.
+  '--password-store=basic',
+  '--use-mock-keychain',
+  ...(input.headless === true ? ['--headless=new'] : []),
+  input.startUrl !== undefined && input.startUrl.trim().length > 0 ? input.startUrl.trim() : 'about:blank',
+]
 
 /** Any listener counts as busy: a port can answer something other than our JSON, or nothing at all. */
-const portBusy = ({ port, timeoutMs = 500 }: { readonly port: number; readonly timeoutMs?: number }): Promise<boolean> =>
-  new Promise(resolve => {
+const portBusy = (port: number) =>
+  Effect.callback<boolean>(resume => {
     const socket = connect({ host: '127.0.0.1', port })
     const settle = (busy: boolean): void => {
       socket.destroy()
-      resolve(busy)
+      resume(Effect.succeed(busy))
     }
-    socket.setTimeout(timeoutMs, () => settle(false))
+    socket.setTimeout(500, () => settle(false))
     socket.once('connect', () => settle(true))
     socket.once('error', () => settle(false))
+    return Effect.sync(() => socket.destroy())
   })
 
-const reachable = async ({ port }: { readonly port: number }): Promise<boolean> => {
-  const response = await fetch(`${ChromeCdp.endpointOf({ port })}/json/version`, { signal: AbortSignal.timeout(700) }).catch(() => undefined)
-  if (response === undefined || !response.ok) return false
-  const version = (await response.json().catch(() => undefined)) as { readonly webSocketDebuggerUrl?: unknown } | undefined
-  return typeof version?.webSocketDebuggerUrl === 'string'
+/**
+ * Never attach to a browser we did not start: if the configured port already answers,
+ * take the next free one instead of driving someone else's Chrome.
+ */
+export const freePort = Effect.fn('annotations find free port')(function* (input: { readonly start: number; readonly attempts?: number }) {
+  for (let offset = 0; offset < (input.attempts ?? 20); offset += 1) {
+    if (!(yield* portBusy(input.start + offset))) return input.start + offset
+  }
+  return yield* new ChromeLaunchFailed({ reason: 'no-free-port', port: input.start })
+})
+
+/** Whether the DevTools endpoint on `port` answers with a browser version. */
+export const devtoolsReachable = Effect.fn('annotations probe devtools')(function* (input: { readonly endpoint: string; readonly timeout: Duration.Input }) {
+  const client = yield* HttpClient.HttpClient
+  return yield* client.get(`${input.endpoint}/json/version`).pipe(
+    Effect.flatMap(response => (response.status >= 200 && response.status < 300 ? response.json : Effect.succeed(undefined))),
+    Effect.map(body => Option.isSome(decodeVersionInfo(body))),
+    Effect.timeoutOption(input.timeout),
+    Effect.map(Option.getOrElse(() => false)),
+    Effect.orElseSucceed(() => false),
+  )
+})
+
+export interface ChromeLaunchRequest {
+  readonly executable: string
+  readonly port: number
+  readonly profileDir: string
+  readonly startUrl?: string | undefined
+  readonly headless?: boolean | undefined
+  readonly timeout?: Duration.Input | undefined
 }
 
-export class ChromeLaunch {
-  /**
-   * A configured path wins; otherwise the platform's usual install locations and PATH.
-   * Nothing here guesses a browser for a platform it does not know.
-   */
-  static chromeExecutable = ({
-    platform,
-    pathValue = '',
-    configured = '',
-  }: {
-    readonly platform: string
-    readonly pathValue?: string
-    readonly configured?: string
-  }): string | undefined => {
-    const chosen = configured.trim()
-    if (chosen.length > 0) return existsSync(chosen) ? chosen : undefined
-    const candidates = platform === 'darwin' ? MAC_PATHS : platform === 'win32' ? WINDOWS_PATHS : LINUX_NAMES
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate
-      if (platform !== 'win32' && platform !== 'darwin') {
-        const found = onPath({ name: candidate, pathValue })
-        if (found !== undefined) return found
-      }
-    }
-    return undefined
+interface RunningChrome {
+  readonly launched: LaunchedChrome
+  readonly scope: Scope.Closeable
+}
+
+/**
+ * The one picker browser this Host launched. It runs as a DSH-managed process in a Scope of its own: stopping it, or
+ * unloading the plugin, ends the whole process range, helpers included.
+ */
+export class ChromeController extends Context.Service<
+  ChromeController,
+  {
+    readonly launched: Effect.Effect<Option.Option<LaunchedChrome>>
+    readonly launch: (request: ChromeLaunchRequest) => Effect.Effect<LaunchedChrome, ChromeLaunchFailed>
+    readonly stop: Effect.Effect<boolean>
   }
+>()('@dshfiles/annotations/ChromeController') {
+  static readonly layer = Layer.effect(
+    ChromeController,
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const fileSystem = yield* FileSystem.FileSystem
+      const client = yield* HttpClient.HttpClient
+      const pluginScope = yield* Effect.scope
+      const running = yield* SynchronizedRef.make(Option.none<RunningChrome>())
 
-  static defaultProfileDir = ({ dshHome }: { readonly dshHome: string | undefined }): string =>
-    join(dshHome === undefined || dshHome.length === 0 ? join(homedir(), '.dsh') : dshHome, 'plugins', 'annotations', 'chrome-profile')
+      const start = Effect.fnUntraced(
+        function* (request: ChromeLaunchRequest) {
+          const chosen = yield* freePort({ start: request.port })
+          // Chrome creates the leaf but not a nested path, and a missing parent makes it exit silently.
+          yield* fileSystem.makeDirectory(request.profileDir, { recursive: true }).pipe(Effect.ignore)
+          const scope = yield* Scope.fork(pluginScope)
+          const endpoint = endpointOf({ port: chosen })
+          const launchedChrome = Effect.gen(function* () {
+            const handle = yield* spawner
+              .spawn(
+                ChildProcess.make(
+                  request.executable,
+                  chromeArguments({ port: chosen, profileDir: request.profileDir, startUrl: request.startUrl, headless: request.headless }),
+                  { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' },
+                ),
+              )
+              .pipe(
+                Scope.provide(scope),
+                Effect.mapError(cause => new ChromeLaunchFailed({ reason: 'exited', port: chosen, cause })),
+              )
+            const ready = Effect.gen(function* () {
+              const alive = yield* handle.isRunning.pipe(Effect.orElseSucceed(() => false))
+              if (!alive) return yield* new ChromeLaunchFailed({ reason: 'exited', port: chosen })
+              return yield* devtoolsReachable({ endpoint, timeout: Duration.millis(700) })
+            })
+            yield* ready.pipe(
+              Effect.repeat({ until: reachable => reachable, schedule: Schedule.spaced(Duration.millis(250)) }),
+              Effect.timeoutOrElse({
+                duration: request.timeout ?? Duration.seconds(12),
+                orElse: () => Effect.fail(new ChromeLaunchFailed({ reason: 'no-debugging-port', port: chosen })),
+              }),
+            )
+            return { launched: { port: chosen, endpoint }, scope } satisfies RunningChrome
+          })
+          return yield* launchedChrome.pipe(Effect.onError(cause => Scope.close(scope, Exit.failCause(cause))))
+        },
+        Effect.provideService(HttpClient.HttpClient, client),
+      )
 
-  static launchedChrome = (): LaunchedChrome | undefined => running
-
-  static chromeArguments = ({
-    port,
-    profileDir,
-    startUrl,
-    headless = false,
-  }: {
-    readonly port: number
-    readonly profileDir: string
-    readonly startUrl?: string
-    readonly headless?: boolean
-  }): string[] => [
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${profileDir}`,
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-features=Translate',
-    // A fresh user-data-dir otherwise triggers macOS's "Keychain Not Found" dialog and
-    // blocks the window before any page exists.
-    '--password-store=basic',
-    '--use-mock-keychain',
-    ...(headless ? ['--headless=new'] : []),
-    startUrl !== undefined && startUrl.trim().length > 0 ? startUrl.trim() : 'about:blank',
-  ]
-
-  /**
-   * Never attach to a browser we did not start: if the configured port already answers,
-   * take the next free one instead of driving someone else's Chrome.
-   */
-  static freePort = async ({ start, attempts = 20 }: { readonly start: number; readonly attempts?: number }): Promise<number> => {
-    for (let offset = 0; offset < attempts; offset += 1) {
-      const candidate = start + offset
-      if (!(await portBusy({ port: candidate }))) return candidate
-    }
-    throw new Error(`No free debugging port between ${start} and ${start + attempts - 1}.`)
-  }
-
-  static launchChrome = async ({
-    executable,
-    port,
-    profileDir,
-    startUrl,
-    headless = false,
-    timeoutMs = 12_000,
-  }: {
-    readonly executable: string
-    readonly port: number
-    readonly profileDir: string
-    readonly startUrl?: string
-    readonly headless?: boolean
-    readonly timeoutMs?: number
-  }): Promise<LaunchedChrome> => {
-    if (running !== undefined) return running
-    return withSpan('annotations launch chrome', async () => {
-      const chosen = await ChromeLaunch.freePort({ start: port })
-      // Chrome creates the leaf but not a nested path, and a missing parent makes it exit silently.
-      await mkdir(profileDir, { recursive: true })
-      const child = spawn(executable, ChromeLaunch.chromeArguments({ port: chosen, profileDir, headless, ...(startUrl !== undefined && { startUrl }) }), {
-        detached: true,
-        stdio: 'ignore',
+      return ChromeController.of({
+        launched: Effect.map(
+          SynchronizedRef.get(running),
+          Option.map(chrome => chrome.launched),
+        ),
+        launch: request =>
+          SynchronizedRef.modifyEffect(running, current =>
+            Option.match(current, {
+              onSome: chrome => Effect.succeed([chrome.launched, current] as const),
+              onNone: () => Effect.map(start(request), chrome => [chrome.launched, Option.some(chrome)] as const),
+            }),
+          ).pipe(Effect.withSpan('annotations launch chrome')),
+        stop: SynchronizedRef.modifyEffect(running, current =>
+          Option.match(current, {
+            onNone: () => Effect.succeed([false, current] as const),
+            onSome: chrome => Effect.as(Scope.close(chrome.scope, Exit.void), [true, Option.none<RunningChrome>()] as const),
+          }),
+        ).pipe(Effect.withSpan('annotations stop chrome')),
       })
-      child.unref()
-      let exited = false
-      child.once('exit', () => {
-        exited = true
-      })
-      const endpoint = ChromeCdp.endpointOf({ port: chosen })
-      const deadline = Date.now() + timeoutMs
-      while (Date.now() < deadline) {
-        if (exited) throw new Error('Chrome exited right after launch. Quit any window already using that profile and try again.')
-        if (await reachable({ port: chosen })) {
-          const launched = { pid: child.pid ?? 0, port: chosen, endpoint }
-          running = launched
-          return launched
-        }
-        await new Promise(resolve => setTimeout(resolve, 250))
-      }
-      throw new Error('Chrome did not open a debugging port in time.')
-    })
-  }
-
-  /**
-   * The launcher was spawned detached, so it leads its own process group: signalling the
-   * group closes the helpers too instead of leaving a headless browser behind.
-   */
-  static stopChrome = (): boolean => {
-    if (running === undefined) return false
-    const pid = running.pid
-    try {
-      process.kill(-pid, 'SIGTERM')
-    } catch {
-      try {
-        process.kill(pid, 'SIGTERM')
-      } catch {
-        running = undefined
-        return false
-      }
-    }
-    running = undefined
-    return true
-  }
+    }),
+  )
 }

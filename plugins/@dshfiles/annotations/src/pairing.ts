@@ -14,8 +14,8 @@ export interface PairingStatus {
 export interface Pairing {
   arm(): PairingStatus
   status(): PairingStatus
-  /** Hands the token over once, only while the user-armed window is open. */
-  take(): string | undefined
+  /** Closes the user-armed window and reports whether it was open, so the token is handed over once. */
+  take(): boolean
 }
 
 /**
@@ -23,15 +23,7 @@ export interface Pairing {
  * pulls the token instead of the user copying it. Single use, and it expires on its
  * own, so a missed window leaves no standing invitation.
  */
-export const createPairing = ({
-  token,
-  now = Date.now,
-  windowMs = PAIR_WINDOW_MS,
-}: {
-  readonly token: () => string
-  readonly now?: () => number
-  readonly windowMs?: number
-}): Pairing => {
+export const createPairing = ({ now = Date.now, windowMs = PAIR_WINDOW_MS }: { readonly now?: () => number; readonly windowMs?: number }): Pairing => {
   let expiresAt: number | undefined
   let pairedAt: number | undefined
 
@@ -49,22 +41,23 @@ export const createPairing = ({
       ...(pairedAt !== undefined && { pairedAt }),
     }),
     take: () => {
-      if (!armed()) return undefined
+      if (!armed()) return false
       expiresAt = undefined
       pairedAt = now()
-      return token()
+      return true
     },
   }
 }
 
 export interface PairHandlerOptions {
   readonly pairing: Pairing
+  readonly token: () => Promise<string>
   readonly allowedOrigins: () => readonly string[]
 }
 
 export const createPairHandler =
-  ({ pairing, allowedOrigins }: PairHandlerOptions) =>
-  (request: IncomingMessage, response: ServerResponse): void => {
+  ({ pairing, token, allowedOrigins }: PairHandlerOptions) =>
+  async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     if (!LOOPBACK.has(request.socket.remoteAddress ?? '')) {
       ExtensionHttp.respond({ response, status: 403, body: { error: 'loopback only' } })
       return
@@ -84,10 +77,9 @@ export const createPairHandler =
       ExtensionHttp.respond({ response, status: 403, body: { error: 'origin not allowed' } })
       return
     }
-    const token = pairing.take()
-    if (token === undefined) {
+    if (!pairing.take()) {
       ExtensionHttp.respond({ response, status: 409, body: { error: 'open the pairing window in DSH first' } })
       return
     }
-    ExtensionHttp.respond({ response, status: 200, body: { token }, headers: ExtensionHttp.corsFor({ origin, allowed }) })
+    ExtensionHttp.respond({ response, status: 200, body: { token: await token() }, headers: ExtensionHttp.corsFor({ origin, allowed }) })
   }
