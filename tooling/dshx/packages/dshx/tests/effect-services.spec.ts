@@ -21,7 +21,10 @@ import { Llm, LlmModelInfoFailed } from '../src/effect/llm.js'
 import { PluginStorage } from '../src/effect/plugin-storage.js'
 import { PluginStorageModel } from '../src/host/plugin-storage.js'
 import { EffectHostServiceError, SettingsRead } from '../src/effect/services.js'
-import { Settings, SettingsConflict } from '../src/effect/settings.js'
+import { Settings, SettingsConflict, SettingsWriteFailed } from '../src/effect/settings.js'
+import { defineSettings } from '../src/settings/index.js'
+import type { SettingsValue } from '../src/settings/types.js'
+import SchemaStery from '@deepseek-ai/schemastery'
 import { StorageDomain } from '../src/effect/storage-domain.js'
 import { defineHost } from '../src/host/index.js'
 import { createTestHost } from '../src/testing/index.js'
@@ -191,6 +194,21 @@ describe('Settings', () => {
           { enabled: true, limit: 1 },
           { enabled: true, limit: 5 },
         ])
+      }),
+    )
+  })
+
+  const fallbackSettings = defineSettings({
+    namespace: 'dshfiles-fallback',
+    schema: SchemaStery.object({ rules: SchemaStery.array(SchemaStery.string()).default([]), limit: SchemaStery.natural().default(3) }),
+  })
+
+  it.layer(Settings.layer(fallbackSettings).pipe(Layer.provide(cordisHost('@test/settings-fallback', async () => undefined))))(layer => {
+    layer.effect('activates on the schema defaults when the Host has no entry, and refuses writes', () =>
+      Effect.gen(function* () {
+        const settings = yield* Settings.Tag<SettingsValue<(typeof fallbackSettings)['schema']>>('dshfiles-fallback')
+        expect(yield* settings.get).toEqual({ rules: [], limit: 3 })
+        expect(yield* settings.update({ limit: 4 }).pipe(Effect.flip)).toBeInstanceOf(SettingsWriteFailed)
       }),
     )
   })

@@ -96,18 +96,23 @@ export const layer = <S extends z<any, object>>(
     service,
     Effect.gen(function* () {
       const host = yield* HostContext
-      const forms = yield* hostService('settings').pipe(Effect.mapError(cause => new SettingsUnavailable({ namespace, cause })))
-      const read = Effect.try({
-        try: (): SettingsSnapshot<Value> => {
-          const descriptor = forms.describe().find(item => item.ns === namespace)
-          if (descriptor === undefined) throw new Error(`No native settings entry is registered for "${namespace}".`)
+      const optionalForms = yield* Effect.option(hostService('settings'))
+      const decode = (stored: unknown, revision: number) =>
+        Effect.try({
           // SAFETY: SettingsValue only drops the schema's index signature at the type level; the decoded object is unchanged.
-          const value = contract.schema(descriptor.value) as Value
-          return { value, revision: descriptor.revision }
-        },
-        catch: cause => new SettingsUnavailable({ namespace, cause }),
+          try: (): SettingsSnapshot<Value> => ({ value: contract.schema(stored) as Value, revision }),
+          catch: cause => new SettingsUnavailable({ namespace, cause }),
+        })
+      const read = Effect.gen(function* () {
+        const forms = yield* Effect.fromOption(optionalForms).pipe(Effect.mapError(() => new SettingsUnavailable({ namespace })))
+        const descriptor = forms.describe().find(item => item.ns === namespace)
+        if (descriptor === undefined) return yield* new SettingsUnavailable({ namespace })
+        return yield* decode(descriptor.value, descriptor.revision)
       }).pipe(Effect.withSpan('settings read', { attributes: { 'dshx.settings.namespace': namespace } }))
-      const ref = yield* SubscriptionRef.make(yield* read)
+      const initial = yield* read.pipe(
+        Effect.catch(error => Effect.logWarning(`${error.message} Using the schema defaults until they load.`).pipe(Effect.andThen(decode({}, 0)))),
+      )
+      const ref = yield* SubscriptionRef.make(initial)
 
       const committed = Stream.callback<number>(queue =>
         Effect.acquireRelease(
@@ -135,9 +140,11 @@ export const layer = <S extends z<any, object>>(
         snapshot: SubscriptionRef.get(ref),
         changes: Stream.map(SubscriptionRef.changes(ref), snapshot => snapshot.value),
         update: Effect.fn('settings update')(function* (patch, expectedRevision) {
+          const forms = yield* Effect.fromOption(optionalForms).pipe(Effect.mapError(() => new SettingsWriteFailed({ namespace, operation: 'update' })))
           yield* Effect.tryPromise({ try: () => forms.update(namespace, patch, expectedRevision), catch: writeError(namespace, 'update') })
         }),
         replace: Effect.fn('settings replace')(function* (value, expectedRevision) {
+          const forms = yield* Effect.fromOption(optionalForms).pipe(Effect.mapError(() => new SettingsWriteFailed({ namespace, operation: 'replace' })))
           yield* Effect.tryPromise({ try: () => forms.replace(namespace, value, expectedRevision), catch: writeError(namespace, 'replace') })
         }),
       })
