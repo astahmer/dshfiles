@@ -189,7 +189,7 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 3,
+    "causelessErrors": 2,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -605,7 +605,7 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0

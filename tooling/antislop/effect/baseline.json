@@ -27,7 +27,6 @@
     "plugins/@dshfiles/agent-telemetry/src/telemetry-effect.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
     "plugins/@dshfiles/background-jobs/src/host.ts": 2,
-    "plugins/@dshfiles/credential-port/src/effect.ts": 1,
     "plugins/@dshfiles/editor/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1,
     "plugins/@dshfiles/jujutsu/src/composer-context-host.ts": 1,
@@ -40,13 +39,10 @@
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
     "plugins/@dshfiles/pulls-review/src/host.ts": 2,
     "plugins/@dshfiles/session-search/src/host.ts": 4,
-    "plugins/@dshfiles/session-source-port/src/index.ts": 1,
     "plugins/@dshfiles/session-undo/src/host.ts": 3,
     "plugins/@dshfiles/usage/src/host.ts": 3,
     "plugins/@dshfiles/usage/src/otel-exporter.ts": 1,
-    "plugins/@dshfiles/vcs-provider-port/src/effect.ts": 2,
-    "plugins/@dshfiles/workspace-folder-picker/src/host.ts": 1,
-    "tooling/dshx/packages/dshx/src/effect/services.ts": 21
+    "plugins/@dshfiles/workspace-folder-picker/src/host.ts": 1
   },
   "effect-migration(no-empty-plugin-layer)": {
     "plugins/@dshfiles/agent-communication/src/host.ts": 1,

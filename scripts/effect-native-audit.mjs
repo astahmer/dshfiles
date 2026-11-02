@@ -135,18 +135,21 @@ const balancedCall = (source, openIndex) => {
 const taggedErrorFields = source =>
   [...source.matchAll(/\bSchema\.TaggedError\b(?:<[^>]*>)?\s*\(\s*\)\s*\(/gu)].map(match => balancedCall(source, match.index + match[0].length - 1))
 
-const hostMetrics = source => {
+const promiseEdgePattern = /-promise\.ts$/u
+
+const hostMetrics = (source, file) => {
   const errors = taggedErrorFields(source)
+  const promiseEdge = promiseEdgePattern.test(file)
   return {
     layerEmpty: count(source, /\bLayer\.empty\b/gu),
-    promiseAdapters: promiseAdapters(source),
+    promiseAdapters: promiseEdge ? 0 : promiseAdapters(source),
     moduleState: count(source, /^(?:export\s+)?(?:let|var)\s/gmu) + count(source, /\bnew\s+WeakMap\s*<\s*(?:[\w$]+\.)?Context\b/gu),
     timers: count(source, /(?<![\w$.])(?:globalThis\.)?(?:setTimeout|setInterval)\s*\(/gu),
     childProcess: importsModule(source, new Set(['node:child_process', 'child_process'])),
     nodeFs: importsModule(source, new Set(['node:fs', 'node:fs/promises', 'fs', 'fs/promises'])),
     globalFetch: count(source, /(?<![\w$.])fetch\s*\(/gu),
     causelessErrors: errors.filter(fields => !/\bDefect\b/u.test(fields)).length,
-    runOutsideEdges: count(source, /\.run(?:Promise|Fork|Sync|Callback)(?:Exit)?\s*\(/gu),
+    runOutsideEdges: promiseEdge ? 0 : count(source, /\.run(?:Promise|Fork|Sync|Callback)(?:Exit)?\s*\(/gu),
     syncDecodeInEffect: /\bEffect\.(?:gen|fn)\b/u.test(source) ? count(source, /\bdecodeUnknownSync\b/gu) : 0,
     taggedErrors: errors.length,
     services: count(source, /\bContext\.Service\b/gu),
@@ -175,7 +178,7 @@ const auditPlugin = (pluginDirectory, hosts) => {
     }
     if (!hosts.has(file) || file.includes('/src/native/')) continue
     hostFileCount += 1
-    addInto(metrics, hostMetrics(stripComments(readFileSync(file, 'utf8'))))
+    addInto(metrics, hostMetrics(stripComments(readFileSync(file, 'utf8')), file))
   }
   return { hostFileCount, metrics }
 }

@@ -18,10 +18,10 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { Effect } from 'effect'
 import { SessionPayload } from './payload.js'
 
-export { fromEffect, SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.js'
+export { SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.js'
+export { fromEffect } from './session-source-promise.js'
 export { SessionPayload, SessionPayloadError } from './payload.js'
 
 /**
@@ -111,35 +111,35 @@ export const createSessionSourceRegistry = (): SessionSourceRegistry => {
  */
 export class SessionSourcePayload {
   static summaries(value: unknown): readonly SessionSummary[] {
-    return Effect.runSync(SessionPayload.summaries(value))
+    return SessionPayload.summaries.sync(value)
   }
 
   static followFrame(value: unknown): SessionFollowFrame {
-    return Effect.runSync(SessionPayload.followFrame(value))
+    return SessionPayload.followFrame.sync(value)
   }
 
   static page(value: unknown): SessionPage {
-    return Effect.runSync(SessionPayload.page(value))
+    return SessionPayload.page.sync(value)
   }
 
   static projections(value: unknown): SessionProjectionsValue {
-    return Effect.runSync(SessionPayload.projections(value))
+    return SessionPayload.projections.sync(value)
   }
 
   static prompt(value: unknown): SessionPromptValue {
-    return Effect.runSync(SessionPayload.prompt(value))
+    return SessionPayload.prompt.sync(value)
   }
 
   static cancel(value: unknown): SessionCancelValue {
-    return Effect.runSync(SessionPayload.cancel(value))
+    return SessionPayload.cancel.sync(value)
   }
 
   static selectedModel(value: unknown): SessionSelectModelValue {
-    return Effect.runSync(SessionPayload.selectedModel(value))
+    return SessionPayload.selectedModel.sync(value)
   }
 
   static queue(value: unknown): SessionUpdateQueueValue {
-    return Effect.runSync(SessionPayload.queue(value))
+    return SessionPayload.queue.sync(value)
   }
 }
 

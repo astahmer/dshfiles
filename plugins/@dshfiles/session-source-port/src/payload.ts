@@ -10,7 +10,7 @@ import type {
   SessionSummary,
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
-import { Effect, Schema } from 'effect'
+import { Effect, Result, Schema } from 'effect'
 
 const payloadKinds = ['summaries', 'follow-frame', 'page', 'projections', 'prompt', 'cancel', 'selected-model', 'queue'] as const
 
@@ -62,19 +62,24 @@ export const sessionProjectionsSchema = Schema.Union([
  * fields this Host or the browser reads and keeps the rest, so the decoded value is that wire payload.
  */
 const decoder = <Wire, S extends Schema.ConstraintDecoder<unknown>>(payload: SessionPayloadError['payload'], shape: S) => {
-  const decode = Schema.decodeUnknownEffect(shape)
-  return (value: unknown): Effect.Effect<Wire, SessionPayloadError, S['DecodingServices']> =>
+  const decode = Schema.decodeUnknownResult(shape)
+  const result = (value: unknown): Result.Result<Wire, SessionPayloadError> =>
     decode(value).pipe(
       // SAFETY: the shape validated every field the Session wire type names that this Host reads, and passthrough kept the rest.
-      Effect.map(decoded => decoded as Wire),
-      Effect.mapError(cause => new SessionPayloadError({ payload, cause })),
+      Result.map(decoded => decoded as Wire),
+      Result.mapError(cause => new SessionPayloadError({ payload, cause })),
     )
+  return Object.assign((value: unknown): Effect.Effect<Wire, SessionPayloadError> => Effect.fromResult(result(value)), {
+    sync: (value: unknown): Wire => Result.getOrThrowWith(result(value), error => error),
+  })
 }
 
 const listDecoder = decoder<{ readonly items: readonly SessionSummary[] }, typeof sessionListSchema>('summaries', sessionListSchema)
 
 /** Rows of one runtime's `session/list` answer. */
-export const summaries = (value: unknown) => Effect.map(listDecoder(value), list => list.items)
+export const summaries = Object.assign((value: unknown) => Effect.map(listDecoder(value), list => list.items), {
+  sync: (value: unknown): readonly SessionSummary[] => listDecoder.sync(value).items,
+})
 /** One frame of a runtime's `session/follow` stream; only its discriminant is checked, the browser validates events. */
 export const followFrame = decoder<SessionFollowFrame, typeof sessionFollowFrameSchema>('follow-frame', sessionFollowFrameSchema)
 /** One history page of a runtime's `session/page` answer. */
