@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { z } from 'zod'
-import { decodeJson, decodeJsonSafe } from '../../scripts/json.ts'
+import { SchemaIssue } from 'effect'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from '../../scripts/json.ts'
 
 /**
  * `pnpm -r run <script>` silently skips a package without that script, so a
@@ -16,10 +17,12 @@ import { decodeJson, decodeJsonSafe } from '../../scripts/json.ts'
 const workspaceRoot = join(import.meta.dirname, '..')
 const packagesRoot = join(workspaceRoot, '@dshfiles')
 
-const scriptsSchema = (required: readonly string[]) => z.object(Object.fromEntries(required.map(name => [name, z.string().min(1)])))
+const nonEmptyString = Schema.String.check(Schema.isMinLength(1))
 
-const bundleManifestSchema = z.object({ scripts: scriptsSchema(['build', 'test', 'typecheck']) })
-const libraryManifestSchema = z.object({ scripts: scriptsSchema(['test', 'typecheck']) })
+const scriptsSchema = (required: readonly string[]) => Schema.Struct(Object.fromEntries(required.map(name => [name, nonEmptyString])))
+
+const bundleManifestSchema = Schema.Struct({ scripts: scriptsSchema(['build', 'test', 'typecheck']) })
+const libraryManifestSchema = Schema.Struct({ scripts: scriptsSchema(['test', 'typecheck']) })
 const clientBase = '../../../tsconfig.base.client.json'
 const tsconfigBaseExceptions = new Map([['subprocess-local', '../../../tsconfig.base.json']])
 const strictFlags = [
@@ -30,12 +33,14 @@ const strictFlags = [
   'verbatimModuleSyntax',
   'isolatedModules',
 ] as const
-const baseTsconfigSchema = z.object({ compilerOptions: z.object(Object.fromEntries(strictFlags.map(flag => [flag, z.literal(true)]))) })
+const baseTsconfigSchema = Schema.Struct({
+  compilerOptions: Schema.Struct(Object.fromEntries(strictFlags.map(flag => [flag, Schema.Literal(true)]))),
+})
 // Client plugins inherit strict flags from the shared base; Host-only forks may declare an explicit base exception.
 const tsconfigSchema = (base: string) =>
-  z.object({
-    extends: z.literal(base),
-    compilerOptions: z.object(Object.fromEntries(strictFlags.map(flag => [flag, z.literal(true).optional()]))),
+  Schema.Struct({
+    extends: Schema.Literal(base),
+    compilerOptions: Schema.Struct(Object.fromEntries(strictFlags.map(flag => [flag, Schema.optional(Schema.Literal(true))]))),
   })
 
 const repositoryRoot = join(workspaceRoot, '..')
@@ -45,18 +50,25 @@ const pinnedFields = ['dependencies', 'devDependencies', 'optionalDependencies']
 // Ranges kept on purpose, keyed by `<package directory> <field> <dependency>`.
 const rangeExceptions = new Map<string, string>([])
 
-const projectManifestSchema = z.object({
-  name: z.string().min(1),
-  dependencies: z.record(z.string(), z.string()).optional(),
-  devDependencies: z.record(z.string(), z.string()).optional(),
-  optionalDependencies: z.record(z.string(), z.string()).optional(),
+const projectManifestSchema = Schema.Struct({
+  name: nonEmptyString,
+  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  optionalDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 })
 
 interface WorkspaceProject {
   readonly directory: string
   readonly name: string
-  readonly manifest: z.infer<typeof projectManifestSchema>
+  readonly manifest: Schema.Schema.Type<typeof projectManifestSchema>
 }
+
+/** The first three failed paths as `path: message`, the shape a manifest reader can act on. */
+const describeFailure = (error: Schema.SchemaError): readonly string[] =>
+  SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues.map(issue => {
+    const path = (issue.path ?? []).map(segment => String(segment instanceof Object ? segment.key : segment)).join('.')
+    return path === '' ? issue.message : `${path}: ${issue.message}`
+  })
 
 const dependenciesOf = (project: WorkspaceProject): readonly string[] => pinnedFields.flatMap(field => Object.keys(project.manifest[field] ?? {}))
 
@@ -66,7 +78,7 @@ const workspaceProjects = (): readonly WorkspaceProject[] => {
     .split('\n')
     .filter(path => path.length > 0)
     .map(packagePath => {
-      const manifest = decodeJson(projectManifestSchema, readFileSync(join(packagePath, 'package.json'), 'utf8'))
+      const manifest = ScriptJson.decodeJson(projectManifestSchema, readFileSync(join(packagePath, 'package.json'), 'utf8'))
       return { directory: relative(repositoryRoot, packagePath) || '.', name: manifest.name, manifest }
     })
 }
@@ -138,19 +150,22 @@ const cycleProblems = (projects: readonly WorkspaceProject[]): string[] => {
 const problemsFor = (name: string): string[] => {
   const directory = join(packagesRoot, name)
   const isBundle = existsSync(join(directory, 'cordis.patch.yml'))
-  const manifest = decodeJsonSafe(isBundle ? bundleManifestSchema : libraryManifestSchema, readFileSync(join(directory, 'package.json'), 'utf8'))
-  const tsconfig = decodeJsonSafe(tsconfigSchema(tsconfigBaseExceptions.get(name) ?? clientBase), readFileSync(join(directory, 'tsconfig.json'), 'utf8'))
+  const manifest = ScriptJson.decodeJsonSafe(isBundle ? bundleManifestSchema : libraryManifestSchema, readFileSync(join(directory, 'package.json'), 'utf8'))
+  const tsconfig = ScriptJson.decodeJsonSafe(
+    tsconfigSchema(tsconfigBaseExceptions.get(name) ?? clientBase),
+    readFileSync(join(directory, 'tsconfig.json'), 'utf8'),
+  )
   return [
-    ...(manifest.success ? [] : manifest.error.issues.map(issue => `package.json ${issue.path.join('.')}: ${issue.message}`)),
-    ...(tsconfig.success ? [] : tsconfig.error.issues.map(issue => `tsconfig.json ${issue.path.join('.')}: ${issue.message}`)),
+    ...(manifest.success ? [] : describeFailure(manifest.error).map(problem => `package.json ${problem}`)),
+    ...(tsconfig.success ? [] : describeFailure(tsconfig.error).map(problem => `tsconfig.json ${problem}`)),
   ].map(problem => `@dshfiles/${name} ${problem}`)
 }
 
-const baseTsconfig = decodeJsonSafe(baseTsconfigSchema, readFileSync(join(workspaceRoot, '..', 'tsconfig.base.client.json'), 'utf8'))
+const baseTsconfig = ScriptJson.decodeJsonSafe(baseTsconfigSchema, readFileSync(join(workspaceRoot, '..', 'tsconfig.base.client.json'), 'utf8'))
 const projects = workspaceProjects()
 
 const problems = [
-  ...(baseTsconfig.success ? [] : baseTsconfig.error.issues.map(issue => `tsconfig.base.client.json ${issue.path.join('.')}: ${issue.message}`)),
+  ...(baseTsconfig.success ? [] : describeFailure(baseTsconfig.error).map(problem => `tsconfig.base.client.json ${problem}`)),
   ...readdirSync(packagesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory() && existsSync(join(packagesRoot, entry.name, 'package.json')))
     .flatMap(entry => problemsFor(entry.name)),
