@@ -358,8 +358,8 @@
         {
           "kind": "custom",
           "span": "agent telemetry pricing reload",
-          "file": "plugins/@dshfiles/agent-telemetry/src/telemetry-effect.test.ts",
-          "testName": "records a reload span through the dshx tracer bridge"
+          "file": "plugins/@dshfiles/agent-telemetry/src/pricing-promise.test.ts",
+          "testName": "reloads at once, then on a cache miss at most every 30 seconds"
         }
       ]
     }
