@@ -1,8 +1,10 @@
-import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { toStorageSchema } from '@dshfiles/dshx/host'
+import type { StorageDomainReadFailed, StorageDomainWriteFailed, StorageTable } from '@dshfiles/dshx/effect/storage-domain'
+import { Clock, Effect, Ref, Schema, Semaphore } from 'effect'
 import type { ReviewProgressSnapshot, ReviewProgressToggle } from './review-progress-api.js'
+import { ReviewMarkInvalid } from './errors.js'
 import { ReviewProgressModel, reviewMarkSchema, reviewStoreSchema, type ReviewMark } from './review-progress.js'
-import { SchemaHelpers } from './schema-helpers.js'
 
 export const reviewProgressDomain = defineDomain({
   name: 'jujutsu_review_progress',
@@ -12,7 +14,7 @@ export const reviewProgressDomain = defineDomain({
   },
 })
 
-export type ReviewMarksTable = KvTable<string, ReviewMark>
+export type ReviewMarksTable = StorageTable<string, ReviewMark>
 
 export interface ReviewMarkIdentity {
   readonly repositoryRoot: string
@@ -28,74 +30,62 @@ const nextReviewRevision = (current: number, now: number): number => Math.max(cu
 
 const byReviewedAtDescending = (left: ReviewMark, right: ReviewMark): number => right.reviewedAt.localeCompare(left.reviewedAt)
 
+const decodeStore = Schema.decodeUnknownEffect(reviewStoreSchema)
+
 export interface ReviewProgressStore {
-  snapshot(): ReviewProgressSnapshot
-  toggle(input: ReviewProgressToggle): Promise<ReviewProgressSnapshot>
-  flush(): Promise<void>
+  readonly snapshot: Effect.Effect<ReviewProgressSnapshot>
+  readonly toggle: (input: ReviewProgressToggle) => Effect.Effect<ReviewProgressSnapshot, ReviewMarkInvalid | StorageDomainWriteFailed>
 }
 
 /** The Host's durable record of which exact file contents the user reviewed, shared by every browser and plugin. */
-const createReviewProgressStore = ({
-  table,
-  now = Date.now,
-  reportError = error => console.error('Jujutsu review progress write failed', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
-}: {
-  readonly table: ReviewMarksTable
-  readonly now?: () => number
-  readonly reportError?: (error: unknown) => void
-}): ReviewProgressStore => {
-  const marks = new Map<string, ReviewMark>(table.entries())
-  let revision = Math.max(now(), 1)
-  let writes: Promise<void> = Promise.resolve()
+const makeReviewProgressStore = Effect.fnUntraced(function* (table: ReviewMarksTable): Effect.fn.Return<ReviewProgressStore, StorageDomainReadFailed> {
+  const marks = yield* Ref.make(new Map<string, ReviewMark>(yield* table.entries))
+  const revision = yield* Ref.make(Math.max(yield* Clock.currentTimeMillis, 1))
+  const writing = yield* Semaphore.make(1)
 
-  const enqueue = (operation: () => Promise<void | boolean>): Promise<void> => {
-    const result = writes.then(operation).then(() => undefined)
-    writes = result.catch(() => undefined)
-    return result
-  }
+  const bounded = (current: ReadonlyMap<string, ReviewMark>): ReviewMark[] =>
+    ReviewProgressModel.boundedMarks([...current.values()].sort(byReviewedAtDescending))
 
-  const bounded = (): ReviewMark[] => ReviewProgressModel.boundedMarks([...marks.values()].sort(byReviewedAtDescending))
+  // The bounded marks always decode: they are records the table schema validated, trimmed to the store bound.
+  const snapshot = Effect.gen(function* () {
+    const store = yield* decodeStore({ schemaVersion: 1, marks: bounded(yield* Ref.get(marks)) }).pipe(Effect.orDie)
+    return { revision: yield* Ref.get(revision), store }
+  })
 
-  const trim = (): void => {
-    const kept = new Set(bounded().map(reviewMarkKey))
-    for (const key of [...marks.keys()]) {
-      if (kept.has(key)) continue
-      marks.delete(key)
-      void enqueue(() => table.delete(key)).catch(reportError)
-    }
-  }
+  const toggle = (input: ReviewProgressToggle) =>
+    writing.withPermit(
+      Effect.gen(function* () {
+        if (input.file.contentDigest === null) return yield* new ReviewMarkInvalid({})
+        const now = yield* Clock.currentTimeMillis
+        const mark: ReviewMark = {
+          repositoryRoot: input.repositoryRoot,
+          commitId: input.commitId,
+          path: input.file.path,
+          contentDigest: input.file.contentDigest,
+          reviewedAt: new Date(now).toISOString(),
+        }
+        const key = reviewMarkKey(mark)
+        yield* Ref.update(revision, current => nextReviewRevision(current, now))
+        if (!input.reviewed) {
+          yield* Ref.update(marks, current => new Map([...current].filter(([existing]) => existing !== key)))
+          yield* table.delete(key)
+          return yield* snapshot
+        }
+        const updated = new Map(yield* Ref.get(marks)).set(key, mark)
+        const kept = new Set(bounded(updated).map(reviewMarkKey))
+        const trimmed = [...updated.keys()].filter(existing => !kept.has(existing))
+        yield* Ref.set(marks, new Map([...updated].filter(([existing]) => kept.has(existing))))
+        if (kept.has(key)) yield* table.put(key, mark)
+        yield* Effect.forEach(trimmed, existing => table.delete(existing), { discard: true })
+        return yield* snapshot
+      }),
+    )
 
-  const snapshot = (): ReviewProgressSnapshot => ({ revision, store: SchemaHelpers.decode(reviewStoreSchema, { schemaVersion: 1, marks: bounded() }) })
-
-  return {
-    snapshot,
-    toggle: async input => {
-      if (input.file.contentDigest === null) throw new Error('A file without a content digest cannot be marked reviewed.')
-      const mark: ReviewMark = {
-        repositoryRoot: input.repositoryRoot,
-        commitId: input.commitId,
-        path: input.file.path,
-        contentDigest: input.file.contentDigest,
-        reviewedAt: new Date(now()).toISOString(),
-      }
-      const key = reviewMarkKey(mark)
-      revision = nextReviewRevision(revision, now())
-      if (input.reviewed) {
-        marks.set(key, mark)
-        trim()
-        if (marks.has(key)) await enqueue(() => table.put(key, mark))
-      } else {
-        marks.delete(key)
-        await enqueue(() => table.delete(key))
-      }
-      return snapshot()
-    },
-    flush: () => writes,
-  }
-}
+  return { snapshot, toggle }
+})
 
 export class ReviewProgressStoreModel {
   static readonly key = reviewMarkKey
   static readonly nextRevision = nextReviewRevision
-  static readonly create = createReviewProgressStore
+  static readonly make = makeReviewProgressStore
 }

@@ -1,45 +1,50 @@
-import { lstat, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { Effect, FileSystem, Option, Path, Schema } from 'effect'
 import { workspaceNameSchema } from './api.js'
 import { JujutsuPathModel } from './core.js'
-import { SchemaHelpers } from './schema-helpers.js'
-
-const pathContains = (parentPath: string, candidatePath: string): boolean => {
-  const relativePath = relative(parentPath, candidatePath)
-  return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith('..' + sep) && !isAbsolute(relativePath))
-}
+import { WorkspaceDestinationInvalid } from './errors.js'
 
 export interface WorkspaceParentIdentity {
   readonly device: string
   readonly inode: string
 }
 
+const isWorkspaceName = Schema.is(workspaceNameSchema)
+
 export const sameWorkspaceParent = (left: WorkspaceParentIdentity, right: WorkspaceParentIdentity): boolean =>
   left.device === right.device && left.inode === right.inode
 
-export const resolveWorkspaceDestination = async (
-  repositoryPath: string,
-  selectedParentPath: string,
-  name: string,
-): Promise<{ readonly parentPath: string; readonly path: string; readonly parentIdentity: WorkspaceParentIdentity }> => {
-  if (!SchemaHelpers.decodeSafe(workspaceNameSchema, name).success) throw new Error('Choose a valid Jujutsu workspace name.')
-  const parentPath = await realpath(JujutsuPathModel.validatedRepositoryPath(selectedParentPath))
-  const parentStat = await stat(parentPath, { bigint: true })
-  if (!parentStat.isDirectory()) throw new Error('Choose an existing parent directory for the new workspace.')
-  const repositoryRoot = await realpath(repositoryPath)
-  const destination = join(parentPath, name)
-  if (pathContains(repositoryRoot, destination) || pathContains(destination, repositoryRoot)) {
-    throw new Error('Choose a sibling workspace path outside the registered repository tree.')
+/** A new workspace folder: a fresh sibling of the repository under an existing, canonical parent directory. */
+export const resolveWorkspaceDestination = Effect.fnUntraced(function* (input: {
+  readonly repositoryPath: string
+  readonly selectedParentPath: string
+  readonly name: string
+}) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const invalid = (reason: WorkspaceDestinationInvalid['reason']) => (cause: unknown) => new WorkspaceDestinationInvalid({ reason, cause })
+  const pathContains = (parentPath: string, candidatePath: string): boolean => {
+    const relativePath = path.relative(parentPath, candidatePath)
+    return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith('..' + path.sep) && !path.isAbsolute(relativePath))
   }
-  try {
-    await lstat(destination)
-    throw new Error('Workspace destination already exists. Choose a new directory name.')
-  } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error
-  }
+  if (!isWorkspaceName(input.name)) return yield* new WorkspaceDestinationInvalid({ reason: 'name' })
+  const parentPath = yield* fileSystem
+    .realPath(yield* Effect.fromResult(JujutsuPathModel.validatedRepositoryPath(input.selectedParentPath)))
+    .pipe(Effect.mapError(invalid('parent')))
+  const parentInfo = yield* fileSystem.stat(parentPath).pipe(Effect.mapError(invalid('parent')))
+  if (parentInfo.type !== 'Directory') return yield* new WorkspaceDestinationInvalid({ reason: 'parent' })
+  const repositoryRoot = yield* fileSystem.realPath(input.repositoryPath).pipe(Effect.mapError(invalid('inside-repository')))
+  const destination = path.join(parentPath, input.name)
+  if (pathContains(repositoryRoot, destination) || pathContains(destination, repositoryRoot))
+    return yield* new WorkspaceDestinationInvalid({ reason: 'inside-repository' })
+  const existing = yield* fileSystem.lstat(destination).pipe(
+    Effect.map(Option.some),
+    Effect.catchReason('PlatformError', 'NotFound', () => Effect.succeedNone),
+    Effect.mapError(invalid('exists')),
+  )
+  if (Option.isSome(existing)) return yield* new WorkspaceDestinationInvalid({ reason: 'exists' })
   return {
     parentPath,
     path: destination,
-    parentIdentity: { device: parentStat.dev.toString(), inode: parentStat.ino.toString() },
+    parentIdentity: { device: String(parentInfo.dev), inode: String(Option.getOrElse(parentInfo.ino, () => 0n)) } satisfies WorkspaceParentIdentity,
   }
-}
+})

@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { Mutation } from './api.js'
-import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore } from './core.ts'
+import { Result, Schema } from 'effect'
+import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel } from './core.ts'
 import { RevisionGraphModel } from './graph.ts'
 
 const id = 'a'.repeat(40)
 const otherId = 'b'.repeat(40)
 
 test('revision and repository inputs reject expressions and relative cwd values', () => {
-  assert.throws(() => JujutsuPathModel.validatedRepositoryPath('repo'), /absolute/)
-  assert.throws(() => JujutsuPathModel.validatedRepositoryPath('/'), /filesystem root/)
-  assert.equal(JujutsuPathModel.validatedRepositoryPath('/tmp/project/../project'), '/tmp/project')
+  assert.throws(() => Result.getOrThrow(JujutsuPathModel.validatedRepositoryPath('repo')), /absolute/)
+  assert.throws(() => Result.getOrThrow(JujutsuPathModel.validatedRepositoryPath('/')), /filesystem root/)
+  assert.equal(Result.getOrThrow(JujutsuPathModel.validatedRepositoryPath('/tmp/project/../project')), '/tmp/project')
   assert.equal(JujutsuPathModel.isSafeSplitPath('src/main.ts'), true)
   assert.equal(JujutsuPathModel.isSafeSplitPath('dir with space/café [1]*?.txt'), true)
   assert.equal(JujutsuPathModel.isSafeSplitPath('../secret'), false)
@@ -24,20 +25,25 @@ test('revision and repository inputs reject expressions and relative cwd values'
 test('mutation strings remain single argv values and never become shell commands', () => {
   const message = 'repair $(touch /tmp/nope); `not a shell`\nsecond line'
   const action: Mutation = { kind: 'describe', commitId: id, message }
-  const argv = JujutsuMutationModel.buildMutationArgv(action)
+  const argv = Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action))
   assert.deepEqual(argv, ['describe', id, '--message', message])
   assert.equal(argv.join(' ').includes(message), true)
   assert.equal(
     argv.some(value => value === 'touch'),
     false,
   )
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: id, message: 'bad\0arg' }), /null bytes/)
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: id, message: '' }), ['describe', id, '--message', ''])
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: id, message: 'bad\0arg' })), /null bytes/)
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: id, message: '' })), [
+    'describe',
+    id,
+    '--message',
+    '',
+  ])
 })
 
 test('split argv quotes each listed path as one exact JJ root-file fileset', () => {
   const action: Mutation = { kind: 'split', commitId: id, paths: ['src/a.ts', 'dir with space/café [1]*?.txt'], message: 'split selected files' }
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv(action), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action)), [
     'split',
     '--revision',
     id,
@@ -46,15 +52,18 @@ test('split argv quotes each listed path as one exact JJ root-file fileset', () 
     'root-file:"src/a.ts"',
     'root-file:"dir with space/café [1]*?.txt"',
   ])
-  assert.equal(JujutsuPathModel.rootFileFileset('odd "quoted" \\ path*.txt'), 'root-file:"odd \\"quoted\\" \\\\ path*.txt"')
-  assert.equal(JujutsuPathModel.rootFileFileset('literal" | all() | root-file:"second'), 'root-file:"literal\\" | all() | root-file:\\"second"')
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ ...action, paths: ['src/../secret'] }), /workspace-relative/)
-  assert.throws(() => JujutsuPathModel.rootFileFileset('bad\0name'), /workspace-relative/)
+  assert.equal(Result.getOrThrow(JujutsuPathModel.rootFileFileset('odd "quoted" \\ path*.txt')), 'root-file:"odd \\"quoted\\" \\\\ path*.txt"')
+  assert.equal(
+    Result.getOrThrow(JujutsuPathModel.rootFileFileset('literal" | all() | root-file:"second')),
+    'root-file:"literal\\" | all() | root-file:\\"second"',
+  )
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ ...action, paths: ['src/../secret'] })), /workspace-relative/)
+  assert.throws(() => Result.getOrThrow(JujutsuPathModel.rootFileFileset('bad\0name')), /workspace-relative/)
 })
 
 test('workspace-add uses a listed revision and one literal isolated destination argument', () => {
   const action: Mutation = { kind: 'workspace-add', parentPath: '/tmp/workspaces', name: 'review-branch-1', commitId: id }
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv(action), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action)), [
     'workspace',
     'add',
     '--name',
@@ -63,24 +72,34 @@ test('workspace-add uses a listed revision and one literal isolated destination 
     id,
     '/tmp/workspaces/review-branch-1',
   ])
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ ...action, parentPath: 'relative' }), /absolute/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ ...action, name: '../outside' }), /workspace name/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ ...action, commitId: 'not-a-revision' }), /visible revision/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ ...action, parentPath: 'relative' })), /absolute/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ ...action, name: '../outside' })), /workspace name/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ ...action, commitId: 'not-a-revision' })), /visible revision/)
 })
 
 test('workspace-edit runs jj edit at a named workspace and validates the target revision', () => {
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: id }), ['edit', id])
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: '../outside', commitId: id }), /valid workspace name/)
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: id })), ['edit', id])
   assert.throws(
-    () => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: 'not-a-revision' }),
+    () => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: '../outside', commitId: id })),
+    /valid workspace name/,
+  )
+  assert.throws(
+    () => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: 'not-a-revision' })),
     /Invalid revision id/,
   )
 })
 
 test('workspace-forget names exactly one workspace and never the default one', () => {
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'thread-8fac71' }), ['workspace', 'forget', 'thread-8fac71'])
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'default' }), /Workspace default cannot be removed/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: '../outside' }), /valid workspace name/)
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'thread-8fac71' })), [
+    'workspace',
+    'forget',
+    'thread-8fac71',
+  ])
+  assert.throws(
+    () => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'default' })),
+    /Workspace default cannot be removed/,
+  )
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: '../outside' })), /valid workspace name/)
 })
 
 test('revision text search includes full IDs and all requested labels', () => {
@@ -148,11 +167,8 @@ test('diff review digest changes with exact content and refuses a truncated fina
 })
 
 test('revision parser fails closed on malformed JSONL', () => {
-  assert.deepEqual(
-    JujutsuOutputModel.parseJsonLines('{"ok":true}\n', value => value),
-    [{ ok: true }],
-  )
-  assert.throws(() => JujutsuOutputModel.parseJsonLines('{oops}\n', value => value), /unreadable revision record/)
+  assert.deepEqual(Result.getOrThrow(JujutsuOutputModel.parseJsonLines('{"ok":true}\n', Schema.Unknown)), [{ ok: true }])
+  assert.throws(() => Result.getOrThrow(JujutsuOutputModel.parseJsonLines('{oops}\n', Schema.Unknown)), /unreadable revision record/)
 })
 
 test('last-push detection requires JJ operation argv metadata', () => {
@@ -186,36 +202,8 @@ test('remote preview redacts complete authorization values and credential-shaped
   assert.equal(result.includes('[redacted]'), true)
 })
 
-test('prepared mutations are one-use, expire, and bind to unchanged repo state', () => {
-  const store = new PreviewStore()
-  const entry = {
-    root: '/tmp/repo',
-    identity: 'device:inode',
-    fingerprint: 'state-1',
-    action: { kind: 'rebase', sourceId: id, destinationId: otherId } as const,
-    argv: ['rebase', '--source', id, '--destination', otherId],
-    title: 'Rebase change',
-    summary: 'Preview',
-    detail: 'source to destination',
-    expiresAt: 5000,
-  }
-  store.put('preview-1', entry, 1000)
-  assert.equal(store.take('preview-1', '/tmp/repo', 'device:inode', 'state-2', 2000), undefined)
-  assert.equal(store.take('preview-1', '/tmp/repo', 'device:inode', 'state-1', 2000), undefined)
-
-  store.put('preview-2', entry, 1000)
-  assert.equal(store.take('preview-2', '/tmp/other', 'device:inode', 'state-1', 2000), undefined)
-  store.put('preview-3', entry, 1000)
-  assert.equal(store.take('preview-3', '/tmp/repo', 'device:inode', 'state-1', 5000), undefined)
-  store.put('preview-4', entry, 1000)
-  assert.equal(store.take('preview-4', '/tmp/repo', 'wrong-inode', 'state-1', 2000), undefined)
-  store.put('preview-5', entry, 1000)
-  assert.deepEqual(store.take('preview-5', '/tmp/repo', 'device:inode', 'state-1', 2000), entry)
-  assert.equal(store.take('preview-5', '/tmp/repo', 'device:inode', 'state-1', 2001), undefined)
-})
-
 test('revision actions build fixed argv with literal file filesets', () => {
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId }), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId })), [
     'squash',
     '--from',
     id,
@@ -223,7 +211,7 @@ test('revision actions build fixed argv with literal file filesets', () => {
     otherId,
     '--use-destination-message',
   ])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId, paths: ['a b.ts'] }), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId, paths: ['a b.ts'] })), [
     'squash',
     '--from',
     id,
@@ -232,22 +220,26 @@ test('revision actions build fixed argv with literal file filesets', () => {
     '--use-destination-message',
     'root-file:"a b.ts"',
   ])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: id, paths: ['src/x.ts'] }), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: id, paths: ['src/x.ts'] })), [
     'restore',
     '--changes-in',
     id,
     'root-file:"src/x.ts"',
   ])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'abandon', commitIds: [id, id, otherId] }), ['abandon', id, otherId])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'revert', commitId: id, destinationId: otherId }), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'abandon', commitIds: [id, id, otherId] })), ['abandon', id, otherId])
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'revert', commitId: id, destinationId: otherId })), [
     'revert',
     '--revision',
     id,
     '--onto',
     otherId,
   ])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'commit', commitId: id, message: 'ship it' }), ['commit', '--message', 'ship it'])
-  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/x', destinationId: id }), [
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'commit', commitId: id, message: 'ship it' })), [
+    'commit',
+    '--message',
+    'ship it',
+  ])
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/x', destinationId: id })), [
     'bookmark',
     'set',
     '--allow-backwards',
@@ -255,7 +247,7 @@ test('revision actions build fixed argv with literal file filesets', () => {
     id,
     'feature/x',
   ])
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: id, paths: ['../escape'] }), /workspace-relative/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-delete', bookmark: '-r' }), /bookmark/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'edit', commitId: '@' }), /revision id/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: id, paths: ['../escape'] })), /workspace-relative/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-delete', bookmark: '-r' })), /bookmark/)
+  assert.throws(() => Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'edit', commitId: '@' })), /revision id/)
 })

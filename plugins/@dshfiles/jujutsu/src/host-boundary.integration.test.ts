@@ -5,18 +5,18 @@ import { join } from 'node:path'
 import { Schema } from 'effect'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost, mountPlugin } from '@dshfiles/dshx/testing'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { jujutsuApi } from './api.js'
 
 /**
- * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jujutsu
- * a–d, f): the real jujutsu Host half, mounted in a dshx test Host with real `jj` processes, answers its API with
- * these exact messages. Repository identity is guarded, jj's stderr never reaches a caller, a timeout and a
- * cancellation read differently, a preview is one-use and bound to its repository state and age, and every handler
- * either passes a user-written message through or replaces it with a generic one.
+ * Characterization of the jujutsu Host half (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jujutsu a–d,
+ * f), mounted in a dshx test Host with real `jj` processes: each failure reaches the caller under its own wire code
+ * with these exact messages. Repository identity is guarded, jj's stderr never reaches a caller, a cancellation reads
+ * as aborted, a preview is one-use and bound to its repository state, and every read endpoint answers a failure as a
+ * value. The command timeout and the preview age are driven by a TestClock in jujutsu-services.integration.test.ts.
  *
  * Only the DSH subprocess seam is substituted (by plain `node:child_process`); `slowCommand` swaps one jj command for
- * a `sleep` so the 30 s command timeout can be reached by advancing a faked `setTimeout`.
+ * a `sleep` so a request can be cancelled while it runs.
  */
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -46,8 +46,6 @@ const initRepository = (repo: string): void => {
   jj(repo, 'bookmark', 'create', 'main', '-r', '@-')
 }
 
-const collected = (read: () => string) => ({ readFrom: () => ({ text: read(), lossy: false }) })
-
 const startHost = async () => {
   const host = await createTestHost()
   const spawned: (readonly string[])[] = []
@@ -55,31 +53,25 @@ const startHost = async () => {
 
   host.ctx.provide('subprocess', {
     resolveExecutable: async () => jjExecutable,
-    spawn: (spec: { readonly argv: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal }) => {
+    spawn: (spec: { readonly argv: readonly string[]; readonly cwd: string }) => {
       spawned.push(spec.argv)
       const [executable = '', ...args] = slowCommand !== undefined && spec.argv.includes(slowCommand) ? ['sleep', '60'] : spec.argv
-      let stdout = ''
-      let stderr = ''
-      const child = spawn(executable, args, { cwd: spec.cwd, env })
-      child.stdout.on('data', chunk => (stdout += String(chunk)))
-      child.stderr.on('data', chunk => (stderr += String(chunk)))
-      const exited = new Promise<{ readonly exitCode: number | null }>(resolvePromise => {
-        child.on('close', code => resolvePromise({ exitCode: code }))
-        child.on('error', () => resolvePromise({ exitCode: null }))
+      const child = spawn(executable, args, { cwd: spec.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] })
+      const exited = new Promise<{ readonly exitCode: number | null; readonly signal: string | null }>(resolvePromise => {
+        child.on('close', (code, signal) => resolvePromise({ exitCode: code, signal }))
+        child.on('error', () => resolvePromise({ exitCode: null, signal: null }))
       })
-      const terminate = (): void => {
-        child.kill('SIGKILL')
-      }
-      if (spec.signal?.aborted === true) terminate()
-      spec.signal?.addEventListener('abort', terminate, { once: true })
       return {
         done: exited,
         waitForExit: async () => {
           await exited
           return true
         },
-        terminate,
-        collected: { stdout: collected(() => stdout), stderr: collected(() => stderr) },
+        terminate: () => {
+          child.kill('SIGKILL')
+        },
+        stdout: child.stdout,
+        stderr: child.stderr,
       }
     },
   })
@@ -132,7 +124,6 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
   }, 60_000)
 
   afterEach(async () => {
-    vi.useRealTimers()
     await host.dispose()
     rmSync(root, { recursive: true, force: true })
   }, 60_000)
@@ -145,7 +136,10 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       renameSync(repo, join(root, 'moved-away'))
       initRepository(repo)
 
-      expect(await host.wire('workspaces', { repoId })).toEqual({ code: 'plugin', message: 'Registered repository directory changed. Select it again.' })
+      expect(await host.wire('workspaces', { repoId })).toEqual({
+        code: 'repository-moved',
+        message: 'Registered repository directory changed. Select it again.',
+      })
       const loaded = await host.wire('load', { repoId })
       expect(loaded).toMatchInlineSnapshot(`
         {
@@ -167,7 +161,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
 
       expect(await host.wire('workspaces', { repoId })).toMatchInlineSnapshot(`
         {
-          "code": "plugin",
+          "code": "repository-moved",
           "message": "Registered repository path is unavailable. Select it again.",
         }
       `)
@@ -208,7 +202,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       expect(JSON.stringify(confirmed)).not.toContain(secret)
       expect(confirmed).toMatchInlineSnapshot(`
         {
-          "code": "plugin",
+          "code": "jujutsu-command-failed",
           "message": "Jujutsu command failed with exit code 1.",
         }
       `)
@@ -221,32 +215,19 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       expect(JSON.stringify(confirmed)).not.toContain(secret)
       expect(confirmed).toMatchInlineSnapshot(`
         {
-          "code": "plugin",
+          "code": "jujutsu-command-failed",
           "message": "Jujutsu command failed with exit code 1.",
         }
       `)
     })
   })
 
-  describe('timeout and cancellation', { timeout: 30_000 }, () => {
+  describe('cancellation', () => {
     const waitForSpawn = async (command: string): Promise<void> => {
       while (!host.spawned.some(argv => argv.includes(command))) {
         await new Promise(resolvePromise => setImmediate(resolvePromise))
       }
     }
-
-    it('names a command that outlived the 30 s command timeout', async () => {
-      const { repoId } = await host.api.registerRepository({ path: repo })
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-      host.slowCommand('diff')
-      const pending = host.wire('workingDiff', { repoId })
-      await waitForSpawn('diff')
-      host.spawned.length = 0
-      await vi.advanceTimersByTimeAsync(29_000)
-      expect(await Promise.race([pending, Promise.resolve('still running')])).toBe('still running')
-      await vi.advanceTimersByTimeAsync(1_000)
-      expect(await pending).toEqual({ code: 'plugin', message: 'Jujutsu command timed out.' })
-    })
 
     it('reports a cancelled request as aborted to the caller', async () => {
       const { repoId } = await host.api.registerRepository({ path: repo })
@@ -281,7 +262,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       const first = await host.wire('confirm', { repoId, previewId: preview.id })
       expect(first).toMatchObject({ output: { message: `${preview.title} completed.` } })
       expect(await host.wire('confirm', { repoId, previewId: preview.id })).toEqual({
-        code: 'plugin',
+        code: 'preview-expired',
         message: 'Preview expired or repository state changed. Refresh and preview again.',
       })
     })
@@ -291,23 +272,10 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       const preview = await host.api.prepare({ repoId, action: await describeAction(repoId) })
       jj(repo, 'describe', '-m', 'changed by someone else')
       expect(await host.wire('confirm', { repoId, previewId: preview.id })).toEqual({
-        code: 'plugin',
+        code: 'preview-expired',
         message: 'Preview expired or repository state changed. Refresh and preview again.',
       })
       expect(jj(repo, 'log', '--no-graph', '-r', '@', '-T', 'description')).toBe('changed by someone else\n')
-    })
-
-    it('refuses a preview older than five minutes', async () => {
-      const { repoId } = await host.api.registerRepository({ path: repo })
-      const action = await describeAction(repoId)
-      vi.useFakeTimers({ toFake: ['Date'] })
-      const preview = await host.api.prepare({ repoId, action })
-      expect(preview.expiresAt - Date.now()).toBe(5 * 60_000)
-      vi.setSystemTime(Date.now() + 5 * 60_000)
-      expect(await host.wire('confirm', { repoId, previewId: preview.id })).toEqual({
-        code: 'plugin',
-        message: 'Preview expired or repository state changed. Refresh and preview again.',
-      })
     })
   })
 
@@ -356,11 +324,11 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
     expect(table).toMatchInlineSnapshot(`
       {
         "confirm: expired registration": {
-          "code": "plugin",
+          "code": "repository-not-found",
           "message": "Repository registration expired. Select it again.",
         },
         "confirm: unknown preview": {
-          "code": "plugin",
+          "code": "preview-expired",
           "message": "Preview expired or repository state changed. Refresh and preview again.",
         },
         "details: unknown revision": {
@@ -371,7 +339,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
           },
         },
         "editTimes: unknown revision": {
-          "code": "plugin",
+          "code": "jujutsu-command-failed",
           "message": "Jujutsu command failed with exit code 1.",
         },
         "graphNavigation: expired registration": {
@@ -403,27 +371,27 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
           },
         },
         "openRepository: a file": {
-          "code": "plugin",
+          "code": "repository-init-failed",
           "message": "Selected repository path must be an existing directory.",
         },
         "openRepository: missing path": {
-          "code": "plugin",
+          "code": "repository-init-failed",
           "message": "Repository metadata is invalid. Existing metadata was left untouched.",
         },
         "prepare: describe an unknown revision": {
-          "code": "plugin",
+          "code": "mutation-refused",
           "message": "Revision is no longer visible. Refresh and try again.",
         },
         "prepare: forget an unknown workspace": {
-          "code": "plugin",
+          "code": "mutation-refused",
           "message": "Workspace is no longer present. Refresh and try again.",
         },
         "prepare: forget the only workspace": {
-          "code": "plugin",
+          "code": "mutation-refused",
           "message": "Workspace removal refused: this is the repository’s only workspace.",
         },
         "prepare: push to an unknown remote": {
-          "code": "plugin",
+          "code": "mutation-refused",
           "message": "Remote is no longer configured. Refresh and select a listed remote.",
         },
         "referenceGraph: unknown reference": {
@@ -450,23 +418,23 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
           },
         },
         "registerRepository: a file": {
-          "code": "plugin",
+          "code": "invalid-repository-path",
           "message": "Selected repository path is not a directory.",
         },
         "registerRepository: folder outside jj": {
-          "code": "plugin",
+          "code": "jujutsu-command-failed",
           "message": "Jujutsu command failed with exit code 1.",
         },
         "registerRepository: missing path": {
-          "code": "plugin",
+          "code": "invalid-repository-path",
           "message": "Selected repository path does not exist.",
         },
         "registerRepository: relative path": {
-          "code": "plugin",
+          "code": "invalid-repository-path",
           "message": "Choose an absolute repository path.",
         },
         "revisionFiles: unknown revision": {
-          "code": "plugin",
+          "code": "jujutsu-command-failed",
           "message": "Jujutsu command failed with exit code 1.",
         },
         "revisionRelationship: unknown revisions": {
@@ -477,11 +445,11 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
           },
         },
         "workingDiff: expired registration": {
-          "code": "plugin",
+          "code": "repository-not-found",
           "message": "Repository registration expired. Select it again.",
         },
         "workspaces: expired registration": {
-          "code": "plugin",
+          "code": "repository-not-found",
           "message": "Repository registration expired. Select it again.",
         },
       }

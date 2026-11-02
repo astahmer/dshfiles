@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { isAbsolute, join, normalize, parse } from 'node:path'
-import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { Result, Schema } from 'effect'
 import { workspaceNameSchema, type FileStatus, type Mutation } from './api.js'
-import { SchemaHelpers } from './schema-helpers.js'
+import { InvalidJjOutput, InvalidRepositoryPath, MutationRefused } from './errors.js'
 
 export interface FileChange {
   readonly path: string
@@ -27,18 +27,16 @@ export interface PreparedMutation {
 }
 
 /** Reject relative paths and lexical aliases before passing a path as cwd. */
-const validatedRepositoryPath = (value: string): string => {
-  if (value.length > 2048 || value.includes('\0') || !isAbsolute(value)) {
-    throw new Error('Choose an absolute repository path.')
-  }
+const validatedRepositoryPath = (value: string): Result.Result<string, InvalidRepositoryPath> => {
+  if (value.length > 2048 || value.includes('\0') || !isAbsolute(value)) return Result.fail(new InvalidRepositoryPath({ reason: 'relative' }))
   const normalized = normalize(value)
-  if (normalized === parse(normalized).root || normalized.length > 2048) {
-    throw new Error('Choose a repository directory, not a filesystem root.')
-  }
-  return normalized
+  if (normalized === parse(normalized).root || normalized.length > 2048) return Result.fail(new InvalidRepositoryPath({ reason: 'filesystem-root' }))
+  return Result.succeed(normalized)
 }
 
 const isCommitId = (value: string): boolean => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)
+
+const isWorkspaceName = Schema.is(workspaceNameSchema)
 
 /** Accept listed workspace-relative paths, including spaces and fileset metacharacters. */
 const isSafeSplitPath = (value: string): boolean => {
@@ -47,9 +45,11 @@ const isSafeSplitPath = (value: string): boolean => {
   return segments.every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
 }
 
+const refused = (reason: MutationRefused['reason']) => Result.fail(new MutationRefused({ reason }))
+
 /** Quote one exact workspace-relative file with JJ's root-file fileset form. */
-const rootFileFileset = (value: string): string => {
-  if (!isSafeSplitPath(value)) throw new Error(SPLIT_PATH_ERROR)
+const rootFileFileset = (value: string): Result.Result<string, MutationRefused> => {
+  if (!isSafeSplitPath(value)) return refused('split-paths')
   const quoted = value
     .replaceAll('\\', '\\\\')
     .replaceAll('"', '\\"')
@@ -57,95 +57,83 @@ const rootFileFileset = (value: string): string => {
     // oxlint-disable-next-line no-control-regex
     .replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, character => '\\x' + character.charCodeAt(0).toString(16).padStart(2, '0'))
     .replaceAll('\t', '\\t')
-  return 'root-file:"' + quoted + '"'
+  return Result.succeed('root-file:"' + quoted + '"')
 }
-
-/** Construct a fixed JJ command. Every user value remains one argv element. */
-const buildMutationArgv = (action: Mutation): readonly string[] => {
-  if ('message' in action && action.message !== undefined && (action.message.includes('\0') || action.message.length > 4000)) {
-    throw new Error('Descriptions must fit the supported message limit and cannot contain null bytes.')
-  }
-  switch (action.kind) {
-    case 'describe':
-      if (!isCommitId(action.commitId)) throw new Error('Invalid revision id.')
-      return ['describe', action.commitId, '--message', action.message]
-    case 'split':
-      if (!isCommitId(action.commitId) || action.paths.length === 0) throw new Error(SPLIT_PATH_ERROR)
-      return ['split', '--revision', action.commitId, '--message', action.message, ...literalFilesets(action.paths)]
-    case 'squash': {
-      if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) {
-        throw new Error('Choose two different visible revisions to squash.')
-      }
-      const messageArgs = action.message === undefined ? ['--use-destination-message'] : ['--message', action.message]
-      return ['squash', '--from', action.sourceId, '--into', action.destinationId, ...messageArgs, ...literalFilesets(action.paths ?? [])]
-    }
-    case 'rebase':
-      if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) {
-        throw new Error('Choose two different visible revisions to rebase.')
-      }
-      return ['rebase', '--source', action.sourceId, '--destination', action.destinationId]
-    case 'bookmark-move':
-      if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark move.')
-      return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
-    case 'bookmark-set':
-      if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark name.')
-      return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
-    case 'bookmark-delete':
-      if (!isBookmarkName(action.bookmark)) throw new Error('Invalid bookmark name.')
-      return ['bookmark', 'delete', action.bookmark]
-    case 'fetch':
-      if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(action.remote)) throw new Error('Invalid remote name.')
-      return ['git', 'fetch', '--remote', action.remote]
-    case 'push':
-      if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(action.remote) || !isBookmarkName(action.bookmark)) {
-        throw new Error('Invalid push target.')
-      }
-      return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
-    case 'workspace-add':
-      if (!isCommitId(action.commitId) || !SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success)
-        throw new Error('Choose a valid workspace name and visible revision.')
-      return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
-    case 'workspace-forget':
-      if (!SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success) throw new Error('Choose a valid workspace name.')
-      if (action.name === 'default') throw new Error('Workspace default cannot be removed; it is the repository main workspace.')
-      return ['workspace', 'forget', action.name]
-    case 'workspace-edit':
-      if (!SchemaHelpers.decodeSafe(workspaceNameSchema, action.name).success) throw new Error('Choose a valid workspace name.')
-      return ['edit', checkedCommitId(action.commitId)]
-    case 'edit':
-      return ['edit', checkedCommitId(action.commitId)]
-    case 'new':
-      return ['new', checkedCommitId(action.commitId)]
-    case 'commit':
-      checkedCommitId(action.commitId)
-      return ['commit', '--message', action.message]
-    case 'duplicate':
-      return ['duplicate', checkedCommitId(action.commitId)]
-    case 'abandon':
-      if (action.commitIds.length === 0) throw new Error('Choose at least one revision to abandon.')
-      return ['abandon', ...new Set(action.commitIds.map(checkedCommitId))]
-    case 'revert':
-      if (checkedCommitId(action.commitId) === checkedCommitId(action.destinationId)) throw new Error('Choose a different revision to revert onto.')
-      return ['revert', '--revision', action.commitId, '--onto', action.destinationId]
-    case 'restore':
-      if (action.paths.length === 0) throw new Error(SPLIT_PATH_ERROR)
-      return ['restore', '--changes-in', checkedCommitId(action.commitId), ...literalFilesets(action.paths)]
-  }
-}
-
-const SPLIT_PATH_ERROR = 'Split paths must be listed workspace-relative file names without traversal or null bytes.'
 
 const isBookmarkName = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/.test(value)
 
-const checkedCommitId = (value: string): string => {
-  if (!isCommitId(value)) throw new Error('Invalid revision id.')
-  return value
-}
+const isRemoteName = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(value)
 
-const literalFilesets = (paths: readonly string[]): string[] => {
-  if (!paths.every(isSafeSplitPath)) throw new Error(SPLIT_PATH_ERROR)
-  return paths.map(rootFileFileset)
-}
+const checkedCommitId = (value: string): Result.Result<string, MutationRefused> => (isCommitId(value) ? Result.succeed(value) : refused('invalid-revision'))
+
+const literalFilesets = (paths: readonly string[]): Result.Result<string[], MutationRefused> => Result.all(paths.map(rootFileFileset))
+
+/** Construct a fixed JJ command. Every user value remains one argv element. */
+const buildMutationArgv = (action: Mutation): Result.Result<readonly string[], MutationRefused | InvalidRepositoryPath> =>
+  Result.gen(function* () {
+    if ('message' in action && action.message !== undefined && (action.message.includes('\0') || action.message.length > 4000))
+      return yield* refused('message-limit')
+    switch (action.kind) {
+      case 'describe':
+        return ['describe', yield* checkedCommitId(action.commitId), '--message', action.message]
+      case 'split':
+        if (!isCommitId(action.commitId) || action.paths.length === 0) return yield* refused('split-paths')
+        return ['split', '--revision', action.commitId, '--message', action.message, ...(yield* literalFilesets(action.paths))]
+      case 'squash': {
+        if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) return yield* refused('squash-same')
+        const messageArgs = action.message === undefined ? ['--use-destination-message'] : ['--message', action.message]
+        return ['squash', '--from', action.sourceId, '--into', action.destinationId, ...messageArgs, ...(yield* literalFilesets(action.paths ?? []))]
+      }
+      case 'rebase':
+        if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) return yield* refused('rebase-same')
+        return ['rebase', '--source', action.sourceId, '--destination', action.destinationId]
+      case 'bookmark-move':
+        if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) return yield* refused('bookmark-move')
+        return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
+      case 'bookmark-set':
+        if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) return yield* refused('bookmark-name')
+        return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
+      case 'bookmark-delete':
+        if (!isBookmarkName(action.bookmark)) return yield* refused('bookmark-name')
+        return ['bookmark', 'delete', action.bookmark]
+      case 'fetch':
+        if (!isRemoteName(action.remote)) return yield* refused('remote-name')
+        return ['git', 'fetch', '--remote', action.remote]
+      case 'push':
+        if (!isRemoteName(action.remote) || !isBookmarkName(action.bookmark)) return yield* refused('push-target')
+        return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
+      case 'workspace-add':
+        if (!isCommitId(action.commitId) || !isWorkspaceName(action.name)) return yield* refused('workspace-target')
+        return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(yield* validatedRepositoryPath(action.parentPath), action.name)]
+      case 'workspace-forget':
+        if (!isWorkspaceName(action.name)) return yield* refused('workspace-name')
+        if (action.name === 'default') return yield* refused('default-workspace')
+        return ['workspace', 'forget', action.name]
+      case 'workspace-edit':
+        if (!isWorkspaceName(action.name)) return yield* refused('workspace-name')
+        return ['edit', yield* checkedCommitId(action.commitId)]
+      case 'edit':
+        return ['edit', yield* checkedCommitId(action.commitId)]
+      case 'new':
+        return ['new', yield* checkedCommitId(action.commitId)]
+      case 'commit':
+        yield* checkedCommitId(action.commitId)
+        return ['commit', '--message', action.message]
+      case 'duplicate':
+        return ['duplicate', yield* checkedCommitId(action.commitId)]
+      case 'abandon': {
+        if (action.commitIds.length === 0) return yield* refused('abandon-empty')
+        const commitIds = yield* Result.all(action.commitIds.map(checkedCommitId))
+        return ['abandon', ...new Set(commitIds)]
+      }
+      case 'revert':
+        if ((yield* checkedCommitId(action.commitId)) === (yield* checkedCommitId(action.destinationId))) return yield* refused('revert-same')
+        return ['revert', '--revision', action.commitId, '--onto', action.destinationId]
+      case 'restore':
+        if (action.paths.length === 0) return yield* refused('split-paths')
+        return ['restore', '--changes-in', yield* checkedCommitId(action.commitId), ...(yield* literalFilesets(action.paths))]
+    }
+  })
 
 const FILE_STATUS_LETTERS = new Map<string, FileStatus>([
   ['modified', 'M'],
@@ -158,31 +146,38 @@ const FILE_STATUS_LETTERS = new Map<string, FileStatus>([
 /** Map JJ's template status word to the single-letter Source Control marker. */
 const fileStatusLetter = (status: string): FileStatus => FILE_STATUS_LETTERS.get(status) ?? 'M'
 
-/** Decode one JSON record per line; malformed or oversized rows fail closed. */
-const parseJsonLines = <T>(text: string, decode: (value: JsonValue) => T): T[] => {
-  const rows: T[] = []
-  for (const line of text.split(/\r?\n/)) {
-    if (line.length === 0) continue
-    let value: JsonValue
-    try {
-      value = decodeJson(jsonValueSchema, line)
-    } catch {
-      throw new Error('Jujutsu returned an unreadable revision record.')
-    }
-    rows.push(decode(value))
-  }
-  return rows
+const decodeJsonLine = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Json))
+
+/** Decode one JSON record per line with `schema`; a malformed or oversized row fails the whole read closed. */
+const parseJsonLines = <S extends Schema.ConstraintDecoder<unknown>>(text: string, schema: S): Result.Result<S['Type'][], InvalidJjOutput> => {
+  const decodeRow = Schema.decodeUnknownResult(schema)
+  return Result.all(
+    text
+      .split(/\r?\n/)
+      .filter(line => line.length > 0)
+      .map(line =>
+        decodeJsonLine(line).pipe(
+          Result.flatMap(value => decodeRow(value)),
+          Result.mapError(cause => new InvalidJjOutput({ cause })),
+        ),
+      ),
+  )
 }
 
 /** Decode one plain (non-JSON) value per line, the shape some jj templates emit. */
-const parseLines = <T>(text: string, decode: (line: string) => T): T[] => {
-  const rows: T[] = []
-  for (const line of text.split(/\r?\n/)) {
-    if (line.length === 0) continue
-    rows.push(decode(line))
-  }
-  return rows
+const parseLines = <S extends Schema.ConstraintDecoder<unknown>>(text: string, schema: S): Result.Result<S['Type'][], InvalidJjOutput> => {
+  const decodeRow = Schema.decodeUnknownResult(schema)
+  return Result.all(
+    text
+      .split(/\r?\n/)
+      .filter(line => line.length > 0)
+      .map(line => decodeRow(line).pipe(Result.mapError(cause => new InvalidJjOutput({ cause })))),
+  )
 }
+
+/** The complete lines of a possibly truncated output: a cut last line is dropped rather than misread. */
+const completeLines = (output: { readonly stdout: string; readonly truncated: boolean }): string =>
+  output.truncated ? output.stdout.slice(0, output.stdout.lastIndexOf('\n') + 1) : output.stdout
 
 /** Match JJ's recorded argv metadata, never a coincidental phrase in an operation description. */
 const isRecordedJjGitPush = (attributes: string): boolean => {
@@ -243,37 +238,8 @@ export class JujutsuOutputModel {
   static readonly fileStatusLetter = fileStatusLetter
   static readonly parseJsonLines = parseJsonLines
   static readonly parseLines = parseLines
+  static readonly completeLines = completeLines
   static readonly isRecordedJjGitPush = isRecordedJjGitPush
   static readonly parsePatchStats = parsePatchStats
   static readonly redactRemoteOutput = redactRemoteOutput
-}
-
-/** One-use, expiring confirmation records bind action to repository state. */
-export class PreviewStore {
-  private readonly entries = new Map<string, PreparedMutation>()
-
-  put(id: string, entry: PreparedMutation, now = Date.now()): void {
-    this.prune(now)
-    while (this.entries.size >= 32) {
-      const oldest = this.entries.keys().next().value
-      if (oldest === undefined) break
-      this.entries.delete(oldest)
-    }
-    this.entries.set(id, entry)
-  }
-
-  take(id: string, root: string, identity: string, fingerprint: string, now = Date.now()): PreparedMutation | undefined {
-    const entry = this.entries.get(id)
-    this.entries.delete(id)
-    if (entry === undefined || entry.expiresAt <= now || entry.root !== root || entry.identity !== identity || entry.fingerprint !== fingerprint) {
-      return undefined
-    }
-    return entry
-  }
-
-  private prune(now: number): void {
-    for (const [id, entry] of this.entries) {
-      if (entry.expiresAt <= now) this.entries.delete(id)
-    }
-  }
 }

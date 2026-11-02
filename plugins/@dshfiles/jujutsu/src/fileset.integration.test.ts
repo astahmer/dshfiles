@@ -4,12 +4,11 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import * as Schema from 'effect/Schema'
+import { Result, Schema } from 'effect'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel } from './core.ts'
 import { revisionSchema, type Mutation, type Revision } from './api.ts'
 import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
 import { RevisionGraphModel } from './graph.ts'
-import { SchemaHelpers } from './schema-helpers.ts'
 
 const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', [...argv], {
@@ -50,24 +49,22 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
 
   runJj(repo, home, ['status'])
   for (const path of selected) {
-    assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only', JujutsuPathModel.rootFileFileset(path)])), [path])
+    assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only', Result.getOrThrow(JujutsuPathModel.rootFileFileset(path))])), [path])
   }
 
   const commitId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
   assert.match(commitId, /^[a-f0-9]{40,64}$/)
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'split', commitId, paths: selected, message: 'selected literal paths' }))
+  runJj(repo, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'split', commitId, paths: selected, message: 'selected literal paths' })))
 
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@-', '--name-only'])), selected.slice().sort())
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only'])), unselected.slice().sort())
 
   const revisions = (): Revision[] =>
-    JujutsuOutputModel.parseJsonLines(
-      runJj(repo, home, ['log', '--no-graph', '--limit', '500', '--revisions', 'all()', '--template', REVISION_TEMPLATE]),
-      value => {
-        const parsed = SchemaHelpers.decodeSafe(revisionSchema, value)
-        if (!parsed.success) throw new Error(JSON.stringify({ value, error: String(parsed.error) }))
-        return parsed.data
-      },
+    Result.getOrThrow(
+      JujutsuOutputModel.parseJsonLines(
+        runJj(repo, home, ['log', '--no-graph', '--limit', '500', '--revisions', 'all()', '--template', REVISION_TEMPLATE]),
+        revisionSchema,
+      ),
     )
   const workingCopy = revisions().find(revision => revision.workingCopy)
   assert.ok(workingCopy)
@@ -81,22 +78,21 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
     unselected.length,
   )
 
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: workingCopy.commitId, message: 'description smoke' }))
+  runJj(
+    repo,
+    home,
+    Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'describe', commitId: workingCopy.commitId, message: 'description smoke' })),
+  )
   const described = revisions().find(revision => revision.workingCopy)
   assert.ok(described)
   assert.equal(described.description, 'description smoke\n')
   assert.equal(RevisionGraphModel.describeDraftChanged('description smoke', described.description), false)
 
-  const evolution = JujutsuOutputModel.parseJsonLines(
-    runJj(repo, home, ['evolog', '--no-graph', '--revisions', described.commitId, '--limit', '30', '--template', EVOLUTION_TEMPLATE]),
-    value => {
-      assert.equal(typeof value, 'object')
-      assert.notEqual(value, null)
-      const row = value as { commitId?: unknown; predecessors?: unknown }
-      assert.equal(typeof row.commitId, 'string')
-      assert.ok(Array.isArray(row.predecessors))
-      return { commitId: row.commitId as string, predecessors: row.predecessors as string[] }
-    },
+  const evolution = Result.getOrThrow(
+    JujutsuOutputModel.parseJsonLines(
+      runJj(repo, home, ['evolog', '--no-graph', '--revisions', described.commitId, '--limit', '30', '--template', EVOLUTION_TEMPLATE]),
+      Schema.Struct({ commitId: Schema.String, predecessors: Schema.Array(Schema.String) }),
+    ),
   )
   assert.ok(evolution.some(row => row.commitId === described.commitId && row.predecessors.length > 0))
 })
@@ -119,7 +115,7 @@ test('workspace-add creates a sibling at the chosen revision and preserves dirty
   const sourceStatus = runJj(repo, home, ['status'])
 
   const action: Mutation = { kind: 'workspace-add', parentPath: parent, name: 'review-at-base', commitId }
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv(action))
+  runJj(repo, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action)))
 
   assert.equal(await realpath(runJj(destination, home, ['root']).trim()), await realpath(destination))
   assert.equal(await readFile(join(destination, 'base.txt'), 'utf8'), 'committed base\n')
@@ -154,7 +150,7 @@ test('workspace-edit moves one workspace without moving another on the same revi
   assert.notEqual(destinationId, baseId)
 
   const action: Mutation = { kind: 'workspace-edit', name: 'review-b', commitId: destinationId }
-  runJj(secondWorkspace, home, JujutsuMutationModel.buildMutationArgv(action))
+  runJj(secondWorkspace, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action)))
   const workingCopyId = (cwd: string): string => runJj(cwd, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
 
   assert.deepEqual(
@@ -175,11 +171,11 @@ test('workspace-forget unregisters a secondary workspace and leaves its folder a
   runJj(repo, home, ['git', 'init', '--no-colocate'])
   await writeFile(join(repo, 'base.txt'), 'base\n')
   const commitId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-add', parentPath: parent, name: 'review-at-base', commitId }))
+  runJj(repo, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-add', parentPath: parent, name: 'review-at-base', commitId })))
   await writeFile(join(destination, 'note.txt'), 'kept on disk\n')
   runJj(destination, home, ['status'])
 
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'review-at-base' }))
+  runJj(repo, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'review-at-base' })))
 
   assert.doesNotMatch(runJj(repo, home, ['workspace', 'list']), /review-at-base/)
   assert.equal(await readFile(join(destination, 'note.txt'), 'utf8'), 'kept on disk\n')
@@ -226,8 +222,9 @@ test('file stats template, file moves, and restore act on exact listed files', a
   runJj(repo, home, ['status'])
   const ids = (revset: string): string => runJj(repo, home, ['log', '--no-graph', '--revisions', revset, '--template', 'self.commit_id().short(64)']).trim()
 
-  const stats = JujutsuOutputModel.parseJsonLines(runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', FILE_STATS_TEMPLATE]), value => {
-    const row = SchemaHelpers.decode(
+  const statRows = Result.getOrThrow(
+    JujutsuOutputModel.parseJsonLines(
+      runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', FILE_STATS_TEMPLATE]),
       Schema.Struct({
         files: Schema.Array(
           Schema.Struct({
@@ -238,18 +235,21 @@ test('file stats template, file moves, and restore act on exact listed files', a
           }),
         ),
       }),
-      value,
-    )
-    return row.files.map(file => ({ ...file, status: JujutsuOutputModel.fileStatusLetter(file.status) }))
-  })[0]
+    ),
+  )
+  const stats = statRows[0]?.files.map(file => ({ ...file, status: JujutsuOutputModel.fileStatusLetter(file.status) }))
   assert.deepEqual(stats, [
     { path: 'discard.txt', status: 'A', additions: 1, deletions: 0 },
     { path: 'keep.txt', status: 'M', additions: 1, deletions: 0 },
     { path: 'moved file.txt', status: 'A', additions: 1, deletions: 0 },
   ])
 
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: ids('@'), destinationId: ids('@-'), paths: ['moved file.txt'] }))
+  runJj(
+    repo,
+    home,
+    Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'squash', sourceId: ids('@'), destinationId: ids('@-'), paths: ['moved file.txt'] })),
+  )
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@-', '--name-only'])), ['keep.txt', 'moved file.txt'])
-  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: ids('@'), paths: ['discard.txt'] }))
+  runJj(repo, home, Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'restore', commitId: ids('@'), paths: ['discard.txt'] })))
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only'])), ['keep.txt'])
 })

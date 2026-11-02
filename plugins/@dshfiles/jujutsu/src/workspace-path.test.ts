@@ -1,54 +1,68 @@
-import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rename, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { onTestFinished, test } from 'vitest'
-import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.ts'
+import { NodeServices } from '@effect/platform-node'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Path } from 'effect'
+import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
-test('workspace destination must be a new sibling outside the registered repository tree', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-path-'))
-  const repository = join(root, 'repository')
-  const parent = join(root, 'workspaces')
-  await mkdir(repository)
-  await mkdir(parent)
-  onTestFinished(() => rm(root, { recursive: true, force: true }))
-
-  const destination = await resolveWorkspaceDestination(repository, parent, 'review-branch')
-  const canonicalParent = await realpath(parent)
-  assert.equal(destination.parentPath, canonicalParent)
-  assert.equal(destination.path, join(canonicalParent, 'review-branch'))
-  await assert.rejects(resolveWorkspaceDestination(repository, repository, 'nested-workspace'), /outside the registered repository tree/)
-  await assert.rejects(resolveWorkspaceDestination(repository, root, 'repository'), /outside the registered repository tree/)
+const directories = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'dshfiles-jj-workspace-path-' })
+  const repository = path.join(root, 'repository')
+  const parent = path.join(root, 'workspaces')
+  yield* fileSystem.makeDirectory(repository)
+  yield* fileSystem.makeDirectory(parent)
+  return { fileSystem, path, root, repository, parent }
 })
 
-test('workspace preview identity detects replacing the selected parent at the same path', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-parent-'))
-  const repository = join(root, 'repository')
-  const parent = join(root, 'workspaces')
-  await mkdir(repository)
-  await mkdir(parent)
-  onTestFinished(() => rm(root, { recursive: true, force: true }))
+const messageOf = <E extends Error, R>(effect: Effect.Effect<unknown, E, R>) => Effect.map(Effect.flip(effect), error => error.message)
 
-  const previewed = await resolveWorkspaceDestination(repository, parent, 'review-branch')
-  await rename(parent, join(root, 'workspaces-before-replacement'))
-  await mkdir(parent)
-  const confirmed = await resolveWorkspaceDestination(repository, parent, 'review-branch')
+describe('workspace destination', () => {
+  it.layer(NodeServices.layer)(it => {
+    it.effect('must be a new sibling outside the registered repository tree', () =>
+      Effect.gen(function* () {
+        const { fileSystem, path, root, repository, parent } = yield* directories
+        const destination = yield* resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: parent, name: 'review-branch' })
+        const canonicalParent = yield* fileSystem.realPath(parent)
+        expect(destination.parentPath).toBe(canonicalParent)
+        expect(destination.path).toBe(path.join(canonicalParent, 'review-branch'))
+        expect(yield* messageOf(resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: repository, name: 'nested-workspace' }))).toMatch(
+          /outside the registered repository tree/,
+        )
+        expect(yield* messageOf(resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: root, name: 'repository' }))).toMatch(
+          /outside the registered repository tree/,
+        )
+      }).pipe(Effect.scoped),
+    )
 
-  assert.equal(previewed.parentPath, confirmed.parentPath)
-  assert.equal(previewed.path, confirmed.path)
-  assert.equal(sameWorkspaceParent(previewed.parentIdentity, confirmed.parentIdentity), false)
-})
+    it.effect('detects replacing the selected parent at the same path', () =>
+      Effect.gen(function* () {
+        const { fileSystem, path, root, repository, parent } = yield* directories
+        const previewed = yield* resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: parent, name: 'review-branch' })
+        yield* fileSystem.rename(parent, path.join(root, 'workspaces-before-replacement'))
+        yield* fileSystem.makeDirectory(parent)
+        const confirmed = yield* resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: parent, name: 'review-branch' })
 
-test('workspace destination rejects unsafe names, filesystem roots, and existing targets', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-path-'))
-  const repository = join(root, 'repository')
-  const parent = join(root, 'workspaces')
-  await mkdir(repository)
-  await mkdir(parent)
-  await mkdir(join(parent, 'already-there'))
-  onTestFinished(() => rm(root, { recursive: true, force: true }))
+        expect(previewed.parentPath).toBe(confirmed.parentPath)
+        expect(previewed.path).toBe(confirmed.path)
+        expect(sameWorkspaceParent(previewed.parentIdentity, confirmed.parentIdentity)).toBe(false)
+      }).pipe(Effect.scoped),
+    )
 
-  await assert.rejects(resolveWorkspaceDestination(repository, parent, '../escape'), /valid Jujutsu workspace name/)
-  await assert.rejects(resolveWorkspaceDestination(repository, '/', 'workspace'), /filesystem root/)
-  await assert.rejects(resolveWorkspaceDestination(repository, parent, 'already-there'), /already exists/)
+    it.effect('rejects unsafe names, filesystem roots, and existing targets', () =>
+      Effect.gen(function* () {
+        const { fileSystem, path, repository, parent } = yield* directories
+        yield* fileSystem.makeDirectory(path.join(parent, 'already-there'))
+
+        expect(yield* messageOf(resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: parent, name: '../escape' }))).toMatch(
+          /valid Jujutsu workspace name/,
+        )
+        expect(yield* messageOf(resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: '/', name: 'workspace' }))).toMatch(
+          /filesystem root/,
+        )
+        expect(yield* messageOf(resolveWorkspaceDestination({ repositoryPath: repository, selectedParentPath: parent, name: 'already-there' }))).toMatch(
+          /already exists/,
+        )
+      }).pipe(Effect.scoped),
+    )
+  })
 })

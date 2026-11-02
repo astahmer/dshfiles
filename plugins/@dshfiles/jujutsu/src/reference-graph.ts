@@ -1,9 +1,9 @@
-import * as Schema from 'effect/Schema'
+import { Effect, Schema } from 'effect'
 import { revisionSchema, type Revision } from './api.js'
 import { JujutsuOutputModel } from './core.js'
+import { InvalidJjOutput, OutputLimitExceeded, RevisionNotFound } from './errors.js'
+import type { JjRun } from './jujutsu-commands.js'
 import { REVISION_TEMPLATE } from './jj-templates.js'
-import type { JjRun } from './revision-reads.js'
-import { SchemaHelpers } from './schema-helpers.js'
 
 const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/))
 const ROW_LIMIT = 20
@@ -74,36 +74,38 @@ const rows = (output: string): readonly string[] =>
     .map(line => line.trimEnd())
     .filter(line => line.length > 0)
 
-const readReferenceGraph = async (input: { readonly run: JjRun; readonly reference: string }): Promise<ReferenceGraph> => {
-  const reference = JSON.stringify(SchemaHelpers.decode(referenceSchema, input.reference))
-  const read = async (args: readonly string[]): Promise<string> => {
-    const result = await input.run(['--ignore-working-copy', '--no-pager', '--color=never', ...args])
-    if (result.truncated) throw new Error('The reference graph exceeded the bounded output limit.')
-    return result.stdout
-  }
-  const resolved = (
-    await read([
-      'log',
-      '--no-graph',
-      '--limit',
-      '1',
-      '-r',
-      reference,
-      '-T',
-      'separate("\\n", commit_id, change_id.short(), description.first_line().substr(0, 255))',
-    ])
+const isCommitId = Schema.is(commitIdSchema)
+
+const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: JjRun; readonly reference: string }) {
+  const reference = JSON.stringify(
+    yield* Schema.decodeUnknownEffect(referenceSchema)(input.reference).pipe(Effect.mapError(cause => new InvalidJjOutput({ cause }))),
   )
+  const read = Effect.fnUntraced(function* (args: readonly string[]) {
+    const result = yield* input.run(['--ignore-working-copy', '--no-pager', '--color=never', ...args])
+    if (result.truncated) return yield* new OutputLimitExceeded({ subject: 'reference-graph' })
+    return result.stdout
+  })
+  const resolved = (yield* read([
+    'log',
+    '--no-graph',
+    '--limit',
+    '1',
+    '-r',
+    reference,
+    '-T',
+    'separate("\\n", commit_id, change_id.short(), description.first_line().substr(0, 255))',
+  ]))
     .trimEnd()
     .split('\n')
   const commitId = resolved.at(0)
   const changeId = resolved.at(1)
   const description = resolved.slice(2).join('\n')
-  if (commitId === undefined || changeId === undefined || !SchemaHelpers.decodeSafe(commitIdSchema, commitId).success) {
-    throw new Error('That reference does not name one revision in this repository.')
+  if (commitId === undefined || changeId === undefined || !isCommitId(commitId)) {
+    return yield* new RevisionNotFound({ reason: 'reference', reference: input.reference, candidates: [] })
   }
-  const hasDefaultWorkspace = rows(await read(['workspace', 'list', '-T', 'name ++ "\\n"'])).includes('default')
-  const defaultCommitId = hasDefaultWorkspace ? rows(await read(['log', '--no-graph', '--limit', '1', '-r', 'default@', '-T', 'commit_id'])).at(0) : undefined
-  const graph = await read([
+  const hasDefaultWorkspace = rows(yield* read(['workspace', 'list', '-T', 'name ++ "\\n"'])).includes('default')
+  const defaultCommitId = hasDefaultWorkspace ? rows(yield* read(['log', '--no-graph', '--limit', '1', '-r', 'default@', '-T', 'commit_id'])).at(0) : undefined
+  const graph = yield* read([
     'log',
     '--limit',
     String(ROW_LIMIT),
@@ -113,19 +115,18 @@ const readReferenceGraph = async (input: { readonly run: JjRun; readonly referen
     template({ commitId, defaultCommitId }),
   ])
   const listedCommitIds = rows(
-    await read(['log', '--no-graph', '--limit', String(ROW_LIMIT), '-r', revset({ reference, hasDefaultWorkspace }), '-T', 'commit_id ++ "\\n"']),
-  ).filter(row => SchemaHelpers.decodeSafe(commitIdSchema, row).success)
+    yield* read(['log', '--no-graph', '--limit', String(ROW_LIMIT), '-r', revset({ reference, hasDefaultWorkspace }), '-T', 'commit_id ++ "\\n"']),
+  ).filter(isCommitId)
   const revisions =
     listedCommitIds.length === 0
       ? []
-      : JujutsuOutputModel.parseJsonLines(
-          await read(['log', '--no-graph', '--limit', String(CONNECTION_LIMIT), '-r', `connected(${listedCommitIds.join(' | ')})`, '-T', REVISION_TEMPLATE]),
-          value => {
-            const revision = SchemaHelpers.decode(revisionSchema, value)
-            return { ...revision, description: revision.description.split('\n')[0] ?? '' }
-          },
-        )
-  return {
+      : (yield* Effect.fromResult(
+          JujutsuOutputModel.parseJsonLines(
+            yield* read(['log', '--no-graph', '--limit', String(CONNECTION_LIMIT), '-r', `connected(${listedCommitIds.join(' | ')})`, '-T', REVISION_TEMPLATE]),
+            revisionSchema,
+          ),
+        )).map(revision => ({ ...revision, description: revision.description.split('\n')[0] ?? '' }))
+  const graphAround: ReferenceGraph = {
     label: input.reference,
     commitId,
     changeId,
@@ -135,7 +136,8 @@ const readReferenceGraph = async (input: { readonly run: JjRun; readonly referen
     revisions,
     defaultCommitId: defaultCommitId ?? null,
   }
-}
+  return graphAround
+})
 
 export class ReferenceGraphModel {
   static readonly revset = revset

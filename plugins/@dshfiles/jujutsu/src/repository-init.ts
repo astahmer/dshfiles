@@ -1,226 +1,177 @@
-import { lstat, open, realpath, stat } from 'node:fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
+import { Context, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
+import { RepositoryInitFailed } from './errors.js'
 
-/** The Host supplies its traced, managed JJ runner. No process is spawned here. */
-export type RepositoryInitRunner = (
-  cwd: string,
-  args: readonly string[],
-  signal?: AbortSignal,
-) => Promise<{ readonly stdout: string; readonly truncated: boolean }>
+/** The traced, managed jj runner the caller supplies; no process is spawned here. */
+export type RepositoryInitRunner<E> = (cwd: string, args: readonly string[]) => Effect.Effect<{ readonly stdout: string; readonly truncated: boolean }, E>
 
 export interface EnsuredJujutsuRepository {
   readonly root: string
   readonly initialized: boolean
 }
 
-/** Only these static messages may cross the Host API boundary. */
-export class RepositoryInitializationError extends Error {}
-
-const messages = {
-  path: 'Selected repository path must be an existing directory.',
-  missing: 'Selected directory is not inside an existing Git or Jujutsu checkout.',
-  marker: 'Repository metadata is invalid. Existing metadata was left untouched.',
-  changed: 'Repository identity changed before initialization. Open the repository again.',
-  existing: 'Existing Jujutsu metadata could not be opened. It was left untouched.',
-  init: 'Jujutsu could not initialize this Git checkout. Existing files and metadata were not replaced.',
-  worktree: 'Jujutsu could not initialize this Git worktree. This JJ version may not support Git worktrees; existing metadata was not replaced.',
-  root: 'Jujutsu did not confirm the exact selected repository root.',
-  cancelled: 'Jujutsu request was cancelled.',
-} as const
-
 type Boundary = { readonly root: string; readonly kind: 'jj' | 'git'; readonly identity: string; readonly worktree: boolean }
-const pendingInits = new Map<string, Promise<EnsuredJujutsuRepository>>()
 
-function fail(message: string): never {
-  throw new RepositoryInitializationError(message)
-}
-const checkCancelled = (signal: AbortSignal | undefined): void => {
-  if (signal?.aborted === true) fail(messages.cancelled)
-}
-const isMissing = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT'
-const entry = async (path: string): Promise<Awaited<ReturnType<typeof lstat>> | undefined> => {
-  try {
-    return await lstat(path)
-  } catch (error) {
-    if (isMissing(error)) return undefined
-    throw error
-  }
-}
-const identity = (value: Awaited<ReturnType<typeof stat>>): string => `${value.dev}:${value.ino}`
+const MAX_MARKER_BYTES = 8192
 
-/** Read at most 8 KiB, even if a malformed marker grows during inspection. */
-const readMarker = async (path: string): Promise<string> => {
-  const file = await open(path, 'r')
-  try {
-    const metadata = await file.stat()
-    if (!metadata.isFile() || metadata.size > 8192) fail(messages.marker)
-    const { buffer, bytesRead } = await file.read(Buffer.alloc(8193), 0, 8193, 0)
-    if (bytesRead > 8192) fail(messages.marker)
-    return buffer.toString('utf8', 0, bytesRead)
-  } finally {
-    await file.close()
-  }
-}
+const refuse = (reason: RepositoryInitFailed['reason']) => Effect.fail(new RepositoryInitFailed({ reason }))
 
-const validateJjMarker = async (root: string): Promise<void> => {
-  const jjPath = join(root, '.jj')
-  const jj = await lstat(jjPath)
-  if (!jj.isDirectory()) fail(messages.existing)
-  await directoryIdentity(join(jjPath, 'working_copy'))
-  const repoPath = join(jjPath, 'repo')
-  const repo = await lstat(repoPath)
-  if (!repo.isDirectory() && !repo.isFile()) fail(messages.existing)
-  let storeRoot = repoPath
-  if (repo.isFile()) {
-    const pointer = (await readMarker(repoPath)).trim()
-    if (pointer.length === 0 || /[\r\n\0]/u.test(pointer)) fail(messages.existing)
-    storeRoot = resolve(jjPath, pointer)
-  }
-  await directoryIdentity(join(storeRoot, 'store'))
-}
-
-const directoryIdentity = async (path: string): Promise<string> => {
-  const value = await stat(path)
-  if (!value.isDirectory()) fail(messages.marker)
-  return `${await realpath(path)}:${identity(value)}`
-}
-
-/** A gitdir file (linked worktree or --separate-git-dir) is a boundary too. */
-const gitIdentity = async (root: string, marker: Awaited<ReturnType<typeof lstat>>): Promise<string> => {
-  if (!marker.isDirectory() && !marker.isFile()) fail(messages.marker)
-  const markerPath = join(root, '.git')
-  const pointer = marker.isFile() ? await readMarker(markerPath) : ''
-  const match = marker.isFile() ? /^gitdir: ([^\r\n\0]+)\r?\n?$/u.exec(pointer) : undefined
-  if (marker.isFile() && match?.[1] === undefined) fail(messages.marker)
-  const gitDir = await realpath(marker.isFile() ? resolve(root, match?.[1] ?? '') : markerPath)
-  const gitDirIdentity = await directoryIdentity(gitDir)
-  const head = await lstat(join(gitDir, 'HEAD'))
-  if (!head.isFile()) fail(messages.marker)
-  const commonMarker = await entry(join(gitDir, 'commondir'))
-  if (commonMarker !== undefined && !commonMarker.isFile()) fail(messages.marker)
-  const commonPointer = commonMarker === undefined ? '' : await readMarker(join(gitDir, 'commondir'))
-  if (commonMarker !== undefined && (commonPointer.trim().length === 0 || commonPointer.includes('\0'))) fail(messages.marker)
-  const commonDir = commonMarker === undefined ? gitDir : await realpath(resolve(gitDir, commonPointer.trim()))
-  const commonIdentity = await directoryIdentity(commonDir)
-  await directoryIdentity(join(commonDir, 'objects'))
-  await directoryIdentity(join(commonDir, 'refs'))
-  return JSON.stringify([identity(await stat(root)), identity(marker), pointer, gitDirIdentity, commonPointer, commonIdentity])
-}
-
-const discover = async (selection: string, signal: AbortSignal | undefined): Promise<Boundary> => {
-  let root = selection
-  for (;;) {
-    checkCancelled(signal)
-    const jj = await entry(join(root, '.jj'))
-    if (jj !== undefined) return { root, kind: 'jj', identity: identity(await stat(root)), worktree: false }
-    const git = await entry(join(root, '.git'))
-    if (git !== undefined) {
-      // A malformed nested marker must never fall through to an outer checkout.
-      const fingerprint = await gitIdentity(root, git)
-      return { root, kind: 'git', identity: fingerprint, worktree: git.isFile() }
-    }
-    // Stop inside bare repositories and Git administration directories, even
-    // when they happen to be nested inside another working checkout.
-    if (
-      (await entry(join(root, 'HEAD'))) !== undefined &&
-      (await entry(join(root, 'objects'))) !== undefined &&
-      (await entry(join(root, 'refs'))) !== undefined
-    ) {
-      fail(messages.missing)
-    }
-    const parent = dirname(root)
-    if (parent === root) fail(messages.missing)
-    root = parent
-  }
-}
-
-const verifyRoot = async (root: string, runJj: RepositoryInitRunner, signal: AbortSignal | undefined, existing: boolean): Promise<void> => {
-  checkCancelled(signal)
-  let output: Awaited<ReturnType<RepositoryInitRunner>>
-  try {
-    await validateJjMarker(root)
-    output = await runJj(root, ['--ignore-working-copy', 'root'], signal)
-  } catch {
-    checkCancelled(signal)
-    fail(existing ? messages.existing : messages.root)
-  }
-  const line = output.stdout.trim()
-  if (output.truncated || line.length === 0 || /[\r\n\0]/u.test(line) || !isAbsolute(line)) fail(messages.root)
-  if ((await realpath(line)) !== root) fail(messages.root)
-}
-
-const waitFor = (pending: Promise<EnsuredJujutsuRepository>, signal: AbortSignal | undefined): Promise<EnsuredJujutsuRepository> => {
-  checkCancelled(signal)
-  if (signal === undefined) return pending
-  return new Promise((resolveResult, reject) => {
-    const cancelled = (): void => reject(new RepositoryInitializationError(messages.cancelled))
-    signal.addEventListener('abort', cancelled, { once: true })
-    pending.then(resolveResult, reject).finally(() => signal.removeEventListener('abort', cancelled))
-  })
-}
+const identity = (info: FileSystem.File.Info): string => `${String(info.dev)}:${String(Option.getOrElse(info.ino, () => 0n))}`
 
 /**
- * Called only when the user explicitly opens the Jujutsu graph. The nearest
- * marker wins: never create metadata in a plain folder or beyond a nested Git
- * boundary, and never repair/remove an existing (including broken) .jj marker.
+ * Opens a folder as a Jujutsu repository, initializing a colocated one in its Git checkout only when the user
+ * explicitly opens the graph. The nearest marker wins: never create metadata in a plain folder or beyond a nested Git
+ * boundary, and never repair or remove an existing (including broken) `.jj` marker. Concurrent opens of one checkout
+ * initialize it once: they queue on its root and the later ones find the new `.jj`.
  *
- * JJ 0.46 rejects --ignore-working-copy for git init. The command-local
- * auto-track override keeps untracked files untracked and preserves staged and
- * unstaged content; JJ may refresh Git's index cache and info/exclude. Later JJ
- * snapshot commands have their usual independent Git-index effects.
+ * JJ 0.46 rejects --ignore-working-copy for git init. The command-local auto-track override keeps untracked files
+ * untracked and preserves staged and unstaged content; JJ may refresh Git's index cache and info/exclude.
  */
-export const ensureJujutsuRepository = async (options: {
-  readonly path: string
-  readonly runJj: RepositoryInitRunner
-  readonly signal?: AbortSignal | undefined
-}): Promise<EnsuredJujutsuRepository> => {
-  const { path, runJj, signal } = options
-  try {
-    checkCancelled(signal)
-    if (path.length === 0 || path.includes('\0')) fail(messages.path)
-    const selection = await realpath(path)
-    if (!(await stat(selection)).isDirectory()) fail(messages.path)
-    const boundary = await discover(selection, signal)
-    const pending = pendingInits.get(boundary.root)
-    if (pending !== undefined) return await waitFor(pending, signal)
-    if (boundary.kind === 'jj') {
-      await verifyRoot(boundary.root, runJj, signal, true)
-      return { root: boundary.root, initialized: false }
-    }
-    const initialize = async (): Promise<EnsuredJujutsuRepository> => {
-      checkCancelled(signal)
-      if ((await realpath(path)) !== selection) fail(messages.changed)
-      const confirmed = await discover(selection, signal)
-      if (confirmed.root !== boundary.root || confirmed.kind !== 'git' || confirmed.identity !== boundary.identity) fail(messages.changed)
-      // Last metadata/identity check immediately before the managed mutation.
-      if ((await realpath(boundary.root)) !== boundary.root || (await entry(join(boundary.root, '.jj'))) !== undefined) fail(messages.changed)
-      checkCancelled(signal)
-      try {
-        await runJj(boundary.root, ['--config=snapshot.auto-track=none()', 'git', 'init', '--colocate'], signal)
-      } catch {
-        checkCancelled(signal)
-        fail(boundary.worktree ? messages.worktree : messages.init)
-      }
-      if ((await gitIdentity(boundary.root, await lstat(join(boundary.root, '.git')))) !== boundary.identity) fail(messages.changed)
-      if ((await entry(join(boundary.root, '.jj'))) === undefined) fail(messages.root)
-      await verifyRoot(boundary.root, runJj, signal, false)
-      return { root: boundary.root, initialized: true }
-    }
-    const operation = initialize()
-    pendingInits.set(boundary.root, operation)
-    // Delete only our own entry; do not leave a rejected cleanup promise behind.
-    void operation.then(
-      () => {
-        if (pendingInits.get(boundary.root) === operation) pendingInits.delete(boundary.root)
-      },
-      () => {
-        if (pendingInits.get(boundary.root) === operation) pendingInits.delete(boundary.root)
-      },
-    )
-    return await waitFor(operation, signal)
-  } catch (error) {
-    if (error instanceof RepositoryInitializationError) throw error
-    checkCancelled(signal)
-    fail(messages.marker)
+export class RepositoryInitializer extends Context.Service<
+  RepositoryInitializer,
+  {
+    readonly ensure: <E>(input: {
+      readonly path: string
+      readonly runJj: RepositoryInitRunner<E>
+    }) => Effect.Effect<EnsuredJujutsuRepository, RepositoryInitFailed>
   }
+>()('@dshfiles/jujutsu/RepositoryInitializer') {
+  static readonly layer = Layer.effect(
+    RepositoryInitializer,
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const initializing = yield* KeyedMutex.make<string>()
+
+      const entry = (target: string) =>
+        fileSystem.lstat(target).pipe(
+          Effect.map(Option.some),
+          Effect.catchReason('PlatformError', 'NotFound', () => Effect.succeedNone),
+        )
+
+      /** Read at most 8 KiB, even if a malformed marker grows during inspection. */
+      const readMarker = (target: string) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const file = yield* fileSystem.open(target, { flag: 'r' })
+            const info = yield* file.stat
+            if (info.type !== 'File' || Number(info.size) > MAX_MARKER_BYTES) return yield* refuse('marker')
+            const bytes = Option.getOrElse(yield* file.readAlloc(MAX_MARKER_BYTES + 1), () => new Uint8Array())
+            if (bytes.byteLength > MAX_MARKER_BYTES) return yield* refuse('marker')
+            return new TextDecoder().decode(bytes)
+          }),
+        )
+
+      const directoryIdentity = Effect.fnUntraced(function* (target: string) {
+        const info = yield* fileSystem.stat(target)
+        if (info.type !== 'Directory') return yield* refuse('marker')
+        return `${yield* fileSystem.realPath(target)}:${identity(info)}`
+      })
+
+      const validateJjMarker = Effect.fnUntraced(function* (root: string) {
+        const jjPath = path.join(root, '.jj')
+        if ((yield* fileSystem.lstat(jjPath)).type !== 'Directory') return yield* refuse('existing')
+        yield* directoryIdentity(path.join(jjPath, 'working_copy'))
+        const repoPath = path.join(jjPath, 'repo')
+        const repo = yield* fileSystem.lstat(repoPath)
+        if (repo.type !== 'Directory' && repo.type !== 'File') return yield* refuse('existing')
+        const pointer = repo.type === 'File' ? (yield* readMarker(repoPath)).trim() : undefined
+        if (pointer !== undefined && (pointer.length === 0 || /[\r\n\0]/u.test(pointer))) return yield* refuse('existing')
+        yield* directoryIdentity(path.join(pointer === undefined ? repoPath : path.resolve(jjPath, pointer), 'store'))
+      })
+
+      /** A gitdir file (linked worktree or --separate-git-dir) is a boundary too. */
+      const gitIdentity = Effect.fnUntraced(function* (root: string, marker: FileSystem.File.Info) {
+        if (marker.type !== 'Directory' && marker.type !== 'File') return yield* refuse('marker')
+        const markerPath = path.join(root, '.git')
+        const pointer = marker.type === 'File' ? yield* readMarker(markerPath) : ''
+        const match = marker.type === 'File' ? /^gitdir: ([^\r\n\0]+)\r?\n?$/u.exec(pointer) : undefined
+        if (marker.type === 'File' && match?.[1] === undefined) return yield* refuse('marker')
+        const gitDir = yield* fileSystem.realPath(marker.type === 'File' ? path.resolve(root, match?.[1] ?? '') : markerPath)
+        const gitDirIdentity = yield* directoryIdentity(gitDir)
+        if ((yield* fileSystem.lstat(path.join(gitDir, 'HEAD'))).type !== 'File') return yield* refuse('marker')
+        const commonMarker = yield* entry(path.join(gitDir, 'commondir'))
+        if (Option.isSome(commonMarker) && commonMarker.value.type !== 'File') return yield* refuse('marker')
+        const commonPointer = Option.isNone(commonMarker) ? '' : yield* readMarker(path.join(gitDir, 'commondir'))
+        if (Option.isSome(commonMarker) && (commonPointer.trim().length === 0 || commonPointer.includes('\0'))) return yield* refuse('marker')
+        const commonDir = Option.isNone(commonMarker) ? gitDir : yield* fileSystem.realPath(path.resolve(gitDir, commonPointer.trim()))
+        const commonIdentity = yield* directoryIdentity(commonDir)
+        yield* directoryIdentity(path.join(commonDir, 'objects'))
+        yield* directoryIdentity(path.join(commonDir, 'refs'))
+        return JSON.stringify([identity(yield* fileSystem.stat(root)), identity(marker), pointer, gitDirIdentity, commonPointer, commonIdentity])
+      })
+
+      const discover = (selection: string): Effect.Effect<Boundary, RepositoryInitFailed | PlatformError.PlatformError> =>
+        Effect.gen(function* () {
+          const jj = yield* entry(path.join(selection, '.jj'))
+          if (Option.isSome(jj))
+            return { root: selection, kind: 'jj', identity: identity(yield* fileSystem.stat(selection)), worktree: false } satisfies Boundary
+          const git = yield* entry(path.join(selection, '.git'))
+          // A malformed nested marker must never fall through to an outer checkout.
+          if (Option.isSome(git)) {
+            return { root: selection, kind: 'git', identity: yield* gitIdentity(selection, git.value), worktree: git.value.type === 'File' } satisfies Boundary
+          }
+          // Stop inside bare repositories and Git administration directories, even inside another working checkout.
+          const bare = yield* Effect.all([entry(path.join(selection, 'HEAD')), entry(path.join(selection, 'objects')), entry(path.join(selection, 'refs'))])
+          if (bare.every(Option.isSome)) return yield* refuse('missing')
+          const parent = path.dirname(selection)
+          if (parent === selection) return yield* refuse('missing')
+          return yield* discover(parent)
+        })
+
+      const verifyRoot = <E>(input: { readonly root: string; readonly runJj: RepositoryInitRunner<E>; readonly existing: boolean }) =>
+        Effect.gen(function* () {
+          const output = yield* validateJjMarker(input.root).pipe(
+            Effect.andThen(input.runJj(input.root, ['--ignore-working-copy', 'root'])),
+            Effect.mapError(cause => new RepositoryInitFailed({ reason: input.existing ? 'existing' : 'root', cause })),
+          )
+          const line = output.stdout.trim()
+          if (output.truncated || line.length === 0 || /[\r\n\0]/u.test(line) || !path.isAbsolute(line)) return yield* refuse('root')
+          if ((yield* fileSystem.realPath(line)) !== input.root) return yield* refuse('root')
+        })
+
+      const initialize = <E>(input: {
+        readonly path: string
+        readonly selection: string
+        readonly boundary: Boundary
+        readonly runJj: RepositoryInitRunner<E>
+      }) =>
+        Effect.gen(function* () {
+          if ((yield* fileSystem.realPath(input.path)) !== input.selection) return yield* refuse('changed')
+          const confirmed = yield* discover(input.selection)
+          if (confirmed.kind === 'jj' && confirmed.root === input.boundary.root) {
+            yield* verifyRoot({ root: confirmed.root, runJj: input.runJj, existing: true })
+            return { root: confirmed.root, initialized: false }
+          }
+          if (confirmed.root !== input.boundary.root || confirmed.kind !== 'git' || confirmed.identity !== input.boundary.identity)
+            return yield* refuse('changed')
+          // Last metadata/identity check immediately before the managed mutation.
+          const root = input.boundary.root
+          if ((yield* fileSystem.realPath(root)) !== root || Option.isSome(yield* entry(path.join(root, '.jj')))) return yield* refuse('changed')
+          yield* input
+            .runJj(root, ['--config=snapshot.auto-track=none()', 'git', 'init', '--colocate'])
+            .pipe(Effect.mapError(cause => new RepositoryInitFailed({ reason: input.boundary.worktree ? 'worktree' : 'init', cause })))
+          if ((yield* gitIdentity(root, yield* fileSystem.lstat(path.join(root, '.git')))) !== input.boundary.identity) return yield* refuse('changed')
+          if (Option.isNone(yield* entry(path.join(root, '.jj')))) return yield* refuse('root')
+          yield* verifyRoot({ root, runJj: input.runJj, existing: false })
+          return { root, initialized: true }
+        })
+
+      const ensure = Effect.fn('jujutsu repository ensure')(function* <E>(input: { readonly path: string; readonly runJj: RepositoryInitRunner<E> }) {
+        return yield* Effect.gen(function* () {
+          if (input.path.length === 0 || input.path.includes('\0')) return yield* refuse('path')
+          const selection = yield* fileSystem.realPath(input.path)
+          if ((yield* fileSystem.stat(selection)).type !== 'Directory') return yield* refuse('path')
+          const boundary = yield* discover(selection)
+          if (boundary.kind === 'jj') {
+            yield* verifyRoot({ root: boundary.root, runJj: input.runJj, existing: true })
+            return { root: boundary.root, initialized: false }
+          }
+          return yield* initializing.withLock(boundary.root)(initialize({ path: input.path, selection, boundary, runJj: input.runJj }))
+        }).pipe(Effect.catchTag('PlatformError', cause => Effect.fail(new RepositoryInitFailed({ reason: 'marker', cause }))))
+      })
+
+      return RepositoryInitializer.of({ ensure })
+    }),
+  )
 }
