@@ -38,7 +38,9 @@ import { knownQuotaResetAt } from './quota-reset.js'
 import { mapRolling } from './rolling-concurrency.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
-import { AccountSettingsModel } from './settings.js'
+import type { PricingSettings } from './settings.js'
+import { AccountSettings } from './account-settings-service.js'
+import { Effect } from 'effect'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { Api } from '@dshfiles/dshx/effect'
 import { effectHandler, lockedHandler } from './host-effect.js'
@@ -103,6 +105,26 @@ const copilotLoginFor = (ctx: Context) => {
   if (service === undefined) throw new Error('GitHub Copilot sign-in is unavailable.')
   return service
 }
+
+const quoteRoutesWith = (settings: PricingSettings) =>
+  effectHandler(aiAccountsApi, 'quoteRoutes', async ({ input, ctx }) => {
+    const pricing = pricingFor(ctx)
+    if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
+    const file = await accountStoreService.readAccountFile()
+    const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
+    const cache = pricing.current()
+    return {
+      fetchedAt: cache?.fetchedAt ?? null,
+      quotes: input.routes.map(route =>
+        PricingCatalogModel.resolveRouteQuote({
+          route,
+          cache,
+          accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined,
+          overrides: settings.pricingOverrides,
+        }),
+      ),
+    }
+  })
 
 export const accountsHostApi = Api.bind(aiAccountsApi, {
   read: effectHandler(aiAccountsApi, 'read', async ({ ctx }) => {
@@ -363,24 +385,9 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   collectUsage: effectHandler(aiAccountsApi, 'collectUsage', async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 })),
   pricingStatus: effectHandler(aiAccountsApi, 'pricingStatus', async ({ ctx }) => pricingFor(ctx).status()),
   refreshPricing: effectHandler(aiAccountsApi, 'refreshPricing', async ({ ctx }) => pricingFor(ctx).refresh()),
-  quoteRoutes: effectHandler(aiAccountsApi, 'quoteRoutes', async ({ input, ctx }) => {
-    const pricing = pricingFor(ctx)
-    const settings = AccountSettingsModel.readPricingSettings()
-    if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
-    const file = await accountStoreService.readAccountFile()
-    const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
-    const cache = pricing.current()
-    return {
-      fetchedAt: cache?.fetchedAt ?? null,
-      quotes: input.routes.map(route =>
-        PricingCatalogModel.resolveRouteQuote({
-          route,
-          cache,
-          accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined,
-          overrides: settings.pricingOverrides,
-        }),
-      ),
-    }
+  quoteRoutes: Effect.fn('ai accounts quote routes')(function* (input, call) {
+    const accountSettings = yield* AccountSettings
+    return yield* quoteRoutesWith((yield* accountSettings.current).pricing)(input, call)
   }),
   quotaContinuations: effectHandler(aiAccountsApi, 'quotaContinuations', async ({ ctx }) => quotaContinuationServiceFor(ctx).list()),
   quotaRecoveryModelCatalog: effectHandler(aiAccountsApi, 'quotaRecoveryModelCatalog', async ({ ctx }) => {

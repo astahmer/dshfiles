@@ -22,7 +22,8 @@ import { createCopilotLoginService } from './copilot-login.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { CLAUDE_CLI_TOKEN, ClaudeCliSessions } from './claude-cli.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { AccountSettingsModel, aiAccountsHostSettings } from './settings.js'
+import { aiAccountsSettings, type AccountSettingsSnapshot } from './settings.js'
+import { AccountSettings } from './account-settings-service.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
 import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
@@ -46,7 +47,7 @@ import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AccountLocks } from './account-locks.js'
 import type { Context } from '@deepseek-ai/cordis'
-import { Duration, Effect, Layer, Schedule } from 'effect'
+import { Duration, Effect, Layer, Schedule, Stream } from 'effect'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
@@ -115,7 +116,7 @@ interface AccountsHostActivation {
  * The imperative account Host still being split into services: everything it starts registers its release in
  * `onRelease`, which the plugin Scope runs in reverse order when the plugin unloads.
  */
-const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => void): AccountsHostActivation => {
+const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnapshot, onRelease: (release: () => void) => void): AccountsHostActivation => {
   const resolveCredential = resolveKeyFromContext(ctx)
   const runtime = activateAccountRuntime(ctx)
   const servingAccount = createServingAccountService(ctx)
@@ -228,7 +229,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
   const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
   runtime.pricing = pricing
   const refreshPricing = (): void => {
-    const settings = AccountSettingsModel.readPricingSettings()
+    const settings = readSettings().pricing
     if (settings.costEstimates) void pricing.ensureFresh(settings.pricingRefreshHours * HOUR_MS)
   }
   void pricing.load().then(refreshPricing)
@@ -265,7 +266,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
   let routes = ProviderRoutes.buildRoutes(config).routes
   let profiles = new Map<string, ResolvedPiAiProviderProfile>()
   const fastMode = new FastModeService({
-    isEnabledByDefault: AccountSettingsModel.readFastModeDefault,
+    isEnabledByDefault: () => readSettings().fastModeDefault,
     isAvailable: route => {
       if (routes.get(route.provider)?.kind !== CODEX_KIND) return false
       const model = profiles
@@ -384,7 +385,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
         return withLunaReserve({
           upstream: codexFastUpstream,
           onReserve: () =>
-            AccountSettingsModel.readLunaReserveRouting() &&
+            readSettings().lunaReserveRouting &&
             (lunaReserveHeld(id, Date.now()) ||
               shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
         })
@@ -454,7 +455,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
   const familySiblings = (input: { readonly provider: string; readonly model: string | undefined }): readonly FallbackRoute[] | undefined => {
     const model = input.model
     if (model === undefined || model === '') return undefined
-    const settings = AccountSettingsModel.readRecoverySettings()
+    const settings = readSettings().recovery
     return RequestAccountRouting.failoverAccountIds({
       from: input.provider,
       model,
@@ -479,9 +480,9 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
   const recovery = FailureRecoveryModel.create({
     pool,
     isAccountRoute: provider => routes.has(provider),
-    readPolicy: () => AccountSettingsModel.readRecoverySettings().policy,
+    readPolicy: () => readSettings().recovery.policy,
     failoverCandidates: ({ from, model }) => {
-      const settings = AccountSettingsModel.readRecoverySettings()
+      const settings = readSettings().recovery
       return RequestAccountRouting.failoverAccountIds({
         from,
         model,
@@ -494,7 +495,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
     },
     lunaReserve: {
       available: id => {
-        if (routes.get(id)?.kind !== CODEX_KIND || !AccountSettingsModel.readLunaReserveRouting()) return false
+        if (routes.get(id)?.kind !== CODEX_KIND || !readSettings().lunaReserveRouting) return false
         const now = Date.now()
         const usage = runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage
         if (lunaReserveHeld(id, now) || shouldUseLunaReserve(usage, now)) return false
@@ -891,7 +892,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
               }
               const distribution = pool.distribution()
               if (distribution !== 'sticky') pool.bindRoute(id, request.provider, request.provider)
-              const recoverySettings = AccountSettingsModel.readRecoverySettings()
+              const recoverySettings = readSettings().recovery
               // A fallback chain is the whole fail-over order, so its routes are not spread across accounts.
               const accountId = RequestAccountRouting.selectTurnAccount({
                 provider: request.provider,
@@ -968,7 +969,7 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
                 const recovery = FailureRecoveryModel.quotaRecoveryFor({
                   failureKind: action.failureKind,
                   rescued: decision !== undefined,
-                  autoRetryDefault: AccountSettingsModel.readQuotaRetrySettings().autoRetryDefault,
+                  autoRetryDefault: readSettings().quotaRetry.autoRetryDefault,
                 })
                 if (recovery !== undefined) {
                   await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection, failure.message)
@@ -1072,10 +1073,27 @@ const startAccountsHost = (ctx: Context, onRelease: (release: () => void) => voi
 const AccountsHostLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const host = yield* HostContext
+    const accountSettings = yield* AccountSettings
+    // The imperative Host reads preferences synchronously; this mirror follows every committed change.
+    const live = { settings: yield* accountSettings.current }
+    yield* DshxPlugin.worker(
+      Stream.runForEach(accountSettings.changes, next =>
+        Effect.sync(() => {
+          live.settings = next
+        }),
+      ),
+    )
     const activation = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const releases: Array<() => void> = []
-        return { started: startAccountsHost(host.ctx, release => releases.push(release)), releases }
+        return {
+          started: startAccountsHost(
+            host.ctx,
+            () => live.settings,
+            release => releases.push(release),
+          ),
+          releases,
+        }
       }),
       activation =>
         Effect.sync(() => {
@@ -1089,8 +1107,8 @@ const AccountsHostLive = Layer.effectDiscard(
 export default DshxPlugin.make({
   name: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
-  settings: [aiAccountsHostSettings],
-  layer: AccountsHostLive.pipe(Layer.provideMerge(Layer.mergeAll(AccountsPlatformLive, AccountLocks.layer))),
+  settings: [aiAccountsSettings],
+  layer: AccountsHostLive.pipe(Layer.provideMerge(Layer.mergeAll(AccountsPlatformLive, AccountLocks.layer, AccountSettings.layer))),
   apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi, accountSessionHostApi, threadAccountHostApi],
   tools: [aiAccountsTool],
 })

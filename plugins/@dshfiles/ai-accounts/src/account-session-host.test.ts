@@ -3,6 +3,7 @@ import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Deferred, Effect, Fiber, Layer } from 'effect'
 import { AccountLocks } from './account-locks.js'
+import { AccountSettings } from './account-settings-service.js'
 import { accountSessionHostApi } from './account-session-host.js'
 import { accountLoginHostApi } from './account-login-host.js'
 import { accountsHostApi } from './accounts-host-api.js'
@@ -19,7 +20,7 @@ const mount = async (locks: AccountLocks['Service']) => {
   await host.mount(
     DshxPlugin.make({
       name: 'session-boundary-test',
-      layer: Layer.succeed(AccountLocks, locks),
+      layer: Layer.mergeAll(Layer.succeed(AccountLocks, locks), AccountSettings.layer),
       apis: [accountSessionHostApi, accountLoginHostApi, accountsHostApi],
     }),
     {
