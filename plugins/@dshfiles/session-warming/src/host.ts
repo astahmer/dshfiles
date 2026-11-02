@@ -5,8 +5,7 @@ import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
-import { Effect, Queue } from 'effect'
-import { z } from 'zod'
+import { Effect, Queue, Schema } from 'effect'
 import { sessionWarmingSettings } from './settings.js'
 import { SessionWarming } from './warming.js'
 
@@ -29,10 +28,12 @@ const sessionWarmingApi = defineApi({
   owner: '@dshfiles/session-warming',
   methods: {
     status: method({
-      input: z.object({}).strict(),
-      output: z
-        .object({ enabled: z.boolean(), warmupsLastHour: z.number().int().nonnegative(), sessions: z.array(SessionWarming.sessionStatusSchema) })
-        .strict(),
+      input: Schema.Struct({}),
+      output: Schema.Struct({
+        enabled: Schema.Boolean,
+        warmupsLastHour: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+        sessions: Schema.Array(SessionWarming.sessionStatusSchema),
+      }),
       description:
         'Prompt-cache warming: whether it is on, warm-ups spent in the last hour, and per thread its model, warm-ups since its last prompt, the next one, the last cache reads and why it stopped. Read-only.',
       tool: {

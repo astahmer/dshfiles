@@ -1,6 +1,5 @@
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { Context, Effect, Fiber, Layer, Queue, Result, Schedule, Schema, type Scope } from 'effect'
-import { z } from 'zod'
 
 export interface WarmingSettings {
   readonly enabled: boolean
@@ -17,21 +16,26 @@ export interface WarmResult {
   readonly outputTokens: number
 }
 
-const sessionStatusSchema = z
-  .object({
-    sessionId: z.string(),
-    provider: z.string(),
-    model: z.string(),
-    warmups: z.number().int().nonnegative(),
-    nextAt: z.number().int().nullable(),
-    lastWarmedAt: z.number().int().nullable(),
-    last: z.object({ inputTokens: z.number(), cacheReadTokens: z.number(), cacheWriteTokens: z.number(), outputTokens: z.number() }).strict().nullable(),
-    stopped: z.enum(['idle-limit', 'hourly-limit', 'failed', 'disabled']).nullable(),
-    error: z.string().nullable(),
-  })
-  .strict()
+const sessionStatusSchema = Schema.Struct({
+  sessionId: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  warmups: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  nextAt: Schema.NullOr(Schema.Number.check(Schema.isInt())),
+  lastWarmedAt: Schema.NullOr(Schema.Number.check(Schema.isInt())),
+  last: Schema.NullOr(
+    Schema.Struct({
+      inputTokens: Schema.Number,
+      cacheReadTokens: Schema.Number,
+      cacheWriteTokens: Schema.Number,
+      outputTokens: Schema.Number,
+    }),
+  ),
+  stopped: Schema.NullOr(Schema.Literals(['idle-limit', 'hourly-limit', 'failed', 'disabled'])),
+  error: Schema.NullOr(Schema.String),
+})
 
-export type WarmingSessionStatus = z.infer<typeof sessionStatusSchema>
+export type WarmingSessionStatus = typeof sessionStatusSchema.Type
 
 const HOUR_MS = 60 * 60_000
 
