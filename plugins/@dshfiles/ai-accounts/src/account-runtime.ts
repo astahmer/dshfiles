@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { AccountOperationBusy } from './errors.js'
 import type { AiAccountsConfig } from './account-config.js'
 import type { createAccountPool } from './account-pool.js'
 import type { UsageHistoryScheduler } from './usage-recorder.js'
@@ -48,8 +49,7 @@ export class AccountSessionWorkModel {
       AccountSessionWorkModel.locks.set(ctx.root, held)
     }
     const selected = [...new Set(ids)]
-    if (selected.some(id => held.has(id)))
-      throw new Error('An account operation is already running. Wait for it to finish before changing its credentials or profile.')
+    if (selected.some(id => held.has(id))) throw new AccountOperationBusy({ instanceIds: selected.filter(id => held.has(id)) })
     for (const id of selected) held.add(id)
     try {
       return await work()

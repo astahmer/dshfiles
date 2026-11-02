@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { AccountSignInActive } from './errors.js'
 import { accountRuntime, AccountSessionWorkModel } from './account-runtime.js'
 import { accountStoreService } from './account-store.js'
 import { Api } from '@dshfiles/dshx/effect'
@@ -104,7 +105,7 @@ export const accountSessionHostApi = Api.bind(aiAccountsSessionApi, {
       // Join any cancelled Codex subprocess that is still exiting. Never cancel a live attempt ourselves.
       const file = await accountStoreService.readAccountFile()
       const account = file.accounts.find(candidate => candidate.instanceId === input.instanceId)
-      if (account !== undefined && busy(ctx, account)) throw new Error('Finish or close the active account connection or sign-in before signing out.')
+      if (account !== undefined && busy(ctx, account)) throw new AccountSignInActive({ instanceId: input.instanceId })
       await accountRuntime(ctx)?.accountLogin?.settledAccount(input.instanceId)
       return serviceFor(ctx).signOut(input)
     }),

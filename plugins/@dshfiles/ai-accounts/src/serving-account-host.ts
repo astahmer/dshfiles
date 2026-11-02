@@ -1,4 +1,5 @@
 import type { ApiCaller } from '@dshfiles/dshx/api'
+import { SessionScopeRefused } from './errors.js'
 import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
 import { servingAccountApi } from './serving-account-api.js'
@@ -7,12 +8,11 @@ import { effectHandler } from './host-effect.js'
 /** Same trust boundary as Fast mode: agents self-only; authenticated UI/Host can select a chat. */
 export const servingAccountSessionForCaller = (input: { readonly sessionId?: string | undefined }, caller: ApiCaller): string => {
   if (caller.kind === 'agent') {
-    if (caller.sessionId === undefined) throw new Error('Serving account metadata requires an active Agent session.')
-    if (input.sessionId !== undefined && input.sessionId !== caller.sessionId)
-      throw new Error('Agents can only read serving account metadata for their own session.')
+    if (caller.sessionId === undefined) throw new SessionScopeRefused({ reason: 'serving-agent-session' })
+    if (input.sessionId !== undefined && input.sessionId !== caller.sessionId) throw new SessionScopeRefused({ reason: 'serving-other-session' })
     return caller.sessionId
   }
-  if (input.sessionId === undefined) throw new Error('Serving account metadata requires a session ID.')
+  if (input.sessionId === undefined) throw new SessionScopeRefused({ reason: 'serving-session' })
   return input.sessionId
 }
 export const servingAccountHostApi = Api.bind(servingAccountApi, {

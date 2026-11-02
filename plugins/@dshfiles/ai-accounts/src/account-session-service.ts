@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { AccountNotFound } from './errors.js'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { constants, type Stats } from 'node:fs'
 import { access, lstat, realpath, writeFile } from 'node:fs/promises'
@@ -296,7 +297,7 @@ export const createAccountSessionService = (input: {
           throw new Error(FAILURE)
         })
         const account = file.accounts.find(candidate => candidate.instanceId === request.instanceId)
-        if (account === undefined) throw new Error('This saved account is no longer available.')
+        if (account === undefined) throw new AccountNotFound({ instanceId: request.instanceId })
         const result = await plan(account, file).catch((): PlanResult => ({ reason: FAILURE }))
         if ('reason' in result) throw new Error(result.reason)
         if (input.isBusy(account)) throw new Error(BUSY)

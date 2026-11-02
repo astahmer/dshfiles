@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { LoginIntentInactive } from './errors.js'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
@@ -56,7 +57,7 @@ export const accountLoginHostApi = Api.bind(aiAccountsLoginApi, {
       accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ??
       accountStoreService.readAccountFileSync().accounts.find(candidate => candidate.instanceId === input.instanceId)
     return AccountSessionWorkModel.run(ctx, account === undefined ? [input.instanceId] : accountSessionRelatedIds(account), async () => {
-      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
+      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new LoginIntentInactive({ instanceId: input.instanceId })
       return AccountLoginHostModel.forCaller(await loginFor(ctx).begin(input.instanceId, input.replaceExisting), caller)
     })
   }),

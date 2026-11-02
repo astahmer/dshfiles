@@ -1,4 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
+import {
+  AccountSignInActive,
+  AccountUnsuitable,
+  BrowserOnlyCredential,
+  HostServiceUnavailable,
+  LoginIntentInactive,
+  SecretCatalogUnavailable,
+  SetupMethodRetired,
+} from './errors.js'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import type { CopilotLoginState } from './api.js'
 
@@ -114,10 +123,10 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   importSecretCatalogKey: effectHandler(aiAccountsApi, 'importSecretCatalogKey', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
-      if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
-      if (!isKeyEnvName(account.apiKeyEnv)) throw new Error('Save a valid API-key variable ending in _API_KEY first.')
+      if (account === undefined || account.kind === 'codex') throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'not-keyed' })
+      if (!isKeyEnvName(account.apiKeyEnv)) throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'invalid-key-env' })
       const bridge = secretCatalogBridgeFor(ctx)
-      if (bridge === undefined) throw new Error('Secret Catalog is not active.')
+      if (bridge === undefined) throw new SecretCatalogUnavailable({ reason: 'inactive' })
       await bridge.importKey({
         alias: input.alias,
         environment: input.environment,
@@ -131,7 +140,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     }),
   ),
   createSetupAccount: effectHandler(aiAccountsApi, 'createSetupAccount', () => {
-    throw new Error('This account setup method is retired. Use prepareAccountConnection on an updated client; no account was saved.')
+    throw new SetupMethodRetired()
   }),
   prepareAccountConnection: effectHandler(aiAccountsApi, 'prepareAccountConnection', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, input.existingInstanceId === undefined ? [] : [input.existingInstanceId], () => setupFor(ctx).prepare(input)),
@@ -155,7 +164,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     return AccountSessionWorkModel.run(ctx, ids, () => setupFor(ctx).configure(operationId, configuration))
   }),
   stageAccountConnectionKey: effectHandler(aiAccountsApi, 'stageAccountConnectionKey', ({ input, ctx, caller }) => {
-    if (caller.kind !== 'client') throw new Error('Raw credential entry is browser-only. Use Secret Catalog import instead.')
+    if (caller.kind !== 'client') throw new BrowserOnlyCredential()
     return setupFor(ctx).stageKey(input.operationId, input.value)
   }),
   importAccountConnectionKey: effectHandler(aiAccountsApi, 'importAccountConnectionKey', async ({ input, ctx }) => {
@@ -163,16 +172,16 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     setup.get(input.operationId)
     const bridge = secretCatalogBridgeFor(ctx)
     const values = AccountsHostApiModel.scopedCatalogValues(ctx.get('secretCatalogValues'))
-    if (bridge === undefined) throw new Error('Secret Catalog is not active.')
+    if (bridge === undefined) throw new SecretCatalogUnavailable({ reason: 'inactive' })
     const cwd = input.scope === 'global' ? null : input.cwd
-    if (input.scope !== 'global' && cwd === null) throw new Error('Choose a folder for that credential scope.')
+    if (input.scope !== 'global' && cwd === null) throw new SecretCatalogUnavailable({ reason: 'scope-folder' })
     const rows = (await bridge.listKeys(cwd)).filter(row => row.alias === input.alias && row.environment === input.environment)
-    if (rows.length !== 1 || rows[0]?.scope !== input.scope) throw new Error('That Secret Catalog entry is unavailable or ambiguous.')
+    if (rows.length !== 1 || rows[0]?.scope !== input.scope) throw new SecretCatalogUnavailable({ reason: 'ambiguous' })
     let value: string
     try {
       value = await values.resolve({ reference: { alias: input.alias, environment: input.environment }, cwd, expectedScope: input.scope })
-    } catch {
-      throw new Error('The selected Secret Catalog entry could not be read.')
+    } catch (cause) {
+      throw new SecretCatalogUnavailable({ reason: 'unreadable', cause })
     }
     return setup.stageKey(input.operationId, value)
   }),
@@ -233,7 +242,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   identity: effectHandler(aiAccountsApi, 'identity', async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId)),
   beginCopilotLogin: effectHandler(aiAccountsApi, 'beginCopilotLogin', ({ input, ctx, caller }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
-      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
+      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new LoginIntentInactive({ instanceId: input.instanceId })
       return AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId), caller)
     }),
   ),
@@ -254,7 +263,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
         ['starting', 'waiting'].includes(login.state(input.instanceId).status) ||
         login.readPending(input.instanceId) !== undefined
       )
-        throw new Error('Close the active account connection or sign-in before signing this account out.')
+        throw new AccountSignInActive({ instanceId: input.instanceId })
       await login.signOut(input.instanceId)
       accountRuntime(ctx)?.usageCache?.invalidate()
       return { signedOut: true }
@@ -348,7 +357,7 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   quotaContinuations: effectHandler(aiAccountsApi, 'quotaContinuations', async ({ ctx }) => quotaContinuationServiceFor(ctx).list()),
   quotaRecoveryModelCatalog: effectHandler(aiAccountsApi, 'quotaRecoveryModelCatalog', async ({ ctx }) => {
     const controller = ctx.get('sessionController')
-    if (controller === undefined) throw new Error('Session model selection is unavailable.')
+    if (controller === undefined) throw new HostServiceUnavailable({ service: 'session-controller' })
     return quotaRecoveryCatalogForClient(await controller.modelCatalog())
   }),
   resumeQuotaContinuation: effectHandler(aiAccountsApi, 'resumeQuotaContinuation', async ({ input, ctx }) => {
@@ -436,8 +445,7 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
 
 export class AccountsHostApiModel {
   static scopedCatalogValues(values: SecretCatalogValues | undefined): SecretCatalogValues {
-    if (values?.supportsExpectedScope !== true)
-      throw new Error('Pending credential import requires an updated Secret Catalog Host with exact-scope resolution.')
+    if (values?.supportsExpectedScope !== true) throw new SecretCatalogUnavailable({ reason: 'outdated' })
     return values
   }
 
