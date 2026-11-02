@@ -158,6 +158,15 @@ optional service as it comes and goes (`None`, `Some(service)`, `None` …), for
 it with `Stream.switchMap` so the work bound to one service instance stops when it goes. Only dshx edge layers use
 them; domain services depend on typed services instead.
 
+### `DshChildProcessSpawner.layer`
+
+From `@dshfiles/dshx/effect/child-process-spawner`: Effect's standard `ChildProcessSpawner` over the DSH `subprocess`
+service, so `ChildProcess.make(...)` keeps DSH environment scrubbing and process-range termination. A bare program
+name (`git`, `secret`) is resolved first with the provider's `resolveExecutable` (its scrubbed `PATH` plus the
+command's explicit `env` entries); absolute and relative paths are spawned as given. A missing program fails with a
+`PlatformError` whose reason is `NotFound`. Shells, extra file descriptors and inherited stdin are refused as
+`BadArgument`.
+
 ## Errors on the wire
 
 | Handler outcome                                                                          | Caller sees                                                                                         |

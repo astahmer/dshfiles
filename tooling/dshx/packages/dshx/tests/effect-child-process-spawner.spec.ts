@@ -3,6 +3,9 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Exit, Fiber, Layer, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { DshChildProcessSpawner } from '../src/effect/child-process-spawner.js'
 import { HostContext } from '../src/effect/host-context.js'
 
@@ -74,7 +77,22 @@ describe.skipIf(process.platform === 'win32')('DshChildProcessSpawner', () => {
         const error = yield* spawner.string(ChildProcess.make('dshx-missing-program-for-test', [])).pipe(Effect.flip)
         expect(error._tag).toBe('PlatformError')
         expect(error.reason._tag).toBe('NotFound')
+        expect(error.reason.cause).toMatchObject({ name: 'SubprocessExecutableNotFoundError' })
       }),
+    )
+
+    layer.effect('resolves a bare program name through the provider PATH and explicit entries', () =>
+      Effect.gen(function* () {
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+        const directory = yield* Effect.acquireRelease(
+          Effect.promise(() => mkdtemp(join(tmpdir(), 'dshx-spawner-'))),
+          path => Effect.promise(() => rm(path, { recursive: true, force: true })),
+        )
+        const program = join(directory, 'dshx-resolve-probe')
+        yield* Effect.promise(() => writeFile(program, `#!${process.execPath}\nprocess.stdout.write(process.argv[1])\n`, { mode: 0o755 }))
+        const pathEntry = `${directory}${delimiter}${process.env['PATH'] ?? ''}`
+        expect(yield* spawner.string(ChildProcess.make('dshx-resolve-probe', [], { env: { PATH: pathEntry } }))).toBe(program)
+      }).pipe(Effect.scoped),
     )
 
     layer.effect('rejects shell commands DSH never interprets', () =>

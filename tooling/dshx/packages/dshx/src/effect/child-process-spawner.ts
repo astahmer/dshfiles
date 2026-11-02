@@ -1,5 +1,6 @@
 export * as DshChildProcessSpawner from './child-process-spawner.js'
 
+import { sep as pathSeparator } from 'node:path'
 import { PassThrough, type Readable } from 'node:stream'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputMode, SubprocessSpawnSpec, SubprocessStdinMode } from '@deepseek-ai/dsh-subprocess'
 import { fromWritable } from '@effect/platform-node/NodeSink'
@@ -14,8 +15,11 @@ export const unknownProcessId = ChildProcessSpawner.ProcessId(-1)
 const DEFAULT_GRACE_MS = 1_000
 
 const SystemErrorCause = Schema.Struct({ code: Schema.String })
+const ExecutableNotFound = Schema.Struct({ name: Schema.Literal('SubprocessExecutableNotFoundError') })
+const isExecutableNotFound = Schema.is(ExecutableNotFound)
 
 const systemErrorTag = (cause: unknown): PlatformError.SystemErrorTag => {
+  if (isExecutableNotFound(cause)) return 'NotFound'
   const code = Option.getOrUndefined(Schema.decodeUnknownOption(SystemErrorCause)(cause))?.code
   if (code === 'ENOENT') return 'NotFound'
   if (code === 'EACCES' || code === 'EPERM') return 'PermissionDenied'
@@ -81,6 +85,11 @@ const specOf = Effect.fnUntraced(function* (command: ChildProcess.StandardComman
   return { spec, stdin }
 })
 
+const isBareName = (program: string): boolean => !program.includes('/') && !program.includes(pathSeparator)
+
+const lookupEnvironment = (env: NodeJS.ProcessEnv | undefined): Record<string, string> =>
+  Object.fromEntries(Object.entries(env ?? {}).flatMap(([name, value]) => (value === undefined ? [] : [[name, value]])))
+
 const readableStream = (command: ChildProcess.StandardCommand, readable: Readable | undefined, name: string) => {
   if (readable === undefined) return Stream.empty
   const passThrough = new PassThrough()
@@ -120,8 +129,20 @@ export const layer: Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, HostSer
   Effect.gen(function* () {
     const subprocess = yield* hostService('subprocess')
 
+    /** A bare program name resolves in the provider's execution world (its scrubbed PATH plus explicit entries). */
+    const resolved = (command: ChildProcess.StandardCommand, spec: SubprocessSpawnSpec) => {
+      const [program, ...args] = spec.argv
+      if (program === undefined || !isBareName(program)) return Effect.succeed(spec)
+      return Effect.tryPromise({
+        try: signal => subprocess.resolveExecutable(program, lookupEnvironment(spec.env), signal),
+        catch: failure(command, 'spawn'),
+      }).pipe(Effect.map((executable): SubprocessSpawnSpec => ({ ...spec, argv: [executable, ...args] })))
+    }
+
     const spawnStandard = Effect.fnUntraced(function* (command: ChildProcess.StandardCommand) {
-      const { spec, stdin } = yield* specOf(command)
+      const prepared = yield* specOf(command)
+      const stdin = prepared.stdin
+      const spec = yield* resolved(command, prepared.spec)
       const handle = yield* Effect.acquireRelease(Effect.try({ try: () => subprocess.spawn(spec), catch: failure(command, 'spawn') }), spawned =>
         terminate(command, spawned).pipe(Effect.ignore({ log: 'Warn', message: `DSH subprocess ${describeCommand(command)} did not stop cleanly` })),
       )
