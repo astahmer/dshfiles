@@ -1,7 +1,4 @@
 {
-  "effect-migration(no-cause-dropping-catch)": {
-    "plugins/@dshfiles/jj-integration/src/host.ts": 1
-  },
   "effect-migration(no-empty-plugin-layer)": {
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
@@ -28,9 +25,6 @@
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/jj-integration/src/auto-cleanup.ts": 1,
-    "plugins/@dshfiles/jj-integration/src/auto-fetch.ts": 1,
-    "plugins/@dshfiles/jj-integration/src/host.ts": 4,
     "plugins/@dshfiles/multi-host/src/connectors/gateway.ts": 3,
     "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 3,
     "plugins/@dshfiles/multi-host/src/gateway-pool.ts": 1,
@@ -47,7 +41,6 @@
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/jj-integration/src/host.ts": 7,
     "plugins/@dshfiles/multi-host/src/host.ts": 1,
     "plugins/@dshfiles/multi-host/src/store.ts": 1,
     "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
