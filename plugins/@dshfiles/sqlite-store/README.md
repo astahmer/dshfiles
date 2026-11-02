@@ -79,15 +79,22 @@ migrations and typing, not loop stalls; heavy indexing stays in a worker (sessio
 How each hand-rolled opener maps onto the layer. Keep every existing migration SQL verbatim as migration `<n>` so
 adopted files and fresh files end with the same schema.
 
-| Store (opener)                                                 | Pragmas today                                                    | Legacy version                                                   | Options                                                                                                        |
-| -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| traces spans (`traces/src/store.ts:385`)                       | `busy_timeout=5000`, WAL, `synchronous=NORMAL`                   | `user_version` loop, 5 migrations                                | `legacyUserVersion: 5`; default pragmas                                                                        |
-| traces alerts (`traces/src/alerts/alert-store.ts:64`)          | `busy_timeout=5000`, WAL, no `synchronous` (FULL)                | `user_version` loop, 1 migration; seeds built-ins when version 0 | `legacyUserVersion: 1`; `pragmas: { synchronous: 'full' }` to keep durability; seed inside migration 1         |
-| usage (`usage/src/store.ts:413`)                               | `busy_timeout=5000`, WAL, `synchronous=NORMAL`                   | `user_version` loop, 8 migrations                                | `legacyUserVersion: 8`; default pragmas                                                                        |
-| memory (`memory/src/store.ts:276`)                             | WAL, `busy_timeout=5000`, no `synchronous` (FULL)                | none: `create if not exists` + `hasColumn` → `ALTER` probes      | no `legacyUserVersion`; idempotent migrations (below); `pragmas: { synchronous: 'full' }` or opt into `normal` |
-| session-search (`session-search/src/index-db.ts:249`, worker)  | WAL, `synchronous=normal`, no busy timeout (0)                   | none: `CREATE ... IF NOT EXISTS`; backfill flags in `meta`       | no `legacyUserVersion`; migration 1 = `SCHEMA`; provide `NodeFileSystem`/`NodePath` in the worker              |
-| resource-packs (`resource-packs/src/store.ts:55`)              | `foreign_keys=ON`, `busy_timeout=5000`, `journal_mode=DELETE`    | `user_version` 1 in one transaction; refuses `> 1`               | `legacyUserVersion: 1`; `pragmas: { journalMode: 'delete', foreignKeys: true }`                                |
-| project-checks (`project-checks/src/durable-task-store.ts:73`) | `foreign_keys=ON`, driver `timeout: 0`, default journal (DELETE) | `user_version` 1; refuses `> 1`                                  | `legacyUserVersion: 1`; `pragmas: { journalMode: 'delete', foreignKeys: true, busyTimeout: 0 }`                |
+Migrated (the hand-rolled opener is gone):
+
+| Store (layer)                                                        | Was                                                              | Options                                                                                         |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| traces spans (`traces/src/trace-repo.ts`, `TraceDb`)                 | `user_version` loop, 5 migrations; WAL, `synchronous=NORMAL`     | `legacyUserVersion: 5`; default pragmas                                                         |
+| traces alerts (`traces/src/alerts/alert-repo.ts`, `AlertDb`)         | `user_version` loop, 1 migration; seeds built-ins when version 0 | `legacyUserVersion: 1`; `pragmas: { synchronous: 'full' }`; seed inside migration `1_rules`     |
+| usage (`usage/src/host.ts`, migrations in `usage/src/migrations.ts`) | `user_version` loop, 8 migrations; WAL, `synchronous=NORMAL`     | `legacyUserVersion: 8`; default pragmas                                                         |
+| project-checks (`project-checks/src/durable-task-store.ts`)          | `user_version` 1, refused `> 1`; `foreign_keys=ON`, `timeout: 0` | `legacyUserVersion: 1`; `pragmas: { journalMode: 'delete', foreignKeys: true, busyTimeout: 0 }` |
+
+Still to migrate:
+
+| Store (opener)                                                | Pragmas today                                                 | Legacy version                                              | Options                                                                                                        |
+| ------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| memory (`memory/src/store.ts:278`)                            | WAL, `busy_timeout=5000`, no `synchronous` (FULL)             | none: `create if not exists` + `hasColumn` → `ALTER` probes | no `legacyUserVersion`; idempotent migrations (below); `pragmas: { synchronous: 'full' }` or opt into `normal` |
+| session-search (`session-search/src/index-db.ts:255`, worker) | WAL, `synchronous=normal`, no busy timeout (0)                | none: `CREATE ... IF NOT EXISTS`; backfill flags in `meta`  | no `legacyUserVersion`; migration 1 = `SCHEMA`; provide `NodeFileSystem`/`NodePath` in the worker              |
+| resource-packs (`resource-packs/src/store.ts:55`)             | `foreign_keys=ON`, `busy_timeout=5000`, `journal_mode=DELETE` | `user_version` 1 in one transaction; refuses `> 1`          | `legacyUserVersion: 1`; `pragmas: { journalMode: 'delete', foreignKeys: true }`                                |
 
 Per-store notes:
 
