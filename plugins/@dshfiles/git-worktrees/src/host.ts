@@ -1,3 +1,5 @@
+// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
+import '@dshfiles/dshx/effect'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
@@ -5,9 +7,9 @@ import { defineApi, method, PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
+import { Schema } from 'effect'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
-import { z } from 'zod'
 import { createGitWorktrees } from './git-worktrees.js'
 import { gitWorktreesSettings } from './settings.js'
 
@@ -39,7 +41,11 @@ const registry = () => {
   return found
 }
 
-const worktreeSchema = z.object({ name: z.string(), path: z.string(), branch: z.string().nullable() }).strict()
+const worktreeSchema = Schema.Struct({ name: Schema.String, path: Schema.String, branch: Schema.NullOr(Schema.String) })
+const pathInputSchema = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) })
+const worktreesOutputSchema = Schema.Struct({ worktrees: Schema.Array(worktreeSchema) })
+const removeInputSchema = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), force: Schema.Boolean })
+const removedOutputSchema = Schema.Struct({ removed: Schema.Literal(true) })
 
 const gitWorktreesApi = defineApi({
   id: 'git-worktrees',
@@ -47,8 +53,8 @@ const gitWorktreesApi = defineApi({
   owner: '@dshfiles/git-worktrees',
   methods: {
     worktrees: method({
-      input: z.object({ path: z.string().min(1) }).strict(),
-      output: z.object({ worktrees: z.array(worktreeSchema) }).strict(),
+      input: pathInputSchema,
+      output: worktreesOutputSchema,
       description: 'List the thread worktrees this plugin created for the git repository holding a path. Read-only.',
       tool: {
         name: 'git_thread_worktrees',
@@ -59,8 +65,8 @@ const gitWorktreesApi = defineApi({
       },
     }),
     remove: method({
-      input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
-      output: z.object({ removed: z.literal(true) }).strict(),
+      input: removeInputSchema,
+      output: removedOutputSchema,
       description:
         'Remove one thread worktree with `git worktree remove` and drop its DSH project registration; its `dsh/thread-…` branch stays. With force false git refuses a worktree holding uncommitted changes; pass force true only when the user explicitly agreed to lose them. Call only when the user asked to remove that worktree.',
       tool: { name: 'git_thread_worktree_remove', render: () => 'Removed that thread worktree; its branch is kept.' },

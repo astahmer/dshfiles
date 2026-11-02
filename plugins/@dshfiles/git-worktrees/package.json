@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@dshfiles/vcs-provider-port": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
