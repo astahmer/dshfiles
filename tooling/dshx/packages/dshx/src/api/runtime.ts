@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { Option, Schema } from 'effect'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiClientContract, ApiError } from './types.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
@@ -11,7 +12,7 @@ type RpcResult =
   | { readonly ok: true; readonly value: unknown }
   | {
       readonly ok: false
-      readonly error?: { readonly code?: string; readonly message?: string }
+      readonly error?: { readonly code?: string; readonly message?: string; readonly details?: object }
     }
 
 interface ClientConnectionLike {
@@ -118,6 +119,8 @@ const coalesce = (calls: Map<string, InflightCall>, key: string, request: (signa
   })
 }
 
+const decodeRemoteDetails = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
+
 function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
   const code = result.error?.code
   const message = result.error?.message ?? `API method ${method} failed.`
@@ -125,7 +128,7 @@ function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, api
     return ApiProtocolModel.error('contract', message, apiId, method, false, undefined, code)
   }
   if (code === 'aborted') return ApiProtocolModel.aborted(apiId, method)
-  return ApiProtocolModel.error('remote', message, apiId, method, false, undefined, code)
+  return ApiProtocolModel.remote({ message, apiId, method, code, details: Option.getOrUndefined(decodeRemoteDetails(result.error?.details)) })
 }
 
 /**

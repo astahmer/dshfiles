@@ -108,7 +108,7 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
     } catch (cause) {
       if (ApiProtocolModel.isApiError(cause)) return { ok: false, error: { code: cause.remoteCode ?? 'internal', message: cause.message, details: {} } }
       if (cause instanceof ContractViolation) return { ok: false, error: { code: 'contract', message: cause.message, details: {} } }
-      if (ApiProtocolModel.isPluginApiError(cause)) return { ok: false, error: { code: cause.code, message: cause.message, details: {} } }
+      if (ApiProtocolModel.isPluginApiError(cause)) return { ok: false, error: { code: cause.code, message: cause.message, details: cause.details ?? {} } }
       hostLogger(ctx).error(`API handler ${packageId} ${contract.id}.${endpoint} failed: ${describeFailure(cause)}`)
       return { ok: false, error: { code: 'internal', message: 'API handler failed. See Host diagnostics.', details: {} } }
     }

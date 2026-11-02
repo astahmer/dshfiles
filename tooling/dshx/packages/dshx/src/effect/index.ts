@@ -3,7 +3,7 @@ import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Strea
 import { effectClient } from './client.js'
 import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
-import { PluginApiError } from '../api/common.js'
+import { thrownForApi } from './wire-error.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
   AnyApiEventDefinition,
@@ -40,29 +40,9 @@ type HostOptions<R> = [R] extends [never]
 type AnyManagedRuntime = ManagedRuntime.ManagedRuntime<never, unknown>
 const pluginRuntimes = new WeakMap<Context, AnyManagedRuntime>()
 
-const taggedFailure = Schema.Struct({ _tag: Schema.String, message: Schema.optional(Schema.String) })
-const isTaggedFailure = Schema.is(taggedFailure)
-
-/** `NotFound` → `not-found`, the shape `PluginApiError` accepts as a remote code. */
-const remoteCode = (tag: string): string =>
-  tag
-    .replace(/([a-z0-9])([A-Z])/gu, '$1-$2')
-    .replace(/[^A-Za-z0-9]+/gu, '-')
-    .toLowerCase()
-    .replace(/^-+|-+$/gu, '')
-
-/** What a handler's failure becomes on the wire: tagged errors reach the Client as `remoteCode`, anything else stays internal. */
-const thrownFailure = (failure: unknown): unknown => {
-  if (failure instanceof PluginApiError || !isTaggedFailure(failure)) return failure
-  return new PluginApiError(failure.message === undefined || failure.message === '' ? failure._tag : failure.message, {
-    code: remoteCode(failure._tag),
-    cause: failure,
-  })
-}
-
-const settle = <A, E>(exit: Exit.Exit<A, E>): A => {
+const settle = <A, E>(exit: Exit.Exit<A, E>, call: { readonly ctx: Context; readonly apiId: string; readonly method: string }): A => {
   if (Exit.isSuccess(exit)) return exit.value
-  throw thrownFailure(Cause.squash(exit.cause))
+  throw thrownForApi({ cause: exit.cause, apiId: call.apiId, method: call.method, warn: message => call.ctx.logger('dshx:api').warn(message) })
 }
 
 /** Serve a contract from handlers that return Effects; the call's AbortSignal interrupts the handler fiber. */
@@ -86,7 +66,11 @@ const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDef
     Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers).map(([name, handler]) => [
       name,
       async (context: ApiHandlerContext<never>) =>
-        settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx)),
+        settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx), {
+          ctx: context.ctx,
+          apiId: contract.id,
+          method: name,
+        }),
     ]),
   )
   // SAFETY: every method key of `handlers` (typed against the contract's methods) maps to a Promise handler of the same input and output.

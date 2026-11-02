@@ -196,6 +196,8 @@ export interface ApiError extends Error {
   readonly method: string
   readonly retryable: boolean
   readonly remoteCode?: string | undefined
+  /** JSON details a `remote` failure carries, e.g. the encoded Effect error the Host chose to expose. */
+  readonly remoteDetails?: Readonly<Record<string, unknown>> | undefined
 }
 
 export type ApiFetchStatus = 'idle' | 'fetching' | 'paused'
