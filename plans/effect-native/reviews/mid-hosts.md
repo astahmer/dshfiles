@@ -212,7 +212,7 @@ const request = Effect.fn('parent question request')(function* (input: QuestionR
   `:89-141` layer builds a lazy `let opening: Promise<...>` memo with `void started.catch(...)` reset (`:93-103`) → `Layer.effect` + `Effect.acquireRelease(open, close)` (or `Effect.cached` if lazy open is required).
 - R1: `:43` module `let settingsScope`; `:45-51` try/catch read → `SettingsRead` service.
 - R4: `:143-146` `unwrap` throws `new Error('annotations ...')` _inside_ `Effect.gen` → defect, not failure; `:179-183` `message: String(error)`; `store.ts:82`.
-- R6: `:61` direct `fetch(.../json/version)` → `HttpClient`; `chrome-launch.ts:161` `await new Promise(r => setTimeout(r, 250))` poll; `chrome-cdp.ts:64-69,216` hand-rolled RPC map + timers over WebSocket (→ `effect/unstable/socket`? keep imperative but wrap one Effect boundary with `acquireRelease` + `timeout`).
+- R6: `:61` direct `fetch(.../json/version)` → `HttpClient`; `chrome-launch.ts:161` `await new Promise(r => setTimeout(r, 250))` poll; `chrome-cdp.ts:64-69,216` hand-rolled RPC map + timers over WebSocket (→ `effect/socket`? keep imperative but wrap one Effect boundary with `acquireRelease` + `timeout`).
 - R5: `ingest.ts:104` module `windows` Map rate limiter (→ `RateLimiter` or a `Ref`); `source.ts:131-132` hand caches (→ `Cache`).
 - R7: `:203-375` 18× `Effect.fn('x')(({input}) => Effect.gen(function* () {...}))` double wrap.
   Target: `AnnotationStore` (scoped domain open, Effect methods, tagged `AnnotationNotFound`/`AnnotationConflict`), `SourceResolver` (Cache-backed), `ChromeController` (Subprocess.spawnScoped + HttpClient), `Pairing`, `IngestRoutes` (layer-scoped `webServer.register` with acquireRelease). Errors per store outcome instead of `StoreResult` → throw.

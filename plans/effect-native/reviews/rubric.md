@@ -14,8 +14,10 @@ Context
 - The user believes the refactor is mediocre. Goal: the highest-standard Effect-native codebase. Be critical and concrete.
 - Effect version is 4.1.0 (NOT 3.x). Verify every API you recommend against ~/.references/effect-4.1.0 source
   (packages/effect/src). v4 names: `Context.Service`, `Context.Reference`, `Effect.fn`, `Schema.TaggedError`,
-  `Layer.effect/succeed/provide/provideMerge`, `effect/FileSystem`, `effect/Path`, `effect/unstable/process`,
-  `effect/unstable/http`, `Effect.catchTag`, `Schedule`, `Semaphore`, `Cache`, `RcMap`, `SubscriptionRef`, `PubSub`, etc.
+  `Layer.effect/succeed/provide/provideMerge`, `effect/FileSystem`, `effect/Path`, `effect/process`,
+  `effect/http`, `effect/sql`, `Effect.catchTag`, `Schedule`, `Semaphore`, `Cache`, `RcMap`, `SubscriptionRef`, `PubSub`, etc.
+- Path correction (applied after the first review round): 4.1 exports `effect/process`, `effect/http` and `effect/sql`;
+  the `effect/unstable/process` and `effect/unstable/http` paths this rubric originally named do not exist.
 - Gold-standard references (read real code, cite file:line):
   - ~/.references/opencode (sst/opencode, effect 4.1.0) — esp. packages/core/src/plugin, packages/core/src/session,
     packages/server, packages/core/src/database

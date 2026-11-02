@@ -157,7 +157,7 @@ Per-plugin key fix (one line each):
 - shared-streams: delete `setupHost` double wrap; `WebServer` edge service; route + tap in one `acquireRelease`.
 - tool-search: `DshxEffect.tool` + `registerTool` on `agent.ctx.tools`; states in a `SynchronizedRef<HashMap>`.
 - workspace-folder-picker: use dshx `Subprocess.spawnScoped` instead of a hand Promise runner.
-- tweet-context, git-worktrees, agent-toolkit: when migrated, `effect/unstable/process` `ChildProcess` + `FileSystem` (R6).
+- tweet-context, git-worktrees, agent-toolkit: when migrated, `effect/process` `ChildProcess` + `FileSystem` (R6).
 - queue-reorder, agents, references, resource-packs, fff-search: replace module `let`/WeakMap stores with scoped layers before anything else.
 - workbench, btw, command-palette, main-tabs, test-runs: no Host work.
 - hmr-gate (fork concern): revert `client.tsx` (and ideally host) to its pre-migration validation or keep zod there; Effect in a reimplemented vendored transport adds bundle weight and upstream drift for no gain.
