@@ -210,7 +210,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     } catch {
       throw new Error('Client boot requires a prepared isolated profileRoot with package.json.')
     }
-    const executable = await resolveDshExecutable(options.executable)
+    const executable = await resolveDshExecutable(options.executable, process.env, options.projectRoot)
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,

@@ -67,7 +67,7 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
   let child: ChildProcess | undefined
 
   try {
-    const executable = await resolveDshExecutable(options.executable)
+    const executable = await resolveDshExecutable(options.executable, process.env, options.projectRoot)
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,

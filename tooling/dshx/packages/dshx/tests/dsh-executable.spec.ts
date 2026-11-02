@@ -23,6 +23,17 @@ describe('verification DSH executable selection', () => {
     expect(await resolveDshExecutable('custom-dsh', { DSHX_DSH_EXECUTABLE: 'invalid-relative-override' })).toBe('custom-dsh')
   })
 
+  it('prefers the CLI the checkout installed over PATH, and keeps PATH when it has none', async () => {
+    const projectRoot = await root()
+    await mkdir(join(projectRoot, 'node_modules', '.bin'), { recursive: true })
+    const checkoutBin = join(projectRoot, 'node_modules', '.bin', 'dsh')
+    await writeFile(checkoutBin, '#!/bin/sh\n')
+    await chmod(checkoutBin, 0o700)
+    expect(await resolveDshExecutable(undefined, {}, projectRoot)).toBe(checkoutBin)
+    expect(await resolveDshExecutable(undefined, {}, await root())).toBe('dsh')
+    expect(await resolveDshExecutable('custom-dsh', {}, projectRoot)).toBe('custom-dsh')
+  })
+
   it.each(['', 'dsh', './bin/dsh', '~/bin/dsh', '/tmp/invalid\0dsh'])(
     'rejects invalid overrides without falling back to a personal launcher: %j',
     async value => {
