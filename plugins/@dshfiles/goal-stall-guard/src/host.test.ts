@@ -1,340 +1,214 @@
-import type { JsonValue } from '@dshfiles/dshx/json'
-import { describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import GoalService from '@deepseek-ai/dsh-goal'
+import { createAssistantMessage, createUserMessage, LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import { vi } from 'vitest'
+import plugin from './host.js'
 
 /**
- * End-to-end wiring check against the recorded livelock.
- *
- * `stall.test.ts` proves the detector decides correctly in isolation. This
- * proves the built plugin reads the real session-event shapes and reaches the
- * real goals service. The event sequence below is the shape taken from
- * session-dbe87c63's durable log, not a hand-written approximation: rounds
- * carrying `<goal_round>` prompts, `assistant/message` events whose
+ * End-to-end wiring check against the recorded livelock, on a real Host with the native agent registry and goal
+ * service. `stall.test.ts` proves the detector decides correctly in isolation; this proves the plugin reads the real
+ * session-event shapes and reaches the real goals service. The event sequence is the shape taken from
+ * session-dbe87c63's durable log: rounds carrying `<goal_round>` prompts, `assistant/message` events whose
  * `message.content` is empty, and `turn/end` with `{ kind: 'completed' }`.
  */
 
 const roundPrompt = (round: number): string => `<goal_round>\nObjective: "restyle the sidebar"\nRound: ${round}/256\n\nContinue working toward the objective.`
 
-interface StubSession {
-  readonly id: string
-}
+const loadPlugin = async () => (process.env.DSH_GOAL_STALL_GUARD_BUILT === '1' ? import(new URL('../dist/index.js', import.meta.url).href) : plugin)
 
-interface StubAgent {
-  readonly id: string
-  readonly session: StubSession
-}
+const fixture = (config: { readonly stallThreshold?: number } = {}) =>
+  Effect.acquireRelease(
+    Effect.promise(async () => {
+      const host = await createTestHost()
+      await host.ctx.plugin(SessionStore)
+      await host.ctx.plugin(SessionProjectionRegistry)
+      await host.ctx.plugin(LlmRuntime)
+      await host.ctx.plugin(AgentRegistry)
+      await host.ctx.plugin(AgentLoop)
+      await host.ctx.plugin(GoalService)
+      await host.mount(await loadPlugin(), { packageId: '@dshfiles/goal-stall-guard', native: process.env.DSH_GOAL_STALL_GUARD_BUILT === '1', config })
+      const handles: Array<{ readonly dispose: () => Promise<void> }> = []
+      const createAgent = async (withGoal: boolean) => {
+        const handle = await host.ctx.agents.create({ sessionId: SessionId(randomUUID()), meta: { cwd: tmpdir() } })
+        handles.push(handle)
+        if (withGoal) host.ctx.goals.create(handle.agent, { objective: 'restyle the sidebar' })
+        return handle
+      }
+      type FixtureAgent = Awaited<ReturnType<typeof createAgent>>['agent']
+      const turnStart = (agent: FixtureAgent, turn: number) => agent.session.append('turn/start', { turn })
+      const stepStart = (agent: FixtureAgent, turn: number) => agent.session.append('step/start', { turn, step: 1 })
+      const prompt = (agent: FixtureAgent, input: { readonly text: string; readonly source?: { readonly kind: string } }) =>
+        agent.session.append('user/message', createUserMessage({ content: [{ type: 'text', text: input.text }], source: input.source ?? { kind: 'user' } }), {
+          surfaceOp: 'append',
+        })
+      const answer = (agent: FixtureAgent, input: { readonly turn: number; readonly content: readonly unknown[] }) =>
+        agent.session.append(
+          'assistant/message',
+          { turn: input.turn, step: 1, message: createAssistantMessage({ content: input.content, provider: 'test', model: 'test' }), stream: [] },
+          { surfaceOp: 'append' },
+        )
+      const turnEnd = (agent: FixtureAgent, input: { readonly turn: number; readonly reason?: unknown }) =>
+        agent.session.append('turn/end', { turn: input.turn, reason: input.reason ?? { kind: 'completed' } })
+      const rounds = (input: {
+        readonly agent: FixtureAgent
+        readonly rounds: readonly number[]
+        readonly prompt?: (round: number) => string
+        readonly content?: readonly unknown[]
+      }) => {
+        for (const round of input.rounds) {
+          turnStart(input.agent, round)
+          prompt(input.agent, { text: (input.prompt ?? roundPrompt)(round) })
+          stepStart(input.agent, round)
+          answer(input.agent, { turn: round, content: input.content ?? [] })
+          turnEnd(input.agent, { turn: round })
+        }
+      }
+      const emptyRounds = (input: { readonly agent: FixtureAgent; readonly rounds: readonly number[]; readonly prompt?: (round: number) => string }) =>
+        rounds(input)
+      return { host, createAgent, turnStart, stepStart, prompt, turnEnd, rounds, emptyRounds, handles }
+    }),
+    f =>
+      Effect.promise(async () => {
+        for (const handle of f.handles.reverse()) await handle.dispose().catch(() => undefined)
+        await f.host.dispose()
+      }),
+  )
 
-/** The goal row `ctx.goals` answers with. */
-interface StubGoal {
-  readonly id: string
-  readonly revision: number
-  readonly phase: 'active' | 'paused'
-}
+const phaseOf = (f: Effect.Success<ReturnType<typeof fixture>>, agent: Parameters<typeof f.turnStart>[0]) => f.host.ctx.goals.get(agent)?.phase
 
-/** The row config the built entry parses after cordis unwraps it. */
-interface PluginRowConfig {
-  readonly stallThreshold?: number | undefined
-}
-
-/** One replayed `session/event`: the bundle reads `type` and `data` only. */
-interface StubSessionEvent {
-  readonly type: string
-  readonly data?: JsonValue
-}
-
-type SessionEventListener = (session: StubSession, event: StubSessionEvent) => void
-type StubListener = (event: string, handler: SessionEventListener) => void
-
-/** The event surface `createBaseApi` binds when it builds the plugin api. */
-interface StubEventSurface {
-  readonly on: StubListener
-  readonly once: StubListener
-  readonly emit: StubListener
-  readonly parallel: StubListener
-  readonly serial: StubListener
-  readonly bail: StubListener
-  readonly waterfall: StubListener
-  readonly effect: () => void
-  readonly get: () => undefined
-  readonly tools: { readonly register: (definition: { readonly name: string }) => void }
-}
-
-/** The Host context this harness supplies: the event surface plus the services the bundle injects. */
-interface StubContext extends StubEventSurface {
-  readonly agents: { readonly get: (sessionId: string) => StubAgent | undefined }
-  readonly goals: {
-    readonly get: (agent: StubAgent) => StubGoal | undefined
-    readonly pause: (agent: StubAgent, input: { readonly id: string; readonly revision: number }) => void
-  }
-  readonly logger: { readonly warn: (...args: readonly unknown[]) => void }
-}
-
-interface Harness {
-  readonly pause: ReturnType<typeof vi.fn>
-  readonly registeredToolNames: string[]
-  readonly dispatch: (event: StubSessionEvent) => void
-}
-
-/**
- * The built bundle's `apply` is the exact entry cordis calls, with the row
- * config already unwrapped from schemastery's resolvers. Testing the definition
- * instead would route through `createPluginApi`, whose event surface a stub
- * context has to imitate; testing `apply` tests what actually runs.
- */
-interface BuiltPlugin {
-  /** The harness only cares that activation ran; the returned disposable is ignored. */
-  readonly apply: (ctx: StubContext, config?: PluginRowConfig) => void
-}
-
-const builtEntry = new URL('../dist/index.js', import.meta.url).href
-
-const loadPlugin = async (): Promise<BuiltPlugin> => import(builtEntry)
-
-/**
- * `createBaseApi` binds cordis's whole event surface when it builds the plugin
- * api, so a stub context that only declares `on` throws before the plugin runs.
- */
-const bindableContext = (listeners: Map<string, SessionEventListener>): StubEventSurface => {
-  const on: StubListener = (event, handler) => {
-    listeners.set(event, handler)
-  }
-  // `get` is what dshx's optional inspect bridge probes; without it the bridge
-  // logs a warning on every activation even though the plugin needs no service.
-  return { on, once: on, emit: on, parallel: on, serial: on, bail: on, waterfall: on, effect: () => {}, get: () => undefined, tools: { register: () => {} } }
-}
-
-const startHarness = (plugin: BuiltPlugin, config: PluginRowConfig = {}): Harness => {
-  let publishing = false
-  // Like the real session, a goal change cannot be appended while a session event is still being published.
-  const pause = vi.fn(() => {
-    if (publishing) throw new Error('session append cannot reenter while another append is being published')
-  })
-  const agent = { id: 'agent-1', session: { id: 'session-1' } }
-  const goal = { id: 'goal-1', revision: 4, phase: 'active' as const }
-  const listeners = new Map<string, SessionEventListener>()
-  const registeredToolNames: string[] = []
-
-  const ctx = {
-    ...bindableContext(listeners),
-    tools: {
-      register: (definition: { readonly name: string }): void => {
-        registeredToolNames.push(definition.name)
-      },
-    },
-    agents: { get: vi.fn(() => agent) },
-    goals: { get: vi.fn(() => goal), pause },
-    logger: { warn: vi.fn() },
-  }
-
-  plugin.apply(ctx, config)
-  const dispatch = (event: StubSessionEvent): void => {
-    const handler = listeners.get('session/event')
-    if (handler === undefined) throw new Error('plugin registered no session/event listener')
-    publishing = true
-    try {
-      handler(agent.session, event)
-    } finally {
-      publishing = false
-    }
-  }
-  return { pause, registeredToolNames, dispatch }
-}
+const waitForPhase = (input: {
+  readonly f: Effect.Success<ReturnType<typeof fixture>>
+  readonly agent: Parameters<typeof input.f.turnStart>[0]
+  readonly phase: string
+}) => Effect.promise(() => vi.waitFor(() => expect(phaseOf(input.f, input.agent)).toBe(input.phase)))
 
 describe('goal-stall-guard wiring', () => {
-  it('registers the supplemental continuation tools', async () => {
-    const plugin = await loadPlugin()
-    const { registeredToolNames } = startHarness(plugin)
+  it.effect('registers the supplemental continuation tools', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      expect(['extend_goal_budget', 'complete_blocked_goal'].map(name => f.host.tools.get(name)?.name)).toEqual(['extend_goal_budget', 'complete_blocked_goal'])
+      const refused = yield* Effect.promise(() =>
+        f.host.tools.execute({
+          callId: ToolCallId(randomUUID()),
+          name: 'complete_blocked_goal',
+          arguments: { evidence: 'every requirement verified' },
+          signal: new AbortController().signal,
+        }),
+      )
+      expect(refused).toMatchObject({ isError: true, error: { message: 'Goal continuation requires an active Agent.' } })
+    }),
+  )
 
-    expect(registeredToolNames).toEqual(['extend_goal_budget', 'complete_blocked_goal'])
-  })
+  it.effect('pauses the goal on the third consecutive empty round', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent, rounds: [1, 2, 3] })
+      yield* waitForPhase({ f, agent, phase: 'paused' })
+    }),
+  )
 
-  it('pauses the goal on the third consecutive empty round', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
+  it.effect('counts a round whose prompt is followed by a runtime-context snapshot and whose turn failed empty', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      // The shape AI Accounts produces: DSH appends its runtime-context snapshot after the round prompt, and an empty
+      // completion is retried as EMPTY_RESPONSE until the turn fails, with no assistant/message at all.
+      for (const round of [1, 2, 3]) {
+        f.turnStart(agent, round)
+        f.stepStart(agent, round)
+        f.prompt(agent, { text: roundPrompt(round) })
+        f.prompt(agent, { text: 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.', source: { kind: 'runtime-context' } })
+        f.turnEnd(agent, { turn: round, reason: { kind: 'error', error: { code: 'EMPTY_RESPONSE', message: 'no content' } } })
+      }
+      yield* waitForPhase({ f, agent, phase: 'paused' })
+    }),
+  )
 
-    for (const round of [1, 2, 3]) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [] } } })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
+  it.effect('the control: two empty rounds are not enough', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent, rounds: [1, 2] })
+      expect(phaseOf(f, agent)).toBe('active')
+    }),
+  )
 
-    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
-    expect(pause).toHaveBeenCalledWith(expect.objectContaining({ session: expect.anything() }), { id: 'goal-1', revision: 4 })
-  })
+  it.effect('the control: a round that spoke never pauses the goal', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.rounds({ agent, rounds: [1, 2, 3, 4, 5, 6, 7, 8], content: [{ type: 'text', text: 'progress' }] })
+      expect(phaseOf(f, agent)).toBe('active')
+    }),
+  )
 
-  it('counts a round whose prompt is followed by a runtime-context snapshot and whose turn failed empty', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
+  it.effect('the control: empty turns that are not goal rounds never pause the goal', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent, rounds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prompt: () => 'a human typed something' })
+      expect(phaseOf(f, agent)).toBe('active')
+    }),
+  )
 
-    // The shape AI Accounts produces: DSH appends its runtime-context snapshot after the round prompt, and an empty
-    // completion is retried as EMPTY_RESPONSE until the turn fails, with no assistant/message at all.
-    for (const round of [1, 2, 3]) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }], source: { kind: 'goal', round } } })
-      dispatch({
-        type: 'user/message',
-        data: {
-          content: [{ type: 'text', text: 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.' }],
-          source: { kind: 'runtime-context' },
-        },
-      })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'error', error: { code: 'EMPTY_RESPONSE', message: 'no content' } } } })
-    }
+  it.effect('a tool-only round counts as progress', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.rounds({ agent, rounds: [1, 2, 3, 4, 5, 6], content: [{ type: 'tool-call', id: 'call-1', name: 'bash', arguments: {} }] })
+      expect(phaseOf(f, agent)).toBe('active')
+    }),
+  )
 
-    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
-  })
+  it.effect('honours a configured threshold of two', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ stallThreshold: 2 })
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent, rounds: [1, 2] })
+      yield* waitForPhase({ f, agent, phase: 'paused' })
+    }),
+  )
 
-  it('the control: two empty rounds are not enough', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
+  it.effect('ignores an agent with no goal', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(false))
+      f.emptyRounds({ agent, rounds: [1, 2, 3] })
+      expect(phaseOf(f, agent)).toBeUndefined()
+    }),
+  )
 
-    for (const round of [1, 2]) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [] } } })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
+  it.effect('does not pause a goal that is not active', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      const goal = f.host.ctx.goals.get(agent)
+      if (goal === undefined) throw new Error('the fixture goal was not created')
+      const paused = f.host.ctx.goals.pause(agent, { id: goal.id, revision: goal.revision })
+      f.emptyRounds({ agent, rounds: [1, 2, 3, 4] })
+      expect(f.host.ctx.goals.get(agent)).toMatchObject({ phase: 'paused', revision: paused.revision })
+    }),
+  )
 
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('the control: a round that spoke never pauses the goal', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
-
-    for (let round = 1; round <= 8; round += 1) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'progress' }] } } })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('the control: empty turns that are not goal rounds never pause the goal', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
-
-    for (let turn = 1; turn <= 10; turn += 1) {
-      dispatch({ type: 'turn/start', data: { turn } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: 'a human typed something' }] } })
-      dispatch({ type: 'step/start', data: { turn, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [] } } })
-      dispatch({ type: 'turn/end', data: { turn, reason: { kind: 'completed' } } })
-    }
-
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('a tool-only round counts as progress', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin)
-
-    for (let round = 1; round <= 6; round += 1) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [{ type: 'tool-call', name: 'bash' }] } } })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('honours a configured threshold of two', async () => {
-    const plugin = await loadPlugin()
-    const { pause, dispatch } = startHarness(plugin, { stallThreshold: 2 })
-
-    for (const round of [1, 2]) {
-      dispatch({ type: 'turn/start', data: { turn: round } })
-      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
-      dispatch({ type: 'assistant/message', data: { message: { content: [] } } })
-      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
-  })
-
-  it('ignores an agent with no goal', async () => {
-    const plugin = await loadPlugin()
-    const pause = vi.fn()
-    const agent = { id: 'agent-1', session: { id: 'session-1' } }
-    const listeners = new Map<string, SessionEventListener>()
-    const ctx: StubContext = {
-      ...bindableContext(listeners),
-      agents: { get: () => agent },
-      goals: { get: () => undefined, pause },
-      logger: { warn: vi.fn() },
-    }
-    plugin.apply(ctx, {})
-
-    for (const round of [1, 2, 3]) {
-      listeners.get('session/event')?.(agent.session, { type: 'turn/start', data: { turn: round } })
-      listeners.get('session/event')?.(agent.session, { type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      listeners.get('session/event')?.(agent.session, { type: 'step/start', data: { turn: round, step: 1 } })
-      listeners.get('session/event')?.(agent.session, { type: 'assistant/message', data: { message: { content: [] } } })
-      listeners.get('session/event')?.(agent.session, { type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('does not pause a goal that is not active', async () => {
-    const plugin = await loadPlugin()
-    const pause = vi.fn()
-    const agent = { id: 'agent-1', session: { id: 'session-1' } }
-    const listeners = new Map<string, SessionEventListener>()
-    const ctx: StubContext = {
-      ...bindableContext(listeners),
-      agents: { get: () => agent },
-      goals: { get: () => ({ id: 'goal-1', revision: 4, phase: 'paused' }), pause },
-      logger: { warn: vi.fn() },
-    }
-    plugin.apply(ctx, {})
-
-    for (const round of [1, 2, 3, 4]) {
-      listeners.get('session/event')?.(agent.session, { type: 'turn/start', data: { turn: round } })
-      listeners.get('session/event')?.(agent.session, { type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      listeners.get('session/event')?.(agent.session, { type: 'step/start', data: { turn: round, step: 1 } })
-      listeners.get('session/event')?.(agent.session, { type: 'assistant/message', data: { message: { content: [] } } })
-      listeners.get('session/event')?.(agent.session, { type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    expect(pause).not.toHaveBeenCalled()
-  })
-
-  it('a pause rejection is logged, not thrown at the session loop', async () => {
-    const plugin = await loadPlugin()
-    const agent = { id: 'agent-1', session: { id: 'session-1' } }
-    const warn = vi.fn()
-    const listeners = new Map<string, SessionEventListener>()
-    const ctx: StubContext = {
-      ...bindableContext(listeners),
-      agents: { get: () => agent },
-      goals: {
-        get: () => ({ id: 'goal-1', revision: 4, phase: 'active' }),
-        pause: () => {
-          throw new Error('GOAL_INVALID_TRANSITION')
-        },
-      },
-      logger: { warn },
-    }
-    plugin.apply(ctx, {})
-
-    for (const round of [1, 2, 3]) {
-      listeners.get('session/event')?.(agent.session, { type: 'turn/start', data: { turn: round } })
-      listeners.get('session/event')?.(agent.session, { type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }] } })
-      listeners.get('session/event')?.(agent.session, { type: 'step/start', data: { turn: round, step: 1 } })
-      listeners.get('session/event')?.(agent.session, { type: 'assistant/message', data: { message: { content: [] } } })
-      listeners.get('session/event')?.(agent.session, { type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
-    }
-
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not pause stalled goal'), 'goal-1', expect.anything()))
-  })
+  it.effect('a pause rejection is logged, not thrown at the session loop', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const gone = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent: gone.agent, rounds: [1, 2, 3] })
+      // The agent leaves before the queued pause runs, so the goal service refuses it.
+      yield* Effect.promise(() => gone.dispose())
+      const { agent } = yield* Effect.promise(() => f.createAgent(true))
+      f.emptyRounds({ agent, rounds: [1, 2, 3] })
+      yield* waitForPhase({ f, agent, phase: 'paused' })
+    }),
+  )
 })

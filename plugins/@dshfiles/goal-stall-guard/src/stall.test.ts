@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Config } from './host.js'
+import plugin from './host.js'
 import { DEFAULT_STALL_POLICY, goalRoundFrom, isGoalOpeningPrompt, StallDetector } from './stall.js'
 
 const roundPrompt = (round: number, total = 256): string =>
@@ -115,7 +115,9 @@ describe('StallDetector', () => {
 })
 
 const decodeConfig = async (input: unknown) => {
-  const result = await Config['~standard'].validate(input)
+  const config = plugin.Config
+  if (config === undefined) throw new Error('the plugin publishes no Config schema')
+  const result = await config['~standard'].validate(input)
   if (result.issues !== undefined) throw new Error(result.issues.map(issue => issue.message).join('; '))
   return result.value
 }
