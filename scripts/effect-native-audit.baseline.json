@@ -118,16 +118,16 @@
   },
   "@dshfiles/apply-patch": {
     "layerEmpty": 0,
-    "promiseAdapters": 5,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 1,
-    "syncDecodeInEffect": 1
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/attachment-gallery": {
     "layerEmpty": 0,
@@ -274,15 +274,28 @@
   },
   "@dshfiles/html-render": {
     "layerEmpty": 0,
-    "promiseAdapters": 2,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 3,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 1,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/jj-cli": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "causelessErrors": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
   "@dshfiles/jj-integration": {
@@ -508,13 +521,13 @@
   },
   "@dshfiles/pulls-review": {
     "layerEmpty": 0,
-    "promiseAdapters": 2,
+    "promiseAdapters": 0,
     "moduleState": 0,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 1,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -735,10 +748,10 @@
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 1,
-    "syncDecodeInEffect": 1
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/traces": {
     "layerEmpty": 0,

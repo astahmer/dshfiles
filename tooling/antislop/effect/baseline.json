@@ -3,15 +3,8 @@
     "plugins/@dshfiles/agent-questions/src/host.ts": 2,
     "plugins/@dshfiles/agent-questions/src/keyed-effect-lock.ts": 1,
     "plugins/@dshfiles/agent-questions/src/service.ts": 1,
-    "plugins/@dshfiles/apply-patch/src/patch-tool.ts": 1,
-    "plugins/@dshfiles/goal-stall-guard/src/goal-continuation.ts": 2,
-    "plugins/@dshfiles/html-render/src/host.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
-    "plugins/@dshfiles/mcp-endpoint/src/mcp-server.ts": 1,
-    "plugins/@dshfiles/tool-search/src/host.ts": 1
-  },
-  "effect-antislop(no-effect-context-reprovide)": {
-    "plugins/@dshfiles/html-render/src/host.ts": 1
+    "plugins/@dshfiles/mcp-endpoint/src/mcp-server.ts": 1
   },
   "effect-migration(effect-span-name-format)": {
     "plugins/@dshfiles/mcp-endpoint/src/host.ts": 1,
@@ -33,7 +26,6 @@
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 4,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
-    "plugins/@dshfiles/pulls-review/src/host.ts": 2,
     "plugins/@dshfiles/session-search/src/host.ts": 4,
     "plugins/@dshfiles/session-undo/src/host.ts": 3,
     "plugins/@dshfiles/usage/src/host.ts": 3,
@@ -55,7 +47,6 @@
     "plugins/@dshfiles/mcp-endpoint/src/host.ts": 4,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
     "plugins/@dshfiles/session-search/src/host.ts": 1,
-    "plugins/@dshfiles/tool-search/src/host.ts": 1,
     "plugins/@dshfiles/usage/src/host.ts": 8
   },
   "effect-migration(no-host-child-process)": {
@@ -105,7 +96,6 @@
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
     "plugins/@dshfiles/preview/src/host.ts": 1,
     "plugins/@dshfiles/project-checks/src/managed-process.ts": 1,
-    "plugins/@dshfiles/pulls-review/src/jj.ts": 1,
     "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.ts": 1,
     "plugins/@dshfiles/session-search/src/worker-client.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 2,

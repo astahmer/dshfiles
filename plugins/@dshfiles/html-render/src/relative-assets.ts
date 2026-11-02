@@ -103,6 +103,7 @@ const inline = Effect.fn('html assets inline')(function* <E, R>(input: {
   let budget = input.maxBytes - Buffer.byteLength(input.html, 'utf8')
   const parts: string[] = []
   let cursor = 0
+  // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each read spends the shared inlining budget, so reads run in page order
   for (const match of input.html.matchAll(ASSET_TAG)) {
     const tag = (match[1] ?? '').toLowerCase()
     const asset = assetKind(tag, attributesOf(match[2] ?? ''))
