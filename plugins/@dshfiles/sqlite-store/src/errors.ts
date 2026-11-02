@@ -25,6 +25,7 @@ export class SqliteStoreVersionUnsupported extends Schema.TaggedError<SqliteStor
   source: Schema.Literals(['user-version', 'migrations']),
   foundVersion: Schema.Int,
   supportedVersion: Schema.Int,
+  cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return `The SQLite store ${this.filename} is at ${this.source} ${String(this.foundVersion)}, newer than the ${String(this.supportedVersion)} this build knows; update the plugin that owns it.`
