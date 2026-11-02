@@ -1,7 +1,6 @@
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
-import { LoopbackSchema } from './schema.js'
 
 const portSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535))
 const activePortSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535))
@@ -59,4 +58,4 @@ export type NetworkSnapshot = typeof networkSnapshotSchema.Type
 export type NetworkAddress = { -readonly [Key in keyof NetworkSnapshot['addresses'][number]]: NetworkSnapshot['addresses'][number][Key] }
 
 /** The client decodes every snapshot at the boundary, so a malformed Host reply never reaches the form. */
-export const decodeNetworkSnapshot = (value: unknown): NetworkSnapshot => LoopbackSchema.decode(networkSnapshotSchema, value)
+export const decodeNetworkSnapshot = (value: unknown): NetworkSnapshot => Schema.decodeUnknownSync(networkSnapshotSchema)(value)
