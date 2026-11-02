@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 export const processCategoryValues = ['dev-server', 'tests', 'build', 'dsh', 'services', 'other'] as const
 export type ProcessCategory = (typeof processCategoryValues)[number]
@@ -17,108 +17,116 @@ export type MemoryPressure = (typeof memoryPressureValues)[number]
 const processOriginValues = ['job', 'host', 'detached'] as const
 export type ProcessOrigin = (typeof processOriginValues)[number]
 
-const processTreeSchema = z.object({
-  pid: z.number().int().positive(),
-  startedAt: z.number().int().nonnegative(),
-  name: z.string().max(120),
-  command: z.string().max(400),
-  cwd: z.string().max(1024),
-  bytes: z.number().nonnegative(),
-  processCount: z.number().int().positive(),
-  origin: z.enum(processOriginValues),
-  category: z.enum(processCategoryValues),
-  jobId: z.string().max(128).nullable(),
-  sessionId: z.string().max(128).nullable(),
-  ownerRunning: z.boolean().default(false).describe('A live job whose owning Session is mid-turn; a bulk stop leaves it to that thread’s own Stop.'),
-})
-export type ProcessTree = z.infer<typeof processTreeSchema>
+const positiveInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
+const nonNegativeInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const nonNegativeNumber = Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))
+const limitedString = (maxLength: number) => Schema.String.check(Schema.isMaxLength(maxLength))
 
-const workspaceThreadSchema = z.object({
-  sessionId: z.string().max(128),
-  title: z.string().max(300).nullable(),
-  createdAt: z.number().nullable().optional(),
-  running: z.boolean(),
-  updatedAt: z.number().nullable(),
+const processTreeSchema = Schema.Struct({
+  pid: positiveInt,
+  startedAt: nonNegativeInt,
+  name: limitedString(120),
+  command: limitedString(400),
+  cwd: limitedString(1024),
+  bytes: nonNegativeNumber,
+  processCount: positiveInt,
+  origin: Schema.Literals(processOriginValues),
+  category: Schema.Literals(processCategoryValues),
+  jobId: Schema.NullOr(limitedString(128)),
+  sessionId: Schema.NullOr(limitedString(128)),
+  ownerRunning: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+    Schema.annotate({ description: 'A live job whose owning Session is mid-turn; a bulk stop leaves it to that thread’s own Stop.' }),
+  ),
 })
-export type WorkspaceThread = z.infer<typeof workspaceThreadSchema>
+export type ProcessTree = typeof processTreeSchema.Type
+
+const workspaceThreadSchema = Schema.Struct({
+  sessionId: limitedString(128),
+  title: Schema.NullOr(limitedString(300)),
+  createdAt: Schema.optional(Schema.NullOr(Schema.Number)),
+  running: Schema.Boolean,
+  updatedAt: Schema.NullOr(Schema.Number),
+})
+export type WorkspaceThread = typeof workspaceThreadSchema.Type
 
 /** `project` is a registered workspace; `workspace` a thread or jj sibling checkout of one; `elsewhere` collects Host children outside every workspace. */
 const workspaceGroupKindValues = ['project', 'workspace', 'elsewhere'] as const
 
-const workspaceGroupSchema = z.object({
-  key: z.string().max(1024),
-  title: z.string().max(300),
-  path: z.string().max(1024),
-  kind: z.enum(workspaceGroupKindValues),
-  project: z.string().max(300).nullable(),
-  bytes: z.number().nonnegative(),
-  detachedBytes: z.number().nonnegative(),
-  detachedCount: z.number().int().nonnegative(),
-  threadCount: z.number().int().nonnegative(),
-  threads: z.array(workspaceThreadSchema).max(20),
-  trees: z.array(processTreeSchema).max(200),
+const workspaceGroupSchema = Schema.Struct({
+  key: limitedString(1024),
+  title: limitedString(300),
+  path: limitedString(1024),
+  kind: Schema.Literals(workspaceGroupKindValues),
+  project: Schema.NullOr(limitedString(300)),
+  bytes: nonNegativeNumber,
+  detachedBytes: nonNegativeNumber,
+  detachedCount: nonNegativeInt,
+  threadCount: nonNegativeInt,
+  threads: Schema.Array(workspaceThreadSchema).check(Schema.isMaxLength(20)),
+  trees: Schema.Array(processTreeSchema).check(Schema.isMaxLength(200)),
 })
-export type WorkspaceGroup = z.infer<typeof workspaceGroupSchema>
+export type WorkspaceGroup = typeof workspaceGroupSchema.Type
 
-const nodeProcessSampleSchema = z.object({
-  pid: z.number().int().positive(),
-  rssBytes: z.number().nonnegative(),
+const nodeProcessSampleSchema = Schema.Struct({
+  pid: positiveInt,
+  rssBytes: nonNegativeNumber,
 })
-export type NodeProcessSample = z.infer<typeof nodeProcessSampleSchema>
+export type NodeProcessSample = typeof nodeProcessSampleSchema.Type
 
-const nodeProcessOriginSchema = z.object({
-  name: z.string().max(120),
-  source: z.string().max(120).nullable(),
-  cwd: z.string().max(1024).nullable(),
-  processCount: z.number().int().nonnegative(),
-  rssBytes: z.number().nonnegative(),
-  samples: z.array(nodeProcessSampleSchema).max(5),
+const nodeProcessOriginSchema = Schema.Struct({
+  name: limitedString(120),
+  source: Schema.NullOr(limitedString(120)),
+  cwd: Schema.NullOr(limitedString(1024)),
+  processCount: nonNegativeInt,
+  rssBytes: nonNegativeNumber,
+  samples: Schema.Array(nodeProcessSampleSchema).check(Schema.isMaxLength(5)),
 })
-export type NodeProcessOrigin = z.infer<typeof nodeProcessOriginSchema>
+export type NodeProcessOrigin = typeof nodeProcessOriginSchema.Type
 
-const nodeProcessSummarySchema = z.object({
-  processCount: z.number().int().nonnegative(),
-  rssBytes: z.number().nonnegative(),
-  truncated: z.boolean(),
-  origins: z.array(nodeProcessOriginSchema).max(100),
+const nodeProcessSummarySchema = Schema.Struct({
+  processCount: nonNegativeInt,
+  rssBytes: nonNegativeNumber,
+  truncated: Schema.Boolean,
+  origins: Schema.Array(nodeProcessOriginSchema).check(Schema.isMaxLength(100)),
 })
-export type NodeProcessSummary = z.infer<typeof nodeProcessSummarySchema>
+export type NodeProcessSummary = typeof nodeProcessSummarySchema.Type
 
-export const memorySnapshotSchema = z.object({
-  takenAt: z.number(),
-  supported: z.boolean(),
-  pressure: z.enum(memoryPressureValues),
-  systemBytes: z.number().nonnegative(),
-  hostBytes: z.number().nonnegative(),
-  trackedBytes: z.number().nonnegative(),
-  detachedBytes: z.number().nonnegative(),
-  detachedCount: z.number().int().nonnegative(),
-  categoryBytes: z.record(z.enum(processCategoryValues), z.number().nonnegative()),
-  groups: z.array(workspaceGroupSchema).max(200),
-  nodeProcesses: nodeProcessSummarySchema.optional(),
+export const memorySnapshotSchema = Schema.Struct({
+  takenAt: Schema.Number,
+  supported: Schema.Boolean,
+  pressure: Schema.Literals(memoryPressureValues),
+  systemBytes: nonNegativeNumber,
+  hostBytes: nonNegativeNumber,
+  trackedBytes: nonNegativeNumber,
+  detachedBytes: nonNegativeNumber,
+  detachedCount: nonNegativeInt,
+  categoryBytes: Schema.Record(Schema.Literals(processCategoryValues), nonNegativeNumber),
+  groups: Schema.Array(workspaceGroupSchema).check(Schema.isMaxLength(200)),
+  nodeProcesses: Schema.optional(nodeProcessSummarySchema),
 })
-export type MemorySnapshot = z.infer<typeof memorySnapshotSchema>
+export type MemorySnapshot = typeof memorySnapshotSchema.Type
 
-export const pressureSnapshotSchema = z.object({
-  takenAt: z.number(),
-  supported: z.boolean(),
-  pressure: z.enum(memoryPressureValues),
-  systemBytes: z.number().nonnegative(),
+export const pressureSnapshotSchema = Schema.Struct({
+  takenAt: Schema.Number,
+  supported: Schema.Boolean,
+  pressure: Schema.Literals(memoryPressureValues),
+  systemBytes: nonNegativeNumber,
 })
-export type PressureSnapshot = z.infer<typeof pressureSnapshotSchema>
+export type PressureSnapshot = typeof pressureSnapshotSchema.Type
 
-export const stopTargetSchema = z
-  .object({
-    pid: z.number().int().positive().describe('Root pid of a process tree from the snapshot.'),
-    startedAt: z.number().int().nonnegative().describe('The tree’s startedAt from the snapshot; a recycled pid with another start time is refused.'),
-  })
-  .strict()
-export type StopTarget = z.infer<typeof stopTargetSchema>
-
-export const stopResultSchema = z.object({
-  stopped: z.number().int().nonnegative(),
-  viaJob: z.number().int().nonnegative(),
-  missing: z.number().int().nonnegative(),
-  refused: z.number().int().nonnegative(),
+export const stopTargetSchema = Schema.Struct({
+  pid: positiveInt.pipe(Schema.annotate({ description: 'Root pid of a process tree from the snapshot.' })),
+  startedAt: nonNegativeInt.pipe(
+    Schema.annotate({ description: 'The tree’s startedAt from the snapshot; a recycled pid with another start time is refused.' }),
+  ),
 })
-export type StopResult = z.infer<typeof stopResultSchema>
+export type StopTarget = typeof stopTargetSchema.Type
+
+export const stopResultSchema = Schema.Struct({
+  stopped: nonNegativeInt,
+  viaJob: nonNegativeInt,
+  missing: nonNegativeInt,
+  refused: nonNegativeInt,
+})
+export type StopResult = typeof stopResultSchema.Type

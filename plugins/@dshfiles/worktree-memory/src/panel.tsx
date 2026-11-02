@@ -471,7 +471,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
 
   const stop = useMutation({
     mutationFn: async (trees: readonly ProcessTree[]) => {
-      const total: StopResult = { stopped: 0, viaJob: 0, missing: 0, refused: 0 }
+      const total = { stopped: 0, viaJob: 0, missing: 0, refused: 0 }
       for (let index = 0; index < trees.length; index += STOP_BATCH_SIZE) {
         const result = await api.stop({
           targets: trees.slice(index, index + STOP_BATCH_SIZE).map(tree => ({ pid: tree.pid, startedAt: tree.startedAt })),

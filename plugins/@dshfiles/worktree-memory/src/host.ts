@@ -9,7 +9,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { defineHost } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import { worktreeMemoryApi } from './api.js'
 import { nodeProcessCwdPids, summarizeNodeProcesses } from './node-process-summary.js'
 import { ProcessTable, type KnownSession, type ProcessRow } from './process-table.js'
@@ -134,8 +134,8 @@ const readPressure = async (context: Context): Promise<MemoryPressure> => {
   return 'unknown'
 }
 
-const listedTitleSchema = z.string().min(1)
-const listedCreationSchema = z.object({ createdAt: z.number().optional() })
+const listedTitleSchema = Schema.String.check(Schema.isMinLength(1))
+const listedCreationSchema = Schema.Struct({ createdAt: Schema.optional(Schema.Number) })
 
 const readSessions = async (context: Context): Promise<readonly KnownSession[] | undefined> => {
   const controller = context.get('sessionController')
@@ -145,11 +145,11 @@ const readSessions = async (context: Context): Promise<readonly KnownSession[] |
   return listed.items.map(summary => ({
     sessionId: summary.sessionId,
     cwd: summary.cwd ?? null,
-    createdAt: listedCreationSchema.safeParse(summary).data?.createdAt ?? null,
+    createdAt: Option.getOrNull(Schema.decodeUnknownOption(listedCreationSchema)(summary))?.createdAt ?? null,
     running: summary.running,
     updatedAt: summary.updatedAt ?? null,
     // The list serves each title from its cached projections; the per-Session title read decoded whole logs.
-    title: listedTitleSchema.safeParse(summary.projections?.values.title).data ?? null,
+    title: Option.getOrNull(Schema.decodeUnknownOption(listedTitleSchema)(summary.projections?.values.title)) ?? null,
   }))
 }
 
