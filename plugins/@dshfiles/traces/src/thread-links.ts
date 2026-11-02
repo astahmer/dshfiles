@@ -1,4 +1,5 @@
 import { ChatFocusModel, type ChatFocus } from '@dshfiles/chat/chat-focus'
+import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { TracesSchema } from './schema.js'
 import type { AttributeValue } from './types.js'
@@ -68,8 +69,8 @@ const targetOf = (spans: readonly LinkableSpan[], spanId: string): ThreadTarget 
     seen.add(span.spanId)
     const link = linkAttributesOf(span)
     if (link.turn === undefined || link.sessionId === undefined) continue
-    const focus = ChatFocusModel.schema.safeParse({ turn: link.turn, step: link.step, toolCallId: link.toolCallId })
-    return { sessionId: link.sessionId, focus: focus.success ? focus.data : null }
+    const focus = Schema.decodeUnknownOption(ChatFocusModel.schema)({ turn: link.turn, step: link.step, toolCallId: link.toolCallId })
+    return { sessionId: link.sessionId, focus: Option.isSome(focus) ? focus.value : null }
   }
   return fallbackSession === undefined ? null : { sessionId: fallbackSession, focus: null }
 }
