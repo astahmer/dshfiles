@@ -275,6 +275,7 @@ edge, and restore exact-message assertions.
 | F8  | (done) Effect's default `ConfigProvider.fromEnv` merges `import.meta.env` after `process.env`; under vitest that snapshot overrides per-test `DSH_HOME`, so `Config.*` resolved the live `~/.dsh` (multi-host tests wrote live `directory.json`, repaired). DshxPlugin.make must provide `fromEnvRecord(process.env)` | dshx2          |
 | F9  | session-search index still on `DatabaseSync`; moving it onto sqlite-store needs a copy-based proof on the 3.1 GB live index                                                                                                                                                                                           | follow-up lane |
 | F10 | memory host-loop-freezes bench has no before/after numbers (the before run measured the stock engine indexing a 2 GB backlog)                                                                                                                                                                                         | Phase 6 perf   |
+| F11 | Full-repo `turbo run test` at `tqlxnmvy` (1099+ plugin tests): only `jj-integration/src/host-background-work.integration.test.ts` failed, and it passes 6/6 alone (28 s) — real-timer assertions flake under parallel load, not a regression. Re-run it alone before blaming a change                                 | Phase 6        |
 
 ## What this does not do
 
