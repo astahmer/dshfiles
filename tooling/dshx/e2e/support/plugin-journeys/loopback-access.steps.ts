@@ -14,6 +14,7 @@ import {
   restartScratchProfileInBrowser,
   visitIsolatedPluginProfile,
 } from '../steps.js'
+import * as Schema from 'effect/Schema'
 import { createDshxApiCaller } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { ApiProtocolModel } from '../../../packages/dshx/src/api/common.js'
@@ -99,7 +100,7 @@ Then('LAN and localhost retain native authentication and browser-origin fencing'
       expect(index.status).toBe(200)
       expect(await index.text()).toContain('__DSH_BOOT__')
       const call = createDshxApiCaller({ origin: url.origin, cookie, packageId, apiId: 'loopback-access', version: 1 })
-      const status = loopbackAccessStatusSchema.parse(await call('status', undefined, AbortSignal.timeout(10_000)))
+      const status = Schema.decodeUnknownSync(loopbackAccessStatusSchema)(await call('status', undefined, AbortSignal.timeout(10_000)))
       expect(status.state).toBe('forwarding')
       expect(status.upstreamOrigin).toBe(lanUrl.origin)
       expect(status.localhostOrigin).toBe(localUrl.origin)
@@ -209,7 +210,7 @@ Then('network choices are staged safely and loaded at the next isolated startup'
   const cookie = (await page.context().cookies(profile.url)).map(item => `${item.name}=${item.value}`).join('; ')
   const origin = new URL(profile.url).origin
   const call = createDshxApiCaller({ origin, cookie, packageId, apiId: 'loopback-access', version: 1 })
-  const read = async () => networkSnapshotSchema.parse(await call('network', undefined, AbortSignal.timeout(10_000)))
+  const read = async () => Schema.decodeUnknownSync(networkSnapshotSchema)(await call('network', undefined, AbortSignal.timeout(10_000)))
   const before = await read()
   expect(before.integration).toBe('managed')
   expect(before.writable).toBe(true)
@@ -283,7 +284,7 @@ Then('network choices are staged safely and loaded at the next isolated startup'
     await restartScratchProfileInBrowser(page)
     const nextCookie = (await page.context().cookies(profile.url)).map(item => `${item.name}=${item.value}`).join('; ')
     const nextCall = createDshxApiCaller({ origin, cookie: nextCookie, packageId, apiId: 'loopback-access', version: 1 })
-    const after = networkSnapshotSchema.parse(await nextCall('network', undefined, AbortSignal.timeout(10_000)))
+    const after = Schema.decodeUnknownSync(networkSnapshotSchema)(await nextCall('network', undefined, AbortSignal.timeout(10_000)))
     expect(after.pendingRestart).toBe(false)
     expect(after.active.host).toBe(address.address)
     expect(after.active.localhostEnabled).toBe(true)
