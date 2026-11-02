@@ -1,5 +1,7 @@
-import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { StorageDomain, type StorageDomainWriteFailed } from '@dshfiles/dshx/effect/storage-domain'
+import { Clock, Context, Effect, Layer, Ref } from 'effect'
 import { agentSchema, agentThreadSchema, Agents, MAX_AGENTS, MAX_THREADS_PER_AGENT, type Agent, type AgentDraft, type AgentThread } from './agent.js'
 
 export const agentsDomain = defineDomain({
@@ -10,9 +12,6 @@ export const agentsDomain = defineDomain({
     threads: { valueSchema: zodSchemaFromEffect(agentThreadSchema), __key: 'threads' },
   },
 })
-
-export type AgentTable = KvTable<string, Agent>
-export type AgentThreadTable = KvTable<string, AgentThread>
 
 export interface AgentSnapshot {
   readonly revision: number
@@ -28,122 +27,141 @@ export type AgentRemoveResult =
   | { readonly kind: 'built-in'; readonly revision: number; readonly agents: Agent[] }
   | { readonly kind: 'missing'; readonly revision: number; readonly agents: Agent[] }
 
-export interface AgentsStore {
-  snapshot(): AgentSnapshot
-  resolve(handle: string): Agent | null
-  save(draft: AgentDraft): Promise<AgentSaveResult>
-  remove(handle: string): Promise<AgentRemoveResult>
-  recordUse(handle: string, thread?: { readonly sessionId: string; readonly title: string }): Promise<AgentSnapshot>
-  threads(handle: string): AgentThread[]
-  threadAgent(sessionId: string): Agent | null
-  flush(): Promise<void>
+interface RegistryState {
+  readonly revision: number
+  readonly records: ReadonlyMap<string, Agent>
+  readonly history: ReadonlyMap<string, AgentThread>
 }
 
-/** Monotone across restarts: revisions outrank every value a reader already saw. */
-const nextRevision = (current: number, now: number): number => Math.max(current + 1, now)
+const snapshotOf = (state: RegistryState): AgentSnapshot => ({ revision: state.revision, agents: Agents.order(state.records.values()) })
 
-const createAgentsStore = ({
-  table,
-  threads,
-  now = Date.now,
-  reportError = (error: unknown) =>
-    console.error('Agent registry write failed', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
-}: {
-  readonly table: AgentTable
-  readonly threads: AgentThreadTable
-  readonly now?: () => number
-  readonly reportError?: (error: unknown) => void
-}): AgentsStore => {
-  const records = new Map<string, Agent>(table.entries())
-  const history = new Map<string, AgentThread>(threads.entries())
-  // The built-in `@dsh` agent exists without setup; an edit to it survives, so it is only seeded while absent.
-  const seeded = Agents.builtIn(now())
-  const seededNow = !records.has(seeded.handle)
-  if (seededNow) records.set(seeded.handle, seeded)
-  let revision = Math.max(now(), ...[...records.values()].map(agent => agent.updatedAt))
-  let writes: Promise<void> = Promise.resolve()
+/** Newest first, and only the rows the panel shows: one agent's history is bounded at its dispatch end. */
+const threadsOf = (history: ReadonlyMap<string, AgentThread>, handle: string, limit = MAX_THREADS_PER_AGENT): AgentThread[] =>
+  [...history.values()]
+    .filter(thread => thread.handle === handle)
+    .sort((left, right) => right.startedAt - left.startedAt)
+    .slice(0, limit)
 
-  const enqueue = (operation: () => Promise<void>): Promise<void> => {
-    const result = writes.then(operation).then(() => undefined)
-    writes = result.catch(() => undefined)
-    return result
+const agentOfThread = (state: RegistryState, sessionId: string): Agent | null => {
+  const thread = state.history.get(sessionId)
+  return thread === undefined ? null : (state.records.get(thread.handle) ?? null)
+}
+
+/** The durable agent registry: rows live in the `agents` storage domain, reads come from the in-memory copy. */
+export class AgentsRegistry extends Context.Service<
+  AgentsRegistry,
+  {
+    readonly snapshot: Effect.Effect<AgentSnapshot>
+    readonly resolve: (handle: string) => Effect.Effect<Agent | null>
+    readonly save: (draft: AgentDraft) => Effect.Effect<AgentSaveResult>
+    readonly remove: (handle: string) => Effect.Effect<AgentRemoveResult>
+    readonly recordUse: (handle: string, thread?: { readonly sessionId: string; readonly title: string }) => Effect.Effect<AgentSnapshot>
+    readonly threads: (handle: string) => Effect.Effect<AgentThread[]>
+    readonly threadAgent: (sessionId: string) => Effect.Effect<Agent | null>
+    /** The same read as `threadAgent`, for a synchronous Host guard that cannot run an Effect. */
+    readonly threadAgentNow: (sessionId: string) => Agent | null
   }
+>()('@dshfiles/agents/AgentsRegistry') {
+  static readonly layer = Layer.effect(
+    AgentsRegistry,
+    Effect.gen(function* () {
+      const storage = yield* StorageDomain
+      const domain = yield* storage.open(agentsDomain)
+      const agentRows = domain.table('agents')
+      const threadRows = domain.table('threads')
+      const persist = (write: Effect.Effect<unknown, StorageDomainWriteFailed>) =>
+        write.pipe(Effect.catchTag('StorageDomainWriteFailed', error => Effect.logError('Agent registry write failed', error)))
 
-  // The built-in agent is a real row, so a store opened after this one does not depend on seeding again.
-  if (seededNow) void enqueue(() => table.put(seeded.handle, seeded)).catch(reportError)
-
-  const snapshot = (): AgentSnapshot => ({ revision, agents: Agents.order(records.values()) })
-
-  /** Newest first, and only the rows the panel shows: one agent's history is bounded at its dispatch end. */
-  const threadsOf = (handle: string, limit = MAX_THREADS_PER_AGENT): AgentThread[] =>
-    [...history.values()]
-      .filter(thread => thread.handle === handle)
-      .sort((left, right) => right.startedAt - left.startedAt)
-      .slice(0, limit)
-
-  return {
-    snapshot,
-    resolve: handle => records.get(handle) ?? null,
-    save: async draft => {
-      const existing = records.get(draft.handle)
-      if (existing === undefined && records.size >= MAX_AGENTS) return { kind: 'limit', ...snapshot() }
-      const at = now()
-      const agent: Agent = {
-        ...draft,
-        builtIn: existing?.builtIn ?? false,
-        createdAt: existing?.createdAt ?? at,
-        updatedAt: at,
-        lastUsedAt: existing?.lastUsedAt ?? null,
-        threadCount: existing?.threadCount ?? 0,
+      const openedAt = yield* Clock.currentTimeMillis
+      const records = new Map(yield* agentRows.entries)
+      // The built-in `@dsh` agent exists without setup; an edit to it survives, so it is only seeded while absent.
+      const seeded = Agents.builtIn(openedAt)
+      if (!records.has(seeded.handle)) {
+        records.set(seeded.handle, seeded)
+        yield* persist(agentRows.put(seeded.handle, seeded))
       }
-      records.set(agent.handle, agent)
-      revision = nextRevision(revision, at)
-      await enqueue(() => table.put(agent.handle, agent)).catch(reportError)
-      return { kind: 'applied', ...snapshot(), agent }
-    },
-    remove: async handle => {
-      const existing = records.get(handle)
-      if (existing === undefined) return { kind: 'missing', ...snapshot() }
-      if (existing.builtIn) return { kind: 'built-in', ...snapshot() }
-      records.delete(handle)
-      const orphaned = [...history.values()].filter(thread => thread.handle === handle)
-      for (const thread of orphaned) history.delete(thread.sessionId)
-      revision = nextRevision(revision, now())
-      await enqueue(async () => {
-        await table.delete(handle)
-        for (const thread of orphaned) await threads.delete(thread.sessionId)
-      }).catch(reportError)
-      const current = snapshot()
-      return { kind: 'applied', ...current }
-    },
-    threads: handle => threadsOf(handle),
-    threadAgent: sessionId => {
-      const thread = history.get(sessionId)
-      return thread === undefined ? null : (records.get(thread.handle) ?? null)
-    },
-    recordUse: async (handle, thread) => {
-      const existing = records.get(handle)
-      if (existing === undefined) return snapshot()
-      const at = now()
-      const started: AgentThread | null = thread === undefined ? null : { sessionId: thread.sessionId, handle, title: thread.title, startedAt: at }
-      if (started !== null) history.set(started.sessionId, started)
-      const count = started === null ? existing.threadCount + 1 : threadsOf(handle, Number.POSITIVE_INFINITY).length
-      const agent: Agent = { ...existing, lastUsedAt: at, updatedAt: existing.updatedAt, threadCount: count }
-      records.set(handle, agent)
-      revision = nextRevision(revision, at)
-      const pruned = started === null ? [] : threadsOf(handle, Number.POSITIVE_INFINITY).slice(MAX_THREADS_PER_AGENT)
-      for (const thread of pruned) history.delete(thread.sessionId)
-      await enqueue(async () => {
-        if (started !== null) await threads.put(started.sessionId, started)
-        for (const old of pruned) await threads.delete(old.sessionId)
-        await table.put(handle, agent)
-      }).catch(reportError)
-      return snapshot()
-    },
-    flush: () => writes,
-  }
-}
+      const state = yield* Ref.make<RegistryState>({
+        revision: Math.max(openedAt, ...[...records.values()].map(agent => agent.updatedAt)),
+        records,
+        history: new Map(yield* threadRows.entries),
+      })
 
-export class AgentRegistry {
-  static readonly createStore = createAgentsStore
+      /** Every mutation holds the domain write lock, so it reads and replaces the state without a lost update. Revisions stay monotone across restarts. */
+      const commit = Effect.fnUntraced(function* (next: Omit<RegistryState, 'revision'>, now: number) {
+        return yield* Ref.updateAndGet(state, current => ({ ...next, revision: Math.max(current.revision + 1, now) }))
+      })
+
+      const save = Effect.fn('agents save')(function* (draft: AgentDraft) {
+        const current = yield* Ref.get(state)
+        const existing = current.records.get(draft.handle)
+        if (existing === undefined && current.records.size >= MAX_AGENTS) return { kind: 'limit' as const, ...snapshotOf(current) }
+        const now = yield* Clock.currentTimeMillis
+        const agent: Agent = {
+          ...draft,
+          builtIn: existing?.builtIn ?? false,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          lastUsedAt: existing?.lastUsedAt ?? null,
+          threadCount: existing?.threadCount ?? 0,
+        }
+        const next = yield* commit({ records: new Map(current.records).set(agent.handle, agent), history: current.history }, now)
+        yield* persist(agentRows.put(agent.handle, agent))
+        return { kind: 'applied' as const, ...snapshotOf(next), agent }
+      }, domain.withWriteLock)
+
+      const remove = Effect.fn('agents remove')(function* (handle: string) {
+        const current = yield* Ref.get(state)
+        const existing = current.records.get(handle)
+        if (existing === undefined) return { kind: 'missing' as const, ...snapshotOf(current) }
+        if (existing.builtIn) return { kind: 'built-in' as const, ...snapshotOf(current) }
+        const orphaned = [...current.history.values()].filter(thread => thread.handle === handle)
+        const records = new Map(current.records)
+        records.delete(handle)
+        const history = new Map(current.history)
+        for (const thread of orphaned) history.delete(thread.sessionId)
+        const next = yield* commit({ records, history }, yield* Clock.currentTimeMillis)
+        yield* persist(
+          Effect.gen(function* () {
+            yield* agentRows.delete(handle)
+            for (const thread of orphaned) yield* threadRows.delete(thread.sessionId)
+          }),
+        )
+        return { kind: 'applied' as const, ...snapshotOf(next) }
+      }, domain.withWriteLock)
+
+      const recordUse = Effect.fn('agents record use')(function* (handle: string, thread?: { readonly sessionId: string; readonly title: string }) {
+        const current = yield* Ref.get(state)
+        const existing = current.records.get(handle)
+        if (existing === undefined) return snapshotOf(current)
+        const now = yield* Clock.currentTimeMillis
+        const started: AgentThread | null = thread === undefined ? null : { sessionId: thread.sessionId, handle, title: thread.title, startedAt: now }
+        const history = new Map(current.history)
+        if (started !== null) history.set(started.sessionId, started)
+        const count = started === null ? existing.threadCount + 1 : threadsOf(history, handle, Number.POSITIVE_INFINITY).length
+        const agent: Agent = { ...existing, lastUsedAt: now, threadCount: count }
+        const pruned = started === null ? [] : threadsOf(history, handle, Number.POSITIVE_INFINITY).slice(MAX_THREADS_PER_AGENT)
+        for (const old of pruned) history.delete(old.sessionId)
+        const next = yield* commit({ records: new Map(current.records).set(handle, agent), history }, now)
+        yield* persist(
+          Effect.gen(function* () {
+            if (started !== null) yield* threadRows.put(started.sessionId, started)
+            for (const old of pruned) yield* threadRows.delete(old.sessionId)
+            yield* agentRows.put(handle, agent)
+          }),
+        )
+        return snapshotOf(next)
+      }, domain.withWriteLock)
+
+      return AgentsRegistry.of({
+        snapshot: Effect.map(Ref.get(state), snapshotOf),
+        resolve: handle => Effect.map(Ref.get(state), current => current.records.get(handle) ?? null),
+        save,
+        remove,
+        recordUse,
+        threads: handle => Effect.map(Ref.get(state), current => threadsOf(current.history, handle)),
+        threadAgent: sessionId => Effect.map(Ref.get(state), current => agentOfThread(current, sessionId)),
+        threadAgentNow: sessionId => agentOfThread(Ref.getUnsafe(state), sessionId),
+      })
+    }),
+  )
 }

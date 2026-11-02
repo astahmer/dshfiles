@@ -1,46 +1,42 @@
-import assert from 'node:assert/strict'
-import { test } from 'vitest'
-import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import type { AgentTable, AgentThreadTable } from './store.js'
-import type { Agent, AgentDraft, AgentThread } from './agent.js'
-import { AgentRegistry } from './store.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import { HostContext } from '@dshfiles/dshx/effect'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Effect, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
+import type { AgentDraft } from './agent.js'
+import { AgentsRegistry } from './store.js'
 
-const memoryTable = <Key extends string, Value>(initial: readonly Value[] = [], keyOf: (value: Value) => Key) => {
-  const rows = new Map<Key, Value>(initial.map(value => [keyOf(value), value]))
-  const table: KvTable<Key, Value> = {
-    get: key => rows.get(key),
-    entries: () => rows.entries(),
-    keys: () => rows.keys(),
-    get size() {
-      return rows.size
-    },
-    put: async (key, value) => {
-      rows.set(key, value)
-    },
-    delete: async key => rows.delete(key),
-    update: async (key, change) => {
-      const current = rows.get(key)
-      if (current === undefined) throw new Error(`missing row ${key}`)
-      const next = change(current)
-      rows.set(key, next)
-      return next
-    },
-  }
-  return { rows, table }
-}
+/** A real JSON-backed storage domain facility in a temporary directory, as the Host serves it. */
+const storageHost = Layer.effect(
+  HostContext,
+  Effect.gen(function* () {
+    const root = yield* Effect.acquireRelease(
+      Effect.promise(() => mkdtemp(join(tmpdir(), 'agents-store-'))),
+      directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+    )
+    const host = yield* Effect.acquireRelease(
+      Effect.promise(async () => {
+        const created = await createTestHost()
+        await created.ctx.plugin(Storage)
+        await created.ctx.plugin(StorageJson, { root })
+        await created.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+        return created
+      }),
+      created => Effect.promise(() => created.dispose()),
+    )
+    return HostContext.of({ ctx: host.ctx, packageId: '@dshfiles/agents' })
+  }),
+)
 
-const storeOf = (now: () => number, initial: readonly Agent[] = []) => {
-  const agents = memoryTable<string, Agent>(initial, agent => agent.handle)
-  const threads = memoryTable<string, AgentThread>([], thread => thread.sessionId)
-  const registry = (agentTable: AgentTable, threadTable: AgentThreadTable) =>
-    AgentRegistry.createStore({ table: agentTable, threads: threadTable, now, reportError: () => undefined })
-  return {
-    rows: agents.rows,
-    threadRows: threads.rows,
-    store: registry(agents.table, threads.table),
-    reopen: () => registry(agents.table, threads.table),
-  }
-}
+/** Open the registry for one scope; closing the scope closes the domain, as a plugin unload does. */
+const openRegistry = Effect.map(Layer.build(AgentsRegistry.layer.pipe(Layer.provide(StorageDomain.layer))), services => Context.get(services, AgentsRegistry))
 
 const draftOf = (handle: string): AgentDraft => ({
   handle,
@@ -56,104 +52,149 @@ const draftOf = (handle: string): AgentDraft => ({
   enabled: true,
 })
 
-test('seeds the built-in agent and keeps it out of deletion', async () => {
-  const { store } = storeOf(() => 1_000)
-  assert.deepEqual(
-    store.snapshot().agents.map(agent => agent.handle),
-    ['dsh'],
-  )
-  const removed = await store.remove('dsh')
-  assert.equal(removed.kind, 'built-in')
-  assert.equal(store.resolve('dsh')?.builtIn, true)
-})
+const handlesOf = (snapshot: { readonly agents: readonly { readonly handle: string }[] }) => snapshot.agents.map(agent => agent.handle)
 
-test('saves a new agent with usage metadata and keeps it on update', async () => {
-  const { store } = storeOf(() => 2_000)
-  const saved = await store.save(draftOf('reviewer'))
-  assert.equal(saved.kind, 'applied')
-  assert.equal(saved.agent.createdAt, 2_000)
-  assert.equal(saved.agent.threadCount, 0)
-  assert.equal(saved.agent.builtIn, false)
+describe('AgentsRegistry', () => {
+  it.layer(storageHost)(it => {
+    it.effect('seeds the built-in agent and keeps it out of deletion', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(1_000)
+          const registry = yield* openRegistry
+          expect(handlesOf(yield* registry.snapshot)).toEqual(['dsh'])
+          expect((yield* registry.remove('dsh')).kind).toBe('built-in')
+          expect((yield* registry.resolve('dsh'))?.builtIn).toBe(true)
+        }),
+      ),
+    )
+  })
 
-  const used = await store.recordUse('reviewer')
-  assert.equal(used.revision > saved.revision, true)
+  it.layer(storageHost)(it => {
+    it.effect('saves a new agent with usage metadata and keeps it on update', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(2_000)
+          const registry = yield* openRegistry
+          const saved = yield* registry.save(draftOf('reviewer'))
+          if (saved.kind !== 'applied') return expect.fail('the first agent should be saved')
+          expect(saved.agent).toMatchObject({ createdAt: 2_000, threadCount: 0, builtIn: false })
 
-  const edited = await store.save({ ...draftOf('reviewer'), name: 'Review Bot' })
-  assert.equal(edited.kind, 'applied')
-  assert.equal(edited.agent.name, 'Review Bot')
-  assert.equal(edited.agent.threadCount, 1)
-  assert.equal(edited.agent.createdAt, 2_000)
-})
+          const used = yield* registry.recordUse('reviewer')
+          expect(used.revision).toBeGreaterThan(saved.revision)
 
-test('removes a custom agent and reports a missing one', async () => {
-  const { rows, store } = storeOf(() => 3_000)
-  await store.save(draftOf('reviewer'))
-  assert.equal(rows.size, 2)
+          const edited = yield* registry.save({ ...draftOf('reviewer'), name: 'Review Bot' })
+          if (edited.kind !== 'applied') return expect.fail('the edit should be saved')
+          expect(edited.agent).toMatchObject({ name: 'Review Bot', threadCount: 1, createdAt: 2_000 })
+        }),
+      ),
+    )
+  })
 
-  const removed = await store.remove('reviewer')
-  assert.equal(removed.kind, 'applied')
-  assert.equal(rows.has('reviewer'), false)
-  assert.equal((await store.remove('reviewer')).kind, 'missing')
-})
+  it.layer(storageHost)(it => {
+    it.effect('removes a custom agent durably and reports a missing one', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(3_000)
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            yield* registry.save(draftOf('reviewer'))
+            yield* registry.save(draftOf('planner'))
+            expect((yield* registry.remove('reviewer')).kind).toBe('applied')
+            expect((yield* registry.remove('reviewer')).kind).toBe('missing')
+          }),
+        )
+        const reopened = yield* Effect.scoped(Effect.flatMap(openRegistry, registry => registry.snapshot))
+        expect(handlesOf(reopened)).toEqual(expect.arrayContaining(['dsh', 'planner']))
+        expect(handlesOf(reopened)).not.toContain('reviewer')
+      }),
+    )
+  })
 
-test('refuses past the agent limit without dropping existing rows', async () => {
-  const now = () => 4_000
-  const { store } = storeOf(now)
-  for (let index = 0; index < 99; index += 1) await store.save(draftOf(`agent-${String(index)}`))
-  const full = await store.save(draftOf('one-more'))
-  assert.equal(full.kind, 'limit')
-  assert.equal(store.resolve('agent-98')?.handle, 'agent-98')
-})
+  it.layer(storageHost)(it => {
+    it.effect('refuses past the agent limit without dropping existing rows', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(4_000)
+          const registry = yield* openRegistry
+          for (let index = 0; index < 99; index += 1) yield* registry.save(draftOf(`agent-${String(index)}`))
+          expect((yield* registry.save(draftOf('one-more'))).kind).toBe('limit')
+          expect((yield* registry.resolve('agent-98'))?.handle).toBe('agent-98')
+        }),
+      ),
+    )
+  })
 
-test('keeps a dispatched thread and its usage across a restart', async () => {
-  const { store, threadRows, reopen } = storeOf(() => 6_000)
-  await store.save(draftOf('reviewer'))
-  const used = await store.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
-  assert.equal(used.agents.find(agent => agent.handle === 'reviewer')?.threadCount, 1)
-  assert.equal(threadRows.size, 1)
+  it.layer(storageHost)(it => {
+    it.effect('keeps a dispatched thread and its usage across a restart', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(6_000)
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            yield* registry.save(draftOf('reviewer'))
+            const used = yield* registry.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
+            expect(used.agents.find(agent => agent.handle === 'reviewer')?.threadCount).toBe(1)
+            // The same dispatch retried is idempotent: one row, one count, one last-used time.
+            yield* registry.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
+          }),
+        )
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const restored = yield* openRegistry
+            expect(yield* restored.resolve('reviewer')).toMatchObject({ threadCount: 1, lastUsedAt: 6_000 })
+            expect((yield* restored.threads('reviewer')).map(thread => thread.sessionId)).toEqual(['session-a'])
+            expect((yield* restored.threadAgent('session-a'))?.handle).toBe('reviewer')
+            expect(restored.threadAgentNow('session-a')?.handle).toBe('reviewer')
+            expect(yield* restored.threadAgent('session-b')).toBeNull()
+          }),
+        )
+      }),
+    )
+  })
 
-  // The same dispatch retried is idempotent: one row, one count, one last-used time.
-  await store.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
-  const restored = reopen()
-  const agent = restored.resolve('reviewer')
-  assert.equal(agent?.threadCount, 1)
-  assert.equal(agent?.lastUsedAt, 6_000)
-  assert.deepEqual(
-    restored.threads('reviewer').map(thread => thread.sessionId),
-    ['session-a'],
-  )
-  assert.equal(restored.threadAgent('session-a')?.handle, 'reviewer')
-  assert.equal(restored.threadAgent('session-b'), null)
-})
+  it.layer(storageHost)(it => {
+    it.effect('lists an agent’s threads newest first and drops one when the agent goes', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(7_000)
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            yield* registry.save(draftOf('reviewer'))
+            yield* registry.save(draftOf('planner'))
+            yield* registry.recordUse('reviewer', { sessionId: 'session-old', title: 'Older' })
+            yield* TestClock.setTime(8_000)
+            yield* registry.recordUse('reviewer', { sessionId: 'session-new', title: 'Newer' })
+            yield* registry.recordUse('planner', { sessionId: 'session-plan', title: 'Plan' })
+            expect((yield* registry.threads('reviewer')).map(thread => thread.title)).toEqual(['Newer', 'Older'])
+            expect((yield* registry.threads('planner')).map(thread => thread.title)).toEqual(['Plan'])
+            yield* registry.remove('reviewer')
+            expect(yield* registry.threadAgent('session-old')).toBeNull()
+          }),
+        )
+        const restored = yield* Effect.scoped(openRegistry)
+        expect(restored.threadAgentNow('session-old')).toBeNull()
+        expect(restored.threadAgentNow('session-plan')?.handle).toBe('planner')
+      }),
+    )
+  })
 
-test('lists an agent’s threads newest first and drops one when the agent goes', async () => {
-  let clock = 7_000
-  const { store, threadRows } = storeOf(() => clock)
-  await store.save(draftOf('reviewer'))
-  await store.save(draftOf('planner'))
-  await store.recordUse('reviewer', { sessionId: 'session-old', title: 'Older' })
-  clock = 8_000
-  await store.recordUse('reviewer', { sessionId: 'session-new', title: 'Newer' })
-  await store.recordUse('planner', { sessionId: 'session-plan', title: 'Plan' })
-  assert.deepEqual(
-    store.threads('reviewer').map(thread => thread.title),
-    ['Newer', 'Older'],
-  )
-  assert.deepEqual(
-    store.threads('planner').map(thread => thread.title),
-    ['Plan'],
-  )
-  await store.remove('reviewer')
-  assert.equal(threadRows.has('session-old'), false)
-  assert.equal(threadRows.has('session-plan'), true)
-  assert.equal(store.threadAgent('session-old'), null)
-})
-
-test('an unchanged agent keeps revision monotonic across restarts', async () => {
-  const { store } = storeOf(() => 5_000)
-  const first = store.snapshot().revision
-  await store.save(draftOf('reviewer'))
-  const second = store.snapshot().revision
-  assert.equal(second > first, true)
-  await store.flush()
+  it.layer(storageHost)(it => {
+    it.effect('advances the revision on a write with an unchanged clock and never starts below a stored edit', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(5_000)
+        const saved = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            const first = (yield* registry.snapshot).revision
+            const result = yield* registry.save(draftOf('reviewer'))
+            expect(result.revision).toBeGreaterThan(first)
+            return result
+          }),
+        )
+        yield* TestClock.setTime(1_000)
+        const reopened = yield* Effect.scoped(Effect.flatMap(openRegistry, registry => registry.snapshot))
+        expect(reopened.revision).toBeGreaterThanOrEqual(saved.kind === 'applied' ? saved.agent.updatedAt : 0)
+      }),
+    )
+  })
 })

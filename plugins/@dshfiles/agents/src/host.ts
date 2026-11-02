@@ -1,119 +1,46 @@
-// Registers the dshx Effect Schema adapter `defineApi` needs before this module serves its contracts.
-import '@dshfiles/dshx/effect'
-import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import type {} from '@deepseek-ai/dsh-storage-domain'
-import { defineHost } from '@dshfiles/dshx/host'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { Effect, Layer } from 'effect'
+import { AgentPresets } from './agent-presets-promise.js'
 import { agentsApi } from './api.js'
 import { DelegationGuard } from './delegation-guard.js'
-import { AgentRegistry, agentsDomain, type AgentsStore } from './store.js'
-
-interface OpenedAgents {
-  readonly store: AgentsStore
-  readonly close: () => Promise<void>
-}
+import { AgentsRegistry } from './store.js'
 
 /**
- * One store per Host process, not per Cordis context: the API handlers and the setup effect receive different
- * contexts, and a second store would keep its own record map and clobber the other's durable rows.
+ * Registering a subagent or a workflow is denied before dispatch when the agent that started the thread set
+ * `delegation.subagents: false`. The tool guard is synchronous, so it reads the registry's in-memory state.
  */
-let opening: Promise<OpenedAgents> | undefined
+const delegationGuard = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const tools = yield* hostService('tools')
+    const registry = yield* AgentsRegistry
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        tools.guard(execution =>
+          DelegationGuard.refusal({ toolName: execution.name, agent: execution.agent === undefined ? null : registry.threadAgentNow(execution.agent.id) }),
+        ),
+      ),
+      dispose => Effect.sync(dispose),
+    )
+  }),
+)
 
-const openAgents = async (ctx: Context): Promise<OpenedAgents> => {
-  const storage = ctx.get('storageDomain')
-  if (storage === undefined) throw new Error('Agent registry storage is unavailable.')
-  const domain = await storage.open(agentsDomain)
-  return {
-    store: AgentRegistry.createStore({ table: domain.table('agents'), threads: domain.table('threads') }),
-    close: () => domain.close(),
-  }
-}
+const registryLayer = AgentsRegistry.layer.pipe(Layer.provide(StorageDomain.layer))
 
-const agentsFor = (ctx: Context): Promise<AgentsStore> => {
-  if (opening === undefined) {
-    const started = openAgents(ctx)
-    opening = started
-    void started.catch(() => {
-      if (opening === started) opening = undefined
-    })
-  }
-  return opening.then(opened => opened.store)
-}
-
-const closeAgents = async (): Promise<void> => {
-  if (opening === undefined) return
-  const opened = await opening.then(
-    value => value,
-    () => undefined,
-  )
-  opening = undefined
-  if (opened === undefined) return
-  await opened.store.flush()
-  await opened.close()
-}
-
-interface AgentPresetRowDraft {
-  readonly id: string
-  name?: string
-  description?: string
-  broken?: string
-}
-
-const agentsApiHost = agentsApi.host({
-  list: async ({ ctx }) => (await agentsFor(ctx)).snapshot(),
-  get: async ({ ctx, input }) => ({ agent: (await agentsFor(ctx)).resolve(input.handle) }),
-  presets: async ({ ctx }) => {
-    const presets = ctx.get('agentPresets')
-    if (presets === undefined) return { presets: [] }
-    const rows = await presets.list()
-    return {
-      presets: rows.map(row => {
-        const preset: AgentPresetRowDraft = { id: row.id }
-        if (row.name !== undefined) preset.name = row.name
-        if (row.description !== undefined) preset.description = row.description
-        if (row.broken !== undefined) preset.broken = row.broken
-        return preset
-      }),
-    }
-  },
-  save: async ({ ctx, input }) => (await agentsFor(ctx)).save(input.agent),
-  remove: async ({ ctx, input }) => (await agentsFor(ctx)).remove(input.handle),
-  recordUse: async ({ ctx, input }) => (await agentsFor(ctx)).recordUse(input.handle, input.thread),
-  threads: async ({ ctx, input }) => ({ threads: (await agentsFor(ctx)).threads(input.handle) }),
-  threadAgent: async ({ ctx, input }) => ({ agent: (await agentsFor(ctx)).threadAgent(input.sessionId) }),
-})
-
-export default defineHost({
+export default DshxPlugin.make({
   name: '@dshfiles/agents',
   inject: ['storageDomain'],
-  apis: [agentsApiHost],
-  setup: ctx => {
-    ctx.effect(() => {
-      const started = agentsFor(ctx)
-      void started.catch(() => undefined)
-      return async () => {
-        await closeAgents()
-      }
-    }, 'agents: registry store')
-    // The guard is synchronous, so it reads the same in-memory store the API serves: registering a subagent or a
-    // workflow is denied before dispatch when the agent that started the thread set `delegation.subagents: false`.
-    ctx.effect(() => {
-      const tools = ctx.get('tools')
-      if (tools === undefined) return () => undefined
-      let closed = false
-      let dispose: (() => void) | undefined
-      void agentsFor(ctx)
-        .then(store => {
-          if (closed) return
-          dispose = tools.guard(execution =>
-            DelegationGuard.refusal({ toolName: execution.name, agent: execution.agent === undefined ? null : store.threadAgent(execution.agent.id) }),
-          )
-        })
-        .catch(() => undefined)
-      return () => {
-        closed = true
-        dispose?.()
-      }
-    }, 'agents: delegation guard')
-  },
+  layer: Layer.mergeAll(delegationGuard, AgentPresets.layer).pipe(Layer.provideMerge(registryLayer)),
+  apis: [
+    Api.bind(agentsApi, {
+      list: () => AgentsRegistry.use(registry => registry.snapshot),
+      get: input => AgentsRegistry.use(registry => Effect.map(registry.resolve(input.handle), agent => ({ agent }))),
+      presets: () => AgentPresets.use(presets => Effect.map(presets.list, rows => ({ presets: [...rows] }))),
+      save: input => AgentsRegistry.use(registry => registry.save(input.agent)),
+      remove: input => AgentsRegistry.use(registry => registry.remove(input.handle)),
+      recordUse: input => AgentsRegistry.use(registry => registry.recordUse(input.handle, input.thread)),
+      threads: input => AgentsRegistry.use(registry => Effect.map(registry.threads(input.handle), threads => ({ threads }))),
+      threadAgent: input => AgentsRegistry.use(registry => Effect.map(registry.threadAgent(input.sessionId), agent => ({ agent }))),
+    }),
+  ],
 })
