@@ -14,7 +14,7 @@ import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter/cli
 import type { RemoteResult, TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { ModelCatalogDirectory } from './catalog.ts'
 import type { SessionDrafts } from '@dshfiles/session-controller/draft-client'
 
@@ -70,10 +70,10 @@ export class ModelDirectory {
   /** Latest selection operation wins; an older response never overwrites a newer one. */
   private generation = 0
   private disposed = false
-  private readonly contextPressureSchema = z.object({
-    pressureTokens: z.number().optional(),
-    projectedTokens: z.number().optional(),
-    contextWindow: z.number().optional(),
+  private readonly contextPressureSchema = Schema.Struct({
+    pressureTokens: Schema.optional(Schema.Number),
+    projectedTokens: Schema.optional(Schema.Number),
+    contextWindow: Schema.optional(Schema.Number),
   })
   private readonly unsubscribeCatalog: () => void
   private readonly unsubscribeSelection: () => void
@@ -224,12 +224,13 @@ export class ModelDirectory {
   private readContextPressure(): ContextPressureProjection | undefined {
     const value = this.pressure.getSnapshot()
     if (value === undefined) return undefined
-    const decoded = this.contextPressureSchema.safeParse(value)
-    if (!decoded.success) return undefined
+    const decoded = Schema.decodeUnknownOption(this.contextPressureSchema)(value)
+    if (Option.isNone(decoded)) return undefined
+    const pressure = decoded.value
     return {
-      ...(decoded.data.pressureTokens === undefined ? {} : { pressureTokens: decoded.data.pressureTokens }),
-      ...(decoded.data.projectedTokens === undefined ? {} : { projectedTokens: decoded.data.projectedTokens }),
-      ...(decoded.data.contextWindow === undefined ? {} : { contextWindow: decoded.data.contextWindow }),
+      ...(pressure.pressureTokens === undefined ? {} : { pressureTokens: pressure.pressureTokens }),
+      ...(pressure.projectedTokens === undefined ? {} : { projectedTokens: pressure.projectedTokens }),
+      ...(pressure.contextWindow === undefined ? {} : { contextWindow: pressure.contextWindow }),
     }
   }
 

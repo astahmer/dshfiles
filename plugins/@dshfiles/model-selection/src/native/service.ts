@@ -17,7 +17,7 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type {} from '@dshfiles/session-controller/draft-client'
 import { Service } from '@deepseek-ai/cordis'
 import { createRegisteredApiClient } from '@dshfiles/dshx/client'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
@@ -74,8 +74,8 @@ export class ModelDirectoryResolver extends Service {
     if (contextWindow === undefined) return null
     const result = await contextWindow(route)
     if (!result.ok) return null
-    const decoded = z.number().int().positive().nullable().safeParse(result.value)
-    return decoded.success ? decoded.data : null
+    const decoded = Schema.decodeUnknownOption(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))))(result.value)
+    return Option.isSome(decoded) ? decoded.value : null
   }
 
   directoryFor(sessionId: SessionId): ModelDirectory {

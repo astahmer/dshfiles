@@ -59,7 +59,7 @@
     "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
