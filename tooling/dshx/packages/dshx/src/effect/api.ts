@@ -1,4 +1,5 @@
-import type { Effect } from 'effect'
+/* oxlint-disable antislop/no-export-bag -- api.ts is the Api namespace of @dshfiles/dshx/effect (export * as Api); its exports are the namespace members. */
+import { Effect, Schema } from 'effect'
 import type {
   AnyApiEventDefinition,
   AnyApiMethodDefinition,
@@ -7,11 +8,22 @@ import type {
   ApiHandlerContext,
   ApiHostInput,
   ApiHostOutput,
+  ApiEventHostPayload,
   ApiHostRegistration,
 } from '../api/types.js'
 import { ApiProtocolModel } from '../api/common.js'
+import { HostApiEventsModel } from '../api/host-events.js'
+import { HostContext } from './host-context.js'
 import { PluginInactive, type PluginRuntime } from './plugin-runtime.js'
 import { thrownForApi } from './wire-error.js'
+
+/** The Host refused to publish an event: the contract declares no such event, its payload failed the schema, or the API is not served. */
+export class PublishEventError extends Schema.TaggedError<PublishEventError>()('PublishEventError', {
+  message: Schema.String,
+  apiId: Schema.String,
+  event: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
 export { ApiContractError, ApiRemoteError, ApiTransportError, ApiUnavailableError, client } from './client.js'
 export type { ApiCallFailure, DeclaredError, TypedApiClient } from './client.js'
@@ -79,3 +91,23 @@ export const bind = <const Methods extends Record<string, AnyApiMethodDefinition
     return contract.host(promised as Parameters<ApiContract<Methods>['host']>[0])
   },
 })
+
+/** Publish one event of `contract` from the Host, e.g. `Stream.runForEach(changes, () => Api.publish({ contract, event: 'changed', payload: {} }))`. */
+export const publish = <const Events extends Record<string, AnyApiEventDefinition>, K extends keyof Events & string>(input: {
+  readonly contract: ApiContract<Record<string, AnyApiMethodDefinition>, Events>
+  readonly event: K
+  readonly payload: ApiEventHostPayload<Events[K]>
+}): Effect.Effect<void, PublishEventError, HostContext> =>
+  Effect.gen(function* () {
+    const host = yield* HostContext
+    yield* Effect.tryPromise({
+      try: () => HostApiEventsModel.publish(host.ctx, input.contract, input.event, input.payload),
+      catch: cause =>
+        new PublishEventError({
+          message: `The Host refused the ${input.contract.id} ${input.event} event.`,
+          apiId: input.contract.id,
+          event: input.event,
+          cause,
+        }),
+    })
+  })

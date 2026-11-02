@@ -1,6 +1,6 @@
 /* oxlint-disable antislop/no-export-bag -- the deprecated DshxEffect namespace is a Cordis edge kept for existing callers; delete it when they reach 0. */
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import { Cause, Context, Effect, Exit, Layer, type ManagedRuntime, Option, Queue, Schema, Scope, Stream } from 'effect'
+import { Cause, Context, Effect, Exit, Layer, type ManagedRuntime, Option, Queue, Scope, Stream } from 'effect'
 import { ApiProtocolModel } from '../api/common.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
 import { HostApiEventsModel } from '../api/host-events.js'
@@ -16,19 +16,12 @@ import type {
   ApiHostOutput,
   ApiHostRegistration,
 } from '../api/types.js'
+import { PublishEventError } from './api.js'
 import { effectClient } from './client.js'
 import { PluginActivationError } from './plugin.js'
 import { makeActivationSlot, PluginInactive, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
 import { tracerLayer } from './tracer.js'
 import { thrownForApi } from './wire-error.js'
-
-/** The Host refused to publish an event: the contract declares no such event, its payload failed the schema, or the API is not served. */
-export class PublishEventError extends Schema.TaggedError<PublishEventError>()('PublishEventError', {
-  message: Schema.String,
-  apiId: Schema.String,
-  event: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
-}) {}
 
 type EffectHandlers<Methods extends Record<string, AnyApiMethodDefinition>, R, E> = {
   readonly [K in keyof Methods]: (context: ApiHandlerContext<ApiHostInput<Methods[K]>>) => Effect.Effect<ApiHostOutput<Methods[K]>, E, R>

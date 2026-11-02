@@ -1,5 +1,5 @@
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Context, Effect, Layer, Option, Queue, Schema, Stream } from 'effect'
 
 /** A Cordis service the plugin asked for is not provided by the running Host. */
 export class HostServiceMissing extends Schema.TaggedError<HostServiceMissing>()('HostServiceMissing', {
@@ -31,3 +31,34 @@ export const hostService = Effect.fnUntraced(function* <K extends string & keyof
   if (service === undefined || service === null) return yield* new HostServiceMissing({ service: name })
   return service
 })
+
+/**
+ * A Cordis service as it comes and goes: `None` first, `Some` while the Host provides it, `None` again when it is
+ * disposed. Use it for an optional service a plugin can work without, instead of `inject`, which blocks activation.
+ */
+export const hostServiceChanges = <K extends string & keyof CordisContext>(
+  name: K,
+): Effect.Effect<Stream.Stream<Option.Option<NonNullable<CordisContext[K]>>>, never, HostContext> =>
+  Effect.map(HostContext, host =>
+    Stream.callback<Option.Option<NonNullable<CordisContext[K]>>>(queue =>
+      Effect.gen(function* () {
+        Queue.offerUnsafe(queue, Option.none())
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            host.ctx.inject([name], scoped => {
+              const service = scoped.get(name)
+              if (service === undefined || service === null) return
+              Queue.offerUnsafe(queue, Option.some(service))
+              scoped.effect(
+                () => () => {
+                  Queue.offerUnsafe(queue, Option.none())
+                },
+                `dshx: ${name} availability`,
+              )
+            }),
+          ),
+          watcher => Effect.promise(() => watcher.dispose()),
+        )
+      }),
+    ),
+  )

@@ -95,6 +95,12 @@ Handlers are `(input, call) => Effect`. `input` is the decoded contract input; `
 There is no AbortSignal: an aborted call interrupts the handler fiber. `Api.handlers` types a handler map declared
 apart from `bind`.
 
+### `Api.publish({ contract, event, payload })`
+
+Publishes one contract event from the Host and needs `HostContext`; a payload the event schema refuses, or an event the
+contract does not declare, fails with `PublishEventError`. Rate-limit a noisy source with a Stream before it, e.g.
+`Stream.runForEach(Stream.throttle(changes, …), () => Api.publish(…))`.
+
 ### `Tool.make({ name, description, input, output?, readOnly?, render?, execute })` and `Tool.register`
 
 `input` is an Effect Schema, published to the model as a closed JSON Schema and decoded strictly before `execute`
@@ -125,8 +131,10 @@ span. Use it instead of a bare `forkScoped` in `Layer.effectDiscard`.
 ### `HostContext`, `hostService(name)`
 
 `HostContext` holds the Cordis `ctx` and `packageId` of the activation. `hostService('tools')` reads one Cordis service
-and fails with `HostServiceMissing` when the Host does not provide it. Only dshx edge layers use them; domain services
-depend on typed services instead.
+and fails with `HostServiceMissing` when the Host does not provide it. `hostServiceChanges('jobs')` yields a Stream of an
+optional service as it comes and goes (`None`, `Some(service)`, `None` …), for a plugin that works without it; pair
+it with `Stream.switchMap` so the work bound to one service instance stops when it goes. Only dshx edge layers use
+them; domain services depend on typed services instead.
 
 ## Errors on the wire
 
@@ -173,7 +181,9 @@ Use `@effect/vitest` and real layers. A domain service that needs no Host is tes
 Test the edge (`DshxPlugin.make`, `Api.bind`, `Tool.make`) against a real in-memory Host: build `createTestHost()`
 from `@dshfiles/dshx/testing` inside `Layer.effect` with `Effect.acquireRelease`, mount the definition, and call it
 through `createHostApiClient` or `host.tools.execute`. A layer that reads `HostContext` gets
-`HostContext.layer({ ctx: host.ctx, packageId })`. Never mock the service under test.
+`HostContext.layer({ ctx: host.ctx, packageId })`. To assert a span, provide `tracerLayer` (exported from
+`@dshfiles/dshx/effect`) and read it with `recordSpans()` from `@dshfiles/dshx/tracing`. Never mock the service under
+test.
 
 ```ts
 import { describe, expect, it } from '@effect/vitest'

@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
-import { Cause, Context, Deferred, Effect, Exit, Layer, Ref, Schema } from 'effect'
-import { defineApi, isApiError, method } from '../src/api/index.js'
-import { Api, DshxPlugin, HostContext, HostEvents, Tool } from '../src/effect/index.js'
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from 'effect'
+import { defineApi, event, isApiError, method } from '../src/api/index.js'
+import { Api, DshxPlugin, HostContext, HostEvents, hostServiceChanges, Tool } from '../src/effect/index.js'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '../src/host/index.js'
 import { tracerLayer } from '../src/effect/tracer.js'
@@ -11,6 +11,9 @@ import { TestHost } from './effect-test-host.js'
 declare module '@deepseek-ai/cordis' {
   interface Events {
     'dshx-effect-test/ping'(value: string): void
+  }
+  interface Context {
+    'dshx-effect-test-optional': { readonly label: string }
   }
 }
 
@@ -399,4 +402,54 @@ describe('DshxPlugin.callback', () => {
     expect(error.message).toBe('p failed to activate. See the Host log for its cause.')
     expect(Cause.isCause(error.cause)).toBe(true)
   })
+})
+
+describe('Api.publish', () => {
+  const changesApi = defineApi({
+    id: 'journal-events',
+    version: 1,
+    owner: '@test/journal-events',
+    methods: { ping: method({ input: Schema.Void, output: Schema.String }) },
+    events: { changed: event({ schema: Schema.Struct({ id: Schema.String }) }) },
+  })
+
+  it.effect('publishes a declared event and fails a refused one with PublishEventError', () =>
+    Effect.gen(function* () {
+      const plugin = yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-events',
+          layer: journalLayer({ prefix: '', log: [] }),
+          apis: [Api.bind(changesApi, { ping: () => Effect.succeed('pong') })],
+        }),
+        '@test/journal-events',
+      )
+      const hostContext = HostContext.layer({ ctx: plugin.ctx, packageId: '@test/journal-events' })
+      yield* Api.publish({ contract: changesApi, event: 'changed', payload: { id: 'a' } }).pipe(Effect.provide(hostContext))
+      // @ts-expect-error the contract declares no such event
+      const refused = yield* Effect.flip(Api.publish({ contract: changesApi, event: 'removed', payload: {} }).pipe(Effect.provide(hostContext)))
+      expect(refused).toMatchObject({ _tag: 'PublishEventError', apiId: 'journal-events', event: 'removed' })
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+})
+
+describe('hostServiceChanges', () => {
+  it.effect('follows an optional Cordis service as it is provided and disposed', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const changes = yield* hostServiceChanges('dshx-effect-test-optional').pipe(
+        Effect.provide(HostContext.layer({ ctx: host.ctx, packageId: '@test/optional' })),
+      )
+      const availability = yield* changes.pipe(
+        Stream.map(Option.match({ onNone: () => 'none', onSome: service => service.label })),
+        Stream.take(3),
+        Stream.runCollect,
+        Effect.forkScoped,
+      )
+      yield* Effect.yieldNow
+      const withdraw = host.ctx.provide('dshx-effect-test-optional', { label: 'first' })
+      yield* Effect.yieldNow
+      withdraw()
+      expect(yield* Fiber.join(availability)).toEqual(['none', 'first', 'none'])
+    }).pipe(Effect.scoped, Effect.provide(TestHost.layer)),
+  )
 })
