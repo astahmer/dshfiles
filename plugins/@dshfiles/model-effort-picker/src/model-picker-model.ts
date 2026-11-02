@@ -1,10 +1,18 @@
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { AccountsUsage } from '@dshfiles/ai-accounts/api'
 import type { FallbackRoute } from '@dshfiles/ai-accounts/model-fallback-api'
+import { UsageOverviewModel } from '@dshfiles/ai-accounts/usage-overview-model'
 import type { BrandKey } from './brand-marks.js'
 
 type ModelGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = ModelGroup['models'][number]
+
+export interface ModelQuota {
+  readonly percent: number
+  readonly label: string
+  readonly onReserve: boolean
+}
 
 /** Tokens that name a model family; a model id or name carries at least one of them. */
 const BRAND_TOKENS: readonly { readonly brand: BrandKey; readonly tokens: readonly string[] }[] = [
@@ -68,9 +76,30 @@ export class ModelPickerModel {
     ...(reasoningEffort !== undefined && { reasoningEffort }),
   })
 
+  /** The quota figure the account strip shows: the window that actually limits this account, not the first listed. */
+  static quota = (card: AccountsUsage['cards'][number] | undefined): ModelQuota | undefined => {
+    if (card === undefined) return undefined
+    const binding = UsageOverviewModel.bindingWindow(card)
+    if (binding === undefined) return undefined
+    return { percent: binding.percentRemaining, label: binding.windowLabel, onReserve: binding.onReserve }
+  }
+
   /** Account providers prefix every model name with their instance id; under its provider the prefix says nothing. */
   static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'name'> }): string =>
     model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name
+
+  /**
+   * The account tag drops a leading service name so the provider label can name the service without repeating it.
+   * An ordinal remainder becomes "#1" instead of repeating the service, and anything else stays whole.
+   */
+  static accountTag = ({ name, provider }: { readonly name: string; readonly provider: string | undefined }): string => {
+    const prefix = provider === undefined ? '' : `${provider} `
+    if (prefix.length === 0 || !name.toLowerCase().startsWith(prefix.toLowerCase())) return name
+    const remainder = name.slice(prefix.length).trim()
+    if (remainder.length === 0) return name
+    if (/\p{L}/u.test(remainder)) return remainder
+    return /^\d+$/u.test(remainder) ? `#${remainder}` : name
+  }
 
   /** The trigger names the provider (its initials) only when another provider offers the same model name. */
   static triggerLabel = ({

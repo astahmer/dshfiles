@@ -34,12 +34,24 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
   )
 }
 
-/** Four bars whose fill and hue name the selected effort level. */
+/** The service name a route is offered through, shown after the model name. */
+export const ProviderLabel = ({ label, className }: { readonly label: string; readonly className?: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-[10px] dshx:leading-none dshx:text-muted-foreground/80', className)} data-model-provider-label>
+        {label}
+      </span>
+    </TooltipTrigger>
+    <TooltipContent side="top">{label}</TooltipContent>
+  </Tooltip>
+)
+
+/** The model's effort glyph: six bars fill in as effort rises, with the hue shifting from neutral to amber. */
 export const EffortBars = ({ glyph, className }: { readonly glyph: EffortGlyph; readonly className?: string }) => (
-  <span aria-hidden="true" className={cn('dshx:flex dshx:h-3.5 dshx:w-3.5 dshx:items-end dshx:justify-center dshx:gap-[2px]', className)}>
+  <span aria-hidden="true" className={cn('dshx:flex dshx:h-3.5 dshx:w-3.5 dshx:items-end dshx:justify-center dshx:gap-[1px]', className)}>
     {Array.from({ length: EFFORT_BAR_COUNT }, (_, index) => (
       <i
-        className={cn('dshx:block dshx:w-[2px] dshx:rounded-[1px]', index < glyph.filled ? TONE_FILL[glyph.tone] : 'dshx:bg-muted-foreground/25')}
+        className={cn('dshx:block dshx:w-[1.5px] dshx:rounded-[1px]', index < glyph.filled ? TONE_FILL[glyph.tone] : 'dshx:bg-muted-foreground/25')}
         key={index}
         style={{ height: `${EFFORT_BAR_HEIGHTS[index] ?? EFFORT_BAR_HEIGHTS[0]}px` }}
       />
@@ -47,8 +59,18 @@ export const EffortBars = ({ glyph, className }: { readonly glyph: EffortGlyph; 
   </span>
 )
 
-/** The account a route belongs to: its colour dot, its name, and the full name on hover. */
-export const AccountBadge = ({ name, color, className }: { readonly name: string; readonly color: string; readonly className?: string }) => (
+/** The account a route belongs to: its colour dot, a compact label, and the full name on hover. */
+export const AccountBadge = ({
+  name,
+  label = name,
+  color,
+  className,
+}: {
+  readonly name: string
+  readonly label?: string | undefined
+  readonly color: string
+  readonly className?: string
+}) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <span
@@ -59,40 +81,43 @@ export const AccountBadge = ({ name, color, className }: { readonly name: string
         data-model-account-badge
       >
         <i aria-hidden="true" className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full" style={{ backgroundColor: color }} />
-        <span className="dshx:min-w-0 dshx:truncate">{name}</span>
+        <span className="dshx:min-w-0 dshx:truncate">{label}</span>
       </span>
     </TooltipTrigger>
     <TooltipContent side="top">{name}</TooltipContent>
   </Tooltip>
 )
 
-const quotaTone = (percent: number): string => (percent >= 50 ? 'dshx:text-success' : percent >= 20 ? 'dshx:text-warning' : 'dshx:text-destructive')
+const quotaTone = (percent: number): string => (percent >= 50 ? 'dshx:text-muted-foreground/60' : percent >= 20 ? 'dshx:text-warning' : 'dshx:text-destructive')
 
-/** Remaining quota as a small arc gauge, the way the fallback rows show it. */
-export const QuotaRing = ({ percent, className }: { readonly percent: number; readonly className?: string }) => {
-  const clamped = Math.min(100, Math.max(0, percent))
-  const circumference = 2 * Math.PI * 6.25
+/** Remaining quota, muted while healthy and stronger as it runs out. */
+export const QuotaText = ({
+  percent,
+  label,
+  onReserve,
+  className,
+}: {
+  readonly percent: number
+  readonly label: string
+  readonly onReserve: boolean
+  readonly className?: string
+}) => {
+  const rounded = Math.round(percent)
+  const text = (
+    <span className={cn('dshx:text-[10px] dshx:tabular-nums', quotaTone(percent), className)}>
+      {onReserve ? '☾ ' : ''}
+      {rounded}%
+    </span>
+  )
   return (
-    <svg aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0', quotaTone(clamped), className)} viewBox="0 0 16 16">
-      <circle cx="8" cy="8" fill="none" r="6.25" stroke="currentColor" strokeOpacity="0.22" strokeWidth="1.75" />
-      <circle
-        cx="8"
-        cy="8"
-        fill="none"
-        r="6.25"
-        stroke="currentColor"
-        strokeDasharray={`${(circumference * clamped) / 100} ${circumference}`}
-        strokeLinecap="round"
-        strokeWidth="1.75"
-        transform="rotate(-90 8 8)"
-      />
-    </svg>
+    <Tooltip>
+      <TooltipTrigger asChild>{text}</TooltipTrigger>
+      <TooltipContent side="top">
+        {label}: {rounded}% left
+      </TooltipContent>
+    </Tooltip>
   )
 }
-
-export const QuotaText = ({ percent, className }: { readonly percent: number; readonly className?: string }) => (
-  <span className={cn('dshx:text-[10px] dshx:tabular-nums', quotaTone(percent), className)}>{Math.round(percent)}%</span>
-)
 
 /** A "?" that explains a control in place, never as inline helper text. */
 export const InfoHint = ({ description, className }: { readonly description: string; readonly className?: string }) => (

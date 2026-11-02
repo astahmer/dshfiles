@@ -40,6 +40,10 @@
       "types": "./src/model-fast-mode-api.ts",
       "default": "./dist/model-fast-mode-api.js"
     },
+    "./usage-overview-model": {
+      "types": "./src/usage-overview-model.ts",
+      "default": "./dist/usage-overview-model.js"
+    },
     "./locale/en.json": "./locale/en.json",
     "./pricing-catalog": {
       "types": "./src/pricing-catalog.ts",

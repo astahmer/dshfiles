@@ -4,20 +4,25 @@
 
 ![Model details with accounts, reasoning slider and the fallback chain](docs/screenshots/model-fallbacks.png)
 
-![Compact reasoning and Fast mode controls for a supported Codex model](docs/screenshots/fast-mode.png)
-
 Replaces the composer model control with two panes. The list names every account-and-model route in one flat, dense
-column: the model family's brand mark, the model name, the account it belongs to with that account's colour dot, the
-account's remaining quota, and a four-bar reasoning-effort glyph. The details pane beside it follows the selected or
-inspected route with the accounts that offer the same model, a reasoning slider, Fast mode, and the thread's fallback
-chain.
+column: the model family's brand mark, the model name, the service that offers it subtly after the name, the account it
+belongs to with that account's colour dot, the account's remaining quota, and a six-bar reasoning-effort glyph. The
+details pane beside it follows the selected or inspected route with the accounts that offer the same model, a reasoning
+slider, Fast mode, and the thread's fallback chain.
 
-The only addition to the reference layout is the remaining-quota percentage in the list; everything else — colours,
-spacing, type sizes and the details panel — follows it. Selections still write through DSH's shared per-session model
-directory, so the native model popup stays in sync.
+The composer trigger still names the model and its provider when two providers offer the same name. The main list always
+shows the provider so two identical model names from different services stay distinguishable, while the account tag
+keeps only the part that identifies the account (`OpenCode Go Alex` next to `OpenCode Go` becomes `Alex`, and
+`GitHub Copilot 1` becomes `#1`). Remaining quota stays muted while healthy and only gains warning colour as it runs low; it names the same binding window the AI Accounts strip uses, not the first session window.
 
-Hovering a truncated account chip shows the account's whole name. Hovering the effort glyph opens that model's
+Hovering a truncated account tag or provider name shows the whole label. Hovering the effort glyph opens that model's
 reasoning levels over the list and picks one directly.
+
+## Fallback chain
+
+The details pane shows a minimal "No fallbacks" state with a small add action. Stored rungs are compact draggable rows
+with their model mark, model name, service, account, remaining quota and a remove action; drag or Alt+Arrow reorders
+them. A small control toggles whether the thread stays on a fallback or returns next turn.
 
 ## Account swap
 

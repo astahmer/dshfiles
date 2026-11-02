@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { AccountsUsage } from '@dshfiles/ai-accounts/api'
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
 const nova = {
@@ -59,6 +60,54 @@ describe('model picker selection rules', () => {
       model: 'nova-3',
       reasoningEffort: 'balanced',
     })
+  })
+
+  it('uses the account’s binding quota window rather than the first listed window', () => {
+    const card = {
+      instanceId: 'codex-alex2',
+      displayName: 'Codex Alex2',
+      kind: 'codex',
+      enabled: true,
+      usage: {
+        status: 'ok',
+        message: null,
+        identity: null,
+        plan: null,
+        windows: [
+          { label: 'Current session', percentRemaining: 100, resetsAt: null },
+          { label: 'Weekly limit', percentRemaining: 0, resetsAt: 2_000 },
+        ],
+        bankedResets: 0,
+        bankedResetExpiries: [],
+      },
+    } satisfies AccountsUsage['cards'][number]
+
+    expect(ModelPickerModel.quota(card)).toEqual({ label: 'Weekly limit', onReserve: false, percent: 0 })
+    expect(ModelPickerModel.quota({ ...card, usage: { ...card.usage, status: 'unsupported' } })).toBeUndefined()
+    expect(ModelPickerModel.quota(undefined)).toBeUndefined()
+  })
+
+  it('keeps the reserve visible once an ordinary window is spent', () => {
+    const card = {
+      instanceId: 'codex-alex2',
+      displayName: 'Codex Alex2',
+      kind: 'codex',
+      enabled: true,
+      usage: {
+        status: 'ok',
+        message: null,
+        identity: null,
+        plan: null,
+        windows: [
+          { label: 'Weekly limit', percentRemaining: 0, resetsAt: 2_000 },
+          { label: 'Luna Reserve', percentRemaining: 60, resetsAt: 3_000, reserve: true },
+        ],
+        bankedResets: 0,
+        bankedResetExpiries: [],
+      },
+    } satisfies AccountsUsage['cards'][number]
+
+    expect(ModelPickerModel.quota(card)).toEqual({ label: 'Luna Reserve', onReserve: true, percent: 60 })
   })
 
   it('lets the user return to the provider default and labels unknown retained efforts safely', () => {
