@@ -87,7 +87,10 @@ service the layer does not build.
 
 `apis` and `tools` stay in the definition, so the registry, the tool-schema snapshot and `inject` see them. Each call
 runs with `Effect.runPromiseExitWith(services)` of the active plugin: a call that arrives before activation finishes
-waits for it, a call after unload is refused as `unavailable`. A definition has one activation at a time.
+waits for it, a call after unload is refused as `unavailable`. A definition has one activation at a time, so the same
+definition object cannot be active on two Cordis Hosts at once (a second activation fails until the first unloads):
+static tool definitions and API registrations carry no owning `ctx` to pick a runtime by. A test that mounts one
+plugin on two Hosts exports a factory that calls `DshxPlugin.make` once per Host.
 
 ### `Api.bind(contract, handlers)` and `Api.handlers(contract, handlers)`
 
