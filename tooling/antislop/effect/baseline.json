@@ -3,18 +3,14 @@
     "plugins/@dshfiles/usage/src/host.ts": 3
   },
   "effect-migration(no-cause-dropping-catch)": {
-    "plugins/@dshfiles/agent-telemetry/src/telemetry-effect.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
     "plugins/@dshfiles/background-jobs/src/host.ts": 2,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1,
-    "plugins/@dshfiles/loopback-access/src/host.ts": 2,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
     "plugins/@dshfiles/session-search/src/host.ts": 4,
-    "plugins/@dshfiles/session-undo/src/host.ts": 3,
     "plugins/@dshfiles/usage/src/host.ts": 3,
-    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1,
-    "plugins/@dshfiles/workspace-folder-picker/src/host.ts": 1
+    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1
   },
   "effect-migration(no-empty-plugin-layer)": {
     "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
@@ -57,7 +53,6 @@
     "plugins/@dshfiles/jj-integration/src/auto-cleanup.ts": 1,
     "plugins/@dshfiles/jj-integration/src/auto-fetch.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 4,
-    "plugins/@dshfiles/loopback-access/src/forwarder.ts": 1,
     "plugins/@dshfiles/memory/src/runtime.ts": 1,
     "plugins/@dshfiles/memory/src/thread-finder.ts": 2,
     "plugins/@dshfiles/multi-host/src/connectors/gateway.ts": 3,
@@ -75,11 +70,9 @@
     "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 2,
     "plugins/@dshfiles/traces/src/host.ts": 1,
     "plugins/@dshfiles/traces/src/receiver.ts": 1,
-    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1,
-    "plugins/@dshfiles/worktree-memory/src/host.ts": 1
+    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1
   },
   "effect-migration(no-host-module-state)": {
-    "plugins/@dshfiles/agent-telemetry/src/host.ts": 1,
     "plugins/@dshfiles/agents/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-runtime.ts": 2,
@@ -100,18 +93,15 @@
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 7,
-    "plugins/@dshfiles/prompt-stash/src/host.ts": 1,
     "plugins/@dshfiles/queue-reorder/src/host.ts": 1,
     "plugins/@dshfiles/references/src/host.ts": 3,
     "plugins/@dshfiles/resource-packs/src/host.ts": 1,
-    "plugins/@dshfiles/settings-shell/src/host.ts": 3,
     "plugins/@dshfiles/thread-sidebar/src/attention-host.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 5,
     "plugins/@dshfiles/thread-sidebar/src/settings.ts": 5,
     "plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts": 1,
     "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 1,
-    "plugins/@dshfiles/traces/src/host.ts": 3,
-    "plugins/@dshfiles/worktree-memory/src/host.ts": 1
+    "plugins/@dshfiles/traces/src/host.ts": 3
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
@@ -122,13 +112,11 @@
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
     "plugins/@dshfiles/project-checks/src/host.ts": 1,
-    "plugins/@dshfiles/session-undo/src/host.ts": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 3,
     "plugins/@dshfiles/traces/src/receiver.ts": 1,
-    "plugins/@dshfiles/worktree-memory/src/host.ts": 1,
     "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
     "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,
     "tooling/dshx/packages/dshx/src/platform/client.ts": 1
