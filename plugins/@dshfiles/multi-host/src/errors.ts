@@ -103,6 +103,165 @@ export class RuntimeNotRunning extends Schema.TaggedError<RuntimeNotRunning>()(
   }
 }
 
+export class DirectoryPathInvalid extends Schema.TaggedError<DirectoryPathInvalid>()('DirectoryPathInvalid', {}, { dshxWireCode: 'directory-path-invalid' }) {
+  override get message(): string {
+    return 'The multi-host data directory or its directory file is not a private regular path.'
+  }
+}
+
+export class DirectoryUnreadable extends Schema.TaggedError<DirectoryUnreadable>()(
+  'DirectoryUnreadable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'directory-unreadable' },
+) {
+  override get message(): string {
+    return 'The multi-host directory could not be read.'
+  }
+}
+
+export class DirectoryCorrupt extends Schema.TaggedError<DirectoryCorrupt>()('DirectoryCorrupt', {}, { dshxWireCode: 'directory-corrupt' }) {
+  override get message(): string {
+    return 'The multi-host directory contains invalid JSON and was left untouched.'
+  }
+}
+
+export class DirectoryVersionUnsupported extends Schema.TaggedError<DirectoryVersionUnsupported>()(
+  'DirectoryVersionUnsupported',
+  {},
+  { dshxWireCode: 'directory-version-unsupported' },
+) {
+  override get message(): string {
+    return 'The multi-host directory has an unsupported schema and was left untouched.'
+  }
+}
+
+export class DirectoryRecordInvalid extends Schema.TaggedError<DirectoryRecordInvalid>()(
+  'DirectoryRecordInvalid',
+  { issue: Schema.String.check(Schema.isMaxLength(2_000)) },
+  { dshxWireCode: 'directory-record-invalid' },
+) {
+  override get message(): string {
+    return `The multi-host directory change was refused: ${this.issue}`
+  }
+}
+
+export class DirectoryWriteFailed extends Schema.TaggedError<DirectoryWriteFailed>()(
+  'DirectoryWriteFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'directory-write-failed' },
+) {
+  override get message(): string {
+    return 'The multi-host directory could not be committed atomically.'
+  }
+}
+
+export class HostConnectorInUse extends Schema.TaggedError<HostConnectorInUse>()(
+  'HostConnectorInUse',
+  { hostId: Schema.String },
+  { dshxWireCode: 'host-connector-in-use' },
+) {
+  override get message(): string {
+    return 'The host connector cannot change while registered runtimes use it.'
+  }
+}
+
+export class HostNotFound extends Schema.TaggedError<HostNotFound>()('HostNotFound', { hostId: Schema.String }, { dshxWireCode: 'host-not-found' }) {
+  override get message(): string {
+    return `No recorded host ${this.hostId}.`
+  }
+}
+
+export class HostOrderIncomplete extends Schema.TaggedError<HostOrderIncomplete>()('HostOrderIncomplete', {}, { dshxWireCode: 'host-order-incomplete' }) {
+  override get message(): string {
+    return 'A host order names every recorded host exactly once.'
+  }
+}
+
+export class ConnectorKindMismatch extends Schema.TaggedError<ConnectorKindMismatch>()(
+  'ConnectorKindMismatch',
+  {},
+  { dshxWireCode: 'connector-kind-mismatch' },
+) {
+  override get message(): string {
+    return 'The runtime locator does not match its recorded host.'
+  }
+}
+
+export class HostHasRuntimes extends Schema.TaggedError<HostHasRuntimes>()(
+  'HostHasRuntimes',
+  { hostId: Schema.String },
+  { dshxWireCode: 'host-has-runtimes' },
+) {
+  override get message(): string {
+    return 'The host still has runtime references; use --directory-only to remove those references. Remote data is retained.'
+  }
+}
+
+export class RuntimeNotFound extends Schema.TaggedError<RuntimeNotFound>()(
+  'RuntimeNotFound',
+  { runtimeId: Schema.String },
+  { dshxWireCode: 'runtime-not-found' },
+) {
+  override get message(): string {
+    return 'No recorded runtime has this id.'
+  }
+}
+
+export class OriginPortExhausted extends Schema.TaggedError<OriginPortExhausted>()('OriginPortExhausted', {}, { dshxWireCode: 'origin-port-exhausted' }) {
+  override get message(): string {
+    return 'No stable browser origin port is available for this runtime.'
+  }
+}
+
+export class IdentityPathInvalid extends Schema.TaggedError<IdentityPathInvalid>()('IdentityPathInvalid', {}, { dshxWireCode: 'identity-path-invalid' }) {
+  override get message(): string {
+    return 'The runtime identity must be stored in a regular file inside a private directory.'
+  }
+}
+
+export class IdentityUnreadable extends Schema.TaggedError<IdentityUnreadable>()(
+  'IdentityUnreadable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'identity-unreadable' },
+) {
+  override get message(): string {
+    return 'The runtime identity file could not be read.'
+  }
+}
+
+export class IdentityCorrupt extends Schema.TaggedError<IdentityCorrupt>()('IdentityCorrupt', {}, { dshxWireCode: 'identity-corrupt' }) {
+  override get message(): string {
+    return 'The runtime identity file has an unsupported shape and was left untouched.'
+  }
+}
+
+export class IdentityWriteFailed extends Schema.TaggedError<IdentityWriteFailed>()(
+  'IdentityWriteFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'identity-write-failed' },
+) {
+  override get message(): string {
+    return 'The runtime identity could not be committed atomically.'
+  }
+}
+
+export class ProfileUnavailable extends Schema.TaggedError<ProfileUnavailable>()('ProfileUnavailable', {}, { dshxWireCode: 'profile-unavailable' }) {
+  override get message(): string {
+    return 'Set the multi-host profile field or launch DSH with --profile before registering this runtime.'
+  }
+}
+
+export class ProfileMismatch extends Schema.TaggedError<ProfileMismatch>()(
+  'ProfileMismatch',
+  { reason: Schema.Literals(['setting', 'recorded']) },
+  { dshxWireCode: 'profile-mismatch' },
+) {
+  override get message(): string {
+    if (this.reason === 'recorded') return 'The recorded runtime identity belongs to a different DSH profile.'
+    return 'The multi-host profile setting does not match the running DSH profile.'
+  }
+}
+
 /** What ssh's own stderr says went wrong with the connection, before the remote command ran. */
 export type SshConnectionError = SshHostKeyRejected | SshAuthenticationFailed | SshHostUnresolved | SshUnreachable
 
@@ -111,3 +270,7 @@ export type SshRunError = SshTargetInvalid | SshUnavailable | SshInputTooLarge
 export type SshExecError = SshRunError | SshOutputTooLarge | SshTimedOut | SshConnectionError | SshCommandFailed
 
 export type SshTunnelError = SshTargetInvalid | SshUnavailable | SshConnectionError | TunnelFailed | TunnelTimedOut
+
+export type DirectoryReadError = DirectoryPathInvalid | DirectoryUnreadable | DirectoryCorrupt | DirectoryVersionUnsupported
+
+export type DirectoryWriteError = DirectoryReadError | DirectoryWriteFailed | DirectoryRecordInvalid

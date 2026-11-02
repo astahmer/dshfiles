@@ -1,20 +1,37 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DirectoryStoreError, HostDirectoryStore } from '../src/store.js'
+import { HostDirectory } from '../src/host-directory.js'
 import type { HostRecord, RuntimeRecord } from '../src/records.js'
+import { dataRunner } from './fixtures/data-runtime.js'
 
 const directories: string[] = []
-let originalDshHome: string | undefined
+let runner: ReturnType<typeof dataRunner> | undefined
 
-beforeEach(() => {
-  originalDshHome = process.env.DSH_HOME
-})
+const directory = <A, E>(body: (service: HostDirectory['Service']) => import('effect').Effect.Effect<A, E>) => {
+  if (runner === undefined) throw new Error('Call inHome() first.')
+  return runner.run(HostDirectory.use(body))
+}
+
+/** The directory service with the Promise shape these cases were written against; every call shares one runtime. */
+const HostDirectoryStore = {
+  listHosts: () => directory(service => service.listHosts),
+  listRuntimes: (hostId?: string) => directory(service => service.listRuntimes(hostId)),
+  findHost: (id: string) => directory(service => service.findHost(id)),
+  findRuntime: (id: string) => directory(service => service.findRuntime(id)),
+  readDirectory: () => directory(service => service.read),
+  upsertHost: (record: HostRecord) => directory(service => service.upsertHost(record)),
+  setHostHidden: (input: { readonly id: string; readonly hidden: boolean }) => directory(service => service.setHostHidden(input)),
+  reorderHosts: (ids: readonly string[]) => directory(service => service.reorderHosts(ids)),
+  upsertRuntime: (record: RuntimeRecord) => directory(service => service.upsertRuntime(record)),
+  removeRuntime: (id: string) => directory(service => service.removeRuntime(id)),
+  removeHost: (id: string, removeDirectory: boolean) => directory(service => service.removeHost({ id, removeDirectory })),
+}
 
 afterEach(async () => {
-  if (originalDshHome === undefined) delete process.env.DSH_HOME
-  else process.env.DSH_HOME = originalDshHome
+  await runner?.dispose()
+  runner = undefined
   const owned = directories.splice(0, directories.length)
   await Promise.all(owned.map(directory => rm(directory, { recursive: true, force: true })))
 })
@@ -22,7 +39,7 @@ afterEach(async () => {
 const inHome = async (): Promise<string> => {
   const home = await mkdtemp(join(tmpdir(), 'mh-store-'))
   directories.push(home)
-  process.env.DSH_HOME = home
+  runner = dataRunner({ DSH_HOME: home })
   return home
 }
 
@@ -197,7 +214,7 @@ describe('multi-host directory store', () => {
     await writeFile(dataPath(home, 'directory.json'), original, 'utf8')
 
     await expect(HostDirectoryStore.listHosts()).rejects.toMatchObject({ code: 'directory-corrupt' })
-    await expect(HostDirectoryStore.upsertHost(buildHost('late'))).rejects.toBeInstanceOf(DirectoryStoreError)
+    await expect(HostDirectoryStore.upsertHost(buildHost('late'))).rejects.toMatchObject({ code: 'directory-corrupt' })
     await expect(readFile(dataPath(home, 'directory.json'), 'utf8')).resolves.toBe(original)
   })
 

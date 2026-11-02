@@ -7,7 +7,8 @@ import { Effect, Exit, ManagedRuntime, Schema, Scope } from 'effect'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import type { Gateway } from '../src/connectors/gateway.js'
 import { SshConnector } from '../src/connectors/ssh.js'
-import { RuntimeLaunchFile } from '../src/launch-file.js'
+import { LaunchFile } from '../src/launch-file.js'
+import { dataRunner } from './fixtures/data-runtime.js'
 import { MultiHostSchema } from '../src/schema.js'
 import { Ssh, type SshRun } from '../src/ssh.js'
 import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
@@ -30,6 +31,8 @@ const scratch = async (prefix: string): Promise<string> => {
 }
 
 const runtime = ManagedRuntime.make(sshLayer)
+const data = dataRunner({ DSH_HOME: '/nonexistent/multi-host-ssh-test' })
+const writeLaunchFile = (input: { readonly dshHome: string; readonly launchUrl: string }) => data.run(LaunchFile.use(launchFile => launchFile.write(input)))
 
 const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
   exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
@@ -87,6 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await runtime.dispose()
+  await data.dispose()
   process.env.PATH = originalPath
   for (const directory of temporary.splice(0)) await rm(directory, { recursive: true, force: true })
 })
@@ -250,7 +254,7 @@ describe('ssh tunnel connect', () => {
 
   const remoteHomeWithLaunch = async (port: number): Promise<string> => {
     const home = await scratch('multi-host-fake-remote-home-')
-    await RuntimeLaunchFile.writeLaunchFile({ dshHome: home, launchUrl: `http://127.0.0.1:${port}/?token=fake-remote-token-123456` })
+    await writeLaunchFile({ dshHome: home, launchUrl: `http://127.0.0.1:${port}/?token=fake-remote-token-123456` })
     return home
   }
 
@@ -344,6 +348,6 @@ describe('ssh tunnel connect', () => {
   let remoteHomeFixed = ''
   beforeAll(async () => {
     remoteHomeFixed = await scratch('multi-host-fake-remote-fixed-')
-    await RuntimeLaunchFile.writeLaunchFile({ dshHome: remoteHomeFixed, launchUrl: 'http://127.0.0.1:9/?token=fake-remote-token-123456' })
+    await writeLaunchFile({ dshHome: remoteHomeFixed, launchUrl: 'http://127.0.0.1:9/?token=fake-remote-token-123456' })
   })
 })

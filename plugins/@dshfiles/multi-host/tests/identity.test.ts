@@ -3,7 +3,17 @@ import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
-import { readOrCreateRuntimeIdentity } from '../src/identity.js'
+import { RuntimeIdentity } from '../src/identity.js'
+import { dataRunner } from './fixtures/data-runtime.js'
+
+const readOrCreateRuntimeIdentity = async () => {
+  const runner = dataRunner({ DSH_HOME: process.env.DSH_HOME ?? '', DSH_PROFILE: 'identity-test' })
+  try {
+    return await runner.run(RuntimeIdentity.use(service => service.current))
+  } finally {
+    await runner.dispose()
+  }
+}
 
 const directories: string[] = []
 let originalDshHome: string | undefined

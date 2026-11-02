@@ -26,11 +26,18 @@ import {
 } from './api.js'
 import { connectLocal } from './connectors/local.js'
 import { SshConnector } from './connectors/ssh.js'
-import { LegacyRuntime } from './legacy-runtime-promise.js'
+import { ConnectorKindMismatch, HostNotFound, OriginPortExhausted, RuntimeNotFound } from './errors.js'
+import { HostDirectoryStore, LegacyRuntime, publishLaunchFile, readOrCreateRuntimeIdentity, RemoteThreadStore } from './legacy-runtime-promise.js'
+import { HostDirectory } from './host-directory.js'
+import { RuntimeIdentity as RuntimeIdentityService } from './identity.js'
+import { LaunchFile } from './launch-file.js'
+import { MultiHostPaths } from './paths.js'
+import { RemoteThreads } from './remote-threads.js'
+import { NodeServices } from '@effect/platform-node'
 import { Ssh, shellQuote } from './ssh.js'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { SchemaAST } from 'effect'
+import { ConfigProvider, SchemaAST } from 'effect'
 import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
@@ -40,8 +47,6 @@ import { knownSessionRuntime } from './session-runtime.js'
 import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
 import { ResourceSnapshotModel } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
-import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
-import { RuntimeLaunchFile } from './launch-file.js'
 import { NativeRpcModel } from './native-rpc.js'
 import {
   hostConnectorSchema,
@@ -59,9 +64,7 @@ import { RemoteProvision } from './remote-provision.js'
 import { RemoteRuntime } from './remote-runtime.js'
 import { RemoteCheckout } from './remote-checkout.js'
 import { listSshConfigHosts } from './ssh-config.js'
-import { DirectoryStoreError, HostDirectoryStore } from './store.js'
 import { reduceTranscript } from './transcript.js'
-import { RemoteThreadStore } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
 import { callNativeRpc } from './native-rpc.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
@@ -189,7 +192,6 @@ interface ViewLease {
   readonly timer: ReturnType<typeof setTimeout>
 }
 
-let configuredProfile: string | undefined
 const activeSessionSources = new Set<SessionSourceRegistry>()
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -252,7 +254,7 @@ const allocateRuntimeOriginPort = async (runtimeId: string, occupiedPorts: reado
       unavailable.add(port)
     }
   }
-  throw new DirectoryStoreError('origin-port-exhausted', 'No stable browser origin port is available for this runtime.')
+  throw new OriginPortExhausted()
 }
 
 const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
@@ -305,13 +307,7 @@ const safeFailure = (error: unknown): { readonly code: string; readonly message:
     const code = wireCodeOf(error.constructor.ast)
     if (code !== undefined && error instanceof Error) return { code, message: error.message }
   }
-  if (
-    error instanceof DirectoryStoreError ||
-    error instanceof RuntimeIdentityError ||
-    error instanceof GatewayUnavailableError ||
-    error instanceof GatewayRequestError ||
-    error instanceof IdentityMismatchError
-  ) {
+  if (error instanceof GatewayUnavailableError || error instanceof GatewayRequestError || error instanceof IdentityMismatchError) {
     return { code: error.code, message: error.message }
   }
   if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
@@ -326,9 +322,9 @@ const pool = createGatewayPool({
   isTransportFailure: error => transportFailures.has(failureCode(error)),
   connect: async runtimeId => {
     const runtime = await HostDirectoryStore.findRuntime(runtimeId)
-    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'No recorded runtime has this id.')
+    if (runtime === undefined) throw new RuntimeNotFound({ runtimeId })
     const host = await HostDirectoryStore.findHost(runtime.hostId)
-    if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime has no recorded host.')
+    if (host === undefined) throw new HostNotFound({ hostId: runtime.hostId })
     // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
     const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort !== undefined && { originPort: runtime.originPort }) })
     try {
@@ -576,7 +572,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
 }
 
 const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
-  identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
+  identity: async () => readOrCreateRuntimeIdentity(),
   resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
   resourcePool: async () => readResourcePool(),
   list: async () => {
@@ -805,10 +801,9 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   runtimeUpsert: async ({ input, signal }) => {
     try {
       const host = await HostDirectoryStore.findHost(input.hostId)
-      if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
+      if (host === undefined) throw new HostNotFound({ hostId: input.hostId })
       const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, input.locator)
-      if (locator.kind !== host.connector.kind)
-        throw new DirectoryStoreError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
+      if (locator.kind !== host.connector.kind) throw new ConnectorKindMismatch()
       return { ok: true as const, runtime: runtimeSummary(await register({ host, locator, name: input.name.trim(), signal })) }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
@@ -1393,7 +1388,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     ),
   runtimeOpenView: async ({ input }) => {
     const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
-    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'Choose a recorded runtime before opening its native view.')
+    if (runtime === undefined) throw new RuntimeNotFound({ runtimeId: input.runtimeId })
     if (runtime.originPort === undefined)
       throw new GatewayUnavailableError('runtime-origin-unavailable', 'This runtime has no stable browser origin. Re-register it before opening its view.')
     const existing = [...viewLeases.entries()].find(([, lease]) => lease.runtimeId === runtime.id)
@@ -1505,12 +1500,21 @@ const effectHandlers = {
 } satisfies MultiHostEffectHandlers
 
 const effectPlugin = DshxEffect.plugin({
-  layer: (ctx: Context) =>
-    Ssh.layer.pipe(Layer.provide(DshChildProcessSpawner.layer), Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/multi-host' }))),
-  setup: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) =>
+  layer: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) =>
+    Layer.mergeAll(
+      Ssh.layer.pipe(Layer.provide(DshChildProcessSpawner.layer), Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/multi-host' }))),
+      Layer.mergeAll(HostDirectory.layer, RemoteThreads.layer, RuntimeIdentityService.layer({ configuredProfile: config?.profile }), LaunchFile.layer).pipe(
+        Layer.provideMerge(MultiHostPaths.layer),
+      ),
+    ).pipe(
+      Layer.provide(NodeServices.layer),
+      // The environment as it is when the plugin activates, not Effect's process-start snapshot.
+      Layer.provide(ConfigProvider.layer(Effect.sync(() => ConfigProvider.fromEnvRecord(process.env)))),
+    ),
+  setup: (ctx: Context) =>
     Effect.andThen(
       LegacyRuntime.install,
-      Effect.sync(() => setupHost(ctx, config)),
+      Effect.sync(() => setupHost(ctx)),
     ),
 })
 const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
@@ -1531,8 +1535,7 @@ export default defineHost({
   setup: effectPlugin.setup,
 })
 
-function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>): void {
-  configuredProfile = MultiHostSchema.decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
+function setupHost(ctx: Context): void {
   // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
   ctx.inject(['connection', 'webServer'], scoped => {
     let releaseLaunchFile: (() => Promise<void>) | undefined
@@ -1545,9 +1548,9 @@ function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>
         const connection: ConnectionSurface | undefined = scoped.get('connection')
         const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
         if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-        const published = await RuntimeLaunchFile.publishLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
-        if (disposed) return published.release()
-        releaseLaunchFile = published.release
+        const published = await publishLaunchFile(launchUrl)
+        if (disposed) return published.close()
+        releaseLaunchFile = published.close
       })().catch(() => undefined)
       return () => {
         disposed = true
