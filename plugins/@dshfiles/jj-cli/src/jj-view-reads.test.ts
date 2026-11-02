@@ -29,7 +29,8 @@ const slowViewRead = Effect.gen(function* () {
   yield* fileSystem.writeFileString(path.join(repository, 'file.txt'), 'changed\n')
   yield* jj.exec({ args: ['status'], cwd: repository })
   const pidFile = path.join(root, 'diff-tool.pid')
-  const script = `echo $$ > "${pidFile}.tmp" && mv "${pidFile}.tmp" "${pidFile}" && sleep 2 && echo slow diff done`
+  const spawnLog = path.join(root, 'diff-tool.spawns')
+  const script = `echo $$ >> "${spawnLog}" && echo $$ > "${pidFile}.tmp" && mv "${pidFile}.tmp" "${pidFile}" && sleep 2 && echo slow diff done`
   const command = {
     args: [
       '--ignore-working-copy',
@@ -45,7 +46,8 @@ const slowViewRead = Effect.gen(function* () {
     ],
     cwd: repository,
   }
-  return { command, pidFile }
+  const spawns = Effect.map(fileSystem.readFileString(spawnLog), log => log.trim().split('\n').length)
+  return { command, pidFile, spawns }
 })
 
 const describeAt = (cwd: string) => ({ args: ['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'description'], cwd })
@@ -116,6 +118,7 @@ describe('JjViewReads against real jj', () => {
       expect(isAlive(pid)).toBe(true)
 
       expect((yield* Fiber.join(second)).stdout).toBe('slow diff done\n')
+      expect(yield* slow.spawns).toBe(1)
       const diffs = recorder.named('jj diff')
       expect(diffs).toHaveLength(1)
       expect(diffs[0]?.status._tag === 'Ended' && Exit.isSuccess(diffs[0].status.exit)).toBe(true)
