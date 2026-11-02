@@ -5,5 +5,6 @@ export default defineConfig({
   name: '@dshfiles/memory',
   host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/optmem-core', '@dshfiles/ai-accounts', '@dshfiles/credential-port', '@dshfiles/usage'] },
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  modules: { api: 'src/api.ts', 'workspace-scripts-api': 'src/workspace-scripts-api.ts' },
   build: { sourcemap: true, declarations: false, minify: true },
 })

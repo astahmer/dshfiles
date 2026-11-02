@@ -16,11 +16,11 @@
     "./client": "./dist/client.js",
     "./api": {
       "types": "./src/api.ts",
-      "default": "./src/api.ts"
+      "default": "./dist/api.js"
     },
     "./workspace-scripts-api": {
       "types": "./src/workspace-scripts-api.ts",
-      "default": "./src/workspace-scripts-api.ts"
+      "default": "./dist/workspace-scripts-api.js"
     }
   },
   "scripts": {
