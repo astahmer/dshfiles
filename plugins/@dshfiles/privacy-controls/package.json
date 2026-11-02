@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:",
     "yaml": "catalog:"
   },
@@ -44,6 +45,7 @@
     "@deepseek-ai/dsh-cordis-host-runner": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
