@@ -2,6 +2,7 @@ import type { Events } from '@deepseek-ai/cordis'
 import { Cause, Effect, FiberSet, Queue, type Scope, Stream } from 'effect'
 import { HostContext } from './host-context.js'
 import { causeReport } from './cause-report.js'
+import { detached } from './detached.js'
 
 type EventName = keyof Events & string
 type EventArguments<K extends EventName> = Parameters<Events[K]>
@@ -16,7 +17,7 @@ export const on = <K extends EventName, R>(
 ): Effect.Effect<void, never, Scope.Scope | HostContext | R> =>
   Effect.gen(function* () {
     const host = yield* HostContext
-    const run = yield* FiberSet.makeRuntime<R, void, never>()
+    const run = yield* detached(FiberSet.makeRuntime<R, void, never>())
     const logged = (...args: EventArguments<K>) =>
       handler(...args).pipe(
         Effect.catchCause(cause =>

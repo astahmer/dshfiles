@@ -3,6 +3,8 @@ import { Cause, Context, Deferred, Effect, Exit, Layer, Ref, Schema } from 'effe
 import { defineApi, isApiError, method } from '../src/api/index.js'
 import { Api, DshxPlugin, HostContext, HostEvents, Tool } from '../src/effect/index.js'
 import { createHostApiClient } from '../src/host/index.js'
+import { tracerLayer } from '../src/effect/tracer.js'
+import { recordSpans } from '../src/tracing/index.js'
 import { TestHost } from './effect-test-host.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -330,6 +332,16 @@ describe('DshxPlugin.callback', () => {
         ),
       ).toBe('x')
     }).pipe(Effect.provide(Layer.succeed(Journal, Journal.of({ entries: Ref.makeUnsafe<ReadonlyArray<string>>([]), prefix: 'Hi' })))),
+  )
+
+  it.effect('starts its own trace instead of inheriting the span it was captured under', () =>
+    Effect.gen(function* () {
+      const probe = yield* DshxPlugin.callback(() => Effect.withSpan(Effect.void, 'callback probe')).pipe(Effect.withSpan('plugin activate'))
+      const recorder = recordSpans()
+      yield* Effect.promise(() => probe())
+      recorder.stop()
+      expect(recorder.span('callback probe').parentSpanId).toBeUndefined()
+    }).pipe(Effect.provide(tracerLayer)),
   )
 
   it('is a Cause-preserving PluginActivationError', () => {

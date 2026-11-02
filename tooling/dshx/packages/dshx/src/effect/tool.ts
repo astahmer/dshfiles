@@ -1,5 +1,6 @@
 import type { ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { Effect, type Schema, type Scope } from 'effect'
+import { detachedContext } from './detached.js'
 import { HostContext, type HostServiceMissing, hostService } from './host-context.js'
 import { runtimeOf } from './plugin-runtime.js'
 import { toDefinition } from './tool-edge.js'
@@ -60,7 +61,7 @@ export const register = <Input extends InputSchema, Output, R>(
   Effect.gen(function* () {
     const host = yield* HostContext
     const tools = options.tools ?? (yield* hostService('tools'))
-    const services = yield* Effect.context<R>()
+    const services = yield* detachedContext<R>()
     const runtime = runtimeOf({ services, ctx: host.ctx })
     const definition = toDefinition(tool, () => Promise.resolve(runtime))
     yield* Effect.acquireRelease(

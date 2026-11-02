@@ -8,6 +8,7 @@ import type { ApiBinding } from './api.js'
 import { HostContext } from './host-context.js'
 import { type ActivationSlot, makeActivationSlot, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
 import { causeReport } from './cause-report.js'
+import { detached, detachedContext } from './detached.js'
 import type { AnyEffectTool } from './tool.js'
 import { toDefinition } from './tool-edge.js'
 import { tracerLayer } from './tracer.js'
@@ -114,13 +115,20 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
 }
 
 /**
+ * Fork a plugin-lifetime background loop from a layer: it lives until the plugin Scope closes, and its spans start
+ * their own traces instead of hanging under the `plugin activate` span.
+ */
+export const worker = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<void, never, R | Scope.Scope> =>
+  Effect.asVoid(Effect.forkScoped(detached(effect)))
+
+/**
  * Turn an Effect function into a Promise function that runs in the current services, for a callback API that
  * must stay Promise (a polyfill, a native hook). Capture it inside the plugin (a layer or `main`), not per call.
  */
 export const callback = <Args extends ReadonlyArray<unknown>, A, E, R>(
   body: (...args: Args) => Effect.Effect<A, E, R>,
 ): Effect.Effect<(...args: Args) => Promise<A>, never, R> =>
-  Effect.map(Effect.context<R>(), services => {
+  Effect.map(detachedContext<R>(), services => {
     const run = Effect.runPromiseWith(services)
     return (...args: Args) => run(body(...args))
   })

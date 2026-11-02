@@ -51,7 +51,8 @@
           "tooling/dshx/packages/dshx/src/effect/plugin.ts",
           "tooling/dshx/packages/dshx/src/effect/plugin-runtime.ts",
           "tooling/dshx/packages/dshx/src/effect/tool.ts",
-          "tooling/dshx/packages/dshx/src/effect/dshx-effect.ts"
+          "tooling/dshx/packages/dshx/src/effect/dshx-effect.ts",
+          "tooling/dshx/packages/dshx/src/effect/detached.ts"
         ]
       }
     ],
