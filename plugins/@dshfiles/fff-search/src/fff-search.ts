@@ -11,9 +11,15 @@ type GlobOutcome = typeof FffSearch.globOutcome.Type
 type SearchScope = typeof FffSearch.searchScope.Type
 
 /** A search the caller can fix: missing path, a root that swallows the workspace, or a pattern fff cannot compile. */
-export class FffSearchError extends Schema.TaggedError<FffSearchError>()('FffSearchError', {
-  message: Schema.String,
-}) {}
+export class FffSearchError extends Schema.TaggedError<FffSearchError>()(
+  'FffSearchError',
+  { reason: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'fff-search-failed' },
+) {
+  override get message(): string {
+    return this.reason
+  }
+}
 
 /**
  * The model-facing `grep`/`glob` contract mapped onto fff queries. fff reads query tokens shaped like paths or globs
@@ -67,7 +73,7 @@ export class FffSearch {
    */
   static scope(options: { workingDirectory: string; path: string | undefined; target: string; stats: { isFile: boolean } | undefined }): SearchScope {
     if (options.path === undefined) return { root: options.workingDirectory }
-    if (options.stats === undefined) throw new FffSearchError({ message: `path does not exist: ${options.path}` })
+    if (options.stats === undefined) throw new FffSearchError({ reason: `path does not exist: ${options.path}` })
     const inside = relative(options.workingDirectory, options.target)
     const outsideRoot = inside.startsWith('..') || isAbsolute(inside)
     const parent = resolve(options.target, '..')
@@ -93,7 +99,7 @@ export class FffSearch {
     const inside = relative(options.root, options.workingDirectory)
     if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return
     throw new FffSearchError({
-      message: `path ${options.path} is outside the workspace and contains it; search from ${options.workingDirectory} or a path inside it`,
+      reason: `path ${options.path} is outside the workspace and contains it; search from ${options.workingDirectory} or a path inside it`,
     })
   }
 
@@ -112,9 +118,9 @@ export class FffSearch {
       pages += 1
       // fff defaults to smart case; ripgrep, whose contract this tool keeps, is case-sensitive.
       const page = options.finder.grep(query, { mode, smartCase: false, pageSize: FffSearch.maxGrepMatches, cursor })
-      if (!page.ok) throw new FffSearchError({ message: `grep failed: ${page.error}` })
+      if (!page.ok) throw new FffSearchError({ reason: `grep failed: ${page.error}` })
       if (page.value.regexFallbackError !== undefined) {
-        throw new FffSearchError({ message: `grep pattern is not a valid regular expression: ${page.value.regexFallbackError}` })
+        throw new FffSearchError({ reason: `grep pattern is not a valid regular expression: ${page.value.regexFallbackError}` })
       }
       for (const item of page.value.items) {
         if (options.scope.file !== undefined && item.relativePath !== options.scope.file) continue
@@ -135,7 +141,7 @@ export class FffSearch {
     const anchored =
       options.scope.directory === undefined ? options.pattern : `${options.scope.directory}/${options.pattern.includes('/') ? '' : '**/'}${options.pattern}`
     const result = options.finder.glob(anchored, { pageSize: FffSearch.maxGlobPaths })
-    if (!result.ok) throw new FffSearchError({ message: `glob failed: ${result.error}` })
+    if (!result.ok) throw new FffSearchError({ reason: `glob failed: ${result.error}` })
     const items = options.scope.file === undefined ? result.value.items : result.value.items.filter(item => item.relativePath === options.scope.file)
     return {
       paths: items.map(item => FffSearch.#fromRoot(options.scope.root, item.relativePath, options.workingDirectory)),
