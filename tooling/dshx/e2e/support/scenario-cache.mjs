@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 /**
  * The per-scenario result cache.
@@ -39,18 +40,16 @@ export const scenarioIdOfTest = testInfo => {
   return undefined
 }
 
-const scenarioKeySchema = z.object({
-  id: z.string(),
-  steps: z.string(),
-  digests: z.record(z.string(), z.string()),
-})
-const keyStoreSchema = z.record(z.string(), scenarioKeySchema)
-const receiptStoreSchema = z.record(z.string(), scenarioKeySchema.extend({ passedAt: z.string().optional() }))
+const withUnknownProperties = fields => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const scenarioKeyFields = { id: Schema.String, steps: Schema.String, digests: Schema.Record(Schema.String, Schema.String) }
+const scenarioKeySchema = withUnknownProperties(scenarioKeyFields)
+const keyStoreSchema = Schema.Record(Schema.String, scenarioKeySchema)
+const receiptStoreSchema = Schema.Record(Schema.String, withUnknownProperties({ ...scenarioKeyFields, passedAt: Schema.optional(Schema.String) }))
 
 const readStore = async (path, schema) => {
   try {
-    const parsed = schema.safeParse(JSON.parse(await readFile(path, 'utf8')))
-    return parsed.success ? parsed.data : {}
+    const parsed = Schema.decodeUnknownOption(schema)(JSON.parse(await readFile(path, 'utf8')))
+    return Option.isSome(parsed) ? parsed.value : {}
   } catch {
     return {}
   }

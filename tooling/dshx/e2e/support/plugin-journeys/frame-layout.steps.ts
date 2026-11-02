@@ -1,14 +1,15 @@
 import { expect, type Page } from '@playwright/test'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const FRAME_WIDTHS_KEY = 'dshfiles.frame-layout.v1'
 
-const storedFrameWidthsSchema = z.object({
-  sidebar: z.number(),
-  rightbar: z.number().nullable(),
-  collapsed: z.boolean(),
+const storedFrameWidthsSchema = Schema.Struct({
+  sidebar: Schema.Number,
+  rightbar: Schema.NullOr(Schema.Number),
+  collapsed: Schema.Boolean,
 })
 
 const sidebarHandle = (page: Page) => page.locator('[data-side="sidebar"]')
@@ -29,11 +30,11 @@ const sidebarTrack = (page: Page): Promise<number> =>
     return Number.parseFloat(track)
   })
 
-const storedFrameWidths = async (page: Page): Promise<z.infer<typeof storedFrameWidthsSchema> | null> => {
+const storedFrameWidths = async (page: Page): Promise<Schema.Schema.Type<typeof storedFrameWidthsSchema> | null> => {
   const raw = await page.evaluate(key => localStorage.getItem(key), FRAME_WIDTHS_KEY)
   if (raw === null) return null
-  const parsed = storedFrameWidthsSchema.safeParse(JSON.parse(raw))
-  return parsed.success ? parsed.data : null
+  const parsed = Schema.decodeUnknownOption(storedFrameWidthsSchema)(JSON.parse(raw))
+  return Option.isSome(parsed) ? parsed.value : null
 }
 
 When('the left sidebar handle is dragged {int}px wider', async ({ page }: { page: Page }, delta: number) => {

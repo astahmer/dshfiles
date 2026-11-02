@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { tabPanelId } from '../../../../../plugins/@dshfiles/workbench/src/tab-panels.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
@@ -11,8 +11,8 @@ import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.j
 const title = { empty: 'Welcome empty thread', existing: 'Welcome existing chat' } as const
 const draft = 'My draft belongs to this centered welcome, not the other chat'
 const message = 'First real message from the centered welcome'
-const created = z.object({ sessionId: z.string() })
-const project = z.object({ projectId: z.string() })
+const created = Schema.Struct({ sessionId: Schema.String })
+const project = Schema.Struct({ projectId: Schema.String })
 interface WelcomeJourney {
   readonly empty: string
   readonly existing: string
@@ -67,10 +67,11 @@ When('a real empty fixed conversation and an existing chat are opened', async ({
   const call = await connectDshxApi({ url: profile.url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
   const path = join(profile.homeRoot, 'welcome-project')
   await mkdir(path)
-  const projectId = project.parse(await call('projectRegister', { path, title: 'Welcome project' })).projectId
+  const projectId = Schema.decodeUnknownSync(project)(await call('projectRegister', { path, title: 'Welcome project' })).projectId
   const ids = {
-    empty: created.parse(await call('create', { projectId, title: title.empty })).sessionId,
-    existing: created.parse(await call('create', { projectId, title: title.existing, text: 'Existing chat owns this real message' })).sessionId,
+    empty: Schema.decodeUnknownSync(created)(await call('create', { projectId, title: title.empty })).sessionId,
+    existing: Schema.decodeUnknownSync(created)(await call('create', { projectId, title: title.existing, text: 'Existing chat owns this real message' }))
+      .sessionId,
   }
   journeys.set(page, ids)
   const route = new URL(profile.url)

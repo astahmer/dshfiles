@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict'
 import { createServer, request as requestHttp } from 'node:http'
 import test from 'node:test'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { startMutationResponseProxy } from './mutation-response-proxy.mjs'
 
-const loopbackAddressSchema = z.object({ port: z.number().int().min(1).max(65_535) })
-const sessionListSchema = z.object({
-  result: z.object({ ok: z.literal(true), value: z.object({ items: z.array(z.object({ sessionId: z.string() })) }) }),
+const withUnknownProperties = fields => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const loopbackAddressSchema = withUnknownProperties({
+  port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
+})
+const sessionListSchema = withUnknownProperties({
+  result: withUnknownProperties({
+    ok: Schema.Literal(true),
+    value: withUnknownProperties({ items: Schema.Array(withUnknownProperties({ sessionId: Schema.String })) }),
+  }),
 })
 
 const listenLoopback = async server => {
@@ -14,9 +21,9 @@ const listenLoopback = async server => {
     server.once('error', rejectListen)
     server.listen(0, '127.0.0.1', resolveListen)
   })
-  const address = loopbackAddressSchema.safeParse(server.address())
-  if (!address.success) throw new Error('The loopback upstream did not bind a TCP port.')
-  return address.data.port
+  const address = Schema.decodeUnknownOption(loopbackAddressSchema)(server.address())
+  if (Option.isNone(address)) throw new Error('The loopback upstream did not bind a TCP port.')
+  return address.value.port
 }
 
 const closeServer = async server => {
@@ -89,7 +96,7 @@ test('scratch mutation proxy drops one admitted create reply and bounds loopback
 
       const listResponse = await fetch(`${proxyOrigin}/api/session/list`, { method: 'POST', body: '{}' })
       assert.equal(listResponse.status, 200)
-      const sessionList = sessionListSchema.parse(await listResponse.json())
+      const sessionList = Schema.decodeUnknownSync(sessionListSchema)(await listResponse.json())
       assert.deepEqual(
         sessionList.result.value.items.map(item => item.sessionId),
         ['scratch-session'],

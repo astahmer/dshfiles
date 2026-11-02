@@ -5,40 +5,41 @@ import { access, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir, homedir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { z } from 'zod'
-import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets as redact, reserveLoopbackPort, waitForSshLocalForward } from './smoke-multi-host-ssh-utils.mjs'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
+import {
+  buildSshOptions,
+  quoteRemoteArgument,
+  redactLaunchSecrets as redact,
+  reserveLoopbackPort,
+  waitForSshLocalForward,
+} from './smoke-multi-host-ssh-utils.mjs'
 import WebSocket from 'ws'
 
-const absolutePathSchema = z
-  .string()
-  .trim()
-  .regex(/^\/[^\0\r\n]+$/)
-  .refine(path => !path.split('/').includes('..'))
-const sshPortSchema = z
-  .string()
-  .regex(/^[1-9]\d{0,4}$/)
-  .default('22')
-  .transform(Number)
-  .refine(port => port <= 65_535)
-const smokeConfigSchema = z.object({
-  sshTarget: z
-    .string()
-    .trim()
-    .min(1)
-    .regex(/^[^-\s][^\s]*$/),
+const withUnknownProperties = fields => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const absolutePathSchema = Schema.Trim.check(
+  Schema.isPattern(/^\/[^\0\r\n]+$/u),
+  Schema.makeFilter(path => !path.split('/').includes('..')),
+)
+const sshPortSchema = Schema.Trim.check(Schema.isPattern(/^[1-9]\d{0,4}$/u)).pipe(
+  Schema.decodeTo(Schema.Number.check(Schema.isLessThanOrEqualTo(65_535)), {
+    decode: SchemaGetter.transform(Number),
+    encode: SchemaGetter.transform(String),
+  }),
+)
+const smokeConfigSchema = Schema.Struct({
+  sshTarget: Schema.Trim.check(Schema.isMinLength(1), Schema.isPattern(/^[^-\s][^\s]*$/u)),
   sshKey: absolutePathSchema,
   knownHosts: absolutePathSchema,
   sshPort: sshPortSchema,
-  sshUnit: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9_.@:-]+$/),
+  sshUnit: Schema.Trim.check(Schema.isPattern(/^[A-Za-z0-9_.@:-]+$/u)),
   remoteWorkspace: absolutePathSchema,
   remoteHome: absolutePathSchema,
-  disposableTarget: z.literal('1'),
-  allowRemoteMutations: z.literal('1'),
+  disposableTarget: Schema.Literal('1'),
+  allowRemoteMutations: Schema.Literal('1'),
 })
-const smokeConfig = smokeConfigSchema.safeParse({
+const smokeConfig = Schema.decodeUnknownOption(smokeConfigSchema)({
   sshTarget: process.env.MH_SSH_TARGET,
   sshKey: process.env.MH_SSH_KEY,
   knownHosts: process.env.MH_KNOWN_HOSTS,
@@ -49,12 +50,12 @@ const smokeConfig = smokeConfigSchema.safeParse({
   disposableTarget: process.env.MH_DISPOSABLE_TARGET,
   allowRemoteMutations: process.env.MH_ALLOW_REMOTE_MUTATIONS,
 })
-if (!smokeConfig.success) {
+if (Option.isNone(smokeConfig)) {
   throw new Error(
     'SSH smoke requires explicit MH_SSH_TARGET, private MH_SSH_KEY, MH_KNOWN_HOSTS, MH_UNIT, absolute MH_WS and MH_REMOTE_HOME, plus MH_DISPOSABLE_TARGET=1 and MH_ALLOW_REMOTE_MUTATIONS=1. MH_SSH_PORT is an optional TCP port from 1 to 65535 (default 22). Use only a disposable remote service.',
   )
 }
-const { sshTarget, sshKey, knownHosts, sshPort, sshUnit, remoteWorkspace, remoteHome } = smokeConfig.data
+const { sshTarget, sshKey, knownHosts, sshPort, sshUnit, remoteWorkspace, remoteHome } = smokeConfig.value
 try {
   const [keyInfo, knownHostsInfo] = await Promise.all([stat(sshKey), stat(knownHosts)])
   if (!keyInfo.isFile() || (keyInfo.mode & 0o077) !== 0 || !knownHostsInfo.isFile() || (knownHostsInfo.mode & 0o022) !== 0) {
@@ -66,14 +67,14 @@ try {
 
 const sshOptions = buildSshOptions({ sshKey, knownHosts, sshPort })
 const { connectDshPlatformClient } = await import('../packages/dshx/dist/platform/client.js')
-const launchUrlSchema = z
-  .string()
-  .regex(/^http:\/\/127\.0\.0\.1:(\d{1,5})\/\?token=[A-Za-z0-9._~-]{8,512}$/)
-  .refine(value => {
-    const port = Number(/127\.0\.0\.1:(\d{1,5})\//.exec(value)?.[1])
+const launchUrlSchema = Schema.String.check(
+  Schema.isPattern(/^http:\/\/127\.0\.0\.1:(\d{1,5})\/\?token=[A-Za-z0-9._~-]{8,512}$/u),
+  Schema.makeFilter(value => {
+    const port = Number(/127\.0\.0\.1:(\d{1,5})\//u.exec(value)?.[1])
     return Number.isInteger(port) && port >= 1 && port <= 65_535
-  })
-const launchRecordSchema = z.object({ launchUrl: launchUrlSchema })
+  }),
+)
+const launchRecordSchema = withUnknownProperties({ launchUrl: launchUrlSchema })
 const tunnelHost = '127.0.0.1'
 const observationLimit = 1200
 
@@ -96,13 +97,13 @@ const remote = async command => ssh([command])
 const readLaunchUrl = content => {
   let record
   try {
-    record = launchRecordSchema.safeParse(JSON.parse(content))
+    record = Schema.decodeUnknownOption(launchRecordSchema)(JSON.parse(content))
   } catch {
     record = undefined
   }
-  if (record?.success) return record.data.launchUrl
-  const line = launchUrlSchema.safeParse(content.split('\n', 1)[0]?.trim() ?? '')
-  return line.success ? line.data : undefined
+  if (record !== undefined && Option.isSome(record)) return record.value.launchUrl
+  const line = Schema.decodeUnknownOption(launchUrlSchema)(content.split('\n', 1)[0]?.trim() ?? '')
+  return Option.isSome(line) ? line.value : undefined
 }
 
 const remoteLaunchUrl = async () => {
@@ -417,7 +418,9 @@ try {
   const restartedGateway = makeGateway({ localPort: restartedTunnel.localPort, cookie: restartedCookie })
   const restored = await restartedGateway.runSafe('session', 'list', { _request: {} })
   assert.ok(restored.ok, `a restarted runtime issues a fresh cookie: ${restored.message}`)
-  const restoredPlatform = await connectDshPlatformClient({ url: `http://${tunnelHost}:${restartedTunnel.localPort}/?token=${new URL(replayedLaunch).searchParams.get('token')}` })
+  const restoredPlatform = await connectDshPlatformClient({
+    url: `http://${tunnelHost}:${restartedTunnel.localPort}/?token=${new URL(replayedLaunch).searchParams.get('token')}`,
+  })
   const restoredHistory = await restoredPlatform.sessions.history(remoteSession.sessionId)
   assert.ok(JSON.stringify(restoredHistory.records).includes('Remote proof'))
   const restoredSessions = await restoredPlatform.sessions.list()

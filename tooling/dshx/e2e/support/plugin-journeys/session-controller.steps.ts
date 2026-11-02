@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { ApiProtocolModel } from '../../../packages/dshx/src/api/common.js'
 import { Then, When } from '../bdd.js'
@@ -14,10 +14,10 @@ const INSTRUCTION = 'SESSIONS-API-E2E-INSTRUCTION: keep answers short.'
 
 const threads = new WeakMap<Page, string>()
 
-const rpcResultSchema = z.object({
-  result: z.union([
-    z.object({ ok: z.literal(true), value: z.object({ output: z.unknown() }) }),
-    z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
+const rpcResultSchema = Schema.Struct({
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: Schema.Unknown }) }),
+    Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String }) }),
   ]),
 })
 
@@ -35,7 +35,7 @@ const callSessions = async (page: Page, method: string, input: unknown): Promise
     },
     { endpoint, input },
   )
-  const parsed = rpcResultSchema.parse(body).result
+  const parsed = Schema.decodeUnknownSync(rpcResultSchema)(body).result
   if (!parsed.ok) throw new Error(`sessions.${method} failed (${parsed.error.code}): ${parsed.error.message}`)
   return parsed.value.output
 }
@@ -52,7 +52,7 @@ const waitIdle = async (page: Page): Promise<void> => {
 
 When('a plugin starts a titled thread with a first prompt through the sessions API', async ({ page }: { page: Page }) => {
   const cwd = await createScratchDirectory('dshx-sessions-api-e2e-')
-  const created = z.object({ sessionId: z.string() }).parse(
+  const created = Schema.decodeUnknownSync(Schema.Struct({ sessionId: Schema.String }))(
     await callSessions(page, 'create', {
       cwd,
       title: TITLE,

@@ -3,7 +3,8 @@ import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
@@ -14,10 +15,10 @@ const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 const workbenchNavigation = (page: Page): Locator =>
   page.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation"]').getByRole('navigation', { name: 'Navigation', exact: true })
 
-const createdSessionResponseSchema = z.object({
-  result: z.object({
-    ok: z.literal(true),
-    value: z.object({ sessionId: z.string().min(1) }),
+const createdSessionResponseSchema = Schema.Struct({
+  result: Schema.Struct({
+    ok: Schema.Literal(true),
+    value: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)) }),
   }),
 })
 
@@ -125,8 +126,8 @@ const startBlankThread = async (page: Page): Promise<string> => {
   const recordCreatedThread = async (response: Response): Promise<void> => {
     const request = response.request()
     if (request.method() !== 'POST' || request.postData()?.includes('session/create') !== true) return
-    const parsed = createdSessionResponseSchema.safeParse(await response.json().catch(() => null))
-    if (parsed.success) createdThreadIds.add(parsed.data.result.value.sessionId)
+    const parsed = Schema.decodeUnknownOption(createdSessionResponseSchema)(await response.json().catch(() => null))
+    if (Option.isSome(parsed)) createdThreadIds.add(parsed.value.result.value.sessionId)
   }
   page.on('response', recordCreatedThread)
   try {
@@ -531,7 +532,9 @@ Then('the continuation opens in that project with the conversation and the origi
   })
   await recordAssertion(page, 'thread-sidebar-host-holds-the-original-settled', async () => {
     const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
-    const listed = z.object({ threads: z.array(z.object({ sessionId: z.string(), settled: z.boolean() })) }).parse(await call('list', {}))
+    const listed = Schema.decodeUnknownSync(Schema.Struct({ threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, settled: Schema.Boolean })) }))(
+      await call('list', {}),
+    )
     // The Host's settled set is what blocks the original's next model step, whatever the browser shows.
     expect(listed.threads.find(thread => thread.sessionId === journey.sourceThreadId)?.settled).toBe(true)
     expect(listed.threads.find(thread => thread.sessionId === continuedThreadId)?.settled).toBe(false)
@@ -2260,7 +2263,7 @@ When('the GUI is opened with a prompt link for a registered project', async ({ p
   const call = await connectDshxApi({ url: profile.url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
   const path = join(profile.homeRoot, 'prompt-link-project')
   await mkdir(path)
-  const registered = z.object({ path: z.string() }).parse(await call('projectRegister', { path, title: promptLinkProject }))
+  const registered = Schema.decodeUnknownSync(Schema.Struct({ path: Schema.String }))(await call('projectRegister', { path, title: promptLinkProject }))
   // The tokenized launch URL redirects and drops other parameters; a signed-in browser opens the plain link.
   const link = new URL(new URL(profile.url).origin)
   link.searchParams.set('prompt', promptLinkText)

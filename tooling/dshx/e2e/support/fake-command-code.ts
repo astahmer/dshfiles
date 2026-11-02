@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { createServer } from 'node:http'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { startFakeCommandCode as startFakeServer, type FakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.js'
 
 export type { FakeChatRequest, FakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.js'
@@ -45,11 +46,13 @@ export const startControllableQuotaCommandCode = async (page: Page): Promise<Fak
         resolve()
       })
     })
-    const address = z.object({ port: z.number().int().min(1).max(65_535) }).safeParse(server.address())
-    if (!address.success) throw new Error('Quota proxy has no loopback port.')
+    const address = Schema.decodeUnknownOption(
+      Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)) }),
+    )(server.address())
+    if (Option.isNone(address)) throw new Error('Quota proxy has no loopback port.')
     const fake: FakeCommandCode = {
       ...upstream,
-      baseUrl: `http://127.0.0.1:${String(address.data.port)}`,
+      baseUrl: `http://127.0.0.1:${String(address.value.port)}`,
       close: async () => {
         server.closeAllConnections()
         await new Promise<void>(resolve => server.close(() => resolve()))

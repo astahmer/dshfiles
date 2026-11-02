@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { accountDraftSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
@@ -154,7 +154,9 @@ When('a supported legacy Codex model is selected without validating a new connec
   await expect(card.getByRole('switch')).toBeChecked()
   const home = profileFor(page).homeRoot
   const readLegacy = async () =>
-    z.object({ accounts: z.array(accountDraftSchema) }).parse(JSON.parse(await readFile(join(home, 'plugins/ai-accounts/accounts.json'), 'utf8'))).accounts[0]
+    Schema.decodeUnknownSync(Schema.Struct({ accounts: Schema.Array(accountDraftSchema) }))(
+      JSON.parse(await readFile(join(home, 'plugins/ai-accounts/accounts.json'), 'utf8')),
+    ).accounts[0]
   await expect.poll(async () => (await readLegacy())?.enabled).toBe(true)
   const legacy = await readLegacy()
   if (legacy === undefined) throw new Error('Legacy catalog fixture is not persisted')

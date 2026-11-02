@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 
 interface ThreadRepository {
   readonly temporaryRoot: string
@@ -46,13 +48,11 @@ const threadComposerName = 'Message or run a task, / commands, @ files or sessio
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: newThreadComposerName, exact: true })
-const destinationRequestSchema = z
-  .object({
-    method: z.string().regex(/\/destination$/u),
-    payload: z.object({ input: z.object({ workspaceId: z.string() }).passthrough() }).passthrough(),
-    rpcId: z.string(),
-  })
-  .passthrough()
+const destinationRequestSchema = withUnknownProperties({
+  method: Schema.String.check(Schema.isPattern(/\/destination$/u)),
+  payload: withUnknownProperties({ input: withUnknownProperties({ workspaceId: Schema.String }) }),
+  rpcId: Schema.String,
+})
 const removeComposerAttachment = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const expectDraftAndAttachments = async (page: Page, text: string): Promise<void> => {
   await expect(newThreadComposer(page)).toHaveText(text)
@@ -99,7 +99,7 @@ const descriptionOf = (repository: ThreadRepository, revset: string): string =>
     'description.first_line()',
   ]).trim()
 
-const spareRecords = z.record(z.string(), z.string())
+const spareRecords = Schema.Record(Schema.String, Schema.String)
 
 /** Workspaces the Host keeps checked out ahead of the next New thread; they are not a thread the journey asked for. */
 const prewarmedSpareNames = (repository: ThreadRepository): readonly string[] => {
@@ -107,8 +107,8 @@ const prewarmedSpareNames = (repository: ThreadRepository): readonly string[] =>
   if (!existsSync(file)) return []
   try {
     // The Host records a spare when it is ready; a half-written record must not fail a workspace assertion.
-    const parsed = spareRecords.safeParse(JSON.parse(readFileSync(file, 'utf8')))
-    return parsed.success ? Object.values(parsed.data) : []
+    const parsed = Schema.decodeUnknownOption(spareRecords)(JSON.parse(readFileSync(file, 'utf8')))
+    return Option.isSome(parsed) ? Object.values(parsed.value) : []
   } catch {
     return []
   }
@@ -709,8 +709,8 @@ When('the New thread destination lookup is held', async ({ page }: { page: Page 
     release: () => releaseLookup?.(),
   })
   await page.context().route('**/api/**', async route => {
-    const parsedRequest = destinationRequestSchema.safeParse(route.request().postDataJSON())
-    if (!parsedRequest.success || requestSeen) return route.continue()
+    const parsedRequest = Schema.decodeUnknownOption(destinationRequestSchema)(route.request().postDataJSON())
+    if (Option.isNone(parsedRequest) || requestSeen) return route.continue()
     requestSeen = true
     await lookupGate
     return route.continue()
@@ -738,10 +738,10 @@ Then('the completed first send leaves Backlog selected', async ({ page }: { page
 When('the next five New thread destination lookups fail', async ({ page }: { page: Page }) => {
   let remainingFailures = 5
   await page.context().route('**/api/**', async route => {
-    const parsedRequest = destinationRequestSchema.safeParse(route.request().postDataJSON())
-    if (!parsedRequest.success || remainingFailures === 0) return route.continue()
+    const parsedRequest = Schema.decodeUnknownOption(destinationRequestSchema)(route.request().postDataJSON())
+    if (Option.isNone(parsedRequest) || remainingFailures === 0) return route.continue()
     remainingFailures -= 1
-    const request = parsedRequest.data
+    const request = parsedRequest.value
     return route.fulfill({
       status: 200,
       contentType: 'application/json',

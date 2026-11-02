@@ -5,9 +5,13 @@ import { createConnection, createServer } from 'node:net'
 import { delimiter, join, resolve, sep } from 'node:path'
 import { tmpdir, userInfo } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
-const boundPortSchema = z.object({ port: z.number().int().min(1).max(65_535) })
+const withUnknownProperties = fields => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const boundPortSchema = withUnknownProperties({
+  port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
+})
 
 const findExecutable = async name => {
   for (const directory of (process.env.PATH ?? '').split(delimiter)) {
@@ -25,13 +29,13 @@ export const reserveLoopbackPort = async () =>
     const server = createServer()
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => {
-      const address = boundPortSchema.safeParse(server.address())
-      if (!address.success) {
+      const address = Schema.decodeUnknownOption(boundPortSchema)(server.address())
+      if (Option.isNone(address)) {
         server.close()
         reject(new Error('Could not reserve a loopback port.'))
         return
       }
-      server.close(error => (error ? reject(error) : resolvePort(address.data.port)))
+      server.close(error => (error ? reject(error) : resolvePort(address.value.port)))
     })
   })
 

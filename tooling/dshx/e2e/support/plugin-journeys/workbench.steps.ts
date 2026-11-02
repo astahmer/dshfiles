@@ -1,10 +1,11 @@
 import { expect, test, type ConsoleMessage, type ElementHandle, type Locator, type Page } from '@playwright/test'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { tabPanelId } from '../../../../../plugins/@dshfiles/workbench/src/tab-panels.js'
 import { OPEN_THREAD_IN_MAIN_TAB_EVENT } from '../../../../../plugins/@dshfiles/thread-sidebar/src/main-tab-request.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 import { After, Given, Then, When } from '../bdd.js'
 import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
@@ -959,7 +960,7 @@ When('legacy global conversation aliases are restored beside the fixed tabs', as
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key) ?? '', MAIN_LAYOUT_KEY)).toContain(tabPanelId(`thread:${ids.first}`))
   const raw = await page.evaluate(key => localStorage.getItem(key), MAIN_LAYOUT_KEY)
   if (raw === null) throw new Error('Workbench lifecycle layout was not saved.')
-  const layout = legacyFloatingRecoverySchema.parse(JSON.parse(raw))
+  const layout = Schema.decodeUnknownSync(legacyFloatingRecoverySchema)(JSON.parse(raw))
   const leaf = layout.grid.root.data[0]
   const original = layout.panels[tabPanelId(`thread:${ids.first}`)]
   if (leaf === undefined || original === undefined) throw new Error('The real fixed panel has no saved root leaf.')
@@ -2139,9 +2140,13 @@ Given('an isolated Workbench recovery profile with Main Tabs and demo views is b
   await bootWorkbenchViewProfile(page, true)
 })
 
-const legacyViewLayoutSchema = z.looseObject({
-  panels: z.record(z.string(), z.looseObject({ id: z.string(), title: z.string().optional() })),
-})
+const legacyViewLayoutFields = {
+  panels: Schema.Record(
+    Schema.String,
+    Schema.mutableKey(withUnknownProperties({ id: Schema.String, title: Schema.mutableKey(Schema.optional(Schema.String)) })),
+  ),
+}
+const legacyViewLayoutSchema = withUnknownProperties(legacyViewLayoutFields)
 const PREVIEW_SOURCE_ID = 'dshfiles-thread-sidebar.workbench-status'
 const SCRATCHPAD_SOURCE_ID = 'dshfiles-workbench.scratchpad'
 
@@ -2198,7 +2203,7 @@ When('legacy reusable view titles are saved with their original panel IDs and re
     await expect.poll(() => page.evaluate(key => localStorage.getItem(key) ?? '', key)).toContain(id)
     const raw = await page.evaluate(key => localStorage.getItem(key), key)
     if (raw === null) throw new Error(`Missing saved layout fixture: ${key}`)
-    const layout = legacyViewLayoutSchema.parse(JSON.parse(raw))
+    const layout = Schema.decodeUnknownSync(legacyViewLayoutSchema)(JSON.parse(raw))
     const panel = layout.panels[id]
     if (panel === undefined || panel.id !== id) throw new Error(`Missing original reusable panel identity: ${id}`)
     panel.title = oldTitle
@@ -2416,14 +2421,15 @@ Then('Reset visibly restores the left thread list and current chat with history 
   await assertVisibleResetChat(page)
 })
 
-const legacyFloatingRecoverySchema = legacyViewLayoutSchema.extend({
-  grid: z.looseObject({
-    root: z.looseObject({
-      type: z.literal('branch'),
-      data: z.array(
-        z.looseObject({
-          type: z.literal('leaf'),
-          data: z.looseObject({ id: z.string(), views: z.array(z.string()) }),
+const legacyFloatingRecoverySchema = withUnknownProperties({
+  ...legacyViewLayoutFields,
+  grid: withUnknownProperties({
+    root: withUnknownProperties({
+      type: Schema.Literal('branch'),
+      data: Schema.Array(
+        withUnknownProperties({
+          type: Schema.Literal('leaf'),
+          data: withUnknownProperties({ id: Schema.String, views: Schema.mutable(Schema.Array(Schema.String)) }),
         }),
       ),
     }),
@@ -2439,7 +2445,7 @@ When('a legacy all-floating main layout with collapsed left is restored', async 
   await expect(paneRoot(page, 'left')).toBeHidden()
   const raw = await page.evaluate(key => localStorage.getItem(key), MAIN_LAYOUT_KEY)
   if (raw === null) throw new Error('The recovered main layout was not persisted.')
-  const layout = legacyFloatingRecoverySchema.parse(JSON.parse(raw))
+  const layout = Schema.decodeUnknownSync(legacyFloatingRecoverySchema)(JSON.parse(raw))
   expect(layout.grid.root.data.length).toBeGreaterThan(0)
   const legacy = {
     ...layout,
