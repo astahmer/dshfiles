@@ -1560,11 +1560,22 @@ const effectPlugin = DshxEffect.plugin({
     }),
 })
 
+class JjIntegrationOperationFailure extends Schema.TaggedError<JjIntegrationOperationFailure>()('JjIntegrationOperationFailure', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
+
 const effectify = <Input, Output>(name: string, handler: ApiHandler<Input, Output>) =>
   Effect.fn(`jj-integration ${name}`)((context: ApiHandlerContext<Input>) =>
     Effect.tryPromise({
       try: signal => Promise.resolve(handler({ ...context, signal })),
-      catch: error => error,
+      catch: error =>
+        error instanceof PluginApiError
+          ? error
+          : new JjIntegrationOperationFailure({
+              operation: name,
+              message: error instanceof Error ? error.message : String(error),
+            }),
     }),
   )
 
@@ -1807,17 +1818,26 @@ const setupHostLifecycle = (context: Context, services: JjHostServices): AsyncIt
     executor: createExecutor(context),
     bookmark: () => readSettings().bookmark,
     threadsDirectory,
-    gitWorktree: async (repoRoot, args) => {
-      const executable = await services.subprocess.resolveExecutable('git')
-      const handle = services.subprocess.spawn({
-        argv: [executable, '-C', repoRoot, 'worktree', ...args],
-        cwd: repoRoot,
-        stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
-        graceMs: 1_500,
-      })
-      const outcome = await handle.done
-      if (outcome.exitCode !== 0) throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
-    },
+    gitWorktree: async (repoRoot, args) =>
+      withSpan(
+        'git worktree',
+        { kind: 'client', attributes: { 'process.executable.name': 'git', 'process.command.verb': 'worktree' } },
+        async span => {
+          const executable = await services.subprocess.resolveExecutable('git')
+          const handle = services.subprocess.spawn({
+            argv: [executable, '-C', repoRoot, 'worktree', ...args],
+            cwd: repoRoot,
+            stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
+            graceMs: 1_500,
+          })
+          const outcome = await handle.done
+          span.setAttributes({ 'process.exit.code': outcome.exitCode ?? 'unknown' })
+          if (outcome.exitCode !== 0) {
+            span.setStatus('error', `exit ${String(outcome.exitCode)}`)
+            throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
+          }
+        },
+      ),
   })
   const projectChecks = createHostApiClient(context, projectChecksApi, '@dshfiles/jj-integration')
   const handleVerifiedTurn = async (verifiedTurn: ProjectChecksVerifiedTurn): Promise<void> => {
