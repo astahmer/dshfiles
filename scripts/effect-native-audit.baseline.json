@@ -336,14 +336,14 @@
     "syncDecodeInEffect": 0
   },
   "@dshfiles/mcp-servers": {
-    "layerEmpty": 1,
-    "promiseAdapters": 4,
-    "moduleState": 1,
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
-    "globalFetch": 1,
-    "testMocks": 23,
+    "globalFetch": 0,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -457,15 +457,15 @@
   },
   "@dshfiles/project-checks": {
     "layerEmpty": 0,
-    "promiseAdapters": 4,
-    "moduleState": 7,
-    "timers": 1,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 2,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "testMocks": 1,
+    "testMocks": 0,
     "runOutsideEdges": 0,
-    "syncDecodeInEffect": 5
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/prompt-stash": {
     "layerEmpty": 0,

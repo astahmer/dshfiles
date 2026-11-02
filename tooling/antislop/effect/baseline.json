@@ -2,13 +2,10 @@
   "effect-migration(no-cause-dropping-catch)": {
     "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1,
-    "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
-    "plugins/@dshfiles/project-checks/src/host.ts": 4,
     "plugins/@dshfiles/session-search/src/host.ts": 4
   },
   "effect-migration(no-empty-plugin-layer)": {
     "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
-    "plugins/@dshfiles/mcp-servers/src/host.ts": 1,
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
   "effect-migration(no-gen-inside-fn)": {
@@ -54,7 +51,6 @@
     "plugins/@dshfiles/optmem-core/src/engine.ts": 6,
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
     "plugins/@dshfiles/preview/src/host.ts": 1,
-    "plugins/@dshfiles/project-checks/src/managed-process.ts": 1,
     "plugins/@dshfiles/session-search/src/worker-client.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 2,
     "plugins/@dshfiles/thread-sidebar/src/restart.ts": 1,
@@ -76,14 +72,12 @@
     "plugins/@dshfiles/git-worktrees/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 7,
-    "plugins/@dshfiles/mcp-servers/src/host.ts": 1,
     "plugins/@dshfiles/memory/src/host.ts": 6,
     "plugins/@dshfiles/multi-host/src/host.ts": 1,
     "plugins/@dshfiles/multi-host/src/store.ts": 1,
     "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2,
-    "plugins/@dshfiles/project-checks/src/host.ts": 7,
     "plugins/@dshfiles/queue-reorder/src/host.ts": 1,
     "plugins/@dshfiles/references/src/host.ts": 3,
     "plugins/@dshfiles/resource-packs/src/host.ts": 1,
@@ -102,7 +96,6 @@
     "plugins/@dshfiles/fff-search/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
-    "plugins/@dshfiles/project-checks/src/host.ts": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
