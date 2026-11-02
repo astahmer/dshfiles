@@ -15,6 +15,7 @@ import { toolSourceSnapshotsEqual } from './tool-source-snapshots.js'
 import { jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
+import { NodeFileSystem } from '@effect/platform-node'
 import { observeLiveCall } from './live-calls.js'
 import { OtlpMetricsExporter } from './otel-exporter.js'
 import { createRatePricer } from './pricing.js'
@@ -22,7 +23,10 @@ import { openUsageStore, type UsageStore } from './store.js'
 
 const INDEX_INTERVAL_MS = 30_000
 const otlpServiceName = OtlpMetricsExporter.serviceName(process.env)
-const usageIndexService = createUsageIndexService({ fileSystem: { readdir, stat }, readLogFrom })
+const usageIndexService = createUsageIndexService({
+  fileSystem: { readdir, stat },
+  readLogFrom: input => Effect.runPromise(readLogFrom(input).pipe(Effect.provide(NodeFileSystem.layer))),
+})
 
 const persistenceConfigSchema = Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) })
 

@@ -2,12 +2,17 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { appendFile, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
+import { NodeFileSystem } from '@effect/platform-node'
 import { openUsageStore, type UsageStore } from './store.js'
 
-const usageIndexService = createUsageIndexService({ fileSystem: { readdir, stat }, readLogFrom })
+const usageIndexService = createUsageIndexService({
+  fileSystem: { readdir, stat },
+  readLogFrom: input => Effect.runPromise(readLogFrom(input).pipe(Effect.provide(NodeFileSystem.layer))),
+})
 
 const FIXTURES = new URL('../fixtures/sessions', import.meta.url).pathname
 const SUBAGENT_LOG = join(FIXTURES, '-home-user-dev-sample/557dd85e-cb22-4b10-a70e-39dabec1bfde/session.v4.jsonl.zstd')

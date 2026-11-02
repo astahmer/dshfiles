@@ -2,7 +2,7 @@ import { basename, dirname, join } from 'node:path'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import type { readdir, stat } from 'node:fs/promises'
 import { UsageFoldModel, type ToolSourceMetadata } from './fold.js'
-import type { readLogFrom } from './session-log.js'
+import type { LogChunk } from './session-log.js'
 import type { UsageStore } from './store.js'
 
 const LOG_NAME = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/
@@ -16,7 +16,7 @@ type UsageIndexFileSystem = {
 
 type UsageIndexDependencies = {
   readonly fileSystem: UsageIndexFileSystem
-  readonly readLogFrom: typeof readLogFrom
+  readonly readLogFrom: (input: { readonly path: string; readonly fromOffset: number; readonly size: number }) => Promise<LogChunk>
 }
 
 const yieldToHost = (): Promise<void> => new Promise(resolve => setImmediate(resolve))
