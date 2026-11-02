@@ -27,8 +27,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:",
-    "write-file-atomic": "catalog:",
-    "zod": "catalog:"
+    "write-file-atomic": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

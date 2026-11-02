@@ -14,7 +14,6 @@ import {
 import type { Context } from '@deepseek-ai/cordis'
 import { Effect, Layer, Schedule, Schema } from 'effect'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
-import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
 import { AgentCommunicationLifecycle } from './agent-lifecycle.js'
@@ -77,7 +76,7 @@ const summaryOutput = {
   },
 }
 
-const workspaceLookupInputSchema = z.object({ sessionId: z.string().min(1).max(256) }).strict()
+const workspaceLookupInputSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) })
 
 /**
  * The agent that started a thread, when the agents bundle serves the registry. An absent bundle, a missing Session row
@@ -165,7 +164,7 @@ const workspaceLookupTool = defineTool({
       operation: 'dshx_comm_workspace',
       run: async () => {
         if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
-        const input = workspaceLookupInputSchema.parse(args)
+        const input = Schema.decodeUnknownSync(workspaceLookupInputSchema)(args)
         const caller = execution.agent
         if (caller === undefined) return { summary: JSON.stringify({ status: 'caller-unavailable' }) }
 
@@ -242,7 +241,7 @@ const historySearchTool = defineTool({
       operation: 'dshx_comm_history',
       run: async () => {
         if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
-        const input = SessionHistoryModel.searchInputSchema.parse(args)
+        const input = Schema.decodeUnknownSync(SessionHistoryModel.searchInputSchema)(args)
         const caller = execution.agent
         if (caller === undefined) return { summary: JSON.stringify({ status: 'caller-unavailable' }) }
 

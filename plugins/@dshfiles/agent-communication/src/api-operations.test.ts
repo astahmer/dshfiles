@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   CommunicationService,
@@ -135,9 +136,9 @@ describe('Agent communication API operations', () => {
 
   it('validates message targets and paginates a direct conversation without duplicate pages', async () => {
     const { operations } = await createTestOperations()
-    expect(postMessageInputSchema.safeParse({ text: 'missing target' }).success).toBe(false)
-    expect(postMessageInputSchema.safeParse({ topic: 'workspace/demo', agentId: 'agent-reader', text: 'ambiguous' }).success).toBe(false)
-    expect(browseMessagesInputSchema.safeParse({ topic: 'workspace/demo', agentId: 'agent-reader' }).success).toBe(false)
+    expect(Schema.is(postMessageInputSchema)({ text: 'missing target' })).toBe(false)
+    expect(Schema.is(postMessageInputSchema)({ topic: 'workspace/demo', agentId: 'agent-reader', text: 'ambiguous' })).toBe(false)
+    expect(Schema.is(browseMessagesInputSchema)({ topic: 'workspace/demo', agentId: 'agent-reader' })).toBe(false)
 
     for (let index = 0; index < 5; index += 1) {
       await operations.postMessage({ agentId: 'agent-reader', text: `direct ${index}` })
