@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { ApiPayload } from './registry.js'
 import type { ApiError, ApiErrorKind } from './types.js'
 import { resolveApiSchema } from './schema.js'
 
@@ -109,6 +110,33 @@ export class ApiProtocolModel {
 
   /** Key-sorted JSON of a call input, so equal inputs written in another key order share one fingerprint. */
   static readonly stableJson = (value: unknown): string => formatStableJson(value)
+
+  /**
+   * A Client input becomes the JSON on the wire, where an object member holding `undefined` simply disappears. Callers
+   * write an absent optional field as `field: undefined`, so the payload is normalized the same way before it reaches
+   * the strict JSON contract. Undefined inside an array still fails there: JSON would silently turn it into `null`.
+   */
+  static jsonInput(value: ApiPayload): ApiPayload {
+    const active = new Set<object>()
+    const normalize = (item: ApiPayload, depth: number): ApiPayload => {
+      if (depth > 100 || item === null || typeof item !== 'object' || active.has(item)) return item
+      if (Object.getOwnPropertySymbols(item).length > 0) return item
+      active.add(item)
+      try {
+        if (Array.isArray(item)) return item.map(entry => normalize(entry, depth + 1))
+        const prototype = Object.getPrototypeOf(item)
+        if (prototype !== Object.prototype && prototype !== null) return item
+        const entries = Object.entries(Object.getOwnPropertyDescriptors(item))
+        if (entries.some(([, descriptor]) => descriptor.get !== undefined || descriptor.set !== undefined || !descriptor.enumerable)) return item
+        return Object.fromEntries(
+          entries.filter(([, descriptor]) => descriptor.value !== undefined).map(([key, descriptor]) => [key, normalize(descriptor.value, depth + 1)]),
+        )
+      } finally {
+        active.delete(item)
+      }
+    }
+    return normalize(value, 0)
+  }
 
   static jsonBytes(value: unknown): number {
     if (value === undefined) return 0

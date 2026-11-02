@@ -53,7 +53,7 @@ describe('installed protocol-2 contract regressions', () => {
     expect(() => api.host({ ping: () => null }, { authority: 'loopback' })).toThrow('native Connection')
   })
 
-  it.each([NaN, Infinity, new Date(), new Map(), { nested: undefined }, { nested: () => 1 }])('rejects lossy JSON payload %s before transport', async input => {
+  it.each([NaN, Infinity, new Date(), new Map(), [undefined], () => 1, { nested: () => 1 }])('rejects lossy JSON payload %s before transport', async input => {
     const api = defineApi({
       id: 'example',
       version: 1,
@@ -74,5 +74,29 @@ describe('installed protocol-2 contract regressions', () => {
     await expect(client.ping(input)).rejects.toMatchObject({
       kind: 'contract',
     })
+  })
+
+  it('drops an object member written as undefined before transport, as the JSON on the wire would', async () => {
+    const api = defineApi({
+      id: 'example',
+      version: 1,
+      methods: { ping: method<unknown, null>() },
+    })
+    const sent: unknown[] = []
+    const client = ApiRuntimeModel.createClient(
+      {
+        get: () => ({
+          rpc: {
+            call: (_path: string, _endpoint: string, request: { readonly input?: unknown }) => {
+              sent.push(request.input)
+              return { ok: true, value: { version: api.version, output: null } }
+            },
+          },
+        }),
+      },
+      api,
+    )
+    await expect(client.ping({ nested: undefined, kept: 1, deeper: { absent: undefined, present: 'yes' } })).resolves.toBeNull()
+    expect(sent).toEqual([{ kept: 1, deeper: { present: 'yes' } }])
   })
 })

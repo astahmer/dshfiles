@@ -158,17 +158,18 @@ function createApiClient<
     try {
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
-      ApiProtocolModel.jsonBytes(input)
+      const payload = ApiProtocolModel.jsonInput(input)
+      ApiProtocolModel.jsonBytes(payload)
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       const request =
         span?.context === undefined
-          ? { version: contract.version, input }
-          : { version: contract.version, input, [TraceparentModel.envelopeField]: TraceparentModel.format(span.context) }
+          ? { version: contract.version, input: payload }
+          : { version: contract.version, input: payload, [TraceparentModel.envelopeField]: TraceparentModel.format(span.context) }
       const endpoint = `${channel.slice(1)}/${name}`
       const result = isReadOnly(contract.methods[name])
         ? await coalesce(
             inflightCalls(rpc),
-            `${endpoint}\0${contract.version}\0${ApiProtocolModel.stableJson(input)}`,
+            `${endpoint}\0${contract.version}\0${ApiProtocolModel.stableJson(payload)}`,
             signal => rpc.call('/api', endpoint, request, signal),
             options?.signal,
           ).then(shared => {

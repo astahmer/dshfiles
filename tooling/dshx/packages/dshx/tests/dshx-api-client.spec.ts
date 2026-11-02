@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { defineApi, isApiOwnerMissing, method, PluginApiError } from '../src/api/index.js'
+import type { ApiPayload } from '../src/api/registry.js'
+import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { defineHost } from '../src/host/index.js'
 import { connectDshxApiClient } from '../src/platform/index.js'
 import { createTestHost } from '../src/testing/index.js'
@@ -64,5 +66,47 @@ describe('connectDshxApiClient', () => {
   it('needs a contract owner to address the route', async () => {
     const ownerless = defineApi({ id: 'ownerless', version: 1, methods: { ping: method<void, string>() } })
     await expect(connectDshxApiClient(ownerless, { origin: 'http://dshx.test' })).rejects.toThrow('declares no owner')
+  })
+})
+
+const echoApi = defineApi({
+  id: 'echo',
+  version: 1,
+  owner: '@test/echo',
+  methods: {
+    find: method({
+      input: Schema.Struct({ id: Schema.String, tag: Schema.optional(Schema.String), scope: Schema.Struct({ project: Schema.optional(Schema.String) }) }),
+      output: Schema.Struct({ ok: Schema.Boolean }),
+    }),
+  },
+})
+
+const clientOf = (call: (request: { readonly input?: ApiPayload }) => ApiPayload) =>
+  ApiRuntimeModel.createClient(
+    { get: () => ({ rpc: { call: async (_path: string, _endpoint: string, request: { readonly input?: ApiPayload }) => call(request) } }) },
+    echoApi,
+    '@test/echo',
+  )
+
+describe('Client input JSON normalization', () => {
+  it('drops an object member written as undefined the way the JSON on the wire does', async () => {
+    const sent: unknown[] = []
+    const api = clientOf(request => {
+      sent.push(request.input)
+      return { ok: true, value: { version: echoApi.version, output: { ok: true } } }
+    })
+
+    await api.find({ id: 'a', tag: undefined, scope: { project: undefined } })
+
+    expect(sent).toEqual([{ id: 'a', scope: {} }])
+  })
+
+  it('still rejects a Host output that carries undefined', async () => {
+    const api = clientOf(() => ({ ok: true, value: { version: echoApi.version, output: { ok: undefined } } }))
+
+    await expect(api.find({ id: 'a', scope: {} })).rejects.toMatchObject({
+      kind: 'contract',
+      message: 'API payload must contain only JSON values; undefined is permitted only for a void root.',
+    })
   })
 })
