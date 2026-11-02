@@ -163,6 +163,7 @@ it('drives threads through MCP tools backed by the sessions API, one span per re
     expect(JSON.stringify(listed.content)).toContain('Fix login')
     const span = recorder.span('mcp request')
     expect(span.attributes).toMatchObject({ 'dshx.mcp.outcome': 'accepted', 'mcp.method.name': 'tools/call', 'gen_ai.tool.name': 'list_threads' })
+    expect(recorder.span('list_threads')).toBeDefined()
   } finally {
     recorder.stop()
   }

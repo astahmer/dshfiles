@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
 import { Effect, Schema } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import type { SessionsClient } from './sessions-client.js'
 
 export interface ProjectRow {
@@ -41,7 +42,7 @@ const run = <Value>(name: string, call: () => Promise<Value>): Promise<CallToolR
           onSuccess: value => textResult(JSON.stringify(value, null, 2)),
         }),
       ),
-    )(),
+    )().pipe(Effect.provide(DshxEffect.tracerLayer)),
   )
 
 /** The JSON Schema MCP publishes for a tool's arguments, validated from the document Effect emits. */
