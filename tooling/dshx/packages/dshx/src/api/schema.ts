@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import * as Schema from 'effect/Schema'
 
 export type EffectApiSchemaShape<Input = unknown, Output = Input> = {
   readonly Encoded: Input
@@ -27,7 +28,12 @@ export const resolveApiSchema = <Input = unknown, Output = Input>(schema: unknow
     }
   }
   if (effectSchemaConverter === undefined) {
-    throw new TypeError('Effect Schema requires importing DshxEffect from @dshfiles/dshx/effect before defining the API.')
+    if (Schema.isSchema(schema)) {
+      const convertedSchema = Schema.toStandardSchemaV1(schema as Schema.Codec<unknown, unknown>)
+      normalizedSchemas.set(schema, convertedSchema)
+      return convertedSchema as StandardSchemaV1<Input, Output>
+    }
+    throw new TypeError('API schema must be a Standard Schema, an Effect Schema, or a schema registered by @dshfiles/dshx/effect.')
   }
   const converted = effectSchemaConverter(schema as EffectApiSchemaShape)
   normalizedSchemas.set(schema, converted)

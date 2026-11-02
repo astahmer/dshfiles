@@ -62,9 +62,9 @@
   "apiMethods": 446,
   "apiToolBindings": 307,
   "apiToolNameCount": 307,
-  "apiToolSchemas": 75,
+  "apiToolSchemas": 74,
   "definedTools": 24,
-  "tools": 99,
+  "tools": 98,
   "schemas": [
     {
       "name": "background_jobs_board",
@@ -242,19 +242,18 @@
             "type": "string"
           },
           "project": {
-            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others).",
-            "type": "string"
+            "type": "string",
+            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others)."
           },
           "limit": {
-            "description": "Hits to return, 1 to 20; default 8.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Hits to return, 1 to 20; default 8."
           },
           "cursor": {
-            "description": "nextCursor from an earlier call with the same query; a cursor from a changed corpus is refused.",
-            "type": "string"
+            "type": "string",
+            "description": "nextCursor from an earlier call with the same query; a cursor from a changed corpus is refused."
           },
           "availability": {
-            "description": "Restrict to Sessions whose log is live in this Host, persisted on disk, or either.",
             "type": "array",
             "items": {
               "type": "string",
@@ -262,19 +261,20 @@
                 "live",
                 "persisted"
               ]
-            }
+            },
+            "description": "Restrict to Sessions whose log is live in this Host, persisted on disk, or either."
           },
           "createdFrom": {
-            "description": "Earliest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp.",
-            "type": "string"
+            "type": "string",
+            "description": "Earliest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp."
           },
           "createdTo": {
-            "description": "Latest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp.",
-            "type": "string"
+            "type": "string",
+            "description": "Latest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp."
           },
           "includeNotes": {
-            "description": "Also return matching notes as separate labeled items; default false.",
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Also return matching notes as separate labeled items; default false."
           }
         },
         "required": [
@@ -299,8 +299,7 @@
         "required": [
           "path",
           "force"
-        ],
-        "additionalProperties": false
+        ]
       }
     },
     {
@@ -315,13 +314,12 @@
         },
         "required": [
           "path"
-        ],
-        "additionalProperties": false
+        ]
       }
     },
     {
       "name": "memory_archive_note",
-      "description": "Archive one note without deleting it. It remains visible in the Memory panel but is excluded from memory tools. Call only when the user asked to archive it.",
+      "description": "Archive one note without deleting it. It remains visible in the Memory panel but is excluded from memory tools. Call only when the user asked to archive that note.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -342,12 +340,12 @@
         "type": "object",
         "properties": {
           "thread": {
-            "description": "Only citations made in this Session.",
-            "type": "string"
+            "type": "string",
+            "description": "Only citations made in this Session."
           },
           "ref": {
-            "description": "Only citations of this memory id (n:<id> or t:<session id>).",
-            "type": "string"
+            "type": "string",
+            "description": "Only citations of this memory id (n:<id> or t:<session id>)."
           }
         },
         "additionalProperties": false
@@ -378,7 +376,6 @@
             "type": "string"
           },
           "reason": {
-            "description": "Empty: \"edited in the Memory panel\".",
             "type": "string"
           }
         },
@@ -419,47 +416,47 @@
         "type": "object",
         "properties": {
           "action": {
-            "description": "Default add.",
             "type": "string",
             "enum": [
               "add",
               "update",
               "forget"
-            ]
+            ],
+            "description": "Default add."
           },
           "text": {
-            "description": "The note (add, update): one or two sentences.",
-            "type": "string"
+            "type": "string",
+            "description": "The note (add, update): one or two sentences."
           },
           "category": {
-            "description": "user: who the user is, their role, expertise, preferences. feedback: a correction or a confirmed approach, with the why. project: a decision, constraint or context not derivable from code or git. reference: a pointer to an external resource. Default project.",
             "type": "string",
             "enum": [
               "user",
               "feedback",
               "project",
               "reference"
-            ]
+            ],
+            "description": "user: who the user is, their role, expertise, preferences. feedback: a correction or a confirmed approach, with the why. project: a decision, constraint or context not derivable from code or git. reference: a pointer to an external resource. Default project."
           },
           "scope": {
-            "description": "repo (default), global, path:<subpath>, or agent:<handle> for a scope only that agent’s threads read. Do not widen a one-off request into a global rule.",
-            "type": "string"
+            "type": "string",
+            "description": "repo (default), global, path:<subpath>, or agent:<handle> for a scope only that agent’s threads read. Do not widen a one-off request into a global rule."
           },
           "confidence": {
-            "description": "stated: the user said it; inferred: you concluded it. Default stated.",
             "type": "string",
             "enum": [
               "stated",
               "inferred"
-            ]
+            ],
+            "description": "stated: the user said it; inferred: you concluded it. Default stated."
           },
           "id": {
-            "description": "Note id (n:<id>) for update and forget.",
-            "type": "string"
+            "type": "string",
+            "description": "Note id (n:<id>) for update and forget."
           },
           "reason": {
-            "description": "Why the note is updated or forgotten (required for both).",
-            "type": "string"
+            "type": "string",
+            "description": "Why the note is updated or forgotten (required for both)."
           }
         },
         "additionalProperties": false
@@ -509,7 +506,16 @@
           "scope": {
             "type": "string"
           },
-          "type": {},
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "feedback",
+              "project",
+              "reference",
+              ""
+            ]
+          },
           "query": {
             "type": "string"
           },
@@ -546,12 +552,11 @@
         "type": "object",
         "properties": {
           "id": {
-            "description": "t:<thread id> or n:<note id>.",
             "type": "string"
           },
           "range": {
-            "description": "For a thread: \"<from>-<to>\" event sequence numbers (at most 60 events, 8 KB).",
-            "type": "string"
+            "type": "string",
+            "description": "For a thread: \"<from>-<to>\" event sequence numbers (at most 60 events, 8 KB)."
           }
         },
         "required": [
@@ -609,12 +614,12 @@
             "type": "string"
           },
           "project": {
-            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others).",
-            "type": "string"
+            "type": "string",
+            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others)."
           },
           "limit": {
-            "description": "Hits to return, 1 to 20; default 6.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Hits to return, 1 to 20; default 6."
           }
         },
         "required": [
@@ -668,8 +673,8 @@
             "type": "string"
           },
           "includeUndigested": {
-            "description": "Also list Sessions memory has not digested yet; default false.",
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Also list Sessions memory has not digested yet; default false."
           }
         },
         "required": [
@@ -685,8 +690,8 @@
         "type": "object",
         "properties": {
           "days": {
-            "description": "Activity window in days; default 30.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Activity window in days; default 30."
           }
         },
         "additionalProperties": false
@@ -843,6 +848,30 @@
       }
     },
     {
+      "name": "multi_host_file_references",
+      "description": "List file and directory mentions for one remote Session cwd. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "runtimeId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runtimeId",
+          "sessionId",
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_find_homes",
       "description": "Look for DSH homes on a host over SSH, the way the add-host dialog does. Call only when the user asked to set that host up.",
       "parameters": {
@@ -882,7 +911,8 @@
       "description": "Identity of this DSH runtime as other hosts see it. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -890,7 +920,8 @@
       "description": "List the machines (hosts) this DSH can run threads on and their DSH runtimes: connector, remote home, whether a connection is open, and the last error. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -1113,7 +1144,8 @@
       "description": "Read resource snapshots for registered hosts and the least-pressured eligible remote destination. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -1121,7 +1153,8 @@
       "description": "Read CPU load and memory capacity for this DSH machine. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -1226,6 +1259,22 @@
       }
     },
     {
+      "name": "multi_host_session_jj_repositories",
+      "description": "Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_set_host_hidden",
       "description": "Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.",
       "parameters": {
@@ -1250,7 +1299,8 @@
       "description": "SSH aliases from the local ssh config and known_hosts entries, as suggestions when adding a host. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -1287,7 +1337,8 @@
             "required": [
               "provider",
               "model"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1413,7 +1464,8 @@
       "description": "Every thread this DSH started on remote runtimes, with its host, Session, title and state. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -1453,12 +1505,12 @@
             "type": "string"
           },
           "project": {
-            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others).",
-            "type": "string"
+            "type": "string",
+            "description": "Restrict to one project: \"current\", a project path, or \"all\" (default: current first, then others)."
           },
           "limit": {
-            "description": "Inferred candidates to return, 1 to 20; default 8. Explicit lineage is always complete.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Inferred candidates to return, 1 to 20; default 8. Explicit lineage is always complete."
           }
         },
         "required": [
@@ -1516,7 +1568,9 @@
           },
           "confirm": {
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
@@ -1608,7 +1662,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "text"
+                          "enum": [
+                            "text"
+                          ]
                         }
                       },
                       "required": [
@@ -1635,7 +1691,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "number"
+                          "enum": [
+                            "number"
+                          ]
                         }
                       },
                       "required": [
@@ -1662,7 +1720,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "checkbox"
+                          "enum": [
+                            "checkbox"
+                          ]
                         }
                       },
                       "required": [
@@ -1689,7 +1749,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "date"
+                          "enum": [
+                            "date"
+                          ]
                         }
                       },
                       "required": [
@@ -1716,7 +1778,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "datetime"
+                          "enum": [
+                            "datetime"
+                          ]
                         }
                       },
                       "required": [
@@ -1743,7 +1807,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "select"
+                          "enum": [
+                            "select"
+                          ]
                         },
                         "options": {
                           "type": "array",
@@ -1790,7 +1856,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "multiselect"
+                          "enum": [
+                            "multiselect"
+                          ]
                         },
                         "options": {
                           "type": "array",
@@ -1837,7 +1905,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "reference"
+                          "enum": [
+                            "reference"
+                          ]
                         }
                       },
                       "required": [
@@ -1864,7 +1934,9 @@
                         },
                         "type": {
                           "type": "string",
-                          "const": "references"
+                          "enum": [
+                            "references"
+                          ]
                         }
                       },
                       "required": [
@@ -1947,7 +2019,8 @@
           },
           "values": {
             "type": "object",
-            "properties": {}
+            "properties": {},
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1955,66 +2028,6 @@
           "expectedRevision",
           "packId",
           "values"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "settings_list",
-      "description": "List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. A query also searches the controls Settings sections publish (title, description, keywords), returning each with its section id and entry id. Read-only.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "namespace": {
-            "type": "string"
-          },
-          "query": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "settings_set",
-      "description": "Merge fields into one settings namespace’s user section. The Host validates every value against that namespace’s schema and refuses an unknown namespace or a field that schema does not define. Call only when the user asked for that settings change.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "namespace": {
-            "type": "string"
-          },
-          "patch": {
-            "type": "object",
-            "properties": {}
-          }
-        },
-        "required": [
-          "namespace",
-          "patch"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "settings_unset",
-      "description": "Reset one settings field to its schema default by unsetting its path, for example [\"reasoningEffort\"] or [\"modelOrder\", \"0\"]. Call only when the user asked to reset it.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "namespace": {
-            "type": "string"
-          },
-          "path": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "namespace",
-          "path"
         ],
         "additionalProperties": false
       }
@@ -2032,7 +2045,9 @@
           "confirm": {
             "description": "Must be true: removing a rule drops its state; its history stays.",
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
@@ -2071,8 +2086,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "description": "Existing rule id to update; omit to create a rule.",
-            "type": "string"
+            "type": "string",
+            "description": "Existing rule id to update; omit to create a rule."
           },
           "name": {
             "type": "string"
@@ -2142,7 +2157,14 @@
             ]
           },
           "percentile": {
-            "description": "Latency rules: which percentile; ignored by other kinds."
+            "description": "Latency rules: which percentile; ignored by other kinds.",
+            "type": "number",
+            "enum": [
+              50,
+              90,
+              95,
+              99
+            ]
           },
           "minSamples": {
             "description": "Error-rate and latency rules stay quiet with fewer matching spans than this, so one failure is not 100%.",
@@ -2192,8 +2214,8 @@
         "type": "object",
         "properties": {
           "historyLimit": {
-            "description": "Newest history events to include; defaults to 50.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Newest history events to include; defaults to 50."
           }
         },
         "additionalProperties": false
@@ -2257,10 +2279,60 @@
             "additionalProperties": false
           },
           "groupBy": {
-            "description": "One row per service, per span name, or per value of one attribute (spans without it group as null)."
+            "description": "One row per service, per span name, or per value of one attribute (spans without it group as null).",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "service"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "operation"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "attribute"
+                    ]
+                  },
+                  "key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "measure": {
-            "description": "Also report p50/p95 of one numeric attribute, in milliseconds.",
             "type": "object",
             "properties": {
               "key": {
@@ -2276,20 +2348,21 @@
               "key",
               "divisor"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Also report p50/p95 of one numeric attribute, in milliseconds."
           },
           "sortBy": {
-            "description": "Row order; defaults to count.",
             "type": "string",
             "enum": [
               "count",
               "errorRate",
               "p95"
-            ]
+            ],
+            "description": "Row order; defaults to count."
           },
           "limit": {
-            "description": "Rows to return; defaults to 25.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Rows to return; defaults to 25."
           }
         },
         "required": [
@@ -2309,7 +2382,9 @@
           "confirm": {
             "description": "Must be true: deleting stored telemetry cannot be undone.",
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
@@ -2325,12 +2400,12 @@
         "type": "object",
         "properties": {
           "windowMinutes": {
-            "description": "Look-back window in minutes; defaults to 60.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
           },
           "limit": {
-            "description": "Groups to return, largest first; defaults to 50.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Groups to return, largest first; defaults to 50."
           }
         },
         "additionalProperties": false
@@ -2368,8 +2443,8 @@
             "type": "string"
           },
           "windowMinutes": {
-            "description": "Look-back window in minutes; defaults to 60.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
           }
         },
         "required": [
@@ -2386,16 +2461,16 @@
         "type": "object",
         "properties": {
           "windowMinutes": {
-            "description": "Look-back window in minutes; defaults to 60.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
           },
           "service": {
-            "description": "Only metrics from this service.name.",
-            "type": "string"
+            "type": "string",
+            "description": "Only metrics from this service.name."
           },
           "search": {
-            "description": "Literal text matched against metric names and descriptions.",
-            "type": "string"
+            "type": "string",
+            "description": "Literal text matched against metric names and descriptions."
           }
         },
         "additionalProperties": false
@@ -2408,16 +2483,16 @@
         "type": "object",
         "properties": {
           "windowMinutes": {
-            "description": "Look-back window in minutes; defaults to 60.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
           },
           "service": {
-            "description": "Only this service.name.",
-            "type": "string"
+            "type": "string",
+            "description": "Only this service.name."
           },
           "limit": {
-            "description": "Operations to return, most frequent first; defaults to 100.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Operations to return, most frequent first; defaults to 100."
           }
         },
         "additionalProperties": false
@@ -2430,53 +2505,53 @@
         "type": "object",
         "properties": {
           "service": {
-            "description": "Only traces with a span from this service.name.",
-            "type": "string"
+            "type": "string",
+            "description": "Only traces with a span from this service.name."
           },
           "operation": {
-            "description": "Only traces with a span of exactly this name.",
-            "type": "string"
+            "type": "string",
+            "description": "Only traces with a span of exactly this name."
           },
           "status": {
-            "description": "error: traces with at least one error span; ok: none. Defaults to all.",
             "type": "string",
             "enum": [
               "all",
               "error",
               "ok"
-            ]
+            ],
+            "description": "error: traces with at least one error span; ok: none. Defaults to all."
           },
           "minDurationMs": {
-            "description": "Only traces at least this long, in milliseconds.",
-            "type": "number"
+            "type": "number",
+            "description": "Only traces at least this long, in milliseconds."
           },
           "fromMs": {
-            "description": "Only traces starting at or after this Unix time in milliseconds.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only traces starting at or after this Unix time in milliseconds."
           },
           "toMs": {
-            "description": "Only traces starting before this Unix time in milliseconds.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only traces starting before this Unix time in milliseconds."
           },
           "search": {
-            "description": "Literal text matched against a trace id, span names, attribute JSON and status messages.",
-            "type": "string"
+            "type": "string",
+            "description": "Literal text matched against a trace id, span names, attribute JSON and status messages."
           },
           "sessionId": {
-            "description": "Only traces whose spans carry this dsh.session.id.",
-            "type": "string"
+            "type": "string",
+            "description": "Only traces whose spans carry this dsh.session.id."
           },
           "turn": {
-            "description": "Only traces with a span of this dsh.turn; with sessionId, that thread's turn (a subagent's turns share the parent's trace).",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only traces with a span of this dsh.turn; with sessionId, that thread's turn (a subagent's turns share the parent's trace)."
           },
           "cursor": {
-            "description": "next_cursor from a previous page.",
-            "type": "string"
+            "type": "string",
+            "description": "next_cursor from a previous page."
           },
           "limit": {
-            "description": "Traces per page, 1 to 200; defaults to 50.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Traces per page, 1 to 200; defaults to 50."
           }
         },
         "additionalProperties": false
@@ -2489,19 +2564,18 @@
         "type": "object",
         "properties": {
           "service": {
-            "description": "Only records from this service.name.",
-            "type": "string"
+            "type": "string",
+            "description": "Only records from this service.name."
           },
           "minSeverity": {
-            "description": "Only records at or above this OTLP severity number: 5 debug, 9 info, 13 warn, 17 error, 21 fatal.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only records at or above this OTLP severity number: 5 debug, 9 info, 13 warn, 17 error, 21 fatal."
           },
           "search": {
-            "description": "Literal text matched against the body, attribute JSON and event name.",
-            "type": "string"
+            "type": "string",
+            "description": "Literal text matched against the body, attribute JSON and event name."
           },
           "attribute": {
-            "description": "Only records whose attribute equals this value.",
             "type": "object",
             "properties": {
               "key": {
@@ -2517,7 +2591,8 @@
               "key",
               "value"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Only records whose attribute equals this value."
           },
           "traceId": {
             "description": "Only records correlated with this trace.",
@@ -2528,24 +2603,24 @@
             "type": "string"
           },
           "sessionId": {
-            "description": "Only records of this DSH Session: correlated with one of its traces, or carrying its dsh.session.id attribute.",
-            "type": "string"
+            "type": "string",
+            "description": "Only records of this DSH Session: correlated with one of its traces, or carrying its dsh.session.id attribute."
           },
           "fromMs": {
-            "description": "Only records at or after this Unix time in milliseconds.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only records at or after this Unix time in milliseconds."
           },
           "toMs": {
-            "description": "Only records before this Unix time in milliseconds.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Only records before this Unix time in milliseconds."
           },
           "cursor": {
-            "description": "next_cursor from a previous page.",
-            "type": "string"
+            "type": "string",
+            "description": "next_cursor from a previous page."
           },
           "limit": {
-            "description": "Records per page, 1 to 500; defaults to 100.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Records per page, 1 to 500; defaults to 100."
           }
         },
         "additionalProperties": false
@@ -2558,8 +2633,8 @@
         "type": "object",
         "properties": {
           "windowMinutes": {
-            "description": "Look-back window in minutes; defaults to 60.",
-            "type": "integer"
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
           }
         },
         "additionalProperties": false
