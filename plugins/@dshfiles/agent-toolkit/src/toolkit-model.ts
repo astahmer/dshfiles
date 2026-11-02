@@ -1,42 +1,79 @@
-import { z } from 'zod'
+import { Effect, Option } from 'effect'
+import * as Schema from 'effect/Schema'
 
 const MEMORY_OWNER = '@dshfiles/memory'
 
-const toolSchema = z.object({
-  name: z.string(),
-  description: z.string().catch(''),
-  source: z.enum(['api', 'mcp', 'plugin', 'tool']).catch('tool'),
-  owner: z.string().optional().catch(undefined),
-  readOnly: z.boolean().optional().catch(undefined),
-  enabled: z.boolean().catch(true),
+/** A listing from any dshx leader: a field an older leader omits or spoils takes the neutral default, as it always has. */
+const textWithDefault = (text: string) =>
+  Schema.String.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(text))),
+    Schema.withDecodingDefaultKey(Effect.succeed(text)),
+  )
+
+const flagWithDefault = (value: boolean) =>
+  Schema.Boolean.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(value))),
+    Schema.withDecodingDefaultKey(Effect.succeed(value)),
+  )
+
+const optionalText = Schema.optional(Schema.String).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))))
+
+const optionalFlag = Schema.optional(Schema.Boolean).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))))
+
+const toolSourceSchema = Schema.Literals(['api', 'mcp', 'plugin', 'tool'])
+
+const toolSchema = Schema.Struct({
+  name: Schema.String,
+  description: textWithDefault(''),
+  source: toolSourceSchema.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some('tool' as const))),
+    Schema.withDecodingDefaultKey(Effect.succeed('tool' as const)),
+  ),
+  owner: optionalText,
+  readOnly: optionalFlag,
+  enabled: flagWithDefault(true),
 })
 
-const skillSchema = z.object({
-  name: z.string(),
-  description: z.string().catch(''),
-  provider: z.string().catch(''),
-  source: z.string().optional().catch(undefined),
-  modelInvocable: z.boolean().catch(true),
-  userInvocable: z.boolean().optional().catch(undefined),
+const skillSchema = Schema.Struct({
+  name: Schema.String,
+  description: textWithDefault(''),
+  provider: textWithDefault(''),
+  source: optionalText,
+  modelInvocable: flagWithDefault(true),
+  userInvocable: optionalFlag,
 })
 
-const apiSchema = z.object({
-  owner: z.string(),
-  id: z.string(),
-  methods: z.array(z.object({ name: z.string(), description: z.string().optional().catch(undefined), tool: z.string().optional().catch(undefined) })).catch([]),
+const apiMethodSchema = Schema.Struct({ name: Schema.String, description: optionalText, tool: optionalText })
+
+const apiSchema = Schema.Struct({
+  owner: Schema.String,
+  id: Schema.String,
+  methods: Schema.Array(apiMethodSchema).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some([]))),
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
 })
 
 /** A registry listing as any dshx leader serves it: fields an older leader lacks take neutral defaults. */
-const listingSchema = z.object({
-  apis: z.array(apiSchema).catch([]),
-  tools: z.array(toolSchema).catch([]),
-  toolScope: z.object({ sessionId: z.string() }).optional().catch(undefined),
-  skills: z.array(skillSchema).catch([]),
+const listingSchema = Schema.Struct({
+  apis: Schema.Array(apiSchema).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some([]))),
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  tools: Schema.Array(toolSchema).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some([]))),
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  toolScope: Schema.optional(Schema.Struct({ sessionId: Schema.String })).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined)))),
+  skills: Schema.Array(skillSchema).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some([]))),
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
 })
 
-export type ToolkitTool = z.infer<typeof toolSchema>
-export type ToolkitSkill = z.infer<typeof skillSchema>
-export type ToolkitListing = z.infer<typeof listingSchema>
+export type ToolkitTool = typeof toolSchema.Type
+export type ToolkitSkill = typeof skillSchema.Type
+export type ToolkitListing = typeof listingSchema.Type
 
 /** Where a tool comes from, as the page filters it. `native` is DSH's own tools and plugins not built with dshx. */
 export type ToolkitSource = 'native' | 'plugin' | 'mcp' | 'memory'
@@ -95,6 +132,11 @@ export class AgentToolkit {
 
   /** Decodes a listing from any dshx leader; an older one lacks fields, which take neutral defaults. */
   static readonly listingSchema = listingSchema
+
+  /** The listing boundary: one decode for the registry read, in the page and in tests. */
+  static decodeListing(value: unknown): ToolkitListing {
+    return Schema.decodeUnknownSync(listingSchema)(value)
+  }
 
   static sourceOf(tool: ToolkitTool): ToolkitSource {
     if (tool.owner === MEMORY_OWNER) return 'memory'

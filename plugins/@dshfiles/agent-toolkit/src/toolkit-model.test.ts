@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AgentToolkit } from './toolkit-model.js'
 
-const listing = AgentToolkit.listingSchema.parse({
+const listing = AgentToolkit.decodeListing({
   apis: [
     {
       owner: '@dshfiles/memory',
@@ -49,18 +49,18 @@ describe('agent toolkit model', () => {
   })
 
   it('reads a listing from an older registry with every tool enabled and read-only unknown', () => {
-    const old = AgentToolkit.listingSchema.parse({
+    const old = AgentToolkit.decodeListing({
       tools: [{ name: 'bash', description: 'Run.', source: 'tool' }],
       skills: [{ name: 'a', description: 'b', provider: 'fs', modelInvocable: true }],
     })
     expect(old.tools[0]).toEqual({ name: 'bash', description: 'Run.', source: 'tool', enabled: true })
     expect(AgentToolkit.skillOrigin(old.skills[0]!)).toBe('other')
     expect(AgentToolkit.invocation(old.skills[0]!)).toBe('both')
-    expect(AgentToolkit.listingSchema.parse({})).toEqual({ apis: [], tools: [], skills: [] })
+    expect(AgentToolkit.decodeListing({})).toEqual({ apis: [], tools: [], skills: [] })
   })
 
   it('uses the Host source for skill provenance and drops legacy paths', () => {
-    const skills = AgentToolkit.listingSchema.parse({
+    const skills = AgentToolkit.decodeListing({
       skills: [
         {
           name: 'project-agents',
