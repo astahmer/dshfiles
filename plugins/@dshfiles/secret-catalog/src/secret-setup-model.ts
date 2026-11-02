@@ -3,7 +3,7 @@ import type { SecretReference } from '@dshfiles/credential-port'
 import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect, secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Schema } from 'effect'
 import type { SecretMetadata } from './secret-metadata.js'
-import type { SecretCreateInput } from './secret-operations.js'
+import type { SecretCreateInput } from './secret-catalog.js'
 
 const secretSetupValueLimit = 262_144
 

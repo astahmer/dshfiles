@@ -1,4 +1,4 @@
-import type { SecretCreateInput } from './secret-operations.js'
+import type { SecretCreateInput } from './secret-catalog.js'
 import { SecretSetupModel } from './secret-setup-model.js'
 
 export interface SecretSetupFlowPorts {

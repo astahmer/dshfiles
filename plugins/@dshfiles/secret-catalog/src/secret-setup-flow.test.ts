@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { SecretCliRequest } from './secret-operations.js'
-import { createSecretCatalogOperations } from './secret-operations.js'
+import { Effect } from 'effect'
+import { SecretCatalog, type SecretCreateInput } from './secret-catalog.js'
+import { catalogWithCli } from './secret-catalog-fixture.js'
 import { bindStoredSecret, storeAndBindSecret } from './secret-setup-flow.js'
 import { SecretSetupModel } from './secret-setup-model.js'
+
+const catalogOperations = (printed: string) => {
+  const fixture = catalogWithCli(request => Effect.succeed(request.args[0] === 'print' ? printed : ''))
+  const create = (input: SecretCreateInput) => Effect.runPromise(SecretCatalog.use(catalog => catalog.create(input)).pipe(Effect.provide(fixture.layer)))
+  return { requests: fixture.requests, operations: { create } }
+}
 
 const setupRequest = (input: {
   readonly alias: string
@@ -21,11 +28,7 @@ const setupRequest = (input: {
 
 describe('Secret Catalog create-and-bind flow', () => {
   it('stores a synthetic project secret through the real CLI operation and binds only its reference', async () => {
-    const requests: SecretCliRequest[] = []
-    const operations = createSecretCatalogOperations(async request => {
-      requests.push(request)
-      return request.args[0] === 'print' ? '[]' : ''
-    })
+    const { requests, operations } = catalogOperations('[]')
     const references: string[] = []
     const request = setupRequest({
       alias: 'SYNTHETIC_TOKEN',
@@ -62,11 +65,7 @@ describe('Secret Catalog create-and-bind flow', () => {
   })
 
   it('keeps a stored reference for retry when binding fails, without creating a second secret', async () => {
-    const requests: SecretCliRequest[] = []
-    const operations = createSecretCatalogOperations(async request => {
-      requests.push(request)
-      return request.args[0] === 'print' ? '[]' : ''
-    })
+    const { requests, operations } = catalogOperations('[]')
     const request = setupRequest({
       alias: 'SYNTHETIC_RETRY',
       environment: 'prod',
@@ -102,11 +101,7 @@ describe('Secret Catalog create-and-bind flow', () => {
   })
 
   it('refuses a duplicate in the Host operation and never binds it', async () => {
-    const requests: SecretCliRequest[] = []
-    const operations = createSecretCatalogOperations(async request => {
-      requests.push(request)
-      return request.args[0] === 'print' ? JSON.stringify([{ alias: 'SYNTHETIC_DUPLICATE', scope: 'global', env: 'prod' }]) : ''
-    })
+    const { requests, operations } = catalogOperations(JSON.stringify([{ alias: 'SYNTHETIC_DUPLICATE', scope: 'global', env: 'prod' }]))
     let bindAttempts = 0
     const request = setupRequest({
       alias: 'SYNTHETIC_DUPLICATE',

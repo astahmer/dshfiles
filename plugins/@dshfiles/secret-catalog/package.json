@@ -33,6 +33,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -48,6 +49,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-credentials": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
