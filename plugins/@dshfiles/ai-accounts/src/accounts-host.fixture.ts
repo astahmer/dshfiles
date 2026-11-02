@@ -33,7 +33,7 @@ process.env.DSH_HOME = home
 
 const MODEL = 'gpt-6-luna'
 
-type ChatReply = { readonly text: string } | { readonly status: number; readonly message: string }
+type ChatReply = { readonly text: string } | { readonly status: number; readonly message: string; readonly headers?: Readonly<Record<string, string>> }
 
 const chatBodySchema = Schema.Struct({ reasoning_effort: Schema.optional(Schema.String) })
 
@@ -111,7 +111,7 @@ const reply = (response: ServerResponse, scripted: ChatReply): void => {
     response.end(sseChunk({ role: 'assistant', content: scripted.text }) + sseChunk({}, 'stop') + 'data: [DONE]\n\n')
     return
   }
-  response.writeHead(scripted.status, { 'content-type': 'application/json' })
+  response.writeHead(scripted.status, { 'content-type': 'application/json', ...scripted.headers })
   response.end(JSON.stringify({ error: { message: scripted.message, type: 'fixture_error' } }))
 }
 

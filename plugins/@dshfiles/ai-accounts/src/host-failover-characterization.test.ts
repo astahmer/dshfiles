@@ -142,6 +142,20 @@ describe('agent/request-error fail-over', { timeout: 30_000 }, () => {
     expect(host.selected).toEqual([])
   })
 
+  it('waits the Retry-After the provider sent on the rejected response instead of the policy minute', async () => {
+    const host = await start({
+      accounts: [{ id: 'cc_a' }],
+      distribution: 'sticky',
+      replies: [{ ...rateLimited, headers: { 'retry-after': '0.05' } }],
+    })
+    const agent = await host.startThread({ sessionId: 'thread-1', provider: 'cc_a' })
+    await host.ask(agent, 'hello')
+
+    expect(host.chats.map(chat => chat.account)).toEqual(['cc_a', 'cc_a'])
+    expect(retryRows(agent).map(event => event.type)).toEqual(['llm/retry', 'llm/retry-started'])
+    expect(retryRows(agent)[0]?.data).toMatchObject({ delayMs: 50, failure: { code: 'RATE_LIMIT' } })
+  })
+
   it('waits the policy minute when the provider names no delay', async () => {
     const host = await start({ accounts: [{ id: 'cc_a' }], distribution: 'sticky', replies: [rateLimited] })
     const agent = await host.startThread({ sessionId: 'thread-1', provider: 'cc_a' })

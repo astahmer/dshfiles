@@ -84,6 +84,7 @@ import { materializeCodexShadowHome } from './codex-home.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
+import { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
 import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
 
@@ -324,6 +325,7 @@ const startAccountsHost = (
     },
   })
   const githubCopilotUpstream = githubCopilotProvider()
+  const declaredRetryAfter = new DeclaredRetryAfter()
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
   const lunaReserveHolds = new Map<string, number>()
   const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
@@ -403,6 +405,7 @@ const startAccountsHost = (
         id,
         ProviderProfileModel.buildProfile({
           upstream: upstreamFor(id, route),
+          onResponse: response => declaredRetryAfter.observe(id, response, Date.now()),
           provider: id,
           displayName: route.displayName,
           ...settings.get(id),
@@ -662,6 +665,7 @@ const startAccountsHost = (
       reasoningDefaults,
       fastMode,
       routeFor: accountForRequest,
+      declaredRetryAfter,
       imageRequestPricing: (provider, model) =>
         routes.get(provider)?.kind === COMMANDCODE_KIND ? CommandCodeCapabilities.imageRequestPricing(model) : undefined,
     },
