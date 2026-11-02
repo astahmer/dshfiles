@@ -1,3 +1,5 @@
+import { Effect } from 'effect'
+
 const IMAGE_MEDIA_TYPES = new Map([
   ['png', 'image/png'],
   ['jpg', 'image/jpeg'],
@@ -18,13 +20,11 @@ const SCHEME = /^[a-z][a-z0-9+.-]*:/i
 
 export type AssetKind = 'stylesheet' | 'script' | 'image'
 
-export interface AssetReader {
+export type AssetRead = { readonly ok: true; readonly bytes: Uint8Array } | { readonly ok: false; readonly reason: string }
+
+export interface AssetReader<E, R> {
   /** Bytes of a path relative to the page, or a reason it cannot be inlined (outside the workspace, missing, too large). */
-  read(input: {
-    readonly path: string
-    readonly kind: AssetKind
-    readonly maxBytes: number
-  }): Promise<{ readonly ok: true; readonly bytes: Uint8Array } | { readonly ok: false; readonly reason: string }>
+  read(input: { readonly path: string; readonly kind: AssetKind; readonly maxBytes: number }): Effect.Effect<AssetRead, E, R>
 }
 
 export interface InlineResult {
@@ -93,7 +93,11 @@ const replacement = (input: {
  * else (CSS `url()`, `@import`, `srcset`, fonts, fetches, root-absolute or remote URLs) stays as written and is blocked
  * by the card's no-network policy.
  */
-const inline = async (input: { readonly html: string; readonly reader: AssetReader; readonly maxBytes: number }): Promise<InlineResult> => {
+const inline = Effect.fn('html assets inline')(function* <E, R>(input: {
+  readonly html: string
+  readonly reader: AssetReader<E, R>
+  readonly maxBytes: number
+}): Effect.fn.Return<InlineResult, E, R> {
   const inlined: string[] = []
   const skipped: string[] = []
   let budget = input.maxBytes - Buffer.byteLength(input.html, 'utf8')
@@ -112,7 +116,7 @@ const inline = async (input: { readonly html: string; readonly reader: AssetRead
       skipped.push(`${path}: more than ${String(RelativeAssetLimits.maxAssets)} assets`)
       continue
     }
-    const read = await input.reader.read({ path, kind: asset.kind, maxBytes: Math.max(0, budget) })
+    const read = yield* input.reader.read({ path, kind: asset.kind, maxBytes: Math.max(0, budget) })
     if (!read.ok) {
       skipped.push(`${path}: ${read.reason}`)
       continue
@@ -125,7 +129,7 @@ const inline = async (input: { readonly html: string; readonly reader: AssetRead
   }
   parts.push(input.html.slice(cursor))
   return { html: parts.join(''), inlined, skipped }
-}
+})
 
 export class RelativeAssets {
   static readonly inline = inline

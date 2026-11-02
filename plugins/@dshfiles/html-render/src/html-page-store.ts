@@ -1,3 +1,5 @@
+import { HostEvents } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer } from 'effect'
 import type { HtmlPage } from './html-page.js'
 
 export const HtmlPageStoreLimits = { maxPagesPerThread: 16, maxTotalBytes: 32 * 1024 * 1024 } as const
@@ -45,4 +47,28 @@ export class HtmlPageStore {
       this.#totalBytes -= stored.bytes
     }
   }
+}
+
+/** The pages of this Host run as a plugin service; a disposed thread's pages are dropped with it. */
+export class HtmlPages extends Context.Service<
+  HtmlPages,
+  {
+    readonly remember: (input: StoredPage) => Effect.Effect<void>
+    readonly find: (input: { readonly sessionId: string; readonly callId?: string | undefined }) => Effect.Effect<ReturnType<HtmlPageStore['find']>>
+    readonly forgetThread: (sessionId: string) => Effect.Effect<void>
+  }
+>()('@dshfiles/html-render/HtmlPages') {
+  static readonly layer = Layer.effect(
+    HtmlPages,
+    Effect.gen(function* () {
+      const store = new HtmlPageStore()
+      const forgetThread = (sessionId: string) => Effect.sync(() => store.forgetThread(sessionId))
+      yield* HostEvents.on('session/disposed', session => forgetThread(session.id))
+      return HtmlPages.of({
+        remember: input => Effect.sync(() => store.remember(input)),
+        find: input => Effect.sync(() => store.find(input)),
+        forgetThread,
+      })
+    }),
+  )
 }
