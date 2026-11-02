@@ -8216,25 +8216,26 @@
         "type": "object",
         "properties": {
           "url": {
-            "type": "string",
-            "description": "An HTTPS x.com or twitter.com post URL containing /status/<id>."
+            "description": "An HTTPS x.com or twitter.com post URL containing /status/<id>.",
+            "type": "string"
           },
           "maxFrames": {
-            "type": "integer",
-            "description": "Maximum video stills across the result. Defaults to 12; valid range is 0–24."
+            "description": "Maximum video stills across the result. Defaults to 12; valid range is 0–24.",
+            "type": "integer"
           },
           "startSeconds": {
-            "type": "number",
-            "description": "Optional start offset in each video, from 0 to 600 seconds. Defaults to 0."
+            "description": "Optional start offset in each video, from 0 to 600 seconds. Defaults to 0.",
+            "type": "number"
           },
           "endSeconds": {
-            "type": "number",
-            "description": "Optional end offset in each video, from 0 to 600 seconds. Defaults to startSeconds + 60 seconds."
+            "description": "Optional end offset in each video, from 0 to 600 seconds. Defaults to startSeconds + 60 seconds.",
+            "type": "number"
           }
         },
         "required": [
           "url"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
