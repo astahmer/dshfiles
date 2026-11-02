@@ -307,7 +307,7 @@
     "nodeFs": 5,
     "globalFetch": 0,
     "causelessErrors": 1,
-    "testMocks": 0,
+    "testMocks": 2,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
