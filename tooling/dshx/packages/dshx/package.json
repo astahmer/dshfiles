@@ -113,6 +113,10 @@
     "./effect/services": {
       "types": "./dist/effect/services.d.ts",
       "default": "./dist/effect/services.js"
+    },
+    "./ids": {
+      "types": "./dist/ids.d.ts",
+      "default": "./dist/ids.js"
     }
   },
   "scripts": {
@@ -172,6 +176,7 @@
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-user-approval": "catalog:",
     "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-workspace": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/credential-port": "workspace:*",
     "@effect/platform-node": "catalog:",
@@ -215,6 +220,7 @@
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@dshfiles/credential-port": ">=0.1.0 <0.2.0",
     "@effect/platform-node": ">=4.1.0 <5",
@@ -294,6 +300,9 @@
       "optional": true
     },
     "@effect/platform-node": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-workspace": {
       "optional": true
     }
   },
