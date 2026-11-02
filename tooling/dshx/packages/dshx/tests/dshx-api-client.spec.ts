@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import '../src/effect/index.js'
 import * as Schema from 'effect/Schema'
 import { defineApi, isApiOwnerMissing, method, PluginApiError } from '../src/api/index.js'
 import { defineHost } from '../src/host/index.js'

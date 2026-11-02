@@ -3,7 +3,6 @@ import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Strea
 import { effectClient } from './client.js'
 import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
-import { registerEffectApiSchemaConverter } from '../api/schema.js'
 import { PluginApiError } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
@@ -40,39 +39,6 @@ type HostOptions<R> = [R] extends [never]
 
 type AnyManagedRuntime = ManagedRuntime.ManagedRuntime<never, unknown>
 const pluginRuntimes = new WeakMap<Context, AnyManagedRuntime>()
-
-const omitDefaultAdditionalProperties = <T>(document: T): T => {
-  const copy = structuredClone(document)
-  const visit = (value: unknown): void => {
-    if (typeof value !== 'object' || value === null) return
-    if (Array.isArray(value)) {
-      for (const entry of value) visit(entry)
-      return
-    }
-    // SAFETY: the object was validated as a non-null, non-array JSON Schema record above.
-    const record = value as Record<string, unknown>
-    if (record.additionalProperties === true) delete record.additionalProperties
-    for (const entry of Object.values(record)) visit(entry)
-  }
-  visit(copy)
-  return copy
-}
-
-registerEffectApiSchemaConverter(schema => {
-  if (!Schema.isSchema(schema)) throw new TypeError('The Effect Schema adapter received a non-Effect schema.')
-  const standard = Schema.toStandardSchemaV1(schema)
-  const jsonSchema = Schema.toStandardJSONSchemaV1(schema)['~standard'].jsonSchema
-  return {
-    ...standard,
-    '~standard': {
-      ...standard['~standard'],
-      jsonSchema: {
-        input: (options: Parameters<typeof jsonSchema.input>[0]) => omitDefaultAdditionalProperties(jsonSchema.input(options)),
-        output: (options: Parameters<typeof jsonSchema.output>[0]) => omitDefaultAdditionalProperties(jsonSchema.output(options)),
-      },
-    },
-  }
-})
 
 const taggedFailure = Schema.Struct({ _tag: Schema.String, message: Schema.optional(Schema.String) })
 const isTaggedFailure = Schema.is(taggedFailure)

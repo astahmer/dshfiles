@@ -6,8 +6,7 @@ import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 74, definedTools: 24, tools: 98 }
-const effectSchemaChangedTools = new Set(['traces_alert_delete', 'traces_alert_save', 'traces_breakdown', 'traces_clear'])
+const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 77, definedTools: 24, tools: 101 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -41,15 +40,7 @@ const toolProperty = (schemas: readonly unknown[], name: string, propertyName: s
   return isObjectRecord(property) ? property : undefined
 }
 
-const withoutEffectSchemaChanges = (source: string): string => {
-  const snapshot: unknown = JSON.parse(source)
-  if (!isObjectRecord(snapshot)) throw new Error('Host tool schema snapshot must be an object.')
-  const schemas = getArrayProperty(snapshot, 'schemas').filter(schema => {
-    const name = getObjectProperty(schema, 'name')
-    return typeof name !== 'string' || !effectSchemaChangedTools.has(name)
-  })
-  return `${JSON.stringify(canonicalize({ ...snapshot, schemas }), null, 2)}\n`
-}
+const canonicalSnapshot = (source: string): string => `${JSON.stringify(canonicalize(JSON.parse(source)), null, 2)}\n`
 
 const linkNodeModules = async (source: string, target: string) => {
   await mkdir(target, { recursive: true })
@@ -238,7 +229,7 @@ const collectHostToolSchemas = async () => {
 }
 
 describe('all Host tool schemas', () => {
-  it('matches the pre-Effect snapshot and pins the intentional Effect schema deltas', async () => {
+  it('matches the recorded snapshot of every Host tool schema', async () => {
     const snapshot = await collectHostToolSchemas()
     if (process.env.UPDATE_HOST_TOOL_SCHEMA_SNAPSHOT === '1') {
       const outputPath = process.env.HOST_TOOL_SCHEMA_SNAPSHOT_PATH ?? fixturePath.pathname
@@ -250,7 +241,7 @@ describe('all Host tool schemas', () => {
     const snapshotText = snapshot.toString()
     const recorded: unknown = JSON.parse(snapshotText)
     expect(recorded).toMatchObject(expectedCounts)
-    expect(withoutEffectSchemaChanges(snapshotText)).toBe(withoutEffectSchemaChanges(await readFile(fixturePath, 'utf8')))
+    expect(canonicalSnapshot(snapshotText)).toBe(canonicalSnapshot(await readFile(fixturePath, 'utf8')))
 
     const schemas = getArrayProperty(recorded, 'schemas')
     expect(toolProperty(schemas, 'traces_alert_delete', 'confirm')).toMatchObject({ type: 'boolean', enum: [true] })

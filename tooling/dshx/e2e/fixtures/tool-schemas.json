@@ -62,9 +62,9 @@
   "apiMethods": 446,
   "apiToolBindings": 307,
   "apiToolNameCount": 307,
-  "apiToolSchemas": 74,
+  "apiToolSchemas": 77,
   "definedTools": 24,
-  "tools": 98,
+  "tools": 101,
   "schemas": [
     {
       "name": "background_jobs_board",
@@ -299,7 +299,8 @@
         "required": [
           "path",
           "force"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -314,7 +315,8 @@
         },
         "required": [
           "path"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -2028,6 +2030,66 @@
           "expectedRevision",
           "packId",
           "values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "settings_list",
+      "description": "List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. A query also searches the controls Settings sections publish (title, description, keywords), returning each with its section id and entry id. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "settings_set",
+      "description": "Merge fields into one settings namespace’s user section. The Host validates every value against that namespace’s schema and refuses an unknown namespace or a field that schema does not define. Call only when the user asked for that settings change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        "required": [
+          "namespace",
+          "patch"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "settings_unset",
+      "description": "Reset one settings field to its schema default by unsetting its path, for example [\"reasoningEffort\"] or [\"modelOrder\", \"0\"]. Call only when the user asked to reset it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "namespace",
+          "path"
         ],
         "additionalProperties": false
       }
