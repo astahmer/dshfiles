@@ -67,7 +67,7 @@ const DRAIN_LIMIT_MS = 30 * 60_000
  * queued follow-up that starts right after a turn ends is not cut off; past the limit it restarts anyway, and the
  * managed restart records whatever still runs so it resumes after boot.
  */
-let pendingRestart: { readonly since: number; readonly timer: NodeJS.Timeout } | undefined
+let pendingRestart: { readonly ctx: Context; readonly since: number; readonly timer: NodeJS.Timeout } | undefined
 
 const runningTurns = (ctx: Context): number => activeRestartSessionIds(ctx.agents.list()).length
 
@@ -92,7 +92,7 @@ const restartWhenIdle = (ctx: Context): void => {
     }
   }, DRAIN_POLL_MS)
   timer.unref()
-  pendingRestart = { since, timer }
+  pendingRestart = { ctx, since, timer }
 }
 
 const restartApi = threadSidebarRestartApi.host({
@@ -336,6 +336,11 @@ export default defineHost({
   setup: ctx => {
     setThreadActionsContext(ctx)
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
+    ctx.effect(() => () => {
+      if (pendingRestart?.ctx !== ctx) return
+      clearInterval(pendingRestart.timer)
+      pendingRestart = undefined
+    }, 'thread-sidebar: pending restart timer')
     // One durable attention record per session, written where the turn actually ends, so every browser,
     // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
     ctx.effect(() => {
