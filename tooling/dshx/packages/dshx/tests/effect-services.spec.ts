@@ -17,7 +17,7 @@ import { DshxEffect } from '../src/effect/index.js'
 import { HostApis } from '../src/effect/host-apis.js'
 import { HostContext } from '../src/effect/host-context.js'
 import { HostTerminal } from '../src/effect/host-terminal.js'
-import { Llm } from '../src/effect/llm.js'
+import { Llm, LlmModelInfoFailed } from '../src/effect/llm.js'
 import { PluginStorage } from '../src/effect/plugin-storage.js'
 import { PluginStorageModel } from '../src/host/plugin-storage.js'
 import { EffectHostServiceError, SettingsRead } from '../src/effect/services.js'
@@ -324,6 +324,17 @@ describe('Llm', () => {
         const failure = yield* llm.complete({ provider: 'echo', model: 'echo-1', system: 'sys', input: 'fail' }).pipe(Effect.flip)
         expect(failure.reason).toBe('echo refused')
         expect(Schema.is(Schema.String)(failure.message)).toBe(true)
+      }),
+    )
+
+    layer.effect('reads a route model info and keeps the lookup failure cause', () =>
+      Effect.gen(function* () {
+        const llm = yield* Llm
+        expect((yield* llm.modelInfo({ provider: 'echo', model: 'echo-1' })).id).toBe('echo-1')
+        expect(yield* llm.imagePricing({ provider: 'echo', model: 'echo-1' })).toBeUndefined()
+        const failure = yield* llm.modelInfo({ provider: 'missing', model: 'none' }).pipe(Effect.flip)
+        expect(failure).toBeInstanceOf(LlmModelInfoFailed)
+        expect(failure.cause).toBeDefined()
       }),
     )
   })

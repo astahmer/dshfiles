@@ -1,4 +1,12 @@
-import { BlockAssembler, createUserMessage, ReasoningEffortId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import {
+  BlockAssembler,
+  createUserMessage,
+  ReasoningEffortId,
+  type GenerateOptions,
+  type LlmImageRequestPricing,
+  type LlmResolvedModelInfo,
+  type StreamChunk,
+} from '@deepseek-ai/dsh-llm'
 import { Context, Effect, Layer, Schema, Stream } from 'effect'
 import { hostService } from './host-context.js'
 
@@ -12,6 +20,22 @@ export class LlmCallFailed extends Schema.TaggedError<LlmCallFailed>()('LlmCallF
   override get message(): string {
     return `The ${this.provider}/${this.model} model call failed${this.reason === undefined ? '' : `: ${this.reason}`}. Check the account in AI Accounts, then retry.`
   }
+}
+
+/** DSH could not resolve what a provider/model route declares (context window, modalities). */
+export class LlmModelInfoFailed extends Schema.TaggedError<LlmModelInfoFailed>()('LlmModelInfoFailed', {
+  provider: Schema.String,
+  model: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `Could not read what ${this.provider}/${this.model} supports. Check the route in AI Accounts, then retry.`
+  }
+}
+
+export interface LlmRoute {
+  readonly provider: string
+  readonly model: string
 }
 
 export interface LlmCompletion {
@@ -32,6 +56,10 @@ export class Llm extends Context.Service<
     readonly stream: (options: Omit<GenerateOptions, 'signal'>) => Stream.Stream<StreamChunk, LlmCallFailed>
     /** The text of a single-turn answer to `input`. */
     readonly complete: (request: LlmCompletion) => Effect.Effect<string, LlmCallFailed>
+    /** What the route declares: context window, input modalities; interrupting aborts the lookup. */
+    readonly modelInfo: (route: LlmRoute) => Effect.Effect<LlmResolvedModelInfo, LlmModelInfoFailed>
+    /** How the route prices images, or undefined when it declares no image pricing. */
+    readonly imagePricing: (route: LlmRoute) => Effect.Effect<LlmImageRequestPricing | undefined>
   }
 >()('@dshfiles/dshx/Llm') {
   static readonly layer = Layer.effect(
@@ -69,7 +97,15 @@ export class Llm extends Context.Service<
           .flatMap(block => (block.type === 'text' ? [block.text] : []))
           .join('')
       })
-      return Llm.of({ stream, complete })
+      const modelInfo = Effect.fn('llm model info')(function* (route: LlmRoute) {
+        yield* Effect.annotateCurrentSpan({ 'gen_ai.provider.name': route.provider, 'gen_ai.request.model': route.model })
+        return yield* Effect.tryPromise({
+          try: signal => llm.resolveModelInfo(route.provider, route.model, signal),
+          catch: cause => new LlmModelInfoFailed({ provider: route.provider, model: route.model, cause }),
+        })
+      })
+      const imagePricing = (route: LlmRoute) => Effect.sync(() => llm.imageRequestPricing(route.provider, route.model))
+      return Llm.of({ stream, complete, modelInfo, imagePricing })
     }),
   )
 }
