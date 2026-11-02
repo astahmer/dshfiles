@@ -137,7 +137,9 @@
           "confirm": {
             "description": "Must be true: stopping another Session’s background job is destructive.",
             "type": "boolean",
-            "const": true
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
