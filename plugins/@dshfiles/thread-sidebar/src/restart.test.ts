@@ -1,130 +1,164 @@
-import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { test } from 'vitest'
-import { createRestartController, readLaunchUrl } from './restart.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Layer, Path, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
+import { RecoveryStore } from './restart-recovery.js'
+import { RestartControl, RestartDrain, type RestartEnvironment } from './restart.js'
+import { StateFiles } from './runtime-files.js'
+import { fakeSidebarHost, makeFakeHost, type FakeHost } from './sidebar-host.test-support.js'
+import { temporaryStateFiles } from './state-files.test-support.js'
 
 const RUN_ID = 'a53b44df-e873-4abb-2c6e-a92223ae2db9'
 
-const testEnvironment = (home: string) => ({
+const managed = (home: string, path: Path.Path): RestartEnvironment => ({
   DSH_HOME: home,
   DSH_RESTART_RUN_ID: RUN_ID,
-  DSH_RESTART_REQUEST_PATH: join(home, 'runtime', `dsh-web-restart-${RUN_ID}.request`),
+  DSH_RESTART_REQUEST_PATH: path.join(home, 'runtime', `dsh-web-restart-${RUN_ID}.request`),
 })
 
-test('restart availability requires both the launcher handoff and the DSH exit hook', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-restart-'))
-  try {
-    const env = testEnvironment(home)
-    assert.equal(createRestartController({ appExit: () => undefined }, { env }).available, true)
-    assert.equal(
-      createRestartController({ appExit: () => undefined }, { env: { ...env, DSH_RESTART_REQUEST_PATH: join(home, 'other.request') } }).available,
-      false,
+/** The restart services over a fake Host and the real files of a temporary DSH home. */
+const withRestart = <A, E>(
+  options: { readonly env?: (home: string, path: Path.Path) => RestartEnvironment; readonly exitHook?: boolean },
+  body: (input: {
+    readonly fake: FakeHost
+    readonly requestPath: string
+    readonly home: string
+  }) => Effect.Effect<A, E, RestartControl | RestartDrain | RecoveryStore | FileSystem.FileSystem | Path.Path>,
+) =>
+  Effect.gen(function* () {
+    const files = yield* StateFiles
+    const path = yield* Path.Path
+    const fake = yield* makeFakeHost
+    const env = (options.env ?? managed)(files.home, path)
+    const layer = RestartDrain.layer.pipe(
+      Layer.provideMerge(RestartControl.layerWith({ env, homeDirectory: files.home })),
+      Layer.provideMerge(fakeSidebarHost(fake, { exitHook: options.exitHook ?? true })),
+      Layer.provideMerge(RecoveryStore.layer.pipe(Layer.provide(Layer.succeed(StateFiles, files)))),
     )
-    assert.equal(createRestartController({}, { env }).available, false)
-
-    let exitRequested = false
-    const unmanaged = createRestartController(
-      {
-        appExit: () => {
-          exitRequested = true
-        },
-      },
-      { env: { ...env, DSH_RESTART_REQUEST_PATH: join(home, 'other.request') } },
+    return yield* body({ fake, requestPath: path.join(files.home, 'runtime', `dsh-web-restart-${RUN_ID}.request`), home: files.home }).pipe(
+      Effect.provide(layer),
     )
-    await assert.rejects(unmanaged.request(), /not running under the managed restart launcher/u)
-    assert.equal(exitRequested, false)
-    await assert.rejects(readFile(env.DSH_RESTART_REQUEST_PATH), { code: 'ENOENT' })
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
+  }).pipe(Effect.provide(temporaryStateFiles))
+
+const exists = (path: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    return yield* fs.exists(path)
+  })
+
+/** File writes finish on the event loop, not on the test clock: yield to it until `read` satisfies `done`. */
+const eventually = <A, E, R>(read: Effect.Effect<A, E, R>, done: (value: A) => boolean) =>
+  read.pipe(Effect.tap(Effect.yieldNow), Effect.repeat({ until: done, times: 500 }))
+
+describe('managed restart', () => {
+  it.effect('restart availability requires both the launcher handoff and the DSH exit hook', () =>
+    Effect.gen(function* () {
+      expect(yield* withRestart({}, () => RestartControl.use(control => Effect.succeed(control.available)))).toBe(true)
+      expect(yield* withRestart({ exitHook: false }, () => RestartControl.use(control => Effect.succeed(control.available)))).toBe(false)
+      yield* withRestart(
+        { env: (home, path) => ({ ...managed(home, path), DSH_RESTART_REQUEST_PATH: path.join(home, 'other.request') }) },
+        ({ fake, requestPath }) =>
+          Effect.gen(function* () {
+            const control = yield* RestartControl
+            expect(control.available).toBe(false)
+            expect((yield* Effect.flip(control.request))._tag).toBe('RestartUnavailable')
+            expect(yield* fake.exits).toEqual([])
+            expect(yield* exists(requestPath)).toBe(false)
+          }),
+      )
+    }).pipe(Effect.provide(temporaryStateFiles)),
+  )
+
+  it.effect('restart request writes one marker and schedules a distinct graceful exit code', () =>
+    withRestart({}, ({ fake, requestPath }) =>
+      Effect.gen(function* () {
+        const control = yield* RestartControl
+        yield* Ref.set(fake.running, ['working'])
+        expect(yield* control.request).toEqual({ accepted: true })
+        expect(yield* (yield* FileSystem.FileSystem).readFileString(requestPath)).toBe(RUN_ID)
+        expect(yield* fake.exits).toEqual([])
+        expect(yield* eventually(Effect.andThen(TestClock.adjust('1 second'), fake.exits), exits => exits.length > 0)).toEqual([75])
+        expect((yield* RecoveryStore.use(store => store.list)).map(entry => [entry.sessionId, entry.reason])).toEqual([['working', 'restart']])
+        expect((yield* Effect.flip(control.request))._tag).toBe('RestartRequestFailed')
+      }),
+    ),
+  )
+
+  it.effect('a failed recovery snapshot cancels the managed restart request', () =>
+    withRestart({}, ({ fake, requestPath }) =>
+      Effect.gen(function* () {
+        yield* Ref.set(fake.persistenceFails, true)
+        yield* RestartControl.use(control => control.request)
+        expect(yield* eventually(Effect.andThen(TestClock.adjust('1 second'), exists(requestPath)), present => !present)).toBe(false)
+        expect(yield* fake.exits).toEqual([])
+      }),
+    ),
+  )
+
+  it.effect('hands out only a loopback launch URL the supervisor recorded', () =>
+    withRestart({}, ({ home }) =>
+      Effect.gen(function* () {
+        const control = yield* RestartControl
+        const files = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        expect(yield* control.launchUrl).toBe(null)
+        yield* files.makeDirectory(path.join(home, 'runtime'), { recursive: true })
+        yield* files.writeFileString(path.join(home, 'runtime', 'web-url'), 'http://127.0.0.1:3080/?token=abc\n')
+        expect(yield* control.launchUrl).toBe('http://127.0.0.1:3080/?token=abc')
+        yield* files.writeFileString(path.join(home, 'runtime', 'web-url'), 'http://evil.example/?token=abc\n')
+        expect(yield* control.launchUrl).toBe(null)
+      }),
+    ),
+  )
 })
 
-test('restart request writes one marker and schedules a distinct graceful exit code', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-restart-'))
-  try {
-    let scheduledExit: (() => Promise<void>) | undefined
-    const exitCodes: number[] = []
-    let recoveryCaptured = false
-    const env = testEnvironment(home)
-    const controller = createRestartController(
-      { appExit: code => exitCodes.push(code) },
-      {
-        env,
-        recordRunningSessions: async () => {
-          recoveryCaptured = true
-        },
-        scheduleExit: exit => {
-          scheduledExit = exit
-        },
-      },
-    )
-    const requestPath = env.DSH_RESTART_REQUEST_PATH
+describe('restart when idle', () => {
+  it.effect('waits for two idle polls in a row, then restarts', () =>
+    withRestart({}, ({ fake, requestPath }) =>
+      Effect.gen(function* () {
+        const drain = yield* RestartDrain
+        yield* TestClock.setTime(1_000)
+        yield* Ref.set(fake.running, ['working'])
+        expect(yield* drain.request).toEqual({ accepted: true })
+        expect(yield* drain.request).toEqual({ accepted: true })
+        expect(yield* drain.pending).toEqual({ since: 1_000, running: 1 })
+        yield* TestClock.adjust('10 seconds')
+        expect(yield* exists(requestPath)).toBe(false)
 
-    assert.deepEqual(await controller.request(), { accepted: true })
-    assert.equal(await readFile(requestPath, 'utf8'), RUN_ID)
-    assert.deepEqual(exitCodes, [])
-    assert.equal(recoveryCaptured, false)
-    assert.ok(scheduledExit)
-    await scheduledExit()
-    assert.equal(recoveryCaptured, true)
-    assert.deepEqual(exitCodes, [75])
-    await assert.rejects(controller.request(), /could not be scheduled/u)
-    assert.deepEqual(exitCodes, [75])
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
-})
+        yield* Ref.set(fake.running, [])
+        yield* TestClock.adjust('2 seconds')
+        expect(yield* exists(requestPath)).toBe(false)
+        yield* TestClock.adjust('2 seconds')
+        expect(yield* eventually(exists(requestPath), present => present)).toBe(true)
+        expect(yield* drain.pending).toBe(null)
+        // The exit fiber starts its one-second delay once the marker is written; keep the clock moving until it ran.
+        expect(yield* eventually(Effect.andThen(TestClock.adjust('1 second'), fake.exits), exits => exits.length > 0)).toEqual([75])
+      }),
+    ),
+  )
 
-test('a failed recovery snapshot cancels the managed restart request', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-restart-recovery-'))
-  try {
-    let scheduledExit: (() => Promise<void>) | undefined
-    const exitCodes: number[] = []
-    const failures: unknown[] = []
-    const env = testEnvironment(home)
-    const controller = createRestartController(
-      { appExit: code => exitCodes.push(code) },
-      {
-        env,
-        recordRunningSessions: async () => {
-          throw new Error('recovery storage unavailable')
-        },
-        onExitFailure: error => failures.push(error),
-        scheduleExit: exit => {
-          scheduledExit = exit
-        },
-      },
-    )
+  it.effect('restarts anyway past the wait limit, and a canceled wait restarts nothing', () =>
+    withRestart({}, ({ fake, requestPath }) =>
+      Effect.gen(function* () {
+        const drain = yield* RestartDrain
+        yield* Ref.set(fake.running, ['working'])
+        yield* drain.request
+        expect(yield* drain.cancel).toEqual({ canceled: true })
+        expect(yield* drain.cancel).toEqual({ canceled: false })
+        yield* TestClock.adjust('31 minutes')
+        expect(yield* exists(requestPath)).toBe(false)
 
-    await controller.request()
-    assert.ok(scheduledExit)
-    await scheduledExit()
-    assert.deepEqual(exitCodes, [])
-    assert.equal(failures.length, 1)
-    await assert.rejects(readFile(env.DSH_RESTART_REQUEST_PATH), { code: 'ENOENT' })
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
-})
+        yield* drain.request
+        yield* TestClock.adjust('30 minutes')
+        expect(yield* eventually(exists(requestPath), present => present)).toBe(true)
+      }),
+    ),
+  )
 
-test('sidebar restart availability uses the DSHX API hook without a React Query provider', async () => {
-  const sidebarShell = await readFile(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
-  assert.match(sidebarShell, /useApiQuery\(threadSidebarRestartApi, 'availability'\)/u)
-  assert.doesNotMatch(sidebarShell, /@dshfiles\/plugin-ui\/query/u)
-})
-
-test('hands out only a loopback launch URL the supervisor recorded', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-launch-url-'))
-  try {
-    assert.equal(await readLaunchUrl({ DSH_HOME: home }), null)
-    await mkdir(join(home, 'runtime'))
-    await writeFile(join(home, 'runtime', 'web-url'), 'http://127.0.0.1:3080/?token=abc\n')
-    assert.equal(await readLaunchUrl({ DSH_HOME: home }), 'http://127.0.0.1:3080/?token=abc')
-    await writeFile(join(home, 'runtime', 'web-url'), 'http://evil.example/?token=abc\n')
-    assert.equal(await readLaunchUrl({ DSH_HOME: home }), null)
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
+  it.effect('refuses to wait when this DSH cannot restart itself', () =>
+    withRestart({ exitHook: false }, () =>
+      Effect.gen(function* () {
+        expect((yield* Effect.flip(RestartDrain.use(drain => drain.request)))._tag).toBe('RestartUnavailable')
+      }),
+    ),
+  )
 })

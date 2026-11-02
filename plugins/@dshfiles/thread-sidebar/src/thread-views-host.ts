@@ -1,136 +1,199 @@
-import * as Schema from 'effect/Schema'
-import {
-  threadViewsApi,
+import { Context, Effect, Layer, Option, Ref, Schema, Semaphore } from 'effect'
+import { SidebarSettingsWriteFailed } from './sidebar-errors.js'
+import { ThreadSidebarSettings } from './sidebar-settings.js'
+import type {
   threadViewCreateSchema,
-  threadViewUpdateSchema,
-  threadViewIdSchema,
   threadViewDeleteSchema,
   threadViewMoveSchema,
   threadViewSelectSchema,
+  threadViewUpdateSchema,
 } from './thread-views-api.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewSettingsSchema, type ThreadViewSettings } from './thread-view-preferences.js'
 
-export interface ThreadViewsSettingsPort {
-  describe(): readonly { readonly ns: string; readonly value: unknown; readonly revision: number }[]
-  update(namespace: string, patch: { readonly threadViews: ThreadViewSettings }, expectedRevision?: number): Promise<void>
+const MAX_ISSUE = 500
+
+/** No saved view has this id. */
+export class ThreadViewNotFound extends Schema.TaggedError<ThreadViewNotFound>()(
+  'ThreadViewNotFound',
+  { id: Schema.String.check(Schema.isMaxLength(64)), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'thread-view-not-found' },
+) {
+  override get message(): string {
+    return `Saved thread view ${JSON.stringify(this.id)} does not exist. List the views and pick an existing id.`
+  }
 }
 
-const namespaceSchema = Schema.Struct({ threadViews: Schema.optional(Schema.Unknown) })
-
-export class ThreadViewsController {
-  readonly #settings: ThreadViewsSettingsPort
-  #pending: Promise<unknown> = Promise.resolve()
-
-  constructor(settings: ThreadViewsSettingsPort) {
-    this.#settings = settings
+/** A saved view with this id already exists. */
+export class ThreadViewExists extends Schema.TaggedError<ThreadViewExists>()(
+  'ThreadViewExists',
+  { id: Schema.String.check(Schema.isMaxLength(64)), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'thread-view-exists' },
+) {
+  override get message(): string {
+    return `Saved thread view ${JSON.stringify(this.id)} already exists. Choose another id or update that view.`
   }
+}
 
-  list = () => {
-    const descriptor = this.#settings.describe().find(entry => entry.ns === 'thread-sidebar')
-    if (descriptor === undefined) throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
-    const document = Schema.decodeUnknownSync(namespaceSchema)(descriptor.value)
-    return { settings: Schema.decodeUnknownSync(threadViewSettingsSchema)(document.threadViews ?? DEFAULT_THREAD_VIEW_SETTINGS), revision: descriptor.revision }
+/** The change would leave no enabled view, or selects a disabled one. */
+export class ThreadViewRefused extends Schema.TaggedError<ThreadViewRefused>()(
+  'ThreadViewRefused',
+  { reason: Schema.Literals(['last-enabled', 'disabled']), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'thread-view-refused' },
+) {
+  override get message(): string {
+    return this.reason === 'last-enabled'
+      ? 'At least one view must remain enabled. Enable another view first.'
+      : 'Cannot select a disabled thread view. Enable it first.'
   }
+}
 
-  get = (input: Schema.Schema.Type<typeof threadViewIdSchema>) => {
-    const parsed = Schema.decodeUnknownSync(threadViewIdSchema)(input)
-    const current = this.list()
-    return { view: this.#view(current.settings, parsed.id), revision: current.revision }
+/** The views after the change, or the stored ones, break a view rule (unique names, a name, the view limit). */
+export class ThreadViewsInvalid extends Schema.TaggedError<ThreadViewsInvalid>()(
+  'ThreadViewsInvalid',
+  { source: Schema.Literals(['change', 'stored']), issue: Schema.String.check(Schema.isMaxLength(MAX_ISSUE)), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'thread-views-invalid' },
+) {
+  override get message(): string {
+    return this.source === 'change' ? `The thread view change is not valid: ${this.issue}` : `The saved thread views are not valid: ${this.issue}`
   }
+}
 
-  #view = (settings: ThreadViewSettings, id: string) => {
-    const view = settings.views.find(candidate => candidate.id === id)
-    if (view === undefined) throw new Error(`Saved thread view ${JSON.stringify(id)} does not exist.`)
-    return view
+/** Another writer changed the sidebar settings since they were read; nothing was written. */
+export class ThreadViewsConflict extends Schema.TaggedError<ThreadViewsConflict>()(
+  'ThreadViewsConflict',
+  { expected: Schema.Number, actual: Schema.Number, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'settings-conflict' },
+) {
+  override get message(): string {
+    return `The thread-sidebar settings changed while this edit was prepared (SETTINGS_CONFLICT: revision ${this.actual}, expected ${this.expected}). List the views again and retry.`
   }
+}
 
-  #change = (operation: (settings: ThreadViewSettings) => ThreadViewSettings) => {
-    const changed = this.#pending.then(async () => {
-      const current = this.list()
-      const next = Schema.decodeUnknownSync(threadViewSettingsSchema)(operation(current.settings))
-      await this.#settings.update('thread-sidebar', { threadViews: next }, current.revision)
-      return this.list()
-    })
-    this.#pending = changed.catch(() => undefined)
-    return changed
+type ThreadView = ThreadViewSettings['views'][number]
+type ViewRead = { readonly settings: ThreadViewSettings; readonly revision: number }
+type ViewFailure = ThreadViewNotFound | ThreadViewExists | ThreadViewRefused | ThreadViewsInvalid
+type ViewWriteFailure = ViewFailure | ThreadViewsConflict | SidebarSettingsWriteFailed
+
+const decodeSettings = Schema.decodeUnknownEffect(threadViewSettingsSchema)
+
+const invalid = (source: ThreadViewsInvalid['source']) => (cause: Schema.SchemaError) =>
+  new ThreadViewsInvalid({ source, issue: cause.message.slice(0, MAX_ISSUE), cause })
+
+const viewOf = (settings: ThreadViewSettings, id: string): Effect.Effect<ThreadView, ThreadViewNotFound> => {
+  const view = settings.views.find(candidate => candidate.id === id)
+  return view === undefined ? Effect.fail(new ThreadViewNotFound({ id })) : Effect.succeed(view)
+}
+
+const enabledCount = (settings: ThreadViewSettings): number => settings.views.filter(candidate => candidate.enabled).length
+
+/**
+ * The saved thread views in the sidebar settings. Changes are serialized and each one writes against the revision it
+ * read, so a concurrent edit from a browser fails as a conflict instead of being overwritten.
+ */
+export class ThreadViews extends Context.Service<
+  ThreadViews,
+  {
+    readonly list: Effect.Effect<ViewRead, ThreadViewsInvalid>
+    readonly get: (input: { readonly id: string }) => Effect.Effect<{ readonly view: ThreadView; readonly revision: number }, ViewFailure>
+    readonly create: (input: typeof threadViewCreateSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
+    readonly update: (input: typeof threadViewUpdateSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
+    readonly delete: (input: typeof threadViewDeleteSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
+    readonly move: (input: typeof threadViewMoveSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
+    readonly select: (input: typeof threadViewSelectSchema.Type) => Effect.Effect<ViewRead, ViewWriteFailure>
   }
+>()('@dshfiles/thread-sidebar/ThreadViews') {
+  static readonly layer = Layer.effect(
+    ThreadViews,
+    Effect.gen(function* () {
+      const settings = yield* ThreadSidebarSettings
+      const exclusive = (yield* Semaphore.make(1)).withPermits(1)
+      // The settings snapshot refreshes when DSH announces the commit; until then this process's own last write is newer.
+      const ownWrite = yield* Ref.make(Option.none<ViewRead>())
 
-  create = (input: Schema.Schema.Type<typeof threadViewCreateSchema>) => {
-    const view = Schema.decodeUnknownSync(threadViewCreateSchema)(input)
-    return this.#change(settings => {
-      if (settings.views.some(candidate => candidate.id === view.id)) throw new Error(`Saved thread view ${JSON.stringify(view.id)} already exists.`)
-      return ThreadViewPreferencesModel.saveThreadView(settings, view)
-    })
-  }
-
-  update = (input: Schema.Schema.Type<typeof threadViewUpdateSchema>) => {
-    const patch = Schema.decodeUnknownSync(threadViewUpdateSchema)(input)
-    return this.#change(settings => {
-      const view = this.#view(settings, patch.id)
-      if (patch.enabled === false && view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1) {
-        throw new Error('At least one view must remain enabled.')
-      }
-      const enabled = patch.enabled === undefined ? settings : ThreadViewPreferencesModel.setThreadViewEnabled(settings, view.id, patch.enabled)
-      const currentView = this.#view(enabled, view.id)
-      return ThreadViewPreferencesModel.saveThreadView(enabled, {
-        id: view.id,
-        name: patch.name === undefined ? currentView.name : patch.name,
-        enabled: currentView.enabled,
-        groupBy: patch.groupBy ?? currentView.groupBy,
-        statusFilters: patch.statusFilters ?? currentView.statusFilters,
-        sourceFilter: patch.sourceFilter ?? currentView.sourceFilter,
+      const list = Effect.gen(function* () {
+        const snapshot = yield* settings.snapshot
+        const own = yield* Ref.get(ownWrite)
+        if (Option.isSome(own) && own.value.revision > snapshot.revision) return own.value
+        const views = yield* decodeSettings(snapshot.value.threadViews ?? DEFAULT_THREAD_VIEW_SETTINGS).pipe(Effect.mapError(invalid('stored')))
+        return { settings: views, revision: snapshot.revision }
       })
-    })
-  }
 
-  delete = (input: Schema.Schema.Type<typeof threadViewDeleteSchema>) => {
-    const parsed = Schema.decodeUnknownSync(threadViewDeleteSchema)(input)
-    return this.#change(settings => {
-      const view = this.#view(settings, parsed.id)
-      if (settings.views.length === 1 || (view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1)) {
-        throw new Error('At least one view must remain enabled.')
-      }
-      return ThreadViewPreferencesModel.removeThreadView(settings, view.id)
-    })
-  }
+      const change = (operation: (settings: ThreadViewSettings) => Effect.Effect<ThreadViewSettings, ViewFailure>) =>
+        exclusive(
+          Effect.gen(function* () {
+            const current = yield* list
+            const next = yield* operation(current.settings).pipe(Effect.flatMap(changed => decodeSettings(changed).pipe(Effect.mapError(invalid('change')))))
+            yield* settings.update({ threadViews: next }, current.revision).pipe(
+              Effect.catchTags({
+                SettingsConflict: cause => Effect.fail(new ThreadViewsConflict({ expected: cause.expected, actual: cause.actual, cause })),
+                SettingsWriteFailed: cause => Effect.fail(new SidebarSettingsWriteFailed({ cause })),
+              }),
+            )
+            const written = { settings: next, revision: current.revision + 1 }
+            yield* Ref.set(ownWrite, Option.some(written))
+            return written
+          }),
+        )
 
-  move = (input: Schema.Schema.Type<typeof threadViewMoveSchema>) => {
-    const parsed = Schema.decodeUnknownSync(threadViewMoveSchema)(input)
-    return this.#change(settings => {
-      this.#view(settings, parsed.id)
-      return ThreadViewPreferencesModel.moveThreadView(settings, parsed.id, parsed.direction === 'earlier' ? -1 : 1)
-    })
-  }
-
-  select = (input: Schema.Schema.Type<typeof threadViewSelectSchema>) => {
-    const parsed = Schema.decodeUnknownSync(threadViewSelectSchema)(input)
-    return this.#change(settings => {
-      if (parsed.id !== undefined && !this.#view(settings, parsed.id).enabled) throw new Error('Cannot select a disabled thread view.')
-      const selected = parsed.id === undefined ? settings : ThreadViewPreferencesModel.selectThreadView(settings, parsed.id)
-      return {
-        ...selected,
-        showGroupControl: parsed.showGroupControl ?? selected.showGroupControl,
-        showFilterControl: parsed.showFilterControl ?? selected.showFilterControl,
-      }
-    })
-  }
+      return ThreadViews.of({
+        list: list.pipe(Effect.withSpan('thread views list')),
+        get: Effect.fn('thread views get')(function* (input) {
+          const current = yield* list
+          return { view: yield* viewOf(current.settings, input.id), revision: current.revision }
+        }),
+        create: Effect.fn('thread views create')(function* (view) {
+          return yield* change(current =>
+            current.views.some(candidate => candidate.id === view.id)
+              ? Effect.fail(new ThreadViewExists({ id: view.id }))
+              : Effect.succeed(ThreadViewPreferencesModel.saveThreadView(current, view)),
+          )
+        }),
+        update: Effect.fn('thread views update')(function* (patch) {
+          return yield* change(current =>
+            Effect.gen(function* () {
+              const view = yield* viewOf(current, patch.id)
+              if (patch.enabled === false && view.enabled && enabledCount(current) === 1) return yield* new ThreadViewRefused({ reason: 'last-enabled' })
+              const enabled = patch.enabled === undefined ? current : ThreadViewPreferencesModel.setThreadViewEnabled(current, view.id, patch.enabled)
+              const currentView = yield* viewOf(enabled, view.id)
+              return ThreadViewPreferencesModel.saveThreadView(enabled, {
+                id: view.id,
+                name: patch.name === undefined ? currentView.name : patch.name,
+                enabled: currentView.enabled,
+                groupBy: patch.groupBy ?? currentView.groupBy,
+                statusFilters: patch.statusFilters ?? currentView.statusFilters,
+                sourceFilter: patch.sourceFilter ?? currentView.sourceFilter,
+              })
+            }),
+          )
+        }),
+        delete: Effect.fn('thread views delete')(function* (input) {
+          return yield* change(current =>
+            Effect.gen(function* () {
+              const view = yield* viewOf(current, input.id)
+              if (current.views.length === 1 || (view.enabled && enabledCount(current) === 1)) return yield* new ThreadViewRefused({ reason: 'last-enabled' })
+              return ThreadViewPreferencesModel.removeThreadView(current, view.id)
+            }),
+          )
+        }),
+        move: Effect.fn('thread views move')(function* (input) {
+          return yield* change(current =>
+            viewOf(current, input.id).pipe(Effect.as(ThreadViewPreferencesModel.moveThreadView(current, input.id, input.direction === 'earlier' ? -1 : 1))),
+          )
+        }),
+        select: Effect.fn('thread views select')(function* (input) {
+          return yield* change(current =>
+            Effect.gen(function* () {
+              if (input.id !== undefined && !(yield* viewOf(current, input.id)).enabled) return yield* new ThreadViewRefused({ reason: 'disabled' })
+              const selected = input.id === undefined ? current : ThreadViewPreferencesModel.selectThreadView(current, input.id)
+              return {
+                ...selected,
+                showGroupControl: input.showGroupControl ?? selected.showGroupControl,
+                showFilterControl: input.showFilterControl ?? selected.showFilterControl,
+              }
+            }),
+          )
+        }),
+      })
+    }),
+  )
 }
-
-const controllers = new WeakMap<ThreadViewsSettingsPort, ThreadViewsController>()
-const controller = (settings: ThreadViewsSettingsPort) => {
-  let current = controllers.get(settings)
-  if (current !== undefined) return current
-  current = new ThreadViewsController(settings)
-  controllers.set(settings, current)
-  return current
-}
-
-export const threadViewsHost = threadViewsApi.host({
-  list: ({ ctx }) => controller(ctx.settings).list(),
-  get: ({ ctx, input }) => controller(ctx.settings).get(input),
-  create: ({ ctx, input }) => controller(ctx.settings).create(input),
-  update: ({ ctx, input }) => controller(ctx.settings).update(input),
-  delete: ({ ctx, input }) => controller(ctx.settings).delete(input),
-  move: ({ ctx, input }) => controller(ctx.settings).move(input),
-  select: ({ ctx, input }) => controller(ctx.settings).select(input),
-})

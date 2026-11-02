@@ -1,42 +1,53 @@
-import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import type { Context } from '@deepseek-ai/cordis'
+import type { ApiCaller } from '@dshfiles/dshx/api'
+import { Api } from '@dshfiles/dshx/effect'
+import { Effect, Schema } from 'effect'
 import { threadQueueApi, type ThreadQueueAction } from './queue-api.js'
+import { SidebarHost, type QueueAction } from './sidebar-host-promise.js'
 
-const targetSessionId = (requested: string | undefined, caller: ApiCaller): string => {
+/** The queue verb names no thread and the caller is not an Agent, so there is no thread to default to. */
+export class QueueTargetUnknown extends Schema.TaggedError<QueueTargetUnknown>()(
+  'QueueTargetUnknown',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'queue-target-unknown' },
+) {
+  override get message(): string {
+    return 'Pass sessionId: this tool cannot tell which thread queue to edit.'
+  }
+}
+
+/** The running DSH has no Session controller to change a queued message. */
+export class QueueControllerMissing extends Schema.TaggedError<QueueControllerMissing>()(
+  'QueueControllerMissing',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'queue-controller-missing' },
+) {
+  override get message(): string {
+    return 'This DSH has no Session controller, so a queued message cannot be changed.'
+  }
+}
+
+const targetSessionId = (requested: string | undefined, caller: ApiCaller) => {
   const sessionId = requested ?? (caller.kind === 'agent' ? caller.sessionId : undefined)
-  if (sessionId === undefined) throw new PluginApiError('Pass sessionId: this tool cannot tell which thread queue to edit.', { code: 'queue-target-unknown' })
-  return sessionId
+  return sessionId === undefined ? Effect.fail(new QueueTargetUnknown()) : Effect.succeed(sessionId)
 }
 
-const controllerOf = (ctx: Context) => {
-  const controller = ctx.get('sessionController')
-  if (controller === undefined)
-    throw new PluginApiError('This DSH has no Session controller, so a queued message cannot be changed.', { code: 'queue-controller-missing' })
-  return controller
-}
+const change = Effect.fn('thread queue change')(function* (input: {
+  readonly sessionId: string | undefined
+  readonly itemId: string
+  readonly caller: ApiCaller
+  readonly action: QueueAction
+}) {
+  const sessionId = yield* targetSessionId(input.sessionId, input.caller)
+  const host = yield* SidebarHost
+  yield* host
+    .updateQueue({ sessionId, itemId: input.itemId, action: input.action })
+    .pipe(Effect.catchTag('HostCapabilityMissing', cause => Effect.fail(new QueueControllerMissing({ cause }))))
+  const action: ThreadQueueAction = input.action.kind
+  return { sessionId, itemId: input.itemId, action }
+})
 
-const queueResult = (sessionId: string, itemId: string, action: ThreadQueueAction) => ({ sessionId, itemId, action })
-
-export const threadQueueHost = threadQueueApi.host({
-  remove: async ({ input, caller, ctx }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    await controllerOf(ctx).updateQueue({ sessionId: SessionId(sessionId), itemId: MessageId(input.itemId), action: { kind: 'remove' } })
-    return queueResult(sessionId, input.itemId, 'remove')
-  },
-  steer: async ({ input, caller, ctx }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    await controllerOf(ctx).updateQueue({ sessionId: SessionId(sessionId), itemId: MessageId(input.itemId), action: { kind: 'steer' } })
-    return queueResult(sessionId, input.itemId, 'steer')
-  },
-  edit: async ({ input, caller, ctx }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    await controllerOf(ctx).updateQueue({
-      sessionId: SessionId(sessionId),
-      itemId: MessageId(input.itemId),
-      action: { kind: 'edit', content: [{ type: 'text', text: input.text }] },
-    })
-    return queueResult(sessionId, input.itemId, 'edit')
-  },
+export const threadQueueHandlers = Api.handlers(threadQueueApi, {
+  remove: (input, call) => change({ sessionId: input.sessionId, itemId: input.itemId, caller: call.caller, action: { kind: 'remove' } }),
+  steer: (input, call) => change({ sessionId: input.sessionId, itemId: input.itemId, caller: call.caller, action: { kind: 'steer' } }),
+  edit: (input, call) => change({ sessionId: input.sessionId, itemId: input.itemId, caller: call.caller, action: { kind: 'edit', text: input.text } }),
 })

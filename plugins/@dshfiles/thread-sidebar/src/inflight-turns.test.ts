@@ -1,56 +1,53 @@
-import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { test } from 'vitest'
-import { InflightTurns } from './inflight-turns.js'
-import { createRestartRecoveryStore } from './restart-recovery.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
+import { InflightTurns, turnBoundaryFromEvent } from './inflight-turns.js'
+import { RecoveryStore } from './restart-recovery.js'
+import { temporaryStateFiles } from './state-files.test-support.js'
 
-test('turn boundaries are the only events that open or close an in-flight turn', () => {
-  assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } }), 'start')
-  assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'completed' } } }), 'end')
-  assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'interrupted' } } }), 'interrupted')
-  assert.equal(InflightTurns.boundaryFromEvent({ type: 'step/start', seq: 3, time: 3, data: { turn: 1, step: 1 } }), null)
-  assert.equal(InflightTurns.boundaryFromEvent(null), null)
-})
+const inflightLayer = InflightTurns.layer.pipe(Layer.provideMerge(RecoveryStore.layer), Layer.provideMerge(temporaryStateFiles))
 
-test('a turn left in flight by an ungraceful exit is promoted as interrupted, once', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-recovery-'))
-  try {
-    const inflight = InflightTurns.open({ home, now: () => 500 })
-    await inflight.start('crashed-mid-turn')
-    await inflight.start('finished-cleanly')
-    await inflight.end('finished-cleanly')
-    assert.deepEqual(await inflight.list(), [{ sessionId: 'crashed-mid-turn', startedAt: 500 }])
-
-    const recovery = createRestartRecoveryStore({ home, now: () => 900 })
-    assert.deepEqual(await InflightTurns.promote({ inflight, recovery }), ['crashed-mid-turn'])
-
-    const entries = await createRestartRecoveryStore({ home }).list()
-    assert.deepEqual(
-      entries.map(entry => [entry.sessionId, entry.reason]),
-      [['crashed-mid-turn', 'interrupted']],
+describe('in-flight turns', () => {
+  it('turn boundaries are the only events that open or close an in-flight turn', () => {
+    expect(turnBoundaryFromEvent({ type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } })).toBe('start')
+    expect(turnBoundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'completed' } } })).toBe('end')
+    expect(turnBoundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'interrupted' } } })).toBe('interrupted')
+    expect(turnBoundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'disposed' } } } })).toBe(
+      'shutdown',
     )
-    // The in-flight file is empty, so a second boot promotes nothing.
-    assert.deepEqual(await InflightTurns.promote({ inflight, recovery }), [])
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
-})
+    expect(turnBoundaryFromEvent({ type: 'step/start', seq: 3, time: 3, data: { turn: 1, step: 1 } })).toBe(null)
+    expect(turnBoundaryFromEvent(null)).toBe(null)
+  })
 
-test('a managed restart keeps its own reason when the same thread was also in flight', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-recovery-'))
-  try {
-    const recovery = createRestartRecoveryStore({ home })
-    await recovery.record(['both'], 'restart')
-    const inflight = InflightTurns.open({ home })
-    await inflight.start('both')
-    await inflight.start('crash-only')
-    await InflightTurns.promote({ inflight, recovery })
-    const reasons = new Map((await recovery.list()).map(entry => [entry.sessionId, entry.reason]))
-    assert.equal(reasons.get('both'), 'restart')
-    assert.equal(reasons.get('crash-only'), 'interrupted')
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
+  it.effect('a turn left in flight by an ungraceful exit is promoted as interrupted, once', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(500)
+      const inflight = yield* InflightTurns
+      yield* inflight.start('crashed-mid-turn')
+      yield* inflight.start('finished-cleanly')
+      expect(yield* inflight.end('finished-cleanly')).toBe(true)
+      expect(yield* inflight.end('never-started')).toBe(false)
+      expect(yield* inflight.list).toEqual([{ sessionId: 'crashed-mid-turn', startedAt: 500 }])
+
+      expect(yield* inflight.promote).toEqual(['crashed-mid-turn'])
+      const entries = yield* RecoveryStore.use(store => store.list)
+      expect(entries.map(entry => [entry.sessionId, entry.reason])).toEqual([['crashed-mid-turn', 'interrupted']])
+      // The in-flight file is empty, so a second boot promotes nothing.
+      expect(yield* inflight.promote).toEqual([])
+    }).pipe(Effect.provide(inflightLayer)),
+  )
+
+  it.effect('a managed restart keeps its own reason when the same thread was also in flight', () =>
+    Effect.gen(function* () {
+      const recovery = yield* RecoveryStore
+      const inflight = yield* InflightTurns
+      yield* recovery.record({ sessionIds: ['both'], reason: 'restart' })
+      yield* inflight.start('both')
+      yield* inflight.start('crash-only')
+      yield* inflight.promote
+      const reasons = new Map((yield* recovery.list).map(entry => [entry.sessionId, entry.reason]))
+      expect(reasons.get('both')).toBe('restart')
+      expect(reasons.get('crash-only')).toBe('interrupted')
+    }).pipe(Effect.provide(inflightLayer)),
+  )
 })

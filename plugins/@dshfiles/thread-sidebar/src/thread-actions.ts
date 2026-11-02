@@ -1,11 +1,13 @@
 import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
-import * as Schema from 'effect/Schema'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import * as Result from 'effect/Result'
+import { Effect, Option, Schedule, Schema } from 'effect'
+import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
 import { WorkspacePaths } from './workspace-paths.js'
-import { SchemaHelpers } from './schema-helpers.js'
+
+/** One Host verb as the actions read it; its failure carries the Host's own error as `cause`. */
+export type HostEffect<A> = Effect.Effect<A, ThreadHostCallFailed>
 
 /** The subset of a Host Session summary these actions read. */
 export interface ThreadSummary {
@@ -26,61 +28,60 @@ export interface ProjectRow {
 
 /** Host services the thread and project actions call, decoded to plain ids at this boundary. */
 export interface ThreadActionDeps {
-  readonly listSessions: (signal: AbortSignal) => Promise<readonly ThreadSummary[]>
-  readonly readTitles: (sessionIds: readonly string[], signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+  readonly listSessions: () => HostEffect<readonly ThreadSummary[]>
+  readonly readTitles: (sessionIds: readonly string[]) => HostEffect<ReadonlyMap<string, string>>
   /** Fork lineage as the Host records it: one entry per session, without reading any log. */
-  readonly listThreadRelations: (signal: AbortSignal) => Promise<readonly ThreadReferenceThread[]>
+  readonly listThreadRelations: () => HostEffect<readonly ThreadReferenceThread[]>
   /** Full-text search over session messages; the reference lookup asks it for one session id. */
-  readonly searchThreadContent: (query: string, limit: number, signal: AbortSignal) => Promise<readonly ThreadReferenceMention[]>
+  readonly searchThreadContent: (query: string, limit: number) => HostEffect<readonly ThreadReferenceMention[]>
   readonly projects: () => readonly ProjectRow[]
   readonly archivedSessionIds: () => readonly string[]
   readonly pinnedSessionIds: () => readonly string[]
   readonly settledSessionIds: () => readonly string[]
   /** Move one thread into or out of the plugin's own settled status; returns the set the Host now holds. */
-  readonly setSettled: (sessionId: string, settled: boolean) => Promise<readonly string[]>
-  readonly archive: (sessionId: string, stopActivity: boolean) => Promise<readonly string[]>
-  readonly unarchive: (sessionId: string) => Promise<readonly string[]>
-  readonly pin: (sessionId: string) => Promise<readonly string[]>
-  readonly unpin: (sessionId: string) => Promise<readonly string[]>
-  readonly rename: (sessionId: string, title: string) => Promise<{ readonly title: string }>
-  readonly fork: (sessionId: string, atSeq: number | undefined) => Promise<{ readonly sessionId: string }>
+  readonly setSettled: (sessionId: string, settled: boolean) => HostEffect<readonly string[]>
+  readonly archive: (sessionId: string, stopActivity: boolean) => HostEffect<readonly string[]>
+  readonly unarchive: (sessionId: string) => HostEffect<readonly string[]>
+  readonly pin: (sessionId: string) => HostEffect<readonly string[]>
+  readonly unpin: (sessionId: string) => HostEffect<readonly string[]>
+  readonly rename: (sessionId: string, title: string) => HostEffect<{ readonly title: string }>
+  readonly fork: (sessionId: string, atSeq: number | undefined) => HostEffect<{ readonly sessionId: string }>
   /** Fork one thread into a workspace whose directory becomes the new thread's own cwd. */
   readonly continueIn: (input: {
     readonly sessionId: string
     readonly workspaceId: string
     readonly includeOpenTurn: boolean
-  }) => Promise<{ readonly sessionId: string }>
+  }) => HostEffect<{ readonly sessionId: string }>
   readonly create: (input: {
     readonly projectId?: string
     readonly cwd?: string
     readonly agentPreset?: string
-  }) => Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
+  }) => HostEffect<{ readonly sessionId: string; readonly agentPreset?: string }>
   /** Hand one message to a thread: queue starts its next turn, steer folds it into the running one. */
-  readonly prompt: (input: { readonly sessionId: string; readonly text: string; readonly mode: 'queue' | 'steer' }) => Promise<void>
+  readonly prompt: (input: { readonly sessionId: string; readonly text: string; readonly mode: 'queue' | 'steer' }) => HostEffect<void>
   /** The workspace a new thread may start in: never a jj thread workspace another thread already uses. */
-  readonly ownWorkspaceFor: (projectId: string) => Promise<string>
-  readonly stop: (sessionId: string) => Promise<void>
+  readonly ownWorkspaceFor: (projectId: string) => HostEffect<string>
+  readonly stop: (sessionId: string) => HostEffect<void>
   readonly selectModel: (input: {
     readonly sessionId: string
     readonly provider: string
     readonly model: string
     readonly reasoningEffort?: string
-  }) => Promise<{ readonly provider: string; readonly model: string; readonly reasoningEffort?: string }>
+  }) => HostEffect<{ readonly provider: string; readonly model: string; readonly reasoningEffort?: string }>
   readonly registerProject: (
     path: string,
     title: string | undefined,
-  ) => Promise<{ readonly projectId: string; readonly title: string; readonly path: string; readonly created: boolean }>
-  readonly renameProject: (projectId: string, title: string) => Promise<{ readonly projectId: string; readonly title: string }>
-  readonly deleteProject: (projectId: string) => Promise<void>
-  readonly reorderProject: (projectId: string, beforeProjectId: string | undefined) => Promise<readonly string[]>
-  readonly moveSession: (projectId: string, sessionId: string, beforeSessionId: string | undefined) => Promise<readonly string[]>
+  ) => HostEffect<{ readonly projectId: string; readonly title: string; readonly path: string; readonly created: boolean }>
+  readonly renameProject: (projectId: string, title: string) => HostEffect<{ readonly projectId: string; readonly title: string }>
+  readonly deleteProject: (projectId: string) => HostEffect<void>
+  readonly reorderProject: (projectId: string, beforeProjectId: string | undefined) => HostEffect<readonly string[]>
+  readonly moveSession: (projectId: string, sessionId: string, beforeSessionId: string | undefined) => HostEffect<readonly string[]>
 }
 
 /** What a dshx API handler receives; `caller` identifies the acting Agent for self-targeted actions. */
 export interface ThreadActionContext<Input> {
   readonly input: Input
   readonly caller: ApiCaller
-  readonly signal: AbortSignal
 }
 
 export interface ThreadListInput {
@@ -170,10 +171,11 @@ const DEFAULT_LIMIT = 50
 const TITLE_BUDGET = 300
 const MAX_ERROR_MESSAGE = 300
 /** A reference search still reconciling the corpus must not hold a menu open; lineage still answers. */
-const REFERENCE_SEARCH_DEADLINE_MS = 1_500
+const REFERENCE_SEARCH_DEADLINE = '1500 millis'
 /** The full-text index builds on its first search, so early attempts can time out before they can answer. */
 const REFERENCE_SEARCH_ATTEMPTS = 3
-const REFERENCE_SEARCH_RETRY_DELAY_MS = 150
+const REFERENCE_SEARCH_RETRY_DELAY = '150 millis'
+const SEARCH_UNANSWERED = 'unanswered' as const
 
 /** The Host failures these actions read: a stable code, and the activity an archive refusal named. */
 const passthroughRecordSchema = Schema.Record(Schema.String, Schema.Unknown)
@@ -190,15 +192,17 @@ const remoteFailureSchema = Schema.StructWithRest(
   [passthroughRecordSchema],
 )
 
-const errorCode = (error: unknown): string | undefined => {
-  const parsed = Schema.decodeUnknownResult(remoteFailureSchema)(error)
-  return Result.isSuccess(parsed) ? parsed.success.code : undefined
-}
+const decodeRemoteFailure = Schema.decodeUnknownOption(remoteFailureSchema)
+
+const hostCause = (error: unknown): unknown => (error instanceof ThreadHostCallFailed ? error.cause : error)
+
+const errorCode = (error: unknown): string | undefined => Option.getOrUndefined(decodeRemoteFailure(hostCause(error)))?.code
 
 const pluginCode = (code: string | undefined): string => (code !== undefined && /^[a-z][a-z0-9-]{0,63}$/u.test(code) ? code : 'action-failed')
 
-const failure = (error: unknown, message: string): PluginApiError => {
-  const code = errorCode(error)
+const failure = (failed: unknown, message: string): PluginApiError => {
+  const code = errorCode(failed)
+  const error = hostCause(failed)
   if (code === 'session/not-found') {
     return new PluginApiError('No thread with that id exists.', { code: 'thread-not-found' })
   }
@@ -214,22 +218,15 @@ const failure = (error: unknown, message: string): PluginApiError => {
   return new PluginApiError(message, { code: pluginCode(code) })
 }
 
-const activityKinds = (error: unknown): string[] => {
-  const parsed = SchemaHelpers.decodeUnknownSafe(remoteFailureSchema, error)
-  if (!parsed.success) return []
-  return (parsed.data.details?.activity ?? []).map(entry => entry.kind)
-}
+const activityKinds = (error: unknown): string[] =>
+  (Option.getOrUndefined(decodeRemoteFailure(hostCause(error)))?.details?.activity ?? []).map(entry => entry.kind)
 
 const callerSessionId = (caller: ApiCaller): string | undefined => (caller.kind === 'agent' ? caller.sessionId : undefined)
 
-const targetSessionId = (requested: string | undefined, caller: ApiCaller): string => {
+const targetSessionId = (requested: string | undefined, caller: ApiCaller): Effect.Effect<string, PluginApiError> => {
   const sessionId = requested ?? callerSessionId(caller)
-  if (sessionId === undefined) {
-    throw new PluginApiError('Pass sessionId: this tool cannot tell which thread to act on.', {
-      code: 'thread-target-unknown',
-    })
-  }
-  return sessionId
+  if (sessionId !== undefined) return Effect.succeed(sessionId)
+  return Effect.fail(new PluginApiError('Pass sessionId: this tool cannot tell which thread to act on.', { code: 'thread-target-unknown' }))
 }
 
 const matches = (query: string, summary: ThreadSummary, title: string | undefined, project: ProjectRow | undefined): boolean =>
@@ -238,41 +235,20 @@ const matches = (query: string, summary: ThreadSummary, title: string | undefine
   (summary.cwd ?? '').toLowerCase().includes(query) ||
   (project?.title ?? '').toLowerCase().includes(query)
 
-/** Threads whose indexed message pulled `sessionId` in as referenced context; null when the search could not answer. */
-const searchWithinDeadline = async (deps: ThreadActionDeps, query: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
-  const deadline = new AbortController()
-  const timer = setTimeout(() => deadline.abort(), REFERENCE_SEARCH_DEADLINE_MS)
-  try {
-    return await deps.searchThreadContent(query, ThreadReferencesModel.maxLimit, AbortSignal.any([signal, deadline.signal]))
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
-}
+/** One reference search, bounded so a search still reconciling the corpus cannot hold the menu open; none when it could not answer. */
+const searchWithinDeadline = (deps: ThreadActionDeps, query: string) =>
+  deps.searchThreadContent(query, ThreadReferencesModel.maxLimit).pipe(
+    Effect.timeoutOption(REFERENCE_SEARCH_DEADLINE),
+    Effect.catch(() => Effect.succeedNone),
+  )
 
-const waitBeforeRetry = (signal: AbortSignal): Promise<void> =>
-  new Promise(resolve => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, REFERENCE_SEARCH_RETRY_DELAY_MS)
-    const onAbort = (): void => {
-      clearTimeout(timer)
-      resolve()
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-
-/** One query with the first-search retries: null when the search could not answer at all. */
-const searchWithRetries = async (deps: ThreadActionDeps, query: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
-  for (let attempt = 0; attempt < REFERENCE_SEARCH_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await waitBeforeRetry(signal)
-    const mentions = await searchWithinDeadline(deps, query, signal)
-    if (mentions !== null || signal.aborted) return mentions
-  }
-  return null
-}
+/** One query with the first-search retries: none when the search could not answer at all. */
+const searchWithRetries = (deps: ThreadActionDeps, query: string) =>
+  searchWithinDeadline(deps, query).pipe(
+    Effect.flatMap(mentions => (Option.isSome(mentions) ? Effect.succeed(mentions) : Effect.fail(SEARCH_UNANSWERED))),
+    Effect.retry({ times: REFERENCE_SEARCH_ATTEMPTS - 1, schedule: Schedule.spaced(REFERENCE_SEARCH_RETRY_DELAY) }),
+    Effect.catch(() => Effect.succeedNone),
+  )
 
 /**
  * How a message that pulled `sessionId` in as referenced context records it. A composer mention serializes the
@@ -285,23 +261,22 @@ const mentionQueries = (sessionId: string): readonly string[] => [
 ]
 
 /**
- * Threads whose indexed message pulled `sessionId` in as referenced context; null when no query could answer.
+ * Threads whose indexed message pulled `sessionId` in as referenced context; none when no query could answer.
  * A query that answers with rows wins; one that answers empty falls through to the next query.
  */
-const mentionThreads = async (deps: ThreadActionDeps, sessionId: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
+const mentionThreads = Effect.fnUntraced(function* (deps: ThreadActionDeps, sessionId: string) {
   let unanswered = false
   for (const query of mentionQueries(sessionId)) {
-    const mentions = await searchWithRetries(deps, query, signal)
-    if (mentions === null) {
+    const mentions = yield* searchWithRetries(deps, query)
+    if (Option.isNone(mentions)) {
       unanswered = true
       continue
     }
-    if (mentions.length > 0) return mentions
+    if (mentions.value.length > 0) return Option.some(mentions.value)
   }
-  return unanswered ? null : []
-}
+  return unanswered ? Option.none<readonly ThreadReferenceMention[]>() : Option.some<readonly ThreadReferenceMention[]>([])
+})
 
-/** Builds the thread and project actions over the injected Host services. */
 /** The registered project that owns a directory, if any; the lookup is best-effort and never blocks creating a thread. */
 const projectIdForPath = (deps: ThreadActionDeps, cwd: string | undefined): string | undefined => {
   if (cwd === undefined) return undefined
@@ -312,9 +287,13 @@ const projectIdForPath = (deps: ThreadActionDeps, cwd: string | undefined): stri
   }
 }
 
+/** Run one Host verb, reporting its failure the way the actions API always has. */
+const attempt = <A>(effect: HostEffect<A>, message: string) => Effect.mapError(effect, error => failure(error, message))
+
+/** Builds the thread and project actions over the injected Host services. */
 export const createThreadActions = (deps: ThreadActionDeps) => ({
-  list: async ({ input, signal }: ThreadActionContext<ThreadListInput>) => {
-    const sessions = await deps.listSessions(signal)
+  list: Effect.fn('thread actions list')(function* ({ input }: ThreadActionContext<ThreadListInput>) {
+    const sessions = yield* attempt(deps.listSessions(), 'Could not list threads.')
     const projects = deps.projects()
     const archived = new Set(deps.archivedSessionIds())
     const pinned = new Set(deps.pinnedSessionIds())
@@ -326,9 +305,9 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
 
     const includeArchived = input.includeArchived === true
     const recent = [...sessions].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, TITLE_BUDGET)
-    const titles = await deps.readTitles(
-      recent.filter(summary => includeArchived || !archived.has(summary.sessionId)).map(summary => summary.sessionId),
-      signal,
+    const titles = yield* attempt(
+      deps.readTitles(recent.filter(summary => includeArchived || !archived.has(summary.sessionId)).map(summary => summary.sessionId)),
+      'Could not read thread titles.',
     )
 
     const query = input.query?.trim().toLowerCase()
@@ -355,19 +334,19 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
 
     const limit = Math.min(input.limit ?? DEFAULT_LIMIT, rows.length)
     return { threads: rows.slice(0, limit), total: rows.length, truncated: rows.length > limit }
-  },
+  }),
 
-  references: async ({ input, caller, signal }: ThreadActionContext<ThreadReferencesInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
+  references: Effect.fn('thread actions references')(function* ({ input, caller }: ThreadActionContext<ThreadReferencesInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
     const limit = Math.max(1, Math.min(input.limit ?? ThreadReferencesModel.defaultLimit, ThreadReferencesModel.maxLimit))
-    const [sessions, relations] = await Promise.all([deps.listSessions(signal), deps.listThreadRelations(signal)])
+    const [sessions, relations] = yield* attempt(Effect.all([deps.listSessions(), deps.listThreadRelations()], { concurrency: 2 }), 'Could not list threads.')
     const relationById = new Map(relations.map(relation => [relation.sessionId, relation]))
     const summaryById = new Map(sessions.map(summary => [summary.sessionId, summary]))
-    const mentions = await mentionThreads(deps, sessionId, signal)
+    const mentions = yield* mentionThreads(deps, sessionId)
     const merged = ThreadReferencesModel.merge({
       sessionId,
       limit,
-      degraded: mentions === null,
+      degraded: Option.isNone(mentions),
       // The logical-session corpus is the authority on lineage; the summary only adds recency.
       threads: [...new Set([...relationById.keys(), ...summaryById.keys()])].map(threadId => {
         const relation = relationById.get(threadId)
@@ -379,266 +358,196 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
           ...(relation?.origin === undefined ? undefined : { origin: relation.origin }),
         }
       }),
-      mentions: mentions ?? [],
+      mentions: Option.getOrElse(mentions, () => []),
     })
     if (merged.references.length === 0) return { ...merged, references: [] }
-    const titles = await deps.readTitles(
-      merged.references.map(row => row.sessionId),
-      signal,
-    )
+    const titles = yield* attempt(deps.readTitles(merged.references.map(row => row.sessionId)), 'Could not read thread titles.')
     return { ...merged, references: [...ThreadReferencesModel.withTitles(merged.references, titles)] }
-  },
+  }),
 
-  archive: async ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
+  archive: Effect.fn('thread actions archive')(function* ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
     const stopActivity = input.stopActivity === true
-    try {
-      const archivedSessionIds = await deps.archive(sessionId, stopActivity)
-      return { status: 'archived' as const, sessionId, archivedSessionIds: [...archivedSessionIds], activity: [] }
-    } catch (error) {
-      if (errorCode(error) === 'workspace/session-active') {
-        return {
-          status: 'refused-active' as const,
-          sessionId,
-          archivedSessionIds: [...deps.archivedSessionIds()],
-          activity: activityKinds(error),
-        }
-      }
-      throw failure(error, `Could not archive thread ${sessionId}.`)
-    }
-  },
+    return yield* deps.archive(sessionId, stopActivity).pipe(
+      Effect.map(archivedSessionIds => ({ status: 'archived' as const, sessionId, archivedSessionIds: [...archivedSessionIds], activity: [] as string[] })),
+      Effect.catch(error =>
+        errorCode(error) === 'workspace/session-active'
+          ? Effect.succeed({
+              status: 'refused-active' as const,
+              sessionId,
+              archivedSessionIds: [...deps.archivedSessionIds()],
+              activity: activityKinds(error),
+            })
+          : Effect.fail(failure(error, `Could not archive thread ${sessionId}.`)),
+      ),
+    )
+  }),
 
-  unarchive: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
-    try {
-      const archivedSessionIds = await deps.unarchive(input.sessionId)
-      return { sessionId: input.sessionId, archivedSessionIds: [...archivedSessionIds] }
-    } catch (error) {
-      throw failure(error, `Could not restore thread ${input.sessionId}.`)
-    }
-  },
+  unarchive: Effect.fn('thread actions unarchive')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
+    const archivedSessionIds = yield* attempt(deps.unarchive(input.sessionId), `Could not restore thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, archivedSessionIds: [...archivedSessionIds] }
+  }),
 
-  settle: async ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    try {
-      return { sessionId, settledSessionIds: [...(await deps.setSettled(sessionId, true))] }
-    } catch (error) {
-      throw failure(error, `Could not settle thread ${sessionId}.`)
-    }
-  },
+  settle: Effect.fn('thread actions settle')(function* ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
+    return { sessionId, settledSessionIds: [...(yield* attempt(deps.setSettled(sessionId, true), `Could not settle thread ${sessionId}.`))] }
+  }),
 
-  unsettle: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
-    try {
-      return { sessionId: input.sessionId, settledSessionIds: [...(await deps.setSettled(input.sessionId, false))] }
-    } catch (error) {
-      throw failure(error, `Could not unsettle thread ${input.sessionId}.`)
-    }
-  },
+  unsettle: Effect.fn('thread actions unsettle')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
+    const settledSessionIds = yield* attempt(deps.setSettled(input.sessionId, false), `Could not unsettle thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, settledSessionIds: [...settledSessionIds] }
+  }),
 
-  pin: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
-    try {
-      const pinnedSessionIds = await deps.pin(input.sessionId)
-      return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
-    } catch (error) {
-      throw failure(error, `Could not pin thread ${input.sessionId}.`)
-    }
-  },
+  pin: Effect.fn('thread actions pin')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
+    const pinnedSessionIds = yield* attempt(deps.pin(input.sessionId), `Could not pin thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
+  }),
 
-  unpin: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
-    try {
-      const pinnedSessionIds = await deps.unpin(input.sessionId)
-      return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
-    } catch (error) {
-      throw failure(error, `Could not unpin thread ${input.sessionId}.`)
-    }
-  },
+  unpin: Effect.fn('thread actions unpin')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
+    const pinnedSessionIds = yield* attempt(deps.unpin(input.sessionId), `Could not unpin thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
+  }),
 
-  rename: async ({ input, caller }: ThreadActionContext<ThreadRenameInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    try {
-      const renamed = await deps.rename(sessionId, input.title)
-      return { sessionId, title: renamed.title }
-    } catch (error) {
-      throw failure(error, `Could not rename thread ${sessionId}.`)
-    }
-  },
+  rename: Effect.fn('thread actions rename')(function* ({ input, caller }: ThreadActionContext<ThreadRenameInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
+    const renamed = yield* attempt(deps.rename(sessionId, input.title), `Could not rename thread ${sessionId}.`)
+    return { sessionId, title: renamed.title }
+  }),
 
-  fork: async ({ input, caller, signal }: ThreadActionContext<ThreadForkInput>) => {
-    signal.throwIfAborted()
-    const sessionId = targetSessionId(input.sessionId, caller)
-    try {
-      const forked = await deps.fork(sessionId, input.atSeq)
-      return { sessionId, forkedSessionId: forked.sessionId }
-    } catch (error) {
-      throw failure(error, `Could not fork thread ${sessionId}.`)
-    }
-  },
+  fork: Effect.fn('thread actions fork')(function* ({ input, caller }: ThreadActionContext<ThreadForkInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
+    const forked = yield* attempt(deps.fork(sessionId, input.atSeq), `Could not fork thread ${sessionId}.`)
+    return { sessionId, forkedSessionId: forked.sessionId }
+  }),
 
-  continueIn: async ({ input, caller, signal }: ThreadActionContext<ThreadContinueInInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
+  continueIn: Effect.fn('thread actions continue in')(function* ({ input, caller }: ThreadActionContext<ThreadContinueInInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
+    const failed = `Could not continue thread ${sessionId} in project ${input.projectId}.`
     // The calling thread continues mid-turn, so its own request is kept; any other running thread would lose its turn.
     const continuingItself = callerSessionId(caller) === sessionId
-    if (!continuingItself && (await deps.listSessions(signal)).some(summary => summary.sessionId === sessionId && summary.running)) {
-      throw new PluginApiError(`Thread ${sessionId} is still running. Stop it or wait for its turn to end, then continue it elsewhere.`, {
-        code: 'thread-running',
-      })
+    if (!continuingItself && (yield* attempt(deps.listSessions(), failed)).some(summary => summary.sessionId === sessionId && summary.running)) {
+      return yield* Effect.fail(
+        new PluginApiError(`Thread ${sessionId} is still running. Stop it or wait for its turn to end, then continue it elsewhere.`, {
+          code: 'thread-running',
+        }),
+      )
     }
-    let continuedSessionId: string
-    let workspaceId: string
-    try {
-      workspaceId = await deps.ownWorkspaceFor(input.projectId)
-      continuedSessionId = (await deps.continueIn({ sessionId, workspaceId, includeOpenTurn: continuingItself })).sessionId
-    } catch (error) {
-      throw failure(error, `Could not continue thread ${sessionId} in project ${input.projectId}.`)
-    }
+    const workspaceId = yield* attempt(deps.ownWorkspaceFor(input.projectId), failed)
+    const continuedSessionId = (yield* attempt(deps.continueIn({ sessionId, workspaceId, includeOpenTurn: continuingItself }), failed)).sessionId
     const continued = { sessionId, continuedSessionId, projectId: input.projectId, workspaceId }
     // The new thread already exists: a failed settle or first message is reported, never a reason to hide its id.
-    let settled = true
-    try {
-      await deps.setSettled(sessionId, true)
-    } catch {
-      settled = false
-    }
+    const settled = yield* deps.setSettled(sessionId, true).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    )
     if (input.text === undefined) return { ...continued, settled }
-    try {
-      await deps.prompt({ sessionId: continuedSessionId, text: input.text, mode: 'queue' })
-      return { ...continued, settled, prompt: 'accepted' as const }
-    } catch (error) {
-      return { ...continued, settled, prompt: 'refused' as const, promptError: failure(error, 'Could not send its first message.').message }
-    }
-  },
+    return yield* deps.prompt({ sessionId: continuedSessionId, text: input.text, mode: 'queue' }).pipe(
+      Effect.as({ ...continued, settled, prompt: 'accepted' as const }),
+      Effect.catch(error =>
+        Effect.succeed({ ...continued, settled, prompt: 'refused' as const, promptError: failure(error, 'Could not send its first message.').message }),
+      ),
+    )
+  }),
 
-  create: async ({ input }: ThreadActionContext<ThreadCreateInput>) => {
+  create: Effect.fn('thread actions create')(function* ({ input }: ThreadActionContext<ThreadCreateInput>) {
     // The Host accounts a Session to a workspace or to a bare cwd, never both, and a bare cwd leaves it ungrouped:
     // when the directory is a registered project, create the thread in that project instead.
     const requestedProjectId = input.projectId ?? projectIdForPath(deps, input.cwd)
-    const projectId = requestedProjectId === undefined ? undefined : await deps.ownWorkspaceFor(requestedProjectId)
-    let created: { readonly sessionId: string; readonly agentPreset?: string }
-    try {
-      created = await deps.create({
+    const projectId = requestedProjectId === undefined ? undefined : yield* attempt(deps.ownWorkspaceFor(requestedProjectId), 'Could not start a new thread.')
+    const created = yield* attempt(
+      deps.create({
         ...(projectId === undefined ? undefined : { projectId }),
         ...(projectId === undefined && input.cwd !== undefined ? { cwd: input.cwd } : undefined),
         ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
-      })
-    } catch (error) {
-      throw failure(error, 'Could not start a new thread.')
-    }
+      }),
+      'Could not start a new thread.',
+    )
     const started = {
       sessionId: created.sessionId,
       ...(created.agentPreset === undefined ? undefined : { agentPreset: created.agentPreset }),
     }
     // The thread already exists, so a refused title or first message must not hide its id from the caller.
-    let title: string | undefined
-    if (input.title !== undefined) {
-      try {
-        title = (await deps.rename(created.sessionId, input.title)).title
-      } catch {
-        title = undefined
-      }
-    }
+    const title =
+      input.title === undefined
+        ? undefined
+        : yield* deps.rename(created.sessionId, input.title).pipe(
+            Effect.map(renamed => renamed.title),
+            Effect.catch(() => Effect.succeed(undefined)),
+          )
     const withTitle = { ...started, ...(title === undefined ? undefined : { title }) }
     if (input.text === undefined) return withTitle
-    try {
-      await deps.prompt({ sessionId: created.sessionId, text: input.text, mode: 'queue' })
-      return { ...withTitle, prompt: 'accepted' as const }
-    } catch (error) {
-      return {
-        ...withTitle,
-        prompt: 'refused' as const,
-        promptError: failure(error, 'Could not send its first message.').message,
-      }
-    }
-  },
+    return yield* deps.prompt({ sessionId: created.sessionId, text: input.text, mode: 'queue' }).pipe(
+      Effect.as({ ...withTitle, prompt: 'accepted' as const }),
+      Effect.catch(error =>
+        Effect.succeed({ ...withTitle, prompt: 'refused' as const, promptError: failure(error, 'Could not send its first message.').message }),
+      ),
+    )
+  }),
 
-  prompt: async ({ input, caller }: ThreadActionContext<ThreadPromptInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
+  prompt: Effect.fn('thread actions prompt')(function* ({ input, caller }: ThreadActionContext<ThreadPromptInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
     const mode = input.mode ?? 'queue'
-    try {
-      await deps.prompt({ sessionId, text: input.text, mode })
-      return { sessionId, mode, accepted: true as const }
-    } catch (error) {
-      throw failure(error, `Could not send a message to thread ${sessionId}.`)
-    }
-  },
+    yield* attempt(deps.prompt({ sessionId, text: input.text, mode }), `Could not send a message to thread ${sessionId}.`)
+    return { sessionId, mode, accepted: true as const }
+  }),
 
-  stop: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
-    try {
-      await deps.stop(input.sessionId)
-      return { sessionId: input.sessionId, accepted: true as const }
-    } catch (error) {
-      throw failure(error, `Could not stop thread ${input.sessionId}.`)
-    }
-  },
+  stop: Effect.fn('thread actions stop')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
+    yield* attempt(deps.stop(input.sessionId), `Could not stop thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, accepted: true as const }
+  }),
 
-  selectModel: async ({ input, caller }: ThreadActionContext<ThreadSelectModelInput>) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    try {
-      const selected = await deps.selectModel({
+  selectModel: Effect.fn('thread actions select model')(function* ({ input, caller }: ThreadActionContext<ThreadSelectModelInput>) {
+    const sessionId = yield* targetSessionId(input.sessionId, caller)
+    const selected = yield* attempt(
+      deps.selectModel({
         sessionId,
         provider: input.provider,
         model: input.model,
         ...(input.reasoningEffort === undefined ? undefined : { reasoningEffort: input.reasoningEffort }),
-      })
-      return {
-        sessionId,
-        provider: selected.provider,
-        model: selected.model,
-        ...(selected.reasoningEffort === undefined ? undefined : { reasoningEffort: selected.reasoningEffort }),
-      }
-    } catch (error) {
-      throw failure(error, `Could not select a model for thread ${sessionId}.`)
+      }),
+      `Could not select a model for thread ${sessionId}.`,
+    )
+    return {
+      sessionId,
+      provider: selected.provider,
+      model: selected.model,
+      ...(selected.reasoningEffort === undefined ? undefined : { reasoningEffort: selected.reasoningEffort }),
     }
-  },
-
-  projectList: async () => ({
-    // A project list names projects: the jj workspaces threads run in are workspaces of one, so they stay out.
-    projects: WorkspacePaths.projects(deps.projects()).map(project => ({
-      projectId: project.projectId,
-      title: project.title,
-      path: project.path,
-      threadCount: project.sessionIds.length,
-    })),
   }),
 
-  projectRegister: async ({ input }: ThreadActionContext<ProjectRegisterInput>) => {
-    try {
-      return await deps.registerProject(input.path, input.title)
-    } catch (error) {
-      throw failure(error, `Could not register ${input.path} as a project.`)
-    }
-  },
+  projectList: () =>
+    Effect.sync(() => ({
+      // A project list names projects: the jj workspaces threads run in are workspaces of one, so they stay out.
+      projects: WorkspacePaths.projects(deps.projects()).map(project => ({
+        projectId: project.projectId,
+        title: project.title,
+        path: project.path,
+        threadCount: project.sessionIds.length,
+      })),
+    })).pipe(Effect.withSpan('thread actions project list')),
 
-  projectRename: async ({ input }: ThreadActionContext<ProjectRenameInput>) => {
-    try {
-      return await deps.renameProject(input.projectId, input.title)
-    } catch (error) {
-      throw failure(error, `Could not rename project ${input.projectId}.`)
-    }
-  },
+  projectRegister: Effect.fn('thread actions project register')(function* ({ input }: ThreadActionContext<ProjectRegisterInput>) {
+    return yield* attempt(deps.registerProject(input.path, input.title), `Could not register ${input.path} as a project.`)
+  }),
 
-  projectDelete: async ({ input }: ThreadActionContext<ProjectDeleteInput>) => {
-    try {
-      await deps.deleteProject(input.projectId)
-      return { projectId: input.projectId, deleted: true as const }
-    } catch (error) {
-      throw failure(error, `Could not remove project ${input.projectId}.`)
-    }
-  },
+  projectRename: Effect.fn('thread actions project rename')(function* ({ input }: ThreadActionContext<ProjectRenameInput>) {
+    return yield* attempt(deps.renameProject(input.projectId, input.title), `Could not rename project ${input.projectId}.`)
+  }),
 
-  projectReorder: async ({ input }: ThreadActionContext<ProjectReorderInput>) => {
-    try {
-      const projectIds = await deps.reorderProject(input.projectId, input.beforeProjectId)
-      return { projectIds: [...projectIds] }
-    } catch (error) {
-      throw failure(error, `Could not reorder project ${input.projectId}.`)
-    }
-  },
+  projectDelete: Effect.fn('thread actions project delete')(function* ({ input }: ThreadActionContext<ProjectDeleteInput>) {
+    yield* attempt(deps.deleteProject(input.projectId), `Could not remove project ${input.projectId}.`)
+    return { projectId: input.projectId, deleted: true as const }
+  }),
 
-  move: async ({ input }: ThreadActionContext<ThreadMoveInput>) => {
-    try {
-      const sessionIds = await deps.moveSession(input.projectId, input.sessionId, input.beforeSessionId)
-      return { sessionId: input.sessionId, projectId: input.projectId, sessionIds: [...sessionIds] }
-    } catch (error) {
-      throw failure(error, `Could not move thread ${input.sessionId}.`)
-    }
-  },
+  projectReorder: Effect.fn('thread actions project reorder')(function* ({ input }: ThreadActionContext<ProjectReorderInput>) {
+    const projectIds = yield* attempt(deps.reorderProject(input.projectId, input.beforeProjectId), `Could not reorder project ${input.projectId}.`)
+    return { projectIds: [...projectIds] }
+  }),
+
+  move: Effect.fn('thread actions move')(function* ({ input }: ThreadActionContext<ThreadMoveInput>) {
+    const sessionIds = yield* attempt(deps.moveSession(input.projectId, input.sessionId, input.beforeSessionId), `Could not move thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId, projectId: input.projectId, sessionIds: [...sessionIds] }
+  }),
 })
+
+export type ThreadActionSet = ReturnType<typeof createThreadActions>
