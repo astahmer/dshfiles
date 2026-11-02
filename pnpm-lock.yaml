@@ -5956,6 +5956,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 18.3.7(@types/react@18.3.31)
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1

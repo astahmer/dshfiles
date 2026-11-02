@@ -1,14 +1,14 @@
 import type { ISessions, SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { expect, it, vi } from 'vitest'
+import { Schema } from 'effect'
 import { SidebarSessionViews } from './native/client/session-views.ts'
-import { z } from 'zod'
 
 it('restores only saved resource Sessions through owned references and releases inactive Views after unmount', () => {
   const releases = new Map<string, ReturnType<typeof vi.fn>>()
   const retain: ISessions['retain'] = vi.fn((target, _options): SessionReference => {
     // SAFETY: this fixture accepts only the local SessionId branch; the public seam is validated here.
-    const sessionId = z.string().parse(target) as SessionId
+    const sessionId = SessionId(Schema.decodeUnknownSync(Schema.String)(target))
     const release = vi.fn()
     releases.set(sessionId, release)
     const ready = new Promise<SessionReference['binding']>(() => {})
@@ -64,7 +64,7 @@ it('bounds saved Session opening concurrency at four and stops queued acquisitio
   const releases = new Map<string, ReturnType<typeof vi.fn>>()
   const retain: ISessions['retain'] = (target): SessionReference => {
     // SAFETY: this fixture accepts only the local SessionId branch; the public seam is validated here.
-    const sessionId = z.string().parse(target) as SessionId
+    const sessionId = SessionId(Schema.decodeUnknownSync(Schema.String)(target))
     starts.push(sessionId)
     const release = vi.fn()
     releases.set(sessionId, release)
