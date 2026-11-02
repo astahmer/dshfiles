@@ -27,6 +27,7 @@
     "plugins/@dshfiles/chat/src/host.ts",
     "plugins/@dshfiles/chat/src/css-modules.d.ts",
     "**/*.snapshot.json",
-    "tooling/dshx/e2e/fixtures/tool-schemas.json"
+    "tooling/dshx/e2e/fixtures/tool-schemas.json",
+    "tooling/dshx/packages/dshx/tests/fixtures/effect-api-tool-schema.json"
   ]
 }
