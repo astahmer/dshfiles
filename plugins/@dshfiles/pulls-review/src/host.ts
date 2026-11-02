@@ -53,6 +53,7 @@ export default DshxPlugin.make({
   apis: [
     Api.bind(pullsReviewApi, {
       review: input => ReviewWorkspace.use(workspace => workspace.review(input)),
+      report: input => ReviewWorkspace.use(workspace => workspace.review(input)).pipe(Effect.map(result => ({ text: reviewReportText(result) }))),
       summarize: input =>
         PullsReviewSummary.use(summary =>
           summary.summarize({
