@@ -66,8 +66,7 @@
     "oxlint": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zod": "catalog:"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
