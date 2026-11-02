@@ -46,12 +46,20 @@
                   "type": "boolean"
                 }
               },
-              "required": ["name", "tool", "match", "reason", "enabled"],
+              "required": [
+                "name",
+                "tool",
+                "match",
+                "reason",
+                "enabled"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["rules"],
+        "required": [
+          "rules"
+        ],
         "additionalProperties": false
       },
       "toolInput": {
@@ -78,7 +86,9 @@
           },
           "arguments": {}
         },
-        "required": ["tool"],
+        "required": [
+          "tool"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -99,7 +109,10 @@
             ]
           }
         },
-        "required": ["denied", "reason"],
+        "required": [
+          "denied",
+          "reason"
+        ],
         "additionalProperties": false
       },
       "toolInput": {
@@ -110,7 +123,9 @@
           },
           "arguments": {}
         },
-        "required": ["tool"],
+        "required": [
+          "tool"
+        ],
         "additionalProperties": false
       }
     }
