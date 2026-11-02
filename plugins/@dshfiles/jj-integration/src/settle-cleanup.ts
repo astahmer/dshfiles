@@ -1,5 +1,4 @@
-import { withSpan } from '@dshfiles/dshx/tracing'
-import { Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import type { CleanupResult, CleanupTarget } from './api.js'
 import type { CleanupKind } from './workspace-cleanup.js'
 
@@ -8,14 +7,11 @@ export const SETTLED_THREADS_NAMESPACE = 'thread-sidebar'
 
 const settledStatusSchema = Schema.Struct({ settledSessionIds: Schema.optional(Schema.Array(Schema.String)) })
 
-export const parseSettledStatus = (value: unknown): { readonly settledSessionIds: readonly string[] } => {
-  try {
-    const parsed = Schema.decodeUnknownSync(settledStatusSchema)(value)
-    return { settledSessionIds: parsed.settledSessionIds ?? [] }
-  } catch {
-    return { settledSessionIds: [] }
-  }
-}
+const decodeSettledStatus = Schema.decodeUnknownOption(settledStatusSchema)
+
+export const parseSettledStatus = (value: unknown): { readonly settledSessionIds: readonly string[] } => ({
+  settledSessionIds: Option.match(decodeSettledStatus(value), { onNone: () => [], onSome: parsed => parsed.settledSessionIds ?? [] }),
+})
 
 interface SettleCleanupThread {
   readonly name: string
@@ -61,29 +57,29 @@ const targets = (input: {
 }
 
 /** One span per settle: how many threads settled, how many workspaces it targeted and how many were removed. */
-const run = (input: {
+const run = Effect.fn('jj-integration settle cleanup')(function* <E, R>(input: {
   readonly justSettled: readonly string[]
   readonly settled: readonly string[]
   readonly kinds: readonly CleanupKind[]
-  readonly repositories: () => Promise<readonly SettleCleanupRepository[]>
-  readonly archived: () => ReadonlySet<string>
-  readonly remove: (targets: CleanupTarget[]) => Promise<CleanupResult>
-}): Promise<number> =>
-  withSpan('jj-integration settle cleanup', { attributes: { 'dshx.cleanup.settled': input.justSettled.length } }, async span => {
-    const found = targets({
-      repositories: await input.repositories(),
-      justSettled: input.justSettled,
-      settled: new Set(input.settled),
-      archived: input.archived(),
-      kinds: input.kinds,
-    })
-    span.setAttributes({ 'dshx.cleanup.targets': found.length })
-    if (found.length === 0) return 0
-    const result = await input.remove(found)
-    const removed = result.workspaces.filter(workspace => workspace.outcome === 'removed').length
-    span.setAttributes({ 'dshx.cleanup.removed': removed })
-    return removed
+  readonly repositories: Effect.Effect<readonly SettleCleanupRepository[], E, R>
+  readonly archived: Effect.Effect<ReadonlySet<string>, E, R>
+  readonly remove: (targets: CleanupTarget[]) => Effect.Effect<CleanupResult, E, R>
+}) {
+  yield* Effect.annotateCurrentSpan({ 'dshx.cleanup.settled': input.justSettled.length })
+  const found = targets({
+    repositories: yield* input.repositories,
+    justSettled: input.justSettled,
+    settled: new Set(input.settled),
+    archived: yield* input.archived,
+    kinds: input.kinds,
   })
+  yield* Effect.annotateCurrentSpan({ 'dshx.cleanup.targets': found.length })
+  if (found.length === 0) return 0
+  const result = yield* input.remove(found)
+  const removed = result.workspaces.filter(workspace => workspace.outcome === 'removed').length
+  yield* Effect.annotateCurrentSpan({ 'dshx.cleanup.removed': removed })
+  return removed
+})
 
 export class SettleCleanupModel {
   static readonly run = run

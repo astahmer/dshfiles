@@ -1,13 +1,7 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { Cause, Effect, Exit } from 'effect'
-import {
-  ThreadWorkspaces,
-  type LandCandidate,
-  type LandCandidateVerification,
-  type LandPhase,
-  type ThreadLocation,
-  type VerifiedLandOptions,
-} from './thread-workspaces.js'
+import type { ThreadWorkspaces, LandCandidate, LandCandidateVerification, LandPhase, VerifiedLandOptions } from './thread-workspaces.js'
+import type { ThreadLocation } from './thread-workspace-model.js'
 
 export type ThreadErrorCode = 'not-a-repository' | 'not-a-thread' | 'jj-failed' | 'unsafe-path' | 'workspace-files-failed'
 
@@ -48,7 +42,7 @@ interface PromiseLandOptions {
 }
 
 /**
- * The thread workspaces as Promises, for the parts of the Host that are not Effect yet. A rejected callback rethrows
+ * The thread workspaces as Promises, for tests written against the Promise API. A rejected callback rethrows
  * its own error, and a domain failure rethrows as a `ThreadError` carrying the same wire code.
  */
 export const promiseThreads = (input: { readonly service: Service; readonly run: ThreadsRunner }) => {
@@ -114,11 +108,3 @@ export const promiseThreads = (input: { readonly service: Service; readonly run:
 }
 
 export type Threads = ReturnType<typeof promiseThreads>
-
-/** The thread workspaces of the running plugin as Promises, bound to its services. */
-export const threadsBridge = Effect.gen(function* () {
-  const service = yield* ThreadWorkspaces
-  const services = yield* Effect.context<ThreadWorkspaces>()
-  const runExit = Effect.runPromiseExitWith(services)
-  return promiseThreads({ service, run: (effect, signal) => runExit(effect, signal === undefined ? undefined : { signal }) })
-})

@@ -1,34 +1,40 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { JjFilesystem } from './jj-filesystem.js'
+import { NodeServices } from '@effect/platform-node'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Path } from 'effect'
 import { WorkspaceSessionPath } from './workspace-session-path.js'
 
-let root: string | undefined
-
-afterEach(() => {
-  if (root === undefined) return
-  rmSync(root, { recursive: true, force: true })
-  root = undefined
+const platform = Effect.gen(function* () {
+  return { fileSystem: yield* FileSystem.FileSystem, path: yield* Path.Path }
 })
 
 describe('WorkspaceSessionPath.includes', () => {
-  it('matches only absolute cwd paths at or below the workspace root', () => {
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout' })).toBe(true)
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout/src' })).toBe(true)
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: '/work/checkout-copy' })).toBe(false)
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: 'src' })).toBe(false)
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath: '/work/checkout', sessionCwd: undefined })).toBe(false)
-  })
+  it.layer(NodeServices.layer)(it => {
+    it.effect('matches only absolute cwd paths at or below the workspace root', () =>
+      Effect.gen(function* () {
+        const workspacePath = '/work/checkout'
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: '/work/checkout' })).toBe(true)
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: '/work/checkout/src' })).toBe(true)
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: '/work/checkout-copy' })).toBe(false)
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: 'src' })).toBe(false)
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: undefined })).toBe(false)
+      }),
+    )
 
-  it('resolves symlinked session cwd paths into the actual workspace', () => {
-    root = mkdtempSync(join(tmpdir(), 'jj-workspace-session-path-'))
-    const workspacePath = join(root, 'workspace')
-    const aliasPath = join(root, 'alias')
-    mkdirSync(workspacePath)
-    symlinkSync(workspacePath, aliasPath, 'dir')
-
-    expect(WorkspaceSessionPath.includes({ filesystem: JjFilesystem, workspacePath, sessionCwd: aliasPath })).toBe(true)
+    it.effect('resolves symlinked session cwd paths into the actual workspace', () =>
+      Effect.gen(function* () {
+        const root = yield* Effect.acquireRelease(
+          Effect.sync(() => mkdtempSync(join(tmpdir(), 'jj-workspace-session-path-'))),
+          directory => Effect.sync(() => rmSync(directory, { recursive: true, force: true })),
+        )
+        const workspacePath = join(root, 'workspace')
+        const aliasPath = join(root, 'alias')
+        mkdirSync(workspacePath)
+        symlinkSync(workspacePath, aliasPath, 'dir')
+        expect(yield* WorkspaceSessionPath.includes({ ...(yield* platform), workspacePath, sessionCwd: aliasPath })).toBe(true)
+      }).pipe(Effect.scoped),
+    )
   })
 })

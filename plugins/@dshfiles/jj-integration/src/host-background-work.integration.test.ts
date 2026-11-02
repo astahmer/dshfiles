@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { JjIntegrationTestHost, type JjIntegrationTestHarness } from './host-test-harness.js'
 
 /**
@@ -11,7 +11,8 @@ import { JjIntegrationTestHost, type JjIntegrationTestHarness } from './host-tes
  * fallback catches unannounced idleness, waiting errors keep the entry, other errors settle it) and the checkout sync
  * queue (one sync at a time, later lands of a repository coalesced into one sync of the newest revision).
  *
- * The 1.5 s settle delay runs on real timers; only the 30 s fallback `setInterval` is faked, before the Host mounts.
+ * The 1.5 s settle delay runs on real timers here; the 30 s fallback and the debounce are driven by a TestClock in
+ * integration-queue.test.ts, on the same wakeup stream the Host worker consumes.
  */
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -50,7 +51,6 @@ describe.skipIf(!jjAvailable)('jj-integration background work', () => {
   })
 
   afterEach(async () => {
-    vi.useRealTimers()
     await harness?.dispose()
     harness = undefined
     rmSync(`${repo}-threads`, { recursive: true, force: true })
@@ -93,24 +93,6 @@ describe.skipIf(!jjAvailable)('jj-integration background work', () => {
       harness.emitSessionEvent('session-busy')
       await wait(1_000)
       expect(eventTypes()).not.toContain('workspace.rebase_landed')
-      await waitFor(() => eventTypes().includes('workspace.rebase_landed'))
-    })
-
-    it('retries on the 30 s fallback when no Session event announced the idleness', async () => {
-      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-      harness = await JjIntegrationTestHost.start({ settings: { syncWorkspaceAfterLand: '' } })
-      harness.setSession('session-busy', { running: false, questions: 1 })
-      const path = await harness.provisionThread(repo, { sessionIds: ['session-busy'] })
-      await harness.api.queueLand({ path, sessionId: 'session-busy' })
-      await wait(1_500)
-      harness.setSession('session-busy', { running: false, questions: 0 })
-      await wait(500)
-      expect(eventTypes()).not.toContain('workspace.rebase_landed')
-
-      vi.advanceTimersByTime(29_000)
-      await wait(1_000)
-      expect(eventTypes()).not.toContain('workspace.rebase_landed')
-      vi.advanceTimersByTime(1_000)
       await waitFor(() => eventTypes().includes('workspace.rebase_landed'))
     })
 

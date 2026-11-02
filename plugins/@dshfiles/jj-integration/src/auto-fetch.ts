@@ -1,15 +1,5 @@
-import { withSpan } from '@dshfiles/dshx/tracing'
-import type { JjIntegrationSettings } from './settings.js'
-export interface JjResult {
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stdoutLossy: boolean
-  readonly stderr: string
-}
-
-export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
-
-type AutoFetchSettings = JjIntegrationSettings['autoFetch']
+import { Jj } from '@dshfiles/jj-cli'
+import { Duration, Effect, Option, Schema } from 'effect'
 
 export type FetchOutcome =
   | { readonly status: 'no-remote'; readonly repoRoot: string }
@@ -18,135 +8,84 @@ export type FetchOutcome =
   | { readonly status: 'failed'; readonly repoRoot: string; readonly step: 'remote-list' | 'fetch' | 'fast-forward'; readonly message: string }
 
 /** Long enough that DSH finishes booting and its first repository scan before the network is touched. */
-export const AUTO_FETCH_FIRST_RUN_DELAY_MS = 2 * 60_000
+export const AUTO_FETCH_FIRST_RUN_DELAY = Duration.minutes(2)
+/** A fetch is network-bound; one stuck remote must not hold every later run. */
+const FETCH_TIMEOUT = Duration.minutes(2)
 
 const errorExcerpt = (text: string): string => text.trim().split('\n').slice(-3).join(' ').slice(0, 400)
 
-const commitOf = async (input: { readonly execute: JjExecutor; readonly repoRoot: string; readonly revset: string }): Promise<string | undefined> => {
-  const result = await input.execute({
-    args: ['--ignore-working-copy', 'log', '--no-graph', '-r', input.revset, '-T', 'commit_id ++ "\\n"'],
-    cwd: input.repoRoot,
-  })
-  if (result.exitCode !== 0) return undefined
-  const lines = result.stdout.split('\n').filter(line => line.length > 0)
-  return lines.length === 1 ? lines[0] : undefined
-}
-
 const exactBookmark = (bookmark: string): string => `bookmarks(exact:${JSON.stringify(bookmark)})`
 const exactRemoteBookmark = (bookmark: string, remote: string): string => `remote_bookmarks(exact:${JSON.stringify(bookmark)}, exact:${JSON.stringify(remote)})`
+
+/** Fails the fetch span so a failed run reads as an error; the caller gets the outcome back as a value. */
+class FetchFailed extends Schema.TaggedError<FetchFailed>()('FetchFailed', {
+  repoRoot: Schema.String,
+  step: Schema.Literals(['remote-list', 'fetch', 'fast-forward']),
+  detail: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `jj git ${this.step} failed in ${this.repoRoot}.`
+  }
+}
+
+/** A failed spawn or a timeout reads like the command exiting with that message, so it is reported on the same path. */
+const run = (args: readonly string[], cwd: string) =>
+  Effect.gen(function* () {
+    const jj = yield* Jj
+    return yield* jj.run({ args, cwd, timeout: FETCH_TIMEOUT })
+  }).pipe(Effect.catch(error => Effect.succeed({ exitCode: 1, stdout: '', stdoutTruncated: false, stderr: error.message, stderrTruncated: false })))
+
+const commitOf = (input: { readonly repoRoot: string; readonly revset: string }) =>
+  Effect.map(run(['--ignore-working-copy', 'log', '--no-graph', '-r', input.revset, '-T', 'commit_id ++ "\\n"'], input.repoRoot), result => {
+    if (result.exitCode !== 0) return Option.none<string>()
+    const lines = result.stdout.split('\n').filter(line => line.length > 0)
+    return lines.length === 1 ? Option.fromUndefinedOr(lines[0]) : Option.none<string>()
+  })
 
 /**
  * Fetches one remote of one repository, then optionally fast-forwards the local bookmark to its remote copy. The
  * bookmark moves only when it is a strict ancestor of the remote copy, so local commits are never dropped or rebased.
  */
-const fetchRepository = (input: {
-  readonly execute: JjExecutor
-  readonly repoRoot: string
-  readonly remote: string
-  readonly bookmark: string
-  readonly fastForward: boolean
-}): Promise<FetchOutcome> =>
-  withSpan('jj-integration auto fetch', { attributes: { 'dshx.fetch.fast_forward': input.fastForward } }, async span => {
-    const outcome = await fetchUntraced(input)
-    span.setAttributes({ 'dshx.fetch.status': outcome.status })
-    if (outcome.status === 'failed') span.setStatus('error', `${outcome.step} failed`)
-    return outcome
-  })
+const fetchRepository = (input: { readonly repoRoot: string; readonly remote: string; readonly bookmark: string; readonly fastForward: boolean }) =>
+  fetchUntraced(input).pipe(
+    Effect.tap(outcome => Effect.annotateCurrentSpan({ 'dshx.fetch.status': outcome.status })),
+    Effect.flatMap(outcome =>
+      outcome.status === 'failed'
+        ? Effect.fail(new FetchFailed({ repoRoot: outcome.repoRoot, step: outcome.step, detail: outcome.message }))
+        : Effect.succeed(outcome),
+    ),
+    Effect.withSpan('jj-integration auto fetch', { attributes: { 'dshx.fetch.fast_forward': input.fastForward } }),
+    Effect.catchTag('FetchFailed', (failed): Effect.Effect<FetchOutcome> =>
+      Effect.succeed({ status: 'failed', repoRoot: failed.repoRoot, step: failed.step, message: failed.detail }),
+    ),
+  )
 
-const fetchUntraced = async (input: {
-  readonly execute: JjExecutor
+const fetchUntraced = Effect.fnUntraced(function* (input: {
   readonly repoRoot: string
   readonly remote: string
   readonly bookmark: string
   readonly fastForward: boolean
-}): Promise<FetchOutcome> => {
+}) {
   const repoRoot = input.repoRoot
-  const remotes = await input.execute({ args: ['--ignore-working-copy', 'git', 'remote', 'list'], cwd: repoRoot })
-  if (remotes.exitCode !== 0) return { status: 'failed', repoRoot, step: 'remote-list', message: errorExcerpt(remotes.stderr) }
+  const remotes = yield* run(['--ignore-working-copy', 'git', 'remote', 'list'], repoRoot)
+  if (remotes.exitCode !== 0) return { status: 'failed', repoRoot, step: 'remote-list', message: errorExcerpt(remotes.stderr) } satisfies FetchOutcome
   const names = remotes.stdout.split('\n').map(line => line.split(/\s+/u)[0] ?? '')
-  if (!names.includes(input.remote)) return { status: 'no-remote', repoRoot }
-  const before = await commitOf({ execute: input.execute, repoRoot, revset: exactBookmark(input.bookmark) })
-  const fetched = await input.execute({ args: ['--ignore-working-copy', 'git', 'fetch', '--remote', input.remote], cwd: repoRoot })
-  if (fetched.exitCode !== 0) return { status: 'failed', repoRoot, step: 'fetch', message: errorExcerpt(fetched.stderr) }
-  const afterFetch = await commitOf({ execute: input.execute, repoRoot, revset: exactBookmark(input.bookmark) })
-  if (!input.fastForward || afterFetch === undefined) return { status: 'fetched', repoRoot, bookmarkMoved: before !== afterFetch }
-  const remoteTip = await commitOf({ execute: input.execute, repoRoot, revset: exactRemoteBookmark(input.bookmark, input.remote) })
-  if (remoteTip === undefined || remoteTip === afterFetch) return { status: 'fetched', repoRoot, bookmarkMoved: before !== afterFetch }
-  const ancestor = await commitOf({
-    execute: input.execute,
-    repoRoot,
-    revset: `${exactBookmark(input.bookmark)} & ::${exactRemoteBookmark(input.bookmark, input.remote)}`,
-  })
-  if (ancestor === undefined) return { status: 'fetched', repoRoot, bookmarkMoved: before !== afterFetch }
-  const moved = await input.execute({ args: ['--ignore-working-copy', 'bookmark', 'set', input.bookmark, '-r', remoteTip], cwd: repoRoot })
-  if (moved.exitCode !== 0) return { status: 'failed', repoRoot, step: 'fast-forward', message: errorExcerpt(moved.stderr) }
-  return { status: 'fast-forwarded', repoRoot, from: afterFetch, to: remoteTip }
-}
-
-const scheduleTimeout = (run: () => void, delayMs: number): (() => void) => {
-  const timer = setTimeout(run, delayMs)
-  timer.unref()
-  return () => clearTimeout(timer)
-}
-
-/**
- * Fetches every registered repository on the configured interval. Settings are read at each run, so turning it on,
- * changing the remote or the interval applies from the next tick; a disabled setting keeps the timer idle.
- */
-export const createAutoFetchScheduler = (options: {
-  readonly settings: () => AutoFetchSettings
-  readonly bookmark: () => string
-  readonly repositories: () => Promise<readonly string[]>
-  readonly execute: JjExecutor
-  readonly report: (outcome: FetchOutcome) => void
-  readonly firstRunDelayMs?: number
-  readonly schedule?: (run: () => void, delayMs: number) => () => void
-  readonly onError?: (error: unknown) => void
-}) => {
-  const schedule = options.schedule ?? scheduleTimeout
-  let cancel: (() => void) | undefined
-  let disposed = false
-
-  const runOnce = async (): Promise<readonly FetchOutcome[]> => {
-    const settings = options.settings()
-    if (!settings.enabled) return []
-    const outcomes: FetchOutcome[] = []
-    // One repository at a time: each fetch is network-bound and a project list is small, so serial keeps load flat.
-    for (const repoRoot of await options.repositories()) {
-      if (disposed) break
-      const outcome = await fetchRepository({
-        execute: options.execute,
-        repoRoot,
-        remote: settings.remote,
-        bookmark: options.bookmark(),
-        fastForward: settings.fastForwardBookmark,
-      })
-      options.report(outcome)
-      outcomes.push(outcome)
-    }
-    return outcomes
-  }
-
-  const arm = (delayMs: number): void => {
-    if (disposed) return
-    cancel = schedule(() => {
-      void runOnce()
-        .catch((error: unknown) => options.onError?.(error))
-        .finally(() => arm(options.settings().intervalMinutes * 60_000))
-    }, delayMs)
-  }
-
-  arm(options.firstRunDelayMs ?? AUTO_FETCH_FIRST_RUN_DELAY_MS)
-
-  return {
-    runOnce,
-    dispose: (): void => {
-      disposed = true
-      cancel?.()
-      cancel = undefined
-    },
-  }
-}
+  if (!names.includes(input.remote)) return { status: 'no-remote', repoRoot } satisfies FetchOutcome
+  const before = yield* commitOf({ repoRoot, revset: exactBookmark(input.bookmark) })
+  const fetched = yield* run(['--ignore-working-copy', 'git', 'fetch', '--remote', input.remote], repoRoot)
+  if (fetched.exitCode !== 0) return { status: 'failed', repoRoot, step: 'fetch', message: errorExcerpt(fetched.stderr) } satisfies FetchOutcome
+  const afterFetch = yield* commitOf({ repoRoot, revset: exactBookmark(input.bookmark) })
+  const bookmarkMoved = Option.getOrUndefined(before) !== Option.getOrUndefined(afterFetch)
+  if (!input.fastForward || Option.isNone(afterFetch)) return { status: 'fetched', repoRoot, bookmarkMoved } satisfies FetchOutcome
+  const remoteTip = yield* commitOf({ repoRoot, revset: exactRemoteBookmark(input.bookmark, input.remote) })
+  if (Option.isNone(remoteTip) || remoteTip.value === afterFetch.value) return { status: 'fetched', repoRoot, bookmarkMoved } satisfies FetchOutcome
+  const ancestor = yield* commitOf({ repoRoot, revset: `${exactBookmark(input.bookmark)} & ::${exactRemoteBookmark(input.bookmark, input.remote)}` })
+  if (Option.isNone(ancestor)) return { status: 'fetched', repoRoot, bookmarkMoved } satisfies FetchOutcome
+  const moved = yield* run(['--ignore-working-copy', 'bookmark', 'set', input.bookmark, '-r', remoteTip.value], repoRoot)
+  if (moved.exitCode !== 0) return { status: 'failed', repoRoot, step: 'fast-forward', message: errorExcerpt(moved.stderr) } satisfies FetchOutcome
+  return { status: 'fast-forwarded', repoRoot, from: afterFetch.value, to: remoteTip.value } satisfies FetchOutcome
+})
 
 export class AutoFetchModel {
   static readonly fetchRepository = fetchRepository

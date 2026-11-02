@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { realpathSync, writeFileSync } from 'node:fs'
+import { PassThrough } from 'node:stream'
 import { basename, join } from 'node:path'
 import { Schema } from 'effect'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
@@ -147,12 +148,26 @@ const start = async (
       const call = { argv: spec.argv, startedAt: Date.now() }
       checkoutSyncs.push(call)
       const answer = options.checkoutSync?.(call) ?? Promise.resolve(syncResult('up-to-date'))
+      const stdoutStream = new PassThrough()
+      const stderrStream = new PassThrough()
       const done = answer.then(text => {
         stdout = text
+        stdoutStream.end(text)
+        stderrStream.end()
         return { exitCode: 0 }
       })
       return {
         done,
+        stdout: stdoutStream,
+        stderr: stderrStream,
+        terminate: () => {
+          stdoutStream.end()
+          stderrStream.end()
+        },
+        waitForExit: async () => {
+          await done
+          return true
+        },
         collected: {
           get stdout() {
             return collected(stdout)

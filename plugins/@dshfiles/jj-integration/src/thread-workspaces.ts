@@ -11,8 +11,6 @@ import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadWorkspaceModel, type ThreadLocation } from './thread-workspace-model.js'
 
-export type { ThreadLocation } from './thread-workspace-model.js'
-
 /**
  * Concurrent read-only `jj` processes per repository scan. Each thread costs two of them, and the scan runs while the
  * New thread screen and the sidebar are open: 45 thread workspaces measured 2.1s at 4 and 1.0s at 8, with no gain above.
@@ -641,8 +639,11 @@ const make = Effect.gen(function* () {
   })
 
   const locate = Effect.fn('thread workspaces locate')(function* (target: string) {
+    const notARepository = new NotARepository({ detail: `${target} is not inside a jj repository.` })
+    // jj cannot even start in a folder that is gone, which is the same answer for the caller.
+    if (!(yield* exists(target))) return yield* notARepository
     const output = yield* run(['--ignore-working-copy', 'root'], target)
-    if (output.exitCode !== 0) return yield* new NotARepository({ detail: `${target} is not inside a jj repository.` })
+    if (output.exitCode !== 0) return yield* notARepository
     const workspaceRoot = output.stdout.trim()
     const repoRoot = (yield* storeRootOf(workspaceRoot)) ?? workspaceRoot
     const isThread = workspaceRoot !== repoRoot && path.dirname(workspaceRoot) === (yield* threadsDirectory(repoRoot))
@@ -1304,7 +1305,6 @@ const make = Effect.gen(function* () {
 
   const conflictedFiles = Effect.fnUntraced(function* (conflicted: readonly ThreadRevision[], cwd: string) {
     const files = new Set<string>()
-    // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- a conflict listing is rare and short; reading revisions in order keeps the file list stable.
     for (const revision of conflicted) {
       const listed = yield* run(['resolve', '--list', '-r', knownCommitRevset(revision.commitId)], cwd)
       if (listed.exitCode !== 0) return yield* jjFailed(`jj resolve --list failed: ${listed.stderr.trim().slice(0, 400)}`)

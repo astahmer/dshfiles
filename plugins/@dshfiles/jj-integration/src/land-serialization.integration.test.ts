@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -187,6 +187,8 @@ describe.skipIf(!jjAvailable)('thread landing serialization against real jj', ()
     const repo = join(root, 'repo-a')
     initRepository(repo)
     const thread = await describedThread(repo, 'first.txt')
+    // The spare for the next thread is checked out in the background and would race the counted snapshots.
+    await expect.poll(() => existsSync(join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')), { timeout: 20_000 }).toBe(true)
     calls = []
     await threads.snapshotFiles(thread.workspaceRoot)
     await threads.snapshotFiles(thread.workspaceRoot)

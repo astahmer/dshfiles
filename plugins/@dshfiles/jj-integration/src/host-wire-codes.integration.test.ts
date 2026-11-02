@@ -106,7 +106,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
           "message": "The workspace destination is unknown. Refresh and retry.",
         },
         "discard: repository root": {
-          "code": "jj-integration-operation-failure",
+          "code": "not-a-thread",
           "message": "<root>/repo is not a thread workspace.",
         },
         "discardMany: mixed": "ok",

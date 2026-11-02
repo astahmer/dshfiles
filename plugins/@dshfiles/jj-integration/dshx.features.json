@@ -129,9 +129,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
-          "testName": "records a jj workspace span with the exit code and marks a failed run"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -234,9 +234,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
-          "testName": "records a jj workspace span with the exit code and marks a failed run"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -626,9 +626,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
-          "testName": "records a jj workspace span with the exit code and marks a failed run"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         },
         {
           "kind": "custom",
@@ -822,9 +822,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
-          "testName": "records a jj workspace span with the exit code and marks a failed run"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         },
         {
           "kind": "custom",

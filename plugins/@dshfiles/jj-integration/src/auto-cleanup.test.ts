@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Deferred, Duration, Effect, Fiber, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
 import type { CleanupResult } from './api.js'
-import { AUTO_CLEANUP_FIRST_RUN_DELAY_MS, AutoCleanupModel, createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
-import { createCleanupJobRunner, type CleanupJobRequest } from './cleanup-jobs.js'
+import { AUTO_CLEANUP_FIRST_RUN_DELAY, AutoCleanupModel } from './auto-cleanup.js'
+import type { CleanupJobRequest } from './cleanup-jobs.js'
+import { CleanupRunner } from './cleanup-runner.js'
 import { defaultJjIntegrationSettings, jjIntegrationSettings } from './settings.js'
 
 const emptyResult: CleanupResult = { applied: true, workspaces: [], skipped: [], untracked: [], emptyRevisions: [] }
@@ -9,45 +12,30 @@ const emptyResult: CleanupResult = { applied: true, workspaces: [], skipped: [],
 const settingsWith = (autoCleanup: Partial<typeof defaultJjIntegrationSettings.autoCleanup>) =>
   jjIntegrationSettings.schema({ autoCleanup: { ...defaultJjIntegrationSettings.autoCleanup, ...autoCleanup } }).autoCleanup
 
-/** Timers the test fires by hand: each entry is one armed run and whether dispose cancelled it. */
-const manualSchedule = () => {
-  const armed: { run: () => void; delayMs: number; cancelled: boolean }[] = []
-  return {
-    armed,
-    schedule: (run: () => void, delayMs: number) => {
-      const entry = { run, delayMs, cancelled: false }
-      armed.push(entry)
-      return () => {
-        entry.cancelled = true
-      }
-    },
-  }
-}
+/** A real runner whose jobs record their request and finish at once. */
+const recordingRunner = Effect.gen(function* () {
+  const requests: CleanupJobRequest[] = []
+  const runner = yield* CleanupRunner.make({
+    execute: ({ request }) =>
+      Effect.sync(() => {
+        requests.push(request)
+        return emptyResult
+      }),
+  })
+  return { runner, requests }
+})
 
-const settle = async (): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, 0))
-}
-
-/** A scheduler over a scripted set of recently active repositories and every repository the registry knows. */
-const schedulerFor = (options: {
-  readonly requests: CleanupJobRequest[]
+const runOnce = (input: {
+  readonly runner: Effect.Success<ReturnType<typeof CleanupRunner.make>>
   readonly active?: readonly string[]
   readonly known?: readonly string[]
   readonly settings?: Parameters<typeof settingsWith>[0]
-  readonly outcome?: (outcome: AutoCleanupOutcome) => void
 }) =>
-  createAutoCleanupScheduler({
-    runner: createCleanupJobRunner({
-      execute: async ({ request }) => {
-        options.requests.push(request)
-        return emptyResult
-      },
-    }),
-    settings: () => settingsWith(options.settings ?? {}),
-    report: options.outcome ?? (() => undefined),
-    activeProjects: async () => options.active ?? [],
-    knownProjects: async () => options.known ?? options.active ?? [],
-    schedule: manualSchedule().schedule,
+  AutoCleanupModel.runOnce({
+    settings: settingsWith(input.settings ?? {}),
+    runner: input.runner,
+    activeProjects: () => Effect.succeed(input.active ?? []),
+    knownProjects: Effect.succeed(input.known ?? input.active ?? []),
   })
 
 describe('auto-cleanup settings', () => {
@@ -90,244 +78,144 @@ describe('AutoCleanupModel.request', () => {
   })
 })
 
-describe('createAutoCleanupScheduler', () => {
-  it('runs one shared cleanup job per recently active repository and reports every run into the same trail', async () => {
-    const requests: CleanupJobRequest[] = []
-    const scheduler = schedulerFor({ requests, active: ['/work/recent-a', '/work/recent-b'] })
+describe('AutoCleanupModel.runOnce', () => {
+  it.effect('runs one shared cleanup job per recently active repository and reports every run into the same trail', () =>
+    Effect.gen(function* () {
+      const { runner, requests } = yield* recordingRunner
+      const outcome = yield* runOnce({ runner, active: ['/work/recent-a', '/work/recent-b'] })
+      expect(requests).toEqual([
+        { path: '/work/recent-a', olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' },
+        { path: '/work/recent-b', olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' },
+      ])
+      expect(outcome).toMatchObject({ status: 'done', inactive: 0 })
+      expect(outcome.status === 'done' ? outcome.runs.map(run => run.path) : []).toEqual(['/work/recent-a', '/work/recent-b'])
+      expect(yield* runner.trail).toHaveLength(2)
+    }).pipe(Effect.scoped),
+  )
 
-    const outcome = await scheduler.runOnce()
+  it.effect('leaves an inactive repository alone and counts it', () =>
+    Effect.gen(function* () {
+      const { runner, requests } = yield* recordingRunner
+      const outcome = yield* runOnce({ runner, active: ['/work/recent-a'], known: ['/work/recent-a', '/work/idle'] })
+      expect(requests.map(request => request.path)).toEqual(['/work/recent-a'])
+      expect(outcome).toMatchObject({ status: 'done', inactive: 1 })
+    }).pipe(Effect.scoped),
+  )
 
-    expect(requests).toEqual([
-      { path: '/work/recent-a', olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' },
-      { path: '/work/recent-b', olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' },
-    ])
-    expect(outcome).toMatchObject({ status: 'done', inactive: 0 })
-    expect(outcome.status === 'done' ? outcome.runs.map(run => run.path) : []).toEqual(['/work/recent-a', '/work/recent-b'])
-    scheduler.dispose()
-  })
+  it.effect('idles without starting any job when no repository was used inside the window', () =>
+    Effect.gen(function* () {
+      const { runner, requests } = yield* recordingRunner
+      expect(yield* runOnce({ runner, active: [], known: ['/work/idle'] })).toEqual({ status: 'idle', activeWithinHours: 2 })
+      expect(requests).toEqual([])
+    }).pipe(Effect.scoped),
+  )
 
-  it('leaves an inactive repository alone and counts it', async () => {
-    const requests: CleanupJobRequest[] = []
-    const scheduler = schedulerFor({ requests, active: ['/work/recent-a'], known: ['/work/recent-a', '/work/idle'] })
+  it.effect('asks for the whole configured window, so a repository just inside it still runs', () =>
+    Effect.gen(function* () {
+      const { runner } = yield* recordingRunner
+      const windows: number[] = []
+      yield* AutoCleanupModel.runOnce({
+        settings: settingsWith({ activeWithinHours: 6 }),
+        runner,
+        activeProjects: withinHours => Effect.sync(() => (windows.push(withinHours), ['/work/recent'])),
+      })
+      expect(windows).toEqual([6])
+    }).pipe(Effect.scoped),
+  )
 
-    const outcome = await scheduler.runOnce()
+  it.effect('covers every registered repository in one job when the activity window is zero', () =>
+    Effect.gen(function* () {
+      const { runner, requests } = yield* recordingRunner
+      yield* runOnce({ runner, active: ['/work/recent'], settings: { activeWithinHours: 0 } })
+      expect(requests).toEqual([{ path: null, olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' }])
+    }).pipe(Effect.scoped),
+  )
 
-    expect(requests.map(request => request.path)).toEqual(['/work/recent-a'])
-    expect(outcome).toMatchObject({ status: 'done', inactive: 1 })
-    scheduler.dispose()
-  })
+  it.effect('leaves a manual run untouched: automatic runs still cover every repository when given a project path', () =>
+    Effect.gen(function* () {
+      const { runner, requests } = yield* recordingRunner
+      yield* Effect.flatMap(runner.start({ path: '/work/sample', olderThanHours: 6, kinds: ['empty'], trigger: 'manual' }), started => started.done)
+      yield* runOnce({ runner, active: ['/work/recent'], settings: { activeWithinHours: 0 } })
+      expect(requests.map(request => [request.trigger, request.path])).toEqual([
+        ['manual', '/work/sample'],
+        ['automatic', null],
+      ])
+    }).pipe(Effect.scoped),
+  )
 
-  it('idles without starting any job when no repository was used inside the window', async () => {
-    const requests: CleanupJobRequest[] = []
-    const outcomes: AutoCleanupOutcome[] = []
-    const scheduler = schedulerFor({ requests, active: [], known: ['/work/idle'], outcome: outcome => outcomes.push(outcome) })
+  it.effect('skips without queuing while another cleanup job is running', () =>
+    Effect.gen(function* () {
+      const release = yield* Deferred.make<void>()
+      const runner = yield* CleanupRunner.make({ execute: () => Effect.as(Deferred.await(release), emptyResult) })
+      const manual = yield* runner.start({ path: '/work/sample', olderThanHours: 6, kinds: ['empty'], trigger: 'manual' })
+      expect(yield* runOnce({ runner, active: ['/work/recent'] })).toEqual({ status: 'busy', jobId: manual.job.id })
+      expect(yield* runner.trail).toHaveLength(1)
+      yield* Deferred.succeed(release, undefined)
+      yield* manual.done
+    }).pipe(Effect.scoped),
+  )
 
-    await expect(scheduler.runOnce()).resolves.toEqual({ status: 'idle', activeWithinHours: 2 })
-    expect(requests).toEqual([])
-    scheduler.dispose()
-  })
+  it.effect('reports a failed job as an outcome', () =>
+    Effect.gen(function* () {
+      const runner = yield* CleanupRunner.make({ execute: () => Effect.fail(new Error('jj workspace forget exited 1')) })
+      expect(yield* runOnce({ runner, active: ['/work/recent'] })).toEqual({ status: 'failed', jobId: 'cleanup-1', message: 'jj workspace forget exited 1' })
+      expect((yield* runner.trail)[0]).toMatchObject({ state: 'failed' })
+    }).pipe(Effect.scoped),
+  )
 
-  it('asks for the whole configured window, so a repository just inside it still runs', async () => {
-    const windows: number[] = []
-    const runner = createCleanupJobRunner({ execute: async () => emptyResult })
-    const scheduler = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({ activeWithinHours: 6 }),
-      report: () => undefined,
-      activeProjects: async withinHours => {
-        windows.push(withinHours)
-        return ['/work/recent']
-      },
-      schedule: manualSchedule().schedule,
-    })
+  it.effect('reports disabled without starting a job', () =>
+    Effect.gen(function* () {
+      const { runner } = yield* recordingRunner
+      expect(yield* runOnce({ runner, active: ['/work/recent'], settings: { enabled: false } })).toEqual({ status: 'disabled' })
+      expect(yield* runner.trail).toHaveLength(0)
+    }).pipe(Effect.scoped),
+  )
+})
 
-    await scheduler.runOnce()
-
-    expect(windows).toEqual([6])
-    scheduler.dispose()
-  })
-
-  it('covers every registered repository in one job when the activity window is zero', async () => {
-    const requests: CleanupJobRequest[] = []
-    const scheduler = schedulerFor({ requests, active: ['/work/recent'], settings: { activeWithinHours: 0 } })
-
-    await scheduler.runOnce()
-
-    expect(requests).toEqual([{ path: null, olderThanHours: 24, kinds: ['empty', 'integrated'], trigger: 'automatic' }])
-    scheduler.dispose()
-  })
-
-  it('leaves a manual run untouched: automatic runs still cover every repository when given a project path', async () => {
-    const requests: CleanupJobRequest[] = []
-    const manualRunner = createCleanupJobRunner({
-      execute: async ({ request }) => {
-        requests.push(request)
-        return emptyResult
-      },
-    })
-    const manual = manualRunner.start({ path: '/work/sample', olderThanHours: 6, kinds: ['empty'], trigger: 'manual' })
-    await manual.done
-    const scheduler = createAutoCleanupScheduler({
-      runner: manualRunner,
-      settings: () => settingsWith({ activeWithinHours: 0 }),
-      report: () => undefined,
-      activeProjects: async () => ['/work/recent'],
-      schedule: manualSchedule().schedule,
-    })
-
-    await scheduler.runOnce()
-
-    expect(requests.map(request => [request.trigger, request.path])).toEqual([
-      ['manual', '/work/sample'],
-      ['automatic', null],
-    ])
-    scheduler.dispose()
-  })
-
-  it('skips without queuing while another cleanup job is running', async () => {
-    let release: (() => void) | undefined
-    const runner = createCleanupJobRunner({
-      execute: () =>
-        new Promise<CleanupResult>(resolve => {
-          release = () => resolve(emptyResult)
+describe('AutoCleanupModel.schedule', () => {
+  it.effect('waits before its first run, then re-arms on the interval read after each run', () =>
+    Effect.gen(function* () {
+      const runs = yield* Ref.make(0)
+      const interval = yield* Ref.make(60)
+      const fiber = yield* Effect.forkChild(
+        AutoCleanupModel.schedule({
+          run: Ref.update(runs, count => count + 1),
+          intervalMinutes: Ref.get(interval),
+          firstRunDelay: AUTO_CLEANUP_FIRST_RUN_DELAY,
         }),
-    })
-    const manual = runner.start({ path: '/work/sample', olderThanHours: 6, kinds: ['empty'], trigger: 'manual' })
-    const scheduler = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({}),
-      report: () => undefined,
-      activeProjects: async () => ['/work/recent'],
-      schedule: manualSchedule().schedule,
-    })
+      )
+      yield* TestClock.adjust(Duration.subtract(AUTO_CLEANUP_FIRST_RUN_DELAY, Duration.seconds(1)))
+      expect(yield* Ref.get(runs)).toBe(0)
+      yield* Ref.set(interval, 15)
+      yield* TestClock.adjust(Duration.seconds(1))
+      expect(yield* Ref.get(runs)).toBe(1)
+      yield* TestClock.adjust(Duration.minutes(14))
+      expect(yield* Ref.get(runs)).toBe(1)
+      yield* TestClock.adjust(Duration.minutes(1))
+      expect(yield* Ref.get(runs)).toBe(2)
+      yield* Fiber.interrupt(fiber)
+      yield* TestClock.adjust(Duration.hours(2))
+      expect(yield* Ref.get(runs)).toBe(2)
+    }),
+  )
 
-    await expect(scheduler.runOnce()).resolves.toEqual({ status: 'busy', jobId: manual.job.id })
-    expect(runner.trail()).toHaveLength(1)
-
-    await settle()
-    release?.()
-    await manual.done
-    scheduler.dispose()
-  })
-
-  it('reports a failed job instead of throwing out of the timer', async () => {
-    const runner = createCleanupJobRunner({
-      execute: () => Promise.reject(new Error('jj workspace forget exited 1')),
-    })
-    const { schedule } = manualSchedule()
-    const scheduler = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({}),
-      report: () => undefined,
-      activeProjects: async () => ['/work/recent'],
-      schedule,
-    })
-
-    await expect(scheduler.runOnce()).resolves.toEqual({ status: 'failed', jobId: 'cleanup-1', message: 'jj workspace forget exited 1' })
-    expect(runner.trail()[0]).toMatchObject({ state: 'failed' })
-    scheduler.dispose()
-  })
-
-  it('waits before its first run, then re-arms on the interval read at that moment', async () => {
-    const { armed, schedule } = manualSchedule()
-    const outcomes: AutoCleanupOutcome[] = []
-    let intervalMinutes = 60
-    const scheduler = createAutoCleanupScheduler({
-      runner: createCleanupJobRunner({ execute: async () => emptyResult }),
-      settings: () => settingsWith({ intervalMinutes }),
-      report: outcome => outcomes.push(outcome),
-      activeProjects: async () => ['/work/recent'],
-      schedule,
-    })
-
-    expect(armed.map(entry => entry.delayMs)).toEqual([AUTO_CLEANUP_FIRST_RUN_DELAY_MS])
-    intervalMinutes = 15
-    armed[0]?.run()
-    await settle()
-
-    expect(outcomes.map(outcome => outcome.status)).toEqual(['done'])
-    expect(armed.map(entry => entry.delayMs)).toEqual([AUTO_CLEANUP_FIRST_RUN_DELAY_MS, 15 * 60_000])
-    scheduler.dispose()
-  })
-
-  it('keeps re-arming while disabled so enabling it later takes effect', async () => {
-    const runner = createCleanupJobRunner({ execute: async () => emptyResult })
-    const { armed, schedule } = manualSchedule()
-    const outcomes: AutoCleanupOutcome[] = []
-    const scheduler = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({ enabled: false }),
-      report: outcome => outcomes.push(outcome),
-      activeProjects: async () => ['/work/recent'],
-      schedule,
-    })
-
-    armed[0]?.run()
-    await settle()
-
-    expect(outcomes).toEqual([{ status: 'disabled' }])
-    expect(runner.trail()).toHaveLength(0)
-    expect(armed).toHaveLength(2)
-    scheduler.dispose()
-  })
-
-  it('cancels the armed run on dispose and never re-arms after it', async () => {
-    let release: (() => void) | undefined
-    const runner = createCleanupJobRunner({
-      execute: () =>
-        new Promise<CleanupResult>(resolve => {
-          release = () => resolve(emptyResult)
+  it.effect('logs a failed run and stays armed', () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0)
+      yield* Effect.forkChild(
+        AutoCleanupModel.schedule({
+          run: Effect.andThen(
+            Ref.update(attempts, count => count + 1),
+            Effect.fail(new Error('registry unreadable')),
+          ),
+          intervalMinutes: Effect.succeed(60),
+          firstRunDelay: Duration.zero,
         }),
-    })
-    const { armed, schedule } = manualSchedule()
-    const outcomes: AutoCleanupOutcome[] = []
-    const scheduler = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({}),
-      report: outcome => outcomes.push(outcome),
-      activeProjects: async () => ['/work/recent'],
-      schedule,
-    })
-
-    armed[0]?.run()
-    await settle()
-    scheduler.dispose()
-    release?.()
-    await settle()
-
-    expect(outcomes).toEqual([])
-    expect(armed).toHaveLength(1)
-
-    const idle = createAutoCleanupScheduler({
-      runner,
-      settings: () => settingsWith({}),
-      report: () => undefined,
-      activeProjects: async () => ['/work/recent'],
-      schedule,
-    })
-    idle.dispose()
-    expect(armed[1]?.cancelled).toBe(true)
-  })
-
-  it('logs a timer run whose repository scan rejects instead of leaving an unhandled rejection, and stays armed', async () => {
-    const { armed, schedule } = manualSchedule()
-    const errors: unknown[] = []
-    const scheduler = createAutoCleanupScheduler({
-      runner: createCleanupJobRunner({ execute: async () => emptyResult }),
-      settings: () => settingsWith({}),
-      report: () => undefined,
-      activeProjects: async () => {
-        throw new Error('registry unreadable')
-      },
-      schedule,
-      onError: error => errors.push(error),
-    })
-
-    armed[0]?.run()
-    await settle()
-
-    expect(errors).toEqual([new Error('registry unreadable')])
-    expect(armed).toHaveLength(2)
-    scheduler.dispose()
-  })
+      )
+      yield* TestClock.adjust(Duration.zero)
+      expect(yield* Ref.get(attempts)).toBe(1)
+      yield* TestClock.adjust(Duration.hours(1))
+      expect(yield* Ref.get(attempts)).toBe(2)
+    }),
+  )
 })

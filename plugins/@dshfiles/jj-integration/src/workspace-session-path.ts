@@ -1,27 +1,29 @@
-import { JjFilesystem } from './jj-filesystem.js'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { Effect, FileSystem, Option, Path } from 'effect'
 
-const contains = (parent: string, candidate: string): boolean => {
-  const relativePath = relative(parent, candidate)
-  return relativePath === '' || (!isAbsolute(relativePath) && relativePath !== '..' && !relativePath.startsWith(`..${sep}`))
-}
-
-const includes = (input: { readonly filesystem: typeof JjFilesystem; readonly workspacePath: string; readonly sessionCwd: string | undefined }): boolean => {
-  if (input.sessionCwd === undefined || !isAbsolute(input.sessionCwd)) return false
-  const candidates = [resolve(input.sessionCwd)]
-  const workspaceRoots = [resolve(input.workspacePath)]
-  try {
-    candidates.push(input.filesystem.realpathSync(input.sessionCwd))
-  } catch {
-    // A removed nested cwd can still be lexically inside the workspace.
+/** Whether a Session's cwd lies inside a workspace, lexically or through symlinks resolved on disk. */
+const includes = Effect.fnUntraced(function* (input: {
+  readonly fileSystem: FileSystem.FileSystem
+  readonly path: Path.Path
+  readonly workspacePath: string
+  readonly sessionCwd: string | undefined
+}) {
+  const fileSystem = input.fileSystem
+  const path = input.path
+  const sessionCwd = input.sessionCwd
+  if (sessionCwd === undefined || !path.isAbsolute(sessionCwd)) return false
+  const contains = (parent: string, candidate: string): boolean => {
+    const relativePath = path.relative(parent, candidate)
+    return relativePath === '' || (!path.isAbsolute(relativePath) && relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`))
   }
-  try {
-    workspaceRoots.push(input.filesystem.realpathSync(input.workspacePath))
-  } catch {
-    // Preserve lexical matching when a workspace root is temporarily unavailable.
-  }
+  // A removed nested cwd, or a workspace root that is briefly unavailable, still matches lexically.
+  const [realCwd, realWorkspace] = yield* Effect.all([
+    fileSystem.realPath(sessionCwd).pipe(Effect.option),
+    fileSystem.realPath(input.workspacePath).pipe(Effect.option),
+  ])
+  const candidates = [path.resolve(sessionCwd), ...Option.toArray(realCwd)]
+  const workspaceRoots = [path.resolve(input.workspacePath), ...Option.toArray(realWorkspace)]
   return workspaceRoots.some(parent => candidates.some(candidate => contains(parent, candidate)))
-}
+})
 
 export class WorkspaceSessionPath {
   static readonly includes = includes
