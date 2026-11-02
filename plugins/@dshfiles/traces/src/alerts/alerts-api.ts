@@ -1,6 +1,5 @@
-import { defineApi } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { method } from '../api-schema.js'
 import { alertFeedSchema, alertRuleDraftSchema, alertRuleSchema, alertsSnapshotSchema, evaluationSummarySchema } from './alert-types.js'
 
 const ruleIdSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,63}$/)).annotate({ description: 'Alert rule id from traces_alerts.' })

@@ -16,11 +16,11 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { BookmarkIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import * as Schema from 'effect/Schema'
+import { trimmedString } from '../alerts/alert-types.js'
 import type { TracesAlertsTranslate } from '../alerts/alerts-locale.js'
 import { logsViewSchema, storedLogsView } from '../log-list.js'
 import { storedTracesView, tracesViewSchema } from '../view-state.js'
 import { BUILTIN_BOARDS } from './board-definitions.js'
-import { TracesSchema } from '../schema.js'
 import { createStoredValue } from '../stored-value.js'
 import { boardCopyOf, storedBoardId } from './boards-view.js'
 
@@ -28,7 +28,7 @@ const MAX_SAVED_VIEWS = 30
 
 const savedViewSchema = Schema.Struct({
   id: Schema.String.check(Schema.isMaxLength(64)),
-  name: TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  name: trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   savedAt: Schema.Number.check(Schema.isFinite()),
   traces: tracesViewSchema,
   logs: logsViewSchema,

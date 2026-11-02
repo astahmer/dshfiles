@@ -1,5 +1,7 @@
 import Schema from '@deepseek-ai/schemastery'
+import { Settings } from '@dshfiles/dshx/effect/settings'
 import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
+import type { Retention } from './trace-repo.js'
 
 export const tracesSettings = defineSettings({
   namespace: 'dshfiles-traces',
@@ -40,3 +42,35 @@ export const tracesSettings = defineSettings({
 })
 
 export type TracesSettings = SettingsValue<typeof tracesSettings.schema>
+
+export const TracesSettingsService = Settings.Tag<TracesSettings>(tracesSettings.namespace)
+
+const retentionOf = (settings: TracesSettings): Retention => ({
+  maxAgeHours: settings.retentionHours,
+  maxSpans: settings.retentionSpans,
+  maxLogs: settings.retentionLogs,
+  maxMetricPoints: settings.retentionMetricPoints,
+})
+
+/** What the listener binds; the forward URL is read per request, so changing it never restarts the listener. */
+export type ListenConfig = { readonly enabled: boolean; readonly host: string; readonly allowNonLoopback: boolean; readonly port: number }
+
+const listenConfigOf = (settings: TracesSettings): ListenConfig => ({
+  enabled: settings.mode !== 'external',
+  host: settings.host.trim() || '127.0.0.1',
+  allowNonLoopback: settings.allowNonLoopback,
+  port: settings.port,
+})
+
+const sameListenConfig = (left: ListenConfig, right: ListenConfig): boolean =>
+  left.enabled === right.enabled && left.host === right.host && left.allowNonLoopback === right.allowNonLoopback && left.port === right.port
+
+const forwardUrlOf = (settings: TracesSettings): string => (settings.mode === 'both' ? settings.forwardUrl : '')
+
+/** How the traces settings map onto the store, the listener and the forwarder. */
+export class TracesSettingsModel {
+  static readonly retentionOf = retentionOf
+  static readonly listenConfigOf = listenConfigOf
+  static readonly sameListenConfig = sameListenConfig
+  static readonly forwardUrlOf = forwardUrlOf
+}

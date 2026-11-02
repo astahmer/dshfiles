@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
 import { ALERT_EVALUATION_SPAN } from '../alerts/alert-engine.js'
 import { OtlpBody } from './decode.js'
@@ -42,7 +43,7 @@ const evaluation = (transitions: number, statusCode = 0) => ({
 describe('own spans at ingest', () => {
   test('drops the dispatch spans of every traces API, so panel and notifier polling never trace themselves', () => {
     const result = SpanNormalizer.normalizeTraces(
-      OtlpBody.decodeTraces(request([apiSpan('traces'), apiSpan('traces-alerts'), apiSpan('traces-boards'), apiSpan('jujutsu')])),
+      Effect.runSync(OtlpBody.decodeTraces(request([apiSpan('traces'), apiSpan('traces-alerts'), apiSpan('traces-boards'), apiSpan('jujutsu')]))),
       { redactContent: true },
     )
     expect(result.spans.map(span => span.name)).toEqual(['jujutsu/state'])
@@ -50,7 +51,9 @@ describe('own spans at ingest', () => {
   })
 
   test('keeps an alert evaluation that changed a rule or failed, and drops a routine one', () => {
-    const result = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces(request([evaluation(0), evaluation(1), evaluation(0, 2)])), { redactContent: true })
+    const result = SpanNormalizer.normalizeTraces(Effect.runSync(OtlpBody.decodeTraces(request([evaluation(0), evaluation(1), evaluation(0, 2)]))), {
+      redactContent: true,
+    })
     expect(result.spans.map(span => [span.name, span.statusCode, span.attributes['dshx.traces.transitions']])).toEqual([
       [ALERT_EVALUATION_SPAN, 0, 1],
       [ALERT_EVALUATION_SPAN, 2, 0],

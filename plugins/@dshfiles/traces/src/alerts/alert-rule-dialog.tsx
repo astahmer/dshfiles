@@ -5,13 +5,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
-import { TracesSchema } from '../schema.js'
 import {
   ALERT_KINDS,
   alertComparatorSchema,
   alertKindSchema,
   alertRuleDraftSchema,
   alertSeveritySchema,
+  trimmedString,
   type AlertKind,
   type AlertRule,
   type AlertRuleDraft,
@@ -36,7 +36,7 @@ const wholeMinutes = Schema.String.check(
 )
 
 const ruleFormSchema = Schema.Struct({
-  name: TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  name: trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
   kind: alertKindSchema,
   service: Schema.String.check(Schema.isMaxLength(256)),
   operation: Schema.String.check(Schema.isMaxLength(256)),
@@ -71,7 +71,7 @@ const PERCENTILE_OF = { '50': 50, '90': 90, '95': 95, '99': 99 } satisfies Recor
 const percentileOf = (text: RuleFormValues['percentile']): AlertRuleDraft['percentile'] => PERCENTILE_OF[text]
 
 const toDraft = (values: RuleFormValues, id: string | undefined): AlertRuleDraft => {
-  const draft = TracesSchema.decode(alertRuleDraftSchema, {
+  const draft = Schema.decodeUnknownSync(alertRuleDraftSchema)({
     name: values.name.trim(),
     kind: values.kind,
     filter: {
