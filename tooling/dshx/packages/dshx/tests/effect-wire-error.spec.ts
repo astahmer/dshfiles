@@ -16,6 +16,12 @@ class LegacyMissing extends Schema.TaggedError<LegacyMissing>()('LegacyMissing',
 
 class WarnedOnce extends Schema.TaggedError<WarnedOnce>()('WarnedOnce', { message: Schema.String }) {}
 
+class ProviderFailed extends Schema.TaggedError<ProviderFailed>()(
+  'ProviderFailed',
+  { provider: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'provider-failed' },
+) {}
+
 class StorageCorrupt extends Schema.TaggedError<StorageCorrupt>()('StorageCorrupt', { path: Schema.String }) {}
 
 const notesApi = defineApi({
@@ -66,6 +72,12 @@ describe('Effect failures on the wire', () => {
       expect(decoded.id).toBe('n1')
     }).pipe(Effect.provide(TestHost.layer)),
   )
+
+  it('keeps a wrapped cause on the Host and out of the wire details', () => {
+    const failure = wireFailure(Cause.fail(new ProviderFailed({ provider: 'openai', cause: new Error('token sk-live-123 rejected') })))
+    expect(failure).toMatchObject({ kind: 'exposed', error: { code: 'provider-failed', details: { _tag: 'ProviderFailed', provider: 'openai' } } })
+    expect(JSON.stringify(failure.kind === 'exposed' ? failure.error.details : undefined)).not.toContain('sk-live-123')
+  })
 
   it.effect('keeps the kebab-case code of an unannotated tagged failure for compatibility', () =>
     Effect.gen(function* () {

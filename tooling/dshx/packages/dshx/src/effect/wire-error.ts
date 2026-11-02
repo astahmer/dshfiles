@@ -34,8 +34,12 @@ const legacyCode = (tag: string): string =>
     .toLowerCase()
     .replace(/^-+|-+$/gu, '')
 
+/** The wrapped `cause` stays on the Host: it can carry provider messages, paths or stderr the Client must never see. */
+const withoutCause = (details: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
+  Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'cause'))
+
 const encodedDetails = (schema: Schema.Codec<unknown, unknown>, error: unknown): Readonly<Record<string, unknown>> | undefined =>
-  Option.getOrUndefined(Option.flatMap(Schema.encodeUnknownOption(Schema.toCodecJson(schema))(error), decodeDetails))
+  Option.getOrUndefined(Option.map(Option.flatMap(Schema.encodeUnknownOption(Schema.toCodecJson(schema))(error), decodeDetails), withoutCause))
 
 /** Contract errors are Schema error classes; their encoding needs no services. */
 const isErrorClass = (value: unknown): value is Schema.Codec<unknown, unknown> => Schema.isSchema(value)
