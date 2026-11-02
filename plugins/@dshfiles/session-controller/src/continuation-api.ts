@@ -1,6 +1,5 @@
-import { defineApi } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { method } from './api-schema.js'
 
 /** Fork one thread into another project, where its directory becomes the new thread's own working directory. */
 export const continuationApi = defineApi({
