@@ -1,5 +1,3 @@
-export * as SessionPayload from './payload.js'
-
 import type {
   SessionCancelValue,
   SessionFollowFrame,

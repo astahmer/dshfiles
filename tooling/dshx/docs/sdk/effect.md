@@ -113,6 +113,15 @@ a defect is logged, never thrown into the emitter. `stream` is the same listener
 Captures the current services and returns `(...args) => Promise`, for a callback API that must stay Promise (a
 polyfill, a native hook). Capture it once in a layer or `main`, not per call.
 
+`callback`, `HostEvents.on` and `Tool.register` capture their context without the current span, so each later run
+starts its own trace instead of hanging under `plugin activate`. A plugin edge that captures context itself (an
+SDK adapter calling `Effect.runPromiseWith`) uses `DshxPlugin.detachedContext()` for the same reason.
+
+### `DshxPlugin.worker(effect)`
+
+Forks a background loop from a layer for the plugin's lifetime (`Effect.forkScoped`), detached from the activation
+span. Use it instead of a bare `forkScoped` in `Layer.effectDiscard`.
+
 ### `HostContext`, `hostService(name)`
 
 `HostContext` holds the Cordis `ctx` and `packageId` of the activation. `hostService('tools')` reads one Cordis service
@@ -127,6 +136,9 @@ depend on typed services instead.
 | A failure whose class has `{ dshxWireCode: 'code' }`, or a `PluginApiError`              | `remote` with that code, the error's message and its JSON-encoded fields as `remoteDetails`         |
 | An unannotated `TaggedError` failure                                                     | its kebab-case tag as the code, for compatibility only; the Host warns once per tag to annotate it  |
 | A defect (`Effect.die`, `orDie` on a `SchemaError`, a thrown exception) or anything else | `internal` with `API handler failed. See Host diagnostics.`; the Host logs `Cause.pretty`, redacted |
+
+`remoteDetails` never includes a wrapped `cause`: it stays in the Host log, because it can carry provider text, paths
+or stderr.
 
 Annotate the error class, not the handler: `Schema.TaggedError<X>()('X', fields, { dshxWireCode: 'x' })`, as
 `effect/http-api` annotates `httpApiStatus`. The codes `aborted`, `bad-request`, `contract` and `internal` are reserved.
@@ -151,6 +163,9 @@ unknown keys (`onExcessProperty: 'error'`) and the published JSON Schema closes 
 dshx bridges Effect spans into its own tracer, recorder and exporter (`tracerLayer`); do not add
 `@effect/opentelemetry`. `DshxPlugin.make` provides the tracer once, under the layer build. Every API call has exactly
 one server span, the dispatch span `<api id>/<method>`; handler and service `Effect.fn` spans are its descendants.
+
+`Effect.log*` in a plugin writes to the Host's Cordis logger of the activating package, with `Cause.pretty` appended
+when the entry carries a cause; `DshxPlugin.make` installs that logger for every fiber of the plugin.
 
 ## Testing
 

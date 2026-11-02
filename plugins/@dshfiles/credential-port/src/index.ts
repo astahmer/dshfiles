@@ -1,14 +1,8 @@
 import type {} from '@deepseek-ai/cordis'
 
-export {
-  DEFAULT_SECRET_ENVIRONMENT,
-  formatSecretReference,
-  parseSecretReference,
-  type SecretCatalogValues,
-  type SecretReference,
-  type SecretReferenceResolution,
-  type ResolvedSecretCredential,
-} from './secret-reference.js'
+export { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference, parseSecretReference, type SecretReference } from './grammar.js'
+export type { ResolvedSecretCredential } from './resolve.js'
+export type { SecretCatalogValues, SecretReferenceResolution } from './secret-reference.js'
 export { SecretReferenceResolver } from './secret-reference-promise.js'
 
 /**

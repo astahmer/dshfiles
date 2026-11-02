@@ -9,6 +9,9 @@ import { HostContext } from './host-context.js'
 import { type ActivationSlot, makeActivationSlot, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
 import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
+import { hostLoggerLayer } from './host-logger.js'
+
+export { detachedContext } from './detached.js'
 import type { AnyEffectTool } from './tool.js'
 import { toDefinition } from './tool-edge.js'
 import { tracerLayer } from './tracer.js'
@@ -70,7 +73,8 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
       const config = yield* decodeConfig(definition.Config, rowConfig)
       // SAFETY: decodeConfig returns the decoded type of `definition.Config`, or undefined when there is none.
       const layer = pluginLayer(definition.layer, config as ConfigOf<Config>)
-      const base = Layer.mergeAll(HostContext.layer({ ctx, packageId }), tracerLayer)
+      const host = HostContext.layer({ ctx, packageId })
+      const base = Layer.mergeAll(host, tracerLayer, Layer.provide(hostLoggerLayer, host))
       const services = yield* Layer.buildWithScope(Layer.provideMerge(layer, base), scope)
       return Context.add(services, Scope.Scope, scope)
     }).pipe(Effect.withSpan('plugin activate', { attributes: { 'dshx.plugin.package': packageId } }), Effect.provide(tracerLayer))

@@ -1,9 +1,6 @@
 import type { SecretScope } from './index.js'
 import type { SecretReference } from './grammar.js'
 
-export { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference, parseSecretReference, type SecretReference } from './grammar.js'
-export type { ResolvedSecretCredential } from './resolve.js'
-
 /** One reference resolved for a folder: `project`/`local` aliases come from that folder's config, `global` needs none. */
 export interface SecretReferenceResolution {
   readonly reference: SecretReference

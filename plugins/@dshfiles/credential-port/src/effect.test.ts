@@ -4,7 +4,7 @@ import { HostContext } from '@dshfiles/dshx/effect/host-context'
 import { Duration, Effect, Exit, Fiber, Layer, Option, Result, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { describe, expect } from 'vitest'
-import { parseSecretReference } from './secret-reference.js'
+import { parseSecretReference } from './grammar.js'
 import {
   SecretReferenceResolver as SecretReferenceResolverService,
   secretAliasSchemaEffect,
