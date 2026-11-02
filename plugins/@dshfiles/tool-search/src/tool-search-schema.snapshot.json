@@ -5,59 +5,22 @@
     "type": "object",
     "properties": {
       "query": {
-        "type": "string",
-        "description": "Capability or exact tool name to find (maximum 512 characters)."
+        "description": "Capability or exact tool name to find (maximum 512 characters).",
+        "type": "string"
       },
       "limit": {
-        "type": "integer",
-        "description": "Maximum matches to load, from 1 to 5."
+        "description": "Maximum matches to load, from 1 to 5.",
+        "type": "integer"
       }
     },
     "required": [
       "query"
-    ]
+    ],
+    "additionalProperties": false
   },
   "output": {
     "schema": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "query": {
-          "type": "string"
-        },
-        "tools": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "loaded",
-                  "already_loaded",
-                  "unavailable"
-                ]
-              }
-            },
-            "required": [
-              "name",
-              "status"
-            ]
-          }
-        },
-        "remainingDeferred": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "query",
-        "tools",
-        "remainingDeferred"
-      ]
+      "description": "tool_search output"
     }
   }
 }

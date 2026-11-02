@@ -68,7 +68,7 @@
           "kind": "unit-test",
           "id": "tool-search.tagged-query-failure",
           "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
-          "testName": "returns a tagged failure for invalid search input"
+          "testName": "refuses blank search input with its validation message"
         },
         {
           "kind": "unit-test",
