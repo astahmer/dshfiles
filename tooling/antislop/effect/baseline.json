@@ -1,16 +1,13 @@
 {
-  "effect-migration(effect-span-name-format)": {
-    "plugins/@dshfiles/usage/src/host.ts": 3
+  "effect-antislop(no-service-flat-map-facade)": {
+    "plugins/@dshfiles/traces/src/host.ts": 1
   },
   "effect-migration(no-cause-dropping-catch)": {
     "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
-    "plugins/@dshfiles/background-jobs/src/host.ts": 2,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
-    "plugins/@dshfiles/session-search/src/host.ts": 4,
-    "plugins/@dshfiles/usage/src/host.ts": 3,
-    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1
+    "plugins/@dshfiles/session-search/src/host.ts": 4
   },
   "effect-migration(no-empty-plugin-layer)": {
     "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
@@ -18,9 +15,7 @@
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
   "effect-migration(no-gen-inside-fn)": {
-    "plugins/@dshfiles/background-jobs/src/host.ts": 4,
-    "plugins/@dshfiles/session-search/src/host.ts": 1,
-    "plugins/@dshfiles/usage/src/host.ts": 8
+    "plugins/@dshfiles/session-search/src/host.ts": 1
   },
   "effect-migration(no-host-child-process)": {
     "plugins/@dshfiles/ai-accounts/src/account-session-service.ts": 1,
@@ -66,11 +61,7 @@
     "plugins/@dshfiles/session-search/src/worker-client.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 2,
     "plugins/@dshfiles/thread-sidebar/src/restart.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/thread-actions.ts": 2,
-    "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 2,
-    "plugins/@dshfiles/traces/src/host.ts": 1,
-    "plugins/@dshfiles/traces/src/receiver.ts": 1,
-    "plugins/@dshfiles/usage/src/otel-exporter.ts": 1
+    "plugins/@dshfiles/thread-sidebar/src/thread-actions.ts": 2
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/agents/src/host.ts": 1,
@@ -99,9 +90,7 @@
     "plugins/@dshfiles/thread-sidebar/src/attention-host.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 5,
     "plugins/@dshfiles/thread-sidebar/src/settings.ts": 5,
-    "plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts": 1,
-    "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 1,
-    "plugins/@dshfiles/traces/src/host.ts": 3
+    "plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts": 1
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
@@ -116,7 +105,6 @@
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 3,
-    "plugins/@dshfiles/traces/src/receiver.ts": 1,
     "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
     "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,
     "tooling/dshx/packages/dshx/src/platform/client.ts": 1

@@ -204,6 +204,24 @@ describe('Notes', () => {
 `create-dshx --template effect-host` scaffolds this shape: `DshxPlugin.make`, one service, one annotated error and an
 `it.layer` test, with `effect` and `@effect/vitest` pinned to `4.1.0`.
 
+## Reference plugins
+
+Copy these two Host halves before writing a new one; each file is one pattern.
+
+| File                                                                                                                                               | Shows                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`background-jobs/src/host.ts`](../../../../plugins/@dshfiles/background-jobs/src/host.ts)                                                         | `DshxPlugin.make` with one layer graph and `Api.bind`; background loops as `Layer.effectDiscard(… Effect.forkScoped)` (use `DshxPlugin.worker` where the edge provides it); a `Schedule` whose delay reads its input; `Stream.groupedWithin` + `Api.publish` to rate-limit an event |
+| [`background-jobs/src/history.ts`](../../../../plugins/@dshfiles/background-jobs/src/history.ts)                                                   | a service on `FileSystem`/`Path` with its config as a service; `Semaphore` instead of a busy flag; state in a `SubscriptionRef`; `Effect.cached` for a one-time load; a span annotated with counts                                                                                  |
+| [`background-jobs/src/live.ts`](../../../../plugins/@dshfiles/background-jobs/src/live.ts)                                                         | an optional Host service through `hostServiceChanges` + `Stream.switchMap`; a callback API as `Stream.callback` with `acquireRelease`                                                                                                                                               |
+| [`background-jobs/src/service.ts`](../../../../plugins/@dshfiles/background-jobs/src/service.ts)                                                   | waiting on state changes with `SubscriptionRef.changes` + `Effect.timeoutOption` instead of polling; annotated errors (`errors.ts`)                                                                                                                                                 |
+| [`usage/src/store.ts`](../../../../plugins/@dshfiles/usage/src/store.ts), [`migrations.ts`](../../../../plugins/@dshfiles/usage/src/migrations.ts) | a repo over `SqlClient` from `@dshfiles/sqlite-store` (legacy `user_version` adoption), hoisted row decoders, `sql.withTransaction`, one tagged error per operation                                                                                                                 |
+| [`usage/src/indexing.ts`](../../../../plugins/@dshfiles/usage/src/indexing.ts)                                                                     | in-flight dedupe with `FiberHandle.run(…, { onlyIfMissing: true })` so a caller's abort never cuts shared work short; a failed step as a tagged error recorded in state                                                                                                             |
+| [`usage/src/otel-exporter.ts`](../../../../plugins/@dshfiles/usage/src/otel-exporter.ts)                                                           | `HttpClient` with `Effect.retry(Schedule.exponential …)` inside `Effect.repeat(Schedule.spaced …)`                                                                                                                                                                                  |
+| `*.test.ts` in both                                                                                                                                | `it.layer`/`it.effect` over real layers (temp dirs, `:memory:` SQLite), `TestClock` for every schedule, stand-ins only for external systems (`JobRegistry`, `HttpClient`)                                                                                                           |
+
+An exposed error's `details` carry its fields without `cause`: keep `cause` on the error for the Host log, never
+assert it on the client.
+
 ## The deprecated `DshxEffect` namespace
 
 `DshxEffect.plugin`, `host`, `setup`, `client`, `events`, `publish` and `tracerLayer` keep working while plugins move.
