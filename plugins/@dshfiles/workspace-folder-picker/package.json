@@ -44,6 +44,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -64,6 +65,7 @@
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-workspace": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "oxfmt": "catalog:",
