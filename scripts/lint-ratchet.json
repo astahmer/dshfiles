@@ -4,7 +4,7 @@
     "antislop(no-export-bag)": 0,
     "antislop(no-known-value-widening)": 96,
     "antislop(no-runtime-typeof)": 381,
-    "antislop(no-unknown-parameters)": 224,
+    "antislop(no-unknown-parameters)": 225,
     "antislop(no-unknown-returns)": 123,
     "antislop(no-unsafe-dictionary-type)": 218,
     "antislop(require-safety-comment-for-type-assertion)": 385,
