@@ -34,9 +34,4 @@ export class SchemaHelpers {
     const result = Schema.decodeUnknownResult(schema)(input)
     return Result.isSuccess(result) ? { success: true, data: result.success } : { success: false, error: result.failure }
   }
-
-  static readonly decodeUnknownOr = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown, fallback: S['Type']) => {
-    const result = Schema.decodeUnknownResult(schema)(input)
-    return Result.isSuccess(result) ? result.success : fallback
-  }
 }
