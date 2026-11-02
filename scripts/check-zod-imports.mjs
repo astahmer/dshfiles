@@ -21,7 +21,7 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const rootArgument = process.argv.indexOf('--root')
 const scannedRoot = rootArgument === -1 ? workspaceRoot : resolve(process.argv[rootArgument + 1] ?? '.')
 const searchRoots = ['plugins', 'tooling', 'scripts']
-const skippedDirectories = new Set(['node_modules', 'dist', '.git', '.jj', 'output', '.turbo', 'test-results', '.features-gen', 'coverage'])
+const skippedDirectories = new Set(['node_modules', 'dist', 'build', '.git', '.jj', 'output', '.turbo', 'test-results', '.features-gen', 'coverage'])
 const sourceExtensions = /\.[cm]?[jt]sx?$/u
 const zodImport = /^\s*(?:import|export)\b[^'"]*from\s*['"]zod(?:\/[^'"]*)?['"]/mu
 
