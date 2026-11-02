@@ -1,8 +1,10 @@
+// Registers the dshx Effect Schema adapter `defineApi` needs before this module serves its contracts.
+import '@dshfiles/dshx/effect'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineHost } from '@dshfiles/dshx/host'
-import { agentsApi, type AgentPresetRow } from './api.js'
+import { agentsApi } from './api.js'
 import { DelegationGuard } from './delegation-guard.js'
 import { AgentRegistry, agentsDomain, type AgentsStore } from './store.js'
 
@@ -50,6 +52,13 @@ const closeAgents = async (): Promise<void> => {
   await opened.close()
 }
 
+interface AgentPresetRowDraft {
+  readonly id: string
+  name?: string
+  description?: string
+  broken?: string
+}
+
 const agentsApiHost = agentsApi.host({
   list: async ({ ctx }) => (await agentsFor(ctx)).snapshot(),
   get: async ({ ctx, input }) => ({ agent: (await agentsFor(ctx)).resolve(input.handle) }),
@@ -59,7 +68,7 @@ const agentsApiHost = agentsApi.host({
     const rows = await presets.list()
     return {
       presets: rows.map(row => {
-        const preset: AgentPresetRow = { id: row.id }
+        const preset: AgentPresetRowDraft = { id: row.id }
         if (row.name !== undefined) preset.name = row.name
         if (row.description !== undefined) preset.description = row.description
         if (row.broken !== undefined) preset.broken = row.broken

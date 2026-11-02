@@ -18,7 +18,6 @@ import {
   AGENTS_QUERY_ROOT,
   type Agent,
   type AgentDraft,
-  type AgentRoute,
   type AgentThread,
 } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
@@ -417,8 +416,10 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                   patch({ route: null })
                   return
                 }
-                const route: AgentRoute = { provider: option.provider, model: option.model }
-                if (option.defaultEffort !== undefined) route.reasoningEffort = option.defaultEffort
+                const route =
+                  option.defaultEffort === undefined
+                    ? { provider: option.provider, model: option.model }
+                    : { provider: option.provider, model: option.model, reasoningEffort: option.defaultEffort }
                 patch({ route })
               }}
               options={routeOptions}

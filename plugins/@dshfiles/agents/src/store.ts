@@ -1,12 +1,13 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { agentSchema, agentThreadSchema, Agents, MAX_AGENTS, MAX_THREADS_PER_AGENT, type Agent, type AgentDraft, type AgentThread } from './agent.js'
 
 export const agentsDomain = defineDomain({
   name: 'agents',
   version: 1,
   tables: {
-    agents: { valueSchema: agentSchema, __key: 'agents' },
-    threads: { valueSchema: agentThreadSchema, __key: 'threads' },
+    agents: { valueSchema: zodSchemaFromEffect(agentSchema), __key: 'agents' },
+    threads: { valueSchema: zodSchemaFromEffect(agentThreadSchema), __key: 'threads' },
   },
 })
 

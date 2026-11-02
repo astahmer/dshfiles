@@ -1,3 +1,4 @@
+import '../../../../tooling/dshx/packages/dshx/src/effect/index.js'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { it, expect } from 'vitest'
 import { publishedJsonSchema, toToolSchema } from '../../../../tooling/dshx/packages/dshx/src/api/json-schema.js'
@@ -5,7 +6,7 @@ import { agentsApi } from '../src/api.js'
 
 const snapshotPath = new URL('../src/api-schema.snapshot.json', import.meta.url)
 
-it('preserves API and agent-tool schemas byte-for-byte', () => {
+it('keeps the published API and agent-tool schemas stable', () => {
   const methods = Object.entries(agentsApi.methods).map(([name, method]) => ({
     name,
     description: method.description,
