@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -14,7 +15,6 @@ import { WORKBENCH_MAIN_PANEL_ID, workbenchPanels } from '@dshfiles/workbench/re
 import { useEffect, useSyncExternalStore } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { z } from 'zod'
 import { createEditorStore, type EditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
@@ -34,26 +34,29 @@ const FILE_LINK_ID = '@dshfiles/editor/file-link'
 const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 
-// `createStoredValue` (plugin-ui) takes a `ZodType` and reads `.safeParse`, so its schemas stay on zod.
 // Open requests arrive while no editor surface is mounted, so the settings are mirrored where the event handler reads them.
-const placement = createStoredValue({ key: 'dshfiles-editor:placement', schema: z.enum(['workbench', 'right-panel']), fallback: 'workbench' })
+const placement = createStoredValue({
+  key: 'dshfiles-editor:placement',
+  schema: zodSchemaFromEffect(Schema.Literals(['workbench', 'right-panel'])),
+  fallback: 'workbench',
+})
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.
 const loadEngine = () => import('./monaco-engine.js').then(module => module.monacoEngine)
 
 const noSession = (): undefined => undefined
 
-// zod's `record` emits `propertyNames`/`additionalProperties` where Effect adds none, and `z.custom` has no JSON Schema document.
-const sessionListSchema = z.object({ byId: z.record(z.string(), z.unknown()) })
-const sessionCwdSchema = z.object({ cwd: z.string().min(1) })
+const sessionListSchema = Schema.Struct({ byId: Schema.Record(Schema.String, Schema.Unknown) })
+const sessionCwdSchema = Schema.Struct({ cwd: Schema.String.check(Schema.isMinLength(1)) })
 
 /**
  * The Client `sessions` service (`ISessions.list`). This package also types the Host `ctx.sessions` (a different
- * shape under the same name) for its write API, so the Client face is decoded here; `z.custom` keeps the observable's
- * own reference (and `this`).
+ * shape under the same name) for its write API, so the Client face is decoded here; the declaration keeps the
+ * observable's own reference (and `this`).
  */
-const clientSessionsSchema = z.object({
-  list: z.custom<{ readonly getSnapshot: () => unknown }>(
-    value => typeof value === 'object' && value !== null && 'getSnapshot' in value && typeof value.getSnapshot === 'function',
+const clientSessionsSchema = Schema.Struct({
+  list: Schema.declare<{ readonly getSnapshot: () => object }>(
+    (value): value is { readonly getSnapshot: () => object } =>
+      typeof value === 'object' && value !== null && 'getSnapshot' in value && typeof value.getSnapshot === 'function',
   ),
 })
 
@@ -91,15 +94,16 @@ export default defineClient({
         return { id: EDITOR_OPEN_FILE_LINKS_OWNER_ID, title: tSettings('openFileLinksTitle'), order: 18, placement: 'general', component: OpenFileLinksRow }
       })
 
-    const clientSessions = clientSessionsSchema.safeParse(ctx.sessions)
+    const clientSessions = Schema.decodeUnknownOption(clientSessionsSchema)(ctx.sessions)
     const store = createEditorStore({
       remote: ctx.remote,
       workspaceRoot: sessionId => {
-        if (!clientSessions.success) return undefined
-        const list = sessionListSchema.safeParse(clientSessions.data.list.getSnapshot())
-        if (!list.success) return undefined
+        if (Option.isNone(clientSessions)) return undefined
+        const list = Schema.decodeUnknownOption(sessionListSchema)(clientSessions.value.list.getSnapshot())
+        if (Option.isNone(list)) return undefined
         // One summary at a time: an unrelated session's odd shape must not hide this one's cwd.
-        return sessionCwdSchema.safeParse(list.data.byId[sessionId]).data?.cwd
+        const summary = Schema.decodeUnknownOption(sessionCwdSchema)(list.value.byId[sessionId])
+        return Option.isSome(summary) ? summary.value.cwd : undefined
       },
     })
     ctx.effect(

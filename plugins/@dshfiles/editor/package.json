@@ -30,8 +30,7 @@
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "effect": "catalog:",
-    "monaco-editor": "0.57.0",
-    "zod": "catalog:"
+    "monaco-editor": "0.57.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
