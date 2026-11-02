@@ -298,6 +298,19 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/jj-cli": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "causelessErrors": 2,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/jj-integration": {
     "layerEmpty": 0,
     "promiseAdapters": 25,
@@ -313,14 +326,14 @@
   },
   "@dshfiles/jujutsu": {
     "layerEmpty": 0,
-    "promiseAdapters": 22,
-    "moduleState": 2,
-    "timers": 1,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 5,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
-    "testMocks": 2,
+    "causelessErrors": 0,
+    "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
