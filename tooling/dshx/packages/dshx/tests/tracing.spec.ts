@@ -249,6 +249,21 @@ describe('OTLP/HTTP JSON payload', () => {
     expect(encoded?.endTimeUnixNano).toBe('1700000000500000000')
   })
 
+  it('encodes span links and omits an empty link list', () => {
+    const link = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), attributes: new Map([['link.kind', 'follows-from']]) }
+    const spans = OtlpTraceExport.encode({
+      serviceName: 's',
+      spans: [
+        { ...finishedSpan('linked'), links: [link] },
+        { ...finishedSpan('plain'), links: [] },
+      ],
+    }).resourceSpans[0]?.scopeSpans[0]?.spans
+    expect(spans?.[0]?.links).toEqual([
+      { traceId: link.traceId, spanId: link.spanId, attributes: [{ key: 'link.kind', value: { stringValue: 'follows-from' } }] },
+    ])
+    expect(spans?.[1]).not.toHaveProperty('links')
+  })
+
   it('bounds attribute strings, lists and count', async () => {
     const sink = collector()
     const tracer = TracerModel.create({ env: ENDPOINT_ENV, fetch: sink.fetch })
@@ -560,7 +575,7 @@ const waitFor = async (condition: () => boolean): Promise<void> => {
   }
 }
 
-const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v2')
+const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v3')
 let restoreTracer: (() => void) | undefined
 afterEach(() => restoreTracer?.())
 

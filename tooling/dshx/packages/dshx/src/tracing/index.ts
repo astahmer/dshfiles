@@ -5,7 +5,7 @@ import { TracerModel, type Span, type SpanAttributes, type SpanContext, type Sta
 export type { LocalOtlpEndpoint, OtlpExportTarget, OtlpSignal } from './local-endpoint.js'
 export type { Span, SpanAttributes, SpanContext, StartSpanOptions } from './tracer.js'
 export type { SpanAttributeValue, SpanKind, SpanStatusCode } from './otlp-exporter.js'
-export type { RecordedSpan, SpanRecorder } from './recorder.js'
+export type { RecordedSpan, RecordedSpanEvent, RecordedSpanLink, SpanRecorder } from './recorder.js'
 
 export const withActiveSpan = TracingHelpers.withActiveSpan
 export const traced = TracingHelpers.traced

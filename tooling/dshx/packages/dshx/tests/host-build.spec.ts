@@ -262,7 +262,7 @@ describe('host compiler', () => {
     expect(code).toContain('loopbackLaunchUrl')
     expect(code).toContain('nativeRpcRequestSchema')
     expect(code).toContain('digestSession')
-    expect(code).toContain('@dshfiles/dshx.tracing.v2')
+    expect(code).toContain('@dshfiles/dshx.tracing.v3')
     expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
   })
 
