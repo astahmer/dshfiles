@@ -2,7 +2,8 @@ import { isApiError } from '@dshfiles/dshx/api'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
-import { dirname } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { Effect, Schedule } from 'effect'
 import { activityTimelineApi } from './api.js'
 import plugin from './host.js'
@@ -29,13 +30,13 @@ const mountedTimeline = Effect.gen(function* () {
   const releaseAgents = host.ctx.provide('agents', {} as never)
   yield* Effect.addFinalizer(() => Effect.sync(releaseAgents))
   yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/activity-timeline' }))
-  return { host, client: createHostApiClient(host.ctx, activityTimelineApi, '@test/caller') }
+  return { host, home: dirname(statePath), client: createHostApiClient(host.ctx, activityTimelineApi, '@test/caller') }
 })
 
 describe('activity-timeline Host', () => {
-  it.live('stores a decoded activity event and serves it through the API', () =>
+  it.live('stores a decoded activity event under the DSH_HOME set after startup and serves it through the API', () =>
     Effect.gen(function* () {
-      const { host, client } = yield* mountedTimeline
+      const { host, home, client } = yield* mountedTimeline
       host.ctx.emit('dshfiles/activity/event', {
         kind: 'communication-message',
         value: { at: 10, messageId: 'message-1', senderId: 'session-a', recipientCount: 1, intent: 'request', topic: null, sessionId: 'session-a' },
@@ -45,6 +46,7 @@ describe('activity-timeline Host', () => {
         Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: result => result.totalRetained > 0, times: 50 }),
       )
       expect(page.items.map(item => item.id)).toEqual(['communication:message:message-1'])
+      expect(existsSync(join(home, 'runtime', 'dshfiles', 'activity-timeline', 'state.json'))).toBe(true)
     }),
   )
 

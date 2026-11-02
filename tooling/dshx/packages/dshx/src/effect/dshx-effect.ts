@@ -20,6 +20,7 @@ import { PublishEventError } from './api.js'
 import { effectClient } from './client.js'
 import { PluginActivationError } from './plugin.js'
 import { makeActivationSlot, PluginInactive, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
+import { processEnvConfig } from './process-env-config.js'
 import { tracerLayer } from './tracer.js'
 import { thrownForApi } from './wire-error.js'
 
@@ -31,7 +32,9 @@ type HostOptions<R> = [R] extends [never]
   ? [options?: { readonly runtime?: ManagedRuntime.ManagedRuntime<R, unknown> }]
   : [options: { readonly runtime: ManagedRuntime.ManagedRuntime<R, unknown> }]
 
-const tracerServices = Effect.runSync(Effect.scoped(Layer.build(tracerLayer)))
+const edgeLayer = Layer.merge(tracerLayer, processEnvConfig)
+
+const tracerServices = Effect.runSync(Effect.scoped(Layer.build(edgeLayer)))
 
 const legacyRegistration = <const Methods extends Record<string, AnyApiMethodDefinition>, R, E>(
   contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
@@ -115,7 +118,7 @@ export const plugin = <Config, E, R>(options: {
       const scope = Scope.makeUnsafe()
       const layer = typeof options.layer === 'function' ? options.layer(ctx, config) : options.layer
       const program = Effect.gen(function* () {
-        const built = yield* Layer.buildWithScope(Layer.provideMerge(layer, tracerLayer), scope)
+        const built = yield* Layer.buildWithScope(Layer.provideMerge(layer, edgeLayer), scope)
         const services = Context.add(built, Scope.Scope, scope)
         yield* Effect.provideContext(options.setup(ctx, config), services)
         return services

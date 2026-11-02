@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@effect/vitest'
-import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from 'effect'
+import { Cause, Config, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { defineApi, event, isApiError, method } from '../src/api/index.js'
 import { Api, DshxPlugin, HostContext, HostEvents, hostServiceChanges, Tool } from '../src/effect/index.js'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
@@ -310,6 +310,46 @@ describe('DshxPlugin.make', () => {
       expect(yield* Ref.get(seen)).toEqual(['one'])
       expect(host.tools.schemas().some(schema => schema.name === 'journal_echo')).toBe(false)
     }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('reads Config from process.env as it is at each lookup, not a startup snapshot', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const name = 'DSHX_EFFECT_TEST_LIVE_HOME'
+      const previous = process.env[name]
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          if (previous === undefined) delete process.env[name]
+          else process.env[name] = previous
+        }),
+      )
+      const api = defineApi({
+        id: 'journal-config',
+        version: 1,
+        owner: '@test/journal-config',
+        methods: { home: method({ input: Schema.Void, output: Schema.String }) },
+      })
+      const home = Effect.orDie(
+        Effect.gen(function* () {
+          return yield* Config.String(name)
+        }),
+      )
+      process.env[name] = '/scratch/at-build'
+      const seenAtBuild: string[] = []
+      yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-config',
+          layer: Layer.effectDiscard(Effect.flatMap(home, value => Effect.sync(() => void seenAtBuild.push(value)))),
+          apis: [Api.bind(api, { home: () => home })],
+        }),
+        '@test/journal-config',
+      )
+      expect(seenAtBuild).toEqual(['/scratch/at-build'])
+      process.env[name] = '/scratch/after-load'
+      expect(yield* Effect.promise(() => createHostApiClient(host.ctx, api, '@test/caller').home())).toBe('/scratch/after-load')
+      const outside = yield* home.pipe(Effect.provide(DshxPlugin.processEnvConfig))
+      expect(outside).toBe('/scratch/after-load')
+    }).pipe(Effect.scoped, Effect.provide(TestHost.layer)),
   )
 
   it.effect('decodes the row config before building the layer', () =>

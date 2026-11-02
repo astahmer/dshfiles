@@ -191,6 +191,13 @@ optional service as it comes and goes (`None`, `Some(service)`, `None` …), for
 it with `Stream.switchMap` so the work bound to one service instance stops when it goes. Only dshx edge layers use
 them; domain services depend on typed services instead.
 
+### `Config` and `DshxPlugin.processEnvConfig`
+
+`DshxPlugin.make` (and the deprecated `DshxEffect.plugin` / `setup`) provide `DshxPlugin.processEnvConfig`, so
+`Config.String('DSH_HOME')` reads `process.env` as it is at each lookup. Effect's default provider merges
+`import.meta.env` over `process.env`, and under Vitest that is a startup snapshot: a test that sets `DSH_HOME` to a
+scratch folder would read the shell's real home and write live state.
+
 ### `DshChildProcessSpawner.layer`
 
 From `@dshfiles/dshx/effect/child-process-spawner`: Effect's standard `ChildProcessSpawner` over the DSH `subprocess`
@@ -245,7 +252,9 @@ Use `@effect/vitest` and real layers. A domain service that needs no Host is tes
 Test the edge (`DshxPlugin.make`, `Api.bind`, `Tool.make`) against a real in-memory Host: build `createTestHost()`
 from `@dshfiles/dshx/testing` inside `Layer.effect` with `Effect.acquireRelease`, mount the definition, and call it
 through `createHostApiClient` or `host.tools.execute`. A layer that reads `HostContext` gets
-`HostContext.layer({ ctx: host.ctx, packageId })`. To assert a span, provide `tracerLayer` (exported from
+`HostContext.layer({ ctx: host.ctx, packageId })`. A test that reads `Config` without going through
+`DshxPlugin.make` (a domain service under `it.layer`) provides the same provider:
+`Effect.provide(DshxPlugin.processEnvConfig)`. To assert a span, provide `tracerLayer` (exported from
 `@dshfiles/dshx/effect`) and read it with `recordSpans()` from `@dshfiles/dshx/tracing`. Never mock the service under
 test.
 
