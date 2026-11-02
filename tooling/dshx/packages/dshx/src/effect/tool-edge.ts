@@ -1,3 +1,4 @@
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { Effect, Schema } from 'effect'
 import { publishedJsonSchema, toToolSchema } from '../api/json-schema.js'
@@ -44,17 +45,27 @@ const callProgram = <Input extends InputSchema, Output, R>(tool: EffectTool<Inpu
     )
   })
 
-/** What the agent reads when a call fails: the failure's own message only when it is exposed, never a defect. */
-const failureMessage = (input: {
+/** A Host error (a DSH `HarnessError` carries a string `code`) keeps its identity, so the Host reports `{ name, code }`. */
+const isCodedHostError = (value: unknown): value is Error & { readonly code: string } =>
+  value instanceof Error && 'code' in value && typeof value.code === 'string'
+
+/**
+ * What a failed call throws to the Host: an exposed failure's message, or the coded Host error it wraps as `cause`;
+ * an abort or any other failure never shows its internals to the agent.
+ */
+const failureThrown = (input: {
   readonly tool: string
   readonly cause: Parameters<typeof wireFailure>[0]
   readonly log: PluginRuntime<never>['log']
-}): string => {
+}): Error => {
   const failure = wireFailure(input.cause)
-  if (failure.kind === 'aborted') return `${input.tool} was cancelled.`
-  if (failure.kind === 'exposed') return failure.error.message
+  if (failure.kind === 'aborted') return new Error(`${input.tool} was cancelled.`)
+  if (failure.kind === 'exposed') {
+    const wrapped = failure.error.cause instanceof Error ? failure.error.cause.cause : undefined
+    return isCodedHostError(wrapped) ? wrapped : new Error(failure.error.message)
+  }
   input.log({ topic: 'tool', level: 'error', message: `Tool ${input.tool} failed:\n${causeReport(input.cause)}` })
-  return `${input.tool} failed. See Host diagnostics.`
+  return new Error(`${input.tool} failed. See Host diagnostics.`)
 }
 
 /** The native definition of an Effect tool whose calls run through `runtimeFor`. */
@@ -65,28 +76,33 @@ export const toDefinition = <Input extends InputSchema, Output, R>(
   const parameters = toToolSchema(publishedJsonSchema(tool.input, 'input'))
   const takesInput = parameters.type === 'object'
   if (!takesInput && !acceptsNoInput(tool.input)) throw new TypeError(`Tool ${tool.name} needs an object input schema, or Schema.Void for no arguments.`)
-  const renderText = (value: unknown): string => {
-    if (tool.render === undefined) return JSON.stringify(value, null, 2)
-    // SAFETY: without an output schema the tool returned this JSON value itself, so it is its Output.
-    if (tool.output === undefined) return tool.render(value as Output)
-    return tool.render(Schema.decodeUnknownSync(Schema.toCodecJson(tool.output))(value))
+  // SAFETY: without an output schema the tool returned this JSON value itself, so it is its Output.
+  const decodeOutput = (value: unknown): Output =>
+    tool.output === undefined ? (value as Output) : Schema.decodeUnknownSync(Schema.toCodecJson(tool.output))(value)
+  const renderContent = (value: unknown): ContentBlock[] => {
+    if (tool.render === undefined) return [{ type: 'text', text: JSON.stringify(value, null, 2) }]
+    const rendered = tool.render(decodeOutput(value))
+    return typeof rendered === 'string' ? [{ type: 'text', text: rendered }] : [...rendered]
   }
+  const presentation = tool.presentation
   const definition: ToolDefinition = {
     name: tool.name,
     description: tool.description,
     parameters: takesInput ? { ...parameters } : { type: 'object', properties: {} },
     output: {
       schema: { description: `${tool.name} output` },
-      render: (_args, value) => [{ type: 'text', text: renderText(value) }],
+      render: (_args, value) => renderContent(value),
+      ...(presentation !== undefined && { presentationMeta: (_args, value) => presentation(decodeOutput(value)) }),
     },
     execute: async (args, execution) => {
       const runtime = await runtimeFor(execution.signal)
       const call: ToolCall = { callId: execution.callId, agent: execution.agent, sessionId: execution.agent?.id }
       const exit = await runtime.run(callProgram(tool, takesInput ? args : undefined, call), { signal: execution.signal })
       if (exit._tag === 'Success') return exit.value ?? null
-      throw new Error(failureMessage({ tool: tool.name, cause: exit.cause, log: runtime.log }))
+      throw failureThrown({ tool: tool.name, cause: exit.cause, log: runtime.log })
     },
   }
+  if (tool.timeoutMs !== undefined) definition.timeoutMs = tool.timeoutMs
   if (tool.readOnly) definition.isConcurrencySafe = () => true
   return definition
 }

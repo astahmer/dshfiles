@@ -2,6 +2,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Cause, Context, Deferred, Effect, Exit, Layer, Ref, Schema } from 'effect'
 import { defineApi, isApiError, method } from '../src/api/index.js'
 import { Api, DshxPlugin, HostContext, HostEvents, Tool } from '../src/effect/index.js'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { createHostApiClient } from '../src/host/index.js'
 import { tracerLayer } from '../src/effect/tracer.js'
 import { recordSpans } from '../src/tracing/index.js'
@@ -217,6 +218,55 @@ describe('DshxPlugin.make', () => {
       expect(Exit.isFailure(outcome)).toBe(true)
       expect(log).toEqual(['acquire @test/journal-f', 'release @test/journal-f'])
       expect(yield* rejection(() => createHostApiClient(host.ctx, api, '@test/caller').greet({ name: 'a' }))).toMatchObject({ kind: 'unavailable' })
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('publishes presentation metadata, content blocks and a deadline, and keeps a wrapped Host error', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      class JournalDenied extends Schema.TaggedError<JournalDenied>()(
+        'JournalDenied',
+        { cause: Schema.optional(Schema.Defect()) },
+        { dshxWireCode: 'journal-denied' },
+      ) {
+        override get message(): string {
+          return 'The journal refused the write.'
+        }
+      }
+      const card = Tool.make({
+        name: 'journal_card',
+        description: 'Show a card.',
+        input: Schema.Struct({ title: Schema.String, deny: Schema.optionalKey(Schema.Boolean) }),
+        output: Schema.Struct({ title: Schema.String }),
+        timeoutMs: 5_000,
+        render: output => [{ type: 'text', text: `Card ${output.title}` }],
+        presentation: output => ({ title: output.title }),
+        execute: input =>
+          input.deny === true
+            ? Effect.fail(new JournalDenied({ cause: new HarnessError('write denied by policy', 'FS_SANDBOX_DENIED') }))
+            : Effect.succeed({ title: input.title }),
+      })
+      const plain = Tool.make({
+        name: 'journal_plain',
+        description: 'Fail without a Host error.',
+        input: Schema.Struct({}),
+        execute: () => Effect.fail(new JournalDenied({ cause: new Error('not a Host error') })),
+      })
+      yield* mount(DshxPlugin.make({ name: 'test-journal-h', layer: Layer.empty, tools: [card, plain] }), '@test/journal-h')
+      expect(host.tools.get('journal_card')?.timeoutMs).toBe(5_000)
+      const shown = yield* Effect.promise(() =>
+        host.tools.execute({ callId: 'call-1' as never, name: 'journal_card', arguments: { title: 'Revenue' }, signal: new AbortController().signal }),
+      )
+      expect(shown).toMatchObject({ isError: false, meta: { title: 'Revenue' }, content: [{ type: 'text', text: 'Card Revenue' }] })
+      const denied = yield* Effect.promise(() =>
+        host.tools.execute({ callId: 'call-2' as never, name: 'journal_card', arguments: { title: 'x', deny: true }, signal: new AbortController().signal }),
+      )
+      expect(denied).toMatchObject({ isError: true, error: { message: 'write denied by policy', info: { code: 'FS_SANDBOX_DENIED' } } })
+      const refused = yield* Effect.promise(() =>
+        host.tools.execute({ callId: 'call-3' as never, name: 'journal_plain', arguments: {}, signal: new AbortController().signal }),
+      )
+      expect(refused).toMatchObject({ isError: true, error: { message: 'The journal refused the write.' } })
+      expect(refused.isError && refused.error.info).toBeUndefined()
     }).pipe(Effect.provide(TestHost.layer)),
   )
 

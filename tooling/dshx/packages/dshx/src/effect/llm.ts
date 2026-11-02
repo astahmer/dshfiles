@@ -8,6 +8,7 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import { Context, Effect, Layer, Schema, Stream } from 'effect'
+import type { SessionId } from '../ids.js'
 import { hostService } from './host-context.js'
 
 /** The model call failed: the adapter reported an error finish, or the stream itself threw. */
@@ -46,6 +47,8 @@ export interface LlmCompletion {
   readonly reasoningEffort?: string | undefined
   readonly maxTokens?: number | undefined
   readonly purpose?: GenerateOptions['purpose']
+  /** The thread whose model route the call borrows; providers keyed per Session reject a call without it. */
+  readonly sessionId?: SessionId | undefined
 }
 
 /** One-shot model calls through DSH's model runtime, with the user's configured accounts and routing. */
@@ -86,6 +89,7 @@ export class Llm extends Context.Service<
             messages: [createUserMessage({ content: [{ type: 'text', text: request.input }], source: { kind: 'user' } })],
             maxTokens: request.maxTokens ?? 512,
             ...(request.purpose !== undefined && { purpose: request.purpose }),
+            ...(request.sessionId !== undefined && { sessionId: request.sessionId }),
             ...(request.reasoningEffort !== undefined && { reasoningEffort: ReasoningEffortId(request.reasoningEffort) }),
           }),
           chunk => Effect.sync(() => assembler.push(chunk)),

@@ -1,4 +1,5 @@
-import type { ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ToolOutputDefinition, ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { Effect, type Schema, type Scope } from 'effect'
 import { detachedContext } from './detached.js'
 import { HostContext, type HostServiceMissing, hostService } from './host-context.js'
@@ -22,9 +23,17 @@ export interface EffectTool<Input extends InputSchema, Output, out R> {
   readonly input: Input
   readonly output: Schema.Codec<Output, unknown> | undefined
   readonly readOnly: boolean
-  render?(output: Output): string
+  readonly timeoutMs: number | undefined
+  render?(output: Output): ToolRendering
+  presentation?(output: Output): ToolPresentation
   execute(input: Input['Type'], call: ToolCall): Effect.Effect<Output, unknown, R>
 }
+
+/** What the model reads for a successful output: plain text, or content blocks such as an image. */
+export type ToolRendering = string | ReadonlyArray<ContentBlock>
+
+/** The replayable presentation metadata a UI renders a settled call from (`result.meta`). */
+export type ToolPresentation = ReturnType<NonNullable<ToolOutputDefinition['presentationMeta']>>
 
 /** Any Effect tool requiring `R`, whatever its schemas. */
 export type AnyEffectTool<R> = EffectTool<InputSchema, unknown, R>
@@ -37,8 +46,12 @@ export const make = <Input extends InputSchema, Output, R>(options: {
   readonly output?: Schema.Codec<Output, unknown>
   /** A read-only tool may run beside sibling tool calls. */
   readonly readOnly?: boolean
-  /** Model-facing text for a successful output; defaults to pretty-printed JSON. */
-  readonly render?: (output: Output) => string
+  /** Model-facing content for a successful output; defaults to pretty-printed JSON. */
+  readonly render?: (output: Output) => ToolRendering
+  /** Presentation metadata a UI renders the settled call from; never sent to the model. */
+  readonly presentation?: (output: Output) => ToolPresentation
+  /** Cooperative deadline the Host's tool-call timeout policy enforces by aborting the call. */
+  readonly timeoutMs?: number
   readonly execute: (input: Input['Type'], call: ToolCall) => Effect.Effect<Output, unknown, R>
 }): EffectTool<Input, Output, R> => ({
   name: options.name,
@@ -46,7 +59,9 @@ export const make = <Input extends InputSchema, Output, R>(options: {
   input: options.input,
   output: options.output,
   readOnly: options.readOnly === true,
+  timeoutMs: options.timeoutMs,
   ...(options.render !== undefined && { render: options.render }),
+  ...(options.presentation !== undefined && { presentation: options.presentation }),
   execute: options.execute,
 })
 
