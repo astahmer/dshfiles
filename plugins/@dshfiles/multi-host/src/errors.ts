@@ -526,11 +526,18 @@ export type RuntimeIdentityCheckError = IdentityUnavailable | IdentityInvalid | 
 
 const wireCodeAt = SchemaAST.resolveAt<string>('dshxWireCode')
 
+/** Any failure of this plugin: a tagged error class. */
+export interface TaggedFailure {
+  readonly _tag: string
+}
+
 /**
  * The code a value-returning handler reports for a failure: the runtime's own code for a remote failure, otherwise
  * the class's wire code.
  */
-export const failureCodeOf = (error: { readonly _tag: string }): string => {
+export const failureCodeOf = (error: TaggedFailure): string => {
   if (error instanceof RemoteRequestFailed || error instanceof StreamFailed || error instanceof RemoteApiFailed) return error.code
-  return (Schema.isSchema(error.constructor) ? wireCodeAt(error.constructor.ast) : undefined) ?? error._tag
+  const code = Schema.isSchema(error.constructor) ? wireCodeAt(error.constructor.ast) : undefined
+  if (code !== undefined) return code
+  return error._tag
 }

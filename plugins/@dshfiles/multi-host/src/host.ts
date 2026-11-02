@@ -25,8 +25,9 @@ import {
   type SessionSummary,
 } from './api.js'
 import { SshConnector } from './connectors/ssh.js'
-import { ConnectorKindMismatch, HostNotFound, OriginPortExhausted, RuntimeNotFound } from './errors.js'
-import { GatewayUnavailableError, type Gateway, HostDirectoryStore, LegacyRuntime, RemoteThreadStore } from './legacy-runtime-promise.js'
+import { ConnectorKindMismatch, HostNotFound, IdentityMismatch, OriginPortExhausted, RuntimeNotFound } from './errors.js'
+import { RuntimePool } from './runtime-pool.js'
+import { GatewayUnavailableError, HostDirectoryStore, LegacyRuntime, RemoteThreadStore } from './legacy-runtime-promise.js'
 import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity as RuntimeIdentityService } from './identity.js'
 import { LaunchFile } from './launch-file.js'
@@ -36,8 +37,7 @@ import { NodeServices } from '@effect/platform-node'
 import { Ssh, shellQuote } from './ssh.js'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { ConfigProvider } from 'effect'
-import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
+import { ConfigProvider, Stream } from 'effect'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { registerRemoteReferenceMiddleware } from './remote-reference-middleware.js'
@@ -46,15 +46,7 @@ import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
 import { ResourceSnapshotModel } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
 import { NativeRpcModel } from './native-rpc.js'
-import {
-  hostConnectorSchema,
-  runtimeIdentitySchema,
-  runtimeLocatorSchema,
-  runtimeOriginPort,
-  type HostRecord,
-  type RuntimeIdentity,
-  type RuntimeRecord,
-} from './records.js'
+import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeIdentity, type RuntimeRecord } from './records.js'
 import { createChildDirectory, listDirectory } from './directory-listing.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
@@ -71,7 +63,6 @@ import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
 
 const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
-const requiredCapabilities: readonly RuntimeIdentity['capabilities'][number][] = ['workspace', 'session', 'agent']
 const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
 const sessionRowSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
@@ -177,18 +168,9 @@ const transportFailures = new Set([
   'gateway-request-failed',
 ])
 
-class IdentityMismatchError extends Error {
-  readonly code = 'identity-mismatch'
-
-  constructor(message: string) {
-    super(message)
-    this.name = 'IdentityMismatchError'
-  }
-}
-
 interface ViewLease {
   readonly runtimeId: string
-  readonly pooled: PooledGateway
+  readonly pooled: Awaited<ReturnType<typeof LegacyRuntime.pool.acquire>>
   readonly timer: ReturnType<typeof setTimeout>
 }
 
@@ -210,7 +192,6 @@ declare module '@deepseek-ai/dsh-llm' {
 const viewLeases = new Map<string, ViewLease>()
 const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
-const connectionErrors = new Map<string, { readonly code: string; readonly message: string; readonly at: string }>()
 const runtimeStatusCache = createRuntimeStatusCache<RuntimeStatus>({ successTtlMs: 30_000, failureTtlMs: 45_000 })
 const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
   successTtlMs: 30_000,
@@ -219,18 +200,6 @@ const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
   spanName: 'multi-host resource snapshot refresh',
 })
 const resourceProbeLimiter = ResourceSnapshotModel.createResourceProbeLimiter(4)
-
-const connectRuntime = ({
-  host,
-  runtime,
-  signal,
-  originPort,
-}: {
-  readonly host: HostRecord
-  readonly runtime: RuntimeRecord
-  readonly signal?: AbortSignal | undefined
-  readonly originPort?: number
-}): Promise<Gateway> => LegacyRuntime.connectRuntime({ host, runtime, originPort }, signal)
 
 const allocateRuntimeOriginPort = async (runtimeId: string, occupiedPorts: readonly number[]): Promise<number> => {
   const unavailable = new Set(occupiedPorts)
@@ -248,88 +217,10 @@ const allocateRuntimeOriginPort = async (runtimeId: string, occupiedPorts: reado
   throw new OriginPortExhausted()
 }
 
-const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
-  let raw: unknown
-  try {
-    raw = await gateway.api('identity')
-  } catch {
-    throw new GatewayUnavailableError(
-      'identity-unavailable',
-      'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.',
-    )
-  }
-  const parsed = MultiHostSchema.safeDecode(runtimeIdentitySchema, raw)
-  if (!parsed.success) throw new GatewayUnavailableError('identity-invalid', 'The connected runtime returned an identity outside the supported contract.')
-  if (parsed.data.protocolVersion !== 1 || parsed.data.dshVersion === 'unknown' || !parsed.data.dshVersion.startsWith('0.2.')) {
-    throw new GatewayUnavailableError('runtime-incompatible', 'The connected runtime does not report a supported DSH 0.2 protocol version.')
-  }
-  if (!requiredCapabilities.every(capability => parsed.data.capabilities.includes(capability))) {
-    throw new GatewayUnavailableError(
-      'runtime-capability-missing',
-      'The connected runtime does not provide the required workspace, session, and agent capabilities.',
-    )
-  }
-  return parsed.data
-}
-
-const verifyPinnedIdentity = async (gateway: Gateway, runtime: RuntimeRecord): Promise<RuntimeIdentity> => {
-  const current = await readIdentity(gateway)
-  const pinned = runtime.identity
-  if (pinned === null) throw new IdentityMismatchError('This runtime has no pinned identity. Re-register it before use.')
-  if (
-    current.runtimeId !== runtime.id ||
-    current.runtimeId !== pinned.runtimeId ||
-    current.profile !== pinned.profile ||
-    current.homeLeaf !== pinned.homeLeaf ||
-    current.protocolVersion !== pinned.protocolVersion
-  ) {
-    throw new IdentityMismatchError('The connected runtime identity changed. Verify the host and runtime before reconnecting.')
-  }
-  if (runtime.locator.kind === 'ssh' && current.homeLeaf !== basename(runtime.locator.remoteHome)) {
-    throw new IdentityMismatchError('The connected runtime home does not match its registered SSH home.')
-  }
-  return current
-}
-
 const safeFailure = (error: unknown): { readonly code: string; readonly message: string } => LegacyRuntime.failureOf(error)
 
-const failureCode = (error: unknown): string => safeFailure(error).code
-
-const pool = createGatewayPool({
-  isTransportFailure: error => transportFailures.has(failureCode(error)),
-  connect: async runtimeId => {
-    const runtime = await HostDirectoryStore.findRuntime(runtimeId)
-    if (runtime === undefined) throw new RuntimeNotFound({ runtimeId })
-    const host = await HostDirectoryStore.findHost(runtime.hostId)
-    if (host === undefined) throw new HostNotFound({ hostId: runtime.hostId })
-    // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
-    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort !== undefined && { originPort: runtime.originPort }) })
-    try {
-      const identity = await verifyPinnedIdentity(gateway, runtime)
-      await HostDirectoryStore.upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
-      connectionErrors.delete(runtimeId)
-      const cachedStatus = runtimeStatusCache.read(runtimeId)
-      if (cachedStatus.status?.ok === false && !cachedStatus.refreshing) runtimeStatusCache.invalidate(runtimeId)
-      return gateway
-    } catch (error) {
-      await gateway.dispose()
-      throw error
-    }
-  },
-})
-
-const withRuntime = async <Result>(
-  runtimeId: string,
-  request: (gateway: Gateway) => Promise<Result>,
-  options: { readonly mutation: boolean; readonly broken?: (result: Result) => boolean },
-): Promise<Result> => {
-  try {
-    return await pool.run(runtimeId, request, options)
-  } catch (error) {
-    connectionErrors.set(runtimeId, { ...safeFailure(error), at: new Date().toISOString() })
-    throw error
-  }
-}
+const withRuntime = LegacyRuntime.pool.withRuntime
+const pool = LegacyRuntime.pool
 
 /** A native RPC result that says the connection, not the request, failed. */
 const brokenRpc = (result: { readonly ok: boolean; readonly code?: string }): boolean =>
@@ -343,7 +234,7 @@ const runtimeSummary = (record: RuntimeRecord) => ({
   ...(record.locator.kind === 'ssh' && { remoteHome: record.locator.remoteHome }),
   ...(record.lastSeenAt !== undefined && { lastSeenAt: record.lastSeenAt }),
   connected: pool.status(record.id) !== undefined,
-  ...(connectionErrors.has(record.id) && { lastError: connectionErrors.get(record.id) }),
+  ...(pool.lastError(record.id) !== undefined && { lastError: pool.lastError(record.id) }),
 })
 
 const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => ({
@@ -426,15 +317,15 @@ const qualifyRuntime = async ({
     identity: null,
     createdAt: new Date().toISOString(),
   }
-  const gateway = await timed('runtime', () => connectRuntime({ host, runtime: provisional, signal }))
+  const connection = await timed('runtime', () => LegacyRuntime.connectRuntime({ host, runtime: provisional }, signal))
   try {
-    const identity = await timed('identity', () => readIdentity(gateway))
+    const identity = await timed('identity', () => LegacyRuntime.readIdentity(connection.gateway))
     if (locator.kind === 'ssh' && identity.homeLeaf !== basename(locator.remoteHome)) {
-      throw new IdentityMismatchError('The connected runtime home does not match the SSH home you selected.')
+      throw new IdentityMismatch({ reason: 'selected-home' })
     }
     return { identity, steps }
   } finally {
-    await gateway.dispose()
+    await connection.close()
   }
 }
 
@@ -443,7 +334,7 @@ const register = async ({ host, locator, name, signal }: Parameters<typeof quali
   const directory = await HostDirectoryStore.readDirectory()
   const existing = directory.runtimes.find(runtime => runtime.id === identity.runtimeId)
   if (existing !== undefined && existing.hostId !== host.id) {
-    throw new IdentityMismatchError('This runtime identity is already registered under a different host.')
+    throw new IdentityMismatch({ reason: 'other-host' })
   }
   const originPort =
     existing?.originPort ??
@@ -843,9 +734,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
           }
         }
       })
-      .catch(error => {
-        connectionErrors.set(runtime.id, { ...safeFailure(error), at: new Date().toISOString() })
-      })
+      .catch(() => undefined)
 
     if (cached.status !== undefined) return { ...cached.status, stale: true, refreshing: true }
     return {
@@ -872,7 +761,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     runtimeStatusCache.invalidate(input.runtimeId)
     runtimeResourceCache.invalidate(input.runtimeId)
     await pool.close(input.runtimeId)
-    connectionErrors.delete(input.runtimeId)
+    await pool.clearError(input.runtimeId)
     try {
       await withRuntime(input.runtimeId, async () => undefined, { mutation: false })
       return { ok: true as const }
@@ -1476,27 +1365,49 @@ const effectHandlers = {
   runtimeRemove: effectHandler('runtimeRemove', multiHostPromiseHandlers.runtimeRemove),
 } satisfies MultiHostEffectHandlers
 
-const effectPlugin = DshxEffect.plugin({
-  layer: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) =>
-    Layer.mergeAll(
-      Connectors.layer.pipe(
-        Layer.provide(FetchHttpClient.layer),
-        Layer.provideMerge(Ssh.layer),
-        Layer.provide(DshChildProcessSpawner.layer),
-        Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/multi-host' })),
-      ),
-      Layer.mergeAll(HostDirectory.layer, RemoteThreads.layer, RuntimeIdentityService.layer({ configuredProfile: config?.profile }), LaunchFile.layer).pipe(
-        Layer.provideMerge(MultiHostPaths.layer),
-      ),
-    ).pipe(
-      Layer.provide(NodeServices.layer),
-      // The environment as it is when the plugin activates, not Effect's process-start snapshot.
-      Layer.provide(ConfigProvider.layer(Effect.sync(() => ConfigProvider.fromEnvRecord(process.env)))),
+const pluginLayer = (input: { readonly ctx: Context; readonly configuredProfile: string | undefined }) => {
+  const data = Layer.mergeAll(
+    HostDirectory.layer,
+    RemoteThreads.layer,
+    RuntimeIdentityService.layer({ configuredProfile: input.configuredProfile }),
+    LaunchFile.layer,
+  ).pipe(Layer.provideMerge(MultiHostPaths.layer))
+  const network = Connectors.layer.pipe(
+    Layer.provide(FetchHttpClient.layer),
+    Layer.provideMerge(Ssh.layer),
+    Layer.provide(DshChildProcessSpawner.layer),
+    Layer.provide(HostContext.layer({ ctx: input.ctx, packageId: '@dshfiles/multi-host' })),
+  )
+  return RuntimePool.layer.pipe(
+    Layer.provideMerge(network),
+    Layer.provideMerge(data),
+    Layer.provideMerge(NodeServices.layer),
+    // The environment as it is when the plugin activates, not Effect's process-start snapshot.
+    Layer.provide(ConfigProvider.layer(Effect.sync(() => ConfigProvider.fromEnvRecord(process.env)))),
+  )
+}
+
+/** A fresh connection makes a cached failed status stale. */
+const refreshStatusOnConnect = RuntimePool.use(pool =>
+  Effect.forkScoped(
+    Stream.runForEach(pool.connected, runtimeId =>
+      Effect.sync(() => {
+        const cachedStatus = runtimeStatusCache.read(runtimeId)
+        if (cachedStatus.status?.ok === false && !cachedStatus.refreshing) runtimeStatusCache.invalidate(runtimeId)
+      }),
     ),
+  ),
+)
+
+const effectPlugin = DshxEffect.plugin({
+  layer: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) => pluginLayer({ ctx, configuredProfile: config?.profile }),
   setup: (ctx: Context) =>
     Effect.andThen(
       LegacyRuntime.install,
-      Effect.sync(() => setupHost(ctx)),
+      Effect.andThen(
+        refreshStatusOnConnect,
+        Effect.sync(() => setupHost(ctx)),
+      ),
     ),
 })
 const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
@@ -1577,6 +1488,5 @@ function setupHost(ctx: Context): void {
   })
   ctx.effect(() => async () => {
     for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
-    await pool.close()
   })
 }

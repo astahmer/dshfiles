@@ -1,5 +1,5 @@
 import type { JsonValue } from '@dshfiles/dshx/platform'
-import { Cause, type Context, Effect, Exit, Schema, SchemaAST, Scope, Stream } from 'effect'
+import { Cause, type Context, Effect, Exit, type Path, Schema, SchemaAST, Scope, Stream } from 'effect'
 import { Connectors } from './connectors/connectors.js'
 import type { Gateway as EffectGateway } from './connectors/gateway.js'
 import { HostDirectory } from './host-directory.js'
@@ -9,12 +9,15 @@ import type { MultiHostPaths } from './paths.js'
 import type { HostRecord, RuntimeRecord } from './records.js'
 import { RemoteThreads, type RemoteThread } from './remote-threads.js'
 import type { Ssh } from './ssh.js'
+import { GatewayUnreachable } from './errors.js'
+import { RemoteIdentity } from './remote-identity.js'
+import { RuntimePool } from './runtime-pool.js'
 
 /**
  * The Effect services the remaining Promise handlers reach while the Host moves onto `DshxPlugin.make`; installed for
  * the plugin activation and removed with it.
  */
-export type LegacyServices = Ssh | MultiHostPaths | HostDirectory | RemoteThreads | RuntimeIdentity | LaunchFile | Connectors
+export type LegacyServices = Ssh | MultiHostPaths | HostDirectory | RemoteThreads | RuntimeIdentity | LaunchFile | Connectors | RuntimePool | Path.Path
 
 export class GatewayUnavailableError extends Error {
   constructor(
@@ -170,13 +173,73 @@ const toPromiseGateway = (input: { readonly gateway: EffectGateway; readonly clo
   }
 }
 
-/** A gateway to a recorded runtime with the old Promise shape; `dispose` closes its connection Scope. */
-const connectRuntime = async (input: Parameters<Connectors['Service']['connect']>[0], signal?: AbortSignal): Promise<Gateway> => {
+/** An unpooled gateway to a runtime that is not registered yet; `close` ends its connection Scope. */
+const connectRuntime = async (input: Parameters<Connectors['Service']['connect']>[0], signal?: AbortSignal) => {
   const opened = await open(
     Connectors.use(connectors => connectors.connect(input)),
     signal,
   )
-  return toPromiseGateway({ gateway: opened.value, close: opened.close })
+  return { gateway: opened.value, close: opened.close }
+}
+
+const readIdentity = (gateway: EffectGateway) => run(RemoteIdentity.read(gateway))
+
+const servicesSync = <A>(effect: Effect.Effect<A, never, LegacyServices>): A => Effect.runSyncWith(servicesOrThrow())(effect)
+
+const pooledAdapter = (gateway: EffectGateway) => toPromiseGateway({ gateway, close: async () => undefined })
+
+const rethrown = (error: unknown): unknown => error
+
+/**
+ * The pooled request of a Promise handler. `broken` lets a request that reports transport failures as values still
+ * retire the connection (and retry a read once), returning its last value instead of failing.
+ */
+const withRuntime = async <Result>(
+  runtimeId: string,
+  request: (gateway: Gateway) => Promise<Result>,
+  options: { readonly mutation: boolean; readonly broken?: (result: Result) => boolean },
+): Promise<Result> => {
+  const brokenMarker = new GatewayUnreachable()
+  const last: { result?: { readonly value: Result } } = {}
+  return run(
+    RuntimePool.use(pool =>
+      pool.use(
+        runtimeId,
+        gateway =>
+          Effect.tryPromise({ try: () => request(pooledAdapter(gateway)), catch: rethrown }).pipe(
+            Effect.flatMap(result => {
+              if (options.broken?.(result) !== true) return Effect.succeed(result)
+              last.result = { value: result }
+              return Effect.fail(brokenMarker)
+            }),
+          ),
+        { mutation: options.mutation },
+      ),
+    ).pipe(
+      Effect.catchIf(
+        error => error === brokenMarker,
+        () => (last.result === undefined ? Effect.fail(brokenMarker) : Effect.succeed(last.result.value)),
+      ),
+    ),
+  )
+}
+
+/** A held pool connection with the old lease shape: `release` ends the hold. */
+const acquire = async (runtimeId: string) => {
+  const opened = await open(RuntimePool.use(pool => pool.acquire(runtimeId)))
+  return { gateway: pooledAdapter(opened.value.gateway), generation: opened.value.generation, release: () => void opened.close() }
+}
+
+const pool = {
+  withRuntime,
+  acquire,
+  status: (runtimeId: string) => {
+    const generation = servicesSync(RuntimePool.use(service => service.generation(runtimeId)))
+    return generation === undefined ? undefined : { connected: true, generation }
+  },
+  lastError: (runtimeId: string) => servicesSync(RuntimePool.use(service => service.lastError(runtimeId))),
+  clearError: (runtimeId: string) => run(RuntimePool.use(service => service.clearError(runtimeId))),
+  close: (runtimeId: string) => run(RuntimePool.use(service => service.invalidate(runtimeId))),
 }
 
 export class LegacyRuntime {
@@ -186,6 +249,8 @@ export class LegacyRuntime {
   static readonly failureOf = failureOf
   static readonly toPromiseGateway = toPromiseGateway
   static readonly connectRuntime = connectRuntime
+  static readonly readIdentity = readIdentity
+  static readonly pool = pool
   static readonly readOrCreateRuntimeIdentity = readOrCreateRuntimeIdentity
   static readonly publishLaunchFile = publishLaunchFile
 }

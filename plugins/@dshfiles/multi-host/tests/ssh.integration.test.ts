@@ -4,7 +4,6 @@ import { FetchHttpClient, HttpClient } from 'effect/http'
 import { LegacyRuntime } from '../src/legacy-runtime-promise.js'
 import { afterAll, describe, expect, test } from 'vitest'
 import { SshConnector } from '../src/connectors/ssh.js'
-import { createGatewayPool } from '../src/gateway-pool.js'
 import type { Ssh } from '../src/ssh.js'
 import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
 
@@ -69,26 +68,15 @@ describe.skipIf(sshTarget === undefined || remoteHome === undefined)('SSH connec
     expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: '/nonexistent/dsh-home' }))).toBe('runtime-not-running')
   })
 
-  test('one pooled tunnel serves consecutive calls and is replaced after it closes', async () => {
-    const pool = createGatewayPool({ isTransportFailure: () => false, connect: () => connect({ sshTarget: target, remoteHome: home }) })
+  test('one tunnel serves consecutive calls', async () => {
+    const gateway = await connect({ sshTarget: target, remoteHome: home })
     try {
-      const first = await pool.run('live', gateway => gateway.api('identity'), { mutation: false })
-      expect(first).toMatchObject({ protocolVersion: 1 })
-      const generation = pool.status('live')?.generation
+      expect(await gateway.api('identity')).toMatchObject({ protocolVersion: 1 })
       const startedAt = Date.now()
-      await pool.run('live', gateway => gateway.run('session', 'list', { _request: {} }), { mutation: false })
+      await gateway.run('session', 'list', { _request: {} })
       expect(Date.now() - startedAt).toBeLessThan(300)
-      expect(pool.status('live')?.generation).toBe(generation)
-
-      const held = await pool.acquire('live')
-      await held.gateway.dispose()
-      await held.gateway.closed
-      held.release()
-      expect(pool.status('live')).toBeUndefined()
-      await pool.run('live', gateway => gateway.api('identity'), { mutation: false })
-      expect(pool.status('live')?.generation).toBeGreaterThan(generation ?? 0)
     } finally {
-      await pool.close()
+      await gateway.dispose()
     }
   }, 60_000)
 })
