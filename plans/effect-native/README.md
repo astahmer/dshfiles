@@ -261,6 +261,17 @@ edge, and restore exact-message assertions.
 | 6.4 | Perf (`live-performance-audit`): Host boot, event-loop lag, Host bundle size, tracer bench; before/after table in `docs/performance.md`; budget ≤ +10% boot |
 | 6.5 | `complete-plan`: Standards → `tooling/dshx/docs/sdk/effect.md`; delete this plan and `effect-refactor`                                                      |
 
+## Foundation follow-ups (from lane reports)
+
+| #   | Gap                                                                                                                                                                                                                              | Owner        |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| F1  | `HostEvents` has no waterfall/middleware listener (`llm/stream` must `return next()`) and no answering listener (`request-messages/status` returns a value); session-warming and request-messages call `ctx.on` in an edge layer | dshx         |
+| F2  | `DshxPlugin.callback` takes no `AbortSignal`; context-compaction's model lookup cannot be cancelled                                                                                                                              | dshx         |
+| F3  | DSH-backed `ChildProcessSpawner` has no executable resolution; secret-catalog spawns its CLI by bare name                                                                                                                        | dshx         |
+| F4  | Audit counts `setTimeout(` inside template-literal browser scripts (shared-streams `shim.ts`) and every causeless TaggedError, even ones that wrap nothing                                                                       | audit script |
+| F5  | Swap remaining layer `Effect.forkScoped` loops to `DshxPlugin.worker` as each lane lands (A3: worktree-memory, agent-telemetry; exemplar: background-jobs, usage)                                                                | integrator   |
+| F6  | ai-accounts provider adapter drops `Retry-After`, so a rate limit with no other account always waits the full 60 s policy delay                                                                                                  | wave F       |
+
 ## What this does not do
 
 - Native forks stay Promise inside `src/native/**`; only owned delta files change.
