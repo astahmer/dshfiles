@@ -3,7 +3,7 @@ import { Schema } from 'effect'
 /** Another credential or profile operation holds one of these accounts; the new one is refused, not queued. */
 export class AccountOperationBusy extends Schema.TaggedError<AccountOperationBusy>()(
   'AccountOperationBusy',
-  { instanceIds: Schema.Array(Schema.String) },
+  { instanceIds: Schema.Array(Schema.String), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'account-busy' },
 ) {
   override get message(): string {
@@ -14,7 +14,7 @@ export class AccountOperationBusy extends Schema.TaggedError<AccountOperationBus
 /** A connection or sign-in still owns the account, so it cannot be signed out yet. */
 export class AccountSignInActive extends Schema.TaggedError<AccountSignInActive>()(
   'AccountSignInActive',
-  { instanceId: Schema.String },
+  { instanceId: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'account-sign-in-active' },
 ) {
   override get message(): string {
@@ -24,7 +24,7 @@ export class AccountSignInActive extends Schema.TaggedError<AccountSignInActive>
 
 export class AccountNotFound extends Schema.TaggedError<AccountNotFound>()(
   'AccountNotFound',
-  { instanceId: Schema.String },
+  { instanceId: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'account-not-found' },
 ) {
   override get message(): string {
@@ -35,7 +35,11 @@ export class AccountNotFound extends Schema.TaggedError<AccountNotFound>()(
 /** The account exists but cannot do what was asked: keyed import on a Codex account, a thread switch to Cursor. */
 export class AccountUnsuitable extends Schema.TaggedError<AccountUnsuitable>()(
   'AccountUnsuitable',
-  { instanceId: Schema.String, reason: Schema.Literals(['not-keyed', 'invalid-key-env', 'cannot-run-models', 'no-route']) },
+  {
+    instanceId: Schema.String,
+    reason: Schema.Literals(['not-keyed', 'invalid-key-env', 'cannot-run-models', 'no-route']),
+    cause: Schema.optional(Schema.Defect()),
+  },
   { dshxWireCode: 'account-unsuitable' },
 ) {
   override get message(): string {
@@ -48,7 +52,7 @@ export class AccountUnsuitable extends Schema.TaggedError<AccountUnsuitable>()(
 
 export class LoginIntentInactive extends Schema.TaggedError<LoginIntentInactive>()(
   'LoginIntentInactive',
-  { instanceId: Schema.String },
+  { instanceId: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'login-intent-inactive' },
 ) {
   override get message(): string {
@@ -77,6 +81,7 @@ export class SessionScopeRefused extends Schema.TaggedError<SessionScopeRefused>
       'serving-other-session',
       'serving-session',
     ]),
+    cause: Schema.optional(Schema.Defect()),
   },
   { dshxWireCode: 'session-scope-refused' },
 ) {
@@ -86,13 +91,21 @@ export class SessionScopeRefused extends Schema.TaggedError<SessionScopeRefused>
 }
 
 /** Raw credential values are typed only in the browser. */
-export class BrowserOnlyCredential extends Schema.TaggedError<BrowserOnlyCredential>()('BrowserOnlyCredential', {}, { dshxWireCode: 'browser-only' }) {
+export class BrowserOnlyCredential extends Schema.TaggedError<BrowserOnlyCredential>()(
+  'BrowserOnlyCredential',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'browser-only' },
+) {
   override get message(): string {
     return 'Raw credential entry is browser-only. Use Secret Catalog import instead.'
   }
 }
 
-export class SetupMethodRetired extends Schema.TaggedError<SetupMethodRetired>()('SetupMethodRetired', {}, { dshxWireCode: 'setup-method-retired' }) {
+export class SetupMethodRetired extends Schema.TaggedError<SetupMethodRetired>()(
+  'SetupMethodRetired',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'setup-method-retired' },
+) {
   override get message(): string {
     return 'This account setup method is retired. Use prepareAccountConnection on an updated client; no account was saved.'
   }
@@ -124,7 +137,7 @@ const serviceMessages = {
 /** A Host service the call needs is not loaded. */
 export class HostServiceUnavailable extends Schema.TaggedError<HostServiceUnavailable>()(
   'HostServiceUnavailable',
-  { service: Schema.Literals(['session-controller', 'model-fallback-storage']) },
+  { service: Schema.Literals(['session-controller', 'model-fallback-storage']), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'service-unavailable' },
 ) {
   override get message(): string {
@@ -135,7 +148,7 @@ export class HostServiceUnavailable extends Schema.TaggedError<HostServiceUnavai
 /** The plugin that owns an API this call depends on is not loaded. */
 export class OwnerApiMissing extends Schema.TaggedError<OwnerApiMissing>()(
   'OwnerApiMissing',
-  { owner: Schema.String, apiId: Schema.String, method: Schema.String },
+  { owner: Schema.String, apiId: Schema.String, method: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'owner-missing' },
 ) {
   override get message(): string {
@@ -146,10 +159,26 @@ export class OwnerApiMissing extends Schema.TaggedError<OwnerApiMissing>()(
 /** The previewed target went stale before the switch was confirmed. */
 export class ThreadSelectionChanged extends Schema.TaggedError<ThreadSelectionChanged>()(
   'ThreadSelectionChanged',
-  { sessionId: Schema.String },
+  { sessionId: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'selection-changed' },
 ) {
   override get message(): string {
     return 'The thread selection or account catalog changed. Review the new target before switching.'
   }
 }
+
+/** Every failure the account APIs expose to their callers. */
+export const AccountsWireError = Schema.Union([
+  AccountOperationBusy,
+  AccountSignInActive,
+  AccountNotFound,
+  AccountUnsuitable,
+  LoginIntentInactive,
+  SessionScopeRefused,
+  BrowserOnlyCredential,
+  SetupMethodRetired,
+  SecretCatalogUnavailable,
+  HostServiceUnavailable,
+  OwnerApiMissing,
+  ThreadSelectionChanged,
+])

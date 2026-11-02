@@ -1,6 +1,8 @@
 import type { AnyApiMethodDefinition, ApiContract, ApiHandler, ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import { HostContext, type Api } from '@dshfiles/dshx/effect'
-import { Effect } from 'effect'
+import { PluginApiError } from '@dshfiles/dshx/api'
+import { Effect, Schema } from 'effect'
+import { AccountsWireError } from './errors.js'
 import { AccountLocks } from './account-locks.js'
 
 type LegacyContext<I> = Omit<ApiHandlerContext<I>, 'signal'>
@@ -13,11 +15,25 @@ const legacyContext = Effect.fnUntraced(function* <I>(input: I, call: Api.ApiCal
   return context
 })
 
-const runLegacy = <I, O>(handler: ApiHandler<I, O>, context: LegacyContext<I>) =>
-  Effect.tryPromise({
-    try: signal => Promise.resolve(handler({ ...context, signal })),
-    catch: error => error,
-  })
+/** A Promise handler threw something that is not a declared account failure; it stays internal to the Host. */
+class LegacyHandlerFailed extends Schema.TaggedError<LegacyHandlerFailed>()('LegacyHandlerFailed', {
+  method: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `${this.method} failed.`
+  }
+}
+
+const isWireError = Schema.is(AccountsWireError)
+
+const legacyFailure = (method: string) => (cause: unknown) =>
+  isWireError(cause) || cause instanceof PluginApiError ? cause : new LegacyHandlerFailed({ method, cause })
+
+const runLegacy = <I, O>(method: string, handler: ApiHandler<I, O>, context: LegacyContext<I>) =>
+  Effect.tryPromise({ try: signal => Promise.resolve(handler({ ...context, signal })), catch: legacyFailure(method) }).pipe(
+    Effect.catchTag('LegacyHandlerFailed', Effect.die),
+  )
 
 /**
  * Serves one not-yet-ported Promise handler from `Api.bind`, inside the plugin's services: the handler still reads
@@ -29,7 +45,7 @@ export const effectHandler = <Methods extends Record<string, AnyApiMethodDefinit
   handler: ApiHandler<ApiHostInput<Methods[Key]>, ApiHostOutput<Methods[Key]>>,
 ) =>
   Effect.fn(spanName(method))(function* (input: ApiHostInput<Methods[Key]>, call: Api.ApiCall) {
-    return yield* runLegacy(handler, yield* legacyContext(input, call))
+    return yield* runLegacy(method, handler, yield* legacyContext(input, call))
   })
 
 /** The same adapter for a handler that must own `accounts` for its whole run; a held account refuses it at once. */
@@ -42,6 +58,8 @@ export const lockedHandler = <Methods extends Record<string, AnyApiMethodDefinit
   Effect.fn(spanName(method))(function* (input: ApiHostInput<Methods[Key]>, call: Api.ApiCall) {
     const context = yield* legacyContext(input, call)
     const locks = yield* AccountLocks
-    const instanceIds = yield* Effect.try({ try: () => accounts(context), catch: error => error })
-    return yield* locks.withAccounts(instanceIds, runLegacy(handler, context))
+    const instanceIds = yield* Effect.try({ try: () => accounts(context), catch: legacyFailure(method) }).pipe(
+      Effect.catchTag('LegacyHandlerFailed', Effect.die),
+    )
+    return yield* locks.withAccounts(instanceIds, runLegacy(method, handler, context))
   })

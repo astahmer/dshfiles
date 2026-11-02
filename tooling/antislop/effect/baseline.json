@@ -1,10 +1,8 @@
 {
   "effect-migration(no-cause-dropping-catch)": {
-    "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1
   },
   "effect-migration(no-empty-plugin-layer)": {
-    "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
   "effect-migration(no-host-child-process)": {
@@ -44,12 +42,10 @@
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/account-runtime.ts": 2,
+    "plugins/@dshfiles/ai-accounts/src/account-runtime.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/settings.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 7,
@@ -62,7 +58,7 @@
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
-    "plugins/@dshfiles/ai-accounts/src/host.ts": 3,
+    "plugins/@dshfiles/ai-accounts/src/host.ts": 2,
     "plugins/@dshfiles/backlog/src/backlog-panel.tsx": 2,
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
