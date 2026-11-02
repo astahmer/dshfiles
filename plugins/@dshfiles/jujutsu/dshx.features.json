@@ -15,7 +15,7 @@
         "click button \"Compare\"",
         "expect region \"Revision comparison\"",
         "click combobox \"Comparison target\"",
-        "click option \"Another revision\u2026\"",
+        "click option \"Another revision…\"",
         "expect combobox \"Choose revision target\"",
         "click combobox \"Choose revision target\"",
         "expect combobox \"Search loaded revisions\""
@@ -424,12 +424,17 @@
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only presentation of workspaces already loaded by the graph." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation of workspaces already loaded by the graph."
+        }
+      ]
     },
     {
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here\u2026 to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here… to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
@@ -438,7 +443,7 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
-        "click menuitem \"New workspace here\u2026\"",
+        "click menuitem \"New workspace here…\"",
         "expect group \"Create workspace at this revision\""
       ],
       "surfaces": ["client", "host", "integration"],
@@ -486,11 +491,11 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Visible links resolve titles lazily and fall back to the bare reference if a title is unavailable.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Visible links resolve titles lazily and fall back to the bare reference if a title is unavailable.",
       "reach": [
         "seed chat-reference-thread",
         "hover link \"Jujutsu bookmark: Sample project (main)\"",
-        "expect text \"Revision graph \u00b7 main\"",
+        "expect text \"Revision graph · main\"",
         "expect text \"default@*\"",
         "expect text \"Commit ID:*\"",
         "expect text \"Change ID:*\"",
@@ -535,7 +540,7 @@
         {
           "id": "jj-repository",
           "boundary": "Local bookmark names read through the composer context query; the reference must appear in a rendered message.",
-          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer \u2026]]` so the code span is deterministic."
+          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer …]]` so the code span is deterministic."
         }
       ],
       "verification": [
@@ -592,7 +597,7 @@
         "expect option \"sample*\"",
         "press Enter",
         "click button \"Repository actions\"",
-        "click menuitem \"Clean up JJ workspaces\u2026\"",
+        "click menuitem \"Clean up JJ workspaces…\"",
         "expect text \"Clean up workspaces\"",
         "expect checkbox \"Select all eligible items\"",
         "expect text \"No workspace qualifies.\"",
@@ -640,7 +645,7 @@
     {
       "id": "workspace-removal",
       "title": "Remove a workspace from the graph",
-      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace\u2026: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
+      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace…: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Jujutsu: Revision graph\"",
@@ -754,11 +759,11 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "click button \"Open this repository in a new tab\"",
-        "expect tab \"Jujutsu \u00b7 sample*\"",
+        "expect tab \"Jujutsu · sample*\"",
         "expect button \"Locate Current\"",
         "click button \"Jujutsu: Source Control\"",
         "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu \u00b7 sample*\"",
+        "click tab \"Jujutsu · sample*\"",
         "expect button \"Locate Current\""
       ],
       "surfaces": ["client", "storage", "integration"],
@@ -815,12 +820,5 @@
       ]
     }
   ],
-  "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/host.ts",
-      "tracedBy": "jj <subcommand>",
-      "reason": "Every jj spawn here goes through runAt, which wraps it in withJjSpan from src/jj-span.ts."
-    }
-  ]
+  "kind": "bundle"
 }

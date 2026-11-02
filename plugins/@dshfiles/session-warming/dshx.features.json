@@ -86,13 +86,13 @@
           "kind": "unit-test",
           "id": "session-warming.model-change",
           "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
-          "testName": "drops a thread’s timer when its model changes or it is forgotten"
+          "testName": "drops a thread’s timer when its model changes, its next turn starts or it is forgotten"
         },
         {
           "kind": "unit-test",
           "id": "session-warming.request",
           "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
-          "testName": "re-sends the request for one output token and reports the cache reads in a span"
+          "testName": "reports the cache reads of a warm-up in its span"
         }
       ],
       "telemetry": [
@@ -100,7 +100,7 @@
           "kind": "custom",
           "span": "session-warming warm",
           "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
-          "testName": "re-sends the request for one output token and reports the cache reads in a span"
+          "testName": "reports the cache reads of a warm-up in its span"
         }
       ]
     }
