@@ -1,4 +1,7 @@
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 /**
  * Editing a queued message in the main composer.
@@ -13,42 +16,38 @@ import { z } from 'zod'
  * reload still offers Cancel.
  */
 
-const imageAttachmentSchema = z.object({
-  attachmentId: z.string().min(1).max(256),
-  mediaType: z.string().min(1).max(128),
-  name: z.string().max(512).optional(),
+const imageAttachmentSchema = Schema.Struct({
+  attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  mediaType: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(512))),
 })
 
-const fileAttachmentSchema = z.object({
-  attachmentId: z.string().min(1).max(256),
-  name: z.string().min(1).max(512),
-  bytes: z.number().int().min(0),
+const fileAttachmentSchema = Schema.Struct({
+  attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  bytes: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 })
 
-const queuedBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string() }),
-  z.object({ type: z.literal('image'), attachment: imageAttachmentSchema }),
-  z.object({ type: z.literal('file'), attachment: fileAttachmentSchema }),
+const queuedBlockSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('text'), text: Schema.String }),
+  Schema.Struct({ type: Schema.Literal('image'), attachment: imageAttachmentSchema }),
+  Schema.Struct({ type: Schema.Literal('file'), attachment: fileAttachmentSchema }),
 ])
 
-const looseBlockSchema = z.object({ type: z.string(), text: z.string().optional() })
+const looseBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optionalKey(Schema.String) })
 
-const queuedRowSchema = z.object({
-  id: z.string().min(1),
-  content: z.array(z.unknown()).catch([]),
-  source: z.object({ rpcId: z.string().optional() }).optional().catch(undefined),
-})
+const queuedRowSourceSchema = Schema.Struct({ rpcId: Schema.optionalKey(Schema.String) })
 
-const inboxSchema = z.object({ 'next-turn': z.array(z.unknown()).catch([]) })
+const inboxSchema = Schema.Struct({ 'next-turn': Schema.Unknown })
 
-export type QueuedBlock = z.infer<typeof queuedBlockSchema>
-export type QueuedImageAttachment = z.infer<typeof imageAttachmentSchema>
-export type QueuedFileAttachment = z.infer<typeof fileAttachmentSchema>
+export type QueuedBlock = typeof queuedBlockSchema.Type
+export type QueuedImageAttachment = typeof imageAttachmentSchema.Type
+export type QueuedFileAttachment = typeof fileAttachmentSchema.Type
 
 export interface QueuedRow {
   readonly id: string
   /** Every block, decoded loosely, for previews. */
-  readonly content: readonly z.infer<typeof looseBlockSchema>[]
+  readonly content: readonly (typeof looseBlockSchema.Type)[]
   /** The blocks the composer can hold; complete only when `editable`. */
   readonly blocks: readonly QueuedBlock[]
   readonly editable: boolean
@@ -56,49 +55,77 @@ export interface QueuedRow {
   readonly rpcId: string | undefined
 }
 
+const decodeBlocks = (value: JsonValue | undefined): readonly QueuedBlock[] => {
+  const items = Schema.decodeUnknownOption(Schema.Array(jsonValueSchema))(value)
+  if (Option.isNone(items)) return []
+  return items.value.flatMap(block =>
+    Option.match(Schema.decodeUnknownOption(queuedBlockSchema)(block), {
+      onNone: () => [],
+      onSome: decoded => [decoded],
+    }),
+  )
+}
+
+const decodeLooseBlocks = (value: JsonValue | undefined): readonly (typeof looseBlockSchema.Type)[] => {
+  const items = Schema.decodeUnknownOption(Schema.Array(jsonValueSchema))(value)
+  if (Option.isNone(items)) return []
+  return items.value.flatMap(block =>
+    Option.match(Schema.decodeUnknownOption(looseBlockSchema)(block), {
+      onNone: () => [],
+      onSome: decoded => [decoded],
+    }),
+  )
+}
+
+const decodeQueuedRow = (value: JsonValue): QueuedRow | undefined => {
+  const object = Schema.decodeUnknownOption(Schema.Record(Schema.String, jsonValueSchema))(value)
+  if (Option.isNone(object)) return undefined
+  const fields = object.value
+  const id = Schema.decodeUnknownOption(Schema.String.check(Schema.isMinLength(1)))(fields['id'])
+  if (Option.isNone(id)) return undefined
+  const rawContent = Schema.decodeUnknownOption(Schema.Array(jsonValueSchema))(fields['content'])
+  const blocks = decodeBlocks(fields['content'])
+  const source = Schema.decodeUnknownOption(queuedRowSourceSchema)(fields['source'])
+  return {
+    id: id.value,
+    content: decodeLooseBlocks(fields['content']),
+    blocks,
+    editable: blocks.length > 0 && blocks.length === (Option.isSome(rawContent) ? rawContent.value.length : 0),
+    rpcId: Option.isSome(source) ? source.value.rpcId : undefined,
+  }
+}
+
 /** Decode the Host `inbox` projection once, tolerating fields an older or newer Host shapes differently. */
 const decodeQueuedRows = (value: unknown): readonly QueuedRow[] => {
-  const inbox = inboxSchema.safeParse(value)
-  if (!inbox.success) return []
-  return inbox.data['next-turn'].flatMap(raw => {
-    const row = queuedRowSchema.safeParse(raw)
-    if (!row.success) return []
-    const decoded = row.data.content.map(block => queuedBlockSchema.safeParse(block))
-    const blocks = decoded.flatMap(result => (result.success ? [result.data] : []))
-    const content = row.data.content.flatMap(block => {
-      const loose = looseBlockSchema.safeParse(block)
-      return loose.success ? [loose.data] : []
-    })
-    return [
-      {
-        id: row.data.id,
-        content,
-        blocks,
-        editable: blocks.length > 0 && blocks.length === row.data.content.length,
-        rpcId: row.data.source?.rpcId,
-      },
-    ]
+  const inbox = Schema.decodeUnknownOption(inboxSchema)(value)
+  if (Option.isNone(inbox)) return []
+  const items = Schema.decodeUnknownOption(Schema.Array(jsonValueSchema))(inbox.value['next-turn'])
+  if (Option.isNone(items)) return []
+  return items.value.flatMap(raw => {
+    const row = decodeQueuedRow(raw)
+    return row === undefined ? [] : [row]
   })
 }
 
-const editRecordSchema = z.object({
-  itemId: z.string(),
-  blocks: z.array(queuedBlockSchema),
+const editRecordSchema = Schema.Struct({
+  itemId: Schema.String,
+  blocks: Schema.Array(queuedBlockSchema),
   /** Ids queued ahead of the message when editing began; its position is "after whichever of these remain". */
-  before: z.array(z.string()),
+  before: Schema.Array(Schema.String),
   /** The composer draft the edit displaced, put back when the edit ends. */
-  backupDraft: z.string(),
-  status: z.enum(['editing', 'submitting', 'restoring', 'failed']),
+  backupDraft: Schema.String,
+  status: Schema.Literals(['editing', 'submitting', 'restoring', 'failed']),
   /** Composer submissions seen while editing; the first to reach the queue is the edited message. */
-  submissions: z.array(z.string()),
-  restoreRequestId: z.string().optional(),
-  composerRestored: z.boolean(),
-  error: z.string().optional(),
+  submissions: Schema.Array(Schema.String),
+  restoreRequestId: Schema.optional(Schema.String),
+  composerRestored: Schema.Boolean,
+  error: Schema.optional(Schema.String),
 })
 
-export const queueEditRecordsSchema = z.record(z.string(), editRecordSchema)
+/** `createStoredValue` types its key schema as `ZodType`; the Effect schema is the source of truth across that boundary. */
+export const queueEditRecordsSchema = zodSchemaFromEffect(Schema.Record(Schema.String, editRecordSchema))
 
-export type QueueEditRecord = z.infer<typeof editRecordSchema>
+export type QueueEditRecord = typeof editRecordSchema.Type
 
 /** A prompt part: plain text, or an attachment the composer serialized (opaque to the editor). */
 export type PromptPart<Attachment> = { readonly type: 'text'; readonly text: string } | Attachment
