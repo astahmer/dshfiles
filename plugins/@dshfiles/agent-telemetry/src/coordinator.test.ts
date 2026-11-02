@@ -2,10 +2,7 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { recordSpans, startSpan, tracingEnabled, withSpan, type RecordedSpan, type SpanRecorder } from '@dshfiles/dshx/tracing'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { createCoordinator, type ObservedEvent, type ObservedLlmRequest, type ObservedSession, type ObservedToolResult } from './coordinator.js'
-
-const bigintSchema = z.bigint()
 
 let capture = false
 const warnings: string[] = []
@@ -181,7 +178,7 @@ describe('LoongSuite parity', () => {
       status: { code: 'error', message: 'ABORTED' },
       attributes: { 'dsh.turn.end_reason': 'aborted' },
     })
-    expect(JSON.stringify(recorder.spans, (_key, value: RenderedSpanValue) => (bigintSchema.safeParse(value).success ? String(value) : value))).not.toContain(
+    expect(JSON.stringify(recorder.spans, (_key, value: RenderedSpanValue) => (typeof value === 'bigint' ? String(value) : value))).not.toContain(
       'PRIVATE-PROMPT',
     )
   })

@@ -3,7 +3,8 @@
 import type { StreamChunk, TokenUsage, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { decodeJson } from '@dshfiles/dshx/json'
 import type { SpanAttributeValue } from '@dshfiles/dshx/tracing'
-import { z } from 'zod'
+import { Effect, Option } from 'effect'
+import * as Schema from 'effect/Schema'
 
 export type Attributes = Record<string, SpanAttributeValue | undefined>
 
@@ -115,44 +116,49 @@ const serializeCaptured = <Captured>(value: Captured): string => {
   return JSON.stringify({ truncated: true, original_characters: serialized.length, limit_characters: CONTENT_MAX_CHARS })
 }
 
-const blockSchema = z.looseObject({ type: z.string() })
-export type LooseBlock = z.infer<typeof blockSchema>
-const contentBlocksSchema = z.array(blockSchema).catch([])
+const looseObject = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
 
-const jsonSchema = z.json()
-type JsonValue = z.infer<typeof jsonSchema>
+const blockSchema = looseObject({ type: Schema.String })
+export type LooseBlock = typeof blockSchema.Type
+const contentBlocksSchema = Schema.Array(blockSchema).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some([]))))
 
-const textField = z.string().catch('')
-const textBlockSchema = z.looseObject({ text: textField })
-const toolCallBlockSchema = z.looseObject({ id: textField, name: textField, arguments: textField })
-const toolResultBlockSchema = z.looseObject({ toolCallId: textField, content: contentBlocksSchema })
-const imageBlockSchema = z.looseObject({ attachment: z.looseObject({}).catch({}) })
+const jsonSchema = Schema.Json
+type JsonValue = typeof jsonSchema.Type
+
+const textField = Schema.String.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(''))))
+const textBlockSchema = looseObject({ text: textField })
+const toolCallBlockSchema = looseObject({ id: textField, name: textField, arguments: textField })
+const toolResultBlockSchema = looseObject({ toolCallId: textField, content: contentBlocksSchema })
+const imageBlockSchema = looseObject({
+  attachment: looseObject({}).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some({})))),
+})
 
 /** One message part in the GenAI vocabulary; a block type this mapping does not know passes through as DSH wrote it. */
 type GenAiPart =
   | { readonly type: 'text' | 'reasoning'; readonly content: string }
   | { readonly type: 'tool_call'; readonly id: string | null; readonly name: string; readonly arguments: JsonValue }
   | { readonly type: 'tool_call_response'; readonly id: string | null; readonly response: readonly GenAiPart[] }
-  | ({ readonly type: 'image' } & z.infer<typeof imageBlockSchema>['attachment'])
+  | ({ readonly type: 'image' } & (typeof imageBlockSchema.Type)['attachment'])
   | LooseBlock
 
 /** One DSH content block in the GenAI message-parts vocabulary (LoongSuite `mapContentBlock`). */
 const mapContentBlock = (block: LooseBlock): GenAiPart => {
   switch (block.type) {
     case 'text':
-      return { type: 'text', content: textBlockSchema.parse(block).text }
+      return { type: 'text', content: Schema.decodeUnknownSync(textBlockSchema)(block).text }
     case 'reasoning':
-      return { type: 'reasoning', content: textBlockSchema.parse(block).text }
+      return { type: 'reasoning', content: Schema.decodeUnknownSync(textBlockSchema)(block).text }
     case 'tool-call': {
-      const call = toolCallBlockSchema.parse(block)
+      const call = Schema.decodeUnknownSync(toolCallBlockSchema)(block)
       return { type: 'tool_call', id: call.id || null, name: call.name, arguments: parseToolArguments(call.arguments) }
     }
     case 'tool-result': {
-      const result = toolResultBlockSchema.parse(block)
+      const result = Schema.decodeUnknownSync(toolResultBlockSchema)(block)
       return { type: 'tool_call_response', id: result.toolCallId || null, response: mapContent(result.content) }
     }
     case 'image':
-      return { type: 'image', ...imageBlockSchema.parse(block).attachment }
+      return { type: 'image', ...Schema.decodeUnknownSync(imageBlockSchema)(block).attachment }
     default:
       return { ...block }
   }
@@ -168,12 +174,14 @@ const parseToolArguments = (value: string): JsonValue => {
   }
 }
 
-export const messageSchema = z.looseObject({
-  role: z.string(),
+export const messageSchema = looseObject({
+  role: Schema.String,
   content: contentBlocksSchema,
-  source: z.looseObject({ kind: z.string(), callId: z.string().optional() }).catch({ kind: 'unknown' }),
+  source: looseObject({ kind: Schema.String, callId: Schema.optionalKey(Schema.String) }).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some({ kind: 'unknown' }))),
+  ),
 })
-export type CapturedMessage = z.infer<typeof messageSchema>
+export type CapturedMessage = typeof messageSchema.Type
 
 export interface GenAiMessage {
   readonly role: string
