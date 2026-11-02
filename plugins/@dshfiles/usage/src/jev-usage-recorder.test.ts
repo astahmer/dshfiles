@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
 import type { ApiCaller } from '@dshfiles/dshx/api'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
 import type { JevUsageRecord } from './jev-usage.js'
-import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
+import { recordJevUsage } from './jev-usage-recorder.js'
+import { UsageRepo } from './store.js'
+import { usageRepoTest } from './test-layers.js'
 
 const record: JevUsageRecord = {
   requestId: '00000000-0000-4000-8000-000000000001',
@@ -14,31 +17,27 @@ const record: JevUsageRecord = {
   outputTokens: 4,
 }
 
+const recordedCalls = UsageRepo.use(repo => repo.jevUsage({ from: 0, to: 1_000 })).pipe(Effect.map(usage => usage.calls))
+
 describe('Jev usage recorder authorization', () => {
-  it('rejects clients and agent callers before persisting', () => {
-    const persisted: JevUsageRecord[] = []
-    const handler = createJevUsageRecorder({
-      authorize: jevSourceOf,
-      record: item => persisted.push(item),
-    })
+  it.effect('rejects clients and agent callers before persisting', () =>
+    Effect.gen(function* () {
+      for (const caller of [{ kind: 'client' }, { kind: 'agent', sessionId: 'session-safe' }] satisfies ApiCaller[]) {
+        const rejected = yield* Effect.flip(recordJevUsage({ record, caller }))
+        expect(rejected).toMatchObject({ _tag: 'JevCallerRejected', source: 'backlog', message: 'Only the Jev source plugin may record its own usage.' })
+      }
+      expect(yield* recordedCalls).toBe(0)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-    for (const caller of [{ kind: 'client' }, { kind: 'agent', sessionId: 'session-safe' }] satisfies ApiCaller[]) {
-      expect(() => handler({ input: record, caller })).toThrow(/Only the Jev source plugin/u)
-    }
-    expect(persisted).toEqual([])
-  })
+  it.effect('rejects a Jev plugin claiming another source and accepts only its matching source', () =>
+    Effect.gen(function* () {
+      const rejected = yield* Effect.flip(recordJevUsage({ record, caller: { kind: 'plugin', packageId: '@dshfiles/memory' } }))
+      expect(rejected._tag).toBe('JevCallerRejected')
+      expect(yield* recordedCalls).toBe(0)
 
-  it('rejects a Jev plugin claiming another source and accepts only its matching source', () => {
-    const persisted: JevUsageRecord[] = []
-    const handler = createJevUsageRecorder({
-      authorize: jevSourceOf,
-      record: item => persisted.push(item),
-    })
-
-    expect(() => handler({ input: record, caller: { kind: 'plugin', packageId: '@dshfiles/memory' } })).toThrow(/Only the Jev source plugin/u)
-    expect(persisted).toEqual([])
-
-    expect(handler({ input: record, caller: { kind: 'plugin', packageId: '@dshfiles/backlog' } })).toEqual({ accepted: true })
-    expect(persisted).toEqual([record])
-  })
+      expect(yield* recordJevUsage({ record, caller: { kind: 'plugin', packageId: '@dshfiles/backlog' } })).toEqual({ accepted: true })
+      expect(yield* recordedCalls).toBe(1)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 })

@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
 import type { RequestRow, ToolExecutionRow } from './fold.js'
 import { createOtlpMetricsRequest, type OtlpHistogramInput } from './otel-metrics.js'
-import { openUsageStore } from './store.js'
+import { UsageRepo } from './store.js'
+import { usageRepoTest } from './test-layers.js'
 
 describe('SQLite-backed OTLP metrics', () => {
-  it('exports bounded aggregate metrics in OTLP JSON without local identifiers or payloads', () => {
-    const store = openUsageStore(':memory:')
-    const from = 1_800_000_000_000
-    try {
+  it.effect('exports bounded aggregate metrics in OTLP JSON without local identifiers or payloads', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const from = 1_800_000_000_000
       const requests: RequestRow[] = [
         {
           id: 'private-request-1',
@@ -63,7 +65,7 @@ describe('SQLite-backed OTLP metrics', () => {
           outcome: 'success',
         },
       ]
-      store.commitLogSlice({
+      yield* store.commitLogSlice({
         path: '/private/user/session.jsonl',
         sessionId: 'private-session-id',
         offset: 1,
@@ -74,7 +76,7 @@ describe('SQLite-backed OTLP metrics', () => {
         rows: requests,
         tools,
       })
-      store.recordJevUsage({
+      yield* store.recordJevUsage({
         requestId: '00000000-0000-4000-8000-000000000020',
         source: 'memory',
         credential: 'PRIVATE_JEV_KEY_LABEL',
@@ -85,7 +87,7 @@ describe('SQLite-backed OTLP metrics', () => {
         outputTokens: 7,
       })
 
-      const request = store.otelMetrics({ from, to: from + 200, temporality: 'delta', serviceName: 'dshfiles' })
+      const request = yield* store.otelMetrics({ from, to: from + 200, temporality: 'delta', serviceName: 'dshfiles' })
       const metrics = request.resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
       const requestMetric = metrics.find(metric => metric.name === 'dsh.model.request.count')
       const toolMetric = metrics.find(metric => metric.name === 'dsh.tool.execution.count')
@@ -167,15 +169,13 @@ describe('SQLite-backed OTLP metrics', () => {
       ])
         expect(output).not.toContain(privateValue)
       expect(request.resourceMetrics[0]?.resource.attributes).toContainEqual({ key: 'service.name', value: { stringValue: 'dshfiles' } })
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('caps named source metrics while keeping category totals exact', () => {
-    const store = openUsageStore(':memory:')
-    const from = 1_800_000_000_000
-    try {
+  it.effect('caps named source metrics while keeping category totals exact', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const from = 1_800_000_000_000
       const tools: ToolExecutionRow[] = Array.from({ length: 501 }, (_, index) => ({
         id: `tool-${String(index)}`,
         sessionId: 'private-session',
@@ -189,7 +189,7 @@ describe('SQLite-backed OTLP metrics', () => {
         endedAt: from + index + 1,
         outcome: 'success',
       }))
-      store.commitLogSlice({
+      yield* store.commitLogSlice({
         path: '/private/session.jsonl',
         sessionId: 'private-session',
         offset: 1,
@@ -201,25 +201,21 @@ describe('SQLite-backed OTLP metrics', () => {
         tools,
       })
       const metrics =
-        store.otelMetrics({ from, to: from + 1_000, temporality: 'delta', serviceName: 'dshfiles' }).resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
+        (yield* store.otelMetrics({ from, to: from + 1_000, temporality: 'delta', serviceName: 'dshfiles' })).resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
       const categories = metrics.find(metric => metric.name === 'dsh.tool.execution.count')
       const sources = metrics.find(metric => metric.name === 'dsh.tool.source.execution.count')
       expect(categories && 'sum' in categories ? categories.sum.dataPoints[0]?.asInt : undefined).toBe('501')
       expect(sources && 'sum' in sources ? sources.sum.dataPoints : []).toHaveLength(500)
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('returns an empty valid OTLP request for a range without records', () => {
-    const store = openUsageStore(':memory:')
-    try {
-      const request = store.otelMetrics({ from: 1_800_000_000_000, to: 1_800_000_000_100, temporality: 'delta', serviceName: 'dshfiles' })
+  it.effect('returns an empty valid OTLP request for a range without records', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const request = yield* store.otelMetrics({ from: 1_800_000_000_000, to: 1_800_000_000_100, temporality: 'delta', serviceName: 'dshfiles' })
       expect(request.resourceMetrics[0]?.scopeMetrics[0]?.metrics).toEqual([])
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 })
 
 describe('OTLP/JSON mapping', () => {

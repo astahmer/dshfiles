@@ -1,80 +1,86 @@
+import { createServer, type IncomingHttpHeaders } from 'node:http'
+import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { Effect, Schema } from 'effect'
-import { decodeJson } from '@dshfiles/dshx/json'
-import { once } from 'node:events'
-import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OtlpMetricsExporter } from './otel-exporter.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Effect, Exit, Fiber, Layer, Option, Queue, Ref, Schema, Scope } from 'effect'
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from 'effect/http'
+import { TestClock } from 'effect/testing'
+import { OtlpExporter, OtlpMetricsExporter } from './otel-exporter.js'
 import { otlpMetricsRequestSchema, type OtlpMetricsRequest } from './otel-metrics.js'
-import { openUsageStore, type UsageStore } from './store.js'
+import { UsageRepo } from './store.js'
+import { usageRepoTest } from './test-layers.js'
 
 interface ReceivedExport {
-  readonly path: string | undefined
-  readonly headers: IncomingHttpHeaders
+  readonly url: string
+  readonly headers: Readonly<Record<string, string>>
   readonly body: OtlpMetricsRequest
-  readonly receivedAt: number
+  readonly signal: AbortSignal
 }
 
-const cleanups: (() => Promise<void> | void)[] = []
-afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
-})
+const INTERVAL_MS = 20
+const decodeBody = Schema.decodeUnknownSync(Schema.fromJsonString(otlpMetricsRequestSchema))
+const COLLECTOR_URL = 'http://collector.test:4318/v1/metrics'
 
-const startCollector = async (
-  respond: (index: number) => { readonly status: number; readonly headers?: Record<string, string> } | 'hang' = () => ({ status: 200 }),
-) => {
-  const received: ReceivedExport[] = []
-  const server: Server = createServer((request, response) => {
-    const chunks: Buffer[] = []
-    request.on('data', (chunk: Buffer) => chunks.push(chunk))
-    request.on('end', () => {
-      received.push({
-        path: request.url,
-        headers: request.headers,
-        body: decodeJson(otlpMetricsRequestSchema, Buffer.concat(chunks).toString('utf8')),
-        receivedAt: Date.now(),
-      })
-      const reply = respond(received.length - 1)
-      if (reply === 'hang') return
-      response.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers })
-      response.end('{}')
-    })
-  })
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  cleanups.push(() => {
-    server.closeAllConnections()
-    server.close()
-  })
-  const address = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number.check(Schema.isInt()) }))(server.address())
-  return { received, url: `http://127.0.0.1:${String(address.port)}/v1/metrics` }
-}
+type Reply = { readonly status: number; readonly headers?: Record<string, string> } | 'hang' | 'unreachable'
 
-const openStore = (): UsageStore => {
-  const store = openUsageStore(':memory:')
-  cleanups.push(() => store.close())
-  return store
-}
-
-const recordJev = (store: UsageStore, index: number) =>
-  store.recordJevUsage({
-    requestId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-    source: 'memory',
-    credential: 'PRIVATE_LABEL',
-    startedAt: Date.now(),
-    durationMs: 40,
-    outcome: 'success',
-    inputTokens: 10,
-    outputTokens: 2,
+/** The OTLP collector is an external system: it answers each export with the scripted reply and queues what it received. */
+const collectorTest = (respond: (index: number) => Reply = () => ({ status: 200 })) =>
+  Effect.gen(function* () {
+    const received = yield* Queue.unbounded<ReceivedExport>()
+    const count = yield* Ref.make(0)
+    const client = HttpClient.make((request, url, signal) =>
+      Effect.gen(function* () {
+        const index = yield* Ref.getAndUpdate(count, current => current + 1)
+        const text = request.body._tag === 'Uint8Array' ? (request.body.text ?? new TextDecoder().decode(request.body.body)) : ''
+        yield* Queue.offer(received, { url: url.toString(), headers: request.headers, body: decodeBody(text), signal })
+        const reply = respond(index)
+        if (reply === 'hang') return yield* Effect.never
+        if (reply === 'unreachable')
+          return yield* new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request, description: 'connect ECONNREFUSED' }) })
+        return HttpClientResponse.fromWeb(request, new Response('{}', { status: reply.status, headers: reply.headers ?? {} }))
+      }),
+    )
+    return { received, layer: Layer.succeed(HttpClient.HttpClient, client) }
   })
+
+const recordJev = (index: number) =>
+  UsageRepo.use(repo =>
+    repo.recordJevUsage({
+      requestId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      source: 'memory',
+      credential: 'PRIVATE_LABEL',
+      startedAt: index,
+      durationMs: 40,
+      outcome: 'success',
+      inputTokens: 10,
+      outputTokens: 2,
+    }),
+  )
 
 const jevCountOf = (request: OtlpMetricsRequest | undefined) => {
   const metric = request?.resourceMetrics[0]?.scopeMetrics[0]?.metrics.find(candidate => candidate.name === 'dsh.jev.request.count')
   return metric && 'sum' in metric ? metric.sum.dataPoints[0] : undefined
 }
 
-/** An exporter tick plus its HTTP round trip; a loaded CI runner needs far more than the 2 s this once allowed. */
-const EXPORT_WAIT_MS = 15_000
+/** Start an exporter in its own scope over the repo in context, so a test can stop it like the plugin's unload does. */
+const startExporter = (input: {
+  readonly http: Layer.Layer<HttpClient.HttpClient>
+  readonly destination?: Effect.Effect<Option.Option<{ readonly url: string; readonly headers: Readonly<Record<string, string>> }>>
+}) =>
+  Effect.gen(function* () {
+    const scope = yield* Scope.make()
+    const context = yield* Layer.buildWithScope(
+      OtlpExporter.layer({
+        timing: { intervalMs: INTERVAL_MS, timeoutMs: 60_000 },
+        serviceName: 'dshfiles',
+        destination: input.destination ?? Effect.succeed(Option.some({ url: COLLECTOR_URL, headers: { authorization: 'Bearer token' } })),
+      }).pipe(Layer.provide(input.http)),
+      scope,
+    )
+    return { exporter: Context.get(context, OtlpExporter), stop: Scope.close(scope, Exit.void) }
+  })
+
+const advance = (millis: number) => Effect.andThen(TestClock.adjust(millis), Effect.yieldNow)
 
 describe('OtlpMetricsExporter.resolve', () => {
   it('stays off without an OTLP endpoint', () => {
@@ -152,225 +158,178 @@ describe('OtlpMetricsExporter.resolve', () => {
   })
 })
 
-describe('OtlpMetricsExporter.start', () => {
-  it('posts cumulative OTLP/JSON with a stable start time so a backend can diff exports', async () => {
-    const collector = await startCollector()
-    const store = openStore()
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 25, timeoutMs: 1_000 },
-      destination: () => ({ url: collector.url, headers: { authorization: 'Bearer token' } }),
-      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    cleanups.push(() => exporter.stop())
-    recordJev(store, 1)
-    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
-    recordJev(store, 2)
-    await vi.waitFor(() => expect(jevCountOf(collector.received.at(-1)?.body)?.asInt).toBe('2'), { timeout: EXPORT_WAIT_MS })
+describe('OtlpExporter', () => {
+  it.effect('posts cumulative OTLP/JSON with a stable start time so a backend can diff exports', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest()
+      const { exporter } = yield* startExporter({ http: collector.layer })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      const first = yield* Queue.take(collector.received)
+      yield* recordJev(2)
+      yield* advance(INTERVAL_MS)
+      const last = yield* Queue.take(collector.received)
 
-    const first = collector.received[0]
-    const last = collector.received.at(-1)
-    expect(first?.path).toBe('/v1/metrics')
-    expect(first?.headers['content-type']).toBe('application/json')
-    expect(first?.headers.authorization).toBe('Bearer token')
-    const firstPoint = jevCountOf(first?.body)
-    const lastPoint = jevCountOf(last?.body)
-    expect(firstPoint?.asInt).toBe('1')
-    expect(lastPoint?.startTimeUnixNano).toBe(firstPoint?.startTimeUnixNano)
-    expect(lastPoint?.startTimeUnixNano).toBe((BigInt(exporter.state().startedAt) * 1_000_000n).toString())
-    expect(BigInt(lastPoint?.timeUnixNano ?? '0')).toBeGreaterThan(BigInt(firstPoint?.timeUnixNano ?? '0'))
-    const body = last?.body
-    expect(body?.resourceMetrics[0]?.resource.attributes).toEqual([{ key: 'service.name', value: { stringValue: 'dshfiles' } }])
-    expect(
-      body?.resourceMetrics[0]?.scopeMetrics[0]?.metrics.map(metric =>
-        'sum' in metric ? metric.sum.aggregationTemporality : metric.histogram.aggregationTemporality,
-      ),
-    ).toEqual(expect.arrayContaining([2]))
-    expect(JSON.stringify(body)).not.toContain('PRIVATE_LABEL')
-    expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 0, lastError: null }))
-  })
+      expect(first.url).toBe(COLLECTOR_URL)
+      expect(first.headers['content-type']).toBe('application/json')
+      expect(first.headers.authorization).toBe('Bearer token')
+      expect(jevCountOf(first.body)?.asInt).toBe('1')
+      expect(jevCountOf(last.body)?.asInt).toBe('2')
+      expect(jevCountOf(last.body)?.startTimeUnixNano).toBe(jevCountOf(first.body)?.startTimeUnixNano)
+      expect(jevCountOf(last.body)?.startTimeUnixNano).toBe((BigInt((yield* exporter.state).startedAt) * 1_000_000n).toString())
+      expect(BigInt(jevCountOf(last.body)?.timeUnixNano ?? '0')).toBeGreaterThan(BigInt(jevCountOf(first.body)?.timeUnixNano ?? '0'))
+      expect(last.body.resourceMetrics[0]?.resource.attributes).toEqual([{ key: 'service.name', value: { stringValue: 'dshfiles' } }])
+      expect(
+        last.body.resourceMetrics[0]?.scopeMetrics[0]?.metrics.map(metric =>
+          'sum' in metric ? metric.sum.aggregationTemporality : metric.histogram.aggregationTemporality,
+        ),
+      ).toEqual(expect.arrayContaining([2]))
+      expect(JSON.stringify(last.body)).not.toContain('PRIVATE_LABEL')
+      expect(yield* exporter.state).toMatchObject({ exports: 2, consecutiveFailures: 0, lastError: null })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('records a usage metrics export span with the collector host and status', async () => {
-    const collector = await startCollector()
-    const store = openStore()
-    using recorder = recordSpans()
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 25, timeoutMs: 1_000 },
-      destination: () => ({ url: collector.url, headers: { authorization: 'Bearer token' } }),
-      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    cleanups.push(() => exporter.stop())
-    recordJev(store, 1)
-    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
-    const span = recorder.span('usage metrics export')
-    expect(span.attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
-  })
+  it.effect('retains the custom export span through the Effect loop', () =>
+    Effect.gen(function* () {
+      const recorder = yield* Effect.acquireRelease(Effect.sync(recordSpans), spans => Effect.sync(() => spans.stop()))
+      const collector = yield* collectorTest()
+      yield* startExporter({ http: collector.layer }).pipe(Effect.provide(tracerLayer))
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect(recorder.span('usage metrics export').attributes).toEqual({ 'server.address': 'collector.test:4318', 'http.response.status_code': 200 })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('skips the POST while there is nothing to report', async () => {
-    const collector = await startCollector()
-    const store = openStore()
-    let collected = 0
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 10, timeoutMs: 1_000 },
-      destination: () => ({ url: collector.url, headers: {} }),
-      collect: range => {
-        collected += 1
-        return store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' })
-      },
-    })
-    await vi.waitFor(() => expect(collected).toBeGreaterThanOrEqual(3), { timeout: EXPORT_WAIT_MS })
-    await exporter.stop()
-    expect(collector.received).toEqual([])
-  })
+  it.effect('skips the POST while there is nothing to report', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest()
+      yield* startExporter({ http: collector.layer })
+      yield* advance(INTERVAL_MS * 5)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('sends nothing until a destination appears, then exports to it', async () => {
-    const collector = await startCollector()
-    const store = openStore()
-    let url: string | undefined
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 10, timeoutMs: 1_000 },
-      destination: () => (url === undefined ? undefined : { url, headers: {} }),
-      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    cleanups.push(() => exporter.stop())
-    recordJev(store, 1)
-    await new Promise(resolve => setTimeout(resolve, 40))
-    expect(collector.received).toEqual([])
-    expect(exporter.state().consecutiveFailures).toBe(0)
-    url = collector.url
-    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
-  })
+  it.effect('sends nothing until a destination appears, then exports to it', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest()
+      const destination = yield* Ref.make(Option.none<{ readonly url: string; readonly headers: Readonly<Record<string, string>> }>())
+      const { exporter } = yield* startExporter({ http: collector.layer, destination: Ref.get(destination) })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS * 3)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+      expect((yield* exporter.state).consecutiveFailures).toBe(0)
+      yield* Ref.set(destination, Option.some({ url: COLLECTOR_URL, headers: {} }))
+      yield* advance(INTERVAL_MS)
+      expect((yield* Queue.take(collector.received)).url).toBe(COLLECTOR_URL)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('backs off exponentially on failure and resumes the interval after recovery', async () => {
-    const collector = await startCollector(index => (index < 2 ? { status: 503 } : { status: 200 }))
-    const store = openStore()
-    const failures: { readonly message: string; readonly consecutiveFailures: number }[] = []
-    let recoveries = 0
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 20, timeoutMs: 1_000 },
-      destination: () => ({ url: collector.url, headers: {} }),
-      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
-      onFailure: failure => {
-        failures.push(failure)
-        throw new Error('a throwing listener must not break the exporter')
-      },
-      onRecovery: () => {
-        recoveries += 1
-      },
-    })
-    cleanups.push(() => exporter.stop())
-    recordJev(store, 1)
-    await vi.waitFor(() => expect(failures).toHaveLength(1), { timeout: EXPORT_WAIT_MS })
-    expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 1, nextDelayMs: 40, lastError: 'HTTP 503' }))
-    await vi.waitFor(() => expect(failures).toHaveLength(2), { timeout: EXPORT_WAIT_MS })
-    expect(exporter.state().nextDelayMs).toBe(80)
-    await vi.waitFor(() => expect(recoveries).toBe(1), { timeout: EXPORT_WAIT_MS })
-    expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 0, nextDelayMs: 20, lastError: null }))
-    expect(exporter.state().exports).toBeGreaterThanOrEqual(1)
-    const [first, second, third] = collector.received
-    expect((second?.receivedAt ?? 0) - (first?.receivedAt ?? 0)).toBeGreaterThanOrEqual(35)
-    expect((third?.receivedAt ?? 0) - (second?.receivedAt ?? 0)).toBeGreaterThanOrEqual(75)
-    expect(failures.map(failure => failure.consecutiveFailures)).toEqual([1, 2])
-  })
+  it.effect('backs off exponentially on failure and resumes the interval after recovery', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest(index => (index < 2 ? { status: 503 } : { status: 200 }))
+      const { exporter } = yield* startExporter({ http: collector.layer })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect(yield* exporter.state).toMatchObject({ consecutiveFailures: 1, lastError: 'HTTP 503' })
 
-  it('waits at least as long as a Retry-After answer asks', async () => {
-    const collector = await startCollector(() => ({ status: 429, headers: { 'retry-after': '3' } }))
-    const store = openStore()
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 20, timeoutMs: 1_000 },
-      destination: () => ({ url: collector.url, headers: {} }),
-      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    cleanups.push(() => exporter.stop())
-    recordJev(store, 1)
-    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBe(1), { timeout: EXPORT_WAIT_MS })
-    expect(exporter.state()).toEqual(expect.objectContaining({ nextDelayMs: 3_000, lastError: 'HTTP 429' }))
-  })
+      yield* advance(INTERVAL_MS * 2 - 1)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+      yield* advance(1)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect((yield* exporter.state).consecutiveFailures).toBe(2)
 
-  it('never throws when the collector is unreachable and stops scheduling once stopped', async () => {
-    const collector = await startCollector()
-    const unreachable = collector.url.replace(/:\d+\//u, ':1/')
-    const store = openStore()
-    recordJev(store, 1)
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 10, timeoutMs: 1_000 },
-      destination: () => ({ url: unreachable, headers: {} }),
-      collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
-    expect(exporter.state().lastError).toMatch(/fetch failed/u)
-    await exporter.stop()
-    const failuresAtStop = exporter.state().consecutiveFailures
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(exporter.state().consecutiveFailures).toBe(failuresAtStop)
-  })
+      yield* advance(INTERVAL_MS * 4 - 1)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+      yield* advance(1)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect(yield* exporter.state).toMatchObject({ exports: 1, consecutiveFailures: 0, lastError: null })
 
-  it('aborts a hanging export on stop', async () => {
-    const collector = await startCollector(() => 'hang')
-    const store = openStore()
-    recordJev(store, 1)
-    const exporter = OtlpMetricsExporter.start({
-      timing: { intervalMs: 10, timeoutMs: 60_000 },
-      destination: () => ({ url: collector.url, headers: {} }),
-      collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
-    })
-    await vi.waitFor(() => expect(collector.received).toHaveLength(1), { timeout: EXPORT_WAIT_MS })
-    const stoppedAt = Date.now()
-    await exporter.stop()
-    expect(Date.now() - stoppedAt).toBeLessThan(1_000)
-    expect(exporter.state().exports).toBe(0)
-  })
-})
+      yield* advance(INTERVAL_MS)
+      yield* Queue.take(collector.received)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-describe('OtlpMetricsExporter.effect', () => {
-  it('interrupts an in-flight collector request with its owning scope', async () => {
-    const store = openStore()
-    recordJev(store, 1)
-    let resolveStarted: (signal: AbortSignal) => void = () => undefined
-    const started = new Promise<AbortSignal>(resolve => {
-      resolveStarted = resolve
-    })
-    vi.stubGlobal('fetch', async (_input: string | URL | Request, init?: RequestInit) => {
-      if (!(init?.signal instanceof AbortSignal)) throw new Error('Exporter fetch must have an interrupt signal.')
-      resolveStarted(init.signal)
-      return new Promise<Response>(() => undefined)
-    })
-    cleanups.push(() => {
-      vi.unstubAllGlobals()
-    })
-    const controller = new AbortController()
-    const pending = Effect.runPromiseExit(
-      OtlpMetricsExporter.effect({
-        timing: { intervalMs: 1, timeoutMs: 60_000 },
-        destination: () => ({ url: 'http://collector.invalid/v1/metrics', headers: {} }),
-        collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
-      }),
-      { signal: controller.signal },
-    )
-    const signal = await started
-    controller.abort()
-    await pending
-    expect(signal.aborted).toBe(true)
-  })
+  it.effect('waits at least as long as a Retry-After answer asks', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest(() => ({ status: 429, headers: { 'retry-after': '3' } }))
+      const { exporter } = yield* startExporter({ http: collector.layer })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect(yield* exporter.state).toMatchObject({ consecutiveFailures: 1, lastError: 'HTTP 429' })
+      yield* advance(2_999)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+      yield* advance(1)
+      yield* Queue.take(collector.received)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('retains the custom export span through the Effect loop', async () => {
-    const collector = await startCollector()
-    const store = openStore()
-    recordJev(store, 1)
-    using recorder = recordSpans()
-    const controller = new AbortController()
-    const pending = Effect.runPromiseExit(
-      OtlpMetricsExporter.effect({
-        timing: { intervalMs: 10, timeoutMs: 1_000 },
-        destination: () => ({ url: collector.url, headers: {} }),
-        // The Jev row is written before the loop starts, so widen the window back from `to`: the loop's own
-        // `from` is captured after it and would exclude the row in the millisecond the two differ.
-        collect: ({ to }) => store.otelMetrics({ from: to - 60_000, to, temporality: 'cumulative', serviceName: 'dshfiles' }),
-      }),
-      { signal: controller.signal },
-    )
-    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
-    controller.abort()
-    await pending
-    expect(recorder.span('usage metrics export').attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
-  }, 20_000)
+  it.effect('never fails when the collector is unreachable and stops scheduling once stopped', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest(() => 'unreachable')
+      const { exporter, stop } = yield* startExporter({ http: collector.layer })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      yield* Queue.take(collector.received)
+      yield* Effect.yieldNow
+      expect((yield* exporter.state).consecutiveFailures).toBe(1)
+      expect((yield* exporter.state).lastError).toMatch(/ECONNREFUSED/u)
+      yield* stop
+      yield* advance(60 * 60_000)
+      expect(yield* Queue.size(collector.received)).toBe(0)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
+
+  it.effect('interrupts a hanging export when its scope closes', () =>
+    Effect.gen(function* () {
+      const collector = yield* collectorTest(() => 'hang')
+      const { exporter, stop } = yield* startExporter({ http: collector.layer })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      const hanging = yield* Queue.take(collector.received)
+      expect(hanging.signal.aborted).toBe(false)
+      const stopping = yield* Effect.forkChild(stop)
+      yield* Fiber.join(stopping)
+      expect(hanging.signal.aborted).toBe(true)
+      expect((yield* exporter.state).exports).toBe(0)
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
+
+  it.effect('posts OTLP/JSON over real HTTP to a local collector', () =>
+    Effect.gen(function* () {
+      const received = yield* Queue.unbounded<{ readonly path: string | undefined; readonly headers: IncomingHttpHeaders; readonly body: string }>()
+      const server = yield* Effect.acquireRelease(
+        Effect.callback<ReturnType<typeof createServer>>(resume => {
+          const listening = createServer((request, response) => {
+            const chunks: Buffer[] = []
+            request.on('data', (chunk: Buffer) => chunks.push(chunk))
+            request.on('end', () => {
+              Queue.offerUnsafe(received, { path: request.url, headers: request.headers, body: Buffer.concat(chunks).toString('utf8') })
+              response.writeHead(200, { 'content-type': 'application/json' })
+              response.end('{}')
+            })
+          })
+          listening.listen(0, '127.0.0.1', () => resume(Effect.succeed(listening)))
+        }),
+        listening => Effect.sync(() => listening.close()),
+      )
+      const address = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }))(server.address())
+      const url = `http://127.0.0.1:${String(address.port)}/v1/metrics`
+      yield* startExporter({ http: FetchHttpClient.layer, destination: Effect.succeed(Option.some({ url, headers: { authorization: 'Bearer token' } })) })
+      yield* recordJev(1)
+      yield* advance(INTERVAL_MS)
+      const request = yield* Queue.take(received)
+      expect(request.path).toBe('/v1/metrics')
+      expect(request.headers['content-type']).toBe('application/json')
+      expect(request.headers.authorization).toBe('Bearer token')
+      expect(jevCountOf(decodeBody(request.body))?.asInt).toBe('1')
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 })

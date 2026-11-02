@@ -1,258 +1,140 @@
-import { readdir, stat } from 'node:fs/promises'
-import type { Context } from '@deepseek-ai/cordis'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { Cause, Context as EffectContext, Duration, Effect, Layer, Schema } from 'effect'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { DEFAULT_PRICING_PATH } from '@dshfiles/ai-accounts/pricing-catalog'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { PluginApiError } from '@dshfiles/dshx/api'
-import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
+import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { localOtlpEndpoint } from '@dshfiles/dshx/tracing'
+import { SqliteStore } from '@dshfiles/sqlite-store'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
+import { Clock, Effect, Layer, Option, Schedule, Schema } from 'effect'
+import { FetchHttpClient } from 'effect/http'
 import { resolveActivityQuery, resolveOtelMetricsRange, usageApi } from './api.js'
-import type { ToolSourceMetadata } from './fold.js'
-import { toolSourceSnapshotsEqual } from './tool-source-snapshots.js'
-import { jevSourceOf } from './jev-usage-recorder.js'
-import { createUsageIndexService } from './indexer.js'
-import { readLogFrom } from './session-log.js'
-import { NodeFileSystem } from '@effect/platform-node'
+import { SessionLogFiles, SessionLogIndex } from './indexer.js'
+import { Indexer, ToolRegistry } from './indexing.js'
+import { recordJevUsage } from './jev-usage-recorder.js'
 import { observeLiveCall } from './live-calls.js'
-import { OtlpMetricsExporter } from './otel-exporter.js'
-import { createRatePricer } from './pricing.js'
-import { openUsageStore, type UsageStore } from './store.js'
+import { LEGACY_USER_VERSION, usageMigrations } from './migrations.js'
+import { OtlpExporter, OtlpMetricsExporter } from './otel-exporter.js'
+import { AccountKinds, Pricing } from './pricing.js'
+import { UsageRepo } from './store.js'
 
-const INDEX_INTERVAL_MS = 30_000
+const INDEX_INTERVAL = '30 seconds'
 const otlpServiceName = OtlpMetricsExporter.serviceName(process.env)
-const usageIndexService = createUsageIndexService({
-  fileSystem: { readdir, stat },
-  readLogFrom: input => Effect.runPromise(readLogFrom(input).pipe(Effect.provide(NodeFileSystem.layer))),
-})
 
-const persistenceConfigSchema = Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) })
+const decodePersistence = Schema.decodeUnknownOption(Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) }))
 
 /** The JSONL backend's configured root, else the default `$DSH_HOME/sessions`. */
-const sessionsRoot = (context: Context): string => {
-  const persistence = context.get('sessionPersistence')
-  return Schema.is(persistenceConfigSchema)(persistence) ? persistence.config.root : dshHomePath('sessions')
-}
+const sessionsRoot = Effect.map(Effect.option(hostService('sessionPersistence')), persistence =>
+  Option.getOrElse(
+    Option.map(Option.flatMap(persistence, decodePersistence), persisted => persisted.config.root),
+    () => dshHomePath('sessions'),
+  ),
+)
 
-interface ToolRegistrySnapshot {
-  readonly toolSources: ReadonlyMap<string, ToolSourceMetadata>
-}
-
-interface UsageRuntimeState {
-  readonly store: UsageStore
-  readonly pricer: ReturnType<typeof createRatePricer>
-  readonly root: string
-  readonly readToolRegistry: () => Promise<ToolRegistrySnapshot | undefined>
-  syncedToolSources: ReadonlyMap<string, ToolSourceMetadata> | undefined
-  pass: Promise<void> | null
-  lastIndexedAt: number | null
-  lastError: string | null
-}
-
-class UsageRuntime extends EffectContext.Service<UsageRuntime, UsageRuntimeState>()('dshfiles/usage/UsageRuntime') {}
-
-class UsageStoreFailure extends Schema.TaggedError<UsageStoreFailure>()('UsageStoreFailure', {
-  message: Schema.String,
-}) {}
-
-const storeOperation = <Output>(operation: () => Output) =>
-  Effect.try({ try: operation, catch: () => new UsageStoreFailure({ message: 'The local usage store could not complete this request.' }) })
-
-const runPass = (active: UsageRuntimeState): Promise<void> => {
-  if (active.pass !== null) return active.pass
-  const pass = (async () => {
-    try {
-      active.store.pruneTelemetry()
-      const toolRegistry = await active.readToolRegistry()
-      if (toolRegistry !== undefined && !toolSourceSnapshotsEqual({ previous: active.syncedToolSources, next: toolRegistry.toolSources })) {
-        active.store.syncToolSources(
-          new Map([...toolRegistry.toolSources].map(([name, source]) => [name, { category: source.source, owner: source.owner }] as const)),
-        )
-        active.syncedToolSources = toolRegistry.toolSources
-      }
-      await usageIndexService.indexSessionLogs({ store: active.store, root: active.root, ...toolRegistry })
-      active.store.reconcileLiveCalls(Date.now())
-      await active.pricer.update()
-      active.lastIndexedAt = Date.now()
-      active.lastError = null
-    } catch (error) {
-      active.lastError = (error instanceof Error ? error.message : String(error)).slice(0, 500)
-    }
-  })().finally(() => {
-    active.pass = null
-  })
-  active.pass = pass
-  return pass
-}
-
-const status = (active: UsageRuntimeState) => {
-  const counts = active.store.counts()
-  return {
-    indexedFiles: counts.files,
-    requests: counts.requests,
-    lastIndexedAt: active.lastIndexedAt,
-    indexing: active.pass !== null,
-    pricingFetchedAt: active.pricer.fetchedAt(),
-    lastError: active.lastError,
-  }
-}
-
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: (context: Context) =>
-    Layer.effect(
-      UsageRuntime,
-      Effect.acquireRelease(
-        Effect.sync(() => {
-          const store = openUsageStore(dshHomePath('plugins', 'usage', 'usage.db'))
-          const accounts = createHostApiClient(context, aiAccountsApi, '@dshfiles/usage')
-          const registry = createHostApiClient(context, dshxRegistryApi, '@dshfiles/usage')
-          const readToolRegistry = async (): Promise<ToolRegistrySnapshot | undefined> => {
-            const result = await registry.safe.list({})
-            if (!result.ok) return undefined
-            return {
-              toolSources: new Map(result.value.tools.map(tool => [tool.name, { source: tool.source, owner: tool.owner?.slice(0, 120) ?? null }] as const)),
-            }
-          }
-          const accountKinds = async (): Promise<ReadonlyMap<string, string>> => {
-            const file = await accounts.safe.read()
-            return new Map(file.ok ? file.value.accounts.map(account => [account.instanceId, account.kind] as const) : [])
-          }
-          return {
-            store,
-            pricer: createRatePricer({ store, accountKinds }),
-            root: sessionsRoot(context),
-            readToolRegistry,
-            syncedToolSources: undefined,
-            pass: null,
-            lastIndexedAt: null,
-            lastError: null,
-          }
-        }),
-        active =>
-          Effect.promise(async () => {
-            await active.pass
-            active.store.close()
-          }),
+const ToolRegistryLive = Layer.effect(
+  ToolRegistry,
+  Effect.map(HostApis, apis => {
+    const registry = apis.client(dshxRegistryApi)
+    return ToolRegistry.of({
+      snapshot: registry.list({}).pipe(
+        Effect.map(listed =>
+          Option.some(new Map(listed.tools.map(tool => [tool.name, { source: tool.source, owner: tool.owner?.slice(0, 120) ?? null }] as const))),
+        ),
+        Effect.catchTag('ApiCallError', () => Effect.succeedNone),
       ),
+    })
+  }),
+)
+
+const AccountKindsLive = Layer.effect(
+  AccountKinds,
+  Effect.map(HostApis, apis => {
+    const accounts = apis.client(aiAccountsApi)
+    return AccountKinds.of({
+      read: accounts.read().pipe(
+        Effect.map(file => new Map(file.accounts.map(account => [account.instanceId, account.kind] as const))),
+        Effect.catchTag('ApiCallError', () => Effect.succeed(new Map<string, string>())),
+      ),
+    })
+  }),
+)
+
+/** Model calls outside the agent loop, observed on `llm/stream` while the plugin runs; the interceptor body stays synchronous. */
+const LiveCalls = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const host = yield* HostContext
+    const repo = yield* UsageRepo
+    const record = yield* DshxPlugin.callback((row: Parameters<typeof repo.insertLiveCall>[0]) =>
+      repo.insertLiveCall(row).pipe(Effect.catchTag('UsageStoreFailed', error => Effect.logWarning('usage: live call not recorded', error.operation))),
+    )
+    yield* Effect.acquireRelease(
+      Effect.sync(() => host.ctx.on('llm/stream', (options, next) => observeLiveCall({ options, next, record }), { global: true })),
+      dispose => Effect.sync(dispose),
+    )
+  }),
+)
+
+const IndexingLoop = Layer.effectDiscard(Effect.forkScoped(Indexer.use(indexer => indexer.pass).pipe(Effect.repeat(Schedule.spaced(INDEX_INTERVAL)))))
+
+/** The OTLP exporter, when the environment or the Host's own receiver names a destination; off otherwise. */
+const Exporter = Layer.unwrap(
+  Effect.sync(() => {
+    const resolution = OtlpMetricsExporter.resolve(process.env)
+    if (!resolution.enabled && resolution.reason === 'invalid-endpoint')
+      return Layer.effectDiscard(Effect.logWarning('usage: OTLP metrics export is off: the configured endpoint is not an http(s) URL'))
+    if (!resolution.enabled && resolution.reason === 'disabled') return Layer.effectDiscard(Effect.logDebug('usage: OTLP metrics export is disabled'))
+    return OtlpExporter.layer({
+      timing: OtlpMetricsExporter.timing(process.env),
+      serviceName: otlpServiceName,
+      destination: Effect.sync(() => {
+        const current = OtlpMetricsExporter.resolve(process.env, { localBaseUrl: localOtlpEndpoint()?.baseUrl })
+        return current.enabled ? Option.some(current.config) : Option.none()
+      }),
+    }).pipe(Layer.provide(FetchHttpClient.layer))
+  }),
+)
+
+const UsageLive = Layer.unwrap(
+  Effect.map(sessionsRoot, root =>
+    Layer.mergeAll(IndexingLoop, LiveCalls, Exporter).pipe(
+      Layer.provideMerge(Indexer.layer({ sessionsRoot: root })),
+      Layer.provideMerge(Layer.mergeAll(SessionLogIndex.layer, Pricing.layer({ catalogPath: DEFAULT_PRICING_PATH }))),
+      Layer.provideMerge(UsageRepo.layer),
+      Layer.provide([
+        SessionLogFiles.layer,
+        ToolRegistryLive,
+        AccountKindsLive,
+        SqliteStore.layer({ filename: dshHomePath('plugins', 'usage', 'usage.db'), migrations: usageMigrations, legacyUserVersion: LEGACY_USER_VERSION }),
+      ]),
+      Layer.provide([HostApis.layer, NodeFileSystem.layer, NodePath.layer]),
     ),
-  setup: (context: Context) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      yield* Effect.sync(() =>
-        context.on(
-          'llm/stream',
-          (options, next) =>
-            observeLiveCall({
-              options,
-              next,
-              record: row => active.store.insertLiveCall(row),
-            }),
-          { global: true },
-        ),
-      )
-      yield* indexLoop(active, context).pipe(Effect.forkScoped)
-      const exporter = startExporter(context, active.store)
-      if (exporter !== undefined) yield* exporter.pipe(Effect.forkScoped)
-    }),
-})
+  ),
+)
 
-const api = hostApi(usageApi, {
-  jevUsage: Effect.fn('usage Jev report')(({ input }) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => active.store.jevUsage(input))
-    }),
-  ),
-  recordJevUsage: Effect.fn('usage Jev record')(({ input, caller }) =>
-    Effect.gen(function* () {
-      if (!jevSourceOf(caller, input.source))
-        return yield* Effect.fail(new PluginApiError('Only the Jev source plugin may record its own usage.', { code: 'jev-caller' }))
-      const active = yield* UsageRuntime
-      yield* storeOperation(() => active.store.recordJevUsage(input))
-      return { accepted: true as const }
-    }),
-  ),
-  requests: Effect.fn('usage requests read')(({ input }) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => active.store.requests(input))
-    }),
-  ),
-  charts: Effect.fn('usage charts read')(({ input }) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => active.store.charts(input))
-    }),
-  ),
-  status: Effect.fn('usage status read')(() =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => status(active))
-    }),
-  ),
-  refresh: Effect.fn('usage reindex')(({ signal: _signal }) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      yield* Effect.tryPromise({ try: () => runPass(active), catch: () => new UsageStoreFailure({ message: 'The local usage index could not be refreshed.' }) })
-      return yield* storeOperation(() => status(active))
-    }),
-  ),
-  activity: Effect.fn('usage activity report')(({ input }) =>
-    Effect.gen(function* () {
-      const query = resolveActivityQuery(input)
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => active.store.activity({ ...query, eventLimit: query.eventLimit ?? 50 }))
-    }),
-  ),
-  otelMetrics: Effect.fn('usage OTLP metrics read')(({ input }) =>
-    Effect.gen(function* () {
-      const active = yield* UsageRuntime
-      return yield* storeOperation(() => active.store.otelMetrics({ ...resolveOtelMetricsRange(input), temporality: 'delta', serviceName: otlpServiceName }))
-    }),
-  ),
-})
-
-const startExporter = (context: Context, store: UsageStore) => {
-  const resolution = OtlpMetricsExporter.resolve(process.env)
-  const logger = context.logger('usage')
-  if (!resolution.enabled && resolution.reason !== 'not-configured') {
-    if (resolution.reason === 'invalid-endpoint') logger.warn('OTLP metrics export is off: the configured endpoint is not an http(s) URL')
-    return undefined
-  }
-  return OtlpMetricsExporter.effect({
-    timing: OtlpMetricsExporter.timing(process.env),
-    destination: () => {
-      const current = OtlpMetricsExporter.resolve(process.env, { localBaseUrl: localOtlpEndpoint()?.baseUrl })
-      return current.enabled ? current.config : undefined
-    },
-    collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: otlpServiceName }),
-    onFailure: failure => {
-      if (failure.consecutiveFailures === 1) logger.warn('OTLP metrics export failed, backing off: %s', failure.message)
-    },
-    onRecovery: () => logger.info('OTLP metrics export recovered'),
-  })
-}
-
-const indexLoop = (active: UsageRuntimeState, context: Context) =>
-  Effect.forever(
-    Effect.gen(function* () {
-      yield* Effect.tryPromise({ try: () => runPass(active), catch: error => error }).pipe(
-        Effect.catchCause(cause =>
-          Effect.sync(() => {
-            context.logger.warn('usage: indexing pass failed: %s', Cause.squash(cause))
-          }),
-        ),
-      )
-      yield* Effect.sleep(Duration.millis(INDEX_INTERVAL_MS))
-    }),
-  )
-
-const host = defineHost({
-  ...effectPlugin,
+export default DshxPlugin.make({
   name: 'usage',
-  apis: [api],
+  layer: UsageLive,
+  apis: [
+    Api.bind(usageApi, {
+      requests: input => UsageRepo.use(repo => repo.requests(input)),
+      charts: input => UsageRepo.use(repo => repo.charts(input)),
+      status: () => Indexer.use(indexer => indexer.status),
+      refresh: () => Indexer.use(indexer => Effect.andThen(indexer.pass, indexer.status)),
+      jevUsage: input => UsageRepo.use(repo => repo.jevUsage(input)),
+      recordJevUsage: (input, call) => recordJevUsage({ record: input, caller: call.caller }),
+      activity: input =>
+        Effect.gen(function* () {
+          const query = yield* Effect.fromResult(resolveActivityQuery(input, yield* Clock.currentTimeMillis))
+          return yield* UsageRepo.use(repo => repo.activity({ ...query, eventLimit: query.eventLimit ?? 50 }))
+        }),
+      otelMetrics: input =>
+        Effect.gen(function* () {
+          const range = yield* Effect.fromResult(resolveOtelMetricsRange(input, yield* Clock.currentTimeMillis))
+          return yield* UsageRepo.use(repo => repo.otelMetrics({ ...range, temporality: 'delta', serviceName: otlpServiceName }))
+        }),
+    }),
+  ],
 })
-
-export default host

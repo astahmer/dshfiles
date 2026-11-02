@@ -1,7 +1,8 @@
-import { stat } from 'node:fs/promises'
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
-import { createPricingCatalog, DEFAULT_PRICING_PATH, PricingCatalogModel, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
-import type { Rates, RouteBand, UsageStore } from './store.js'
+import { PricingCatalogModel, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
+import { Context, Effect, FileSystem, Layer, Option, Ref, Schema } from 'effect'
+import type { UsageStoreFailed } from './errors.js'
+import { type Rates, type RouteBand, UsageRepo } from './store.js'
 
 /**
  * Prices come from AI Accounts' models.dev catalog, the same file its cost
@@ -11,6 +12,7 @@ import type { Rates, RouteBand, UsageStore } from './store.js'
  */
 
 const PER_MILLION = 1_000_000
+const decodeCatalog = Schema.decodeUnknownEffect(Schema.fromJsonString(PricingCatalogModel.cacheSchema))
 
 /** USD per million tokens for one route at one context band, tiers included. */
 export const ratesAt = (input: { readonly price: Parameters<typeof CostEstimateModel.costOfTokens>[0]['price']; readonly band: number }): Rates => {
@@ -43,31 +45,57 @@ const ratesFor = (input: {
   return rates
 }
 
-/** Account instance id → kind, so subscription routes resolve their quote; empty when AI Accounts is absent. */
-export type AccountKinds = () => Promise<ReadonlyMap<string, string>>
+/** Account instance id → kind from AI Accounts, so subscription routes resolve their quote; empty when it is absent. */
+export class AccountKinds extends Context.Service<AccountKinds, { readonly read: Effect.Effect<ReadonlyMap<string, string>> }>()(
+  '@dshfiles/usage/AccountKinds',
+) {}
 
-export const createRatePricer = (options: { readonly store: UsageStore; readonly pricingPath?: string; readonly accountKinds?: AccountKinds }) => {
-  const accountKinds = options.accountKinds ?? (async () => new Map<string, string>())
-  const pricingPath = options.pricingPath ?? DEFAULT_PRICING_PATH
-  const catalog = createPricingCatalog({ path: pricingPath })
-  let loadedMtime = -1
-
-  /** Price new routes; re-price everything when the catalog file changed since the last call. */
-  const update = async (): Promise<void> => {
-    const mtime = (await stat(pricingPath).catch(() => undefined))?.mtimeMs ?? -1
-    const catalogChanged = mtime !== loadedMtime
-    if (catalogChanged) {
-      await catalog.load()
-      loadedMtime = mtime
-    }
-    const cache = catalog.current()
-    if (cache === null) return
-    const replace = catalogChanged || options.store.getMeta('pricingFetchedAt') !== String(cache.fetchedAt)
-    const routes = replace ? options.store.routeBands() : options.store.unratedRouteBands()
-    if (routes.length === 0 && !replace) return
-    options.store.writeRates({ rates: ratesFor({ cache, routes, kinds: await accountKinds() }), replace })
-    options.store.setMeta('pricingFetchedAt', String(cache.fetchedAt))
+export class Pricing extends Context.Service<
+  Pricing,
+  {
+    /** Price new routes; re-price everything when the catalog file changed since the last call. */
+    readonly update: Effect.Effect<void, UsageStoreFailed>
+    readonly fetchedAt: Effect.Effect<number | null>
   }
+>()('@dshfiles/usage/Pricing') {
+  static readonly layer = (input: { readonly catalogPath: string }) =>
+    Layer.effect(
+      Pricing,
+      Effect.gen(function* () {
+        const repo = yield* UsageRepo
+        const accountKinds = yield* AccountKinds
+        const fileSystem = yield* FileSystem.FileSystem
+        const catalog = yield* Ref.make<{ readonly mtimeMs: number; readonly cache: Option.Option<PricingCache> }>({ mtimeMs: -1, cache: Option.none() })
 
-  return { update, fetchedAt: (): number | null => catalog.current()?.fetchedAt ?? null }
+        const catalogMtime = fileSystem.stat(input.catalogPath).pipe(
+          Effect.map(info => Option.match(info.mtime, { onNone: () => 0, onSome: date => date.getTime() })),
+          Effect.orElseSucceed(() => -1),
+        )
+
+        // No catalog yet, or an unreadable one: keep the previous one; AI Accounts writes a fresh file on its next refresh.
+        const readCatalog = fileSystem.readFileString(input.catalogPath).pipe(Effect.flatMap(decodeCatalog), Effect.option)
+
+        const update = Effect.fn('usage pricing update')(function* () {
+          const mtimeMs = yield* catalogMtime
+          const previous = yield* Ref.get(catalog)
+          const catalogChanged = mtimeMs !== previous.mtimeMs
+          const loaded = catalogChanged ? yield* readCatalog : Option.none<PricingCache>()
+          const newer = Option.filter(loaded, cache => Option.match(previous.cache, { onNone: () => true, onSome: known => cache.fetchedAt > known.fetchedAt }))
+          const current = Option.orElse(newer, () => previous.cache)
+          yield* Ref.set(catalog, { mtimeMs: catalogChanged ? mtimeMs : previous.mtimeMs, cache: current })
+          if (Option.isNone(current)) return
+          const cache = current.value
+          const replace = catalogChanged || (yield* repo.getMeta('pricingFetchedAt')) !== String(cache.fetchedAt)
+          const routes = replace ? yield* repo.routeBands : yield* repo.unratedRouteBands
+          if (routes.length === 0 && !replace) return
+          yield* repo.writeRates({ rates: ratesFor({ cache, routes, kinds: yield* accountKinds.read }), replace })
+          yield* repo.setMeta({ key: 'pricingFetchedAt', value: String(cache.fetchedAt) })
+        })
+
+        return Pricing.of({
+          update: update(),
+          fetchedAt: Effect.map(Ref.get(catalog), state => Option.getOrNull(Option.map(state.cache, cache => cache.fetchedAt))),
+        })
+      }),
+    )
 }

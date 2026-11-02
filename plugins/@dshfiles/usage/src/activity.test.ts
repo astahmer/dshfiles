@@ -1,11 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Option, Path } from 'effect'
 import type { ToolExecutionRow } from './fold.js'
 import type { JevUsageRecord } from './jev-usage.js'
-import { openUsageStore } from './store.js'
+import { UsageRepo } from './store.js'
+import { PlatformTest, usageRepoTest } from './test-layers.js'
 
 const jevRecord: JevUsageRecord = {
   requestId: '00000000-0000-4000-8000-000000000000',
@@ -37,43 +36,42 @@ const toolRow = (
 })
 
 describe('usage activity telemetry', () => {
-  it('adds the tools table to an existing usage database without touching its Jev requests', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'usage-migration-'))
-    const path = join(directory, 'usage.db')
-    try {
+  it.effect('adopts a version-4 usage database: adds the tools table without touching its Jev requests', () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'usage-migration-' })
+      const filename = path.join(directory, 'usage.db')
       const now = Date.now()
-      const store = openUsageStore(path)
-      store.recordJevUsage({ ...jevRecord, requestId: '00000000-0000-4000-8000-000000000010', startedAt: now, durationMs: 12 })
-      store.close()
-      const previous = new DatabaseSync(path)
+      yield* UsageRepo.use(repo =>
+        repo.recordJevUsage({ ...jevRecord, requestId: '00000000-0000-4000-8000-000000000010', startedAt: now, durationMs: 12 }),
+      ).pipe(Effect.provide(usageRepoTest(filename)))
+      const previous = new DatabaseSync(filename)
       previous.exec(`
         DROP TABLE tools;
+        DROP TABLE effect_sql_migrations;
         PRAGMA user_version = 4;
         INSERT OR REPLACE INTO meta (key, value) VALUES ('foldVersion', '2');
         INSERT INTO files (path, session_id, offset, size, mtime_ms, state) VALUES ('/session/log', 'session-a', 10, 10, 1, '{}');
       `)
       previous.close()
-      const upgraded = openUsageStore(path)
-      try {
-        expect(upgraded.fileCursor('/session/log')).toBeUndefined()
-        upgraded.commitLogSlice({ ...emptySlice, tools: [toolRow({ id: 'session-a#1', name: 'new-tool', startedAt: now + 10, endedAt: now + 20 })] })
-        const report = upgraded.activity({ from: now, to: now + 100 })
+      yield* Effect.gen(function* () {
+        const upgraded = yield* UsageRepo
+        expect(yield* upgraded.fileCursor('/session/log')).toEqual(Option.none())
+        yield* upgraded.commitLogSlice({ ...emptySlice, tools: [toolRow({ id: 'session-a#1', name: 'new-tool', startedAt: now + 10, endedAt: now + 20 })] })
+        const report = yield* upgraded.activity({ from: now, to: now + 100 })
         expect(report.jev).toMatchObject({ calls: 1, successes: 1 })
         expect(report.tools).toEqual([expect.objectContaining({ name: 'new-tool', calls: 1 })])
-      } finally {
-        upgraded.close()
-      }
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
-  })
+      }).pipe(Effect.provide(usageRepoTest(filename)))
+    }).pipe(Effect.provide(PlatformTest)),
+  )
 
-  it('reports returned text as token estimates per tool, category and bucket', () => {
-    const store = openUsageStore(':memory:')
-    const day = 86_400_000
-    const start = Date.UTC(2026, 9, 1)
-    try {
-      store.commitLogSlice({
+  it.effect('reports returned text as token estimates per tool, category and bucket', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const day = 86_400_000
+      const start = Date.UTC(2026, 9, 1)
+      yield* store.commitLogSlice({
         ...emptySlice,
         tools: [
           toolRow({ id: 'session-a#1', name: 'bash', startedAt: start + 1_000, endedAt: start + 2_000, resultChars: 4_000 }),
@@ -81,7 +79,7 @@ describe('usage activity telemetry', () => {
           toolRow({ id: 'session-a#3', name: 'read', startedAt: start + day + 1_000, endedAt: start + day + 2_000 }),
         ],
       })
-      const report = store.activity({ from: start, to: start + 2 * day, bucket: 'day', tzOffsetMinutes: 0 })
+      const report = yield* store.activity({ from: start, to: start + 2 * day, bucket: 'day', tzOffsetMinutes: 0 })
       expect(report.totals).toMatchObject({ calls: 3, measuredCalls: 2, outputTokens: 1_001 })
       expect(report.tools.find(row => row.name === 'bash')).toMatchObject({ calls: 2, measuredCalls: 2, outputTokens: 1_001 })
       expect(report.tools.find(row => row.name === 'read')).toMatchObject({ calls: 1, measuredCalls: 0, outputTokens: 0 })
@@ -91,16 +89,14 @@ describe('usage activity telemetry', () => {
         { start, category: 'plugin', calls: 2, errors: 0, durationMs: 2_000, outputTokens: 1_001 },
         { start: start + day, category: 'plugin', calls: 1, errors: 0, durationMs: 1_000, outputTokens: 0 },
       ])
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('keeps category totals exact when the per-tool table is capped', () => {
-    const store = openUsageStore(':memory:')
-    const now = Date.now()
-    try {
-      store.commitLogSlice({
+  it.effect('keeps category totals exact when the per-tool table is capped', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const now = Date.now()
+      yield* store.commitLogSlice({
         path: '/session/log',
         sessionId: 'session-a',
         offset: 1,
@@ -123,36 +119,32 @@ describe('usage activity telemetry', () => {
           outcome: 'success',
         })),
       })
-      const report = store.activity({ from: now, to: now + 2 })
+      const report = yield* store.activity({ from: now, to: now + 2 })
       expect(report.tools).toHaveLength(100)
       expect(report.categories).toEqual([{ category: 'mcp', calls: 101, outputTokens: 0 }])
       expect(report.categoryOutcomes[0]).toMatchObject({ calls: 101, successes: 101, errors: 0, successRate: 1 })
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('prunes tool executions past retention and leaves Jev requests to their own recorder', () => {
-    const store = openUsageStore(':memory:')
-    const now = Date.now()
-    try {
+  it.effect('prunes tool executions past retention and leaves Jev requests to their own recorder', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const now = Date.now()
       const eventAt = now - 364 * 24 * 60 * 60 * 1_000
-      store.commitLogSlice({ ...emptySlice, tools: [toolRow({ id: 'session-a#1', name: 'old-tool', startedAt: eventAt, endedAt: eventAt + 1 })] })
-      store.recordJevUsage({ ...jevRecord, requestId: '00000000-0000-4000-8000-000000000011', startedAt: eventAt })
-      store.pruneTelemetry(now + 2 * 24 * 60 * 60 * 1_000)
-      const report = store.activity({ from: eventAt - 1, to: eventAt + 1 })
+      yield* store.commitLogSlice({ ...emptySlice, tools: [toolRow({ id: 'session-a#1', name: 'old-tool', startedAt: eventAt, endedAt: eventAt + 1 })] })
+      yield* store.recordJevUsage({ ...jevRecord, requestId: '00000000-0000-4000-8000-000000000011', startedAt: eventAt })
+      yield* store.pruneTelemetry(now + 2 * 24 * 60 * 60 * 1_000)
+      const report = yield* store.activity({ from: eventAt - 1, to: eventAt + 1 })
       expect(report.tools).toEqual([])
       expect(report.jev.calls).toBe(1)
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('expires stale pending calls while preserving recent ones', () => {
-    const store = openUsageStore(':memory:')
-    const now = Date.now()
-    try {
-      store.commitLogSlice({
+  it.effect('expires stale pending calls while preserving recent ones', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const now = Date.now()
+      yield* store.commitLogSlice({
         path: '/session/log',
         sessionId: 'session-a',
         offset: 1,
@@ -190,22 +182,20 @@ describe('usage activity telemetry', () => {
           },
         ],
       })
-      store.pruneTelemetry(now)
-      const report = store.activity({ from: now - 3 * 24 * 60 * 60 * 1_000, to: now + 1 })
+      yield* store.pruneTelemetry(now)
+      const report = yield* store.activity({ from: now - 3 * 24 * 60 * 60 * 1_000, to: now + 1 })
       expect(report.tools).toEqual([
         expect.objectContaining({ name: 'live-tool', pending: 1, unknown: 0 }),
         expect.objectContaining({ name: 'pending-tool', pending: 0, unknown: 1 }),
       ])
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 
-  it('reports tool executions and Jev outcomes without storing sensitive payloads', () => {
-    const store = openUsageStore(':memory:')
-    const now = Date.now()
-    try {
-      store.commitLogSlice({
+  it.effect('reports tool executions and Jev outcomes without storing sensitive payloads', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const now = Date.now()
+      yield* store.commitLogSlice({
         path: '/session/log',
         sessionId: 'session-a',
         offset: 1,
@@ -247,7 +237,7 @@ describe('usage activity telemetry', () => {
           },
         ],
       })
-      store.recordJevUsage({
+      yield* store.recordJevUsage({
         ...jevRecord,
         requestId: '00000000-0000-4000-8000-000000000001',
         source: 'backlog',
@@ -266,9 +256,9 @@ describe('usage activity telemetry', () => {
         inputTokens: null,
         outputTokens: null,
       } as const
-      store.recordJevUsage(failed)
-      store.recordJevUsage(failed)
-      const report = store.activity({ from: now, to: now + 1_000 })
+      yield* store.recordJevUsage(failed)
+      yield* store.recordJevUsage(failed)
+      const report = yield* store.activity({ from: now, to: now + 1_000 })
       expect(report.tools).toEqual([
         expect.objectContaining({
           name: 'shell.run',
@@ -319,7 +309,7 @@ describe('usage activity telemetry', () => {
         { runner: 'pnpm:test:e2e', calls: 1, totalDurationMs: 500, successes: 0, errors: 1, interrupted: 0, unknown: 0, pending: 0 },
         { runner: 'pnpm:test', calls: 1, totalDurationMs: 200, successes: 1, errors: 0, interrupted: 0, unknown: 0, pending: 0 },
       ])
-      const pluginReport = store.activity({ from: now, to: now + 1_000, category: 'plugin' })
+      const pluginReport = yield* store.activity({ from: now, to: now + 1_000, category: 'plugin' })
       expect(pluginReport.commandDistribution).toEqual([{ command: 'pnpm test:e2e', calls: 1, totalDurationMs: 500 }])
       expect(pluginReport.commandDurationTotalMs).toBe(500)
       expect(report.events).toEqual(
@@ -354,8 +344,8 @@ describe('usage activity telemetry', () => {
         ],
       })
       expect(JSON.stringify(report)).not.toContain('Legacy / unknown')
-      store.syncToolSources(new Map([['shell.run', { category: 'api', owner: '@dshfiles/terminal' }]]))
-      const reclassified = store.activity({ from: now, to: now + 1_000 })
+      yield* store.syncToolSources(new Map([['shell.run', { category: 'api', owner: '@dshfiles/terminal' }]]))
+      const reclassified = yield* store.activity({ from: now, to: now + 1_000 })
       expect(reclassified.tools).toEqual([
         expect.objectContaining({
           name: 'shell.run',
@@ -370,15 +360,13 @@ describe('usage activity telemetry', () => {
       ])
       expect(reclassified.categories).toEqual([{ category: 'api', calls: 2, outputTokens: 0 }])
       expect(reclassified.categoryOutcomes[0]).toMatchObject({ category: 'api', calls: 2, successes: 1, errors: 1, successRate: 0.5 })
-      const limited = store.activity({ from: now, to: now + 1_000, category: 'tool', limit: 1, eventLimit: 1 })
+      const limited = yield* store.activity({ from: now, to: now + 1_000, category: 'tool', limit: 1, eventLimit: 1 })
       expect(limited.tools).toHaveLength(0)
       expect(limited.events).toHaveLength(1)
       expect(limited.events[0]?.kind).toBe('tool')
-      const bounded = store.activity({ from: now, to: now + 1_000, eventLimit: 2 })
+      const bounded = yield* store.activity({ from: now, to: now + 1_000, eventLimit: 2 })
       expect(bounded.events).toHaveLength(2)
       expect(bounded.events.map(event => event.kind)).toEqual(['tool', 'jev'])
-    } finally {
-      store.close()
-    }
-  })
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 })

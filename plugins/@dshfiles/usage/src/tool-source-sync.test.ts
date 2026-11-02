@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import type { RegistryToolSource } from '@dshfiles/dshx/api'
-import { expect, it } from 'vitest'
+import { expect, it } from '@effect/vitest'
+import { Effect, Schema } from 'effect'
+import { SqlClient } from 'effect/sql'
 import type { ToolExecutionRow } from './fold.js'
-import { openUsageStore } from './store.js'
+import { UsageRepo } from './store.js'
+import { usageRepoTest } from './test-layers.js'
+
+const decodeCount = Schema.decodeUnknownEffect(Schema.Tuple([Schema.Struct({ count: Schema.Number })]))
 
 type ToolSource = { readonly category: RegistryToolSource; readonly owner: string | null }
 
@@ -32,15 +33,12 @@ const createToolRow = (input: {
   resultChars: null,
 })
 
-it('skips unchanged tool-source updates while reclassifying changed non-skill metadata', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'usage-tool-source-sync-'))
-  const path = join(directory, 'usage.db')
-  const now = Date.now()
-  const store = openUsageStore(path)
-  const observer = new DatabaseSync(path)
-
-  try {
-    store.commitLogSlice({
+it.effect('skips unchanged tool-source updates while reclassifying changed non-skill metadata', () =>
+  Effect.gen(function* () {
+    const now = Date.now()
+    const store = yield* UsageRepo
+    const sql = yield* SqlClient.SqlClient
+    yield* store.commitLogSlice({
       path: '/session/log',
       sessionId: 'session-a',
       offset: 1,
@@ -54,50 +52,46 @@ it('skips unchanged tool-source updates while reclassifying changed non-skill me
         createToolRow({ id: 'session-a#2', name: 'skill.run', category: 'skill', owner: null, startedAt: now }),
       ],
     })
-    observer.exec(`
-      CREATE TABLE sync_update_count (count INTEGER NOT NULL);
-      INSERT INTO sync_update_count VALUES (0);
-      CREATE TRIGGER count_tool_updates AFTER UPDATE OF category, owner ON tools
-      BEGIN UPDATE sync_update_count SET count = count + 1; END;
-    `)
+    yield* sql.unsafe('CREATE TABLE sync_update_count (count INTEGER NOT NULL)')
+    yield* sql.unsafe('INSERT INTO sync_update_count VALUES (0)')
+    yield* sql.unsafe('CREATE TRIGGER count_tool_updates AFTER UPDATE OF category, owner ON tools BEGIN UPDATE sync_update_count SET count = count + 1; END')
     const sources = new Map<string, ToolSource>([
       ['task.run', { category: 'api', owner: '@dshfiles/terminal' }],
       ['skill.run', { category: 'plugin', owner: '@dshfiles/terminal' }],
     ])
-    const readUpdateCount = (): number => Number(observer.prepare('SELECT count FROM sync_update_count').get()?.count)
+    const readUpdateCount = sql.unsafe('SELECT count FROM sync_update_count').pipe(
+      Effect.flatMap(decodeCount),
+      Effect.map(([row]) => row.count),
+    )
 
-    store.syncToolSources(sources)
-    expect(store.activity({ from: now, to: now + 1_000 }).tools).toEqual(
+    yield* store.syncToolSources(sources)
+    expect((yield* store.activity({ from: now, to: now + 1_000 })).tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: 'task.run', category: 'api', owner: '@dshfiles/terminal' })]),
     )
-    expect(readUpdateCount()).toBe(1)
-    store.syncToolSources(sources)
-    expect(readUpdateCount()).toBe(1)
+    expect(yield* readUpdateCount).toBe(1)
+    yield* store.syncToolSources(sources)
+    expect(yield* readUpdateCount).toBe(1)
 
     const changedCategory = new Map<string, ToolSource>([
       ['task.run', { category: 'mcp', owner: '@dshfiles/terminal' }],
       ['skill.run', { category: 'plugin', owner: '@dshfiles/terminal' }],
     ])
-    store.syncToolSources(changedCategory)
-    expect(readUpdateCount()).toBe(2)
+    yield* store.syncToolSources(changedCategory)
+    expect(yield* readUpdateCount).toBe(2)
 
     const changedOwner = new Map<string, ToolSource>([
       ['task.run', { category: 'mcp', owner: null }],
       ['skill.run', { category: 'plugin', owner: '@dshfiles/terminal' }],
     ])
-    store.syncToolSources(changedOwner)
-    expect(readUpdateCount()).toBe(3)
+    yield* store.syncToolSources(changedOwner)
+    expect(yield* readUpdateCount).toBe(3)
 
-    const report = store.activity({ from: now, to: now + 1_000 })
+    const report = yield* store.activity({ from: now, to: now + 1_000 })
     expect(report.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'skill.run', category: 'skill', owner: null }),
         expect.objectContaining({ name: 'task.run', category: 'mcp', owner: null }),
       ]),
     )
-  } finally {
-    observer.close()
-    store.close()
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
+  }).pipe(Effect.provide(usageRepoTest())),
+)

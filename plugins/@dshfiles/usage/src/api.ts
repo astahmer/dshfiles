@@ -1,5 +1,5 @@
 import { defineApi } from '@dshfiles/dshx/api'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import type * as SchemaTypes from 'effect/Schema'
 import * as Schema from 'effect/Schema'
 import { REQUEST_PURPOSES, REQUEST_STATUSES } from './fold-contracts.js'
@@ -210,9 +210,7 @@ export const chartViewSchema = Schema.Struct({
 export type ChartView = typeof chartViewSchema.Type
 
 /** The range a caller asked for cannot be resolved; the tool surfaces the message and the caller's next step. */
-export class UsageRangeError extends Schema.TaggedError<UsageRangeError>()('UsageRangeError', {
-  message: Schema.String,
-}) {}
+export class UsageRangeError extends Schema.TaggedError<UsageRangeError>()('UsageRangeError', { message: Schema.String }, { dshxWireCode: 'usage-range' }) {}
 
 const DAY_MS = 24 * 60 * 60 * 1_000
 const TOOL_CATEGORIES = ['api', 'mcp', 'plugin', 'tool', 'skill', 'other'] as const
@@ -250,19 +248,20 @@ type ResolvedActivityQuery = {
   tzOffsetMinutes: number
 }
 
-export const resolveActivityQuery = (input: typeof activityInputSchema.Type, now = Date.now()): ResolvedActivityQuery => {
-  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined))
-    throw new UsageRangeError({ message: 'days cannot be combined with from/to.' })
-  if ((input.from === undefined) !== (input.to === undefined)) throw new UsageRangeError({ message: 'Provide both from and to, or neither.' })
+const rangeError = (message: string) => Result.fail(new UsageRangeError({ message }))
+
+export const resolveActivityQuery = (input: typeof activityInputSchema.Type, now: number): Result.Result<ResolvedActivityQuery, UsageRangeError> => {
+  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined)) return rangeError('days cannot be combined with from/to.')
+  if ((input.from === undefined) !== (input.to === undefined)) return rangeError('Provide both from and to, or neither.')
   const to = input.to ?? now
-  if (to < (input.from ?? 0)) throw new UsageRangeError({ message: 'to must be at or after from.' })
+  if (to < (input.from ?? 0)) return rangeError('to must be at or after from.')
   const from = input.from ?? to - (input.days ?? 30) * DAY_MS
   // An hourly timeline over a long window would return tens of thousands of rows; a day bucket stays bounded.
   const bucket = input.bucket === 'hour' && to - from > 2 * DAY_MS ? 'day' : (input.bucket ?? 'day')
   const query: ResolvedActivityQuery = { from, to, bucket, tzOffsetMinutes: input.tzOffsetMinutes ?? 0, limit: input.limit ?? 10 }
   if (input.category !== undefined) query.category = input.category
   if (input.eventLimit !== undefined) query.eventLimit = input.eventLimit
-  return query
+  return Result.succeed(query)
 }
 
 const activityOutcomeSchema = Schema.Struct({
@@ -458,15 +457,17 @@ export const otelMetricsInputSchema = Schema.Struct({
   days: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(365))),
 })
 
-export const resolveOtelMetricsRange = (input: typeof otelMetricsInputSchema.Type, now = Date.now()) => {
-  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined))
-    throw new UsageRangeError({ message: 'days cannot be combined with from/to.' })
-  if ((input.from === undefined) !== (input.to === undefined)) throw new UsageRangeError({ message: 'Provide both from and to, or neither.' })
+export const resolveOtelMetricsRange = (
+  input: typeof otelMetricsInputSchema.Type,
+  now: number,
+): Result.Result<{ readonly from: number; readonly to: number }, UsageRangeError> => {
+  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined)) return rangeError('days cannot be combined with from/to.')
+  if ((input.from === undefined) !== (input.to === undefined)) return rangeError('Provide both from and to, or neither.')
   const to = input.to ?? now
   const from = input.from ?? Math.max(0, to - (input.days ?? 30) * DAY_MS)
-  if (to <= from) throw new UsageRangeError({ message: 'to must be after from.' })
-  if (to - from > 365 * DAY_MS) throw new UsageRangeError({ message: 'OTLP export range cannot exceed 365 days.' })
-  return { from, to }
+  if (to <= from) return rangeError('to must be after from.')
+  if (to - from > 365 * DAY_MS) return rangeError('OTLP export range cannot exceed 365 days.')
+  return Result.succeed({ from, to })
 }
 
 export const otelMetricsOutputSchema = otlpMetricsRequestSchema
