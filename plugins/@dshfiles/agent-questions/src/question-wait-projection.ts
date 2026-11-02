@@ -2,8 +2,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-llm'
 import { isTimedAskUserQuestionSchema } from '@deepseek-ai/dsh-user-questions'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
-import { z } from 'zod'
 
 const maximumTimeoutSeconds = 2_147_483
 
@@ -63,15 +63,6 @@ const decodeJsonText = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, 
 
 const pendingResultSchema = Schema.Struct({ pending: Schema.Literal(true) })
 const userQuestionReplySourceSchema = Schema.Struct({ kind: Schema.Literal('user-question-reply'), callId: Schema.String })
-const projectionCompatibilitySchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
-  z.custom<S['Type']>(value => {
-    try {
-      Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
-      return true
-    } catch {
-      return false
-    }
-  })
 
 export const defaultTimeoutFromDescription = (description: string | undefined): number | null => {
   if (description === undefined) return null
@@ -181,11 +172,11 @@ export const applyQuestionWaitEvent = (state: QuestionWaitState, event: SessionE
 
 export const questionWaitProjectionDefinition = {
   key: 'dshfilesQuestionWaits',
-  stateSchema: projectionCompatibilitySchema(questionWaitStateSchema),
+  stateSchema: zodSchemaFromEffect(questionWaitStateSchema),
   init: () => ({ timedToolConfigured: false, defaultTimeoutSeconds: null, active: [] }),
   apply: applyQuestionWaitEvent,
   wire: {
-    viewSchema: projectionCompatibilitySchema(questionWaitViewSchema),
+    viewSchema: zodSchemaFromEffect(questionWaitViewSchema),
     view: (state: QuestionWaitState) => ({ active: state.active }),
   },
   stateVersion: 1,

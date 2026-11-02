@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 
 const trimmedString = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
 const sessionIdSchema = trimmedString(1, 256)
@@ -133,18 +133,8 @@ export const parentQuestionRecordEffectSchema = Schema.Struct({
   }),
 )
 
-const strictPersistedSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
-  z.custom<S['Type']>(value => {
-    try {
-      Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
-      return true
-    } catch {
-      return false
-    }
-  })
-
-export const parentQuestionRecordSchema = strictPersistedSchema(parentQuestionRecordEffectSchema)
-export const revisionedFeedbackRecordSchema = strictPersistedSchema(revisionedFeedbackRecordEffectSchema)
+export const parentQuestionRecordSchema = zodSchemaFromEffect(parentQuestionRecordEffectSchema)
+export const revisionedFeedbackRecordSchema = zodSchemaFromEffect(revisionedFeedbackRecordEffectSchema)
 
 export type ParentQuestionOption = typeof parentQuestionOptionSchema.Type
 export type ParentQuestionRecord = typeof parentQuestionRecordEffectSchema.Type
