@@ -6,7 +6,7 @@ import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 75, definedTools: 24, tools: 99 }
+const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 74, definedTools: 24, tools: 98 }
 const effectSchemaChangedTools = new Set(['traces_alert_delete', 'traces_alert_save', 'traces_breakdown', 'traces_clear'])
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
