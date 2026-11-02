@@ -44,8 +44,7 @@
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sidebar-right": "workspace:*",
     "dockview-react": "8.4.1",
-    "effect": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
