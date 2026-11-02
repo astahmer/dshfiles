@@ -102,7 +102,9 @@ const bootAlone = async plugin => {
 const bootComposed = async (plugins, ignoredIds, includeSourceProfileBundles = true) => {
   const profile = await prepareComposedBootProfile(
     plugins.map(plugin => ({ projectRoot: plugin.dir, packageId: plugin.id })),
-    includeSourceProfileBundles ? { sourceProfileRoot, includeSourceProfileBundles: true } : {},
+    // Always read the checked-in seed: the defaults fall back to the operator's live ~/.dsh profile, which a CI
+    // runner does not have.
+    { sourceProfileRoot, includeSourceProfileBundles },
   )
   try {
     return await checkClientBoot({
