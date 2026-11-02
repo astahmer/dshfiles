@@ -5857,17 +5857,18 @@
         "type": "object",
         "properties": {
           "pageId": {
-            "type": "string",
-            "description": "Preview page id from preview_open or preview_list, e.g. \"p1\"."
+            "description": "Preview page id from preview_open or preview_list, e.g. \"p1\".",
+            "type": "string"
           },
           "fullPage": {
-            "type": "boolean",
-            "description": "Capture the whole scrollable page instead of the viewport."
+            "description": "Capture the whole scrollable page instead of the viewport.",
+            "type": "boolean"
           }
         },
         "required": [
           "pageId"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
