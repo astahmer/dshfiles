@@ -78,8 +78,8 @@ export class ActivityTimelineAdapters {
     readonly outcome: 'success' | 'failure'
     readonly callId: string
     readonly rootCallId: string | null
-    readonly correlationId?: string
-    readonly errorCode?: string | null
+    readonly correlationId?: string | undefined
+    readonly errorCode?: string | null | undefined
   }): ActivityIngest => ({
     id: `communication:activity:${input.callId}`,
     at: input.at,
