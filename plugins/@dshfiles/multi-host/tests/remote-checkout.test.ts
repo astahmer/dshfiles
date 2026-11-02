@@ -1,5 +1,7 @@
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
 import type { RemoteFacts } from '../src/remote-doctor.js'
+import { sshLayer } from './fixtures/ssh-runtime.js'
 import { RemoteCheckout } from '../src/remote-checkout.js'
 
 const factsOf = ({
@@ -59,7 +61,12 @@ describe('remote checkout sync', () => {
   })
 
   test('a dry run reports without applying', async () => {
-    const run = await RemoteCheckout.run({ sshTarget: 'example', facts: factsOf({ commitId: 'def400', mainOrigin: 'def456' }), bookmark: 'main', apply: false })
+    const run = await Effect.runPromise(
+      Effect.provide(
+        RemoteCheckout.run({ sshTarget: 'example', facts: factsOf({ commitId: 'def400', mainOrigin: 'def456' }), bookmark: 'main', apply: false }),
+        sshLayer,
+      ),
+    )
     expect(run).toMatchObject({ ok: true, applied: false })
     expect(run.detail).toContain('would fetch')
   })

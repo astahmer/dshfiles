@@ -3,15 +3,18 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import * as Schema from 'effect/Schema'
+import { Effect, Exit, ManagedRuntime, Schema, Scope } from 'effect'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import { GatewayUnavailableError } from '../src/connectors/gateway.js'
+import type { Gateway } from '../src/connectors/gateway.js'
 import { SshConnector } from '../src/connectors/ssh.js'
 import { RuntimeLaunchFile } from '../src/launch-file.js'
 import { MultiHostSchema } from '../src/schema.js'
+import { Ssh, type SshRun } from '../src/ssh.js'
+import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
 
-// Characterization of the ssh process and tunnel contract before it moves onto an Effect `Ssh` service. Only the
-// ssh executable is faked: a script on PATH that runs the "remote" command locally and fakes `-L` with a TCP proxy.
+// Characterization of the ssh process and tunnel contract, pinned before it moved onto the Effect `Ssh` service and
+// kept as its spec. Only the ssh executable is faked: a script on PATH that runs the "remote" command locally and
+// fakes `-L` with a TCP proxy. A cancelled request is an interrupted fiber, read here as `cancelled`.
 
 const fixturePath = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-ssh.mjs')
 const target = 'tester@fake-host'
@@ -26,13 +29,30 @@ const scratch = async (prefix: string): Promise<string> => {
   return directory
 }
 
-const failureCode = async <Value>(run: () => Promise<Value>): Promise<string> => {
-  try {
-    await run()
-    return 'no-error'
-  } catch (error) {
-    return error instanceof GatewayUnavailableError ? error.code : 'unexpected'
+const runtime = ManagedRuntime.make(sshLayer)
+
+const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
+  exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
+
+const run = (input: SshRun, signal?: AbortSignal) =>
+  runtime.runPromise(
+    Ssh.use(ssh => ssh.run(input)),
+    signal === undefined ? undefined : { signal },
+  )
+
+const runEffect = (input: SshRun) => Ssh.use(ssh => ssh.run(input))
+
+const probe = (input: { readonly sshTarget: string }) => SshConnector.probe(input)
+
+/** A gateway whose tunnel lives until `dispose` closes its Scope. */
+const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }): Promise<Gateway> => {
+  const scope = await runtime.runPromise(Scope.make())
+  const exit = await runtime.runPromiseExit(Scope.provide(scope)(SshConnector.connect(input)))
+  if (Exit.isFailure(exit)) {
+    await runtime.runPromise(Scope.close(scope, exit))
+    throw new Error(exitCode(exit))
   }
+  return { ...exit.value, dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)) }
 }
 
 const logLines = async (): Promise<string[]> => {
@@ -66,6 +86,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  await runtime.dispose()
   process.env.PATH = originalPath
   for (const directory of temporary.splice(0)) await rm(directory, { recursive: true, force: true })
 })
@@ -79,7 +100,7 @@ beforeEach(async () => {
 
 describe('ssh run', () => {
   test('passes BatchMode options and the target before the remote command', async () => {
-    await SshConnector.run({ sshTarget: target, command: 'true' })
+    await run({ sshTarget: target, command: 'true' })
     const argv = JSON.parse((await logLines()).find(line => line.startsWith('argv '))?.slice(5) ?? '[]')
     expect(argv).toEqual([
       '-o',
@@ -104,46 +125,44 @@ describe('ssh run', () => {
   })
 
   test('a non-zero remote exit is a value with both streams, not a failure', async () => {
-    const result = await SshConnector.run({ sshTarget: target, command: 'echo out; echo err >&2; exit 3' })
+    const result = await run({ sshTarget: target, command: 'echo out; echo err >&2; exit 3' })
     expect(result).toMatchObject({ code: 3, stdout: 'out\n', stderr: 'err\n', timedOut: false, outputExceeded: false })
     expect(result.durationMs).toBeGreaterThanOrEqual(0)
   })
 
   test('a run past its time limit resolves with timedOut and a null code', async () => {
-    const result = await SshConnector.run({ sshTarget: target, command: 'sleep 5', timeoutMs: 200 })
+    const result = await run({ sshTarget: target, command: 'sleep 5', timeout: 200 })
     expect(result).toMatchObject({ code: null, timedOut: true, outputExceeded: false })
     expect(result.durationMs).toBeLessThan(2_000)
   })
 
   test('output past its byte limit stops the process and flags outputExceeded, keeping only what fit', async () => {
-    const result = await SshConnector.run({ sshTarget: target, command: 'printf 1234567890; sleep 5', maxOutputBytes: 4 })
+    const result = await run({ sshTarget: target, command: 'printf 1234567890; sleep 5', maxOutputBytes: 4 })
     expect(result).toMatchObject({ outputExceeded: true, timedOut: false, stdout: '' })
     expect(result.durationMs).toBeLessThan(4_000)
   })
 
   test('stdin bytes reach the remote command', async () => {
-    const result = await SshConnector.run({ sshTarget: target, command: 'wc -c', stdin: new TextEncoder().encode('hello') })
+    const result = await run({ sshTarget: target, command: 'wc -c', stdin: new TextEncoder().encode('hello') })
     expect(result.stdout.trim()).toBe('5')
   })
 
   test('stdin over 60 MiB is refused before ssh starts', async () => {
-    expect(await failureCode(() => SshConnector.run({ sshTarget: target, command: 'true', stdin: new Uint8Array(60 * 1024 * 1024 + 1) }))).toBe(
-      'ssh-input-too-large',
-    )
+    expect(await failureCode(runEffect({ sshTarget: target, command: 'true', stdin: new Uint8Array(60 * 1024 * 1024 + 1) }))).toBe('ssh-input-too-large')
     expect(await logLines()).toEqual([])
   })
 
   test('an already-aborted signal is refused before ssh starts', async () => {
     const controller = new AbortController()
     controller.abort()
-    expect(await failureCode(() => SshConnector.run({ sshTarget: target, command: 'true', signal: controller.signal }))).toBe('cancelled')
+    expect(await failureCode(runEffect({ sshTarget: target, command: 'true' }), controller.signal)).toBe('cancelled')
     expect(await logLines()).toEqual([])
   })
 
   test('cancelling rejects at once, then stops ssh with SIGTERM and SIGKILL after the grace period', async () => {
     process.env.FAKE_SSH_IGNORE_TERM = '1'
     const controller = new AbortController()
-    const running = failureCode(() => SshConnector.run({ sshTarget: target, command: 'sleep 4', signal: controller.signal }))
+    const running = failureCode(runEffect({ sshTarget: target, command: 'sleep 4' }), controller.signal)
     await expect.poll(fakePid).toBeGreaterThan(0)
     const pid = await fakePid()
     controller.abort()
@@ -156,14 +175,14 @@ describe('ssh run', () => {
   test('a missing ssh executable rejects with ssh-unavailable', async () => {
     process.env.PATH = '/nonexistent'
     try {
-      expect(await failureCode(() => SshConnector.run({ sshTarget: target, command: 'true' }))).toBe('ssh-unavailable')
+      expect(await failureCode(runEffect({ sshTarget: target, command: 'true' }))).toBe('ssh-unavailable')
     } finally {
       process.env.PATH = `${binDirectory}:${originalPath ?? ''}`
     }
   })
 
   test('a shell-shaped target is refused before ssh starts', async () => {
-    await expect(SshConnector.run({ sshTarget: 'host; rm -rf /', command: 'true' })).rejects.toThrow()
+    expect(await failureCode(runEffect({ sshTarget: 'host; rm -rf /', command: 'true' }))).toBe('invalid-ssh-target')
     expect(await logLines()).toEqual([])
   })
 })
@@ -180,20 +199,20 @@ describe('ssh command failures map to stable codes', () => {
   ])('probe stderr %j → %s', async (stderr, code) => {
     process.env.FAKE_SSH_FORCE_STDERR = stderr
     try {
-      expect(await failureCode(() => SshConnector.probe({ sshTarget: target }))).toBe(code)
+      expect(await failureCode(probe({ sshTarget: target }))).toBe(code)
     } finally {
       delete process.env.FAKE_SSH_FORCE_STDERR
     }
   })
 
   test('a probe that succeeds resolves', async () => {
-    expect(await failureCode(() => SshConnector.probe({ sshTarget: target }))).toBe('no-error')
+    expect(await failureCode(probe({ sshTarget: target }))).toBe('no-error')
   })
 
   test('a command over the default 128 KiB output limit is ssh-output-too-large', async () => {
     process.env.FAKE_SSH_FORCE_STDOUT_BYTES = String(200 * 1024)
     try {
-      expect(await failureCode(() => SshConnector.probe({ sshTarget: target }))).toBe('ssh-output-too-large')
+      expect(await failureCode(probe({ sshTarget: target }))).toBe('ssh-output-too-large')
     } finally {
       delete process.env.FAKE_SSH_FORCE_STDOUT_BYTES
     }
@@ -239,7 +258,7 @@ describe('ssh tunnel connect', () => {
     const runtime = await startRuntimeFixture()
     closers.push(runtime.close)
     const remoteHome = await remoteHomeWithLaunch(runtime.port)
-    const gateway = await SshConnector.connect({ sshTarget: target, remoteHome })
+    const gateway = await connect({ sshTarget: target, remoteHome })
     closers.push(() => gateway.dispose())
     expect(new URL(gateway.origin).hostname).toBe('127.0.0.1')
     expect(new URL(gateway.origin).port).not.toBe(String(runtime.port))
@@ -255,7 +274,7 @@ describe('ssh tunnel connect', () => {
   test('disposing the gateway stops the tunnel process and settles closed', async () => {
     const runtime = await startRuntimeFixture()
     closers.push(runtime.close)
-    const gateway = await SshConnector.connect({ sshTarget: target, remoteHome: await remoteHomeWithLaunch(runtime.port) })
+    const gateway = await connect({ sshTarget: target, remoteHome: await remoteHomeWithLaunch(runtime.port) })
     const pids = (await logLines()).filter(line => line.startsWith('pid ')).map(line => Number(line.slice(4)))
     const tunnelPid = pids.at(-1) ?? 0
     expect(isAlive(tunnelPid)).toBe(true)
@@ -267,7 +286,7 @@ describe('ssh tunnel connect', () => {
   test('a tunnel process that dies on its own settles closed', async () => {
     const runtime = await startRuntimeFixture()
     closers.push(runtime.close)
-    const gateway = await SshConnector.connect({ sshTarget: target, remoteHome: await remoteHomeWithLaunch(runtime.port) })
+    const gateway = await connect({ sshTarget: target, remoteHome: await remoteHomeWithLaunch(runtime.port) })
     closers.push(() => gateway.dispose())
     const tunnelPid = (await logLines())
       .filter(line => line.startsWith('pid '))
@@ -279,7 +298,7 @@ describe('ssh tunnel connect', () => {
 
   test('a remote home without a launch file is runtime-not-running and opens no tunnel', async () => {
     const remoteHome = await scratch('multi-host-fake-remote-empty-')
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome }))).toBe('runtime-not-running')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome }))).toBe('runtime-not-running')
     expect((await logLines()).filter(line => line.startsWith('argv '))).toHaveLength(1)
   })
 
@@ -288,23 +307,23 @@ describe('ssh tunnel connect', () => {
     const port = runtime.port
     await runtime.close()
     const remoteHome = await remoteHomeWithLaunch(port)
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome }))).toBe('runtime-not-running')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome }))).toBe('runtime-not-running')
   })
 
   test('a forward that exits before its readiness line is tunnel-failed', async () => {
     process.env.FAKE_SSH_TUNNEL = 'exit'
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('tunnel-failed')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('tunnel-failed')
   })
 
   test('a forward that exits with a recognizable ssh error keeps that error code', async () => {
     process.env.FAKE_SSH_TUNNEL = 'refused'
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('ssh-unreachable')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('ssh-unreachable')
   })
 
   test('a forward that never reports readiness is tunnel-timeout after 12 s and its process is stopped', async () => {
     process.env.FAKE_SSH_TUNNEL = 'silent'
     const startedAt = Date.now()
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('tunnel-timeout')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('tunnel-timeout')
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(11_900)
     const tunnelPid = (await logLines())
       .filter(line => line.startsWith('pid '))
@@ -316,7 +335,7 @@ describe('ssh tunnel connect', () => {
   test('cancelling while the forward starts rejects with cancelled and stops the process', async () => {
     process.env.FAKE_SSH_TUNNEL = 'silent'
     const controller = new AbortController()
-    const connecting = failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed, signal: controller.signal }))
+    const connecting = failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }), controller.signal)
     await expect.poll(async () => (await logLines()).filter(line => line.startsWith('argv ')).length).toBe(2)
     controller.abort()
     expect(await connecting).toBe('cancelled')

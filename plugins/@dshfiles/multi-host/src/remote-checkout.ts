@@ -1,4 +1,5 @@
-import { shellQuote } from './connectors/ssh.js'
+import { shellQuote } from './ssh.js'
+import { Effect } from 'effect'
 import { RemoteExec } from './remote-exec.js'
 import type { RemoteFacts } from './remote-doctor.js'
 
@@ -46,26 +47,25 @@ export interface CheckoutSyncRun {
   readonly detail: string
 }
 
-const runCheckoutSync = async ({
+const runCheckoutSync = Effect.fn('remote checkout sync')(function* ({
   sshTarget,
   facts,
   bookmark,
   apply,
-  signal,
 }: {
   readonly sshTarget: string
   readonly facts: RemoteFacts
   readonly bookmark: string
   readonly apply: boolean
-  readonly signal?: AbortSignal | undefined
-}): Promise<CheckoutSyncRun> => {
+}) {
   const plan = planCheckoutSync({ facts, bookmark, apply })
-  if (!apply) return { ok: true, applied: false, plan, stdout: '', stderr: '', detail: plan.reason }
-  if (plan.upToDate || plan.commands.length === 0) return { ok: true, applied: false, plan, stdout: '', stderr: '', detail: plan.reason }
+  if (!apply) return { ok: true, applied: false, plan, stdout: '', stderr: '', detail: plan.reason } satisfies CheckoutSyncRun
+  if (plan.upToDate || plan.commands.length === 0)
+    return { ok: true, applied: false, plan, stdout: '', stderr: '', detail: plan.reason } satisfies CheckoutSyncRun
   let stdout = ''
   let stderr = ''
   for (const command of plan.commands) {
-    const result = await RemoteExec.run({ sshTarget, command, timeoutMs: 180_000, signal })
+    const result = yield* RemoteExec.run({ sshTarget, command, timeoutMs: 180_000 })
     stdout = `${stdout}${result.stdout}`.slice(-16_000)
     stderr = `${stderr}${result.stderr}`.slice(-8_000)
     if (!result.ok) {
@@ -76,11 +76,11 @@ const runCheckoutSync = async ({
         stdout,
         stderr,
         detail: result.timedOut ? `${command} timed out` : `${command} exited ${result.code ?? 'unknown'}`,
-      }
+      } satisfies CheckoutSyncRun
     }
   }
-  return { ok: true, applied: true, plan, stdout, stderr, detail: `fetched and rebased onto ${bookmark}@origin` }
-}
+  return { ok: true, applied: true, plan, stdout, stderr, detail: `fetched and rebased onto ${bookmark}@origin` } satisfies CheckoutSyncRun
+})
 
 export class RemoteCheckout {
   static readonly plan = planCheckoutSync

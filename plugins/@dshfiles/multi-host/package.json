@@ -35,6 +35,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:",
     "ws": "catalog:"
   },
@@ -56,12 +57,14 @@
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-projection": "catalog:",
     "@deepseek-ai/dsh-session-reference": "catalog:",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.2",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-token-meter": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/session-source-port": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "@types/ws": "catalog:",

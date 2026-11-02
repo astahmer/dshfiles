@@ -68,8 +68,9 @@ if (forward !== undefined) {
 } else {
   const command = positional.slice(1).join(' ')
   remoteCommand = spawn('sh', ['-c', command], { stdio: 'inherit' })
-  remoteCommand.on('exit', (code, signal) => {
-    if (process.env.FAKE_SSH_IGNORE_TERM === '1' && signal === null) setInterval(() => undefined, 60_000)
+  remoteCommand.on('exit', code => {
+    // DSH signals the whole process group, so the local stand-in for the remote command dies on SIGTERM too.
+    if (process.env.FAKE_SSH_IGNORE_TERM === '1') setInterval(() => undefined, 60_000)
     else process.exit(code ?? 255)
   })
 }

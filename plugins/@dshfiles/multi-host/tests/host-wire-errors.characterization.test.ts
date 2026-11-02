@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as Schema from 'effect/Schema'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import multiHostHost from '../src/host.js'
@@ -100,6 +101,8 @@ beforeAll(async () => {
   process.env.PATH = `${bin}:${originalPath ?? ''}`
   process.env.DSH_HOME = home
   host = await createTestHost()
+  // The real Host provides DSH's subprocess runtime; ssh runs through it.
+  await host.ctx.plugin(LocalSubprocessRuntime)
   await host.mount(multiHostHost, { packageId: '@dshfiles/multi-host', config: {} })
   expect(await call('hostUpsert', { id: 'local-host', name: 'Local', connector: { kind: 'local' } })).toEqual({ shape: 'success' })
 })

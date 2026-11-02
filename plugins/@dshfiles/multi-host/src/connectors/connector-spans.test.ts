@@ -3,7 +3,6 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { connectGateway } from './gateway.js'
-import { SshConnector } from './ssh.js'
 
 const servers: Server[] = []
 
@@ -43,13 +42,5 @@ describe('multi-host connector spans', () => {
     expect(span.status.code).toBe('error')
     expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-argument|synthetic-token/)
     await gateway.dispose()
-  })
-
-  it('records an ssh command span that fails on a refused target before ssh starts', async () => {
-    using recorder = recordSpans()
-    await expect(SshConnector.run({ sshTarget: '-oProxyCommand=evil', command: 'true' })).rejects.toThrow()
-    const span = recorder.span('ssh command')
-    expect(span.status.code).toBe('error')
-    expect(JSON.stringify(span.attributes)).not.toContain('evil')
   })
 })

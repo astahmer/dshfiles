@@ -1,5 +1,6 @@
 import { posix } from 'node:path'
-import { shellQuote } from './connectors/ssh.js'
+import { shellQuote } from './ssh.js'
+import { Effect } from 'effect'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteRuntime } from './remote-runtime.js'
@@ -284,19 +285,11 @@ const stepTimeouts: Record<ProvisionStepId, number> = {
   runtime: 180_000,
 }
 
-const runStep = async ({
-  sshTarget,
-  step,
-  signal,
-}: {
-  readonly sshTarget: string
-  readonly step: ProvisionPlanStep
-  readonly signal?: AbortSignal | undefined
-}): Promise<ProvisionStepRun> => {
+const runStep = Effect.fnUntraced(function* ({ sshTarget, step }: { readonly sshTarget: string; readonly step: ProvisionPlanStep }) {
   let stdout = ''
   let stderr = ''
   for (const command of step.commands) {
-    const result = await RemoteExec.run({ sshTarget, command, timeoutMs: stepTimeouts[step.id], signal })
+    const result = yield* RemoteExec.run({ sshTarget, command, timeoutMs: stepTimeouts[step.id] })
     stdout = `${stdout}${result.stdout}`.slice(-16_000)
     stderr = `${stderr}${result.stderr}`.slice(-8_000)
     if (!result.ok) {
@@ -307,24 +300,23 @@ const runStep = async ({
         detail: result.timedOut ? `${step.id} timed out` : `${step.id} exited ${result.code ?? 'unknown'}`,
         stdout,
         stderr,
-      }
+      } satisfies ProvisionStepRun
     }
   }
-  return { id: step.id, ok: true, state: 'ran', detail: step.reason, stdout, stderr }
-}
+  return { id: step.id, ok: true, state: 'ran', detail: step.reason, stdout, stderr } satisfies ProvisionStepRun
+})
 
 /**
  * Run named provisioning steps. `confirm: 'all'` runs every named step in order; `confirm: 'next'` runs exactly one
  * step per call, so every step is its own explicit opt-in. Nothing runs while `dryRun` is set.
  */
-const runProvision = async ({
+const runProvision = Effect.fn('remote provision run')(function* ({
   sshTarget,
   facts,
   options,
   steps,
   confirm,
   dryRun,
-  signal,
 }: {
   readonly sshTarget: string
   readonly facts: RemoteFacts
@@ -332,13 +324,13 @@ const runProvision = async ({
   readonly steps: readonly ProvisionStepId[]
   readonly confirm: 'all' | 'next'
   readonly dryRun: boolean
-  readonly signal?: AbortSignal | undefined
-}): Promise<ProvisionRun> => {
+}) {
   const plan = planProvision({ facts, options }).filter(step => steps.includes(step.id))
-  if (dryRun) return { executed: [], remaining: plan.filter(step => step.state !== 'done').map(step => step.id) }
+  if (dryRun) return { executed: [], remaining: plan.filter(step => step.state !== 'done').map(step => step.id) } satisfies ProvisionRun
   const runnable = plan.filter(step => steps.includes(step.id))
   const selected = confirm === 'next' ? runnable.slice(0, 1) : runnable
   const executed: ProvisionStepRun[] = []
+  // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- steps run in plan order and stop at the first failure.
   for (const step of selected) {
     if (step.state === 'done') {
       executed.push({ id: step.id, ok: true, state: 'skipped', detail: step.reason, stdout: '', stderr: '' })
@@ -348,13 +340,13 @@ const runProvision = async ({
       executed.push({ id: step.id, ok: false, state: 'blocked', detail: step.reason, stdout: '', stderr: '' })
       break
     }
-    const result = await runStep({ sshTarget, step, signal })
+    const result = yield* runStep({ sshTarget, step })
     executed.push(result)
     if (!result.ok) break
   }
   const done = new Set(executed.filter(result => result.ok).map(result => result.id))
-  return { executed, remaining: runnable.filter(step => !done.has(step.id)).map(step => step.id) }
-}
+  return { executed, remaining: runnable.filter(step => !done.has(step.id)).map(step => step.id) } satisfies ProvisionRun
+})
 
 export class RemoteProvision {
   static readonly stepIds = provisionStepIds

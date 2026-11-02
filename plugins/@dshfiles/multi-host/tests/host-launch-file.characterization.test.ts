@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { afterEach, describe, expect, test } from 'vitest'
 import multiHostHost from '../src/host.js'
@@ -22,6 +23,8 @@ const mountWithWebServer = async () => {
   homes.push(home)
   process.env.DSH_HOME = home
   const host = await createTestHost()
+  // The real Host provides DSH's subprocess runtime; ssh runs through it.
+  await host.ctx.plugin(LocalSubprocessRuntime)
   const connection = host.ctx.get('connection')
   if (connection === undefined) throw new Error('The test Host provides a connection.')
   host.connection.dispose()
