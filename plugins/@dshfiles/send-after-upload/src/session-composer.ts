@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { Option, Schema } from 'effect'
 import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, SessionInput } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { z } from 'zod'
 import { startPendingSend, type ComposerView, type PendingSendActor, type PendingSendPorts, type UploadStatus } from './pending-send-machine.js'
 
 /**
@@ -17,14 +17,15 @@ interface ConversationWithInput {
   readonly input: { for(ctx: Context): SessionInput }
 }
 
-const conversationSchema = z.object({
-  resolveDraftAttachments: z.instanceof(Function),
-  fileUploads: z.object({ getSnapshot: z.instanceof(Function), subscribe: z.instanceof(Function) }),
-  input: z.object({ for: z.instanceof(Function) }),
+const conversationSchema = Schema.Struct({
+  resolveDraftAttachments: Schema.instanceOf(Function),
+  fileUploads: Schema.Struct({ getSnapshot: Schema.instanceOf(Function), subscribe: Schema.instanceOf(Function) }),
+  input: Schema.Struct({ for: Schema.instanceOf(Function) }),
 })
 
 // The schema only proves the shape; the guard hands back the live controller so its methods keep their `this`.
-const isConversation = (value: unknown): value is DraftUploads & ConversationWithInput => conversationSchema.safeParse(value).success
+const isConversation = (value: unknown): value is DraftUploads & ConversationWithInput =>
+  Option.isSome(Schema.decodeUnknownOption(conversationSchema)(value))
 
 const isDraftAttachmentId = (value: string): value is DraftAttachmentId => value.length > 0
 
