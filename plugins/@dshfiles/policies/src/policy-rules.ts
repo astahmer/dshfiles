@@ -1,3 +1,4 @@
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { Context, Effect, Layer, Ref, Stream } from 'effect'
@@ -26,10 +27,7 @@ export class PolicyRules extends Context.Service<
     Effect.gen(function* () {
       const settings = yield* PoliciesSettings
       const current = yield* Ref.make<readonly PolicyRule[]>((yield* settings.get).rules)
-      yield* settings.changes.pipe(
-        Stream.runForEach(value => Ref.set(current, value.rules)),
-        Effect.forkScoped,
-      )
+      yield* DshxPlugin.worker(settings.changes.pipe(Stream.runForEach(value => Ref.set(current, value.rules))))
       const guard = Policies.guard(() => Ref.getUnsafe(current))
       return PolicyRules.of({
         list: Ref.get(current),

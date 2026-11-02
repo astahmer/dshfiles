@@ -65,7 +65,7 @@ const WarmingEvents = Layer.effectDiscard(
       ]),
       disposers => Effect.sync(() => disposers.forEach(dispose => dispose())),
     )
-    yield* Queue.take(events).pipe(Effect.flatMap(warming.handle), Effect.forever, Effect.forkScoped)
+    yield* DshxPlugin.worker(Queue.take(events).pipe(Effect.flatMap(warming.handle), Effect.forever))
   }),
 )
 

@@ -3,6 +3,7 @@ export * as Settings from './settings.js'
 import type z from '@deepseek-ai/schemastery'
 import { Context, Effect, Layer, Option, Queue, Schema, Stream, SubscriptionRef } from 'effect'
 import type { SettingsContract, SettingsValue } from '../settings/types.js'
+import { detached } from './detached.js'
 import { HostContext, hostService } from './host-context.js'
 
 /** The namespace has no native settings entry yet, or its stored document does not match the plugin's schema. */
@@ -131,6 +132,7 @@ export const layer = <S extends z<any, object>>(
             Effect.catch(error => Effect.logWarning('Settings refresh kept the previous value', error)),
           ),
         ),
+        detached,
         Effect.forkScoped,
       )
 
