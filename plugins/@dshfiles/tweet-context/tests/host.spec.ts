@@ -7,7 +7,7 @@ import { join, resolve, sep } from 'node:path'
 import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { TweetContextModel, TweetContextService } from '../src/tweet-context.js'
 
 const createFixtureVideo = async (input: { readonly videoPath: string; readonly dimensions?: string; readonly durationSeconds?: number }): Promise<void> =>
@@ -127,7 +127,7 @@ const createTestTempDirectory = async (): Promise<{ readonly path: string; reado
   return { path, target }
 }
 
-const serverAddressSchema = z.object({ port: z.number().int().min(1).max(65_535) })
+const serverAddressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)) })
 
 describe('tweet context URL parsing', () => {
   it('normalizes status links and drops tracking parameters', () => {
@@ -484,9 +484,9 @@ describe('sampled video frames', () => {
         server.once('error', rejectExecution)
         server.listen(0, '127.0.0.1', resolveExecution)
       })
-      const address = serverAddressSchema.safeParse(server.address())
-      if (!address.success) throw new Error('The local fixture server did not bind a TCP port.')
-      const origin = `http://127.0.0.1:${String(address.data.port)}`
+      const address = Schema.decodeUnknownResult(serverAddressSchema)(server.address())
+      if (address._tag === 'Failure') throw new Error('The local fixture server did not bind a TCP port.')
+      const origin = `http://127.0.0.1:${String(address.success.port)}`
       const fetcher: typeof fetch = async (input, init) => {
         const requestUrl = new URL(input instanceof Request ? input.url : String(input))
         if (requestUrl.hostname === 'api.fxtwitter.com') return fetch(new URL(requestUrl.pathname, origin), init)
