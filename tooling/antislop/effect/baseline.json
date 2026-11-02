@@ -17,13 +17,11 @@
     "plugins/@dshfiles/workspace-folder-picker/src/host.ts": 1
   },
   "effect-migration(no-empty-plugin-layer)": {
-    "plugins/@dshfiles/agent-communication/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 1,
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
   "effect-migration(no-gen-inside-fn)": {
-    "plugins/@dshfiles/annotations/src/host.ts": 15,
     "plugins/@dshfiles/background-jobs/src/host.ts": 4,
     "plugins/@dshfiles/session-search/src/host.ts": 1,
     "plugins/@dshfiles/usage/src/host.ts": 8
@@ -34,7 +32,6 @@
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1,
-    "plugins/@dshfiles/annotations/src/chrome-launch.ts": 1,
     "plugins/@dshfiles/git-worktrees/src/git-worktrees.ts": 1,
     "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 1,
     "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1,
@@ -54,8 +51,6 @@
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/request-retry-wait.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
-    "plugins/@dshfiles/annotations/src/chrome-cdp.ts": 2,
-    "plugins/@dshfiles/annotations/src/chrome-launch.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/fff-search/src/host.ts": 1,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
@@ -73,7 +68,6 @@
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
     "plugins/@dshfiles/preview/src/host.ts": 1,
     "plugins/@dshfiles/project-checks/src/managed-process.ts": 1,
-    "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.ts": 1,
     "plugins/@dshfiles/session-search/src/worker-client.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 2,
     "plugins/@dshfiles/thread-sidebar/src/restart.ts": 1,
@@ -85,7 +79,6 @@
     "plugins/@dshfiles/worktree-memory/src/host.ts": 1
   },
   "effect-migration(no-host-module-state)": {
-    "plugins/@dshfiles/agent-communication/src/host.ts": 5,
     "plugins/@dshfiles/agent-telemetry/src/host.ts": 1,
     "plugins/@dshfiles/agents/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
@@ -95,8 +88,6 @@
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/settings.ts": 1,
-    "plugins/@dshfiles/annotations/src/chrome-launch.ts": 1,
-    "plugins/@dshfiles/annotations/src/host.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/git-worktrees/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
@@ -113,7 +104,6 @@
     "plugins/@dshfiles/queue-reorder/src/host.ts": 1,
     "plugins/@dshfiles/references/src/host.ts": 3,
     "plugins/@dshfiles/resource-packs/src/host.ts": 1,
-    "plugins/@dshfiles/secret-catalog/src/host.ts": 2,
     "plugins/@dshfiles/settings-shell/src/host.ts": 3,
     "plugins/@dshfiles/thread-sidebar/src/attention-host.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 5,
