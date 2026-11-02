@@ -5,15 +5,15 @@ schemas; this one migrates the Host runtime itself. Evidence for every claim bel
 (seven independent reviews with file:line citations, plus the [rubric](reviews/rubric.md) they used and an
 [Effect 4.1 cookbook](reviews/cookbook.md) drawn from `~/.references/{effect-4.1.0,opencode,t3code}`).
 
-**Resume here:** nothing executed yet. Answer the open questions, then start Phase 0.
+**Resume here:** Phases 0, 1 and 2.1–2.3 run as parallel lanes in workspaces `eff-{phase0,edge,tracer,services,lint,sqlite,jjcli}` on `lomurmxs`; integrate them into this thread line, then start Phase 3.
 
 ## Progress
 
 | Phase                       | Status      |
 | --------------------------- | ----------- |
-| 0 — Stop the bleeding       | not started |
-| 1 — Foundation v2 (dshx)    | not started |
-| 2 — Shared libraries        | not started |
+| 0 — Stop the bleeding       | in progress |
+| 1 — Foundation v2 (dshx)    | in progress |
+| 2 — Shared libraries        | in progress |
 | 3 — Exemplar + scaffold     | not started |
 | 4 — Plugin waves            | not started |
 | 5 — Schema cleanup          | not started |
@@ -269,25 +269,17 @@ edge, and restore exact-message assertions.
 - Browser logic (old Phase 5) stays out until the Host is done; client wire errors become typed only through 1.9.
 - No wire-code or tool-schema changes: compatibility is a gate, not a goal.
 
-## Open questions
-
-1. Add `@effect/platform-node@4.1.0` and `@effect/sql-sqlite-node@4.1.0` to the catalog? (Needed for `FileSystem`,
-   `NodeWorker`, `SqlClient`; neither is installed.)
-2. Import style: named imports from `effect` (recommended, matches dshx and opencode) or t3code's
-   `import * as Effect from 'effect/Effect'`?
-3. Deprecate `DshxEffect.*` behind shims during migration and delete at zero callers (recommended), or hard-cut in one
-   wave?
-4. 41 Host bundles each embed Effect. Accept (measure in 6.4) or externalize one shared Effect copy through the profile?
-   Externalizing changes the bundling contract and every Host bundle.
-5. Shared `Jev` service: a library package, or a dshx module published by `usage` (both backlog and memory already
-   depend on usage)?
-6. Mark `plans/effect-refactor` superseded now (and stop further waves under it), or keep it open until Phase 0 lands?
-
 ## Decisions log
 
-| Date       | Decision                                                                                              | Why                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| 2026-11-02 | Re-plan around the runtime, not schemas; foundation before plugins                                    | Seven reviews found the plugin facades are caused by the dshx edge and process           |
-| 2026-11-02 | Done is measured by `effect-native-audit` + behaviour parity, not schema parity or `Effect.fn` counts | The old metrics rewarded facades                                                         |
-| 2026-11-02 | Expose DSH subprocess as Effect's standard `ChildProcessSpawner`                                      | Keeps DSH env scrubbing and process-range termination while plugins use the standard API |
-| 2026-11-02 | `@dshfiles/jj-cli` and `@dshfiles/sqlite-store` as library packages, not dshx modules                 | Shared implementation, not contracts; keeps plugin dependency direction                  |
+| Date       | Decision                                                                                                    | Why                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 2026-11-02 | Re-plan around the runtime, not schemas; foundation before plugins                                          | Seven reviews found the plugin facades are caused by the dshx edge and process           |
+| 2026-11-02 | Done is measured by `effect-native-audit` + behaviour parity, not schema parity or `Effect.fn` counts       | The old metrics rewarded facades                                                         |
+| 2026-11-02 | Expose DSH subprocess as Effect's standard `ChildProcessSpawner`                                            | Keeps DSH env scrubbing and process-range termination while plugins use the standard API |
+| 2026-11-02 | `@dshfiles/jj-cli` and `@dshfiles/sqlite-store` as library packages, not dshx modules                       | Shared implementation, not contracts; keeps plugin dependency direction                  |
+| 2026-11-02 | Add `@effect/platform-node`, `@effect/platform-node-shared`, `@effect/sql-sqlite-node` 4.1.0 to the catalog | User approved; needed for FileSystem, NodeWorker, SqlClient                              |
+| 2026-11-02 | Named imports from `effect`                                                                                 | Matches dshx and opencode; user delegated the choice                                     |
+| 2026-11-02 | `DshxEffect.*` stays as deprecated shims over the new edge; deleted at zero callers                         | Lets waves land plugin by plugin                                                         |
+| 2026-11-02 | Keep one Effect copy per Host bundle for now; measure in 6.4 before changing the bundling contract          | Externalizing touches every bundle; decide on numbers                                    |
+| 2026-11-02 | Shared `Jev` service as a library package                                                                   | Two consumers, no contract to own; keeps usage free of new responsibilities              |
+| 2026-11-02 | `plans/effect-refactor` superseded by this plan                                                             | User approved executing this plan end to end                                             |
