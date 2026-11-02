@@ -12,8 +12,7 @@
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1,
     "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 1,
-    "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1,
-    "plugins/@dshfiles/tweet-context/src/tweet-context.ts": 1
+    "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1
   },
   "effect-migration(no-host-global-timer)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-verification.ts": 1,
@@ -53,8 +52,7 @@
     "plugins/@dshfiles/multi-host/src/store.ts": 1,
     "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
-    "plugins/@dshfiles/preview/src/host.ts": 2,
-    "plugins/@dshfiles/resource-packs/src/host.ts": 1
+    "plugins/@dshfiles/preview/src/host.ts": 2
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
