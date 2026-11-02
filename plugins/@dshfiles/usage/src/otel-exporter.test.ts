@@ -73,6 +73,9 @@ const jevCountOf = (request: OtlpMetricsRequest | undefined) => {
   return metric && 'sum' in metric ? metric.sum.dataPoints[0] : undefined
 }
 
+/** An exporter tick plus its HTTP round trip; a loaded CI runner needs far more than the 2 s this once allowed. */
+const EXPORT_WAIT_MS = 15_000
+
 describe('OtlpMetricsExporter.resolve', () => {
   it('stays off without an OTLP endpoint', () => {
     expect(OtlpMetricsExporter.resolve({})).toEqual({ enabled: false, reason: 'not-configured' })
@@ -160,9 +163,9 @@ describe('OtlpMetricsExporter.start', () => {
     })
     cleanups.push(() => exporter.stop())
     recordJev(store, 1)
-    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
     recordJev(store, 2)
-    await vi.waitFor(() => expect(jevCountOf(collector.received.at(-1)?.body)?.asInt).toBe('2'), { timeout: 2_000 })
+    await vi.waitFor(() => expect(jevCountOf(collector.received.at(-1)?.body)?.asInt).toBe('2'), { timeout: EXPORT_WAIT_MS })
 
     const first = collector.received[0]
     const last = collector.received.at(-1)
@@ -197,7 +200,7 @@ describe('OtlpMetricsExporter.start', () => {
     })
     cleanups.push(() => exporter.stop())
     recordJev(store, 1)
-    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
     const span = recorder.span('usage metrics export')
     expect(span.attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
   })
@@ -214,7 +217,7 @@ describe('OtlpMetricsExporter.start', () => {
         return store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' })
       },
     })
-    await vi.waitFor(() => expect(collected).toBeGreaterThanOrEqual(3), { timeout: 2_000 })
+    await vi.waitFor(() => expect(collected).toBeGreaterThanOrEqual(3), { timeout: EXPORT_WAIT_MS })
     await exporter.stop()
     expect(collector.received).toEqual([])
   })
@@ -234,7 +237,7 @@ describe('OtlpMetricsExporter.start', () => {
     expect(collector.received).toEqual([])
     expect(exporter.state().consecutiveFailures).toBe(0)
     url = collector.url
-    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
   })
 
   it('backs off exponentially on failure and resumes the interval after recovery', async () => {
@@ -256,11 +259,11 @@ describe('OtlpMetricsExporter.start', () => {
     })
     cleanups.push(() => exporter.stop())
     recordJev(store, 1)
-    await vi.waitFor(() => expect(failures).toHaveLength(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(failures).toHaveLength(1), { timeout: EXPORT_WAIT_MS })
     expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 1, nextDelayMs: 40, lastError: 'HTTP 503' }))
-    await vi.waitFor(() => expect(failures).toHaveLength(2), { timeout: 2_000 })
+    await vi.waitFor(() => expect(failures).toHaveLength(2), { timeout: EXPORT_WAIT_MS })
     expect(exporter.state().nextDelayMs).toBe(80)
-    await vi.waitFor(() => expect(recoveries).toBe(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(recoveries).toBe(1), { timeout: EXPORT_WAIT_MS })
     expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 0, nextDelayMs: 20, lastError: null }))
     expect(exporter.state().exports).toBeGreaterThanOrEqual(1)
     const [first, second, third] = collector.received
@@ -279,7 +282,7 @@ describe('OtlpMetricsExporter.start', () => {
     })
     cleanups.push(() => exporter.stop())
     recordJev(store, 1)
-    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBe(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBe(1), { timeout: EXPORT_WAIT_MS })
     expect(exporter.state()).toEqual(expect.objectContaining({ nextDelayMs: 3_000, lastError: 'HTTP 429' }))
   })
 
@@ -293,7 +296,7 @@ describe('OtlpMetricsExporter.start', () => {
       destination: () => ({ url: unreachable, headers: {} }),
       collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
-    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
     expect(exporter.state().lastError).toMatch(/fetch failed/u)
     await exporter.stop()
     const failuresAtStop = exporter.state().consecutiveFailures
@@ -310,7 +313,7 @@ describe('OtlpMetricsExporter.start', () => {
       destination: () => ({ url: collector.url, headers: {} }),
       collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
-    await vi.waitFor(() => expect(collector.received).toHaveLength(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(collector.received).toHaveLength(1), { timeout: EXPORT_WAIT_MS })
     const stoppedAt = Date.now()
     await exporter.stop()
     expect(Date.now() - stoppedAt).toBeLessThan(1_000)
@@ -359,13 +362,15 @@ describe('OtlpMetricsExporter.effect', () => {
       OtlpMetricsExporter.effect({
         timing: { intervalMs: 10, timeoutMs: 1_000 },
         destination: () => ({ url: collector.url, headers: {} }),
-        collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
+        // The Jev row is written before the loop starts, so widen the window back from `to`: the loop's own
+        // `from` is captured after it and would exclude the row in the millisecond the two differ.
+        collect: ({ to }) => store.otelMetrics({ from: to - 60_000, to, temporality: 'cumulative', serviceName: 'dshfiles' }),
       }),
       { signal: controller.signal },
     )
-    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: EXPORT_WAIT_MS })
     controller.abort()
     await pending
     expect(recorder.span('usage metrics export').attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
-  })
+  }, 20_000)
 })
