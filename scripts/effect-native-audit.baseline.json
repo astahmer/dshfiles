@@ -178,8 +178,8 @@
     "globalFetch": 0,
     "causelessErrors": 1,
     "testMocks": 0,
-    "runOutsideEdges": 1,
-    "syncDecodeInEffect": 1
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/credential-port": {
     "layerEmpty": 0,
@@ -378,13 +378,13 @@
   },
   "@dshfiles/model-effort-picker": {
     "layerEmpty": 0,
-    "promiseAdapters": 1,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -444,12 +444,12 @@
   "@dshfiles/policies": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
-    "moduleState": 1,
+    "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -625,13 +625,13 @@
   },
   "@dshfiles/session-warming": {
     "layerEmpty": 0,
-    "promiseAdapters": 1,
-    "moduleState": 1,
+    "promiseAdapters": 0,
+    "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -651,15 +651,15 @@
   },
   "@dshfiles/shared-streams": {
     "layerEmpty": 0,
-    "promiseAdapters": 1,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 1,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 1,
+    "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
   "@dshfiles/sidebar-right": {
@@ -821,7 +821,7 @@
   "@dshfiles/web-search-brave": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
-    "moduleState": 1,
+    "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,

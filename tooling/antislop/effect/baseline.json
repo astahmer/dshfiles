@@ -4,13 +4,10 @@
     "plugins/@dshfiles/agent-questions/src/keyed-effect-lock.ts": 1,
     "plugins/@dshfiles/agent-questions/src/service.ts": 1,
     "plugins/@dshfiles/apply-patch/src/patch-tool.ts": 1,
-    "plugins/@dshfiles/context-compaction/src/host.ts": 1,
     "plugins/@dshfiles/goal-stall-guard/src/goal-continuation.ts": 2,
     "plugins/@dshfiles/html-render/src/host.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-server.ts": 1,
-    "plugins/@dshfiles/request-messages/src/host.ts": 1,
-    "plugins/@dshfiles/shared-streams/src/host.ts": 1,
     "plugins/@dshfiles/tool-search/src/host.ts": 1
   },
   "effect-antislop(no-effect-context-reprovide)": {
@@ -35,7 +32,6 @@
     "plugins/@dshfiles/mcp-endpoint/src/host.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 4,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
-    "plugins/@dshfiles/model-effort-picker/src/host.ts": 1,
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
     "plugins/@dshfiles/pulls-review/src/host.ts": 2,
     "plugins/@dshfiles/session-search/src/host.ts": 4,
@@ -58,9 +54,6 @@
     "plugins/@dshfiles/editor/src/host.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/host.ts": 4,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
-    "plugins/@dshfiles/model-effort-picker/src/host.ts": 1,
-    "plugins/@dshfiles/request-messages/src/host.ts": 1,
-    "plugins/@dshfiles/request-messages/src/polyfill.ts": 2,
     "plugins/@dshfiles/session-search/src/host.ts": 1,
     "plugins/@dshfiles/tool-search/src/host.ts": 1,
     "plugins/@dshfiles/usage/src/host.ts": 8
@@ -150,7 +143,6 @@
     "plugins/@dshfiles/multi-host/src/store.ts": 1,
     "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
-    "plugins/@dshfiles/policies/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 7,
     "plugins/@dshfiles/prompt-stash/src/host.ts": 1,
@@ -158,7 +150,6 @@
     "plugins/@dshfiles/references/src/host.ts": 3,
     "plugins/@dshfiles/resource-packs/src/host.ts": 1,
     "plugins/@dshfiles/secret-catalog/src/host.ts": 2,
-    "plugins/@dshfiles/session-warming/src/host.ts": 1,
     "plugins/@dshfiles/settings-shell/src/host.ts": 3,
     "plugins/@dshfiles/thread-sidebar/src/attention-host.ts": 1,
     "plugins/@dshfiles/thread-sidebar/src/host.ts": 5,
@@ -166,7 +157,6 @@
     "plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts": 1,
     "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 1,
     "plugins/@dshfiles/traces/src/host.ts": 3,
-    "plugins/@dshfiles/web-search-brave/src/host.ts": 1,
     "plugins/@dshfiles/worktree-memory/src/host.ts": 1
   },
   "effect-migration(no-void-then)": {
