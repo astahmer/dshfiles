@@ -2,12 +2,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import * as Schema from 'effect/Schema'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import mcpServersHost from './host.js'
 
-// The OAuth pending-authorization map and the manager's wire failures, through the mounted Host, pinned before the
-// module-level Map becomes a Ref with expiry and McpManagerOperationError becomes tagged errors. The OAuth provider is
-// a real loopback HTTP server.
+// The OAuth callback and the manager's wire failures through the mounted Host; the OAuth provider is a real loopback
+// HTTP server. The 10-minute expiry of a pending authorization is pinned on TestClock in pending-authorizations.test.ts.
 
 type Route = { readonly path: string; readonly handler: (request: IncomingMessage, response: ServerResponse) => void | Promise<void> }
 
@@ -153,10 +152,6 @@ beforeAll(async () => {
   await host.mount(mcpServersHost, { packageId: '@dshfiles/mcp-servers', config })
 })
 
-afterEach(() => {
-  vi.useRealTimers()
-})
-
 afterAll(async () => {
   await host.dispose()
   await Promise.all(servers.splice(0).map(server => new Promise(resolve => server.close(resolve))))
@@ -190,23 +185,6 @@ describe('OAuth pending authorizations', () => {
     expect(await callback(`state=${state}`)).toMatchObject({ status: 400, text: expect.stringContaining('no authorization code') })
     expect(await callback(`state=${state}&code=late-code`)).toMatchObject({ status: 400 })
   })
-
-  it('a pending authorization expires after 10 minutes, swept on the next callback', async () => {
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
-    const state = await authorize()
-    vi.setSystemTime(Date.now() + 600_001)
-    expect(await callback(`state=${state}&code=authorization-code`)).toMatchObject({
-      status: 400,
-      text: expect.stringContaining('expired or was already used'),
-    })
-  })
-
-  it('a pending authorization younger than 10 minutes still completes', async () => {
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
-    const state = await authorize()
-    vi.setSystemTime(Date.now() + 599_000)
-    expect(await callback(`state=${state}&code=authorization-code`)).toMatchObject({ status: 200 })
-  })
 })
 
 describe('MCP manager wire failures', () => {
@@ -215,17 +193,25 @@ describe('MCP manager wire failures', () => {
       name: 'authorize for an unknown server',
       method: 'authorize',
       input: { id: 'missing', origin: 'http://127.0.0.1:3080' },
+      code: 'mcp-server-not-found',
       message: 'MCP server was not found.',
     },
     {
       name: 'authorize for a server without OAuth',
       method: 'authorize',
       input: { id: 'plain-server', origin: 'http://127.0.0.1:3080' },
+      code: 'mcp-oauth-not-supported',
       message: 'This server does not use OAuth sign-in.',
     },
-    { name: 'sign out of an unknown server', method: 'signOut', input: { id: 'missing' }, message: 'MCP server was not found.' },
-    { name: 'connect an unknown server', method: 'setConnection', input: { id: 'missing', connected: true }, message: 'MCP server was not found.' },
-  ])('$name is mcp-manager-operation-error carrying the thrown message', async ({ method, input, message }) => {
-    expect(await call(method, input)).toEqual({ ok: false, error: { code: 'mcp-manager-operation-error', message } })
+    { name: 'sign out of an unknown server', method: 'signOut', input: { id: 'missing' }, code: 'mcp-server-not-found', message: 'MCP server was not found.' },
+    {
+      name: 'connect an unknown server',
+      method: 'setConnection',
+      input: { id: 'missing', connected: true },
+      code: 'mcp-server-not-found',
+      message: 'MCP server was not found.',
+    },
+  ])('$name fails with its domain code and message', async ({ method, input, code, message }) => {
+    expect(await call(method, input)).toEqual({ ok: false, error: { code, message } })
   })
 })

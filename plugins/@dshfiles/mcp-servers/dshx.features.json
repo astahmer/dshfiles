@@ -348,12 +348,7 @@
     {
       "file": "src/catalog.ts",
       "tracedBy": "mcp registry search",
-      "reason": "The registry search runs inside createTracedRegistrySearch (src/registry-search-host.ts), which opens the span; this module stays importable by the Client."
-    },
-    {
-      "file": "src/host.ts",
-      "tracedBy": "mcp registry search",
-      "reason": "Passes globalThis.fetch into createTracedRegistrySearch, which opens the mcp registry search span around each request."
+      "reason": "Pure Registry URL and row parsing; RegistrySearch (src/registry-search.ts) runs the request inside its mcp registry search span."
     }
   ]
 }

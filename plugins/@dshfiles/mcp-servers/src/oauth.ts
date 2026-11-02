@@ -4,7 +4,7 @@ import { McpSchema } from './schema.js'
 
 /** OAuth 2.1 client flow for remote MCP servers: discovery, dynamic registration, PKCE, and refresh. */
 
-type Fetch = (url: string, init: RequestInit) => Promise<Response>
+export type Fetch = (url: string, init: RequestInit) => Promise<Response>
 
 const REQUEST_TIMEOUT_MS = 10_000
 const REFRESH_MARGIN_MS = 60_000
@@ -125,12 +125,12 @@ const authorizationServerMetadata = async (fetcher: Fetch, issuer: URL): Promise
 
 const clientAuth = (clientSecret: string | undefined): oauth.ClientAuth => (clientSecret === undefined ? oauth.None() : oauth.ClientSecretPost(clientSecret))
 
-/** All OAuth operations for one remote MCP server; network adapters stay injected. */
+/** All OAuth operations for one remote MCP server, over oauth4webapi; the Host injects an HttpClient-backed `fetcher`. */
 export class McpOAuthModel {
   /** RFC 9728 protected-resource metadata, then RFC 8414 (or OpenID) authorization-server metadata. */
-  static readonly discover = async (input: { readonly serverUrl: string; readonly fetcher?: Fetch }): Promise<OAuthEndpoints> => {
+  static readonly discover = async (input: { readonly serverUrl: string; readonly fetcher: Fetch }): Promise<OAuthEndpoints> => {
     const server = new URL(input.serverUrl)
-    const fetcher = input.fetcher ?? fetch
+    const fetcher = input.fetcher
     const resourceMetadata = await protectedResource(fetcher, server)
     const issuer = new URL(resourceMetadata?.authorization_servers?.[0] ?? server.origin)
     trustedEndpoint(issuer.href)
@@ -155,7 +155,7 @@ export class McpOAuthModel {
     readonly authorizationServer: oauth.AuthorizationServer
     readonly redirectUri: string
     readonly clientName: string
-    readonly fetcher?: Fetch
+    readonly fetcher: Fetch
   }): Promise<{ readonly clientId: string; readonly clientSecret: string | undefined }> => {
     const endpoint = input.authorizationServer.registration_endpoint
     if (endpoint === undefined) throw new Error('The authorization server does not support dynamic client registration.')
@@ -168,7 +168,7 @@ export class McpOAuthModel {
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
       },
-      requestOptions(input.fetcher ?? fetch, endpoint),
+      requestOptions(input.fetcher, endpoint),
     )
     const client = await oauth.processDynamicClientRegistrationResponse(response)
     const clientSecret = Schema.decodeUnknownResult(Schema.String)(client.client_secret)
@@ -227,7 +227,7 @@ export class McpOAuthModel {
   static readonly exchangeCode = async (input: {
     readonly pending: PendingAuthorization
     readonly callbackParameters: URLSearchParams
-    readonly fetcher?: Fetch
+    readonly fetcher: Fetch
     readonly now?: number
   }): Promise<OAuthGrant> => {
     const pending = input.pending
@@ -244,7 +244,7 @@ export class McpOAuthModel {
       pending.redirectUri,
       pending.verifier,
       {
-        ...requestOptions(input.fetcher ?? fetch, tokenEndpoint),
+        ...requestOptions(input.fetcher, tokenEndpoint),
         additionalParameters: { resource: pending.resource },
       },
     )
@@ -265,7 +265,7 @@ export class McpOAuthModel {
   /** Refreshes an expiring grant; `undefined` means the user must sign in again. */
   static readonly refreshGrant = async (input: {
     readonly grant: OAuthGrant
-    readonly fetcher?: Fetch
+    readonly fetcher: Fetch
     readonly now?: number
   }): Promise<OAuthGrant | undefined> => {
     const grant = input.grant
@@ -274,7 +274,7 @@ export class McpOAuthModel {
     const client: oauth.Client = { client_id: grant.clientId }
     try {
       const response = await oauth.refreshTokenGrantRequest(as, client, clientAuth(grant.clientSecret), grant.refreshToken, {
-        ...requestOptions(input.fetcher ?? fetch, grant.tokenEndpoint),
+        ...requestOptions(input.fetcher, grant.tokenEndpoint),
         additionalParameters: { resource: grant.resource },
       })
       return McpOAuthModel.grantFromToken({
