@@ -1,16 +1,10 @@
-import { execFile } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
-import { PluginApiError } from '@dshfiles/dshx/api'
-import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
-
-interface GitResult {
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stderr: string
-}
+import { homedir } from 'node:os'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import type { SettingsValue } from '@dshfiles/dshx/settings'
+import { commandAttributes } from '@dshfiles/dshx/tracing'
+import { Context, Duration, Effect, FileSystem, Layer, Option, Path, Random, Schema, Stream } from 'effect'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
+import { gitWorktreesSettings } from './settings.js'
 
 export interface GitLocation {
   /** The main worktree: the repository a thread worktree belongs to. */
@@ -26,125 +20,226 @@ export interface ThreadWorktree {
   readonly branch: string | null
 }
 
+export class GitFailed extends Schema.TaggedError<GitFailed>()(
+  'GitFailed',
+  { subcommand: Schema.String, exitCode: Schema.optional(Schema.Number), detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'git-failed' },
+) {
+  override get message(): string {
+    return `git ${this.subcommand}: ${this.detail}`
+  }
+}
+
+export class NotARepository extends Schema.TaggedError<NotARepository>()(
+  'NotARepository',
+  { path: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'not-a-repository' },
+) {
+  override get message(): string {
+    return `${this.path} is not inside a git repository.`
+  }
+}
+
+export class NotAThreadWorktree extends Schema.TaggedError<NotAThreadWorktree>()(
+  'NotAThreadWorktree',
+  { path: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'not-a-thread' },
+) {
+  override get message(): string {
+    return `${this.path} is not a thread worktree this plugin created.`
+  }
+}
+
+export class InvalidSnapshot extends Schema.TaggedError<InvalidSnapshot>()(
+  'InvalidSnapshot',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'invalid-snapshot' },
+) {
+  override get message(): string {
+    return 'That snapshot is not a git commit id.'
+  }
+}
+
 const THREAD_NAME = /^thread-[0-9a-f]{6}$/u
 const OBJECT_ID = /^[0-9a-f]{40,64}$/u
+const MAX_STDERR_CHARACTERS = 400
 const SNAPSHOT_AUTHOR = { GIT_AUTHOR_NAME: 'dsh', GIT_AUTHOR_EMAIL: 'dsh@localhost', GIT_COMMITTER_NAME: 'dsh', GIT_COMMITTER_EMAIL: 'dsh@localhost' }
 
-const runGit = (args: readonly string[], cwd: string, env: Readonly<Record<string, string>> = {}): Promise<GitResult> => {
-  const execute = () =>
-    new Promise<GitResult>(settle => {
-      execFile(
-        'git',
-        ['-c', 'core.quotePath=false', ...args],
-        { cwd, env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 },
-        (error, stdout, stderr) => {
-          const exitCode = error === null ? 0 : typeof error.code === 'number' ? error.code : 1
-          settle({ exitCode, stdout, stderr })
-        },
-      )
-    })
-  if (!tracingEnabled()) return execute()
-  const attributes = commandAttributes({ executable: 'git', args, valueFlags: ['-c', '-C', '-b', '-m'] })
-  return withSpan(`git ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
-    const result = await execute()
-    span.setAttributes({ 'process.exit.code': result.exitCode })
-    if (result.exitCode !== 0) span.setStatus('error', `exit ${String(result.exitCode)}`)
-    return result
-  })
-}
+const GitWorktreesSettings = Settings.Tag<SettingsValue<typeof gitWorktreesSettings.schema>>(gitWorktreesSettings.namespace)
 
-const git = async (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>): Promise<string> => {
-  const result = await runGit(args, cwd, env)
-  if (result.exitCode !== 0) throw new PluginApiError(`git ${args[0] ?? ''}: ${result.stderr.trim().slice(0, 400)}`, { code: 'git-failed' })
-  return result.stdout
-}
+const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
+  stream.pipe(
+    Stream.decodeText(),
+    Stream.runFold(
+      () => '',
+      (text, chunk) => text + chunk,
+    ),
+  )
 
 /**
  * Plain git repositories: thread worktrees beside the repository and file snapshots as unreferenced-but-kept commits.
  * A snapshot is a commit of every tracked and untracked, non-ignored file under `refs/dsh/snapshots/`, built in a
  * throwaway index so neither the real index nor HEAD moves.
  */
-export const createGitWorktrees = (options: { readonly threadsDirectory: (repoRoot: string) => string }) => {
-  const locate = async (path: string): Promise<GitLocation | undefined> => {
-    const result = await runGit(['rev-parse', '--show-toplevel', '--git-common-dir'], path)
-    if (result.exitCode !== 0) return undefined
-    const [toplevel, commonDir] = result.stdout.trim().split('\n')
-    if (toplevel === undefined || commonDir === undefined) return undefined
-    const workspaceRoot = resolve(toplevel)
-    const repoRoot = dirname(resolve(workspaceRoot, commonDir))
-    const threadsDirectory = options.threadsDirectory(repoRoot)
-    const isThread = workspaceRoot !== repoRoot && dirname(workspaceRoot) === threadsDirectory && THREAD_NAME.test(basename(workspaceRoot))
-    return { repoRoot, workspaceRoot, threadName: isThread ? basename(workspaceRoot) : undefined }
+export class GitWorktrees extends Context.Service<
+  GitWorktrees,
+  {
+    /** Undefined outside a git repository. */
+    readonly locate: (path: string) => Effect.Effect<GitLocation | undefined>
+    readonly isolateByDefault: Effect.Effect<boolean>
+    readonly worktrees: (repoRoot: string) => Effect.Effect<readonly ThreadWorktree[], GitFailed>
+    readonly provision: (repoRoot: string, base: string | undefined) => Effect.Effect<ThreadWorktree, GitFailed>
+    readonly remove: (path: string, force: boolean) => Effect.Effect<void, GitFailed | NotARepository | NotAThreadWorktree>
+    readonly snapshot: (path: string) => Effect.Effect<string, GitFailed | NotARepository>
+    readonly restore: (path: string, target: string) => Effect.Effect<string, GitFailed | NotARepository | InvalidSnapshot>
   }
+>()('@dshfiles/git-worktrees/GitWorktrees') {
+  static readonly layer = Layer.effect(
+    GitWorktrees,
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const settings = yield* GitWorktreesSettings
 
-  const requireLocation = async (path: string): Promise<GitLocation> => {
-    const location = await locate(path)
-    if (location === undefined) throw new PluginApiError(`${path} is not inside a git repository.`, { code: 'not-a-repository' })
-    return location
-  }
+      const threadsDirectoryOf = Effect.fnUntraced(function* (repoRoot: string) {
+        const configured = (yield* settings.get).threadsDirectory.trim()
+        if (configured === '') return `${repoRoot}-threads`
+        return path.join(configured.startsWith('~/') ? path.join(homedir(), configured.slice(2)) : configured, path.basename(repoRoot))
+      })
 
-  const worktrees = async (repoRoot: string): Promise<readonly ThreadWorktree[]> => {
-    const threadsDirectory = options.threadsDirectory(repoRoot)
-    const listed = await git(['worktree', 'list', '--porcelain'], repoRoot)
-    return listed.split('\n\n').flatMap((block): ThreadWorktree[] => {
-      const lines = block.split('\n')
-      const path = lines.find(line => line.startsWith('worktree '))?.slice('worktree '.length)
-      const branch = lines.find(line => line.startsWith('branch refs/heads/'))?.slice('branch refs/heads/'.length) ?? null
-      if (path === undefined || dirname(path) !== threadsDirectory || !THREAD_NAME.test(basename(path))) return []
-      return [{ name: basename(path), path, branch }]
-    })
-  }
+      /** One git process; a non-zero exit fails inside its span, so the span carries the error status. */
+      const git = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => {
+        const subcommand = args[0] ?? ''
+        const attributes = commandAttributes({ executable: 'git', args, valueFlags: ['-c', '-C', '-b', '-m'] })
+        return Effect.gen(function* () {
+          const handle = yield* spawner.spawn(
+            ChildProcess.make('git', ['-c', 'core.quotePath=false', ...args], {
+              cwd,
+              stdin: 'ignore',
+              forceKillAfter: Duration.seconds(1),
+              ...(env !== undefined && { env }),
+            }),
+          )
+          const [stdout, stderr, exitCode] = yield* Effect.all([collectText(handle.stdout), collectText(handle.stderr), handle.exitCode], {
+            concurrency: 'unbounded',
+          })
+          yield* Effect.annotateCurrentSpan({ 'process.exit.code': exitCode })
+          if (exitCode !== 0) return yield* new GitFailed({ subcommand, exitCode, detail: stderr.trim().slice(0, MAX_STDERR_CHARACTERS) })
+          return stdout
+        }).pipe(
+          Effect.scoped,
+          Effect.catchTag('PlatformError', cause => Effect.fail(new GitFailed({ subcommand, detail: 'git could not be started.', cause }))),
+          Effect.withSpan(`git ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }),
+        )
+      }
 
-  const provision = async (repoRoot: string, base: string | undefined): Promise<ThreadWorktree> => {
-    const threadsDirectory = options.threadsDirectory(repoRoot)
-    await mkdir(threadsDirectory, { recursive: true })
-    const name = `thread-${randomBytes(3).toString('hex')}`
-    const path = join(threadsDirectory, name)
-    const branch = `dsh/${name}`
-    await git(['worktree', 'add', '-b', branch, path, base ?? 'HEAD'], repoRoot)
-    return { name, path, branch }
-  }
+      const locate = Effect.fn('git locate')(function* (target: string) {
+        const listed = yield* git(['rev-parse', '--show-toplevel', '--git-common-dir'], target).pipe(Effect.option)
+        if (Option.isNone(listed)) return undefined
+        const [toplevel, commonDir] = listed.value.trim().split('\n')
+        if (toplevel === undefined || commonDir === undefined) return undefined
+        const workspaceRoot = path.resolve(toplevel)
+        const repoRoot = path.dirname(path.resolve(workspaceRoot, commonDir))
+        const threadsDirectory = yield* threadsDirectoryOf(repoRoot)
+        const isThread = workspaceRoot !== repoRoot && path.dirname(workspaceRoot) === threadsDirectory && THREAD_NAME.test(path.basename(workspaceRoot))
+        const location: GitLocation = { repoRoot, workspaceRoot, threadName: isThread ? path.basename(workspaceRoot) : undefined }
+        return location
+      })
 
-  const remove = async (path: string, force: boolean): Promise<void> => {
-    const location = await requireLocation(path)
-    if (location.threadName === undefined) throw new PluginApiError(`${path} is not a thread worktree this plugin created.`, { code: 'not-a-thread' })
-    await git(['worktree', 'remove', ...(force ? ['--force'] : []), location.workspaceRoot], location.repoRoot)
-  }
+      const requireLocation = Effect.fnUntraced(function* (target: string) {
+        const location = yield* locate(target)
+        if (location === undefined) return yield* new NotARepository({ path: target })
+        return location
+      })
 
-  const snapshot = async (path: string): Promise<string> => {
-    const { workspaceRoot } = await requireLocation(path)
-    const scratch = await mkdtemp(join(tmpdir(), 'dsh-git-snapshot-'))
-    try {
-      const index = { GIT_INDEX_FILE: join(scratch, 'index') }
-      await git(['add', '--all', '.'], workspaceRoot, index)
-      const tree = (await git(['write-tree'], workspaceRoot, index)).trim()
-      const commit = (await git(['commit-tree', tree, '-m', 'dsh file snapshot'], workspaceRoot, SNAPSHOT_AUTHOR)).trim()
-      if (!OBJECT_ID.test(commit)) throw new PluginApiError('git commit-tree returned no commit id.', { code: 'git-failed' })
-      await git(['update-ref', `refs/dsh/snapshots/${commit}`, commit], workspaceRoot)
-      return commit
-    } finally {
-      await rm(scratch, { recursive: true, force: true })
-    }
-  }
+      const worktrees = Effect.fn('git thread worktrees')(function* (repoRoot: string) {
+        const threadsDirectory = yield* threadsDirectoryOf(repoRoot)
+        const listed = yield* git(['worktree', 'list', '--porcelain'], repoRoot)
+        return listed.split('\n\n').flatMap((block): ThreadWorktree[] => {
+          const lines = block.split('\n')
+          const worktreePath = lines.find(line => line.startsWith('worktree '))?.slice('worktree '.length)
+          const branch = lines.find(line => line.startsWith('branch refs/heads/'))?.slice('branch refs/heads/'.length) ?? null
+          if (worktreePath === undefined || path.dirname(worktreePath) !== threadsDirectory || !THREAD_NAME.test(path.basename(worktreePath))) return []
+          return [{ name: path.basename(worktreePath), path: worktreePath, branch }]
+        })
+      })
 
-  const restore = async (path: string, target: string): Promise<string> => {
-    if (!OBJECT_ID.test(target)) throw new PluginApiError('That snapshot is not a git commit id.', { code: 'invalid-snapshot' })
-    const { workspaceRoot } = await requireLocation(path)
-    const previous = await snapshot(workspaceRoot)
-    const added = (await git(['diff', '--name-only', '-z', '--diff-filter=A', target, previous], workspaceRoot)).split('\0').filter(file => file.length > 0)
-    await Promise.all(added.map(file => rm(join(workspaceRoot, file), { force: true })))
-    const scratch = await mkdtemp(join(tmpdir(), 'dsh-git-restore-'))
-    try {
-      const index = { GIT_INDEX_FILE: join(scratch, 'index') }
-      await git(['read-tree', target], workspaceRoot, index)
-      await git(['checkout-index', '--all', '--force'], workspaceRoot, index)
-    } finally {
-      await rm(scratch, { recursive: true, force: true })
-    }
-    return previous
-  }
+      const provision = Effect.fn('git thread provision')(function* (repoRoot: string, base: string | undefined) {
+        const threadsDirectory = yield* threadsDirectoryOf(repoRoot)
+        yield* fs
+          .makeDirectory(threadsDirectory, { recursive: true })
+          .pipe(Effect.mapError(cause => new GitFailed({ subcommand: 'worktree', detail: 'the threads directory could not be created.', cause })))
+        const suffix = yield* Random.nextIntBetween(0, 0xff_ff_ff)
+        const name = `thread-${suffix.toString(16).padStart(6, '0')}`
+        const worktreePath = path.join(threadsDirectory, name)
+        const branch = `dsh/${name}`
+        yield* git(['worktree', 'add', '-b', branch, worktreePath, base ?? 'HEAD'], repoRoot)
+        const thread: ThreadWorktree = { name, path: worktreePath, branch }
+        return thread
+      })
 
-  return { locate, worktrees, provision, remove, snapshot, restore }
+      const remove = Effect.fn('git thread remove')(function* (target: string, force: boolean) {
+        const location = yield* requireLocation(target)
+        if (location.threadName === undefined) return yield* new NotAThreadWorktree({ path: target })
+        yield* git(['worktree', 'remove', ...(force ? ['--force'] : []), location.workspaceRoot], location.repoRoot)
+      })
+
+      const scratchIndex = (prefix: string) =>
+        fs.makeTempDirectoryScoped({ prefix }).pipe(
+          Effect.map(directory => ({ GIT_INDEX_FILE: path.join(directory, 'index') })),
+          Effect.mapError(cause => new GitFailed({ subcommand: 'snapshot', detail: 'a scratch index could not be created.', cause })),
+        )
+
+      const snapshotOf = Effect.fnUntraced(function* (workspaceRoot: string) {
+        const index = yield* scratchIndex('dsh-git-snapshot-')
+        yield* git(['add', '--all', '.'], workspaceRoot, index)
+        const tree = (yield* git(['write-tree'], workspaceRoot, index)).trim()
+        const commit = (yield* git(['commit-tree', tree, '-m', 'dsh file snapshot'], workspaceRoot, SNAPSHOT_AUTHOR)).trim()
+        if (!OBJECT_ID.test(commit)) return yield* new GitFailed({ subcommand: 'commit-tree', detail: 'returned no commit id.' })
+        yield* git(['update-ref', `refs/dsh/snapshots/${commit}`, commit], workspaceRoot)
+        return commit
+      }, Effect.scoped)
+
+      const snapshot = Effect.fn('git snapshot')(function* (target: string) {
+        const location = yield* requireLocation(target)
+        return yield* snapshotOf(location.workspaceRoot)
+      })
+
+      const restore = Effect.fn('git restore')(function* (target: string, snapshotId: string) {
+        if (!OBJECT_ID.test(snapshotId)) return yield* new InvalidSnapshot({})
+        const { workspaceRoot } = yield* requireLocation(target)
+        const previous = yield* snapshotOf(workspaceRoot)
+        const added = (yield* git(['diff', '--name-only', '-z', '--diff-filter=A', snapshotId, previous], workspaceRoot))
+          .split('\0')
+          .filter(file => file.length > 0)
+        yield* Effect.forEach(
+          added,
+          file =>
+            fs
+              .remove(path.join(workspaceRoot, file), { force: true })
+              .pipe(Effect.mapError(cause => new GitFailed({ subcommand: 'restore', detail: 'a file added since the snapshot could not be removed.', cause }))),
+          { concurrency: 16, discard: true },
+        )
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const index = yield* scratchIndex('dsh-git-restore-')
+            yield* git(['read-tree', snapshotId], workspaceRoot, index)
+            yield* git(['checkout-index', '--all', '--force'], workspaceRoot, index)
+          }),
+        )
+        return previous
+      })
+
+      return GitWorktrees.of({
+        locate,
+        isolateByDefault: Effect.map(settings.get, value => value.isolate),
+        worktrees,
+        provision,
+        remove,
+        snapshot,
+        restore,
+      })
+    }),
+  )
 }
-
-export type GitWorktrees = ReturnType<typeof createGitWorktrees>
