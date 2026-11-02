@@ -1,5 +1,5 @@
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
 import { servingAccountApi } from './serving-account-api.js'
 import { effectHandler } from './host-effect.js'
@@ -15,7 +15,7 @@ export const servingAccountSessionForCaller = (input: { readonly sessionId?: str
   if (input.sessionId === undefined) throw new Error('Serving account metadata requires a session ID.')
   return input.sessionId
 }
-export const servingAccountHostApi = DshxEffect.host(servingAccountApi, {
+export const servingAccountHostApi = Api.bind(servingAccountApi, {
   snapshot: effectHandler(servingAccountApi, 'snapshot', async ({ ctx, input, caller }) => {
     const sessionId = servingAccountSessionForCaller(input, caller)
     const service = accountRuntime(ctx)?.servingAccount

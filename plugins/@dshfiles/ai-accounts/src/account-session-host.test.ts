@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
-import { definePlugin } from '@dshfiles/dshx/host'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { Layer } from 'effect'
 import { accountSessionHostApi } from './account-session-host.js'
 import { accountLoginHostApi } from './account-login-host.js'
 import { accountsHostApi } from './accounts-host-api.js'
@@ -15,9 +16,12 @@ afterEach(async () => {
 const mount = async () => {
   const host = await createTestHost()
   hosts.push(host)
-  await host.mount(definePlugin({ id: 'session-boundary-test', apis: [accountSessionHostApi, accountLoginHostApi, accountsHostApi] }), {
-    packageId: '@dshfiles/ai-accounts',
-  })
+  await host.mount(
+    DshxPlugin.make({ name: 'session-boundary-test', layer: Layer.empty, apis: [accountSessionHostApi, accountLoginHostApi, accountsHostApi] }),
+    {
+      packageId: '@dshfiles/ai-accounts',
+    },
+  )
   return host
 }
 const call = async (host: TestHost, apiId: string, method: string, input: unknown) => {

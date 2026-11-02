@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
 import { effectHandler } from './host-effect.js'
 import { aiAccountsFastModeApi } from './model-fast-mode-api.js'
@@ -32,7 +32,7 @@ const fastModeFor = (ctx: Context) => {
   return fastMode
 }
 
-export const modelFastModeHostApi = DshxEffect.host(aiAccountsFastModeApi, {
+export const modelFastModeHostApi = Api.bind(aiAccountsFastModeApi, {
   status: effectHandler(aiAccountsFastModeApi, 'status', ({ ctx, input, caller }) => fastModeFor(ctx).status(fastModeRouteForCaller(input, caller))),
   setFast: effectHandler(aiAccountsFastModeApi, 'setFast', ({ ctx, input, caller }) =>
     fastModeFor(ctx).set({ ...fastModeRouteForCaller(input, caller), enabled: input.enabled }),

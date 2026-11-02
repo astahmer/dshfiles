@@ -4,7 +4,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { threadModelApi } from '@dshfiles/session-controller/thread-model-api'
 import { accountStoreService } from './account-store.js'
 import { accountRuntime } from './account-runtime.js'
@@ -75,7 +75,7 @@ const previewThreadAccount = async (
   }
 }
 
-export const threadAccountHostApi = DshxEffect.host(threadAccountApi, {
+export const threadAccountHostApi = Api.bind(threadAccountApi, {
   preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller }) => previewThreadAccount(ctx, input, caller)),
   switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller }) => {
     const preview = await previewThreadAccount(ctx, input, caller)

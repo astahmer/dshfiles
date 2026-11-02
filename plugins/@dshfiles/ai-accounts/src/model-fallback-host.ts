@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-storage-domain'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
 import { effectHandler } from './host-effect.js'
 import { DEFAULT_DISTRIBUTION } from './account-pool.js'
@@ -57,7 +57,7 @@ const snapshot = async (ctx: Context, sessionId: string | undefined): Promise<Mo
   return { ...base, active: runtime.modelFallbackRouter.active(sessionId) ?? null }
 }
 
-export const modelFallbackHostApi = DshxEffect.host(aiAccountsModelFallbackApi, {
+export const modelFallbackHostApi = Api.bind(aiAccountsModelFallbackApi, {
   state: effectHandler(aiAccountsModelFallbackApi, 'state', ({ ctx, input }) => snapshot(ctx, input.sessionId)),
   setChain: effectHandler(aiAccountsModelFallbackApi, 'setChain', async ({ ctx, input }) => {
     await (await modelFallbacksFor(ctx)).setChain({ sessionId: input.sessionId, chain: input.chain })

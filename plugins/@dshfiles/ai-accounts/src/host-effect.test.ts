@@ -1,4 +1,5 @@
 import { Context } from '@deepseek-ai/cordis'
+import { HostContext } from '@dshfiles/dshx/effect'
 import { Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { aiAccountsFastModeApi } from './model-fast-mode-api.js'
@@ -20,13 +21,9 @@ describe('AI Accounts Effect API bridge', () => {
       })
     })
     const running = Effect.runPromiseExit(
-      handler({
-        ctx: new Context(),
-        caller: { kind: 'client' },
-        peer: undefined,
-        input: { provider: 'codex-primary', model: 'gpt-6-luna' },
-        signal: controller.signal,
-      }),
+      handler({ provider: 'codex-primary', model: 'gpt-6-luna' }, { caller: { kind: 'client' }, peer: undefined }).pipe(
+        Effect.provide(HostContext.layer({ ctx: new Context(), packageId: '@dshfiles/ai-accounts' })),
+      ),
       { signal: controller.signal },
     )
 

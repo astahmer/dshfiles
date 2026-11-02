@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { accountStoreService, type AccountStoreFile } from './account-store.js'
@@ -50,7 +50,7 @@ const loginFor = (ctx: Context) => {
   return login
 }
 
-export const accountLoginHostApi = DshxEffect.host(aiAccountsLoginApi, {
+export const accountLoginHostApi = Api.bind(aiAccountsLoginApi, {
   begin: effectHandler(aiAccountsLoginApi, 'begin', ({ ctx, input, caller }) => {
     const account =
       accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ??

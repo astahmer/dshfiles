@@ -31,7 +31,7 @@ import { readNativeProviders, setNativeProviderEnabled } from './native-provider
 import { PricingCatalogModel } from './pricing-catalog.js'
 import { AccountSettingsModel } from './settings.js'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { effectHandler } from './host-effect.js'
 
 /**
@@ -95,7 +95,7 @@ const copilotLoginFor = (ctx: Context) => {
   return service
 }
 
-export const accountsHostApi = DshxEffect.host(aiAccountsApi, {
+export const accountsHostApi = Api.bind(aiAccountsApi, {
   read: effectHandler(aiAccountsApi, 'read', async ({ ctx }) => {
     // A changed file means changed routes, so rebuild before answering.
     await refreshRoutes(ctx)

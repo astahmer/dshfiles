@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { accountRuntime, AccountSessionWorkModel } from './account-runtime.js'
 import { accountStoreService } from './account-store.js'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { aiAccountsSessionApi } from './account-session-api.js'
 import { effectHandler } from './host-effect.js'
 import { createAccountSessionService, type AccountSessionService } from './account-session-service.js'
@@ -88,7 +88,7 @@ const serviceFor = (ctx: Context): AccountSessionService => {
   })
   return service
 }
-export const accountSessionHostApi = DshxEffect.host(aiAccountsSessionApi, {
+export const accountSessionHostApi = Api.bind(aiAccountsSessionApi, {
   capability: effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input }) =>
     AccountSessionWorkModel.isLocked(ctx, input.instanceId)
       ? {
