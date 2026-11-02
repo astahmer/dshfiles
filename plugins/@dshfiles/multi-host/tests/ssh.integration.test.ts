@@ -1,9 +1,9 @@
 import { createConnection } from 'node:net'
 import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect'
 import { FetchHttpClient, HttpClient } from 'effect/http'
-import { LegacyRuntime } from '../src/legacy-runtime-promise.js'
 import { afterAll, describe, expect, test } from 'vitest'
 import { SshConnector } from '../src/connectors/ssh.js'
+import type { JsonValue } from '@dshfiles/dshx/platform'
 import type { Ssh } from '../src/ssh.js'
 import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
 
@@ -13,10 +13,16 @@ afterAll(() => runtime.dispose())
 const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | HttpClient.HttpClient | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
   exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
 
+/** A gateway whose tunnel lives until `dispose` closes its Scope. */
 const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }) => {
   const scope = await runtime.runPromise(Scope.make())
   const gateway = await runtime.runPromise(Scope.provide(scope)(SshConnector.connect(input)))
-  return LegacyRuntime.toPromiseGateway({ gateway, close: () => runtime.runPromise(Scope.close(scope, Exit.void)) })
+  const inScope = <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(Scope.provide(scope)(effect))
+  return {
+    api: (method: string, payload?: JsonValue) => inScope(gateway.api(method, payload)),
+    run: (namespace: string, method: string, args: Record<string, unknown>) => inScope(gateway.run({ namespace, method, args })),
+    dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)),
+  }
 }
 
 const localSshdListening = (): Promise<boolean> =>

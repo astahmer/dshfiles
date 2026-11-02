@@ -1,15 +1,10 @@
 {
-  "effect-migration(no-empty-plugin-layer)": {
-    "plugins/@dshfiles/multi-host/src/host.ts": 1
-  },
   "effect-migration(no-host-child-process)": {
     "plugins/@dshfiles/ai-accounts/src/account-session-service.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1,
-    "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 1,
-    "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1
+    "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1
   },
   "effect-migration(no-host-global-timer)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-verification.ts": 1,
@@ -25,10 +20,6 @@
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/multi-host/src/connectors/gateway.ts": 3,
-    "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 3,
-    "plugins/@dshfiles/multi-host/src/gateway-pool.ts": 1,
-    "plugins/@dshfiles/multi-host/src/host.ts": 1,
     "plugins/@dshfiles/optmem-core/src/engine.ts": 6,
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
     "plugins/@dshfiles/preview/src/host.ts": 1
@@ -41,9 +32,6 @@
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/multi-host/src/host.ts": 1,
-    "plugins/@dshfiles/multi-host/src/store.ts": 1,
-    "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2
   },

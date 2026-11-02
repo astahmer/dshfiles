@@ -2,14 +2,39 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import type { ApiSchema } from '@dshfiles/dshx/api'
 import { multiHostApi, resourceSnapshotSchema } from './api.js'
-import { MultiHostSchema } from './schema.js'
+import { SchemaFields } from './schema.js'
+
+/** Decode unknown input strictly: a decoded value, or a failure the test asserts on. */
+const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
+  const result = Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)
+  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
+}
+
+/** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
+const decodeLoose = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
+  const result = Schema.decodeUnknownResult(schema)(input)
+  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
+}
 
 const isEffectSchema = (schema: ApiSchema): schema is Schema.ConstraintDecoder<unknown> => 'ast' in schema
 
+/** The strict boundary dshx publishes for a contract schema, which is what a client and a tool both see. */
 const standard = (schema: ApiSchema) => {
   if ('~standard' in schema) return schema['~standard']
-  if (isEffectSchema(schema)) return Schema.toStandardSchemaV1(schema)['~standard']
-  throw new Error('The API schema must expose Standard Schema validation.')
+  if (!isEffectSchema(schema)) throw new Error('The API schema must expose Standard Schema validation.')
+  const boundary = Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })['~standard']
+  const jsonSchema = Schema.toStandardJSONSchemaV1(schema)['~standard'].jsonSchema
+  const document = Schema.toJsonSchemaDocument(schema, { onExcessProperty: 'error' })
+  return {
+    ...boundary,
+    jsonSchema: {
+      ...jsonSchema,
+      input: (options: { readonly target: 'draft-2020-12' }) => {
+        const published = jsonSchema.input(options)
+        return { ...published, ...document.schema }
+      },
+    },
+  }
 }
 
 type JsonSchemaDocument = Record<string, unknown>
@@ -243,15 +268,23 @@ describe('multi-host tool exposure', () => {
       memoryFreeBytes: 60,
     }
 
-    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, snapshot).success).toBe(true)
-    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, { ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
-    expect(MultiHostSchema.safeDecode(resourceSnapshotSchema, { ...snapshot, loadAverage1m: -1 }).success).toBe(false)
+    expect(decodeLoose(resourceSnapshotSchema, snapshot).success).toBe(true)
+    expect(decodeLoose(resourceSnapshotSchema, { ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
+    expect(decodeLoose(resourceSnapshotSchema, { ...snapshot, loadAverage1m: -1 }).success).toBe(false)
   })
 
   test('the remote JJ repository proxy validates bounded read-only data', async () => {
     const outputSchema = multiHostApi.methods.sessionJjRepositories.output
     if (outputSchema === undefined) throw new Error('The remote JJ repository API must define an output schema.')
+    // The contract boundary is strict, so a newer field a remote runtime sends is refused rather than silently kept;
+    // decoding the same payload with the schema alone is what tolerates it.
     const valid = await standard(outputSchema).validate({
+      ok: true,
+      repositories: { repositories: [{ repoRoot: '/remote/project', title: 'project', workspaceId: 'workspace-1', threads: [] }] },
+    })
+    if ('issues' in valid) throw new Error('The remote JJ repository fixture was rejected.')
+    expect(valid.value).toMatchObject({ ok: true, repositories: { repositories: [{}] } })
+    const newer = await standard(outputSchema).validate({
       ok: true,
       repositories: {
         repositories: [
@@ -259,9 +292,7 @@ describe('multi-host tool exposure', () => {
         ],
       },
     })
-    if ('issues' in valid) throw new Error('The remote JJ repository fixture was rejected.')
-    expect(valid.value).toMatchObject({ ok: true, repositories: { repositories: [{}] } })
-    expect(valid.value).not.toHaveProperty('repositories.repositories.0.futureStatus')
+    expect('issues' in newer).toBe(true)
     const backwardCompatible = await standard(outputSchema).validate({
       ok: true,
       repositories: { repositories: [], refreshing: false },

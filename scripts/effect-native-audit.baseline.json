@@ -396,13 +396,13 @@
     "syncDecodeInEffect": 0
   },
   "@dshfiles/multi-host": {
-    "layerEmpty": 1,
-    "promiseAdapters": 48,
-    "moduleState": 3,
-    "timers": 5,
-    "childProcess": 2,
-    "nodeFs": 9,
-    "globalFetch": 2,
+    "layerEmpty": 0,
+    "promiseAdapters": 1,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 1,
+    "globalFetch": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0

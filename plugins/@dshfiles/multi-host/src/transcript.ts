@@ -1,44 +1,55 @@
+import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
-import { MultiHostSchema } from './schema.js'
+import { SchemaFields } from './schema.js'
 import type { ModelSelection, TranscriptEntry } from './api.js'
 
 const eventSchema = Schema.Struct({ type: Schema.String, seq: Schema.Number.check(Schema.isFinite(), Schema.isInt()), data: Schema.Unknown }).pipe(
-  MultiHostSchema.passthrough,
+  SchemaFields.passthrough,
 )
-const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(MultiHostSchema.passthrough)
+const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(SchemaFields.passthrough)
 const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }).pipe(
-  MultiHostSchema.passthrough,
+  SchemaFields.passthrough,
 )
 const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(
-  MultiHostSchema.passthrough,
+  SchemaFields.passthrough,
 )
 const userMessageSchema = Schema.Struct({
   content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))),
-  source: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)),
-}).pipe(MultiHostSchema.passthrough)
-const assistantSchema = Schema.Struct({ message: messageSchema }).pipe(MultiHostSchema.passthrough)
+  source: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(SchemaFields.passthrough)),
+}).pipe(SchemaFields.passthrough)
+const assistantSchema = Schema.Struct({ message: messageSchema }).pipe(SchemaFields.passthrough)
 const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(
-  MultiHostSchema.passthrough,
+  SchemaFields.passthrough,
 )
 const toolArgumentsSchema = Schema.Struct({
   command: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
   path: Schema.optional(Schema.String),
-}).pipe(MultiHostSchema.passthrough)
+}).pipe(SchemaFields.passthrough)
 const toolResultSchema = Schema.Struct({
   message: Schema.Struct({ toolCallId: Schema.String, isError: Schema.optional(Schema.Boolean), content: Schema.optional(Schema.Array(textBlockSchema)) }).pipe(
-    MultiHostSchema.passthrough,
+    SchemaFields.passthrough,
   ),
-}).pipe(MultiHostSchema.passthrough)
-const turnEndSchema = Schema.Struct({ reason: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)) }).pipe(
-  MultiHostSchema.passthrough,
+}).pipe(SchemaFields.passthrough)
+const turnEndSchema = Schema.Struct({ reason: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(SchemaFields.passthrough)) }).pipe(
+  SchemaFields.passthrough,
 )
-const titleSchema = Schema.Struct({ title: Schema.String }).pipe(MultiHostSchema.passthrough)
+const titleSchema = Schema.Struct({ title: Schema.String }).pipe(SchemaFields.passthrough)
 const requestHeaderSchema = Schema.Struct({
-  header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }).pipe(MultiHostSchema.passthrough) }).pipe(
-    MultiHostSchema.passthrough,
+  header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }).pipe(SchemaFields.passthrough) }).pipe(
+    SchemaFields.passthrough,
   ),
-}).pipe(MultiHostSchema.passthrough)
+}).pipe(SchemaFields.passthrough)
+
+const decodeRecord = Schema.decodeUnknownOption(recordSchema)
+const decodeTurnEnd = Schema.decodeUnknownOption(turnEndSchema)
+const decodeTitle = Schema.decodeUnknownOption(titleSchema)
+const decodeRequestHeader = Schema.decodeUnknownOption(requestHeaderSchema)
+const decodeUserMessage = Schema.decodeUnknownOption(userMessageSchema)
+const decodeAssistant = Schema.decodeUnknownOption(assistantSchema)
+const decodeToolCall = Schema.decodeUnknownOption(toolCallSchema)
+const decodeToolResult = Schema.decodeUnknownOption(toolResultSchema)
+const decodeToolArguments = Schema.decodeUnknownOption(toolArgumentsSchema)
 
 const maxText = 8_000
 const maxToolOutput = 1_200
@@ -46,8 +57,7 @@ const maxToolOutput = 1_200
 const toolSummary = (call: Schema.Schema.Type<typeof toolCallSchema>): string => {
   let parsed: Schema.Schema.Type<typeof toolArgumentsSchema> | undefined
   try {
-    const result = MultiHostSchema.safeDecode(toolArgumentsSchema, JSON.parse(call.arguments ?? '{}'))
-    parsed = result.success ? result.data : undefined
+    parsed = Option.getOrUndefined(decodeToolArguments(JSON.parse(call.arguments ?? '{}')))
   } catch {
     parsed = undefined
   }
@@ -89,51 +99,51 @@ export const reduceTranscript = (
   const toolEntries = new Map<string, number>()
   const resolvedCalls = new Set<string>()
   for (const raw of records) {
-    const record = MultiHostSchema.safeDecode(recordSchema, raw)
-    if (!record.success) continue
-    const { type, seq, data } = record.data.event
+    const record = decodeRecord(raw)
+    if (Option.isNone(record)) continue
+    const { type, seq, data } = record.value.event
     if (type === 'turn/start') running = true
     if (type === 'turn/end') {
       running = false
-      const reason = MultiHostSchema.safeDecode(turnEndSchema, data).data?.reason?.kind
+      const reason = Option.getOrUndefined(Option.flatMap(decodeTurnEnd(data), end => Option.fromUndefinedOr(end.reason?.kind)))
       if (reason !== undefined && reason !== 'completed') entries.push({ seq, kind: 'status', text: `Turn ended: ${reason}` })
     }
-    if (type === 'session/title') title = MultiHostSchema.safeDecode(titleSchema, data).data?.title ?? title
+    if (type === 'session/title') title = Option.match(decodeTitle(data), { onNone: () => title, onSome: row => row.title })
     if (type === 'request/header') {
-      const config = MultiHostSchema.safeDecode(requestHeaderSchema, data).data?.header.config
+      const config = Option.getOrUndefined(Option.flatMap(decodeRequestHeader(data), header => Option.fromUndefinedOr(header.header.config)))
       if (config !== undefined) model = { provider: config.provider, model: config.model }
     }
     if (type === 'user/message') {
-      const message = MultiHostSchema.safeDecode(userMessageSchema, data)
-      if (!message.success || message.data.source?.kind !== 'user') continue
-      const text = texts(message.data.content)
+      const message = decodeUserMessage(data)
+      if (Option.isNone(message) || message.value.source?.kind !== 'user') continue
+      const text = texts(message.value.content)
       if (text !== '') entries.push({ seq, kind: 'user', text: clip(text) })
     }
     if (type === 'assistant/message') {
-      const message = MultiHostSchema.safeDecode(assistantSchema, data)
-      if (!message.success) continue
-      const text = texts(message.data.message.content)
+      const message = decodeAssistant(data)
+      if (Option.isNone(message)) continue
+      const text = texts(message.value.message.content)
       if (text !== '') entries.push({ seq, kind: 'assistant', text: clip(text) })
     }
     if (type === 'tool/call') {
-      const call = MultiHostSchema.safeDecode(toolCallSchema, data)
-      if (!call.success) continue
-      const entry: TranscriptEntry = { seq, kind: 'tool', text: toolSummary(call.data) }
+      const call = decodeToolCall(data)
+      if (Option.isNone(call)) continue
+      const entry: TranscriptEntry = { seq, kind: 'tool', text: toolSummary(call.value) }
       entries.push(entry)
-      toolEntries.set(call.data.callId, entries.length - 1)
-      lastCall = { callId: call.data.callId, name: call.data.name, seq }
+      toolEntries.set(call.value.callId, entries.length - 1)
+      lastCall = { callId: call.value.callId, name: call.value.name, seq }
     }
     if (type === 'tool/result') {
-      const result = MultiHostSchema.safeDecode(toolResultSchema, data)
-      if (result.success) resolvedCalls.add(result.data.message.toolCallId)
-      const entryIndex = result.success ? toolEntries.get(result.data.message.toolCallId) : undefined
+      const result = decodeToolResult(data)
+      if (Option.isSome(result)) resolvedCalls.add(result.value.message.toolCallId)
+      const entryIndex = Option.isSome(result) ? toolEntries.get(result.value.message.toolCallId) : undefined
       const entry = entryIndex === undefined ? undefined : entries[entryIndex]
-      if (result.data === undefined || entryIndex === undefined || entry === undefined) continue
-      const output = texts(result.data.message.content)
+      if (Option.isNone(result) || entryIndex === undefined || entry === undefined) continue
+      const output = texts(result.value.message.content)
       const shown = output.length > maxToolOutput ? `${output.slice(0, maxToolOutput)}…` : output
       entries[entryIndex] = {
         ...entry,
-        text: `${entry.text}${result.data.message.isError === true ? ' (failed)' : ''}${shown === '' ? '' : `\n${shown}`}`,
+        text: `${entry.text}${result.value.message.isError === true ? ' (failed)' : ''}${shown === '' ? '' : `\n${shown}`}`,
       }
     }
   }

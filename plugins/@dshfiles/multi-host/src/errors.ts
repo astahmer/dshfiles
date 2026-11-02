@@ -427,7 +427,7 @@ export class LoopbackForwardUnavailable extends Schema.TaggedError<LoopbackForwa
 
 export class InvalidRuntimeLocator extends Schema.TaggedError<InvalidRuntimeLocator>()(
   'InvalidRuntimeLocator',
-  {},
+  { cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'invalid-runtime-locator' },
 ) {
   override get message(): string {
@@ -491,6 +491,89 @@ export class RuntimeOriginUnavailable extends Schema.TaggedError<RuntimeOriginUn
   }
 }
 
+export class RemoteHomeUnknown extends Schema.TaggedError<RemoteHomeUnknown>()('RemoteHomeUnknown', {}, { dshxWireCode: 'remote-home-unknown' }) {
+  override get message(): string {
+    return 'The remote home could not be read; pass remoteHome.'
+  }
+}
+
+export class NoOfficialNode extends Schema.TaggedError<NoOfficialNode>()('NoOfficialNode', {}, { dshxWireCode: 'no-official-node' }) {
+  override get message(): string {
+    return 'No official Node build on that machine; provision it first.'
+  }
+}
+
+export class DshMissing extends Schema.TaggedError<DshMissing>()('DshMissing', {}, { dshxWireCode: 'dsh-missing' }) {
+  override get message(): string {
+    return 'No dsh CLI on that machine; provision it first.'
+  }
+}
+
+export class SessionUnavailable extends Schema.TaggedError<SessionUnavailable>()('SessionUnavailable', {}, { dshxWireCode: 'session-unavailable' }) {
+  override get message(): string {
+    return 'The host did not return this thread. It may have been deleted there.'
+  }
+}
+
+export class SessionCursorUnavailable extends Schema.TaggedError<SessionCursorUnavailable>()(
+  'SessionCursorUnavailable',
+  {},
+  { dshxWireCode: 'session-cursor-unavailable' },
+) {
+  override get message(): string {
+    return 'The runtime did not return a session history cursor.'
+  }
+}
+
+/** No connected runtime claims this Session, so a routed Session call cannot be forwarded. */
+export class SessionOwnerMissing extends Schema.TaggedError<SessionOwnerMissing>()('SessionOwnerMissing', { sessionId: Schema.String }) {
+  override get message(): string {
+    return `No connected runtime owns Session ${this.sessionId}.`
+  }
+}
+
+const localProjectMessages = {
+  'local-path-not-absolute': 'Choose an absolute local project folder path.',
+  'local-path-unavailable': 'That local project folder is not available on this machine.',
+  'not-a-git-project': 'The selected local folder is not inside a Git project.',
+  'local-path-not-project-root': 'Choose the root folder of the local Git project.',
+  'local-process-failed': 'git or tar could not complete the local project operation.',
+  'too-many-files': 'Select no more than 128 local files to copy.',
+  'invalid-file-path': 'One or more selected local file paths are invalid.',
+  'file-not-copyable': 'A selected local file is no longer available to copy.',
+  'credential-like-file': 'A selected local file has a credential-like name and cannot be copied.',
+  'file-too-large': 'A selected local file is too large to copy.',
+  'copy-size-limit': 'Selected local files exceed the 50 MB copy limit.',
+  'archive-too-large': 'The local files archive exceeds the 55 MB transfer limit.',
+} as const
+
+/** A local project scan or archive refused; `code` names which rule it broke. */
+export class LocalProjectFailed extends Schema.TaggedError<LocalProjectFailed>()(
+  'LocalProjectFailed',
+  { code: Schema.Literals(Object.keys(localProjectMessages) as [keyof typeof localProjectMessages]), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'local-project-failed' },
+) {
+  override get message(): string {
+    return localProjectMessages[this.code]
+  }
+}
+
+export class FolderPathInvalid extends Schema.TaggedError<FolderPathInvalid>()('FolderPathInvalid', {}, { dshxWireCode: 'folder-path-invalid' }) {
+  override get message(): string {
+    return 'Folder paths must be absolute, and a new folder needs a single name.'
+  }
+}
+
+export class FolderUnavailable extends Schema.TaggedError<FolderUnavailable>()(
+  'FolderUnavailable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'folder-unavailable' },
+) {
+  override get message(): string {
+    return 'That folder is not available on this machine.'
+  }
+}
+
 /** What ssh's own stderr says went wrong with the connection, before the remote command ran. */
 export type SshConnectionError = SshHostKeyRejected | SshAuthenticationFailed | SshHostUnresolved | SshUnreachable
 
@@ -546,7 +629,8 @@ export interface TaggedFailure {
  * the class's wire code.
  */
 export const failureCodeOf = (error: TaggedFailure): string => {
-  if (error instanceof RemoteRequestFailed || error instanceof StreamFailed || error instanceof RemoteApiFailed) return error.code
+  if (error instanceof RemoteRequestFailed || error instanceof StreamFailed || error instanceof RemoteApiFailed || error instanceof LocalProjectFailed)
+    return error.code
   const code = Schema.isSchema(error.constructor) ? wireCodeAt(error.constructor.ast) : undefined
   if (code !== undefined) return code
   return error._tag

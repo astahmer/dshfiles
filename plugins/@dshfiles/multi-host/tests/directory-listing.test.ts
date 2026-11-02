@@ -1,8 +1,14 @@
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { NodeServices } from '@effect/platform-node'
+import { Effect, Layer } from 'effect'
 import { describe, expect, test } from 'vitest'
-import { createChildDirectory, listDirectory } from '../src/directory-listing.js'
+import { DirectoryListingModel } from '../src/directory-listing.js'
+
+const listDirectory = (path: string) => DirectoryListingModel.list(path).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer)), Effect.runPromise)
+const createChildDirectory = (input: { readonly path: string; readonly name: string }) =>
+  DirectoryListingModel.createChild(input).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer)), Effect.runPromise)
 
 describe('runtime folder listing', () => {
   test('lists folders and folder symlinks, hidden ones last, with crumbs; files are left out', async () => {

@@ -3,16 +3,30 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from 'effect'
+import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect'
 import { FetchHttpClient, HttpClient } from 'effect/http'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import { LegacyRuntime, type Gateway } from '../src/legacy-runtime-promise.js'
 import { SshConnector } from '../src/connectors/ssh.js'
 import { LaunchFile } from '../src/launch-file.js'
 import { dataRunner } from './fixtures/data-runtime.js'
-import { MultiHostSchema } from '../src/schema.js'
+import * as Schema from 'effect/Schema'
+import { SchemaFields } from '../src/schema.js'
 import { Ssh, type SshRun } from '../src/ssh.js'
 import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
+
+const decodeValue = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
+
+/** Decode unknown input strictly: a decoded value, or a failure the test asserts on. */
+const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
+  const result = Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)
+  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
+}
+
+/** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
+const decodeLoose = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
+  const result = Schema.decodeUnknownResult(schema)(input)
+  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
+}
 
 // Characterization of the ssh process and tunnel contract, pinned before it moved onto the Effect `Ssh` service and
 // kept as its spec. Only the ssh executable is faked: a script on PATH that runs the "remote" command locally and
@@ -48,15 +62,28 @@ const runEffect = (input: SshRun) => Ssh.use(ssh => ssh.run(input))
 
 const probe = (input: { readonly sshTarget: string }) => SshConnector.probe(input)
 
-/** A gateway whose tunnel lives until `dispose` closes its Scope. */
-const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }): Promise<Gateway> => {
+/** A gateway whose tunnel lives until `dispose` closes its Scope, called from the test's own async code. */
+const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }): Promise<TestGateway> => {
   const scope = await runtime.runPromise(Scope.make())
   const exit = await runtime.runPromiseExit(Scope.provide(scope)(SshConnector.connect(input)))
   if (Exit.isFailure(exit)) {
     await runtime.runPromise(Scope.close(scope, exit))
     throw new Error(exitCode(exit))
   }
-  return LegacyRuntime.toPromiseGateway({ gateway: exit.value, close: () => runtime.runPromise(Scope.close(scope, Exit.void)) })
+  const inScope = <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(Scope.provide(scope)(effect))
+  return {
+    origin: exit.value.origin,
+    closed: inScope(exit.value.closed),
+    run: (namespace, method, args) => inScope(exit.value.run({ namespace, method, args })),
+    dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)),
+  }
+}
+
+interface TestGateway {
+  readonly origin: string
+  readonly closed: Promise<void>
+  readonly run: (namespace: string, method: string, args: Record<string, unknown>) => Promise<unknown>
+  readonly dispose: () => Promise<void>
 }
 
 const logLines = async (): Promise<string[]> => {
@@ -237,7 +264,7 @@ const startRuntimeFixture = async () => {
     request.on('data', chunk => body.push(chunk))
     request.on('end', () => {
       calls.push(request.url ?? '')
-      const rpcId = MultiHostSchema.decode(Schema.Struct({ rpcId: Schema.String }).pipe(MultiHostSchema.passthrough), JSON.parse(body.join(''))).rpcId
+      const rpcId = decodeValue(Schema.Struct({ rpcId: Schema.String }).pipe(SchemaFields.passthrough), JSON.parse(body.join(''))).rpcId
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value: { items: [] } } }))
     })

@@ -210,10 +210,10 @@ export const connectGateway = Effect.fn('multi-host gateway connect')(function* 
   readonly transport: (origin: URL) => Effect.Effect<GatewayTransport, E, R | Scope.Scope>
 }) {
   const client = yield* HttpClient.HttpClient
-  const launch = yield* Effect.try({ try: () => loopbackLaunchUrl(input.launchUrl), catch: () => new InvalidRuntimeLocator() })
+  const launch = yield* Effect.try({ try: () => loopbackLaunchUrl(input.launchUrl), catch: cause => new InvalidRuntimeLocator({ cause }) })
   const transport = yield* input.transport(new URL(launch.origin))
   const runtimeLaunchUrl = transport.launchUrl ?? input.launchUrl
-  const runtimeLaunch = yield* Effect.try({ try: () => loopbackLaunchUrl(runtimeLaunchUrl), catch: () => new InvalidRuntimeLocator() })
+  const runtimeLaunch = yield* Effect.try({ try: () => loopbackLaunchUrl(runtimeLaunchUrl), catch: cause => new InvalidRuntimeLocator({ cause }) })
   const exchange = yield* client.get(`${runtimeLaunch.origin}/?token=${encodeURIComponent(runtimeLaunch.token)}`).pipe(
     Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'manual' }),
     Effect.mapError(cause => new GatewayUnreachable({ cause })),

@@ -1,5 +1,4 @@
 import * as Schema from 'effect/Schema'
-import { MultiHostSchema } from './schema.js'
 import { Effect } from 'effect'
 import { SshCommandFailed, SshTimedOut } from './errors.js'
 import { Ssh, shellQuote } from './ssh.js'
@@ -123,7 +122,7 @@ const parseRemoteFacts = ({
     const value = line.slice(separator + 1)
     if (key === 'fnm_node') {
       const [version, path] = value.split('|')
-      if (version !== undefined && path !== undefined) fnmNodes.push(MultiHostSchema.decode(fnmNodeSchema, { version, path }))
+      if (version !== undefined && path !== undefined) fnmNodes.push({ version, path })
       continue
     }
     const current = values.get(key) ?? []

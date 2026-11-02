@@ -1,7 +1,7 @@
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore } from 'effect'
 import { MultiHostPaths } from './paths.js'
 import { PrivateFile } from './private-file.js'
-import { MultiHostSchema } from './schema.js'
+import { SchemaFields } from './schema.js'
 
 /** A thread this manager started on another runtime: where it lives, so the local UI can list and reopen it. */
 const remoteThreadSchema = Schema.Struct({
@@ -9,7 +9,7 @@ const remoteThreadSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   cwd: Schema.String.check(Schema.isMaxLength(4096)),
   title: Schema.String.check(Schema.isMaxLength(512)),
-  createdAt: MultiHostSchema.dateTimeString,
+  createdAt: SchemaFields.dateTimeString,
 })
 const threadFileSchema = Schema.fromJsonString(
   Schema.Struct({ schemaVersion: Schema.Literal(1), threads: Schema.Array(remoteThreadSchema).check(Schema.isMaxLength(1000)) }),

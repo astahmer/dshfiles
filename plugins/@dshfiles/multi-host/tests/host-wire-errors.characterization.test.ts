@@ -10,10 +10,9 @@ import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import multiHostHost from '../src/host.js'
 
-// The wire shape of each failure class a multi-host API call surfaces today, pinned before the handlers become
-// Effect-native with tagged errors. Two shapes exist: handlers that report `{ ok: false, code, message }` as a value,
-// and handlers that throw, which reach the wire as the generic `multi-host-handler-error` with only the message (the
-// domain code is dropped there today).
+// The wire shape of each failure class a multi-host API call surfaces. Two shapes exist: value handlers report
+// `{ ok: false, code, message }`, and failing Effect handlers reach the wire as their tagged error's own code. Both keep
+// the domain code; the facade's generic `multi-host-handler-error` is gone.
 
 const fixturePath = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-ssh.mjs')
 const originalPath = process.env.PATH
@@ -134,19 +133,22 @@ describe('multi-host wire failures by class', () => {
       expected: { shape: 'value', code: 'runtime-not-found' },
     },
     {
-      name: 'unknown runtime, throwing handler (runtimeOpenView) loses its code',
+      // These three used to reach the wire as the generic `multi-host-handler-error`: `effectHandler` flattened every
+      // thrown failure into it. Handlers are Effect handlers with the domain's own tagged errors now, so each keeps
+      // its own wire code, like the value handlers above always did.
+      name: 'unknown runtime, failing Effect handler (runtimeOpenView) keeps its domain code',
       run: () => call('runtimeOpenView', { runtimeId: 'missing-runtime' }),
-      expected: { shape: 'error', code: 'multi-host-handler-error' },
+      expected: { shape: 'error', code: 'runtime-not-found' },
     },
     {
-      name: 'unknown runtime, throwing handler (sessionCursor) loses its code',
+      name: 'unknown runtime, failing Effect handler (sessionCursor) keeps its domain code',
       run: () => call('sessionCursor', { runtimeId: 'missing-runtime', sessionId: 'session-1' }),
-      expected: { shape: 'error', code: 'multi-host-handler-error' },
+      expected: { shape: 'error', code: 'runtime-not-found' },
     },
     {
-      name: 'unknown host, throwing handler (hostSetHidden)',
+      name: 'unknown host, failing Effect handler (hostSetHidden) keeps its domain code',
       run: () => call('hostSetHidden', { id: 'missing-host', hidden: true }),
-      expected: { shape: 'error', code: 'multi-host-handler-error' },
+      expected: { shape: 'error', code: 'host-not-found' },
     },
     {
       name: 'unknown host remove is a no-op, not a failure',
