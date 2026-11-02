@@ -1,18 +1,54 @@
-import { describe, expect, it } from 'vitest'
-import { Config } from './host.js'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import plugin from './host.js'
 import { injectAfterHead, SHARED_EVENT_SOURCE_WORKER, SHARED_EVENT_SOURCE_WORKER_PATH, sharedEventSourceScript } from './shim.js'
 
 const INDEX_HTML =
   '<!doctype html><html><head><title>DeepSeek Harness</title><script type="module" src="./assets/index.js"></script></head><body><div id="root"></div></body></html>'
 
-describe('Host configuration', () => {
-  it('defaults an omitted row config to enabled', async () => {
-    expect(await Config['~standard'].validate(undefined)).toEqual({ value: { enabled: true } })
+const mountWith = (config: { readonly enabled: boolean } | undefined) =>
+  Effect.gen(function* () {
+    const host = yield* Effect.acquireRelease(
+      Effect.promise(() => createTestHost()),
+      testHost => Effect.promise(() => testHost.dispose()),
+    )
+    const routes = new Set<string>()
+    const taps = new Set<(html: string) => string>()
+    host.ctx.provide('webServer', {
+      register: (route: { readonly path: string }) => {
+        routes.add(route.path)
+        return () => routes.delete(route.path)
+      },
+      tapIndex: (tap: (html: string) => string) => {
+        taps.add(tap)
+        return () => taps.delete(tap)
+      },
+    })
+    const mounted = yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/shared-streams', config }))
+    return { routes, taps, mounted }
   })
 
-  it('preserves an explicit disabled value', async () => {
-    expect(await Config['~standard'].validate({ enabled: false })).toEqual({ value: { enabled: false } })
-  })
+describe('Host configuration', () => {
+  it.effect('serves the worker and injects the shim by default, until the plugin unloads', () =>
+    Effect.gen(function* () {
+      const { routes, taps, mounted } = yield* mountWith(undefined)
+      expect([...routes]).toEqual([`/${SHARED_EVENT_SOURCE_WORKER_PATH}`])
+      expect([...taps].map(tap => tap(INDEX_HTML).includes(sharedEventSourceScript()))).toEqual([true])
+
+      yield* Effect.promise(() => mounted.dispose())
+      expect(routes.size).toBe(0)
+      expect(taps.size).toBe(0)
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('installs nothing when the row disables it', () =>
+    Effect.gen(function* () {
+      const { routes, taps } = yield* mountWith({ enabled: false })
+      expect(routes.size).toBe(0)
+      expect(taps.size).toBe(0)
+    }).pipe(Effect.scoped),
+  )
 })
 
 describe('shared event source script', () => {
