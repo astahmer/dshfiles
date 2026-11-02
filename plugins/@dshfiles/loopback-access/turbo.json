@@ -6,13 +6,10 @@
     "test:boot": {
       "dependsOn": [],
       "inputs": [
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__loopback-access.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/loopback-access/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/loopback-access/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
@@ -37,7 +34,6 @@
       "dependsOn": [],
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__loopback-access.sha256",
@@ -49,8 +45,6 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/loopback-access/cordis.patch.yml",
@@ -89,7 +83,6 @@
       "dependsOn": [],
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__loopback-access.sha256",
@@ -101,8 +94,6 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/loopback-access/cordis.patch.yml",
