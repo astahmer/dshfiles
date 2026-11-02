@@ -1,139 +1,123 @@
-import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
-import type { ImageBlock } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-llm'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
-import { Context, Effect, Layer, Schema } from 'effect'
-import { serializedMessageBytes, summarizeInChunks } from './chunked-summary.js'
+import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
+import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { Llm } from '@dshfiles/dshx/effect/llm'
+import { Effect, Layer, Schema } from 'effect'
+import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
 
 const FALLBACK_CONTEXT_WINDOW = 32_768
 const MAX_INPUT_BYTES = 64_000
 const SUMMARY_PROMPT_RESERVE = 4_096
 const MIN_CONTEXT_RESERVE = 4_096
-const compactionConfigSchema = Schema.Struct({
+
+const CompactionConfig = Schema.Struct({
   maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
 })
-type PluginConfig = typeof compactionConfigSchema.Type
-type CompactionConfig = BasicCompactionEngine['config']
+
 type SummarizeInput = Parameters<BasicCompactionEngine['summarize']>[0]
 type CompactionAgent = Parameters<BasicCompactionEngine['summarize']>[1]
 type SummaryResult = Awaited<ReturnType<BasicCompactionEngine['summarize']>>
-type BaseSummarize = (input: SummarizeInput, signal?: AbortSignal) => Promise<SummaryResult>
-type Summarize = (request: {
+
+interface SummaryRequest {
   readonly input: SummarizeInput
   readonly agent: CompactionAgent
-  readonly config: CompactionConfig
-  readonly signal?: AbortSignal
-  readonly summarize: BaseSummarize
-}) => Promise<SummaryResult>
+  readonly config: BasicCompactionEngine['config']
+  readonly signal: AbortSignal | undefined
+  /** The stock engine's single summary request. */
+  readonly base: (input: SummarizeInput, signal?: AbortSignal) => Promise<SummaryResult>
+}
 
-class ContextCompactionRuntime extends Context.Service<ContextCompactionRuntime, { readonly llm: CordisContext['llm'] | undefined }>()(
-  '@dshfiles/context-compaction/Runtime',
-) {}
+const failureMessages = {
+  'model-info': 'Could not read the summarization model’s context capacity.',
+  'input-capacity': 'The selected summarization model has too little safe input capacity.',
+  'image-pricing': 'Cannot safely size an image-bearing summary without model-declared image pricing.',
+} as const
 
 class ContextCompactionFailure extends Schema.TaggedError<ContextCompactionFailure>()('ContextCompactionFailure', {
-  message: Schema.String,
-}) {}
-
-const summarizeBounded = Effect.fn('context compaction run')(function* ({
-  input,
-  agent,
-  signal,
-  config,
-  llm,
-  summarize,
-}: {
-  readonly input: SummarizeInput
-  readonly agent: CompactionAgent
-  readonly signal?: AbortSignal
-  readonly config: CompactionConfig
-  readonly llm: CordisContext['llm'] | undefined
-  readonly summarize: BaseSummarize
+  reason: Schema.Literals(['model-info', 'input-capacity', 'image-pricing']),
+  cause: Schema.optional(Schema.Defect()),
 }) {
-  const recentRequest = agent.session.requestHeader()?.config
-  const provider = config.summarizationProvider || recentRequest?.provider || agent.options.provider
-  const model = config.summarizationModel || recentRequest?.model || agent.options.model
-  if (llm === undefined) return yield* Effect.fail(new ContextCompactionFailure({ message: 'The Host language-model service is unavailable.' }))
+  override get message(): string {
+    return failureMessages[this.reason]
+  }
+}
+
+const ContextOverflow = Schema.Struct({ code: Schema.Literal('CONTEXT_WINDOW_EXCEEDED') })
+const isContextOverflow = Schema.is(ContextOverflow)
+
+const hasImages = (message: Message) => message.content.some(block => block.type === 'image')
+
+const summarizeBounded = Effect.fn('context compaction run')(function* (request: SummaryRequest) {
+  const llm = yield* Llm
+  const recentRequest = request.agent.session.requestHeader()?.config
+  const provider = request.config.summarizationProvider || recentRequest?.provider || request.agent.options.provider
+  const model = request.config.summarizationModel || recentRequest?.model || request.agent.options.model
+  const route = provider === undefined || model === undefined ? undefined : { provider, model }
   const modelInfo =
-    provider === undefined || model === undefined
-      ? undefined
-      : yield* Effect.tryPromise({
-          try: () => llm.resolveModelInfo(provider, model, signal),
-          catch: error => new ContextCompactionFailure({ message: error instanceof Error ? error.message : String(error) }),
-        })
+    route === undefined ? undefined : yield* llm.modelInfo(route).pipe(Effect.mapError(cause => new ContextCompactionFailure({ reason: 'model-info', cause })))
   const contextWindow = modelInfo?.context?.contextWindow ?? FALLBACK_CONTEXT_WINDOW
   const reserve = Math.max(MIN_CONTEXT_RESERVE, Math.ceil(contextWindow * 0.05))
-  const maxInputBytes = Math.min(MAX_INPUT_BYTES, Math.floor((contextWindow - config.maxTokens - reserve) / 2) - SUMMARY_PROMPT_RESERVE)
-  if (maxInputBytes < 1_024)
-    return yield* Effect.fail(new ContextCompactionFailure({ message: 'The selected summarization model has too little safe input capacity.' }))
+  const maxInputBytes = Math.min(MAX_INPUT_BYTES, Math.floor((contextWindow - request.config.maxTokens - reserve) / 2) - SUMMARY_PROMPT_RESERVE)
+  if (maxInputBytes < 1_024) return yield* new ContextCompactionFailure({ reason: 'input-capacity' })
 
-  const imagePricing = provider === undefined || model === undefined ? undefined : llm.imageRequestPricing(provider, model)
+  const imagePricing = route === undefined ? undefined : yield* llm.imagePricing(route)
   const textOnlyRoute = modelInfo?.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')
-  const messageBytes = (message: SummarizeInput['messages'][number]) => {
+  if (imagePricing === undefined && !textOnlyRoute && request.input.messages.some(hasImages))
+    return yield* new ContextCompactionFailure({ reason: 'image-pricing' })
+  const messageBytes = (message: Message) => {
     const images = message.content.filter((block): block is ImageBlock => block.type === 'image')
-    if (images.length === 0) return serializedMessageBytes(message)
-    if (imagePricing === undefined) {
-      if (textOnlyRoute) return serializedMessageBytes(message)
-      throw new ContextCompactionFailure({ message: 'Cannot safely size an image-bearing summary without model-declared image pricing.' })
-    }
+    if (images.length === 0 || imagePricing === undefined) return serializedMessageBytes(message)
     const imageCost = imagePricing.priceImages(images).reduce((sum, price) => sum + price.visualTokens + serializedMessageBytes(price.text), 0)
     return serializedMessageBytes(message) + imageCost
   }
 
-  return yield* Effect.tryPromise({
-    try: () =>
-      summarizeInChunks({
-        input,
-        maxInputBytes,
-        messageBytes,
-        ...(signal !== undefined && { signal }),
-        summarize: (candidate, candidateSignal) => summarize(candidate, candidateSignal),
+  return yield* summarizeInChunks({
+    input: request.input,
+    maxInputBytes,
+    messageBytes,
+    summarize: candidate =>
+      Effect.tryPromise({
+        try: () => request.base(candidate, request.signal),
+        catch: cause => new SummaryRequestFailed({ contextOverflow: isContextOverflow(cause), cause }),
       }),
-    catch: error =>
-      error instanceof ContextCompactionFailure ? error : new ContextCompactionFailure({ message: error instanceof Error ? error.message : String(error) }),
   })
 })
 
-const summarizeByContext = new WeakMap<CordisContext, Summarize>()
-
-class ContextCompactionEngine extends BasicCompactionEngine {
-  protected override summarize(input: SummarizeInput, agent: CompactionAgent, signal?: AbortSignal): ReturnType<BasicCompactionEngine['summarize']> {
-    const summarize = summarizeByContext.get(this.ctx)
-    if (summarize === undefined) return Promise.reject(new ContextCompactionFailure({ message: 'Context compaction is not initialized.' }))
-    const request = {
-      input,
-      agent,
-      config: this.config,
-      summarize: (candidate: SummarizeInput, candidateSignal?: AbortSignal) => super.summarize(candidate, agent, candidateSignal),
+/** The stock engine with its single summary request bounded to the route's safe input, split and reduced as needed. */
+const engineWith = (summarize: (request: SummaryRequest) => Promise<SummaryResult>) =>
+  class ContextCompactionEngine extends BasicCompactionEngine {
+    protected override summarize(input: SummarizeInput, agent: CompactionAgent, signal?: AbortSignal): Promise<SummaryResult> {
+      return summarize({
+        input,
+        agent,
+        config: this.config,
+        signal,
+        base: (candidate, candidateSignal) => super.summarize(candidate, agent, candidateSignal),
+      })
     }
-    if (signal !== undefined) return summarize({ ...request, signal })
-    return summarize(request)
   }
-}
 
-const compactionPlugin = DshxEffect.plugin<PluginConfig, ContextCompactionFailure, ContextCompactionRuntime>({
-  layer: (ctx: CordisContext) => Layer.succeed(ContextCompactionRuntime, { llm: ctx.get('llm') }),
-  setup: Effect.fn('context compaction setup')(function* (ctx: CordisContext, config: PluginConfig) {
-    const runtime = yield* ContextCompactionRuntime
-    yield* Effect.acquireRelease(
-      Effect.sync(() => {
-        summarizeByContext.set(ctx, request =>
-          Effect.runPromise(
-            summarizeBounded({ ...request, llm: runtime.llm }).pipe(Effect.provide(DshxEffect.tracerLayer)),
-            request.signal === undefined ? undefined : { signal: request.signal },
-          ),
-        )
-        ctx.plugin(ContextCompactionEngine, config)
-      }),
-      () => Effect.sync(() => summarizeByContext.delete(ctx)),
-    )
-  }),
-})
+const CompactionEngine = (config: typeof CompactionConfig.Type) =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const host = yield* HostContext
+      const summarize = yield* DshxPlugin.callback(summarizeBounded)
+      // A failed provider request reaches the engine as the provider's own error, as the stock engine throws it.
+      const engine = engineWith(request =>
+        summarize(request).catch((error: unknown) => {
+          throw error instanceof SummaryRequestFailed ? error.cause : error
+        }),
+      )
+      yield* Effect.acquireRelease(
+        Effect.sync(() => host.ctx.plugin(engine, config)),
+        fiber => Effect.promise(() => fiber.dispose()),
+      )
+    }),
+  )
 
-export default defineHost({
+export default DshxPlugin.make({
   name: '@dshfiles/context-compaction',
-  Config: { '~standard': Schema.toStandardSchemaV1(compactionConfigSchema)['~standard'] },
-  setup: (ctx: CordisContext, config: unknown) =>
-    compactionPlugin.setup(ctx, Schema.decodeUnknownSync(compactionConfigSchema, { onExcessProperty: 'error' })(config)),
+  inject: ['llm'],
+  Config: CompactionConfig,
+  layer: config => CompactionEngine(config).pipe(Layer.provide(Llm.layer)),
 })
