@@ -12,21 +12,12 @@ import { Effect, Layer } from 'effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
-import {
-  fileUploadValueSchema,
-  jjRepositoriesEffectSchema,
-  multiHostApi,
-  resourceSnapshotSchema,
-  type ConnectionTestStep,
-  type ResourcePool,
-  type ResourcePoolEntry,
-  type ResourceProbe,
-  type RuntimeStatus,
-  type SessionSummary,
-} from './api.js'
+import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ConnectionTestStep } from './api.js'
 import { SshConnector } from './connectors/ssh.js'
-import { ConnectorKindMismatch, HostNotFound, IdentityMismatch, OriginPortExhausted, RuntimeNotFound } from './errors.js'
+import { ConnectorKindMismatch, HostNotFound, IdentityMismatch, OriginPortExhausted } from './errors.js'
 import { RuntimePool } from './runtime-pool.js'
+import { ResourcePool, RuntimeStatus } from './runtime-status.js'
+import { ViewLeases } from './view-leases.js'
 import { GatewayUnavailableError, HostDirectoryStore, LegacyRuntime, RemoteThreadStore } from './legacy-runtime-promise.js'
 import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity as RuntimeIdentityService } from './identity.js'
@@ -37,12 +28,11 @@ import { NodeServices } from '@effect/platform-node'
 import { Ssh, shellQuote } from './ssh.js'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { ConfigProvider, Stream } from 'effect'
+import { ConfigProvider } from 'effect'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { registerRemoteReferenceMiddleware } from './remote-reference-middleware.js'
 import { knownSessionRuntime } from './session-runtime.js'
-import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
 import { ResourceSnapshotModel } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
 import { NativeRpcModel } from './native-rpc.js'
@@ -64,25 +54,7 @@ import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesErro
 
 const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
-const sessionRowSchema = Schema.Struct({
-  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
-  cwd: Schema.optional(Schema.String.check(Schema.isMaxLength(4096))),
-  running: Schema.Boolean,
-  blank: Schema.Boolean,
-  updatedAt: Schema.Number.check(Schema.isFinite()),
-  title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))),
-  // The remote list names a thread through its title projection; an untitled thread reports null there.
-  projections: Schema.optional(
-    Schema.Struct({
-      values: Schema.optional(
-        Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(MultiHostSchema.passthrough),
-      ),
-    }).pipe(MultiHostSchema.passthrough),
-  ),
-}).pipe(MultiHostSchema.passthrough)
-type MutableSessionSummary = { -readonly [Key in keyof SessionSummary]: SessionSummary[Key] }
 
-const sessionListSchema = Schema.Struct({ items: Schema.Array(sessionRowSchema).check(Schema.isMaxLength(10_000)) }).pipe(MultiHostSchema.passthrough)
 const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(MultiHostSchema.passthrough)
 const directoryListingSchema = Schema.Struct({
   path: Schema.String,
@@ -91,24 +63,10 @@ const directoryListingSchema = Schema.Struct({
   entries: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })).check(Schema.isMaxLength(5_000)),
   truncated: Schema.Boolean,
 }).pipe(MultiHostSchema.passthrough)
-const workspaceRowSchema = Schema.Struct({
-  workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
-  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
-  title: Schema.optional(Schema.String.check(Schema.isMaxLength(512))),
-  sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000))),
-}).pipe(MultiHostSchema.passthrough)
 const workspaceCreatedSchema = Schema.Struct({
   workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(
     MultiHostSchema.passthrough,
   ),
-}).pipe(MultiHostSchema.passthrough)
-const workspaceContainerSchema = Schema.Struct({
-  items: Schema.optional(Schema.Unknown),
-  value: Schema.optional(Schema.Unknown),
-  workspace: Schema.optional(Schema.Unknown),
-  workspaces: Schema.optional(Schema.Unknown),
-  baseline: Schema.optional(Schema.Unknown),
-  snapshot: Schema.optional(Schema.Unknown),
 }).pipe(MultiHostSchema.passthrough)
 const fileReferenceCandidatesSchema = Schema.Array(
   Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
@@ -168,12 +126,6 @@ const transportFailures = new Set([
   'gateway-request-failed',
 ])
 
-interface ViewLease {
-  readonly runtimeId: string
-  readonly pooled: Awaited<ReturnType<typeof LegacyRuntime.pool.acquire>>
-  readonly timer: ReturnType<typeof setTimeout>
-}
-
 const activeSessionSources = new Set<SessionSourceRegistry>()
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -189,18 +141,6 @@ declare module '@deepseek-ai/dsh-llm' {
     }
   }
 }
-const viewLeases = new Map<string, ViewLease>()
-const viewLeaseTtlMs = 30 * 60_000
-const maxViewLeases = 8
-const runtimeStatusCache = createRuntimeStatusCache<RuntimeStatus>({ successTtlMs: 30_000, failureTtlMs: 45_000 })
-const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
-  successTtlMs: 30_000,
-  failureTtlMs: 45_000,
-  maxEntries: 128,
-  spanName: 'multi-host resource snapshot refresh',
-})
-const resourceProbeLimiter = ResourceSnapshotModel.createResourceProbeLimiter(4)
-
 const allocateRuntimeOriginPort = async (runtimeId: string, occupiedPorts: readonly number[]): Promise<number> => {
   const unavailable = new Set(occupiedPorts)
   for (let attempt = 0; attempt < 20_000; attempt += 1) {
@@ -244,41 +184,6 @@ const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => 
   runtimeCount: runtimes.filter(runtime => runtime.hostId === record.id).length,
   hidden: record.hidden,
 })
-
-const collectWorkspaces = (frames: readonly unknown[]): Schema.Schema.Type<typeof workspaceRowSchema>[] => {
-  const results = new Map<string, Schema.Schema.Type<typeof workspaceRowSchema>>()
-  const visit = (value: unknown, depth: number): void => {
-    if (depth > 16 || results.size >= 256) return
-    if (Array.isArray(value)) {
-      for (const item of value.slice(0, 512)) visit(item, depth + 1)
-      return
-    }
-    if (typeof value !== 'object' || value === null) return
-    const workspace = MultiHostSchema.safeDecode(workspaceRowSchema, value)
-    if (workspace.success) results.set(workspace.data.workspaceId, workspace.data)
-    const record = MultiHostSchema.decode(workspaceContainerSchema, value)
-    for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
-      const child = record[key]
-      if (child !== undefined) visit(child, depth + 1)
-    }
-  }
-  for (const frame of frames) visit(frame, 0)
-  return [...results.values()]
-}
-
-const closeLease = async (leaseId: string): Promise<boolean> => {
-  const lease = viewLeases.get(leaseId)
-  if (lease === undefined) return false
-  viewLeases.delete(leaseId)
-  clearTimeout(lease.timer)
-  lease.pooled.release()
-  return true
-}
-
-const closeRuntimeLeases = async (runtimeId: string): Promise<void> => {
-  const leases = [...viewLeases.entries()].filter(([, lease]) => lease.runtimeId === runtimeId).map(([leaseId]) => leaseId)
-  await Promise.all(leases.map(closeLease))
-}
 
 /** Probe one SSH target + DSH home and pin its identity; shared by the add-host test and the save. */
 const qualifyRuntime = async ({
@@ -381,68 +286,10 @@ const officialNodeOf = ({ facts, minimum = '22.19.0' }: { readonly facts: Remote
   return facts.node.nix ? official : (facts.node.path ?? official)
 }
 
-const readResourcePool = async (): Promise<ResourcePool> => {
-  const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
-  const remoteHosts = hosts.filter(host => host.connector.kind === 'ssh')
-  const entries: ResourcePoolEntry[] = remoteHosts.map(host => {
-    const runtime = runtimes
-      .filter(item => item.hostId === host.id && item.locator.kind === 'ssh')
-      .sort((left, right) => (right.lastSeenAt ?? right.createdAt).localeCompare(left.lastSeenAt ?? left.createdAt) || left.id.localeCompare(right.id))[0]
-    if (runtime === undefined) {
-      return {
-        hostId: host.id,
-        hostName: host.name,
-        runtimeId: null,
-        destination: null,
-        hidden: host.hidden,
-        probe: { ok: false, code: 'runtime-unavailable', message: 'No remote DSH runtime is registered.' },
-        stale: false,
-        refreshing: false,
-      }
-    }
-
-    const cached = runtimeResourceCache.read(runtime.id)
-    if (cached.stale) {
-      void runtimeResourceCache
-        .refresh(runtime.id, () =>
-          resourceProbeLimiter.run(async () => {
-            try {
-              const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
-              const parsed = MultiHostSchema.safeDecode(resourceSnapshotSchema, raw)
-              if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
-              return { ok: true as const, snapshot: parsed.data }
-            } catch (error) {
-              const failure = safeFailure(error)
-              return {
-                ok: false as const,
-                code: failure.code.slice(0, 128),
-                message: 'Resource data is unavailable. Reconnect the runtime or update its multi-host plugin.',
-              }
-            }
-          }),
-        )
-        .catch(() => undefined)
-    }
-    const current = runtimeResourceCache.read(runtime.id)
-    return {
-      hostId: host.id,
-      hostName: host.name,
-      runtimeId: runtime.id,
-      destination: { kind: 'runtime', runtimeId: runtime.id },
-      hidden: host.hidden,
-      probe: current.status ?? { ok: false, code: 'resource-refreshing', message: 'Waiting for a fresh resource snapshot.' },
-      stale: current.stale,
-      refreshing: current.refreshing,
-    }
-  })
-
-  return { hosts: entries, selected: ResourceSnapshotModel.selectAutoHost(entries) }
-}
-
 const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   identity: async () => LegacyRuntime.readOrCreateRuntimeIdentity(),
   resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
-  resourcePool: async () => readResourcePool(),
+  resourcePool: async () => LegacyRuntime.run(ResourcePool.use(pool => pool.read)),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
     return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
@@ -660,7 +507,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     const removed = await HostDirectoryStore.removeHost(input.id, input.removeDirectory)
     if (removed) {
       for (const runtime of runtimes) {
-        await closeRuntimeLeases(runtime.id)
+        await LegacyRuntime.run(ViewLeases.use(leases => leases.closeRuntime(runtime.id)))
         await pool.close(runtime.id)
       }
     }
@@ -677,77 +524,7 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       return { ok: false as const, ...safeFailure(error) }
     }
   },
-  runtimeStatus: async ({ input }): Promise<RuntimeStatus> => {
-    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
-    if (runtime === undefined)
-      return { ok: false, hostId: 'unknown', runtimeId: input.runtimeId, code: 'runtime-not-found', message: 'No recorded runtime has this id.', stale: true }
-    const cached = runtimeStatusCache.read(runtime.id)
-    if (cached.status !== undefined && !cached.stale) return cached.status
-
-    void runtimeStatusCache
-      .refresh(runtime.id, async () => {
-        try {
-          return await withRuntime(
-            runtime.id,
-            async gateway => {
-              const [frames, sessionValue] = await Promise.all([
-                gateway.follow('workspace/follow', {}, 10_000),
-                gateway.run('session', 'list', { _request: {} }),
-              ])
-              const sessions = MultiHostSchema.decode(sessionListSchema, sessionValue)
-                .items.slice(0, 500)
-                .map(item => {
-                  const title = item.title ?? item.projections?.values?.title ?? undefined
-                  const summary: MutableSessionSummary = {
-                    runtimeId: runtime.id,
-                    sessionId: item.sessionId,
-                    running: item.running,
-                    blank: item.blank,
-                    updatedAt: item.updatedAt,
-                  }
-                  if (item.cwd !== undefined) summary.cwd = item.cwd
-                  if (title !== undefined && title !== '') summary.title = title
-                  return summary
-                })
-              const workspaces = collectWorkspaces(frames).map(item => ({
-                runtimeId: runtime.id,
-                workspaceId: item.workspaceId,
-                path: item.path,
-                title: item.title ?? item.path,
-                sessionIds: item.sessionIds ?? [],
-              }))
-              const refreshed = (await HostDirectoryStore.findRuntime(runtime.id)) ?? runtime
-              return { ok: true as const, runtime: runtimeSummary(refreshed), workspaces, sessions }
-            },
-            { mutation: false },
-          )
-        } catch (error) {
-          const failure = safeFailure(error)
-          return {
-            ok: false,
-            hostId: runtime.hostId,
-            runtimeId: runtime.id,
-            code: failure.code,
-            message: failure.message,
-            stale: true,
-            lastSeenAt: runtime.lastSeenAt,
-          }
-        }
-      })
-      .catch(() => undefined)
-
-    if (cached.status !== undefined) return { ...cached.status, stale: true, refreshing: true }
-    return {
-      ok: false,
-      hostId: runtime.hostId,
-      runtimeId: runtime.id,
-      code: 'runtime-status-refreshing',
-      message: 'A remote status refresh is running.',
-      stale: true,
-      refreshing: true,
-      lastSeenAt: runtime.lastSeenAt,
-    }
-  },
+  runtimeStatus: async ({ input }) => LegacyRuntime.run(RuntimeStatus.use(status => status.status(input.runtimeId))),
   runtimePing: async ({ input, signal }) => {
     const startedAt = Date.now()
     try {
@@ -758,8 +535,12 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
     }
   },
   runtimeReconnect: async ({ input }) => {
-    runtimeStatusCache.invalidate(input.runtimeId)
-    runtimeResourceCache.invalidate(input.runtimeId)
+    await LegacyRuntime.run(
+      Effect.andThen(
+        RuntimeStatus.use(status => status.invalidate(input.runtimeId)),
+        ResourcePool.use(resources => resources.invalidate(input.runtimeId)),
+      ),
+    )
     await pool.close(input.runtimeId)
     await pool.clearError(input.runtimeId)
     try {
@@ -1252,32 +1033,12 @@ const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
       },
       { mutation: false },
     ),
-  runtimeOpenView: async ({ input }) => {
-    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
-    if (runtime === undefined) throw new RuntimeNotFound({ runtimeId: input.runtimeId })
-    if (runtime.originPort === undefined)
-      throw new GatewayUnavailableError('runtime-origin-unavailable', 'This runtime has no stable browser origin. Re-register it before opening its view.')
-    const existing = [...viewLeases.entries()].find(([, lease]) => lease.runtimeId === runtime.id)
-    if (existing !== undefined && pool.status(runtime.id)?.generation === existing[1].pooled.generation) {
-      return { leaseId: existing[0], launchUrl: existing[1].pooled.gateway.launchUrl }
-    }
-    if (existing !== undefined) await closeLease(existing[0])
-    const pooled = await pool.acquire(runtime.id)
-    while (viewLeases.size >= maxViewLeases) {
-      const oldest = viewLeases.keys().next().value
-      if (oldest === undefined) break
-      await closeLease(oldest)
-    }
-    const leaseId = randomUUID()
-    const timer = setTimeout(() => void closeLease(leaseId), viewLeaseTtlMs)
-    viewLeases.set(leaseId, { runtimeId: runtime.id, pooled, timer })
-    return { leaseId, launchUrl: pooled.gateway.launchUrl }
-  },
-  runtimeCloseView: async ({ input }) => ({ closed: await closeLease(input.leaseId) }),
+  runtimeOpenView: async ({ input }) => LegacyRuntime.run(ViewLeases.use(leases => leases.open(input.runtimeId))),
+  runtimeCloseView: async ({ input }) => ({ closed: await LegacyRuntime.run(ViewLeases.use(leases => leases.close(input.leaseId))) }),
   runtimeRemove: async ({ input }) => {
     const removed = await HostDirectoryStore.removeRuntime(input.runtimeId)
     if (removed) {
-      await closeRuntimeLeases(input.runtimeId)
+      await LegacyRuntime.run(ViewLeases.use(leases => leases.closeRuntime(input.runtimeId)))
       await pool.close(input.runtimeId)
     }
     return { removed }
@@ -1378,7 +1139,8 @@ const pluginLayer = (input: { readonly ctx: Context; readonly configuredProfile:
     Layer.provide(DshChildProcessSpawner.layer),
     Layer.provide(HostContext.layer({ ctx: input.ctx, packageId: '@dshfiles/multi-host' })),
   )
-  return RuntimePool.layer.pipe(
+  return Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, ViewLeases.layer).pipe(
+    Layer.provideMerge(RuntimePool.layer),
     Layer.provideMerge(network),
     Layer.provideMerge(data),
     Layer.provideMerge(NodeServices.layer),
@@ -1387,27 +1149,12 @@ const pluginLayer = (input: { readonly ctx: Context; readonly configuredProfile:
   )
 }
 
-/** A fresh connection makes a cached failed status stale. */
-const refreshStatusOnConnect = RuntimePool.use(pool =>
-  Effect.forkScoped(
-    Stream.runForEach(pool.connected, runtimeId =>
-      Effect.sync(() => {
-        const cachedStatus = runtimeStatusCache.read(runtimeId)
-        if (cachedStatus.status?.ok === false && !cachedStatus.refreshing) runtimeStatusCache.invalidate(runtimeId)
-      }),
-    ),
-  ),
-)
-
 const effectPlugin = DshxEffect.plugin({
   layer: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) => pluginLayer({ ctx, configuredProfile: config?.profile }),
   setup: (ctx: Context) =>
     Effect.andThen(
       LegacyRuntime.install,
-      Effect.andThen(
-        refreshStatusOnConnect,
-        Effect.sync(() => setupHost(ctx)),
-      ),
+      Effect.sync(() => setupHost(ctx)),
     ),
 })
 const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
@@ -1485,8 +1232,5 @@ function setupHost(ctx: Context): void {
       unregister()
       activeSessionSources.delete(scoped.sessionSources)
     })
-  })
-  ctx.effect(() => async () => {
-    for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
   })
 }

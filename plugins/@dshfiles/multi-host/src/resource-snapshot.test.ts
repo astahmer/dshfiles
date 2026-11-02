@@ -73,25 +73,6 @@ it('keeps directory order as the deterministic tie-break and skips hidden or sta
   ).toMatchObject({ hostId: 'first', runtimeId: 'runtime-first' })
 })
 
-it('limits concurrent remote resource probes', async () => {
-  const limiter = ResourceSnapshotModel.createResourceProbeLimiter(2)
-  let active = 0
-  let maximum = 0
-
-  await Promise.all(
-    Array.from({ length: 8 }, () =>
-      limiter.run(async () => {
-        active += 1
-        maximum = Math.max(maximum, active)
-        await new Promise(resolve => setTimeout(resolve, 1))
-        active -= 1
-      }),
-    ),
-  )
-
-  expect(maximum).toBe(2)
-})
-
 it('returns no candidate when snapshots are unavailable or unsupported', () => {
   const noLoad = snapshot({ loadAverage1m: null, cpuCount: 4, memoryFreeBytes: 80 })
   const unavailable: ResourcePoolEntry = {

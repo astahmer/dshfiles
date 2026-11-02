@@ -12,12 +12,26 @@ import type { Ssh } from './ssh.js'
 import { GatewayUnreachable } from './errors.js'
 import { RemoteIdentity } from './remote-identity.js'
 import { RuntimePool } from './runtime-pool.js'
+import type { ResourcePool, RuntimeStatus } from './runtime-status.js'
+import type { ViewLeases } from './view-leases.js'
 
 /**
  * The Effect services the remaining Promise handlers reach while the Host moves onto `DshxPlugin.make`; installed for
  * the plugin activation and removed with it.
  */
-export type LegacyServices = Ssh | MultiHostPaths | HostDirectory | RemoteThreads | RuntimeIdentity | LaunchFile | Connectors | RuntimePool | Path.Path
+export type LegacyServices =
+  | Ssh
+  | MultiHostPaths
+  | HostDirectory
+  | RemoteThreads
+  | RuntimeIdentity
+  | LaunchFile
+  | Connectors
+  | RuntimePool
+  | Path.Path
+  | RuntimeStatus
+  | ResourcePool
+  | ViewLeases
 
 export class GatewayUnavailableError extends Error {
   constructor(

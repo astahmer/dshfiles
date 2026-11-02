@@ -12,6 +12,7 @@ import { GatewayUnreachable, InvalidResponse } from '../src/errors.js'
 import { HostDirectory } from '../src/host-directory.js'
 import type { RuntimeIdentity, RuntimeRecord } from '../src/records.js'
 import { RuntimePool } from '../src/runtime-pool.js'
+import { ViewLeases } from '../src/view-leases.js'
 import { dataLayer } from './fixtures/data-runtime.js'
 
 // The pool contract, formerly pinned on the Promise gateway pool (gateway-pool.test.ts and its characterization),
@@ -294,6 +295,43 @@ describe('RuntimePool', () => {
       }).pipe(Effect.provide(poolWith({ connectors: fake.layer })))
       const opened = yield* Ref.get(fake.opened)
       expect(yield* Effect.forEach(opened, connection => Ref.get(connection.disposed))).toEqual([1, 1])
+    }),
+  )
+})
+
+describe('ViewLeases', () => {
+  it.effect('reuses one lease per runtime connection and releases it after thirty minutes', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeConnectors
+      const runtime = { ...runtimeRecord(runtimeIds[0]), originPort: 45_001 }
+      yield* Effect.gen(function* () {
+        const leases = yield* ViewLeases
+        const pool = yield* RuntimePool
+        const first = yield* leases.open(runtime.id)
+        const again = yield* leases.open(runtime.id)
+        expect(again.leaseId).toBe(first.leaseId)
+        expect(yield* Ref.get(fake.opened)).toHaveLength(1)
+        yield* TestClock.adjust(Duration.minutes(31))
+        yield* settle
+        expect(yield* leases.close(first.leaseId)).toBe(false)
+        expect(yield* pool.generation(runtime.id)).toBeDefined()
+        yield* TestClock.adjust(Duration.minutes(5))
+        yield* settle
+        expect(yield* pool.generation(runtime.id)).toBeUndefined()
+      }).pipe(Effect.provide(ViewLeases.layer.pipe(Layer.provideMerge(poolWith({ connectors: fake.layer, runtimes: [runtime] })))))
+    }),
+  )
+
+  it.effect('closing a lease releases its hold on the connection', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeConnectors
+      const runtime = { ...runtimeRecord(runtimeIds[0]), originPort: 45_002 }
+      yield* Effect.gen(function* () {
+        const leases = yield* ViewLeases
+        const opened = yield* leases.open(runtime.id)
+        expect(yield* leases.close(opened.leaseId)).toBe(true)
+        expect(yield* leases.close(opened.leaseId)).toBe(false)
+      }).pipe(Effect.provide(ViewLeases.layer.pipe(Layer.provideMerge(poolWith({ connectors: fake.layer, runtimes: [runtime] })))))
     }),
   )
 })

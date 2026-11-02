@@ -481,6 +481,16 @@ export class IdentityMismatch extends Schema.TaggedError<IdentityMismatch>()(
   }
 }
 
+export class RuntimeOriginUnavailable extends Schema.TaggedError<RuntimeOriginUnavailable>()(
+  'RuntimeOriginUnavailable',
+  { runtimeId: Schema.String },
+  { dshxWireCode: 'runtime-origin-unavailable' },
+) {
+  override get message(): string {
+    return 'This runtime has no stable browser origin. Re-register it before opening its view.'
+  }
+}
+
 /** What ssh's own stderr says went wrong with the connection, before the remote command ran. */
 export type SshConnectionError = SshHostKeyRejected | SshAuthenticationFailed | SshHostUnresolved | SshUnreachable
 

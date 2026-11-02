@@ -2,25 +2,6 @@ import { cpus, freemem, loadavg, platform, totalmem } from 'node:os'
 import type { ResourcePoolEntry, ResourceSelection, ResourceSnapshot } from './api.js'
 
 export class ResourceSnapshotModel {
-  static readonly createResourceProbeLimiter = (maximumConcurrent: number) => {
-    if (!Number.isInteger(maximumConcurrent) || maximumConcurrent < 1) throw new RangeError('At least one resource probe must be allowed.')
-    let active = 0
-    const waiting: Array<() => void> = []
-
-    return {
-      run: async <Result>(operation: () => Promise<Result>): Promise<Result> => {
-        if (active >= maximumConcurrent) await new Promise<void>(resolve => waiting.push(resolve))
-        active += 1
-        try {
-          return await operation()
-        } finally {
-          active -= 1
-          waiting.shift()?.()
-        }
-      },
-    }
-  }
-
   static readonly readResourceSnapshot = (): ResourceSnapshot => {
     const currentPlatform = platform()
     return {
