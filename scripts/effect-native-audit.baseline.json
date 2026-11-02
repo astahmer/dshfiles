@@ -1,16 +1,16 @@
 {
   "@dshfiles/activity-timeline": {
     "layerEmpty": 0,
-    "promiseAdapters": 7,
+    "promiseAdapters": 0,
     "moduleState": 0,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
-    "nodeFs": 1,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 1,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
-    "syncDecodeInEffect": 1
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/agent-communication": {
     "layerEmpty": 1,
@@ -40,16 +40,16 @@
   },
   "@dshfiles/agent-questions": {
     "layerEmpty": 0,
-    "promiseAdapters": 9,
-    "moduleState": 2,
+    "promiseAdapters": 0,
+    "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
-    "nodeFs": 4,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 6,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 4,
-    "syncDecodeInEffect": 8
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/agent-telemetry": {
     "layerEmpty": 0,
@@ -209,13 +209,13 @@
   },
   "@dshfiles/editor": {
     "layerEmpty": 0,
-    "promiseAdapters": 2,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
-    "nodeFs": 1,
+    "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 2,
+    "causelessErrors": 0,
     "testMocks": 0,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
@@ -352,16 +352,16 @@
   },
   "@dshfiles/mcp-endpoint": {
     "layerEmpty": 0,
-    "promiseAdapters": 6,
+    "promiseAdapters": 0,
     "moduleState": 0,
     "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,
-    "causelessErrors": 3,
+    "causelessErrors": 0,
     "testMocks": 0,
-    "runOutsideEdges": 2,
-    "syncDecodeInEffect": 2
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
   },
   "@dshfiles/mcp-servers": {
     "layerEmpty": 1,

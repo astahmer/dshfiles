@@ -1,29 +1,15 @@
 {
-  "effect-antislop(no-domain-effect-run)": {
-    "plugins/@dshfiles/agent-questions/src/host.ts": 2,
-    "plugins/@dshfiles/agent-questions/src/keyed-effect-lock.ts": 1,
-    "plugins/@dshfiles/agent-questions/src/service.ts": 1,
-    "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
-    "plugins/@dshfiles/mcp-endpoint/src/mcp-server.ts": 1
-  },
   "effect-migration(effect-span-name-format)": {
-    "plugins/@dshfiles/mcp-endpoint/src/host.ts": 1,
     "plugins/@dshfiles/usage/src/host.ts": 3
   },
   "effect-migration(no-cause-dropping-catch)": {
-    "plugins/@dshfiles/agent-questions/src/host.ts": 1,
-    "plugins/@dshfiles/agent-questions/src/keyed-effect-lock.ts": 1,
-    "plugins/@dshfiles/agent-questions/src/markdown-target.ts": 1,
     "plugins/@dshfiles/agent-telemetry/src/telemetry-effect.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/host-effect.ts": 1,
     "plugins/@dshfiles/background-jobs/src/host.ts": 2,
-    "plugins/@dshfiles/editor/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 1,
     "plugins/@dshfiles/jujutsu/src/composer-context-host.ts": 1,
     "plugins/@dshfiles/jujutsu/src/review-progress-host.ts": 2,
     "plugins/@dshfiles/loopback-access/src/host.ts": 2,
-    "plugins/@dshfiles/mcp-endpoint/src/host.ts": 1,
-    "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 4,
     "plugins/@dshfiles/mcp-servers/src/host.ts": 2,
     "plugins/@dshfiles/project-checks/src/host.ts": 4,
     "plugins/@dshfiles/session-search/src/host.ts": 4,
@@ -39,13 +25,8 @@
     "plugins/@dshfiles/multi-host/src/host.ts": 1
   },
   "effect-migration(no-gen-inside-fn)": {
-    "plugins/@dshfiles/agent-questions/src/service.ts": 1,
-    "plugins/@dshfiles/agent-questions/src/tool-flow.ts": 1,
     "plugins/@dshfiles/annotations/src/host.ts": 15,
     "plugins/@dshfiles/background-jobs/src/host.ts": 4,
-    "plugins/@dshfiles/editor/src/host.ts": 1,
-    "plugins/@dshfiles/mcp-endpoint/src/host.ts": 4,
-    "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
     "plugins/@dshfiles/session-search/src/host.ts": 1,
     "plugins/@dshfiles/usage/src/host.ts": 8
   },
@@ -64,7 +45,6 @@
     "plugins/@dshfiles/tweet-context/src/tweet-context.ts": 1
   },
   "effect-migration(no-host-global-timer)": {
-    "plugins/@dshfiles/activity-timeline/src/service.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-connection-verification.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-login-service.ts": 1,
@@ -109,7 +89,6 @@
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/agent-communication/src/host.ts": 5,
-    "plugins/@dshfiles/agent-questions/src/host.ts": 2,
     "plugins/@dshfiles/agent-telemetry/src/host.ts": 1,
     "plugins/@dshfiles/agents/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
