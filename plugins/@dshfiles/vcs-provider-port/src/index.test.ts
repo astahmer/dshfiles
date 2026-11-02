@@ -1,6 +1,8 @@
 import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
-import { Effect } from 'effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
+import { HostContext } from '@dshfiles/dshx/effect/host-context'
+import { Effect, Layer, Option } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
 import { VcsProviders } from './index.js'
 import { VcsProviderService } from './effect.js'
@@ -50,20 +52,42 @@ describe('VcsProviders.resolve', () => {
     expect(await VcsProviders.resolve(host.ctx, { path: '/anywhere', callerPackageId: '@test/caller' })).toBeUndefined()
   })
 
-  test('provides the same provider resolution through the Effect service', async () => {
+  test('resolves the provider through the Effect service, skipping a provider whose detect fails', async () => {
     host = await createTestHost()
     await host.mount(provider({ owner: '@test/git', vcs: 'git', priority: 10, claims: () => true }), { packageId: '@test/git' })
+    await host.mount(
+      defineHost({
+        apis: [
+          VcsProviders.contract('@test/broken').host({
+            detect: () => {
+              throw new Error('detect exploded')
+            },
+            provision: ({ input: request }) => ({ workspaceId: request.workspaceId, isolated: false }),
+            snapshot: () => ({ snapshot: 'broken:1' }),
+            restore: () => ({ previous: 'broken:0' }),
+          }),
+        ],
+      }),
+      { packageId: '@test/broken' },
+    )
+    const hostContext = Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@test/caller' }))
 
     const service = Effect.gen(function* () {
       const providers = yield* VcsProviderService
-      const owners = yield* providers.owners()
-      const match = yield* providers.resolve({ path: '/repo', callerPackageId: '@test/caller' })
-      return { owners, match }
-    }).pipe(Effect.provide(VcsProviderService.layer(host.ctx)))
+      const owners = yield* providers.owners
+      const resolved = yield* providers.resolve({ path: '/repo' })
+      const snapshot = yield* Option.match(resolved, {
+        onNone: () => Effect.succeed(undefined),
+        onSome: resolution => resolution.client.snapshot({ path: '/repo' }),
+      })
+      return { owners, resolved, snapshot }
+    }).pipe(Effect.provide(VcsProviderService.layer.pipe(Layer.provide(HostApis.layer), Layer.provide(hostContext))))
     const result = await Effect.runPromise(service)
 
-    expect(result.owners).toEqual(['@test/git'])
-    expect(result.match?.owner).toBe('@test/git')
-    expect(result.match?.match).toEqual({ vcs: 'git', priority: 10, repoRoot: '/repo', workspaceRoot: '/repo', isolated: false })
+    expect([...result.owners].sort()).toEqual(['@test/broken', '@test/git'])
+    expect(Option.map(result.resolved, resolution => [resolution.owner, resolution.match])).toEqual(
+      Option.some(['@test/git', { vcs: 'git', priority: 10, repoRoot: '/repo', workspaceRoot: '/repo', isolated: false }]),
+    )
+    expect(result.snapshot).toEqual({ snapshot: 'git:1' })
   })
 })

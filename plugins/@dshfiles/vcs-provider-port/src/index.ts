@@ -1,5 +1,3 @@
-// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
-import '@dshfiles/dshx/effect'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { defineApi, method, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { createHostApiClient, listApis } from '@dshfiles/dshx/host'
@@ -45,10 +43,8 @@ const methods = {
   }),
 }
 
-type VcsProviderMethods = typeof methods
+export type VcsProviderMethods = typeof methods
 export type VcsMatch = typeof matchSchema.Type
-
-const contracts = new Map<string, ApiContract<VcsProviderMethods>>()
 
 /**
  * Version-control providers are dshx APIs that share one id and method set and differ by owner, so jj-integration and
@@ -58,11 +54,7 @@ export class VcsProviders {
   static readonly apiId = 'vcs-provider'
 
   static contract(owner: string): ApiContract<VcsProviderMethods> {
-    const known = contracts.get(owner)
-    if (known !== undefined) return known
-    const contract = defineApi({ id: VcsProviders.apiId, version: 1, owner, methods })
-    contracts.set(owner, contract)
-    return contract
+    return defineApi({ id: VcsProviders.apiId, version: 1, owner, methods })
   }
 
   static owners(ctx: CordisContext): string[] {
