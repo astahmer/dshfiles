@@ -7,8 +7,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
-import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
-import { z } from 'zod'
+import { Context as EffectContext, Effect, Layer, Option, Schema } from 'effect'
 import { sessionUndoApi } from './api.js'
 import { UndoHistory } from './undo-history.js'
 import { createUndoService, type UndoService } from './undo-service.js'
@@ -27,11 +26,15 @@ class SessionUndoRuntime extends EffectContext.Service<
   }
 >()('@dshfiles/session-undo/Runtime') {}
 
-const modelSelectionSchema = z.object({ provider: z.string().min(1), model: z.string().min(1), reasoningEffort: z.string().optional() })
-const projectedSelectionSchema = z.object({ next: modelSelectionSchema.nullable(), lastUsed: modelSelectionSchema.nullable() })
+const modelSelectionSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1)),
+  model: Schema.String.check(Schema.isMinLength(1)),
+  reasoningEffort: Schema.optional(Schema.String),
+})
+const projectedSelectionSchema = Schema.Struct({ next: Schema.NullOr(modelSelectionSchema), lastUsed: Schema.NullOr(modelSelectionSchema) })
 
 /** Only a message the user wrote names a turn; DSH also appends runtime-context and time messages as user turns. */
-const userWritten = z.object({ source: z.object({ kind: z.literal('user') }) })
+const userWritten = Schema.Struct({ source: Schema.Struct({ kind: Schema.Literal('user') }) })
 
 const rootLayer = (ctx: Context) =>
   Layer.effect(
@@ -73,8 +76,8 @@ const rootLayer = (ctx: Context) =>
             copyModel: async input => {
               const projected = await controller().projections({ sessionId: SessionId(input.from) }, AbortSignal.timeout(30_000))
               const values = projected?.kind === 'sequenced' ? projected.values : projected?.values
-              const selection = projectedSelectionSchema.safeParse(values?.modelSelection)
-              const chosen = selection.success ? (selection.data.next ?? selection.data.lastUsed) : null
+              const selection = Option.getOrNull(Schema.decodeUnknownOption(projectedSelectionSchema)(values?.modelSelection))
+              const chosen = selection === null ? null : selection.next ?? selection.lastUsed
               if (chosen === null) return
               const route = { sessionId: SessionId(input.to), provider: chosen.provider, model: chosen.model }
               await controller().selectModel(chosen.reasoningEffort === undefined ? route : { ...route, reasoningEffort: chosen.reasoningEffort })
@@ -123,7 +126,7 @@ const { hostApi, ...effectPlugin } = DshxEffect.plugin({
               const cwd = session.header.cwd
               if (cwd !== undefined) withService(service => service.turnStarted({ sessionId, turn: event.data.turn, forkAtSeq, cwd }))
             }
-            if (event.type === 'user/message' && userWritten.safeParse(event.data).success) {
+            if (event.type === 'user/message' && Option.isSome(Schema.decodeUnknownOption(userWritten)(event.data))) {
               const turn = turns.get(sessionId)
               const text = UndoHistory.promptOf(event.data.content)
               if (turn !== undefined && text !== '') withService(service => service.promptEntered({ sessionId, turn, text }))

@@ -1,41 +1,40 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const checkpointSchema = z
-  .object({
-    turn: z.number().int().nonnegative(),
-    /** The last event before the turn started: the conversation an undo forks back to. */
-    forkAtSeq: z.number().int().nonnegative(),
-    cwd: z.string().min(1),
-    /** Owner of the VCS provider that took the snapshot; null when no provider claims the folder. */
-    provider: z.string().nullable(),
-    snapshot: z.string().max(512).nullable(),
-    prompt: z.string().max(200),
-    at: z.number().int().nonnegative(),
-  })
-  .strict()
+const nonEmptyString = Schema.String.check(Schema.isMinLength(1))
+const nonNegativeInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const snapshotRef = Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))
 
-const redoSchema = z
-  .object({
-    /** The thread the undo forked from, archived until a redo brings it back. */
-    sessionId: z.string().min(1),
-    provider: z.string().nullable(),
-    cwd: z.string().min(1),
-    /** The files as they were before the undo restored the checkpoint. */
-    snapshot: z.string().max(512).nullable(),
-  })
-  .strict()
+const checkpointSchema = Schema.Struct({
+  turn: nonNegativeInt,
+  /** The last event before the turn started: the conversation an undo forks back to. */
+  forkAtSeq: nonNegativeInt,
+  cwd: nonEmptyString,
+  /** Owner of the VCS provider that took the snapshot; null when no provider claims the folder. */
+  provider: Schema.NullOr(Schema.String),
+  snapshot: snapshotRef,
+  prompt: Schema.String.check(Schema.isMaxLength(200)),
+  at: nonNegativeInt,
+})
 
-const historySchema = z
-  .object({
-    sessionId: z.string().min(1),
-    checkpoints: z.array(checkpointSchema).max(20),
-    redo: redoSchema.nullable(),
-  })
-  .strict()
+const redoSchema = Schema.Struct({
+  /** The thread the undo forked from, archived until a redo brings it back. */
+  sessionId: nonEmptyString,
+  provider: Schema.NullOr(Schema.String),
+  cwd: nonEmptyString,
+  /** The files as they were before the undo restored the checkpoint. */
+  snapshot: snapshotRef,
+})
 
-export type Checkpoint = z.infer<typeof checkpointSchema>
-export type UndoHistoryRecord = z.infer<typeof historySchema>
+const historySchema = Schema.Struct({
+  sessionId: nonEmptyString,
+  checkpoints: Schema.Array(checkpointSchema).check(Schema.isMaxLength(20)),
+  redo: Schema.NullOr(redoSchema),
+})
+
+export type Checkpoint = typeof checkpointSchema.Type
+export type UndoHistoryRecord = typeof historySchema.Type
 
 const MAX_CHECKPOINTS = 20
 
@@ -47,7 +46,7 @@ export class UndoHistory {
     name: 'dshfiles_session_undo',
     version: 1,
     layout: 'per-record',
-    tables: { history: { valueSchema: historySchema, __key: 'history' } },
+    tables: { history: { valueSchema: zodSchemaFromEffect(historySchema), __key: 'history' } },
   })
 
   static empty(sessionId: string): UndoHistoryRecord {

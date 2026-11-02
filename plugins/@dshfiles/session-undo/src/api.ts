@@ -1,7 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const sessionIdSchema = z.string().min(1).max(256)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+const intSchema = Schema.Number.check(Schema.isInt())
 
 export const sessionUndoApi = defineApi({
   id: 'session-undo',
@@ -9,14 +10,12 @@ export const sessionUndoApi = defineApi({
   owner: '@dshfiles/session-undo',
   methods: {
     history: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z
-        .object({
-          checkpoints: z.array(z.object({ turn: z.number().int(), prompt: z.string(), at: z.number().int(), files: z.boolean() }).strict()),
-          /** The thread a redo returns to; null when there is nothing to redo. */
-          redoTo: sessionIdSchema.nullable(),
-        })
-        .strict(),
+      input: Schema.Struct({ sessionId: sessionIdSchema }),
+      output: Schema.Struct({
+        checkpoints: Schema.Array(Schema.Struct({ turn: intSchema, prompt: Schema.String, at: intSchema, files: Schema.Boolean })),
+        /** The thread a redo returns to; null when there is nothing to redo. */
+        redoTo: Schema.NullOr(sessionIdSchema),
+      }),
       description:
         'The turns of a thread that can be undone, newest last, each with its prompt and whether its files were snapshotted, and whether a redo is available. Read-only.',
       tool: {
@@ -32,8 +31,8 @@ export const sessionUndoApi = defineApi({
       },
     }),
     undo: method({
-      input: z.object({ sessionId: sessionIdSchema, confirm: z.literal(true) }).strict(),
-      output: z.object({ sessionId: sessionIdSchema, filesRestored: z.boolean(), prompt: z.string() }).strict(),
+      input: Schema.Struct({ sessionId: sessionIdSchema, confirm: Schema.Literal(true) }),
+      output: Schema.Struct({ sessionId: sessionIdSchema, filesRestored: Schema.Boolean, prompt: Schema.String }),
       description:
         'Undo a thread’s last turn: put its workspace files back to the snapshot taken when the turn started, continue in a fork of the conversation cut before that turn, and archive the original until a redo. Refused while the thread runs. Requires confirm: true; call only when the user asked to undo that thread.',
       tool: {
@@ -43,8 +42,8 @@ export const sessionUndoApi = defineApi({
       },
     }),
     redo: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: sessionIdSchema, filesRestored: z.boolean() }).strict(),
+      input: Schema.Struct({ sessionId: sessionIdSchema }),
+      output: Schema.Struct({ sessionId: sessionIdSchema, filesRestored: Schema.Boolean }),
       description:
         'Reverse the undo that created this thread: put the files back as they were before it, bring the original thread back and archive this one. Refused once this thread ran a new turn. Call only when the user asked to redo.',
       tool: {
