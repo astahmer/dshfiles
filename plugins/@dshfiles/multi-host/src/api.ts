@@ -9,13 +9,21 @@ import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/pl
 import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
 import { SchemaFields } from './schema.js'
 
+/** A no-argument method publishes the closed empty object, so its tool takes no arguments instead of a bare `null`. */
+const noInput = Schema.Struct({})
+
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
   options: Omit<ApiMethodOptions<Input, Output>, 'tool'> & {
     readonly input: Input
     readonly output: Output
     readonly tool?: ApiToolExposure<Output['Type']>
   },
-) => defineMethod(options)
+) =>
+  defineMethod({
+    ...options,
+    // SAFETY: the closed empty object decodes exactly the values `Void` does (none), so the declaration keeps its input type.
+    input: (options.input.ast === Schema.Void.ast ? noInput : options.input) as Input,
+  })
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)

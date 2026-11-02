@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { SchemaFields } from '../src/schema.js'
 import {
   hostDirectorySchema,
   hostConnectorSchema,
@@ -10,17 +9,9 @@ import {
   runtimeRecordSchema,
 } from '../src/records.js'
 
-const decodeValue = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
-
 /** Decode unknown input strictly: a decoded value, or a failure the test asserts on. */
 const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
   const result = Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)
-  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
-}
-
-/** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
-const decodeLoose = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
-  const result = Schema.decodeUnknownResult(schema)(input)
   return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
 }
 

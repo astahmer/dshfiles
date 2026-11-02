@@ -9,18 +9,6 @@ import { Effect } from 'effect'
 
 const decodeValue = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
 
-/** Decode unknown input strictly: a decoded value, or a failure the test asserts on. */
-const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
-  const result = Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)
-  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
-}
-
-/** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
-const decodeLoose = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
-  const result = Schema.decodeUnknownResult(schema)(input)
-  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
-}
-
 describe('native mutation outcome recovery', () => {
   const requestEnvelopeSchema = Schema.Struct({ rpcId: Schema.String }).pipe(SchemaFields.passthrough)
   const addressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)) })

@@ -2,13 +2,6 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import type { ApiSchema } from '@dshfiles/dshx/api'
 import { multiHostApi, resourceSnapshotSchema } from './api.js'
-import { SchemaFields } from './schema.js'
-
-/** Decode unknown input strictly: a decoded value, or a failure the test asserts on. */
-const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {
-  const result = Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)
-  return result._tag === 'Success' ? { success: true as const, data: result.success } : { success: false as const, error: new Error(result.failure.message) }
-}
 
 /** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
 const decodeLoose = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown) => {

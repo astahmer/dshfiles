@@ -12,7 +12,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
-import { Api, DshxPlugin, HostContext, hostService, hostServiceChanges } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi } from './api.js'
 import type { ConnectionTestStep } from './api.js'
@@ -31,7 +31,6 @@ import {
   NoOfficialNode,
   OriginPortExhausted,
   RemoteHomeUnknown,
-  RuntimeNotFound,
   SessionCursorUnavailable,
   SessionUnavailable,
   type TaggedFailure,
@@ -42,7 +41,7 @@ import { LaunchFile } from './launch-file.js'
 import { LocalProjectFiles } from './local-project-files.js'
 import { NativeRpc } from './native-rpc.js'
 import { MultiHostPaths } from './paths.js'
-import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeIdentity as RuntimeIdentityValue, type RuntimeRecord } from './records.js'
+import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
 import { RemoteCheckout } from './remote-checkout.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
@@ -57,8 +56,6 @@ import { ResourceSnapshotModel } from './resource-snapshot.js'
 import { ResourcePool, RuntimeStatus } from './runtime-status.js'
 import { RuntimePool } from './runtime-pool.js'
 import { SchemaFields } from './schema.js'
-import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
-import { knownSessionRuntime } from './session-runtime.js'
 import { Ssh, shellQuote } from './ssh.js'
 import { listSshConfigHosts } from './ssh-config.js'
 import { ViewLeases } from './view-leases.js'
