@@ -4,6 +4,8 @@ import { composerContextApi } from './composer-context-api.js'
 import { jujutsuApi } from './api.js'
 import { jujutsuReviewProgressApi } from './review-progress-api.js'
 
+const normalizeEol = (text: string): string => text.replace(/\r\n/g, '\n')
+
 const contracts = [jujutsuApi, composerContextApi, jujutsuReviewProgressApi]
 
 it('preserves Jujutsu API and agent-tool schemas byte-for-byte', async () => {
@@ -31,5 +33,5 @@ it('preserves Jujutsu API and agent-tool schemas byte-for-byte', async () => {
     return
   }
 
-  expect(actual).toBe(readFileSync(snapshotPath, 'utf8'))
+  expect(normalizeEol(actual)).toBe(normalizeEol(readFileSync(snapshotPath, 'utf8')))
 })

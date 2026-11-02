@@ -2496,7 +2496,317 @@
             "repoId": {
               "type": "string"
             },
-            "action": {}
+            "action": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["describe"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId", "message"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["split"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId", "paths", "message"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["squash"]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["kind", "sourceId", "destinationId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["rebase"]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "sourceId", "destinationId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["bookmark-move"]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "bookmark", "destinationId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["bookmark-set"]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "bookmark", "destinationId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["bookmark-delete"]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "bookmark"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["fetch"]
+                    },
+                    "remote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "remote"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["push"]
+                    },
+                    "remote": {
+                      "type": "string"
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "remote", "bookmark"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["workspace-add"]
+                    },
+                    "parentPath": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "parentPath", "name", "commitId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["workspace-forget"]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "name"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["workspace-edit"]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "name", "commitId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["edit"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["new"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["commit"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId", "message"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["duplicate"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["abandon"]
+                    },
+                    "commitIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["kind", "commitIds"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["revert"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["kind", "commitId", "destinationId"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["restore"]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["kind", "commitId", "paths"]
+                }
+              ]
+            }
           },
           "required": ["repoId", "action"]
         },
