@@ -42,6 +42,9 @@ import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcod
 import { CredentialModel, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { createHostApiClient, definePlugin } from '@dshfiles/dshx/host'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import type { Context } from '@deepseek-ai/cordis'
+import { Duration, Effect, Layer, Schedule } from 'effect'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
@@ -102,6 +105,21 @@ const LUNA_RESERVE_HOLD_MS = 60 * 60_000
 /** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
 const PRICING_CHECK_MS = 30 * 60_000
 
+const refreshStalePricing = new WeakMap<Context, () => void>()
+
+const accountHostEffect = DshxEffect.plugin({
+  layer: Layer.empty,
+  setup: ctx =>
+    Effect.asVoid(
+      Effect.forkScoped(
+        Effect.repeat(
+          Effect.sync(() => refreshStalePricing.get(ctx)?.()),
+          Schedule.spaced(Duration.millis(PRICING_CHECK_MS)),
+        ),
+      ),
+    ),
+})
+
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
@@ -110,6 +128,17 @@ export default definePlugin({
   settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
+    let releaseAccountHostEffect: (() => Promise<void>) | undefined
+    ctx.effect(() => () => {
+      refreshStalePricing.delete(ctx)
+      void releaseAccountHostEffect?.()
+    })
+    void accountHostEffect.setup(ctx, undefined).then(
+      release => {
+        releaseAccountHostEffect = release
+      },
+      error => ctx.logger.warn('ai-accounts: Effect runtime could not start', error),
+    )
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
     const servingAccount = createServingAccountService(ctx)
@@ -221,18 +250,17 @@ export default definePlugin({
     })
     const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
     runtime.pricing = pricing
-    const refreshStalePricing = (): void => {
+    const refreshPricing = (): void => {
       const settings = AccountSettingsModel.readPricingSettings()
       if (settings.costEstimates) void pricing.ensureFresh(settings.pricingRefreshHours * HOUR_MS)
     }
     ctx.effect(() => {
-      void pricing.load().then(refreshStalePricing)
-      const timer = setInterval(refreshStalePricing, PRICING_CHECK_MS)
+      void pricing.load().then(refreshPricing)
       return () => {
-        clearInterval(timer)
         if (runtime.pricing === pricing) delete runtime.pricing
       }
     })
+    refreshStalePricing.set(ctx, refreshPricing)
     installCostProjection(ctx)
     let fallbackStore: ModelFallbackStore | undefined
     ctx.effect(() => {
@@ -245,7 +273,10 @@ export default definePlugin({
         void closeModelFallbacks().catch(() => ctx.logger.warn('ai-accounts: model fallback storage could not close cleanly'))
       }
     })
-    const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, accountId) })
+    const quotaContinuations = createQuotaContinuationService({
+      context: ctx,
+      readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, accountId),
+    })
     runtime.quotaContinuations = quotaContinuations
     ctx.effect(() => {
       const stopQuotaContinuations = quotaContinuations.start()

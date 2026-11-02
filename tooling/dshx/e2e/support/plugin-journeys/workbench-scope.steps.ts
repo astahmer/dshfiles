@@ -1,13 +1,14 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { layoutSchema } from '../../../../../plugins/@dshfiles/workbench/src/layout-store.js'
 import { savedLayoutSchema } from '../../../../../plugins/@dshfiles/workbench/src/saved-layouts.js'
 import { tabPanelId } from '../../../../../plugins/@dshfiles/workbench/src/tab-panels.js'
 import type { PersistedTabs } from '../../../../../plugins/@dshfiles/main-tabs/src/tabs-machine.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 import { Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
@@ -15,18 +16,25 @@ import { finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPlug
 const KEYS = { tabs: 'dshfiles.main-tabs.v1', main: 'dshfiles.workbench.layout.v1', scenes: 'dshfiles.workbench.semantic-layouts.v1' } as const
 const titles = { a: 'Scope A conversation', b: 'Scope B conversation' } as const
 const drafts = { a: 'Unsent draft remains owned by project A', b: 'Unsent draft remains owned by project B' } as const
-const projectResult = z.object({ projectId: z.string() })
-const createdResult = z.object({ sessionId: z.string() })
-const threadList = z.object({ threads: z.array(z.object({ sessionId: z.string(), projectId: z.string().optional(), running: z.boolean() })) })
-const persistedIdentity = z.object({ lastProjectKey: z.string().nullable() })
+const projectResult = Schema.Struct({ projectId: Schema.String })
+const createdResult = Schema.Struct({ sessionId: Schema.String })
+const threadList = Schema.Struct({
+  threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, projectId: Schema.optional(Schema.String), running: Schema.Boolean })),
+})
+const persistedIdentity = Schema.Struct({ lastProjectKey: Schema.NullOr(Schema.String) })
 // Start from real Dockview serialization; validate the one-group shape before
 // constructing the historical destination scene that predates the ordinary chooser.
-const oneGroupLayout = z.looseObject({
-  panels: z.record(z.string(), z.looseObject({ id: z.string() })),
-  grid: z.looseObject({
-    root: z.looseObject({
-      type: z.literal('branch'),
-      data: z.tuple([z.looseObject({ type: z.literal('leaf'), data: z.looseObject({ views: z.array(z.string()) }) })]),
+const oneGroupLayout = withUnknownProperties({
+  panels: Schema.Record(Schema.String, Schema.mutableKey(withUnknownProperties({ id: Schema.String }))),
+  grid: withUnknownProperties({
+    root: withUnknownProperties({
+      type: Schema.Literal('branch'),
+      data: Schema.Tuple([
+        withUnknownProperties({
+          type: Schema.Literal('leaf'),
+          data: withUnknownProperties({ views: Schema.mutableKey(Schema.Array(Schema.String)) }),
+        }),
+      ]),
     }),
   }),
 })
@@ -49,7 +57,7 @@ const order = (page: Page): Promise<string[]> =>
 const readMain = async (page: Page) => {
   const raw = await page.evaluate(key => localStorage.getItem(key), KEYS.main)
   if (raw === null) throw new Error('Real Workbench main layout was not saved')
-  return layoutSchema.parse(JSON.parse(raw))
+  return Schema.decodeUnknownSync(layoutSchema)(JSON.parse(raw))
 }
 const selected = async (page: Page, journey: ScopeJourney, key: keyof typeof titles): Promise<void> => {
   await expect(tab(page, key)).toHaveAttribute('aria-selected', 'true')
@@ -94,19 +102,19 @@ Given('two real projects have conversations in a legacy mixed Workbench scene', 
   await mkdir(aPath, { recursive: true })
   await mkdir(bPath, { recursive: true })
   const projects = {
-    a: projectResult.parse(await call('projectRegister', { path: aPath, title: 'Scope project A' })).projectId,
-    b: projectResult.parse(await call('projectRegister', { path: bPath, title: 'Scope project B' })).projectId,
+    a: Schema.decodeUnknownSync(projectResult)(await call('projectRegister', { path: aPath, title: 'Scope project A' })).projectId,
+    b: Schema.decodeUnknownSync(projectResult)(await call('projectRegister', { path: bPath, title: 'Scope project B' })).projectId,
   }
   const sessions = {
-    a: createdResult.parse(await call('create', { projectId: projects.a, title: titles.a, text: 'Message owned by project A' })).sessionId,
-    b: createdResult.parse(await call('create', { projectId: projects.b, title: titles.b, text: 'Message owned by project B' })).sessionId,
+    a: Schema.decodeUnknownSync(createdResult)(await call('create', { projectId: projects.a, title: titles.a, text: 'Message owned by project A' })).sessionId,
+    b: Schema.decodeUnknownSync(createdResult)(await call('create', { projectId: projects.b, title: titles.b, text: 'Message owned by project B' })).sessionId,
   }
   await recordAssertion(page, 'scope-two-real-native-workspace-attachments', async () => {
     expect(projects.a).not.toBe(projects.b)
     expect(sessions.a).not.toBe(sessions.b)
     await expect
       .poll(async () => {
-        const rows = threadList.parse(await call('list', {})).threads
+        const rows = Schema.decodeUnknownSync(threadList)(await call('list', {})).threads
         return [sessions.a, sessions.b].map(id => {
           const row = rows.find(candidate => candidate.sessionId === id)
           return row === undefined ? null : { projectId: row.projectId, running: row.running }
@@ -152,15 +160,15 @@ Given('two real projects have conversations in a legacy mixed Workbench scene', 
   const captured = await readMain(page)
   const chooser = Object.keys(captured.panels).find(id => id.startsWith('dshfiles-workbench.new-view/'))
   if (chooser === undefined) throw new Error('Fixture requires an ordinary NewView occurrence, not ActorStart')
-  const origin = oneGroupLayout.parse(captured)
+  const origin = Schema.decodeUnknownSync(oneGroupLayout)(captured)
   origin.grid.root.data[0].data.views = [chooser, bId, aId]
-  const layoutA = layoutSchema.parse(origin)
-  const destination = oneGroupLayout.parse(structuredClone(layoutA))
+  const layoutA = Schema.decodeUnknownSync(layoutSchema)(origin)
+  const destination = Schema.decodeUnknownSync(oneGroupLayout)(structuredClone(layoutA))
   delete destination.panels[chooser]
   const leaf = destination.grid.root.data[0]
   leaf.data.views = [aId, bId]
-  const sceneA = savedLayoutSchema.parse({ main: layoutA })
-  const sceneB = savedLayoutSchema.parse({ main: layoutSchema.parse(destination) })
+  const sceneA = Schema.decodeUnknownSync(savedLayoutSchema)({ main: layoutA })
+  const sceneB = Schema.decodeUnknownSync(savedLayoutSchema)({ main: Schema.decodeUnknownSync(layoutSchema)(destination) })
   // The destination is deliberately an older legitimate scene: same two real
   // conversations, different semantic order, no chooser. Selecting B must NOT
   // interpret B's native workspace as a request to restore this scene.
@@ -212,7 +220,7 @@ Then('the same chooser order pins and conversation drafts survive project-crossi
     await expect.poll(() => order(page)).toEqual(journey.order)
     await expect(tab(page, 'b').getByLabel('Pinned', { exact: true })).toBeVisible()
     const raw = await page.evaluate(key => localStorage.getItem(key), KEYS.tabs)
-    expect(persistedIdentity.parse(raw === null ? null : JSON.parse(raw)).lastProjectKey).toBe(`project:${journey.projects.a}`)
+    expect(Schema.decodeUnknownSync(persistedIdentity)(raw === null ? null : JSON.parse(raw)).lastProjectKey).toBe(`project:${journey.projects.a}`)
   }
   await recordAssertion(page, 'scope-existing-other-project-keeps-ordinary-chooser', assertScene)
   await composer(page, journey.sessions.b).fill(drafts.b)
@@ -239,7 +247,7 @@ Then('the same chooser order pins and conversation drafts survive project-crossi
     // The older project-scene cache deliberately still contains the chooser.
     // The current root layout, not that cache, owns the explicit close on reload.
     const cached = await page.evaluate(key => localStorage.getItem(key), KEYS.scenes)
-    const scenes = z.record(z.string(), savedLayoutSchema).parse(cached === null ? null : JSON.parse(cached))
+    const scenes = Schema.decodeUnknownSync(Schema.Record(Schema.String, savedLayoutSchema))(cached === null ? null : JSON.parse(cached))
     expect(scenes[`project:${journey.projects.a}`]?.main?.panels[journey.chooser]).toBeDefined()
     await main(page).getByRole('tab', { name: 'New tab', exact: true }).getByRole('button', { name: 'Close New tab', exact: true }).click()
     await expect(main(page).getByRole('tab', { name: 'New tab', exact: true })).toHaveCount(0)

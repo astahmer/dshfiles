@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonValue } from '../json.js'
 
@@ -51,7 +51,7 @@ export interface BrowserBootOutcome {
   /** The browser readiness signal stayed unsettled until the deadline. */
   readonly timedOut: boolean
   /** Why readiness could not be established. */
-  readonly readinessError?: string
+  readonly readinessError?: string | undefined
   /**
    * Slots that lost their entry to a render crash: the boundary markers still in
    * the DOM, plus the entries the renderer retired onto a fallback survivor.
@@ -67,15 +67,15 @@ const SLOT_ERROR = '[data-slot-error]'
 const BOOT_CARD = '[data-dsh-boot]'
 const APP_OUTLET = '[data-slot="root"]'
 const SLOT_INSPECTION_TIMEOUT_MS = 10_000
-const SlotFailureNamesSchema = z.array(z.string().nullable())
-const NativeReadinessSchema = z.object({
-  ready: z.boolean(),
-  missingClientEntries: z.array(z.string()),
-  failureCardVisible: z.boolean(),
-  text: z.string(),
-  timedOut: z.boolean(),
-  readinessError: z.string().exactOptional(),
-  evidence: z.enum(['app-outlet', 'boot-card-cleared', 'failure-card', 'stalled', 'blank']),
+const SlotFailureNamesSchema = Schema.Array(Schema.NullOr(Schema.String))
+const NativeReadinessSchema = Schema.Struct({
+  ready: Schema.Boolean,
+  missingClientEntries: Schema.Array(Schema.String),
+  failureCardVisible: Schema.Boolean,
+  text: Schema.String,
+  timedOut: Schema.Boolean,
+  readinessError: Schema.optional(Schema.String),
+  evidence: Schema.Literals(['app-outlet', 'boot-card-cleared', 'failure-card', 'stalled', 'blank']),
 })
 
 /** The part of a Playwright Page the reader drives. Results cross from the browser, so they are decoded here. */
@@ -107,7 +107,7 @@ interface BootPage {
  * caller captures console text: only it can attach before the first navigation.
  */
 export const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
-  const nativeReadiness = NativeReadinessSchema.parse(
+  const nativeReadiness = Schema.decodeUnknownSync(NativeReadinessSchema)(
     await page.evaluate(
       async ({ expectedClientEntries, timeoutMs, bootCardSelector, appOutletSelector }) => {
         // The page publishes its boot graph and readiness promise as untyped globals; these guards read the parts used here.
@@ -314,13 +314,15 @@ const slotFailures = async (page: BootPage): Promise<readonly SlotRenderFailure[
 
   let slotNames: JsonValue
   try {
-    slotNames = decodeJson(jsonValueSchema, z.string().parse(serializedSlotNames))
+    slotNames = decodeJson(jsonValueSchema, Schema.decodeUnknownSync(Schema.String)(serializedSlotNames))
   } catch {
     throw new Error('The browser returned invalid Slot error-boundary data.')
   }
-  const parsedSlotNames = SlotFailureNamesSchema.safeParse(slotNames)
-  if (!parsedSlotNames.success) throw new Error('The browser returned invalid Slot error-boundary data.')
-  return slotRenderFailures(parsedSlotNames.data)
+  try {
+    return slotRenderFailures(Schema.decodeUnknownSync(SlotFailureNamesSchema)(slotNames))
+  } catch {
+    throw new Error('The browser returned invalid Slot error-boundary data.')
+  }
 }
 
 export class BrowserBootModel {

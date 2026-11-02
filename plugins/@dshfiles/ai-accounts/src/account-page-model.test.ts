@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { filterPageAccounts } from './account-page-model.js'
 import { accountProfileSchema, type AccountProfile, type AccountsCatalog } from './api.js'
+import * as Schema from 'effect/Schema'
 
 const account = (instanceId: string, patch: Partial<AccountProfile> = {}): AccountProfile =>
-  accountProfileSchema.parse({
+  Schema.decodeUnknownSync(accountProfileSchema)({
     ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
     instanceId,
     displayName: instanceId,

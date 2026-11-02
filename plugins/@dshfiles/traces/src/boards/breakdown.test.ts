@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { NormalizedSpan } from '../otlp/normalize.js'
 import { openTraceStore } from '../store.js'
 import { BUILTIN_BOARDS } from './board-definitions.js'
+import { TracesSchema } from '../schema.js'
 import { breakdownInputSchema } from './boards-api.js'
 import { SpanBreakdown } from './breakdown.js'
 
@@ -40,7 +41,7 @@ const span = (input: {
 const board = (id: string) => {
   const found = BUILTIN_BOARDS.find(candidate => candidate.id === id)
   if (found === undefined) throw new Error(`No board ${id}`)
-  return breakdownInputSchema.parse({ ...found.query, windowMinutes: 60 })
+  return TracesSchema.decodeStrict(breakdownInputSchema, { ...found.query, windowMinutes: 60 })
 }
 
 describe('span breakdown', () => {
@@ -96,7 +97,7 @@ describe('span breakdown', () => {
     ])
     const byOperation = SpanBreakdown.compute({
       source: store,
-      query: breakdownInputSchema.parse({
+      query: TracesSchema.decodeStrict(breakdownInputSchema, {
         windowMinutes: 60,
         filter: { service: null, operation: null, attribute: { key: 'rpc.system', value: '*' } },
         groupBy: { kind: 'operation' },
@@ -106,7 +107,11 @@ describe('span breakdown', () => {
     expect(byOperation.rows.map(row => row.key)).toEqual(['jujutsu/status', 'memory/search', 'GET /'])
     const byService = SpanBreakdown.compute({
       source: store,
-      query: breakdownInputSchema.parse({ windowMinutes: 60, filter: { service: null, operation: null, attribute: null }, groupBy: { kind: 'service' } }),
+      query: TracesSchema.decodeStrict(breakdownInputSchema, {
+        windowMinutes: 60,
+        filter: { service: null, operation: null, attribute: null },
+        groupBy: { kind: 'service' },
+      }),
       now: NOW,
     })
     expect(byService.rows).toMatchObject([{ key: 'deepseek-harness', count: 4 }])
@@ -114,7 +119,7 @@ describe('span breakdown', () => {
 
   test('rejects an attribute key that could escape the JSON path', () => {
     expect(() =>
-      breakdownInputSchema.parse({
+      TracesSchema.decodeStrict(breakdownInputSchema, {
         windowMinutes: 60,
         filter: { service: null, operation: null, attribute: null },
         groupBy: { kind: 'attribute', key: 'a"b' },

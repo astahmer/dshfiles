@@ -3,10 +3,10 @@ import { createServer, type IncomingMessage } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { defineHost } from '../src/host/index.js'
 import { createTestHost, type TestHost } from '../src/testing/index.js'
@@ -35,10 +35,10 @@ const withoutOtelEnvironment = (): void => {
   })
 }
 
-const rpcResultSchema = z.object({
-  result: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.object({ version: z.number(), output: z.unknown() }) }),
-    z.object({ ok: z.literal(false), error: z.object({ code: z.string() }) }),
+const rpcResultSchema = Schema.Struct({
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ version: Schema.Number, output: Schema.Unknown }) }),
+    Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String }) }),
   ]),
 })
 
@@ -51,7 +51,7 @@ const call = async (host: TestHost, methodName: 'status' | 'export', input?: unk
     input,
   })
   expect(response.status).toBe(200)
-  return rpcResultSchema.parse(await response.json()).result
+  return Schema.decodeUnknownSync(rpcResultSchema)(await response.json()).result
 }
 
 const hostWithLeader = async (): Promise<TestHost> => {
@@ -91,23 +91,25 @@ const receiver = async () => {
   return { bodies }
 }
 
-const keyValueSchema = z.object({ key: z.string(), value: z.record(z.string(), z.unknown()) })
-const exportedSchema = z.object({
-  resourceSpans: z.array(
-    z.object({
-      resource: z.object({ attributes: z.array(keyValueSchema) }),
-      scopeSpans: z.array(
-        z.object({
-          spans: z.array(
-            z.object({
-              traceId: z.string(),
-              spanId: z.string(),
-              parentSpanId: z.string().optional(),
-              name: z.string(),
-              kind: z.number(),
-              startTimeUnixNano: z.string(),
-              attributes: z.array(keyValueSchema),
-              events: z.array(z.object({ name: z.string(), timeUnixNano: z.string(), attributes: z.array(keyValueSchema) })).optional(),
+const keyValueSchema = Schema.Struct({ key: Schema.String, value: Schema.Record(Schema.String, Schema.Unknown) })
+const exportedSchema = Schema.Struct({
+  resourceSpans: Schema.Array(
+    Schema.Struct({
+      resource: Schema.Struct({ attributes: Schema.Array(keyValueSchema) }),
+      scopeSpans: Schema.Array(
+        Schema.Struct({
+          spans: Schema.Array(
+            Schema.Struct({
+              traceId: Schema.String,
+              spanId: Schema.String,
+              parentSpanId: Schema.optionalKey(Schema.String),
+              name: Schema.String,
+              kind: Schema.Number,
+              startTimeUnixNano: Schema.String,
+              attributes: Schema.Array(keyValueSchema),
+              events: Schema.optionalKey(
+                Schema.Array(Schema.Struct({ name: Schema.String, timeUnixNano: Schema.String, attributes: Schema.Array(keyValueSchema) })),
+              ),
             }),
           ),
         }),
@@ -186,7 +188,7 @@ describe('browser traces ingest', () => {
     })
     await host.dispose()
 
-    const exported = exportedSchema.parse(sink.bodies[0])
+    const exported = Schema.decodeUnknownSync(exportedSchema)(sink.bodies[0])
     const [resourceSpans] = exported.resourceSpans
     expect(Object.fromEntries(resourceSpans?.resource.attributes.map(attribute => [attribute.key, attribute.value]) ?? [])).toEqual({
       'service.name': { stringValue: 'dshfiles-web' },
@@ -262,7 +264,7 @@ describe('browser traces ingest', () => {
       call: async (channel: string, endpoint: string, payload: unknown) => {
         expect(channel).toBe('/api')
         const response = await host.connection.requestRpc({ endpoint, payload })
-        return rpcResultSchema.parse(await response.json()).result
+        return Schema.decodeUnknownSync(rpcResultSchema)(await response.json()).result
       },
     }
     const client = ApiRuntimeModel.createClient({ get: (name: string) => (name === 'connection' ? { rpc } : undefined) }, probe)
@@ -280,6 +282,6 @@ describe('browser traces ingest', () => {
     expect(serverSpan.traceId).toBe(root.traceId)
     expect(serverSpan.parentSpanId).toBe(clientSpan.spanId)
     expect(serverSpan.attributes).toMatchObject({ 'dshx.api.caller': 'client', 'dshx.api.outcome': 'ok' })
-    expect(ApiProtocolModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)).toMatch(/^\/dshx-/u)
+    expect(ApiChannelModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)).toMatch(/^\/dshx-/u)
   })
 })

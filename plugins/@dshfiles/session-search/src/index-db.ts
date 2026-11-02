@@ -6,7 +6,8 @@
 import { mkdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, IndexHealth, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
@@ -72,42 +73,49 @@ CREATE TABLE IF NOT EXISTS meta (
 ) STRICT;
 `
 
-const numberLike = z.union([z.number(), z.bigint()]).transform(Number)
-const nullableString = z.string().nullable()
+/** SQLite hands back an integer as either a number or a bigint depending on its size. */
+const numberLike = Schema.Union([Schema.Number, Schema.BigInt]).pipe(
+  Schema.decodeTo(Schema.Number, {
+    decode: SchemaGetter.transform((value: number | bigint) => Number(value)),
+    encode: SchemaGetter.transform((value: number) => value),
+  }),
+)
+const nullableString = Schema.NullOr(Schema.String)
 
-const cursorRowSchema = z.object({
-  id: z.string(),
-  log_path: z.string(),
-  log_dev: z.string(),
-  log_ino: z.string(),
+const cursorRowSchema = Schema.Struct({
+  id: Schema.String,
+  log_path: Schema.String,
+  log_dev: Schema.String,
+  log_ino: Schema.String,
   log_offset: numberLike,
   log_size: numberLike,
-  log_mtime_ns: z.string(),
+  log_mtime_ns: Schema.String,
 })
 
-const sessionRowSchema = z.object({
-  id: z.string(),
+const sessionRowSchema = Schema.Struct({
+  id: Schema.String,
   version: numberLike,
   created_at: numberLike,
   cwd: nullableString,
   parent_session: nullableString,
-  seed_length: numberLike.nullable(),
-  delegation_depth: numberLike.nullable(),
+  seed_length: Schema.NullOr(numberLike),
+  delegation_depth: Schema.NullOr(numberLike),
   agent_preset: nullableString,
 })
 
-const rankedRowSchema = sessionRowSchema.extend({
-  session_id: z.string(),
+const rankedRowSchema = Schema.Struct({
+  ...sessionRowSchema.fields,
+  session_id: Schema.String,
   seq: numberLike,
-  type: z.string(),
+  type: Schema.String,
   time: numberLike,
-  surface: z.string(),
-  marked_text: z.string(),
+  surface: Schema.String,
+  marked_text: Schema.String,
 })
 
-const countRowSchema = z.object({ count: numberLike })
+const countRowSchema = Schema.Struct({ count: numberLike })
 
-const documentRowidSchema = z.object({ document_rowid: numberLike })
+const documentRowidSchema = Schema.Struct({ document_rowid: numberLike })
 
 export interface SessionCursor {
   readonly id: string
@@ -153,14 +161,14 @@ export type EventSearchRows = SearchRows & {
   readonly header: SessionHeaderRow | null
 }
 
-type SessionRow = z.infer<typeof sessionRowSchema>
-type RankedRow = z.infer<typeof rankedRowSchema>
+type SessionRow = typeof sessionRowSchema.Type
+type RankedRow = typeof rankedRowSchema.Type
 
 const headerOf = (
   row: Pick<SessionRow, 'id' | 'version' | 'created_at' | 'cwd' | 'parent_session' | 'seed_length' | 'delegation_depth' | 'agent_preset'>,
 ): SessionHeaderRow =>
   withoutUndefined(
-    sessionHeaderSchema.parse({
+    Schema.decodeUnknownSync(sessionHeaderSchema)({
       version: row.version,
       id: row.id,
       createdAt: row.created_at,
@@ -225,15 +233,15 @@ type DocumentTable = 'session_documents' | 'conversation_documents'
 /** The FTS table a search reads and the filter clauses still left to apply on it. */
 type SearchRoute = { readonly table: DocumentTable; readonly filters: EventFilters | undefined }
 
-const metaValueSchema = z.object({ value: z.string() })
-const backfillRowSchema = z.object({
+const metaValueSchema = Schema.Struct({ value: Schema.String })
+const backfillRowSchema = Schema.Struct({
   rowid: numberLike,
-  text: z.string(),
-  session_id: z.string(),
+  text: Schema.String,
+  session_id: Schema.String,
   seq: numberLike,
-  type: z.string(),
+  type: Schema.String,
   time: numberLike,
-  surface: z.string(),
+  surface: Schema.String,
   truncated: numberLike,
 })
 
@@ -252,16 +260,16 @@ export class SearchIndex {
 
   cursor(sessionId: string): SessionCursor | undefined {
     const value = this.#database.prepare('SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions WHERE id = ?').get(sessionId)
-    const parsed = cursorRowSchema.safeParse(value)
-    if (!parsed.success) return undefined
+    const parsed = Schema.decodeUnknownResult(cursorRowSchema)(value)
+    if (parsed._tag === 'Failure') return undefined
     return {
-      id: parsed.data.id,
-      logPath: parsed.data.log_path,
-      dev: parsed.data.log_dev,
-      ino: parsed.data.log_ino,
-      offset: parsed.data.log_offset,
-      size: parsed.data.log_size,
-      mtimeNs: parsed.data.log_mtime_ns,
+      id: parsed.success.id,
+      logPath: parsed.success.log_path,
+      dev: parsed.success.log_dev,
+      ino: parsed.success.log_ino,
+      offset: parsed.success.log_offset,
+      size: parsed.success.log_size,
+      mtimeNs: parsed.success.log_mtime_ns,
     }
   }
 
@@ -368,8 +376,10 @@ export class SearchIndex {
     if (mapped.length === 0) {
       // Nothing indexed means nothing to delete; only a Session indexed before the rowid map (see `backfillRowMap`)
       // still takes the scanning delete, ~15 s on this index while the worker serves no search.
-      const counted = countRowSchema.safeParse(this.#database.prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId))
-      if (!counted.success || counted.data.count === 0) return
+      const counted = Schema.decodeUnknownResult(countRowSchema)(
+        this.#database.prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId),
+      )
+      if (counted._tag === 'Failure' || counted.success.count === 0) return
       this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
       this.#database.prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
       return
@@ -377,7 +387,7 @@ export class SearchIndex {
     const remove = this.#database.prepare('DELETE FROM session_documents WHERE rowid = ?')
     const removeConversation = this.#database.prepare('DELETE FROM conversation_documents WHERE rowid = ?')
     for (const row of mapped) {
-      const rowid = documentRowidSchema.parse(row).document_rowid
+      const rowid = Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid
       remove.run(rowid)
       removeConversation.run(rowid)
     }
@@ -385,8 +395,8 @@ export class SearchIndex {
   }
 
   #meta(key: string): string | undefined {
-    const parsed = metaValueSchema.safeParse(this.#database.prepare('SELECT value FROM meta WHERE key = ?').get(key))
-    return parsed.success ? parsed.data.value : undefined
+    const parsed = Schema.decodeUnknownResult(metaValueSchema)(this.#database.prepare('SELECT value FROM meta WHERE key = ?').get(key))
+    return parsed._tag === 'Success' ? parsed.success.value : undefined
   }
 
   #setMeta(key: string, value: string): void {
@@ -409,7 +419,9 @@ export class SearchIndex {
     try {
       let until = Number(this.#meta('conversation_backfill_until') ?? Number.NaN)
       if (Number.isNaN(until)) {
-        until = numberLike.parse(this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
+        until = Schema.decodeUnknownSync(numberLike)(
+          this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0,
+        )
         this.#setMeta('conversation_backfill_until', String(until))
       }
       const from = Number(this.#meta('conversation_backfill_from') ?? '0')
@@ -420,7 +432,7 @@ export class SearchIndex {
       for (const raw of this.#database
         .prepare('SELECT rowid, text, session_id, seq, type, time, surface, truncated FROM session_documents WHERE rowid > ? AND rowid <= ?')
         .all(from, to)) {
-        const row = backfillRowSchema.parse(raw)
+        const row = Schema.decodeUnknownSync(backfillRowSchema)(raw)
         if (isConversation(row)) copy.run(row.rowid, row.text, row.session_id, row.seq, row.type, row.time, row.surface, row.truncated)
       }
       this.#setMeta('conversation_backfill_from', String(to))
@@ -445,7 +457,9 @@ export class SearchIndex {
     try {
       let until = Number(this.#meta('row_map_backfill_until') ?? Number.NaN)
       if (Number.isNaN(until)) {
-        until = numberLike.parse(this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
+        until = Schema.decodeUnknownSync(numberLike)(
+          this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0,
+        )
         this.#setMeta('row_map_backfill_until', String(until))
       }
       const from = Number(this.#meta('row_map_backfill_from') ?? '0')
@@ -536,8 +550,8 @@ export class SearchIndex {
     const value = this.#database
       .prepare('SELECT id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset FROM sessions WHERE id = ?')
       .get(sessionId)
-    const parsed = sessionRowSchema.safeParse(value)
-    return parsed.success ? headerOf(parsed.data) : null
+    const parsed = Schema.decodeUnknownResult(sessionRowSchema)(value)
+    return parsed._tag === 'Success' ? headerOf(parsed.success) : null
   }
 
   /**
@@ -608,7 +622,7 @@ export class SearchIndex {
       ORDER BY page.score ASC, page.document_length ASC, page.time DESC, page.session_id ASC, page.seq DESC
     `
     const values = this.#database.prepare(sql).all(...bindings.slice(0, -1), MARKER_START, MARKER_END, input.query)
-    return values.map(value => rankedRowSchema.parse(value))
+    return values.map(value => Schema.decodeUnknownSync(rankedRowSchema)(value))
   }
 
   #match(row: RankedRow): SearchMatch {
@@ -633,10 +647,12 @@ export class SearchIndex {
     readonly slowestSearchMs: number
     readonly lastError: string | null
   }): IndexHealth {
-    const sessions = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count
+    const sessions = Schema.decodeUnknownSync(countRowSchema)(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count
     // `commitBatch` maintains `documents_count` on every append, replace and forget, so the sum is the
     // FTS5 row count without scanning the virtual table (measured 572 ms per `count(*)` at 982 MB).
-    const documents = countRowSchema.parse(this.#database.prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
+    const documents = Schema.decodeUnknownSync(countRowSchema)(
+      this.#database.prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get(),
+    ).count
     let indexBytes = 0
     for (const suffix of ['', '-wal', '-shm']) indexBytes += statSize(`${this.#path}${suffix}`)
     return { sessions, documents, indexBytes, ...input }

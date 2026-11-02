@@ -3,12 +3,15 @@ import type {} from '@deepseek-ai/dsh-token-meter'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import type { ApiCaller } from '@dshfiles/dshx/api'
+
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { threadModelApi } from '@dshfiles/session-controller/thread-model-api'
 import { accountStoreService } from './account-store.js'
 import { accountRuntime } from './account-runtime.js'
 import { servingAccountSessionForCaller } from './serving-account-host.js'
 import { threadAccountApi, type ThreadAccountPreview } from './thread-account-api.js'
 import { ThreadAccountModel } from './thread-account-model.js'
+import { effectHandler } from './host-effect.js'
 
 const threadModels = (ctx: Context) => createHostApiClient(ctx, threadModelApi, '@dshfiles/ai-accounts')
 
@@ -36,11 +39,8 @@ const previewThreadAccount = async (
     choice.strategy === 'same-model' && resolved.reasoning?.efforts.some(effort => effort.id === session.selection.reasoningEffort)
       ? session.selection.reasoningEffort
       : undefined
-  const target: ThreadAccountPreview['target'] = {
-    provider: account.instanceId,
-    model: choice.model.id,
-  }
-  if (retainedEffort !== undefined) target.reasoningEffort = retainedEffort
+  const targetBase = { provider: account.instanceId, model: choice.model.id }
+  const target: ThreadAccountPreview['target'] = retainedEffort === undefined ? targetBase : { ...targetBase, reasoningEffort: retainedEffort }
   let context: ThreadAccountPreview['context'] = null
   const liveSession = ctx.get('agents')?.get(SessionId(sessionId))?.session
   const meter = ctx.get('tokenMeter')
@@ -75,9 +75,9 @@ const previewThreadAccount = async (
   }
 }
 
-export const threadAccountHostApi = threadAccountApi.host({
-  preview: ({ ctx, input, caller }) => previewThreadAccount(ctx, input, caller),
-  switch: async ({ ctx, input, caller }) => {
+export const threadAccountHostApi = DshxEffect.host(threadAccountApi, {
+  preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller }) => previewThreadAccount(ctx, input, caller)),
+  switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller }) => {
     const preview = await previewThreadAccount(ctx, input, caller)
     if (preview.expectedRevision !== input.expectedRevision || !ThreadAccountModel.same(preview.target, input.target))
       throw new Error('The thread selection or account catalog changed. Review the new target before switching.')
@@ -92,5 +92,5 @@ export const threadAccountHostApi = threadAccountApi.host({
     runtime?.modelFallbackRouter?.returnToSelection(preview.sessionId)
     runtime?.releaseRetryWait?.(preview.sessionId)
     return preview
-  },
+  }),
 })

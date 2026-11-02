@@ -1,8 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { CostEstimateModel, modelPriceSchema, type ModelPrice, type RouteQuote } from './cost-estimate.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 /**
  * Model prices from models.dev, cached on disk so a cold or offline Host still
@@ -16,28 +17,40 @@ export const DEFAULT_PRICING_PATH = join(process.env.DSH_HOME ?? join(homedir(),
 
 const FETCH_TIMEOUT_MS = 30_000
 
-const pricingCacheSchema = z.object({
-  version: z.literal(1),
-  fetchedAt: z.number(),
-  source: z.string(),
-  providers: z.record(z.string(), z.record(z.string(), modelPriceSchema)),
+const nonNegative = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
+
+const pricingCacheSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  fetchedAt: Schema.Number.check(Schema.isFinite()),
+  source: Schema.String,
+  providers: Schema.Record(Schema.String, Schema.Record(Schema.String, modelPriceSchema)),
 })
 
-export type PricingCache = z.infer<typeof pricingCacheSchema>
+export type PricingCache = typeof pricingCacheSchema.Type
 
 const rawRateShape = {
-  input: z.number().min(0),
-  output: z.number().min(0),
-  cache_read: z.number().min(0).optional(),
-  cache_write: z.number().min(0).optional(),
+  input: nonNegative,
+  output: nonNegative,
+  cache_read: Schema.optional(nonNegative),
+  cache_write: Schema.optional(nonNegative),
 }
 
-const rawCostSchema = z.object({
+const rawCostSchema = Schema.Struct({
   ...rawRateShape,
-  tiers: z.array(z.object({ ...rawRateShape, tier: z.object({ type: z.string(), size: z.number().int().min(0) }) })).optional(),
+  tiers: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        ...rawRateShape,
+        tier: Schema.Struct({
+          type: Schema.String,
+          size: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+        }),
+      }),
+    ),
+  ),
 })
 
-const rawProviderSchema = z.object({ models: z.record(z.string(), z.object({ cost: z.unknown().optional() })) })
+const rawProviderSchema = Schema.Struct({ models: Schema.Record(Schema.String, Schema.Struct({ cost: Schema.optional(Schema.Unknown) })) })
 
 /**
  * models.dev publishes tier sizes both as `200000` and `200001`; either means
@@ -46,9 +59,9 @@ const rawProviderSchema = z.object({ models: z.record(z.string(), z.object({ cos
 const tierThreshold = (size: number): number => (size % 1_000 === 1 ? size - 1 : size)
 
 const toModelPrice = (raw: unknown): ModelPrice | undefined => {
-  const parsed = rawCostSchema.safeParse(raw)
-  if (!parsed.success) return undefined
-  const cost = parsed.data
+  const parsed = AiAccountsSchema.decodeResult(rawCostSchema, raw)
+  if (parsed._tag === 'Failure') return undefined
+  const cost = parsed.success
   const tiers = (cost.tiers ?? [])
     .filter(tier => tier.tier.type === 'context')
     .map(tier => ({
@@ -73,10 +86,10 @@ const trimModelsDev = (raw: unknown, fetchedAt: number): PricingCache => {
   const providers: Record<string, Record<string, ModelPrice>> = {}
   if (typeof raw === 'object' && raw !== null) {
     for (const [providerId, provider] of Object.entries(raw)) {
-      const parsed = rawProviderSchema.safeParse(provider)
-      if (!parsed.success) continue
+      const parsed = AiAccountsSchema.decodeResult(rawProviderSchema, provider)
+      if (parsed._tag === 'Failure') continue
       const models: Record<string, ModelPrice> = {}
-      for (const [modelId, model] of Object.entries(parsed.data.models)) {
+      for (const [modelId, model] of Object.entries(parsed.success.models)) {
         const price = toModelPrice(model.cost)
         if (price !== undefined) models[modelId] = price
       }
@@ -163,8 +176,8 @@ const parsePricingOverride = (value: string): PricingOverride | undefined => {
       if (key === undefined || !Number.isFinite(amount) || amount < 0) return undefined
       rates[key] = amount
     }
-    const parsed = modelPriceSchema.safeParse(rates)
-    return parsed.success ? { kind: 'price', price: parsed.data } : undefined
+    const parsed = AiAccountsSchema.decodeResult(modelPriceSchema, rates)
+    return parsed._tag === 'Success' ? { kind: 'price', price: parsed.success } : undefined
   }
   const slash = trimmed.indexOf('/')
   if (slash <= 0 || slash === trimmed.length - 1) return undefined
@@ -315,8 +328,8 @@ export const createPricingCatalog = (options: {
 
   const load = async (): Promise<void> => {
     try {
-      const parsed = pricingCacheSchema.safeParse(JSON.parse(await readFile(options.path, 'utf8')))
-      if (parsed.success && (cache === null || parsed.data.fetchedAt > cache.fetchedAt)) cache = parsed.data
+      const parsed = AiAccountsSchema.decodeResult(pricingCacheSchema, JSON.parse(await readFile(options.path, 'utf8')))
+      if (parsed._tag === 'Success' && (cache === null || parsed.success.fetchedAt > cache.fetchedAt)) cache = parsed.success
     } catch {
       // No cache yet, or an unreadable one: the next refresh writes a fresh file.
     }

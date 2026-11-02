@@ -7,8 +7,6 @@ import { useCallback, useId, useState, type ChangeEvent, type ClipboardEvent, ty
 
 import { readComposerFile, type ComposerFile } from './composer-files.js'
 import { BacklogItems } from './item.js'
-import { threadMentionText } from './thread-mention-drop.js'
-
 export { threadMentionText } from './thread-mention-drop.js'
 
 export const fileSizeLabel = (bytes: number): string =>

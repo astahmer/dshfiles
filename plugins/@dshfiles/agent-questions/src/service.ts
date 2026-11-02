@@ -1,39 +1,39 @@
 import { randomUUID } from 'node:crypto'
 import { createHash } from 'node:crypto'
-import { z } from 'zod'
+import { Context, Effect, Schema } from 'effect'
+import { createKeyedEffectLock } from './keyed-effect-lock.js'
 import {
   deferredFilePathSchema,
   parentQuestionExpiryBehaviorSchema,
-  parentQuestionRecordSchema,
+  parentQuestionRecordEffectSchema,
   parentQuestionOptionsSchema,
   type ParentQuestionExpiryBehavior,
   type ParentQuestionRecord,
   type ParentQuestionTable,
 } from './store.js'
 
-const requestInputSchema = z
-  .object({
-    operationId: z.string().trim().min(1).max(256),
-    question: z.string().trim().min(1).max(4_000),
-    context: z.string().max(16_000).optional(),
-    options: parentQuestionOptionsSchema,
-    recommendedOptionId: z.string().trim().min(1).max(80),
-    expiryBehavior: parentQuestionExpiryBehaviorSchema,
-    timeoutMs: z.number().int().min(1_000).max(3_600_000),
-  })
-  .strict()
-  .superRefine((request, context) => {
-    if (!request.options.some(option => option.id === request.recommendedOptionId)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['recommendedOptionId'],
-        message: 'The recommended option must exist in the question options.',
-      })
-    }
-  })
+const trimmedString = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] =>
+  Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
 
-const answerInputSchema = z.string().trim().min(1).max(4_000)
-const parentQuestionListInputSchema = z.object({ childSessionId: z.string().trim().min(1).max(256).optional() }).strict()
+const requestInputSchema = Schema.Struct({
+  operationId: trimmedString(1, 256),
+  question: trimmedString(1, 4_000),
+  context: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(16_000))),
+  options: parentQuestionOptionsSchema,
+  recommendedOptionId: trimmedString(1, 80),
+  expiryBehavior: parentQuestionExpiryBehaviorSchema,
+  timeoutMs: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 3_600_000 })),
+}).check(
+  Schema.makeFilter(request =>
+    request.options.some(option => option.id === request.recommendedOptionId)
+      ? undefined
+      : { path: ['recommendedOptionId'], issue: 'The recommended option must exist in the question options.' },
+  ),
+)
+
+const answerInputSchema = trimmedString(1, 4_000)
+const parentQuestionListInputSchema = Schema.Struct({ childSessionId: Schema.optionalKey(trimmedString(1, 256)) })
 
 const MAX_STORED_QUESTIONS = 1_000
 const MAX_PENDING_PER_PARENT = 50
@@ -116,31 +116,36 @@ export interface ParentQuestionService {
   close(): Promise<void>
 }
 
+export interface ParentQuestionServiceEffectApi {
+  request(input: Parameters<ParentQuestionService['request']>[0]): Effect.Effect<ParentQuestionReceipt, ParentQuestionServiceError>
+  listForParent(input: Parameters<ParentQuestionService['listForParent']>[0]): Effect.Effect<ParentQuestionInboxEntry[], ParentQuestionServiceError>
+  answer(input: Parameters<ParentQuestionService['answer']>[0]): Effect.Effect<ParentQuestionOutcome, ParentQuestionServiceError>
+  wait(input: Parameters<ParentQuestionService['wait']>[0]): Effect.Effect<ParentQuestionOutcome, ParentQuestionServiceError>
+  cancel(input: Parameters<ParentQuestionService['cancel']>[0]): Effect.Effect<ParentQuestionOutcome, ParentQuestionServiceError>
+  recordDeferredFile(input: Parameters<ParentQuestionService['recordDeferredFile']>[0]): Effect.Effect<ParentQuestionOutcome, ParentQuestionServiceError>
+  close(): Effect.Effect<void, ParentQuestionServiceError>
+}
+
+export class ParentQuestionServiceEffect extends Context.Service<ParentQuestionServiceEffect, ParentQuestionServiceEffectApi>()(
+  'agent-questions/ParentQuestionService',
+) {}
+
+export class ParentQuestionServiceError extends Schema.TaggedError<ParentQuestionServiceError>()('ParentQuestionServiceError', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
+
 interface QuestionWaiter {
-  readonly resolve: (outcome: ParentQuestionOutcome) => void
-  readonly reject: (error: unknown) => void
+  readonly resume: (effect: Effect.Effect<ParentQuestionOutcome, ParentQuestionServiceError>) => void
 }
 
-interface Deferred<Value> {
-  readonly promise: Promise<Value>
-  readonly resolve: (value: Value) => void
-  readonly reject: (error: unknown) => void
-}
+const questionWaitEffects = new WeakMap<ParentQuestionService, ParentQuestionServiceEffectApi['wait']>()
 
-const createDeferred = <Value>(): Deferred<Value> => {
-  let resolve = (_value: Value): void => {
-    throw new Error('Deferred resolve was used before initialization.')
-  }
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- The promise plumbing rejects with `unknown`; this placeholder only throws until the executor replaces it.
-  let reject = (_error: unknown): void => {
-    throw new Error('Deferred reject was used before initialization.')
-  }
-  const promise = new Promise<Value>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
-  return { promise, resolve, reject }
-}
+const questionServiceFailure = (operation: string, error: unknown): ParentQuestionServiceError =>
+  new ParentQuestionServiceError({ operation, message: error instanceof Error ? error.message : String(error) })
+
+const promiseEffect = <Value>(operation: string, run: () => Promise<Value>): Effect.Effect<Value, ParentQuestionServiceError> =>
+  Effect.tryPromise({ try: run, catch: error => questionServiceFailure(operation, error) })
 
 const operationKeyFor = (parentSessionId: string, childSessionId: string, operationId: string): string =>
   createHash('sha256')
@@ -184,26 +189,12 @@ const receiptOf = (record: ParentQuestionRecord): ParentQuestionReceipt => ({
   status: record.status,
 })
 
-const runWithLock = async <Value>(locks: Map<string, Promise<void>>, key: string, operation: () => Promise<Value>): Promise<Value> => {
-  const previous = locks.get(key) ?? Promise.resolve()
-  const gate = createDeferred<void>()
-  const current = previous.then(() => gate.promise)
-  locks.set(key, current)
-  await previous
-  try {
-    return await operation()
-  } finally {
-    gate.resolve(undefined)
-    if (locks.get(key) === current) locks.delete(key)
-  }
-}
-
 export const createParentQuestionService = (input: {
   readonly table: () => Promise<ParentQuestionTable>
   readonly runtime: ParentQuestionRuntime
   readonly now?: () => number
 }): ParentQuestionService => {
-  const operationLocks = new Map<string, Promise<void>>()
+  const operationLocks = createKeyedEffectLock()
   const waiters = new Map<string, Set<QuestionWaiter>>()
   const now = input.now ?? Date.now
   let closed = false
@@ -215,7 +206,7 @@ export const createParentQuestionService = (input: {
   const notifyWaiters = (record: ParentQuestionRecord): void => {
     if (record.status === 'pending') return
     const outcome = outcomeOf(record)
-    for (const waiter of waiters.get(record.questionId) ?? []) waiter.resolve(outcome)
+    for (const waiter of waiters.get(record.questionId) ?? []) waiter.resume(Effect.succeed(outcome))
   }
 
   const findByQuestionId = (table: ParentQuestionTable, questionId: string): { readonly key: string; readonly record: ParentQuestionRecord } | undefined => {
@@ -235,7 +226,7 @@ export const createParentQuestionService = (input: {
     const updated = await table.update(key, current => {
       if (current.questionId !== questionId || current.status !== 'pending') return current
       const next = status === 'answered' ? { ...current, status, answer, updatedAt: now() } : { ...current, status, updatedAt: now() }
-      return parentQuestionRecordSchema.parse(next)
+      return decodeStrict(parentQuestionRecordEffectSchema, next)
     })
     if (updated.questionId !== questionId) throw new Error('Parent question identity changed during settlement.')
     notifyWaiters(updated)
@@ -293,7 +284,7 @@ export const createParentQuestionService = (input: {
       })
       const updated = await table.update(key, current => {
         if (current.questionId !== record.questionId || current.status !== 'pending' || current.notificationMessageId !== undefined) return current
-        return parentQuestionRecordSchema.parse({
+        return decodeStrict(parentQuestionRecordEffectSchema, {
           ...current,
           notificationMessageId,
           updatedAt: now(),
@@ -311,10 +302,52 @@ export const createParentQuestionService = (input: {
     }
   }
 
-  return {
+  const waitEffect: ParentQuestionServiceEffectApi['wait'] = Effect.fn('parent question wait')(waitRequest =>
+    Effect.gen(function* () {
+      yield* Effect.try({ try: assertOpen, catch: error => questionServiceFailure('wait', error) })
+      const found = yield* promiseEffect('wait-authorize', () => findAuthorizedChildQuestion(waitRequest.agent, waitRequest.questionId))
+      if (found.record.status !== 'pending') return outcomeOf(found.record)
+      if (found.record.expiresAt <= now()) return outcomeOf(yield* promiseEffect('wait-expire', () => settleExpired(found.table, found.key, found.record)))
+      if (waitRequest.signal.aborted) {
+        return outcomeOf(yield* promiseEffect('wait-cancel', () => settle(found.table, found.key, waitRequest.questionId, 'cancelled')))
+      }
+
+      const completion = Effect.callback<ParentQuestionOutcome, ParentQuestionServiceError>(resume => {
+        const waiter: QuestionWaiter = { resume }
+        const questionWaiters = waiters.get(waitRequest.questionId) ?? new Set<QuestionWaiter>()
+        questionWaiters.add(waiter)
+        waiters.set(waitRequest.questionId, questionWaiters)
+        const onAbort = (): void => {
+          void settle(found.table, found.key, waitRequest.questionId, 'cancelled').catch(error =>
+            waiter.resume(Effect.fail(questionServiceFailure('wait-cancel', error))),
+          )
+        }
+        waitRequest.signal.addEventListener('abort', onAbort, { once: true })
+        if (waitRequest.signal.aborted) onAbort()
+        const latest = findByQuestionId(found.table, waitRequest.questionId)
+        if (latest === undefined) {
+          waiter.resume(Effect.fail(questionServiceFailure('wait', 'Parent question disappeared while waiting.')))
+        } else if (latest.record.status !== 'pending') {
+          waiter.resume(Effect.succeed(outcomeOf(latest.record)))
+        }
+        return Effect.sync(() => {
+          waitRequest.signal.removeEventListener('abort', onAbort)
+          questionWaiters.delete(waiter)
+          if (questionWaiters.size === 0) waiters.delete(waitRequest.questionId)
+        })
+      })
+      const expiry = Effect.sleep(Math.max(1, found.record.expiresAt - now())).pipe(
+        Effect.andThen(promiseEffect('wait-expire', () => settleExpired(found.table, found.key, found.record))),
+        Effect.map(outcomeOf),
+      )
+      return yield* Effect.raceFirst(completion, expiry)
+    }),
+  )
+
+  const service: ParentQuestionService = {
     request: async request => {
       assertOpen()
-      const parsed = requestInputSchema.parse({
+      const parsed = decodeStrict(requestInputSchema, {
         operationId: request.operationId,
         question: request.question,
         ...(request.context !== undefined && { context: request.context }),
@@ -329,64 +362,70 @@ export const createParentQuestionService = (input: {
       }
       request.signal.throwIfAborted()
       const key = operationKeyFor(parentSessionId, request.agent.id, parsed.operationId)
-      return runWithLock(operationLocks, key, async () => {
-        assertOpen()
-        const table = await input.table()
-        let record = table.get(key)
-        if (record !== undefined) {
-          if (
-            record.parentSessionId !== parentSessionId ||
-            record.childSessionId !== request.agent.id ||
-            record.question !== parsed.question ||
-            record.context !== parsed.context ||
-            JSON.stringify(record.options) !== JSON.stringify(parsed.options) ||
-            (record.recommendedOptionId !== undefined &&
-              (record.recommendedOptionId !== parsed.recommendedOptionId || record.expiryBehavior !== parsed.expiryBehavior))
-          ) {
-            throw new Error('Question operation id was reused with different input.')
+      return operationLocks.run({
+        key,
+        operation: async () => {
+          assertOpen()
+          const table = await input.table()
+          let record = table.get(key)
+          if (record !== undefined) {
+            if (
+              record.parentSessionId !== parentSessionId ||
+              record.childSessionId !== request.agent.id ||
+              record.question !== parsed.question ||
+              record.context !== parsed.context ||
+              JSON.stringify(record.options) !== JSON.stringify(parsed.options) ||
+              (record.recommendedOptionId !== undefined &&
+                (record.recommendedOptionId !== parsed.recommendedOptionId || record.expiryBehavior !== parsed.expiryBehavior))
+            ) {
+              throw new Error('Question operation id was reused with different input.')
+            }
+            if (record.status !== 'pending' || record.notificationMessageId !== undefined) return receiptOf(record)
+            record = await sendQuestion(table, key, record, request.signal)
+            return receiptOf(record)
           }
-          if (record.status !== 'pending' || record.notificationMessageId !== undefined) return receiptOf(record)
-          record = await sendQuestion(table, key, record, request.signal)
-          return receiptOf(record)
-        }
 
-        const created = await runWithLock(operationLocks, 'question-admission', async () => {
-          await expireDueQuestions(table)
-          const rows = Array.from(table.entries())
-          const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
-          if (pendingForParent >= MAX_PENDING_PER_PARENT) {
-            throw new Error('The parent has reached its pending question limit.')
-          }
-          if (table.size >= MAX_STORED_QUESTIONS) {
-            throw new Error('The retained parent question limit has been reached.')
-          }
-          const timestamp = now()
-          const next = parentQuestionRecordSchema.parse({
-            questionId: randomUUID(),
-            parentSessionId,
-            childSessionId: request.agent.id,
-            operationId: parsed.operationId,
-            question: parsed.question,
-            ...(parsed.context !== undefined && { context: parsed.context }),
-            options: parsed.options,
-            recommendedOptionId: parsed.recommendedOptionId,
-            expiryBehavior: parsed.expiryBehavior,
-            status: 'pending',
-            createdAt: timestamp,
-            expiresAt: timestamp + parsed.timeoutMs,
-            updatedAt: timestamp,
+          const created = await operationLocks.run({
+            key: 'question-admission',
+            operation: async () => {
+              await expireDueQuestions(table)
+              const rows = Array.from(table.entries())
+              const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
+              if (pendingForParent >= MAX_PENDING_PER_PARENT) {
+                throw new Error('The parent has reached its pending question limit.')
+              }
+              if (table.size >= MAX_STORED_QUESTIONS) {
+                throw new Error('The retained parent question limit has been reached.')
+              }
+              const timestamp = now()
+              const next = decodeStrict(parentQuestionRecordEffectSchema, {
+                questionId: randomUUID(),
+                parentSessionId,
+                childSessionId: request.agent.id,
+                operationId: parsed.operationId,
+                question: parsed.question,
+                ...(parsed.context !== undefined && { context: parsed.context }),
+                options: parsed.options,
+                recommendedOptionId: parsed.recommendedOptionId,
+                expiryBehavior: parsed.expiryBehavior,
+                status: 'pending',
+                createdAt: timestamp,
+                expiresAt: timestamp + parsed.timeoutMs,
+                updatedAt: timestamp,
+              })
+              await table.put(key, next)
+              return next
+            },
           })
-          await table.put(key, next)
-          return next
-        })
-        record = await sendQuestion(table, key, created, request.signal)
-        return receiptOf(record)
+          record = await sendQuestion(table, key, created, request.signal)
+          return receiptOf(record)
+        },
       })
     },
     listForParent: async ({ agent, childSessionId }) => {
       assertOpen()
       if (!input.runtime.isLive(agent)) throw new Error('Question list requires the exact live parent Agent.')
-      const parsed = parentQuestionListInputSchema.parse({ childSessionId })
+      const parsed = decodeStrict(parentQuestionListInputSchema, childSessionId === undefined ? {} : { childSessionId })
       const table = await input.table()
       const timestamp = now()
 
@@ -420,7 +459,7 @@ export const createParentQuestionService = (input: {
       if (!input.runtime.isLive(answerRequest.agent)) {
         throw new Error('Question answer requires the exact live parent Agent.')
       }
-      const answer = answerInputSchema.parse(answerRequest.answer)
+      const answer = decodeStrict(answerInputSchema, answerRequest.answer)
       const table = await input.table()
       const found = findByQuestionId(table, answerRequest.questionId)
       if (found === undefined) throw new Error('Parent question was not found.')
@@ -441,49 +480,7 @@ export const createParentQuestionService = (input: {
       }
       return outcomeOf(settled)
     },
-    wait: async waitRequest => {
-      assertOpen()
-      const found = await findAuthorizedChildQuestion(waitRequest.agent, waitRequest.questionId)
-      assertOpen()
-      if (found.record.status !== 'pending') return outcomeOf(found.record)
-      if (found.record.expiresAt <= now()) {
-        return outcomeOf(await settleExpired(found.table, found.key, found.record))
-      }
-      if (waitRequest.signal.aborted) {
-        return outcomeOf(await settle(found.table, found.key, waitRequest.questionId, 'cancelled'))
-      }
-
-      const completion = createDeferred<ParentQuestionOutcome>()
-      const waiter: QuestionWaiter = { resolve: completion.resolve, reject: completion.reject }
-      const questionWaiters = waiters.get(waitRequest.questionId) ?? new Set<QuestionWaiter>()
-      questionWaiters.add(waiter)
-      waiters.set(waitRequest.questionId, questionWaiters)
-      const timeout = setTimeout(
-        () => {
-          void settleExpired(found.table, found.key, found.record).catch(waiter.reject)
-        },
-        Math.max(1, found.record.expiresAt - now()),
-      )
-      const onAbort = (): void => {
-        void settle(found.table, found.key, waitRequest.questionId, 'cancelled').catch(waiter.reject)
-      }
-      waitRequest.signal.addEventListener('abort', onAbort, { once: true })
-      if (waitRequest.signal.aborted) onAbort()
-      const latest = findByQuestionId(found.table, waitRequest.questionId)
-      if (latest === undefined) {
-        waiter.reject(new Error('Parent question disappeared while waiting.'))
-      } else if (latest.record.status !== 'pending') {
-        waiter.resolve(outcomeOf(latest.record))
-      }
-      try {
-        return await completion.promise
-      } finally {
-        clearTimeout(timeout)
-        waitRequest.signal.removeEventListener('abort', onAbort)
-        questionWaiters.delete(waiter)
-        if (questionWaiters.size === 0) waiters.delete(waitRequest.questionId)
-      }
-    },
+    wait: waitRequest => Effect.runPromise(waitEffect(waitRequest)),
     cancel: async cancelRequest => {
       assertOpen()
       const found = await findAuthorizedChildQuestion(cancelRequest.agent, cancelRequest.questionId)
@@ -495,34 +492,60 @@ export const createParentQuestionService = (input: {
     },
     recordDeferredFile: async fileRequest => {
       assertOpen()
-      const filePath = deferredFilePathSchema.parse(fileRequest.filePath)
-      return runWithLock(operationLocks, `deferred-file:${fileRequest.questionId}`, async () => {
-        const found = await findAuthorizedChildQuestion(fileRequest.agent, fileRequest.questionId)
-        if (found.record.status !== 'deferred') {
-          throw new Error(`Parent question is ${found.record.status}; only deferred questions can attach a file.`)
-        }
-        if (found.record.deferredFilePath !== undefined && found.record.deferredFilePath !== filePath) {
-          throw new Error('Deferred question already has a different file path.')
-        }
-        const updated = await found.table.update(found.key, current => {
-          if (current.questionId !== fileRequest.questionId || current.status !== 'deferred') return current
-          if (current.deferredFilePath !== undefined && current.deferredFilePath !== filePath) {
+      const filePath = decodeStrict(deferredFilePathSchema, fileRequest.filePath)
+      return operationLocks.run({
+        key: `deferred-file:${fileRequest.questionId}`,
+        operation: async () => {
+          const found = await findAuthorizedChildQuestion(fileRequest.agent, fileRequest.questionId)
+          if (found.record.status !== 'deferred') {
+            throw new Error(`Parent question is ${found.record.status}; only deferred questions can attach a file.`)
+          }
+          if (found.record.deferredFilePath !== undefined && found.record.deferredFilePath !== filePath) {
             throw new Error('Deferred question already has a different file path.')
           }
-          return parentQuestionRecordSchema.parse({ ...current, deferredFilePath: filePath })
-        })
-        if (updated.status !== 'deferred') throw new Error(`Parent question is ${updated.status}.`)
-        return outcomeOf(updated)
+          const updated = await found.table.update(found.key, current => {
+            if (current.questionId !== fileRequest.questionId || current.status !== 'deferred') return current
+            if (current.deferredFilePath !== undefined && current.deferredFilePath !== filePath) {
+              throw new Error('Deferred question already has a different file path.')
+            }
+            return decodeStrict(parentQuestionRecordEffectSchema, { ...current, deferredFilePath: filePath })
+          })
+          if (updated.status !== 'deferred') throw new Error(`Parent question is ${updated.status}.`)
+          return outcomeOf(updated)
+        },
       })
     },
     close: async () => {
       if (closed) return
       closed = true
+      operationLocks.clear()
       for (const [questionId, questionWaiters] of waiters.entries()) {
         const outcome: ParentQuestionOutcome = { kind: 'interrupted', questionId }
-        for (const waiter of questionWaiters) waiter.resolve(outcome)
+        for (const waiter of questionWaiters) waiter.resume(Effect.succeed(outcome))
       }
       waiters.clear()
     },
+  }
+  questionWaitEffects.set(service, waitEffect)
+  return service
+}
+
+export const createParentQuestionEffectService = (input: {
+  readonly table: () => Promise<ParentQuestionTable>
+  readonly runtime: ParentQuestionRuntime
+  readonly now?: () => number
+}): ParentQuestionServiceEffectApi => {
+  const service = createParentQuestionService(input)
+  const wait = questionWaitEffects.get(service)
+  if (wait === undefined) throw new Error('Parent question service did not register its Effect wait operation.')
+
+  return {
+    request: Effect.fn('parent question request')(request => promiseEffect('request', () => service.request(request))),
+    listForParent: Effect.fn('parent question list')(request => promiseEffect('listForParent', () => service.listForParent(request))),
+    answer: Effect.fn('parent question answer')(request => promiseEffect('answer', () => service.answer(request))),
+    wait,
+    cancel: Effect.fn('parent question cancel')(request => promiseEffect('cancel', () => service.cancel(request))),
+    recordDeferredFile: Effect.fn('deferred question file record')(request => promiseEffect('recordDeferredFile', () => service.recordDeferredFile(request))),
+    close: Effect.fn('parent question close')(() => promiseEffect('close', () => service.close())),
   }
 }

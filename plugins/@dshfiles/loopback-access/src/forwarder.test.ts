@@ -1,8 +1,8 @@
 import { once } from 'node:events'
 import { createServer, Socket } from 'node:net'
 import type { Server } from 'node:net'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { LoopbackForwarder } from './forwarder.js'
 import { socketClosed } from './socket-closed.test-support.js'
@@ -10,8 +10,12 @@ import { socketClosed } from './socket-closed.test-support.js'
 const servers: Server[] = []
 const sockets = new Set<Socket>()
 const forwarders: LoopbackForwarder[] = []
-const unavailableIPv6Schema = z.object({ code: z.enum(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
-const tcpAddressSchema = z.object({ address: z.string(), port: z.number().int().min(1).max(65_535) })
+const unavailableIPv6Schema = Schema.Struct({ code: Schema.Literals(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
+const tcpAddressSchema = Schema.Struct({
+  address: Schema.String,
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
+})
+const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 
 function track(socket: Socket): Socket {
   sockets.add(socket)
@@ -27,9 +31,9 @@ function serverWith(handler: (socket: Socket) => void): Server {
 }
 
 function portOf(server: Server): number {
-  const parsed = tcpAddressSchema.safeParse(server.address())
-  if (!parsed.success) throw new Error('Expected TCP listener')
-  return parsed.data.port
+  const parsed = Schema.decodeUnknownResult(tcpAddressSchema)(server.address())
+  if (parsed._tag === 'Failure') throw new Error('Expected TCP listener')
+  return parsed.success.port
 }
 
 async function listen(server: Server, host = '127.0.0.1', port = 0): Promise<number> {
@@ -45,13 +49,13 @@ async function ipv6Blocker(): Promise<Server | undefined> {
     await listen(server, '::1')
     return server
   } catch (error) {
-    if (unavailableIPv6Schema.safeParse(error).success) return undefined
+    if (accepts(unavailableIPv6Schema, error)) return undefined
     throw error
   }
 }
 
 async function reserveLoopbackPair(): Promise<{ ipv4: Server; ipv6: Server; port: number } | undefined> {
-  const addressInUse = z.object({ code: z.literal('EADDRINUSE') })
+  const addressInUse = Schema.Struct({ code: Schema.Literal('EADDRINUSE') })
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const ipv4 = serverWith(() => undefined)
     const ipv6 = serverWith(() => undefined)
@@ -62,8 +66,8 @@ async function reserveLoopbackPair(): Promise<{ ipv4: Server; ipv6: Server; port
       reserved = true
       return { ipv4, ipv6, port }
     } catch (error) {
-      if (unavailableIPv6Schema.safeParse(error).success) return undefined
-      if (!addressInUse.safeParse(error).success) throw error
+      if (accepts(unavailableIPv6Schema, error)) return undefined
+      if (!accepts(addressInUse, error)) throw error
     } finally {
       if (!reserved) await Promise.all([closeServer(ipv4), closeServer(ipv6)])
     }

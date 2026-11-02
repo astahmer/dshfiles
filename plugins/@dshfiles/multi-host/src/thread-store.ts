@@ -1,22 +1,21 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { mkdir, open, readFile, rename } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { z } from 'zod'
+import { MultiHostSchema } from './schema.js'
 import { HostDirectoryStore } from './store.js'
 
 /** A thread this manager started on another runtime: where it lives, so the local UI can list and reopen it. */
-const remoteThreadSchema = z
-  .object({
-    runtimeId: z.string().min(1).max(64),
-    sessionId: z.string().min(1).max(256),
-    cwd: z.string().max(4096),
-    title: z.string().max(512),
-    createdAt: z.string().datetime(),
-  })
-  .strict()
-const threadFileSchema = z.object({ schemaVersion: z.literal(1), threads: z.array(remoteThreadSchema).max(1000) }).strict()
+const remoteThreadSchema = Schema.Struct({
+  runtimeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  cwd: Schema.String.check(Schema.isMaxLength(4096)),
+  title: Schema.String.check(Schema.isMaxLength(512)),
+  createdAt: MultiHostSchema.dateTimeString,
+})
+const threadFileSchema = Schema.Struct({ schemaVersion: Schema.Literal(1), threads: Schema.Array(remoteThreadSchema).check(Schema.isMaxLength(1000)) })
 
-export type RemoteThread = z.infer<typeof remoteThreadSchema>
+export type RemoteThread = Schema.Schema.Type<typeof remoteThreadSchema>
 
 const threadsPath = (): string => HostDirectoryStore.pluginDataPath('threads.json')
 let writeTail: Promise<unknown> = Promise.resolve()
@@ -25,8 +24,8 @@ const readThreads = async (): Promise<RemoteThread[]> => {
   const raw = await readFile(threadsPath(), 'utf8').catch(() => undefined)
   if (raw === undefined) return []
   try {
-    const parsed = threadFileSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data.threads : []
+    const parsed = MultiHostSchema.safeDecodeStrict(threadFileSchema, JSON.parse(raw))
+    return parsed.success ? [...parsed.data.threads] : []
   } catch {
     return []
   }
@@ -62,7 +61,10 @@ const listRemoteThreads = async (): Promise<readonly RemoteThread[]> => {
 
 const recordRemoteThread = (thread: RemoteThread): Promise<RemoteThread> =>
   update(threads => ({
-    next: [...threads.filter(item => !(item.runtimeId === thread.runtimeId && item.sessionId === thread.sessionId)), remoteThreadSchema.parse(thread)],
+    next: [
+      ...threads.filter(item => !(item.runtimeId === thread.runtimeId && item.sessionId === thread.sessionId)),
+      MultiHostSchema.decodeStrict(remoteThreadSchema, thread),
+    ],
     result: thread,
   }))
 

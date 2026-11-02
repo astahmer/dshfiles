@@ -1,5 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
+import * as Option from 'effect/Option'
 import {
   NOT_WORKING_REPLACEMENT_FILTERS,
   THREAD_GROUP_BY_OPTIONS,
@@ -13,6 +15,7 @@ import {
   type ThreadViewAttentionEntry,
   type ThreadViewPreferences,
 } from './thread-view.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const ALL_THREADS_VIEW_ID = 'all-threads'
 export const WORKING_VIEW_ID = 'working'
@@ -72,102 +75,128 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   showFilterControl: true,
 }
 
-export const doneViewFilterMigration = createStoredValue({
+export const doneViewFilterMigration = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.done-view-filters.v1',
-  schema: z.boolean(),
+  schema: Schema.Boolean,
   fallback: false,
 })
 
-export const shippedViewFiltersMigration = createStoredValue({
+export const shippedViewFiltersMigration = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.shipped-view-filters.v2',
-  schema: z.boolean(),
+  schema: Schema.Boolean,
   fallback: false,
 })
 
-const groupBySchema = z.enum(THREAD_GROUP_BY_OPTIONS)
-const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS)
-const legacyStatusFilterSchema = z.union([statusFilterSchema, z.literal('not-working')])
-const selectedStatusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))
-const statusFiltersSchema = z.preprocess(value => (Array.isArray(value) ? upgradeLegacyStatusFilters(value) : value), z.array(selectedStatusFilterSchema))
-const sourceFilterSchema = z.enum(THREAD_SOURCE_FILTER_OPTIONS)
+const groupBySchema = Schema.Literals(THREAD_GROUP_BY_OPTIONS)
+const statusFilterSchema = Schema.Literals(THREAD_STATUS_FILTER_OPTIONS)
+const legacyStatusFilterSchema = Schema.Union([statusFilterSchema, Schema.Literal('not-working')])
+const selectedStatusFilterSchema = Schema.Literals(THREAD_STATUS_FILTER_OPTIONS.filter((value): value is ThreadStatusFilter => value !== 'all'))
+const legacySelectedStatusFilterSchema = Schema.Literals([
+  ...THREAD_STATUS_FILTER_OPTIONS.filter((value): value is ThreadStatusFilter => value !== 'all'),
+  'not-working',
+])
+const statusFiltersSchema = Schema.Array(legacySelectedStatusFilterSchema).pipe(
+  Schema.decodeTo(Schema.Array(selectedStatusFilterSchema), {
+    decode: SchemaGetter.transform(upgradeLegacyStatusFilters),
+    encode: SchemaGetter.transform(value => value),
+  }),
+)
+const sourceFilterSchema = Schema.Literals(THREAD_SOURCE_FILTER_OPTIONS)
 
-const legacyThreadViewPreferencesSchema = z
-  .object({
-    groupBy: groupBySchema.default('status'),
-    statusFilter: legacyStatusFilterSchema.default('all'),
-    sourceFilter: sourceFilterSchema.default('all'),
-  })
-  .strict()
+const legacyThreadViewPreferencesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    groupBy: SchemaHelpers.withDecodedDefault(groupBySchema, () => 'status'),
+    statusFilter: SchemaHelpers.withDecodedDefault(legacyStatusFilterSchema, () => 'all'),
+    sourceFilter: SchemaHelpers.withDecodedDefault(sourceFilterSchema, () => 'all'),
+  }),
+)
 
-const threadViewPreferencesSchema = z
-  .object({
-    groupBy: groupBySchema.default('status'),
-    statusFilters: statusFiltersSchema.default([]),
-    sourceFilter: sourceFilterSchema.default('all'),
-  })
-  .strict()
+const threadViewPreferencesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    groupBy: SchemaHelpers.withDecodedDefault(groupBySchema, () => 'status'),
+    statusFilters: SchemaHelpers.withDecodedDefault(statusFiltersSchema, () => []),
+    sourceFilter: SchemaHelpers.withDecodedDefault(sourceFilterSchema, () => 'all'),
+  }),
+)
 
-const legacyThreadViewPresetSchema = z
-  .object({
-    id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u),
-    name: z.string().trim().min(1).max(32).nullable(),
-    enabled: z.boolean(),
+const legacyThreadViewPresetSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u)),
+    name: Schema.NullOr(Schema.Trim.check(Schema.isMinLength(1)).check(Schema.isMaxLength(32))),
+    enabled: Schema.Boolean,
     groupBy: groupBySchema,
     statusFilter: legacyStatusFilterSchema,
     sourceFilter: sourceFilterSchema,
-  })
-  .strict()
+  }),
+)
 
-const threadViewPresetSchema = z
-  .object({
-    id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u),
-    name: z.string().trim().min(1).max(32).nullable(),
-    enabled: z.boolean(),
+const threadViewPresetSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    id: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u)),
+    name: Schema.NullOr(Schema.Trim.check(Schema.isMinLength(1)).check(Schema.isMaxLength(32))),
+    enabled: Schema.Boolean,
     groupBy: groupBySchema,
-    statusFilters: statusFiltersSchema.readonly(),
+    statusFilters: statusFiltersSchema,
     sourceFilter: sourceFilterSchema,
-    showCount: z.boolean().optional(),
-  })
-  .strict()
+    showCount: Schema.optional(Schema.Boolean),
+  }),
+)
 
 /** The whole saved-view document; the Host settings value and the browser's older copy share it. */
-export const threadViewSettingsSchema = z
-  .object({
-    views: z.array(threadViewPresetSchema).min(1).max(MAX_THREAD_VIEWS).readonly(),
-    activeViewId: z.string().min(1).max(64),
-    showGroupControl: z.boolean().default(true),
-    showFilterControl: z.boolean().default(true),
-  })
-  .strict()
-  .superRefine((settings, context) => {
-    const ids = new Set<string>()
-    const names = new Set<string>()
-    let enabledCount = 0
+export const threadViewSettingsSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    views: Schema.Array(threadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
+    activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
+    showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+    showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+  }),
+)
+  .check(
+    Schema.makeFilter(settings => {
+      const ids = new Set<string>()
+      const names = new Set<string>()
+      const issues: Array<Schema.FilterIssue> = []
+      let enabledCount = 0
 
-    for (const [index, view] of settings.views.entries()) {
-      if (ids.has(view.id)) {
-        context.addIssue({ code: 'custom', path: ['views', index, 'id'], message: 'View ids must be unique.' })
-      }
-      ids.add(view.id)
-      if (view.name === null && !BUILT_IN_VIEW_IDS.includes(view.id)) {
-        context.addIssue({ code: 'custom', path: ['views', index, 'name'], message: 'Custom views need a name.' })
-      }
-      if (view.name !== null) {
-        const normalizedName = view.name.toLowerCase()
-        if (names.has(normalizedName)) {
-          context.addIssue({ code: 'custom', path: ['views', index, 'name'], message: 'View names must be unique.' })
+      for (const [index, view] of settings.views.entries()) {
+        if (ids.has(view.id)) issues.push({ path: ['views', index, 'id'], issue: 'View ids must be unique.' })
+        ids.add(view.id)
+        if (view.name === null && !BUILT_IN_VIEW_IDS.includes(view.id)) {
+          issues.push({ path: ['views', index, 'name'], issue: 'Custom views need a name.' })
         }
-        names.add(normalizedName)
+        if (view.name !== null) {
+          const normalizedName = view.name.toLowerCase()
+          if (names.has(normalizedName)) issues.push({ path: ['views', index, 'name'], issue: 'View names must be unique.' })
+          names.add(normalizedName)
+        }
+        if (view.enabled) enabledCount += 1
       }
-      if (view.enabled) enabledCount += 1
-    }
 
-    if (enabledCount === 0) context.addIssue({ code: 'custom', path: ['views'], message: 'At least one view must be enabled.' })
-  })
-  .transform(settings => {
-    const activeView = settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled)
-    return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
-  })
+      if (enabledCount === 0) issues.push({ path: ['views'], issue: 'At least one view must be enabled.' })
+      return issues
+    }),
+  )
+  .pipe(
+    Schema.decodeTo(
+      Schema.toType(
+        SchemaHelpers.strictStruct(
+          Schema.Struct({
+            views: Schema.Array(threadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
+            activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
+            showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+            showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+          }),
+        ),
+      ),
+      {
+        decode: SchemaGetter.transform(settings => {
+          const activeView = settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled)
+          return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
+        }),
+        encode: SchemaGetter.transform(settings => settings),
+      },
+    ),
+  )
 
 const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)[number] | 'not-working'): readonly ThreadStatusFilter[] => {
   if (statusFilter === 'all') return []
@@ -175,21 +204,21 @@ const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)
   return [statusFilter]
 }
 
-const legacyThreadViewSettingsSchema = z
-  .object({
-    views: z.array(legacyThreadViewPresetSchema).min(1).max(MAX_THREAD_VIEWS),
-    activeViewId: z.string().min(1).max(64),
-    showGroupControl: z.boolean().default(true),
-    showFilterControl: z.boolean().default(true),
-  })
-  .strict()
+const legacyThreadViewSettingsSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    views: Schema.Array(legacyThreadViewPresetSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(MAX_THREAD_VIEWS)),
+    activeViewId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64)),
+    showGroupControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+    showFilterControl: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => true),
+  }),
+)
 
-const migrateLegacySettings = (legacy: z.infer<typeof legacyThreadViewSettingsSchema>): ThreadViewSettings => ({
+const migrateLegacySettings = (legacy: typeof legacyThreadViewSettingsSchema.Type): ThreadViewSettings => ({
   ...legacy,
   views: legacy.views.map(({ statusFilter, ...view }) => ({ ...view, statusFilters: migrateStatusFilter(statusFilter) })),
 })
 
-const migrateLegacyPreferences = (legacy: z.infer<typeof legacyThreadViewPreferencesSchema>): ThreadViewSettings => {
+const migrateLegacyPreferences = (legacy: typeof legacyThreadViewPreferencesSchema.Type): ThreadViewSettings => {
   const isDefaultView = legacy.groupBy === 'status' && legacy.sourceFilter === 'all' && (legacy.statusFilter === 'all' || legacy.statusFilter === 'working')
   if (isDefaultView) {
     return {
@@ -213,23 +242,26 @@ const migrateLegacyPreferences = (legacy: z.infer<typeof legacyThreadViewPrefere
   }
 }
 
-const storedThreadViewSettingsSchema = z.preprocess(value => {
-  const current = threadViewSettingsSchema.safeParse(value)
-  if (current.success) return current.data
-  const legacySettings = legacyThreadViewSettingsSchema.safeParse(value)
-  if (legacySettings.success) return migrateLegacySettings(legacySettings.data)
-  const legacyPreferences = legacyThreadViewPreferencesSchema.safeParse(value)
-  return legacyPreferences.success ? migrateLegacyPreferences(legacyPreferences.data) : value
-}, threadViewSettingsSchema)
+const storedThreadViewInputSchema = Schema.Union([threadViewSettingsSchema, legacyThreadViewSettingsSchema, legacyThreadViewPreferencesSchema])
+const storedThreadViewSettingsSchema = storedThreadViewInputSchema.pipe(
+  Schema.decodeTo(Schema.toType(threadViewSettingsSchema), {
+    decode: SchemaGetter.transform(value => {
+      if (Schema.is(legacyThreadViewPreferencesSchema)(value)) return migrateLegacyPreferences(value)
+      if (Schema.is(legacyThreadViewSettingsSchema)(value)) return migrateLegacySettings(value)
+      return value
+    }),
+    encode: SchemaGetter.transform(value => value),
+  }),
+)
 
 const decodeThreadViewPreferences = (value: unknown): ThreadViewPreferences | null => {
-  const result = threadViewPreferencesSchema.safeParse(value)
-  return result.success ? result.data : null
+  const result = Schema.decodeUnknownOption(threadViewPreferencesSchema)(value)
+  return Option.isSome(result) ? result.value : null
 }
 
 const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => {
-  const result = storedThreadViewSettingsSchema.safeParse(value)
-  return result.success ? result.data : null
+  const result = Schema.decodeUnknownOption(storedThreadViewSettingsSchema)(value)
+  return Option.isSome(result) ? result.value : null
 }
 
 const ensureDoneViewIncludesInactiveAndInterrupted = (settings: ThreadViewSettings): ThreadViewSettings => settings
@@ -397,7 +429,7 @@ const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadV
 }
 
 /** The browser copy this plugin wrote before the saved views became Host settings; read once to migrate. */
-export const threadViewPreferences = createStoredValue({
+export const threadViewPreferences = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.view.v1',
   schema: storedThreadViewSettingsSchema,
   fallback: DEFAULT_THREAD_VIEW_SETTINGS,

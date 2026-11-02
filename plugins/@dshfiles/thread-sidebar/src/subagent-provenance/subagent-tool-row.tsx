@@ -1,5 +1,6 @@
 import { useMemo, type ComponentProps } from 'react'
-import { z } from 'zod'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -10,20 +11,21 @@ import { JsonText } from '../json-text.js'
 import { subagentName } from './subagent-name.js'
 import { providerModelLabel } from './route-label.js'
 
-const subagentArgumentsSchema = z
-  .object({
-    prompt: z.string().optional(),
-    provider: z.string().optional(),
-    model: z.string().optional(),
-  })
-  .passthrough()
+const subagentArgumentsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    prompt: Schema.optional(Schema.String),
+    provider: Schema.optional(Schema.String),
+    model: Schema.optional(Schema.String),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
 type SubagentToolRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 
 const callArguments = (argsRaw: string | undefined) => {
   if (argsRaw === undefined) return null
-  const parsed = JsonText.decode(subagentArgumentsSchema, argsRaw)
-  return parsed?.success === true ? parsed.data : null
+  const parsed = JsonText.decodeEffect(subagentArgumentsSchema, argsRaw)
+  return parsed !== undefined && Result.isSuccess(parsed) ? parsed.success : null
 }
 
 const resultText = (props: SubagentToolRowProps): string | undefined => {

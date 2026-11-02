@@ -1,5 +1,5 @@
 import { MemoryAnchorModel } from './memory-anchor.ts'
-import { memoryReferenceMatches, memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type MemoryReferenceMatch } from './memory-reference.ts'
+import { MemoryReferenceModel, memoryReferenceMatches, memoryReferencePreviewEvent, type MemoryReferenceMatch } from './memory-reference.ts'
 
 const memoryReferenceSelector = '[data-dshfiles-memory-reference]'
 const ignoredTextSelector = 'a, button, [role="link"]:not([data-dshfiles-memory-reference]), [data-composer-card], [data-dshfiles-memory-preview]'
@@ -94,9 +94,9 @@ const previewAt = (element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
   const candidate = range === null ? { id, anchorId, anchor } : { id, range, anchorId, anchor }
-  const parsed = memoryReferencePreviewRequestSchema.safeParse(candidate)
-  if (!parsed.success) return false
-  window.dispatchEvent(new CustomEvent(memoryReferencePreviewEvent, { detail: parsed.data }))
+  const request = MemoryReferenceModel.decodePreviewRequest(candidate)
+  if (request === null) return false
+  window.dispatchEvent(new CustomEvent(memoryReferencePreviewEvent, { detail: request }))
   return true
 }
 

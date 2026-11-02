@@ -1,19 +1,28 @@
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as Result from 'effect/Result'
 import { dshHome } from './dsh-home.js'
 import { JsonFile } from './json-file.js'
 import { JsonText } from './json-text.js'
 import type { RecoveryReason } from './restart-recovery.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const sessionIdSchema = z.string().min(1).max(256)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 const MAX_INFLIGHT_TURNS = 5000
 
 /** One turn this Host process opened and has not seen close. */
-const inflightTurnSchema = z.object({ sessionId: sessionIdSchema, startedAt: z.number().int().nonnegative() }).strict()
+const inflightTurnSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    sessionId: sessionIdSchema,
+    startedAt: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+  }),
+)
 
-const persistedInflightSchema = z.object({ version: z.literal(1), entries: z.array(inflightTurnSchema).max(MAX_INFLIGHT_TURNS) }).strict()
+const persistedInflightSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ version: Schema.Literal(1), entries: Schema.Array(inflightTurnSchema).check(Schema.isMaxLength(MAX_INFLIGHT_TURNS)) }),
+)
 
-export type InflightTurn = z.infer<typeof inflightTurnSchema>
+export type InflightTurn = Schema.Schema.Type<typeof inflightTurnSchema>
 
 export interface InflightTurnStore {
   list(): Promise<InflightTurn[]>
@@ -24,15 +33,20 @@ export interface InflightTurnStore {
   take(): Promise<InflightTurn[]>
 }
 
-const turnStartSchema = z.object({ type: z.literal('turn/start') })
+const turnStartSchema = Schema.Struct({ type: Schema.Literal('turn/start') })
 
-const turnEndSchema = z.object({
-  type: z.literal('turn/end'),
-  data: z
-    .object({
-      reason: z.object({ kind: z.string().max(64), reason: z.object({ kind: z.string().max(64) }).optional() }).optional(),
-    })
-    .optional(),
+const turnEndSchema = Schema.Struct({
+  type: Schema.Literal('turn/end'),
+  data: Schema.optional(
+    Schema.Struct({
+      reason: Schema.optional(
+        Schema.Struct({
+          kind: Schema.String.check(Schema.isMaxLength(64)),
+          reason: Schema.optional(Schema.Struct({ kind: Schema.String.check(Schema.isMaxLength(64)) })),
+        }),
+      ),
+    }),
+  ),
 })
 
 /**
@@ -52,8 +66,8 @@ interface RecoveryRecorder {
  * another process left open, so it still needs a resume row when its marker closes.
  */
 const parseTurnBoundary = (event: unknown): TurnBoundary | null => {
-  if (turnStartSchema.safeParse(event).success) return 'start'
-  const end = turnEndSchema.safeParse(event)
+  if (SchemaHelpers.decodeUnknownSafe(turnStartSchema, event).success) return 'start'
+  const end = SchemaHelpers.decodeUnknownSafe(turnEndSchema, event)
   if (!end.success) return null
   const reason = end.data.data?.reason
   if (reason?.kind === 'interrupted') return 'interrupted'
@@ -77,9 +91,9 @@ export class InflightTurns {
 
     const read = async (): Promise<InflightTurn[]> => {
       const contents = await JsonFile.readText({ path, missing: '{"version":1,"entries":[]}' })
-      const parsed = JsonText.decode(persistedInflightSchema, contents)
-      if (parsed === undefined || !parsed.success) throw new Error('In-flight turn state is invalid.')
-      return parsed.data.entries
+      const parsed = JsonText.decodeEffect(persistedInflightSchema, contents)
+      if (parsed === undefined || Result.isFailure(parsed)) throw new Error('In-flight turn state is invalid.')
+      return [...parsed.success.entries]
     }
 
     const write = (entries: readonly InflightTurn[]): Promise<void> => JsonFile.write({ path, text: `${JSON.stringify({ version: 1, entries })}\n` })

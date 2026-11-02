@@ -1,4 +1,3 @@
-import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type {
   AnyApiEventDefinition,
   AnyApiMethodDefinition,
@@ -10,10 +9,13 @@ import type {
   ApiMethodDefinition,
   ApiMethodOptions,
   ApiSchema,
+  ApiSchemaInput,
+  ApiSchemaOutput,
   ApiToolExposure,
   RegistryListInput,
   RegistryListing,
 } from './types.js'
+import { resolveApiSchema } from './schema.js'
 
 export interface ApiHostRegistrationParts {
   readonly contract: ApiContract
@@ -22,29 +24,39 @@ export interface ApiHostRegistrationParts {
 
 const apiHostRegistrations = new WeakMap<object, ApiHostRegistrationParts>()
 
-type SchemaInput<Schema> = Schema extends StandardSchemaV1<infer Input, any> ? Input : never
-type SchemaOutput<Schema> = Schema extends StandardSchemaV1<any, infer Output> ? Output : never
 type MethodFromSchemas<InputSchema, OutputSchema> = ApiMethodDefinition<
-  InputSchema extends ApiSchema ? SchemaInput<InputSchema> : void,
-  InputSchema extends ApiSchema ? SchemaOutput<InputSchema> : void,
-  OutputSchema extends ApiSchema ? SchemaInput<OutputSchema> : unknown,
-  OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown
->
+  InputSchema extends ApiSchema ? ApiSchemaInput<InputSchema> : void,
+  InputSchema extends ApiSchema ? ApiSchemaOutput<InputSchema> : void,
+  OutputSchema extends ApiSchema ? ApiSchemaInput<OutputSchema> : unknown,
+  OutputSchema extends ApiSchema ? ApiSchemaOutput<OutputSchema> : unknown
+> &
+  (InputSchema extends ApiSchema ? { readonly input?: InputSchema } : {}) &
+  (OutputSchema extends ApiSchema ? { readonly output?: OutputSchema } : {})
 
 function method<I = void, O = unknown>(): ApiMethodDefinition<I, I, O, O>
+function method(options: {
+  readonly input?: never
+  readonly output?: never
+  readonly description?: string
+  readonly readOnly?: boolean
+  readonly tool?: ApiToolExposure
+}): ApiMethodDefinition<void, void, unknown, unknown>
 function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
   readonly input?: InputSchema
   readonly output?: OutputSchema
   readonly description?: string
   readonly readOnly?: boolean
-  readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown>
+  readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? ApiSchemaOutput<OutputSchema> : unknown>
 }): MethodFromSchemas<InputSchema, OutputSchema>
 function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
   return { ...options }
 }
 
 /** Declare an event the Host publishes; `schema` checks the payload on the Host and again in the browser. */
-const event = <Input, Output>(options: { readonly schema: ApiSchema<Input, Output>; readonly description?: string }): ApiEventDefinition<Input, Output> => ({
+const event = <const Schema extends ApiSchema>(options: {
+  readonly schema: Schema
+  readonly description?: string
+}): ApiEventDefinition<ApiSchemaInput<Schema>, ApiSchemaOutput<Schema>> => ({
   ...options,
 })
 
@@ -80,8 +92,12 @@ function defineApi<
   for (const [name, declared] of Object.entries(definition.events ?? {})) {
     if (!/^[A-Za-z0-9._-]+$/.test(name))
       throw new Error(`API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} must use letters, numbers, ".", "_" or "-".`)
-    if (typeof declared.schema?.['~standard']?.validate !== 'function') {
-      throw new Error(`API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} needs a Standard Schema; declare it with event({ schema }).`)
+    try {
+      resolveApiSchema(declared.schema)
+    } catch {
+      throw new Error(
+        `API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} needs a Standard Schema or Effect Schema; declare it with event({ schema }).`,
+      )
     }
   }
   if (!Number.isInteger(definition.version) || definition.version < 1) {

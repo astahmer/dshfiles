@@ -1,9 +1,11 @@
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
@@ -12,11 +14,24 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-user-questions'
-import { z } from 'zod'
-import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionOutcome, type ParentQuestionService } from './service.js'
+import { Effect, Layer, Schema } from 'effect'
+import {
+  createParentQuestionEffectService,
+  ParentQuestionServiceEffect,
+  type ParentQuestionAgent,
+  type ParentQuestionOutcome,
+  type ParentQuestionServiceEffectApi,
+  type ParentQuestionRuntime,
+} from './service.js'
 import { writeDeferredQuestionFile } from './deferred-question.js'
 import { captureMarkdownAnchor, currentMarkdownRevision } from './markdown-target.js'
-import { createParentFeedbackService, type ParentFeedbackAgent, type ParentFeedbackService } from './revisioned-feedback.js'
+import {
+  createParentFeedbackEffectService,
+  ParentFeedbackServiceEffect,
+  type ParentFeedbackAgent,
+  type ParentFeedbackRuntime,
+  type ParentFeedbackServiceEffectApi,
+} from './revisioned-feedback.js'
 import { questionWaitProjectionDefinition } from './question-wait-projection.js'
 import { QuestionScan, type SessionQuestionFacts, type SessionQuestionTarget } from './question-scan.js'
 import { projectNativeQuestion, projectParentQuestion } from './question-inbox.js'
@@ -34,18 +49,42 @@ type ParentQuestionDomain = Domain<typeof parentQuestionDomain>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    parentQuestions: ParentQuestionService
-    parentFeedback: ParentFeedbackService
+    parentQuestions: ParentQuestionServiceEffectApi
+    parentFeedback: ParentFeedbackServiceEffectApi
   }
 }
 
 interface ParentQuestionHostServices {
   readonly context: Context
-  readonly parentQuestions: ParentQuestionService
-  readonly parentFeedback: ParentFeedbackService
+  readonly parentQuestions: ParentQuestionServiceEffectApi
+  readonly parentFeedback: ParentFeedbackServiceEffectApi
 }
 
 let activeHostServices: ParentQuestionHostServices | undefined
+
+class AgentQuestionToolError extends Schema.TaggedError<AgentQuestionToolError>()('AgentQuestionToolError', {
+  message: Schema.String,
+}) {}
+
+const effectTool = (tool: ToolDefinition): ToolDefinition => ({
+  ...tool,
+  execute: (args, execution) =>
+    Effect.runPromise(
+      Effect.provide(
+        Effect.fn(`agent-questions ${tool.name}`)(() =>
+          Effect.tryPromise({
+            try: () => tool.execute(args, execution),
+            catch: error => new AgentQuestionToolError({ message: error instanceof Error ? error.message : String(error) }),
+          }),
+        )(),
+        DshxEffect.tracerLayer,
+      ),
+      { signal: execution.signal },
+    ),
+})
+
+const runHostEffect = <Value, Failure>(effect: Effect.Effect<Value, Failure>, signal?: AbortSignal): Promise<Value> =>
+  Effect.runPromise(Effect.provide(effect, DshxEffect.tracerLayer), signal === undefined ? {} : { signal })
 
 const requireHostServices = (): ParentQuestionHostServices => {
   if (activeHostServices === undefined) throw new Error('Agent Questions Host is not active.')
@@ -180,74 +219,61 @@ const feedbackNotice = (record: RevisionedFeedbackRecord): string =>
 const feedbackResolutionNotice = (record: RevisionedFeedbackRecord): string =>
   `Parent recorded ${record.status} feedback ${record.feedbackId}. Retrieve its durable resolution with get_parent_feedback.`
 
-const newParentQuestionInputSchema = z
-  .object({
-    question: z.string().trim().min(1).max(4_000),
-    context: z.string().max(16_000).optional(),
-    options: parentQuestionOptionsSchema,
-    recommendedOptionId: z.string().trim().min(1).max(80),
-    expiryBehavior: parentQuestionExpiryBehaviorSchema,
-    timeoutMs: z.number().int().min(1_000).max(3_600_000).optional(),
-  })
-  .strict()
+const trimmedString = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const decodeStrict = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] =>
+  Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(value)
 
-const resumedParentQuestionInputSchema = z.object({ questionId: z.string().uuid() }).strict()
+const newParentQuestionInputSchema = Schema.Struct({
+  question: trimmedString(1, 4_000),
+  context: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(16_000))),
+  options: parentQuestionOptionsSchema,
+  recommendedOptionId: trimmedString(1, 80),
+  expiryBehavior: parentQuestionExpiryBehaviorSchema,
+  timeoutMs: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1_000, maximum: 3_600_000 }))),
+})
 
-const askParentQuestionInputSchema = z.union([newParentQuestionInputSchema, resumedParentQuestionInputSchema])
+const resumedParentQuestionInputSchema = Schema.Struct({ questionId: Schema.String.check(Schema.isUUID()) })
+const askParentQuestionInputSchema = Schema.Union([newParentQuestionInputSchema, resumedParentQuestionInputSchema])
 
-const submitMarkdownFeedbackInputSchema = z
-  .object({
-    path: workspaceMarkdownPathSchema,
-    startLine: z.number().int().positive(),
-    endLine: z.number().int().positive(),
-    selectedText: z.string().min(1).max(4_000),
-    comment: z.string().trim().min(1).max(4_000),
-  })
-  .strict()
+const submitMarkdownFeedbackInputSchema = Schema.Struct({
+  path: workspaceMarkdownPathSchema,
+  startLine: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  endLine: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  selectedText: boundedString(1, 4_000),
+  comment: trimmedString(1, 4_000),
+})
 
-const resolveParentFeedbackInputSchema = z
-  .object({
-    responses: z
-      .array(
-        z
-          .object({
-            feedbackId: z.string().uuid(),
-            disposition: z.enum(['accepted', 'rejected', 'deferred']),
-            note: z.string().trim().min(1).max(4_000).optional(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(20),
-  })
-  .strict()
+const resolveParentFeedbackInputSchema = Schema.Struct({
+  responses: Schema.Array(
+    Schema.Struct({
+      feedbackId: Schema.String.check(Schema.isUUID()),
+      disposition: Schema.Literals(['accepted', 'rejected', 'deferred']),
+      note: Schema.optionalKey(trimmedString(1, 4_000)),
+    }),
+  ).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
+})
 
-const feedbackIdInputSchema = z.object({ feedbackId: z.string().uuid() }).strict()
+const feedbackIdInputSchema = Schema.Struct({ feedbackId: Schema.String.check(Schema.isUUID()) })
 
-const threadQuestionListInputSchema = z
-  .object({
-    sessionId: z.string().trim().min(1).max(256).optional(),
-    includeStopped: z.boolean().optional(),
-    offset: z.number().int().nonnegative().max(5_000).optional(),
-    limit: z.number().int().min(1).max(200).optional(),
-  })
-  .strict()
+const threadQuestionListInputSchema = Schema.Struct({
+  sessionId: Schema.optionalKey(trimmedString(1, 256)),
+  includeStopped: Schema.optionalKey(Schema.Boolean),
+  offset: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(5_000))),
+  limit: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 200 }))),
+})
 
-const nativeQuestionAnswerInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(256),
-    callId: z.string().min(1).max(256),
-    answers: z.array(
-      z
-        .object({
-          id: z.string(),
-          selected: z.array(z.string()),
-          custom: z.string().optional(),
-        })
-        .strict(),
-    ),
-  })
-  .strict()
+const nativeQuestionAnswerInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 256),
+  callId: boundedString(1, 256),
+  answers: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      selected: Schema.Array(Schema.String),
+      custom: Schema.optionalKey(Schema.String),
+    }),
+  ),
+})
 
 const askParentQuestionTool = defineTool({
   name: 'ask_parent_question',
@@ -293,15 +319,18 @@ const askParentQuestionTool = defineTool({
     const agent = execution.agent
     if (agent === undefined) throw new Error('Parent questions require an active child Agent.')
     const service = requireHostServices().parentQuestions
-    const input = askParentQuestionInputSchema.parse(args)
+    const input = decodeStrict(askParentQuestionInputSchema, args)
     let outcome: ParentQuestionOutcome
     if ('questionId' in input) {
-      outcome = await ParentQuestionToolFlow.reattach({
-        service,
-        agent,
-        questionId: input.questionId,
-        signal: execution.signal,
-      })
+      outcome = await runHostEffect(
+        ParentQuestionToolFlow.reattach({
+          service,
+          agent,
+          questionId: input.questionId,
+          signal: execution.signal,
+        }),
+        execution.signal,
+      )
     } else {
       const questionRequest = {
         service,
@@ -314,7 +343,10 @@ const askParentQuestionTool = defineTool({
         timeoutMs: input.timeoutMs ?? 180_000,
         signal: execution.signal,
       }
-      outcome = await ParentQuestionToolFlow.ask(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context })
+      outcome = await runHostEffect(
+        ParentQuestionToolFlow.ask(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context }),
+        execution.signal,
+      )
     }
     switch (outcome.kind) {
       case 'answered':
@@ -324,8 +356,8 @@ const askParentQuestionTool = defineTool({
       case 'deferred': {
         const workspacePath = agent.session.header.cwd
         if (workspacePath === undefined) throw new Error('Cannot defer a parent question without a child workspace path.')
-        const filePath = await writeDeferredQuestionFile({ workspacePath, question: outcome })
-        const persisted = await service.recordDeferredFile({ agent, questionId: outcome.questionId, filePath })
+        const filePath = await runHostEffect(writeDeferredQuestionFile({ workspacePath, question: outcome }), execution.signal)
+        const persisted = await runHostEffect(service.recordDeferredFile({ agent, questionId: outcome.questionId, filePath }), execution.signal)
         if (persisted.kind !== 'deferred') {
           throw new Error(`Deferred parent question ${outcome.questionId} changed before its file path was recorded.`)
         }
@@ -360,12 +392,15 @@ const answerParentQuestionTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Parent answers require an active parent Agent.')
-    const outcome = await ParentQuestionToolFlow.answer({
-      service: requireHostServices().parentQuestions,
-      agent,
-      questionId: args.questionId,
-      answer: args.answer,
-    })
+    const outcome = await runHostEffect(
+      ParentQuestionToolFlow.answer({
+        service: requireHostServices().parentQuestions,
+        agent,
+        questionId: args.questionId,
+        answer: args.answer,
+      }),
+      execution.signal,
+    )
     if (outcome.kind !== 'answered') {
       return `Parent question ${outcome.questionId} is ${outcome.kind}; no answer was delivered.`
     }
@@ -393,7 +428,7 @@ const listThreadQuestionsTool = defineTool({
     const hostServices = requireHostServices()
     const caller = execution.agent
     if (caller === undefined) throw new Error('Question listing requires an active Agent.')
-    const input = threadQuestionListInputSchema.parse(args)
+    const input = decodeStrict(threadQuestionListInputSchema, args)
     const context = hostServices.context
     const liveRoots = runtimeRootSessionIds(context)
     const callerIsRoot = context.agents.get(caller.id) === caller && liveRoots.has(String(caller.id))
@@ -402,15 +437,18 @@ const listThreadQuestionsTool = defineTool({
     const targets = callerIsRoot
       ? await threadQuestionTargets({ context, liveRoots, sessionId: input.sessionId, includeStopped, signal: execution.signal })
       : []
-    const scan = await QuestionScan.scan({
-      targets,
-      concurrency: QUESTION_SCAN_CONCURRENCY,
-      cache: questionFactsCache,
-      reads: questionFactsReads,
-      signal: execution.signal,
-      now: observedAt,
-      load: (target, signal) => readNativeQuestionFacts({ context, target, signal: signal ?? execution.signal }),
-    })
+    const scan = await runHostEffect(
+      QuestionScan.scan({
+        targets,
+        concurrency: QUESTION_SCAN_CONCURRENCY,
+        cache: questionFactsCache,
+        reads: questionFactsReads,
+        signal: execution.signal,
+        now: observedAt,
+        load: (target, signal) => readNativeQuestionFacts({ context, target, signal: signal ?? execution.signal }),
+      }),
+      execution.signal,
+    )
     const nativeQuestions = scan.reads.flatMap(read => {
       const facts = read.facts
       if (facts === undefined) return []
@@ -427,8 +465,9 @@ const listThreadQuestionsTool = defineTool({
         return wait === undefined ? projectNativeQuestion(projectionInput) : projectNativeQuestion({ ...projectionInput, wait })
       })
     })
-    const parentQuestions = await hostServices.parentQuestions.listForParent(
-      input.sessionId === undefined ? { agent: caller } : { agent: caller, childSessionId: input.sessionId },
+    const parentQuestions = await runHostEffect(
+      hostServices.parentQuestions.listForParent(input.sessionId === undefined ? { agent: caller } : { agent: caller, childSessionId: input.sessionId }),
+      execution.signal,
     )
     const questions = [...nativeQuestions, ...parentQuestions.map(projectParentQuestion)].sort((left, right) => {
       const leftDeadline = left.kind === 'native' ? (left.deadlineAt ?? Number.MAX_SAFE_INTEGER) : left.expiresAt
@@ -489,7 +528,7 @@ const answerThreadQuestionTool = defineTool({
   execute: async (args, execution) => {
     const caller = execution.agent
     if (caller === undefined) throw new Error('Native question answers require an active root Agent.')
-    const input = nativeQuestionAnswerInputSchema.parse(args)
+    const input = decodeStrict(nativeQuestionAnswerInputSchema, args)
     const context = requireHostServices().context
     const liveRoots = runtimeRootSessionIds(context)
     if (context.agents.get(caller.id) !== caller || !liveRoots.has(String(caller.id))) {
@@ -502,7 +541,7 @@ const answerThreadQuestionTool = defineTool({
 
     const answer: AskUserQuestionAnswer = {
       answers: input.answers.map(item =>
-        item.custom === undefined ? { id: item.id, selected: item.selected } : { id: item.id, selected: item.selected, custom: item.custom },
+        item.custom === undefined ? { id: item.id, selected: [...item.selected] } : { id: item.id, selected: [...item.selected], custom: item.custom },
       ),
     }
     const accepted = context.userQuestions.answer(targetAgent, ToolCallId(input.callId), answer)
@@ -539,17 +578,20 @@ const submitMarkdownFeedbackTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Markdown feedback requires an active child Agent.')
-    const input = submitMarkdownFeedbackInputSchema.parse(args)
+    const input = decodeStrict(submitMarkdownFeedbackInputSchema, args)
     const workspacePath = agent.session.header.cwd
     if (workspacePath === undefined) throw new Error('Markdown feedback requires a child workspace path.')
-    const anchor = await captureMarkdownAnchor({ workspacePath, ...input })
-    const record = await requireHostServices().parentFeedback.submit({
-      agent,
-      operationId: execution.callId,
-      anchor,
-      comment: input.comment,
-      signal: execution.signal,
-    })
+    const anchor = await runHostEffect(captureMarkdownAnchor({ workspacePath, ...input }), execution.signal)
+    const record = await runHostEffect(
+      requireHostServices().parentFeedback.submit({
+        agent,
+        operationId: execution.callId,
+        anchor,
+        comment: input.comment,
+        signal: execution.signal,
+      }),
+      execution.signal,
+    )
     if (record.status === 'delivery-failed') {
       return `Feedback ${record.feedbackId} was stored, but the parent wakeup failed. Re-submit with a new call after confirming the parent is available.`
     }
@@ -584,12 +626,15 @@ const resolveParentFeedbackTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Feedback resolution requires an active parent Agent.')
-    const input = resolveParentFeedbackInputSchema.parse(args)
-    const results = await requireHostServices().parentFeedback.answerMany({
-      agent,
-      responses: input.responses,
-      signal: execution.signal,
-    })
+    const input = decodeStrict(resolveParentFeedbackInputSchema, args)
+    const results = await runHostEffect(
+      requireHostServices().parentFeedback.answerMany({
+        agent,
+        responses: input.responses,
+        signal: execution.signal,
+      }),
+      execution.signal,
+    )
     return results
       .map(result => {
         const wakeup = result.notified ? 'child notified' : 'durable receipt saved; child can retrieve it later'
@@ -615,8 +660,8 @@ const getParentFeedbackTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Feedback reads require an active child Agent.')
-    const input = feedbackIdInputSchema.parse(args)
-    const record = await requireHostServices().parentFeedback.read({ agent, feedbackId: input.feedbackId })
+    const input = decodeStrict(feedbackIdInputSchema, args)
+    const record = await runHostEffect(requireHostServices().parentFeedback.read({ agent, feedbackId: input.feedbackId }), execution.signal)
     if (record.status === 'pending') return `Feedback ${record.feedbackId} is still pending with its direct parent.`
     if (record.status === 'cancelled') return `Feedback ${record.feedbackId} was cancelled.`
     if (record.status === 'delivery-failed') return `Feedback ${record.feedbackId} could not be delivered to its parent.`
@@ -644,104 +689,128 @@ const cancelParentFeedbackTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Feedback cancellation requires an active child Agent.')
-    const input = feedbackIdInputSchema.parse(args)
-    const record = await requireHostServices().parentFeedback.cancel({ agent, feedbackId: input.feedbackId })
+    const input = decodeStrict(feedbackIdInputSchema, args)
+    const record = await runHostEffect(requireHostServices().parentFeedback.cancel({ agent, feedbackId: input.feedbackId }), execution.signal)
     return `Feedback ${record.feedbackId} is ${record.status}.`
   },
 })
 
-const setupHost = (context: Context): void => {
-  context.sessionProjections.register(questionWaitProjectionDefinition)
-  const service = createParentQuestionService({
-    table: async () => (await storageFor(context)).table('questions'),
-    runtime: {
-      isLive: (agent: ParentQuestionAgent): boolean => context.agents.get(SessionId(agent.id)) === agent,
-      parentSessionId: (childSessionId: string): string | undefined => context.sessions.get(SessionId(childSessionId))?.header.parentSession,
-      isDirectChild: (childSessionId: string, parentSessionId: string): boolean => {
-        const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
-        return parent !== undefined && context.agents.isOwnedBy(SessionId(childSessionId), parent)
-      },
-      sendToParent: async ({ childSessionId, parentSessionId, record, signal }) => {
-        const child: Agent | undefined = context.agents.get(SessionId(childSessionId))
-        const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
-        if (child === undefined || parent === undefined || !context.agents.isOwnedBy(child.id, parent)) {
-          throw new Error('The direct parent is unavailable; the question was not delivered.')
-        }
-        const messageId = await context.subagents.sendMessage(child, parent.id, [{ type: 'text', text: parentNotice(record) }], { signal })
-        return String(messageId)
-      },
-    },
-  })
-  const feedbackService = createParentFeedbackService({
-    table: async () => (await storageFor(context)).table('feedback'),
-    runtime: {
-      isLive: (agent: ParentFeedbackAgent): boolean => context.agents.get(SessionId(agent.id)) === agent,
-      parentSessionId: (childSessionId: string): string | undefined => context.sessions.get(SessionId(childSessionId))?.header.parentSession,
-      isDirectChild: (childSessionId: string, parentSessionId: string): boolean => {
-        const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
-        return parent !== undefined && context.agents.isOwnedBy(SessionId(childSessionId), parent)
-      },
-      currentRevision: async ({ childSessionId, path }) => {
-        let workspacePath = context.sessions.get(SessionId(childSessionId))?.header.cwd
-        if (workspacePath === undefined) {
-          let observation: Awaited<ReturnType<typeof context.sessionQuery.observeSession>> | undefined
-          try {
-            observation = await context.sessionQuery.observeSession(SessionId(childSessionId))
-            workspacePath = observation.header.cwd
-          } catch {
-            return null
-          } finally {
-            observation?.[Symbol.dispose]()
-          }
-        }
-        if (workspacePath === undefined) return null
-        return currentMarkdownRevision({ workspacePath, path })
-      },
-      sendToParent: async ({ childSessionId, parentSessionId, record, signal }) => {
-        const child: Agent | undefined = context.agents.get(SessionId(childSessionId))
-        const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
-        if (child === undefined || parent === undefined || !context.agents.isOwnedBy(child.id, parent)) {
-          throw new Error('The direct parent is unavailable; feedback was not delivered.')
-        }
-        const messageId = await context.subagents.sendMessage(child, parent.id, [{ type: 'text', text: feedbackNotice(record) }], { signal })
-        return String(messageId)
-      },
-      sendToChild: async ({ parentSessionId, childSessionId, record, signal }) => {
-        const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
-        if (parent === undefined) {
-          throw new Error('The direct parent is unavailable; the resolution remains in durable storage.')
-        }
-        await context.subagents.sendMessage(parent, SessionId(childSessionId), [{ type: 'text', text: feedbackResolutionNotice(record) }], { signal })
-      },
-    },
-  })
-  const hostServices = { context, parentQuestions: service, parentFeedback: feedbackService }
-  context.provide('parentQuestions', service)
-  context.provide('parentFeedback', feedbackService)
-  activeHostServices = hostServices
-  context.effect(
-    () => async () => {
-      if (activeHostServices === hostServices) activeHostServices = undefined
-      await feedbackService.close()
-      await service.close()
-      await closeStorage(context)
-    },
-    'agent-questions.storage',
-  )
-}
+const createParentQuestionRuntime = (context: Context): ParentQuestionRuntime => ({
+  isLive: (agent: ParentQuestionAgent): boolean => context.agents.get(SessionId(agent.id)) === agent,
+  parentSessionId: (childSessionId: string): string | undefined => context.sessions.get(SessionId(childSessionId))?.header.parentSession,
+  isDirectChild: (childSessionId: string, parentSessionId: string): boolean => {
+    const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
+    return parent !== undefined && context.agents.isOwnedBy(SessionId(childSessionId), parent)
+  },
+  sendToParent: async ({ childSessionId, parentSessionId, record, signal }) => {
+    const child: Agent | undefined = context.agents.get(SessionId(childSessionId))
+    const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
+    if (child === undefined || parent === undefined || !context.agents.isOwnedBy(child.id, parent)) {
+      throw new Error('The direct parent is unavailable; the question was not delivered.')
+    }
+    const messageId = await context.subagents.sendMessage(child, parent.id, [{ type: 'text', text: parentNotice(record) }], { signal })
+    return String(messageId)
+  },
+})
+
+const createParentFeedbackRuntime = (context: Context): ParentFeedbackRuntime => ({
+  isLive: (agent: ParentFeedbackAgent): boolean => context.agents.get(SessionId(agent.id)) === agent,
+  parentSessionId: (childSessionId: string): string | undefined => context.sessions.get(SessionId(childSessionId))?.header.parentSession,
+  isDirectChild: (childSessionId: string, parentSessionId: string): boolean => {
+    const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
+    return parent !== undefined && context.agents.isOwnedBy(SessionId(childSessionId), parent)
+  },
+  currentRevision: async ({ childSessionId, path }) => {
+    let workspacePath = context.sessions.get(SessionId(childSessionId))?.header.cwd
+    if (workspacePath === undefined) {
+      let observation: Awaited<ReturnType<typeof context.sessionQuery.observeSession>> | undefined
+      try {
+        observation = await context.sessionQuery.observeSession(SessionId(childSessionId))
+        workspacePath = observation.header.cwd
+      } catch {
+        return null
+      } finally {
+        observation?.[Symbol.dispose]()
+      }
+    }
+    if (workspacePath === undefined) return null
+    return runHostEffect(currentMarkdownRevision({ workspacePath, path }))
+  },
+  sendToParent: async ({ childSessionId, parentSessionId, record, signal }) => {
+    const child: Agent | undefined = context.agents.get(SessionId(childSessionId))
+    const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
+    if (child === undefined || parent === undefined || !context.agents.isOwnedBy(child.id, parent)) {
+      throw new Error('The direct parent is unavailable; feedback was not delivered.')
+    }
+    const messageId = await context.subagents.sendMessage(child, parent.id, [{ type: 'text', text: feedbackNotice(record) }], { signal })
+    return String(messageId)
+  },
+  sendToChild: async ({ parentSessionId, childSessionId, record, signal }) => {
+    const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
+    if (parent === undefined) {
+      throw new Error('The direct parent is unavailable; the resolution remains in durable storage.')
+    }
+    await context.subagents.sendMessage(parent, SessionId(childSessionId), [{ type: 'text', text: feedbackResolutionNotice(record) }], { signal })
+  },
+})
+
+const setupHostPlugin = DshxEffect.plugin({
+  layer: (context: Context) =>
+    Layer.merge(
+      Layer.succeed(
+        ParentQuestionServiceEffect,
+        createParentQuestionEffectService({
+          table: async () => (await storageFor(context)).table('questions'),
+          runtime: createParentQuestionRuntime(context),
+        }),
+      ),
+      Layer.succeed(
+        ParentFeedbackServiceEffect,
+        createParentFeedbackEffectService({
+          table: async () => (await storageFor(context)).table('feedback'),
+          runtime: createParentFeedbackRuntime(context),
+        }),
+      ),
+    ),
+  setup: (context: Context) =>
+    Effect.gen(function* () {
+      const parentQuestions = yield* ParentQuestionServiceEffect
+      const parentFeedback = yield* ParentFeedbackServiceEffect
+      const hostServices = { context, parentQuestions, parentFeedback }
+      yield* Effect.addFinalizer(() =>
+        Effect.gen(function* () {
+          if (activeHostServices === hostServices) activeHostServices = undefined
+          yield* parentFeedback.close().pipe(Effect.catch(error => Effect.die(error)))
+          yield* parentQuestions.close().pipe(Effect.catch(error => Effect.die(error)))
+          yield* Effect.tryPromise({
+            try: () => closeStorage(context),
+            catch: error => error,
+          }).pipe(Effect.catch(error => Effect.die(error)))
+        }),
+      )
+      yield* Effect.sync(() => {
+        context.sessionProjections.register(questionWaitProjectionDefinition)
+        context.provide('parentQuestions', parentQuestions)
+        context.provide('parentFeedback', parentFeedback)
+        activeHostServices = hostServices
+      })
+    }),
+})
+
+const setupHostEffect = setupHostPlugin.setup
 
 export default defineHost({
   name: 'agent-questions',
   inject: ['agents', 'sessions', 'sessionProjections', 'sessionQuery', 'subagents', 'storageDomain', 'userQuestions'],
   tools: [
-    askParentQuestionTool,
-    answerParentQuestionTool,
-    listThreadQuestionsTool,
-    answerThreadQuestionTool,
-    submitMarkdownFeedbackTool,
-    resolveParentFeedbackTool,
-    getParentFeedbackTool,
-    cancelParentFeedbackTool,
+    effectTool(askParentQuestionTool),
+    effectTool(answerParentQuestionTool),
+    effectTool(listThreadQuestionsTool),
+    effectTool(answerThreadQuestionTool),
+    effectTool(submitMarkdownFeedbackTool),
+    effectTool(resolveParentFeedbackTool),
+    effectTool(getParentFeedbackTool),
+    effectTool(cancelParentFeedbackTool),
   ],
-  setup: setupHost,
+  setup: setupHostEffect,
 })

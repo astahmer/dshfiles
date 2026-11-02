@@ -1,6 +1,7 @@
 import type { OAuthCredential } from '@earendil-works/pi-ai'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { UsageCard } from './api.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { ProviderUsageModel } from './usage.js'
 import { providerFetch } from './provider-request.js'
 
@@ -11,21 +12,21 @@ import { providerFetch } from './provider-request.js'
  */
 const COPILOT_USER_URL = 'https://api.github.com/copilot_internal/user'
 
-const snapshotSchema = z.object({
-  percent_remaining: z.number().finite().optional(),
-  unlimited: z.boolean().optional(),
+const snapshotSchema = Schema.Struct({
+  percent_remaining: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  unlimited: Schema.optional(Schema.Boolean),
 })
 
-const copilotUserSchema = z.object({
-  copilot_plan: z.string().optional(),
-  quota_reset_date: z.string().optional(),
-  quota_snapshots: z.object({
-    premium_interactions: snapshotSchema.nullish(),
-    chat: snapshotSchema.nullish(),
+const copilotUserSchema = Schema.Struct({
+  copilot_plan: Schema.optional(Schema.String),
+  quota_reset_date: Schema.optional(Schema.String),
+  quota_snapshots: Schema.Struct({
+    premium_interactions: Schema.optional(Schema.NullOr(snapshotSchema)),
+    chat: Schema.optional(Schema.NullOr(snapshotSchema)),
   }),
 })
 
-type CopilotUser = z.infer<typeof copilotUserSchema>
+type CopilotUser = typeof copilotUserSchema.Type
 
 /** Windows GitHub meters, in the order the card shows them. */
 const WINDOWS = [
@@ -79,18 +80,19 @@ export const readCopilotUsage = async (input: {
       return ProviderUsageModel.emptyUsage('unauthenticated', 'GitHub rejected this Copilot sign-in; sign in again.')
     if (response.status === 429) return ProviderUsageModel.emptyUsage('rate-limited', 'GitHub rate-limited the quota request.')
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `GitHub returned ${String(response.status)} for Copilot quota.`)
-    const user = copilotUserSchema.safeParse(await response.json())
+    const user = AiAccountsSchema.decodeResult(copilotUserSchema, await response.json())
+    const decoded = user._tag === 'Success' ? user.success : undefined
     if (
-      user.success &&
+      decoded !== undefined &&
       !input.signal?.aborted &&
-      (user.data.copilot_plan?.trim() ||
+      (decoded.copilot_plan?.trim() ||
         WINDOWS.some(([key]) => {
-          const snapshot = user.data.quota_snapshots[key]
+          const snapshot = decoded.quota_snapshots[key]
           return snapshot?.unlimited === true || snapshot?.percent_remaining !== undefined
         }))
     )
       input.onAuthenticated?.()
-    const card = user.success ? CopilotQuotaModel.cardFrom(user.data) : null
+    const card = decoded === undefined ? null : CopilotQuotaModel.cardFrom(decoded)
     return card ?? ProviderUsageModel.emptyUsage('unsupported', 'GitHub returned no Copilot quota this card can show.')
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Copilot quota could not be read.')

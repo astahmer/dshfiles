@@ -25,7 +25,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 import { DshxFeatureCatalogSchema } from '../tooling/dshx/packages/dshx/src/project/features.ts'
 import { PluginScreenshots } from './plugin-screenshots-core.mjs'
 
@@ -63,21 +64,23 @@ const { values } = parseArgs({
   },
 })
 
-const ignored = existsSync(ignoreFile) ? z.record(z.string(), z.string()).parse(JSON.parse(readFileSync(ignoreFile, 'utf8'))) : {}
+const ignored = existsSync(ignoreFile)
+  ? Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.String))(JSON.parse(readFileSync(ignoreFile, 'utf8')))
+  : {}
 for (const [name, reason] of Object.entries(ignored)) {
   if (reason.trim().length < minimumReasonLength)
     throw new Error(`${relative(repositoryRoot, ignoreFile)}: "${name}" needs a reason of at least ${minimumReasonLength} characters.`)
 }
 
-const pluginManifestSchema = z.object({ dshx: z.object({ features: z.string() }).optional() })
-const shotResultSchema = z.object({ data: z.object({ screenshot: z.string() }).optional() })
+const pluginManifestSchema = Schema.Struct({ dshx: Schema.optionalKey(Schema.Struct({ features: Schema.String })) })
+const shotResultSchema = Schema.Struct({ data: Schema.optionalKey(Schema.Struct({ screenshot: Schema.String })) })
 
 const readCatalog = name => {
-  const manifest = pluginManifestSchema.parse(JSON.parse(readFileSync(join(pluginsRoot, name, 'package.json'), 'utf8')))
+  const manifest = Schema.decodeUnknownSync(pluginManifestSchema)(JSON.parse(readFileSync(join(pluginsRoot, name, 'package.json'), 'utf8')))
   const reference = manifest.dshx?.features
   if (reference === undefined) return { name, directory: join(pluginsRoot, name) }
-  const parsed = DshxFeatureCatalogSchema.safeParse(JSON.parse(readFileSync(join(pluginsRoot, name, reference), 'utf8')))
-  if (!parsed.success) throw new Error(`plugins/@dshfiles/${name}/${reference}: ${parsed.error.issues[0]?.message ?? 'invalid catalog'}`)
+  const parsed = ScriptJson.decodeUnknownSafe(DshxFeatureCatalogSchema, JSON.parse(readFileSync(join(pluginsRoot, name, reference), 'utf8')))
+  if (!parsed.success) throw new Error(`plugins/@dshfiles/${name}/${reference}: ${parsed.error.message ?? 'invalid catalog'}`)
   return { name, directory: join(pluginsRoot, name), catalog: parsed.data }
 }
 
@@ -165,7 +168,8 @@ const capture = plugin => {
     const evidence = mkdtempSync(join(tmpdir(), 'dshx-screenshots-'))
     try {
       const shot = runScratch(['shot', '--label', `${plugin.name}-${feature}`, '--out', evidence])
-      const screenshot = shotResultSchema.safeParse(shot).data?.data?.screenshot
+      const screenshotResult = ScriptJson.decodeUnknownSafe(shotResultSchema, shot)
+      const screenshot = screenshotResult.success ? screenshotResult.data.data?.screenshot : undefined
       if (shot.ok !== true || screenshot === undefined) {
         outcome.failures.push(`${feature}: ${shot.error?.message ?? 'shot failed'}`)
         continue

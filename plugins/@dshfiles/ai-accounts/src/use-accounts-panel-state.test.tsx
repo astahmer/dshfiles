@@ -9,6 +9,7 @@ import { acceptAccountOrder, aiAccountsKeys } from './accounts-queries.js'
 import { aiAccountsApi, accountProfileSchema, type AccountsFile } from './api.js'
 import { DEFAULT_CLIENT_SETTINGS } from './settings.js'
 import { useAccountsPanelState, type AccountsPanelState } from './use-accounts-panel-state.js'
+import * as Schema from 'effect/Schema'
 
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 const api = vi.hoisted(() => ({
@@ -39,7 +40,7 @@ const initialFile = (): AccountsFile => ({
   cooldownMs: 0,
   shadowRoot: '',
   accounts: [
-    accountProfileSchema.parse({
+    Schema.decodeUnknownSync(accountProfileSchema)({
       ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
       instanceId: 'synthetic',
       displayName: 'Synthetic Work',
@@ -121,7 +122,9 @@ beforeEach(() => {
   api.save.mockReset().mockImplementation(async ({ draft }) => {
     stored = {
       ...stored,
-      accounts: stored.accounts.map(account => (account.instanceId === draft.instanceId ? accountProfileSchema.parse({ ...account, ...draft }) : account)),
+      accounts: stored.accounts.map(account =>
+        account.instanceId === draft.instanceId ? Schema.decodeUnknownSync(accountProfileSchema)({ ...account, ...draft }) : account,
+      ),
     }
     return stored
   })

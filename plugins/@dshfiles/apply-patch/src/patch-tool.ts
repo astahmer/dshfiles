@@ -3,24 +3,21 @@ import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-working-directory'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineTool } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
 import { applyEdits, describeEditsFailure, type PatchEdit } from './apply-edits.js'
 
-const editSchema = z
-  .object({
-    old: z.string(),
-    new: z.string(),
-    replaceAll: z.boolean().optional(),
-  })
-  .strict()
+const editSchema = Schema.Struct({
+  old: Schema.String,
+  new: Schema.String,
+  replaceAll: Schema.optionalKey(Schema.Boolean),
+})
 
-const inputSchema = z
-  .object({
-    path: z.string().trim().min(1).max(2048),
-    edits: z.array(editSchema).min(1).max(50),
-  })
-  .strict()
+const inputSchema = Schema.Struct({
+  path: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  edits: Schema.Array(editSchema).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
+})
 
 const patchOutputSchema = {
   type: 'object',
@@ -43,6 +40,39 @@ const describe = (output: {
 }): string =>
   `${output.operation} ${output.path} · ${String(output.exact)} exact + ${String(output.fuzzy)} whitespace-tolerant edit(s) · ${String(output.bytes)} bytes`
 
+class ApplyPatchFailure extends Schema.TaggedError<ApplyPatchFailure>()('ApplyPatchFailure', {
+  message: Schema.String,
+}) {}
+
+const patchFailureSources = new WeakMap<ApplyPatchFailure, unknown>()
+
+interface ApplyPatchHostServices {
+  readonly context: Context
+  readonly fs: Context['fs']
+  readonly sandboxPolicy: Context['sandboxPolicy'] | undefined
+  readonly sessions: Context['sessions']
+  readonly workingDirectory: Context['workingDirectory']
+}
+
+export class ApplyPatchHost extends EffectContext.Service<ApplyPatchHost, ApplyPatchHostServices>()('@dshfiles/apply-patch/Host') {}
+
+export const applyPatchRootLayer = (ctx: Context) =>
+  Layer.succeed(ApplyPatchHost, {
+    context: ctx,
+    fs: ctx.fs,
+    sandboxPolicy: ctx.get('sandboxPolicy'),
+    sessions: ctx.sessions,
+    workingDirectory: ctx.workingDirectory,
+  })
+
+const failureMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+const patchFailure = (error: unknown): ApplyPatchFailure => {
+  const failure = new ApplyPatchFailure({ message: failureMessage(error) })
+  patchFailureSources.set(failure, error)
+  return failure
+}
+
 /**
  * Edits one file without the native read-before-edit handshake: it reads the
  * file itself, keeps that read as an observation, and writes exactly once. The
@@ -57,7 +87,7 @@ const describe = (output: {
  * failures in one week). `apply-patch` declares those services itself, and the
  * tool body must read them from the context that declared them.
  */
-export const createApplyPatchTool = (ctx: Context) =>
+export const createApplyPatchTool = (services: ApplyPatchHostServices) =>
   defineTool({
     name: 'apply_patch',
     description:
@@ -85,43 +115,80 @@ export const createApplyPatchTool = (ctx: Context) =>
         return [{ type: 'text', text: describe(value) }]
       },
     },
-    execute: async (args, execution) => {
-      const input = inputSchema.parse(args)
-      const agent = execution.agent
-      const policy = ctx.get('sandboxPolicy')
-      if (ctx.fs.sandboxMode !== undefined && policy === undefined) {
-        throw new Error('apply_patch: the mounted filesystem confines but ctx.sandboxPolicy is missing')
-      }
-      const session = agent === undefined ? undefined : ctx.sessions.get(agent.id)
-      if (agent !== undefined && session === undefined) throw new Error('cannot patch because the caller session is no longer live')
-      // Match native file tools: resolve the caller's standing mode and original
-      // workspace boundary per call, never from the deployment or mutable cwd.
-      const sandboxPolicy = policy?.resolve(session === undefined ? {} : { session })
-      const cwd = agent === undefined ? undefined : await ctx.workingDirectory.ensure(agent, execution.signal)
-      const resolveOptions: { readonly cwd?: string; readonly signal: AbortSignal } =
-        cwd === undefined ? { signal: execution.signal } : { cwd, signal: execution.signal }
-      const target = await ctx.fs.resolve(input.path, resolveOptions)
-      const info = await ctx.fs.stat(target, execution.signal)
-      if (info === undefined) {
-        ctx.emit('fs/observed', target, { kind: 'absent' }, execution)
-        throw new Error(`cannot patch "${target.displayPath}": not found`)
-      }
-      if (info.type !== 'file') throw new Error(`cannot patch "${target.displayPath}": not a regular file`)
-      const before = await ctx.fs.readText(target, execution.signal)
-      ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, execution)
-      const edits: readonly PatchEdit[] = input.edits.map(edit =>
-        edit.replaceAll === undefined ? { old: edit.old, new: edit.new } : { old: edit.old, new: edit.new, replaceAll: edit.replaceAll },
-      )
-      const result = applyEdits({ content: before, edits })
-      if (!result.ok) throw new Error(`cannot patch "${target.displayPath}": ${describeEditsFailure(result.error)}`)
-      const outcome = await ctx.fs.writeText(target, result.value.content, undefined, execution.signal, sandboxPolicy)
-      ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, execution)
-      return {
-        path: ctx.fs.processPath(target),
-        exact: result.value.exact,
-        fuzzy: result.value.fuzzy,
-        bytes: Buffer.byteLength(result.value.content, 'utf8'),
-        operation: outcome.operation,
-      }
-    },
+    execute: (args, execution) =>
+      Effect.runPromise(
+        Effect.provide(
+          Effect.fn('apply patch')(function* () {
+            const input = yield* Effect.try({
+              try: () => Schema.decodeUnknownSync(inputSchema, { onExcessProperty: 'error' })(args),
+              catch: patchFailure,
+            })
+            const agent = execution.agent
+            const policy = services.sandboxPolicy
+            if (services.fs.sandboxMode !== undefined && policy === undefined) {
+              return yield* new ApplyPatchFailure({ message: 'apply_patch: the mounted filesystem confines but ctx.sandboxPolicy is missing' })
+            }
+            const session = agent === undefined ? undefined : services.sessions.get(agent.id)
+            if (agent !== undefined && session === undefined) {
+              return yield* new ApplyPatchFailure({ message: 'cannot patch because the caller session is no longer live' })
+            }
+            const sandboxPolicy = policy?.resolve(session === undefined ? {} : { session })
+            const cwd =
+              agent === undefined
+                ? undefined
+                : yield* Effect.tryPromise({
+                    try: signal => services.workingDirectory.ensure(agent, signal),
+                    catch: patchFailure,
+                  })
+            const resolveOptions: { readonly cwd?: string; readonly signal: AbortSignal } =
+              cwd === undefined ? { signal: execution.signal } : { cwd, signal: execution.signal }
+            const target = yield* Effect.tryPromise({
+              try: signal => services.fs.resolve(input.path, { ...resolveOptions, signal }),
+              catch: patchFailure,
+            })
+            const info = yield* Effect.tryPromise({
+              try: signal => services.fs.stat(target, signal),
+              catch: patchFailure,
+            })
+            if (info === undefined) {
+              services.context.emit('fs/observed', target, { kind: 'absent' }, execution)
+              return yield* new ApplyPatchFailure({ message: `cannot patch "${target.displayPath}": not found` })
+            }
+            if (info.type !== 'file') {
+              return yield* new ApplyPatchFailure({ message: `cannot patch "${target.displayPath}": not a regular file` })
+            }
+            const before = yield* Effect.tryPromise({
+              try: signal => services.fs.readText(target, signal),
+              catch: patchFailure,
+            })
+            services.context.emit('fs/observed', target, { kind: 'present', version: info.version }, execution)
+            const edits: readonly PatchEdit[] = input.edits.map(edit =>
+              edit.replaceAll === undefined ? { old: edit.old, new: edit.new } : { old: edit.old, new: edit.new, replaceAll: edit.replaceAll },
+            )
+            const result = applyEdits({ content: before, edits })
+            if (!result.ok) {
+              return yield* new ApplyPatchFailure({ message: `cannot patch "${target.displayPath}": ${describeEditsFailure(result.error)}` })
+            }
+            const outcome = yield* Effect.tryPromise({
+              try: signal => services.fs.writeText(target, result.value.content, undefined, signal, sandboxPolicy),
+              catch: patchFailure,
+            })
+            services.context.emit('fs/observed', target, { kind: 'present', version: outcome.version }, execution)
+            return {
+              path: services.fs.processPath(target),
+              exact: result.value.exact,
+              fuzzy: result.value.fuzzy,
+              bytes: Buffer.byteLength(result.value.content, 'utf8'),
+              operation: outcome.operation,
+            }
+          })().pipe(
+            Effect.catchTag('ApplyPatchFailure', failure => {
+              const original = patchFailureSources.get(failure)
+              return original instanceof Error ? Effect.fail(original) : Effect.fail(failure)
+            }),
+          ),
+          DshxEffect.tracerLayer,
+        ),
+        { signal: execution.signal },
+      ),
   })

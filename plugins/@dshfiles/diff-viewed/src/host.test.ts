@@ -51,7 +51,7 @@ interface HarnessContext {
   readonly serial: () => void
   readonly bail: () => void
   readonly waterfall: () => void
-  readonly effect: (callback: () => void | (() => void)) => void
+  readonly effect: (callback: () => void | (() => void | Promise<void>) | Promise<() => void | Promise<void>>) => void
   readonly get: (name: string) => { readonly open: (domain: DomainSpec) => Promise<HarnessDomain> } | undefined
   readonly inject: () => void
   readonly settings: HarnessSettings
@@ -60,7 +60,7 @@ interface HarnessContext {
 interface BuiltPlugin {
   readonly name: string
   readonly inject: readonly string[] | undefined
-  readonly apply: (ctx: HarnessContext) => Promise<void> | void
+  readonly apply: (ctx: HarnessContext) => Promise<void | (() => void | Promise<void>)> | void | (() => void | Promise<void>)
 }
 
 interface OpenedDomain {
@@ -88,7 +88,11 @@ const startHarness = async () => {
     waterfall: ignore,
     effect: callback => {
       const disposer = callback()
-      if (disposer !== undefined) disposers.push(disposer)
+      if (typeof disposer === 'function') {
+        disposers.push(disposer)
+        return
+      }
+      if (disposer !== undefined) disposers.push(async () => (await disposer)())
     },
     get: name =>
       name === 'storageDomain'
@@ -115,7 +119,8 @@ const startHarness = async () => {
       replace: async () => undefined,
     },
   }
-  await plugin.apply(ctx)
+  const pluginDisposer = await plugin.apply(ctx)
+  if (typeof pluginDisposer === 'function') disposers.push(pluginDisposer)
   return {
     plugin,
     rows,

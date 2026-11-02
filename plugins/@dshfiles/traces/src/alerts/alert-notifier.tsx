@@ -1,9 +1,9 @@
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, usePlugin } from '@dshfiles/dshx/client'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useQuery } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
+import { createStoredValue } from '../stored-value.js'
 import type { AlertEvent } from './alert-types.js'
 import { tracesAlertsApi } from './alerts-api.js'
 import type { TracesAlertsTranslate } from './alerts-locale.js'
@@ -14,7 +14,11 @@ const TOAST_HOLD_MS = 8_000
 const ANNOUNCE_WITHIN_MS = 10 * 60_000
 
 /** The newest event id any tab announced: tabs share it, so one alert is announced once per browser. */
-const storedAnnouncedId = createStoredValue({ key: 'dshfiles.traces.alerts.announced.v1', schema: z.number().int().nonnegative().nullable(), fallback: null })
+const storedAnnouncedId = createStoredValue({
+  key: 'dshfiles.traces.alerts.announced.v1',
+  schema: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  fallback: null,
+})
 
 type Announcement = { readonly sequence: number; readonly text: string }
 

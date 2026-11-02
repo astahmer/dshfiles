@@ -1,16 +1,14 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
-const ruleSchema = z
-  .object({
-    name: z.string().max(120),
-    tool: z.string().min(1).max(200),
-    match: z.string().max(2000),
-    reason: z.string().max(1000),
-    enabled: z.boolean(),
-  })
-  .strict()
+const ruleSchema = Schema.Struct({
+  name: Schema.String.check(Schema.isMaxLength(120)),
+  tool: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+  match: Schema.String.check(Schema.isMaxLength(2_000)),
+  reason: Schema.String.check(Schema.isMaxLength(1_000)),
+  enabled: Schema.Boolean,
+})
 
-export type PolicyRule = z.infer<typeof ruleSchema>
+export type PolicyRule = Schema.Schema.Type<typeof ruleSchema>
 
 const patterns = new Map<string, RegExp>()
 

@@ -1,6 +1,6 @@
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { SessionSearchCursor, type SessionEventSearchPage, type SessionEventSearchRequest } from '@deepseek-ai/dsh-session-query'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 export class SessionHistoryModel {
   private static readonly maxHistoryCursorLength = 4096
@@ -8,14 +8,12 @@ export class SessionHistoryModel {
   private static readonly maxHistorySnippetLength = 280
   private static readonly eventFilters: NonNullable<SessionEventSearchRequest['filters']> = [{ kind: 'type', values: ['user/message', 'assistant/message'] }]
 
-  static readonly searchInputSchema = z
-    .object({
-      sessionId: z.string().min(1).max(256),
-      query: z.string().trim().min(1).max(256),
-      limit: z.number().int().min(1).max(10).optional(),
-      cursor: z.string().min(1).max(SessionHistoryModel.maxHistoryCursorLength).optional(),
-    })
-    .strict()
+  static readonly searchInputSchema = Schema.Struct({
+    sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    query: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(10))),
+    cursor: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(SessionHistoryModel.maxHistoryCursorLength))),
+  })
 
   static readonly createSessionHistorySearchRequest = (input: {
     readonly sessionId: SessionId

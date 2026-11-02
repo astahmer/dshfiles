@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { connectGateway } from './gateway.js'
 import { SshConnector } from './ssh.js'
 
@@ -10,6 +10,8 @@ const servers: Server[] = []
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => new Promise(resolve => server.close(resolve))))
 })
+
+const portSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt()) })
 
 /** A loopback runtime that hands out a session cookie and rejects every API call as expired. */
 const startRuntime = async (): Promise<string> => {
@@ -22,7 +24,7 @@ const startRuntime = async (): Promise<string> => {
   })
   servers.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  return `http://127.0.0.1:${String(z.object({ port: z.number().int() }).parse(server.address()).port)}`
+  return `http://127.0.0.1:${String(Schema.decodeUnknownSync(portSchema)(server.address()).port)}`
 }
 
 describe('multi-host connector spans', () => {

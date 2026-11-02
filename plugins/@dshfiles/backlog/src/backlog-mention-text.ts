@@ -1,11 +1,9 @@
 /** The canonical spelling of one Backlog mention in a sent message, and the parser that reads it back. */
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 
 import { BacklogReference } from './backlog-reference.js'
 
 const SUFFIX = ' (backlog item; backlog_get has its details)'
-const titleSchema = z.string()
-
 /** A serialized mention, or a bare item number written in prose. */
 export interface BacklogMentionMatch {
   readonly id: number
@@ -23,12 +21,7 @@ const opensReference = (text: string, start: number): boolean => start === 0 || 
 
 const titleOf = (quoted: string | undefined): string | null => {
   if (quoted === undefined) return null
-  try {
-    const parsed = titleSchema.safeParse(JSON.parse(quoted))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
+  return Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.String))(quoted))
 }
 
 /** The full serialized mention the composer sends; the Agent reads the id, the title and where to learn more. */

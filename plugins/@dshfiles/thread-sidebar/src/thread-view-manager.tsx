@@ -20,7 +20,7 @@ import {
   Trash2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { useMemo, useState } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, type ThreadSidebarLocaleKey } from './locales.js'
 import {
   ALL_THREADS_VIEW_ID,
@@ -34,9 +34,17 @@ import {
   type ThreadViewSettings,
   WORKING_VIEW_ID,
 } from './thread-view-preferences.js'
-import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_GROUPS, THREAD_STATUS_FILTER_OPTIONS } from './thread-view.js'
+import {
+  THREAD_GROUP_BY_OPTIONS,
+  THREAD_SOURCE_FILTER_OPTIONS,
+  THREAD_STATUS_FILTER_GROUPS,
+  THREAD_STATUS_FILTER_OPTIONS,
+  type ThreadStatusFilter,
+} from './thread-view.js'
 
 export type ThreadSidebarTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+
+const threadStatusFilterValues = THREAD_STATUS_FILTER_OPTIONS.filter((value): value is ThreadStatusFilter => value !== 'all')
 
 const groupLabelKeys = {
   project: 'threadSidebarGroupProject',
@@ -129,20 +137,19 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
   )
   const editorSchema = useMemo(
     () =>
-      z
-        .object({
-          name: z
-            .string()
-            .trim()
-            .min(1, translate('threadSidebarViewNameRequired'))
-            .max(32, translate('threadSidebarViewNameTooLong'))
-            .refine(name => !existingNames.includes(name.toLowerCase()), translate('threadSidebarViewNameExists')),
-          groupBy: z.enum(THREAD_GROUP_BY_OPTIONS),
-          statusFilters: z.array(z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))),
-          sourceFilter: z.enum(THREAD_SOURCE_FILTER_OPTIONS),
-          showCount: z.boolean(),
-        })
-        .strict(),
+      Schema.toStandardSchemaV1(
+        Schema.Struct({
+          name: Schema.Trim.check(
+            Schema.isMinLength(1, { message: translate('threadSidebarViewNameRequired') }),
+            Schema.isMaxLength(32, { message: translate('threadSidebarViewNameTooLong') }),
+            Schema.makeFilter(name => !existingNames.includes(name.toLowerCase()), { message: translate('threadSidebarViewNameExists') }),
+          ),
+          groupBy: Schema.Literals(THREAD_GROUP_BY_OPTIONS),
+          statusFilters: Schema.Array(Schema.Literals(threadStatusFilterValues)),
+          sourceFilter: Schema.Literals(THREAD_SOURCE_FILTER_OPTIONS),
+          showCount: Schema.Boolean,
+        }),
+      ),
     [existingNames, translate],
   )
   const [saveWarning, setSaveWarning] = useState(false)

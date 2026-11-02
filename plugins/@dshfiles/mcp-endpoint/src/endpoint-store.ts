@@ -1,21 +1,28 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { pluginStorage } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 const NAMESPACE = '@dshfiles/mcp-endpoint'
 const TOKEN_KEY = 'token'
 const LAN_KEY = 'lan-enabled'
 const TOKEN_PREFIX = 'dshmcp_'
 
-const storedTokenSchema = z.object({ sha256: z.string().regex(/^[0-9a-f]{64}$/), createdAt: z.number() }).strict()
+const storedTokenSchema = Schema.Struct({
+  sha256: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
+  createdAt: Schema.Number,
+})
 
 const digest = (token: string): Buffer => createHash('sha256').update(token, 'utf8').digest()
 
 /** Only the token's SHA-256 is stored: the value leaves the Host once, in the rotate response. */
 export const createEndpointStore = (ctx: Context) => {
   const storage = pluginStorage(ctx, NAMESPACE)
-  const readToken = async () => storedTokenSchema.safeParse((await storage.get(TOKEN_KEY))?.value).data
+  const readToken = async () => {
+    const stored = await storage.get(TOKEN_KEY)
+    const decoded = Schema.decodeUnknownResult(storedTokenSchema, { onExcessProperty: 'error' })(stored?.value)
+    return decoded._tag === 'Success' ? decoded.success : undefined
+  }
   return {
     tokenInfo: async () => {
       const stored = await readToken()

@@ -2,8 +2,9 @@ import Schema from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
 import { SettingsPluginPages } from './plugin-settings.js'
 import { jsonValueSchema } from './schema-form/schema-model.js'
+import * as EffectSchema from 'effect/Schema'
 
-const wire = (schema: Schema) => jsonValueSchema.parse(schema.toJSON())
+const wire = (schema: Schema) => EffectSchema.decodeUnknownSync(jsonValueSchema)(schema.toJSON())
 
 const text = SettingsPluginPages.localizedTextReader('en')
 

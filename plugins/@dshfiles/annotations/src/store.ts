@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import {
   MAX_ANNOTATIONS_PER_SESSION,
   MAX_THREAD_MESSAGES,
@@ -21,9 +22,10 @@ export const annotationsDomain = defineDomain({
   name: 'annotations',
   version: 1,
   tables: {
-    annotations: { valueSchema: annotationSchema, __key: 'annotations' },
-    unassigned: { valueSchema: unassignedSchema, __key: 'unassigned' },
-    meta: { valueSchema: metaSchema, __key: 'meta' },
+    // `defineDomain` still types a table's record validator as a zod schema; the Effect schemas stay the source of truth.
+    annotations: { valueSchema: zodSchemaFromEffect(annotationSchema), __key: 'annotations' },
+    unassigned: { valueSchema: zodSchemaFromEffect(unassignedSchema), __key: 'unassigned' },
+    meta: { valueSchema: zodSchemaFromEffect(metaSchema), __key: 'meta' },
   },
 })
 
@@ -113,7 +115,7 @@ export const createAnnotationStore = ({
       .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
 
   const countsFor = (sessionId: string): AnnotationCounts => {
-    const counts: AnnotationCounts = { pending: 0, acknowledged: 0, stale: 0, resolved: 0, dismissed: 0 }
+    const counts = { pending: 0, acknowledged: 0, stale: 0, resolved: 0, dismissed: 0 }
     for (const record of records.values()) {
       if (record.sessionId !== sessionId) continue
       counts[record.status] += 1

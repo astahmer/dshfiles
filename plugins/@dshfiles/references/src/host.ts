@@ -1,11 +1,13 @@
+// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
+import '@dshfiles/dshx/effect'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineApi, method, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { defineCommand, defineHost, definePromptContext, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { Option, Schema } from 'effect'
 import { rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { z } from 'zod'
 import { References, type Reference, type ReferenceStore } from './references.js'
 
 let hostContext: Context | undefined
@@ -55,7 +57,11 @@ const sessionOf = (input: { readonly sessionId?: string | undefined }, caller: A
 const describe = (reference: Reference): string =>
   `${reference.name} · ${reference.path}${reference.kind === 'git' ? ` (${reference.source}${reference.ref === null ? '' : ` @ ${reference.ref}`})` : ''}`
 
-const sessionInput = z.string().min(1).max(256).optional().describe('Session to change; defaults to the calling agent’s own Session.')
+const sessionInput = Schema.optional(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({
+    description: 'Session to change; defaults to the calling agent’s own Session.',
+  }),
+)
 
 const referencesApi = defineApi({
   id: 'references',
@@ -63,8 +69,8 @@ const referencesApi = defineApi({
   owner: '@dshfiles/references',
   methods: {
     list: method({
-      input: z.object({ sessionId: sessionInput }).strict(),
-      output: z.object({ references: z.array(References.referenceSchema), attached: z.array(References.nameSchema) }).strict(),
+      input: Schema.Struct({ sessionId: sessionInput }),
+      output: Schema.Struct({ references: Schema.Array(References.referenceSchema), attached: Schema.Array(References.nameSchema) }),
       description: 'List saved references (named outside directories and git clones) and which are attached to a Session. Read-only.',
       tool: {
         name: 'references_list',
@@ -75,36 +81,36 @@ const referencesApi = defineApi({
       },
     }),
     save: method({
-      input: z
-        .object({
-          name: References.nameSchema,
-          source: z.string().min(1).max(2048).describe('Absolute directory path (or ~/…) or git URL.'),
-          ref: z.string().min(1).max(256).optional().describe('Branch or tag to clone a git reference at.'),
-          description: z.string().max(500).optional(),
-        })
-        .strict(),
+      input: Schema.Struct({
+        name: References.nameSchema,
+        source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)).annotate({ description: 'Absolute directory path (or ~/…) or git URL.' }),
+        ref: Schema.optional(
+          Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({ description: 'Branch or tag to clone a git reference at.' }),
+        ),
+        description: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
+      }),
       output: References.referenceSchema,
       description:
         'Save a named reference: an outside directory read in place, or a git URL shallow-cloned under $DSH_HOME/references. Saving an existing name replaces it (a git reference is cloned again). Call only when the user asked to add a reference.',
       tool: { name: 'reference_save', render: output => `Saved reference ${describe(output)}.` },
     }),
     remove: method({
-      input: z.object({ name: References.nameSchema, confirm: z.literal(true) }).strict(),
-      output: z.object({ removed: z.boolean() }).strict(),
+      input: Schema.Struct({ name: References.nameSchema, confirm: Schema.Literal(true) }),
+      output: Schema.Struct({ removed: Schema.Boolean }),
       description:
         'Forget a saved reference and detach it from every Session; a git clone is deleted, a directory is left untouched. Requires confirm: true. Call only when the user asked to remove it.',
       tool: { name: 'reference_remove', render: output => (output.removed ? 'Removed that reference.' : 'No reference had that name.') },
     }),
     attach: method({
-      input: z.object({ name: References.nameSchema, sessionId: sessionInput }).strict(),
-      output: z.object({ attached: z.array(References.nameSchema) }).strict(),
+      input: Schema.Struct({ name: References.nameSchema, sessionId: sessionInput }),
+      output: Schema.Struct({ attached: Schema.Array(References.nameSchema) }),
       description:
         'Attach a saved reference to a Session, so its path and origin are part of that Session’s runtime context from the next model request. Call only when the user asked to attach it.',
       tool: { name: 'reference_attach', render: output => `Attached references: ${output.attached.join(', ')}.` },
     }),
     detach: method({
-      input: z.object({ name: References.nameSchema, sessionId: sessionInput }).strict(),
-      output: z.object({ attached: z.array(References.nameSchema) }).strict(),
+      input: Schema.Struct({ name: References.nameSchema, sessionId: sessionInput }),
+      output: Schema.Struct({ attached: Schema.Array(References.nameSchema) }),
       description: 'Detach a reference from a Session; the saved reference stays. Call only when the user asked to detach it.',
       tool: {
         name: 'reference_detach',
@@ -160,21 +166,21 @@ const referenceCommand = defineCommand({
         const lines = (await storeOf()).list().map(reference => `${attached.includes(reference.name) ? '● ' : '○ '}${describe(reference)}`)
         return { kind: 'success', text: lines.length === 0 ? `No saved references. ${USAGE}` : lines.join('\n') }
       }
-      const parsedName = References.nameSchema.safeParse(name)
-      if (!parsedName.success) return { kind: 'error', text: USAGE }
+      const parsedName = Schema.decodeUnknownOption(References.nameSchema)(name)
+      if (Option.isNone(parsedName)) return { kind: 'error', text: USAGE }
       if (verb === 'attach' && source === undefined) {
-        if ((await storeOf()).get(parsedName.data) === undefined) return { kind: 'error', text: `No reference is named ${parsedName.data}. ${USAGE}` }
-        await (await storeOf()).attach(sessionId, parsedName.data)
-        return { kind: 'success', text: `Attached ${parsedName.data}. Attached now: ${(await attachedNames(sessionId)).join(', ')}.` }
+        if ((await storeOf()).get(parsedName.value) === undefined) return { kind: 'error', text: `No reference is named ${parsedName.value}. ${USAGE}` }
+        await (await storeOf()).attach(sessionId, parsedName.value)
+        return { kind: 'success', text: `Attached ${parsedName.value}. Attached now: ${(await attachedNames(sessionId)).join(', ')}.` }
       }
       if (verb === 'detach' && source === undefined) {
-        const detached = await (await storeOf()).detach(sessionId, parsedName.data)
+        const detached = await (await storeOf()).detach(sessionId, parsedName.value)
         return detached
-          ? { kind: 'success', text: `Detached ${parsedName.data}.` }
-          : { kind: 'error', text: `${parsedName.data} is not attached to this thread.` }
+          ? { kind: 'success', text: `Detached ${parsedName.value}.` }
+          : { kind: 'error', text: `${parsedName.value} is not attached to this thread.` }
       }
       if (verb === 'save' && source !== undefined && rest.length === 0) {
-        const reference = await saveReference({ name: parsedName.data, source, ref })
+        const reference = await saveReference({ name: parsedName.value, source, ref })
         await (await storeOf()).attach(sessionId, reference.name)
         return { kind: 'success', text: `Saved and attached ${describe(reference)}.` }
       }

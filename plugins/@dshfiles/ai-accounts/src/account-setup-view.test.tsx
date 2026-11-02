@@ -14,6 +14,7 @@ import { aiAccountsKeys } from './accounts-queries.js'
 import { createAccountSetupController } from './account-setup-controller.js'
 import { AccountSetupOverlay } from './account-setup-dialog.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
+import * as Schema from 'effect/Schema'
 
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 type LoginClient = typeof aiAccountsLoginApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
@@ -69,7 +70,7 @@ const syntheticLoginHints: Partial<Record<AccountKind, string>> = {
   cursor: 'cursor-agent login',
 }
 const profile = (kind: AccountKind = 'claude') =>
-  accountProfileSchema.parse({
+  Schema.decodeUnknownSync(accountProfileSchema)({
     ...AccountDraftModel.newAccountDraft({ kind, existing: [] }),
     instanceId: 'pending-account',
     displayName: 'Synthetic Claude',

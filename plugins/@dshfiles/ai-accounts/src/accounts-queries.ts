@@ -1,6 +1,8 @@
 import { isApiError, isApiOwnerMissing, type ApiClient, type ApiContract } from '@dshfiles/dshx/api'
 import { queryOptions, type QueryClient } from '@dshfiles/plugin-ui/query'
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import {
   accountKindSchema,
   aiAccountsApi,
@@ -14,6 +16,7 @@ import {
   type NativeProviders,
   type SecretCatalogKeys,
 } from './api.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
@@ -90,24 +93,36 @@ const QUOTE_STALE_MS = 15 * 60_000
  * `refreshUsage` method; read what is there and fill the rest, so a surface
  * degrades to plainer cards instead of failing until DSH restarts.
  */
-const tolerantUsageSchema = z.object({
-  readAt: z.number().catch(() => Date.now()),
-  hostName: z.string().catch(''),
-  cards: z.array(
-    z.object({
-      instanceId: z.string(),
-      displayName: z.string().optional().catch(undefined),
-      kind: accountKindSchema.catch('codex'),
-      enabled: z.boolean().catch(true),
+const tolerantUsageSchema = Schema.Struct({
+  readAt: Schema.Number.check(Schema.isFinite()).pipe(
+    Schema.catchDecoding(() => Effect.sync(() => Option.some(Date.now()))),
+    Schema.withDecodingDefaultKey(Effect.sync(() => Date.now())),
+  ),
+  hostName: Schema.String.pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(''))),
+    Schema.withDecodingDefaultKey(Effect.succeed('')),
+  ),
+  cards: Schema.Array(
+    Schema.Struct({
+      instanceId: Schema.String,
+      displayName: Schema.optional(Schema.String).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined)))),
+      kind: accountKindSchema.pipe(
+        Schema.catchDecoding(() => Effect.succeed(Option.some('codex' as const))),
+        Schema.withDecodingDefaultKey(Effect.succeed('codex' as const)),
+      ),
+      enabled: Schema.Boolean.pipe(
+        Schema.catchDecoding(() => Effect.succeed(Option.some(true))),
+        Schema.withDecodingDefaultKey(Effect.succeed(true)),
+      ),
       usage: usageCardSchema,
     }),
   ),
 })
 
 const normalizeUsage = (raw: unknown): AccountsUsage | null => {
-  const parsed = tolerantUsageSchema.safeParse(raw)
-  if (!parsed.success) return null
-  return { ...parsed.data, cards: parsed.data.cards.map(card => ({ ...card, displayName: card.displayName ?? card.instanceId })) }
+  const parsed = AiAccountsSchema.decodeResult(tolerantUsageSchema, raw)
+  if (parsed._tag === 'Failure') return null
+  return { ...parsed.success, cards: parsed.success.cards.map(card => ({ ...card, displayName: card.displayName ?? card.instanceId })) }
 }
 
 /** A provider read that failed or was throttled says nothing new about the quota; the last good windows still stand. */

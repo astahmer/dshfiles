@@ -3,6 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { JjFilesystem } from './jj-filesystem.js'
 import { JjReadCache } from './jj-read-cache.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -36,7 +37,7 @@ describe.skipIf(!jjAvailable)('JjReadCache against real jj', () => {
   }
 
   it('answers a repeated view read without spawning jj until an operation lands', async () => {
-    const cache = new JjReadCache<string>()
+    const cache = new JjReadCache<string>(JjFilesystem)
 
     expect(await describeAt(cache, repo)).toBe('')
     expect(await describeAt(cache, repo)).toBe('')
@@ -48,7 +49,7 @@ describe.skipIf(!jjAvailable)('JjReadCache against real jj', () => {
   })
 
   it('shares the operation head with a secondary workspace of the same store', async () => {
-    const cache = new JjReadCache<string>()
+    const cache = new JjReadCache<string>(JjFilesystem)
     const secondary = join(repo, '..', 'secondary')
     execFileSync('jj', ['workspace', 'add', secondary], { cwd: repo, stdio: 'ignore', env })
 

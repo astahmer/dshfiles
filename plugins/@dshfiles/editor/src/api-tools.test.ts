@@ -1,5 +1,6 @@
+import { Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
-import { editorApi } from './api.js'
+import { editorApi, editorWriteInputSchema } from './api.js'
 
 describe('editor tool exposure', () => {
   test('the guarded save is an agent tool', () => {
@@ -10,17 +11,10 @@ describe('editor tool exposure', () => {
     expect(editorApi.methods.write.tool?.readOnly).toBeUndefined()
   })
 
-  test('sessionId is optional so a tool defaults to the calling thread', async () => {
-    const schema = editorApi.methods.write.input
-    if (schema === undefined) throw new Error('write must declare an input schema')
-    const validate = async (value: {
-      readonly path: string
-      readonly text: string
-      readonly expectedSha256: string | null
-      readonly sessionId?: string | undefined
-    }) => await schema['~standard'].validate(value)
+  test('sessionId is optional so a tool defaults to the calling thread', () => {
+    const decode = Schema.decodeUnknownSync(editorWriteInputSchema)
     const base = { path: 'a.ts', text: 'x', expectedSha256: null }
-    expect('issues' in (await validate(base))).toBe(false)
-    expect('issues' in (await validate({ ...base, sessionId: 'session-a' }))).toBe(false)
+    expect(decode(base)).toEqual({ ...base, overwrite: false })
+    expect(decode({ ...base, sessionId: 'session-a' })).toEqual({ ...base, sessionId: 'session-a', overwrite: false })
   })
 })

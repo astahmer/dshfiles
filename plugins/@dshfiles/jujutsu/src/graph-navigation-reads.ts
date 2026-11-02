@@ -1,22 +1,23 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { revisionSchema, type GraphNavigation, type RevisionRelationship } from './api.js'
 import { JujutsuOutputModel } from './core.js'
 import { REVISION_TEMPLATE } from './jj-templates.js'
 import type { JjRun } from './revision-reads.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
-const operationIdSchema = z.string().regex(/^[a-f0-9]{128}$/)
+const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/))
+const operationIdSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{128}$/))
 const LIMIT = 500
 
 const pinned = async (run: JjRun) => {
   const result = await run(['--ignore-working-copy', 'op', 'log', '--limit', '1', '--no-graph', '--template', 'id'])
   if (result.truncated) throw new Error('Revision operation exceeded the output limit.')
-  const operationId = operationIdSchema.parse(result.stdout.trim())
+  const operationId = SchemaHelpers.decode(operationIdSchema, result.stdout.trim())
   const read: JjRun = (args, options) => run(['--ignore-working-copy', '--at-operation', operationId, ...args], options)
   const revisions = async (revset: string) => {
     const output = await read(['log', '--no-graph', '--limit', String(LIMIT + 1), '-r', revset, '-T', REVISION_TEMPLATE])
     if (output.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-    const rows = JujutsuOutputModel.parseJsonLines(output.stdout, value => revisionSchema.parse(value))
+    const rows = JujutsuOutputModel.parseJsonLines(output.stdout, value => SchemaHelpers.decode(revisionSchema, value))
     return { revisions: rows.slice(0, LIMIT), truncated: rows.length > LIMIT }
   }
   const ids = async (revset: string) => {
@@ -28,7 +29,7 @@ const pinned = async (run: JjRun) => {
         : output.stdout
             .trim()
             .split('\n')
-            .map(value => commitIdSchema.parse(value))
+            .map(value => SchemaHelpers.decode(commitIdSchema, value))
     return { ids: values.slice(0, LIMIT), truncated: values.length > LIMIT }
   }
   const count = async (revset: string) => {
@@ -41,7 +42,7 @@ const pinned = async (run: JjRun) => {
 
 const readGraphNavigation = async (run: JjRun): Promise<GraphNavigation> => {
   const snapshot = await pinned(run)
-  const landmarks: GraphNavigation['landmarks'] = []
+  const landmarks: Array<GraphNavigation['landmarks'][number]> = []
   const definitions = [
     { kind: 'current', label: 'Current', revset: '@' },
     { kind: 'main-origin', label: 'main@origin', revset: 'remote_bookmarks(exact:main, exact:origin)' },
@@ -76,8 +77,8 @@ const relationshipFromCounts = (input: {
 }
 
 const readRevisionRelationship = async (input: { run: JjRun; commitId: string; targetCommitId: string }): Promise<RevisionRelationship> => {
-  const selected = commitIdSchema.parse(input.commitId)
-  const target = commitIdSchema.parse(input.targetCommitId)
+  const selected = SchemaHelpers.decode(commitIdSchema, input.commitId)
+  const target = SchemaHelpers.decode(commitIdSchema, input.targetCommitId)
   const snapshot = await pinned(input.run)
   const endpoints = await snapshot.ids(`${selected} | ${target}`)
   if (!endpoints.ids.includes(selected) || !endpoints.ids.includes(target)) throw new Error('Revision is unavailable at this operation.')
@@ -110,7 +111,7 @@ const readRevisionRelationship = async (input: { run: JjRun; commitId: string; t
 }
 
 const readGraphSlice = async (input: { run: JjRun; commitId: string; mode: 'history' | 'exclusive' }) => {
-  const selected = commitIdSchema.parse(input.commitId)
+  const selected = SchemaHelpers.decode(commitIdSchema, input.commitId)
   const snapshot = await pinned(input.run)
   const roots = `(heads(all()) | bookmarks() | remote_bookmarks() | working_copies()) ~ ${selected}`
   const result = await snapshot.revisions(input.mode === 'history' ? `::${selected}` : `::${selected} ~ ::(${roots})`)

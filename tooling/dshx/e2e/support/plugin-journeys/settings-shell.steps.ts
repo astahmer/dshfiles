@@ -2,7 +2,7 @@ import { expect, test, type Page, type Request, type Response, type Route } from
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { realpath } from 'node:fs/promises'
 import { Then, When } from '../bdd.js'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
 import { registerWorkspaceFolder } from '../threads.js'
 
@@ -279,7 +279,9 @@ When('the held settings writes finish', async ({ page }: { page: Page }) => {
 Then('the Host accepted both writes and Max tabs is back to {int}', async ({ page }: { page: Page }, value: number) => {
   await recordAssertion(page, 'settings-shell-reset-while-saving', async () => {
     const accepted = await Promise.all(
-      (settledSettingsWrites.get(page) ?? []).map(async response => z.object({ result: z.object({ ok: z.boolean() }) }).parse(await response.json()).result.ok),
+      (settledSettingsWrites.get(page) ?? []).map(
+        async response => Schema.decodeUnknownSync(Schema.Struct({ result: Schema.Struct({ ok: Schema.Boolean }) }))(await response.json()).result.ok,
+      ),
     )
     expect(accepted).toEqual([true, true])
     await expect(settingRow(page, 'maxTabs').getByRole('spinbutton', { name: 'Max tabs', exact: true })).toHaveValue(String(value))

@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { readFile, stat } from 'node:fs/promises'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { zstdDecompressSync } from 'node:zlib'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 const ZSTD_MAGIC = 0xfd2fb528
 /** Below this a log decodes whole about as fast as its tail (median 155 ms vs 170 ms measured), so it keeps the full read. */
@@ -15,16 +15,17 @@ const MIN_TAIL_BYTES = 1_000_000
 const KEPT_TAILS = 3
 const KEPT_TAIL_MS = 120_000
 
-const jsonlLogSchema = z.object({ resolveCurrentLog: z.function() })
-const cacheTableSchema = z.object({ requireTable: z.function() })
-const cacheRecordSchema = z.object({ rows: z.record(z.string(), z.unknown()) })
-const logPathSchema = z.string().endsWith('.zstd')
-const rowSchema = z.record(z.string(), z.unknown())
-const eventRowSchema = z.looseObject({
-  seq: z.number().int().nonnegative(),
-  type: z.string(),
-  time: z.number(),
-  sourceEventSeqs: z.array(z.union([z.number().int().nonnegative(), z.tuple([z.number().int(), z.number().int()])])).optional(),
+const cacheRecordSchema = Schema.Struct({ rows: Schema.Record(Schema.String, Schema.Unknown) })
+const logPathSchema = Schema.String.check(Schema.isEndingWith('.zstd'))
+const rowSchema = Schema.Record(Schema.String, Schema.Unknown)
+const nonNegativeInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const eventRowSchema = Schema.Struct({
+  seq: nonNegativeInt,
+  type: Schema.String,
+  time: Schema.Number,
+  sourceEventSeqs: Schema.optional(
+    Schema.Array(Schema.Union([nonNegativeInt, Schema.Tuple([Schema.Number.check(Schema.isInt()), Schema.Number.check(Schema.isInt())])])),
+  ),
 })
 
 /** The JSONL backend's log lookup, public on its class but absent from the persistence contract. */
@@ -34,8 +35,14 @@ interface JsonlLogLookup {
 
 /** The projection cache's in-memory record table, private to its class. */
 interface ProjectionCacheTable {
-  requireTable(): { get(id: SessionId): z.input<typeof cacheRecordSchema> | undefined }
+  requireTable(): { get(id: SessionId): object | undefined }
 }
+
+const isJsonlLogLookup = (value: unknown): value is JsonlLogLookup =>
+  typeof value === 'object' && value !== null && 'resolveCurrentLog' in value && typeof value.resolveCurrentLog === 'function'
+
+const isProjectionCacheTable = (value: unknown): boolean =>
+  typeof value === 'object' && value !== null && 'requireTable' in value && typeof value.requireTable === 'function'
 
 interface FrameRange {
   readonly start: number
@@ -117,7 +124,7 @@ export class TailLog {
       TailLog.forget(input.sessionId)
     }
     const persistence = input.ctx.get('sessionPersistence')
-    if (persistence === undefined || !jsonlLogSchema.safeParse(persistence).success) {
+    if (persistence === undefined || !isJsonlLogLookup(persistence)) {
       metrics.fallback_reason = 'persistence-unavailable'
       return undefined
     }
@@ -139,20 +146,18 @@ export class TailLog {
       metrics.fallback_reason = 'ineligible-session'
       return undefined
     }
-    // SAFETY: the schema above proved the JSONL backend's public resolveCurrentLog method is present.
-    const lookup = persistence as unknown as JsonlLogLookup
-    const currentPath = await measureTailPhase(metrics, 'lookup_ms', () => lookup.resolveCurrentLog(input.sessionId, input.signal))
-    const path = logPathSchema.safeParse(currentPath)
-    if (!path.success) {
+    const currentPath = await measureTailPhase(metrics, 'lookup_ms', () => persistence.resolveCurrentLog(input.sessionId, input.signal))
+    const path = Schema.decodeUnknownResult(logPathSchema)(currentPath)
+    if (path._tag === 'Failure') {
       metrics.fallback_reason = 'log-path-unavailable'
       return undefined
     }
-    const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(path.data))
+    const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(path.success))
     if (identity === undefined) {
       metrics.fallback_reason = 'log-identity-unavailable'
       return undefined
     }
-    const bytes = await measureTailPhase(metrics, 'read_ms', () => readFile(path.data, { signal: input.signal }))
+    const bytes = await measureTailPhase(metrics, 'read_ms', () => readFile(path.success, { signal: input.signal }))
     const frames = await measureTailPhase(metrics, 'scan_ms', () => TailLog.scan(bytes))
     if (frames === undefined || frames.length < 2) {
       metrics.fallback_reason = 'invalid-zstd-frames'
@@ -164,7 +169,7 @@ export class TailLog {
       metrics.fallback_reason = 'incomplete-final-line'
       return undefined
     }
-    TailLog.keep(input.sessionId, { path: path.data, identity, tail })
+    TailLog.keep(input.sessionId, { path: path.success, identity, tail })
     return tail
   }
 
@@ -279,13 +284,13 @@ export class TailLog {
     const registry = ctx.get('sessionProjections')
     if (cache === undefined || registry === undefined) return undefined
     // The public listing read proves this lifecycle owns the stored record before its rows seed a fold.
-    if (cache.cachedSnapshot(this.header) === undefined || !cacheTableSchema.safeParse(cache).success) return undefined
-    // SAFETY: the schema above proved the cache keeps its rows behind requireTable(); its record is validated below.
+    if (cache.cachedSnapshot(this.header) === undefined || !isProjectionCacheTable(cache)) return undefined
+    // SAFETY: the check above proved the cache keeps its rows behind requireTable(); its record is validated below.
     const table = (cache as unknown as ProjectionCacheTable).requireTable()
-    const record = cacheRecordSchema.safeParse(table.get(this.header.id))
-    if (!record.success) return undefined
+    const record = Schema.decodeUnknownResult(cacheRecordSchema)(table.get(this.header.id))
+    if (record._tag === 'Failure') return undefined
     // SAFETY: rows came from the cache's own checkpoint table; restore validates each row's version and watermark.
-    const checkpoint = record.data.rows as ProjectionCheckpoint
+    const checkpoint = record.success.rows as ProjectionCheckpoint
     const floor = registry.restoreFloor(checkpoint)
     if (floor === undefined || floor < this.base) return undefined
     const suffix = this.decoded.slice(floor - this.base)
@@ -311,12 +316,10 @@ export class TailLog {
   private static eventOf(line: string): SessionEvent {
     // The row itself is returned, not the schema's output, which would move the declared keys first: the browser copy
     // must match the full read byte for byte.
-    const record = rowSchema.parse(JSON.parse(line))
-    const sources = eventRowSchema
-      .parse(record)
-      .sourceEventSeqs?.flatMap(entry =>
-        typeof entry === 'number' ? [entry] : Array.from({ length: entry[1] - entry[0] + 1 }, (_, index) => entry[0] + index),
-      )
+    const record = Schema.decodeUnknownSync(rowSchema)(JSON.parse(line))
+    const sources = Schema.decodeUnknownSync(eventRowSchema)(record).sourceEventSeqs?.flatMap(entry =>
+      typeof entry === 'number' ? [entry] : Array.from({ length: entry[1] - entry[0] + 1 }, (_, index) => entry[0] + index),
+    )
     // SAFETY: the JSONL backend wrote this row from a validated SessionEvent; only the seq ranges differ on disk.
     return (sources === undefined ? record : { ...record, sourceEventSeqs: sources }) as unknown as SessionEvent
   }

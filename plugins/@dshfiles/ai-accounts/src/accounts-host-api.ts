@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import type { CopilotLoginState } from './api.js'
+
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { SecretCatalogCredentialBridge, SecretCatalogValues } from '@dshfiles/credential-port'
 import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
@@ -30,6 +31,8 @@ import { readNativeProviders, setNativeProviderEnabled } from './native-provider
 import { PricingCatalogModel } from './pricing-catalog.js'
 import { AccountSettingsModel } from './settings.js'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { effectHandler } from './host-effect.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -37,16 +40,12 @@ import { createCopilotCredentialsService } from './copilot-credentials.js'
  * `ai_accounts` tool can never describe different state.
  */
 const quotaRecoveryModelForClient = (model: ModelCatalogModel): QuotaRecoveryModelCatalog['groups'][number]['models'][number] => {
-  const result: QuotaRecoveryModelCatalog['groups'][number]['models'][number] = { id: model.id, name: model.name }
-  if (model.description !== undefined) result.description = model.description
-  if (model.reasoning !== undefined) {
-    const reasoning: NonNullable<typeof result.reasoning> = {
-      efforts: model.reasoning.efforts.map(effort => ({ id: effort.id, name: effort.name })),
-    }
-    if (model.reasoning.defaultEffort !== undefined) reasoning.defaultEffort = model.reasoning.defaultEffort
-    result.reasoning = reasoning
-  }
-  return result
+  const named = { id: model.id, name: model.name }
+  const described = model.description === undefined ? named : { ...named, description: model.description }
+  if (model.reasoning === undefined) return described
+  const efforts = model.reasoning.efforts.map(effort => ({ id: effort.id, name: effort.name }))
+  const reasoning = model.reasoning.defaultEffort === undefined ? { efforts } : { efforts, defaultEffort: model.reasoning.defaultEffort }
+  return { ...described, reasoning }
 }
 
 const quotaRecoveryCatalogForClient = (catalog: ModelCatalog): QuotaRecoveryModelCatalog => ({
@@ -96,14 +95,14 @@ const copilotLoginFor = (ctx: Context) => {
   return service
 }
 
-export const accountsHostApi = aiAccountsApi.host({
-  read: async ({ ctx }) => {
+export const accountsHostApi = DshxEffect.host(aiAccountsApi, {
+  read: effectHandler(aiAccountsApi, 'read', async ({ ctx }) => {
     // A changed file means changed routes, so rebuild before answering.
     await refreshRoutes(ctx)
     return accountsFile(ctx)
-  },
-  filePath: () => AccountHomePolicy.filePath(),
-  secretCatalogKeys: async ({ input, ctx }) => {
+  }),
+  filePath: effectHandler(aiAccountsApi, 'filePath', () => AccountHomePolicy.filePath()),
+  secretCatalogKeys: effectHandler(aiAccountsApi, 'secretCatalogKeys', async ({ input, ctx }) => {
     const bridge = secretCatalogBridgeFor(ctx)
     if (bridge === undefined) return { available: false, items: [] }
     try {
@@ -111,8 +110,8 @@ export const accountsHostApi = aiAccountsApi.host({
     } catch {
       return { available: false, items: [] }
     }
-  },
-  importSecretCatalogKey: ({ input, ctx }) =>
+  }),
+  importSecretCatalogKey: effectHandler(aiAccountsApi, 'importSecretCatalogKey', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
       if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
@@ -130,13 +129,15 @@ export const accountsHostApi = aiAccountsApi.host({
       accountRuntime(ctx)?.usageCache?.invalidate()
       return { imported: true, apiKeyEnv: account.apiKeyEnv }
     }),
-  createSetupAccount: () => {
+  ),
+  createSetupAccount: effectHandler(aiAccountsApi, 'createSetupAccount', () => {
     throw new Error('This account setup method is retired. Use prepareAccountConnection on an updated client; no account was saved.')
-  },
-  prepareAccountConnection: ({ input, ctx }) =>
+  }),
+  prepareAccountConnection: effectHandler(aiAccountsApi, 'prepareAccountConnection', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, input.existingInstanceId === undefined ? [] : [input.existingInstanceId], () => setupFor(ctx).prepare(input)),
-  getAccountConnection: ({ input, ctx }) => setupFor(ctx).get(input.operationId),
-  configureAccountConnection: ({ input, ctx }) => {
+  ),
+  getAccountConnection: effectHandler(aiAccountsApi, 'getAccountConnection', ({ input, ctx }) => setupFor(ctx).get(input.operationId)),
+  configureAccountConnection: effectHandler(aiAccountsApi, 'configureAccountConnection', ({ input, ctx }) => {
     const { operationId, ...configuration } = input
     const account = setupFor(ctx).get(operationId).account
     const ids =
@@ -152,12 +153,12 @@ export const accountsHostApi = aiAccountsApi.host({
             }),
           ]
     return AccountSessionWorkModel.run(ctx, ids, () => setupFor(ctx).configure(operationId, configuration))
-  },
-  stageAccountConnectionKey: ({ input, ctx, caller }) => {
+  }),
+  stageAccountConnectionKey: effectHandler(aiAccountsApi, 'stageAccountConnectionKey', ({ input, ctx, caller }) => {
     if (caller.kind !== 'client') throw new Error('Raw credential entry is browser-only. Use Secret Catalog import instead.')
     return setupFor(ctx).stageKey(input.operationId, input.value)
-  },
-  importAccountConnectionKey: async ({ input, ctx }) => {
+  }),
+  importAccountConnectionKey: effectHandler(aiAccountsApi, 'importAccountConnectionKey', async ({ input, ctx }) => {
     const setup = setupFor(ctx)
     setup.get(input.operationId)
     const bridge = secretCatalogBridgeFor(ctx)
@@ -174,16 +175,16 @@ export const accountsHostApi = aiAccountsApi.host({
       throw new Error('The selected Secret Catalog entry could not be read.')
     }
     return setup.stageKey(input.operationId, value)
-  },
-  completeAccountConnection: ({ input, ctx }) => {
+  }),
+  completeAccountConnection: effectHandler(aiAccountsApi, 'completeAccountConnection', ({ input, ctx }) => {
     const account = setupFor(ctx).get(input.operationId).account
     return AccountSessionWorkModel.run(ctx, account === null ? [] : accountSessionRelatedIds(account), () => setupFor(ctx).complete(input.operationId))
-  },
-  discardAccountConnection: async ({ input, ctx }) => {
+  }),
+  discardAccountConnection: effectHandler(aiAccountsApi, 'discardAccountConnection', async ({ input, ctx }) => {
     await setupFor(ctx).discard(input.operationId)
-    return { discarded: true }
-  },
-  save: ({ input, ctx }) =>
+    return { discarded: true } satisfies { readonly discarded: true }
+  }),
+  save: effectHandler(aiAccountsApi, 'save', ({ input, ctx }) =>
     AccountSessionWorkModel.run(
       ctx,
       [...accountSessionRelatedIds(input.draft), ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId])],
@@ -194,14 +195,16 @@ export const accountsHostApi = aiAccountsApi.host({
         return accountsFile(ctx)
       },
     ),
-  remove: ({ input, ctx }) =>
+  ),
+  remove: effectHandler(aiAccountsApi, 'remove', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       await accountStoreService.removeAccount(input.instanceId)
       accountRuntime(ctx)?.usageCache?.invalidate()
       await refreshRoutes(ctx)
       return accountsFile(ctx)
     }),
-  removeCustomModel: ({ input, ctx }) =>
+  ),
+  removeCustomModel: effectHandler(aiAccountsApi, 'removeCustomModel', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       const account = (await accountStoreService.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
       if (account === undefined) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
@@ -211,35 +214,39 @@ export const accountsHostApi = aiAccountsApi.host({
       await refreshRoutes(ctx)
       return { removed: true, instanceId: input.instanceId, modelId: input.modelId }
     }),
-  moveAccount: async ({ input, ctx }) => {
+  ),
+  moveAccount: effectHandler(aiAccountsApi, 'moveAccount', async ({ input, ctx }) => {
     await accountStoreService.moveAccount(input.instanceId, input.direction)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
-  },
-  reorderAccount: async ({ input, ctx }) => {
+  }),
+  reorderAccount: effectHandler(aiAccountsApi, 'reorderAccount', async ({ input, ctx }) => {
     await accountStoreService.reorderAccount(input)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
-  },
-  setDistribution: async ({ input, ctx }) => {
+  }),
+  setDistribution: effectHandler(aiAccountsApi, 'setDistribution', async ({ input, ctx }) => {
     await accountStoreService.setDistribution(input.distribution)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
-  },
-  identity: async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId),
-  beginCopilotLogin: ({ input, ctx, caller }) =>
+  }),
+  identity: effectHandler(aiAccountsApi, 'identity', async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId)),
+  beginCopilotLogin: effectHandler(aiAccountsApi, 'beginCopilotLogin', ({ input, ctx, caller }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
       return AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId), caller)
     }),
-  copilotLoginStatus: async ({ input, ctx, caller }) => AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
-  cancelCopilotLogin: async ({ input, ctx }) => {
-    if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId, true)) return { cancelled: true }
+  ),
+  copilotLoginStatus: effectHandler(aiAccountsApi, 'copilotLoginStatus', async ({ input, ctx, caller }) =>
+    AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
+  ),
+  cancelCopilotLogin: effectHandler(aiAccountsApi, 'cancelCopilotLogin', async ({ input, ctx }) => {
+    if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId, true)) return { cancelled: true } satisfies { readonly cancelled: true }
     if (input.operationId !== undefined) await setupFor(ctx).discard(input.operationId)
     else copilotLoginFor(ctx).cancel(input.instanceId)
-    return { cancelled: true }
-  },
-  signOutCopilot: ({ input, ctx }) =>
+    return { cancelled: true } satisfies { readonly cancelled: true }
+  }),
+  signOutCopilot: effectHandler(aiAccountsApi, 'signOutCopilot', ({ input, ctx }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       const login = copilotLoginFor(ctx)
       if (
@@ -252,7 +259,8 @@ export const accountsHostApi = aiAccountsApi.host({
       accountRuntime(ctx)?.usageCache?.invalidate()
       return { signedOut: true }
     }),
-  catalog: async ({ input, ctx }) => {
+  ),
+  catalog: effectHandler(aiAccountsApi, 'catalog', async ({ input, ctx }) => {
     await refreshRoutes(ctx)
     const llm = ctx.get('llm')
     if (llm === undefined) return { instanceId: input.instanceId, models: [] }
@@ -278,16 +286,16 @@ export const accountsHostApi = aiAccountsApi.host({
     const catalog = { instanceId: input.instanceId, models: resolved }
     if (warning === undefined) return catalog
     return { ...catalog, warning }
-  },
-  nativeProviders: async ({ ctx }) => readNativeProviders(ctx),
-  setNativeProviderEnabled: async ({ input, ctx }) => setNativeProviderEnabled(ctx, input),
-  usage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx),
-  refreshUsage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx),
-  history: async ({ input, ctx }) => ({
+  }),
+  nativeProviders: effectHandler(aiAccountsApi, 'nativeProviders', async ({ ctx }) => readNativeProviders(ctx)),
+  setNativeProviderEnabled: effectHandler(aiAccountsApi, 'setNativeProviderEnabled', async ({ input, ctx }) => setNativeProviderEnabled(ctx, input)),
+  usage: effectHandler(aiAccountsApi, 'usage', async ({ ctx }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx)),
+  refreshUsage: effectHandler(aiAccountsApi, 'refreshUsage', async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx)),
+  history: effectHandler(aiAccountsApi, 'history', async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
-  }),
-  forecastHistoryBatch: async ({ input, ctx }) => ({
+  })),
+  forecastHistoryBatch: effectHandler(aiAccountsApi, 'forecastHistoryBatch', async ({ input, ctx }) => ({
     histories: (
       await createUsageHistoryService(ctx).readMany(input.instanceIds, Date.now() - FORECAST_HISTORY_DAYS * 24 * 60 * 60_000, FORECAST_HISTORY_BUCKET_MINUTES)
     ).map(history => ({
@@ -300,13 +308,13 @@ export const accountsHostApi = aiAccountsApi.host({
         bankedResetExpiries: point.bankedResetExpiries ?? [],
       })),
     })),
-  }),
-  fastModeHistory: async ({ input, ctx }) => ({
+  })),
+  fastModeHistory: effectHandler(aiAccountsApi, 'fastModeHistory', async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     ...((await accountRuntime(ctx)?.fastModeUsageHistory?.read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000)) ?? { points: [] }),
-  }),
-  historySettings: async ({ ctx }) => createUsageHistoryService(ctx).readSettings(),
-  saveHistorySettings: async ({ input, ctx }) => {
+  })),
+  historySettings: effectHandler(aiAccountsApi, 'historySettings', async ({ ctx }) => createUsageHistoryService(ctx).readSettings()),
+  saveHistorySettings: effectHandler(aiAccountsApi, 'saveHistorySettings', async ({ input, ctx }) => {
     const settings = await createUsageHistoryService(ctx).saveSettings(input)
     try {
       await accountRuntime(ctx)?.fastModeUsageHistory?.prune(settings.retentionDays)
@@ -314,11 +322,11 @@ export const accountsHostApi = aiAccountsApi.host({
       ctx.logger.warn('ai-accounts: Fast mode usage retention pruning failed (%s)', error instanceof Error ? error.name : 'unknown error')
     }
     return settings
-  },
-  collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
-  pricingStatus: async ({ ctx }) => pricingFor(ctx).status(),
-  refreshPricing: async ({ ctx }) => pricingFor(ctx).refresh(),
-  quoteRoutes: async ({ input, ctx }) => {
+  }),
+  collectUsage: effectHandler(aiAccountsApi, 'collectUsage', async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 })),
+  pricingStatus: effectHandler(aiAccountsApi, 'pricingStatus', async ({ ctx }) => pricingFor(ctx).status()),
+  refreshPricing: effectHandler(aiAccountsApi, 'refreshPricing', async ({ ctx }) => pricingFor(ctx).refresh()),
+  quoteRoutes: effectHandler(aiAccountsApi, 'quoteRoutes', async ({ input, ctx }) => {
     const pricing = pricingFor(ctx)
     const settings = AccountSettingsModel.readPricingSettings()
     if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
@@ -336,19 +344,25 @@ export const accountsHostApi = aiAccountsApi.host({
         }),
       ),
     }
-  },
-  quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
-  quotaRecoveryModelCatalog: async ({ ctx }) => {
+  }),
+  quotaContinuations: effectHandler(aiAccountsApi, 'quotaContinuations', async ({ ctx }) => quotaContinuationServiceFor(ctx).list()),
+  quotaRecoveryModelCatalog: effectHandler(aiAccountsApi, 'quotaRecoveryModelCatalog', async ({ ctx }) => {
     const controller = ctx.get('sessionController')
     if (controller === undefined) throw new Error('Session model selection is unavailable.')
     return quotaRecoveryCatalogForClient(await controller.modelCatalog())
-  },
-  resumeQuotaContinuation: async ({ input, ctx }) => {
+  }),
+  resumeQuotaContinuation: effectHandler(aiAccountsApi, 'resumeQuotaContinuation', async ({ input, ctx }) => {
     return quotaContinuationServiceFor(ctx).resume(input.continuationId, selectionForContinuation(input.selection))
-  },
-  setQuotaContinuationAutoRetry: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).setAutoRetry(input.continuationId, input.sessionId, input.enabled),
-  snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
-  dismissQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).dismiss(input.continuationId),
+  }),
+  setQuotaContinuationAutoRetry: effectHandler(aiAccountsApi, 'setQuotaContinuationAutoRetry', async ({ input, ctx }) =>
+    quotaContinuationServiceFor(ctx).setAutoRetry(input.continuationId, input.sessionId, input.enabled),
+  ),
+  snoozeQuotaContinuation: effectHandler(aiAccountsApi, 'snoozeQuotaContinuation', async ({ input, ctx }) =>
+    quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
+  ),
+  dismissQuotaContinuation: effectHandler(aiAccountsApi, 'dismissQuotaContinuation', async ({ input, ctx }) =>
+    quotaContinuationServiceFor(ctx).dismiss(input.continuationId),
+  ),
 })
 
 /** Provider reads are independent; bound them so a profile with 64 accounts is not a 64-request burst. */

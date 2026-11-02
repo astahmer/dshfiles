@@ -1,16 +1,27 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { preferencesInputSchema, type ManagerPreferences } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 import { useSavePreferences } from './server-queries.js'
 
 /** The timeout is typed as text in its field and saved as a whole number of seconds. */
-const preferencesFormSchema = preferencesInputSchema.extend({ toolCallTimeoutSeconds: z.string().regex(/^\d+$/) }).superRefine((value, context) => {
-  const seconds = Number(value.toolCallTimeoutSeconds)
-  if (seconds < 5 || seconds > 600) context.addIssue({ code: 'custom', path: ['toolCallTimeoutSeconds'], message: 'Use 5 to 600 seconds.' })
-})
+const timeoutTextSchema = Schema.String.check(
+  Schema.isPattern(/^\d+$/),
+  Schema.makeFilter((value: string) => {
+    const seconds = Number(value)
+    return seconds >= 5 && seconds <= 600 ? undefined : 'Use 5 to 600 seconds.'
+  }),
+)
+const preferencesFormSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({
+    connectOnStartup: preferencesInputSchema.fields.connectOnStartup,
+    registrySearch: preferencesInputSchema.fields.registrySearch,
+    oauthClientName: preferencesInputSchema.fields.oauthClientName,
+    toolCallTimeoutSeconds: timeoutTextSchema,
+  }),
+)
 
 export const PreferencesForm = (props: { readonly t: McpServersTranslate; readonly preferences: ManagerPreferences }): JSX.Element => {
   const t = props.t

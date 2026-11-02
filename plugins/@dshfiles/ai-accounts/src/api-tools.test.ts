@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { aiAccountsApi, removeCustomModelInputSchema, type CopilotLoginState } from './api.js'
 import { AccountsHostApiModel } from './accounts-host-api.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 describe('ai-accounts tool exposure', () => {
   test('every account and quota action a human can take is a named tool', () => {
@@ -108,8 +109,8 @@ describe('ai-accounts tool exposure', () => {
 
   test('custom-model removal requires explicit confirmation', () => {
     const input = { instanceId: 'codex-main', modelId: 'custom-model' }
-    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: true }).success).toBe(true)
-    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: false }).success).toBe(false)
+    expect(AiAccountsSchema.accepts(removeCustomModelInputSchema, { ...input, confirm: true })).toBe(true)
+    expect(AiAccountsSchema.accepts(removeCustomModelInputSchema, { ...input, confirm: false })).toBe(false)
   })
 
   test('inspection stays read-only and every tool explains itself', () => {

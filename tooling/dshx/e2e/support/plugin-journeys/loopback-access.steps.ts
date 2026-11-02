@@ -14,7 +14,9 @@ import {
   restartScratchProfileInBrowser,
   visitIsolatedPluginProfile,
 } from '../steps.js'
+import * as Schema from 'effect/Schema'
 import { createDshxApiCaller } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { ApiProtocolModel } from '../../../packages/dshx/src/api/common.js'
 import { loopbackAccessStatusSchema } from '../../../../../plugins/@dshfiles/loopback-access/src/api.js'
 import { networkSnapshotSchema } from '../../../../../plugins/@dshfiles/loopback-access/src/network-api.js'
@@ -91,14 +93,14 @@ Then('LAN and localhost retain native authentication and browser-origin fencing'
     for (const url of [localUrl, lanUrl]) {
       const unauthenticated = await fetch(url.origin, { signal: AbortSignal.timeout(10_000) })
       expect(unauthenticated.status).toBe(401)
-      const api = `${url.origin}/api${ApiProtocolModel.apiChannel(packageId, 'loopback-access')}/status`
+      const api = `${url.origin}/api${ApiChannelModel.apiChannel(packageId, 'loopback-access')}/status`
       expect((await fetch(api, { signal: AbortSignal.timeout(10_000) })).status).toBe(401)
       const cookie = await bootstrap(url)
       const index = await fetch(url.origin, { headers: { cookie }, signal: AbortSignal.timeout(10_000) })
       expect(index.status).toBe(200)
       expect(await index.text()).toContain('__DSH_BOOT__')
       const call = createDshxApiCaller({ origin: url.origin, cookie, packageId, apiId: 'loopback-access', version: 1 })
-      const status = loopbackAccessStatusSchema.parse(await call('status', undefined, AbortSignal.timeout(10_000)))
+      const status = Schema.decodeUnknownSync(loopbackAccessStatusSchema)(await call('status', undefined, AbortSignal.timeout(10_000)))
       expect(status.state).toBe('forwarding')
       expect(status.upstreamOrigin).toBe(lanUrl.origin)
       expect(status.localhostOrigin).toBe(localUrl.origin)
@@ -116,7 +118,7 @@ Then('LAN and localhost retain native authentication and browser-origin fencing'
       [lanUrl, localUrl],
     ] as const) {
       const cookie = await bootstrap(url)
-      const api = `${url.origin}/api${ApiProtocolModel.apiChannel(packageId, 'loopback-access')}/status`
+      const api = `${url.origin}/api${ApiChannelModel.apiChannel(packageId, 'loopback-access')}/status`
       for (const headers of [
         { host: 'attacker.invalid', cookie },
         { origin: 'http://attacker.invalid', cookie },
@@ -208,7 +210,7 @@ Then('network choices are staged safely and loaded at the next isolated startup'
   const cookie = (await page.context().cookies(profile.url)).map(item => `${item.name}=${item.value}`).join('; ')
   const origin = new URL(profile.url).origin
   const call = createDshxApiCaller({ origin, cookie, packageId, apiId: 'loopback-access', version: 1 })
-  const read = async () => networkSnapshotSchema.parse(await call('network', undefined, AbortSignal.timeout(10_000)))
+  const read = async () => Schema.decodeUnknownSync(networkSnapshotSchema)(await call('network', undefined, AbortSignal.timeout(10_000)))
   const before = await read()
   expect(before.integration).toBe('managed')
   expect(before.writable).toBe(true)
@@ -282,7 +284,7 @@ Then('network choices are staged safely and loaded at the next isolated startup'
     await restartScratchProfileInBrowser(page)
     const nextCookie = (await page.context().cookies(profile.url)).map(item => `${item.name}=${item.value}`).join('; ')
     const nextCall = createDshxApiCaller({ origin, cookie: nextCookie, packageId, apiId: 'loopback-access', version: 1 })
-    const after = networkSnapshotSchema.parse(await nextCall('network', undefined, AbortSignal.timeout(10_000)))
+    const after = Schema.decodeUnknownSync(networkSnapshotSchema)(await nextCall('network', undefined, AbortSignal.timeout(10_000)))
     expect(after.pendingRestart).toBe(false)
     expect(after.active.host).toBe(address.address)
     expect(after.active.localhostEnabled).toBe(true)

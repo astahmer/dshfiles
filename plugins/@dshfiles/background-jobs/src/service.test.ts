@@ -1,3 +1,4 @@
+import { Effect, Schema } from 'effect'
 import { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JobEvent, JobView } from '@deepseek-ai/dsh-jobs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -182,6 +183,27 @@ describe('background jobs board', () => {
     expect(() => board.kill({ jobId: 'missing' })).toThrow()
   })
 
+  it('waits for the selected job to settle with an interruptible Effect sleep', async () => {
+    const board = new JobsBoard({ history: historySource([]) })
+    const registry = registryStub()
+    board.attachLive(registry)
+    registry.emit({ type: 'registered', job: liveView({ id: jobId('bash-wait') }) })
+
+    const waiting = Effect.runPromise(board.wait({ jobIds: ['bash-wait'], timeoutMs: 2_000 }))
+    setTimeout(() => {
+      registry.emit({
+        type: 'settled',
+        job: liveView({ id: jobId('bash-wait'), status: 'completed', finishedAt: Date.now() }),
+        cause: 'producer',
+        awaited: false,
+      })
+    }, 1)
+    const result = await waiting
+
+    expect(result.jobs).toMatchObject([{ jobId: 'bash-wait', status: 'completed', settled: true }])
+    expect(result.timedOut).toBe(false)
+  })
+
   it('reports the recorded session title for rows it lists', () => {
     const board = new JobsBoard({
       history: historySource(
@@ -208,8 +230,7 @@ describe('background jobs board', () => {
       }),
     })
 
-    const parsed = jobBoardSchema.safeParse(board.board({ scope: 'all' }))
-    expect(parsed.success).toBe(true)
+    expect(Schema.is(jobBoardSchema)(board.board({ scope: 'all' }))).toBe(true)
     const row = board.board({ scope: 'all' }).rows[0]
     expect(row?.label).toHaveLength(2_000)
     expect(row?.label.includes('\r')).toBe(false)

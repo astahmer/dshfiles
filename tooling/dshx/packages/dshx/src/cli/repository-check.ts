@@ -80,7 +80,7 @@ const runCheck = (name: CheckName, root: string, packages: readonly WorkspacePac
     }))
     return { name, ok: findings.length === 0, inspected: packages.length, findings }
   }
-  const reports = packages.map(item => ({ item, report: BundleFreshness.inspect({ directory: item.directory, decodeJson }) }))
+  const reports = packages.map(item => ({ item, report: BundleFreshness.inspect({ directory: item.directory }) }))
   const findings = reports.flatMap(({ item, report }) => {
     if (report.status !== 'stale') return []
     const subject = report.source === null ? `dist/${report.bundle} is missing` : `dist/${report.bundle} is older than ${report.source}`

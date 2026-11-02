@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 import type { UsageCard } from './api.js'
 import { CommandCodeProviderModel, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 import { providerFetch } from './provider-request.js'
 
@@ -21,22 +23,34 @@ type JsonValue = string | number | boolean | null | undefined | readonly JsonVal
  * the file `cmd login` writes.
  */
 
-const credentialRecordSchema = z.object({ type: z.string().optional(), key: z.string().optional(), access: z.string().optional() })
-
-type CommandCodeAuthValue =
-  | { readonly kind: 'key'; readonly key: string }
-  | { readonly kind: 'record'; readonly record: z.infer<typeof credentialRecordSchema> }
-
-const commandCodeKeySchema = z.string().transform((key): CommandCodeAuthValue => ({ kind: 'key', key }))
-const commandCodeRecordSchema = credentialRecordSchema.transform((record): CommandCodeAuthValue => ({ kind: 'record', record }))
-
-const authFileSchema = z.object({
-  apiKey: z.string().optional(),
-  commandcode: z.union([commandCodeKeySchema, commandCodeRecordSchema]).optional(),
-  'command-code': credentialRecordSchema.optional(),
+const credentialRecordSchema = Schema.Struct({
+  type: Schema.optional(Schema.String),
+  key: Schema.optional(Schema.String),
+  access: Schema.optional(Schema.String),
 })
 
-const keyFromRecord = (record: z.infer<typeof credentialRecordSchema> | undefined): string | undefined =>
+type CredentialRecord = typeof credentialRecordSchema.Type
+
+const commandCodeKeySchema = Schema.String.pipe(
+  Schema.decodeTo(Schema.Struct({ kind: Schema.Literal('key'), key: Schema.String }), {
+    decode: SchemaGetter.transform((key: string) => ({ kind: 'key' as const, key })),
+    encode: SchemaGetter.transform(value => value.key),
+  }),
+)
+const commandCodeRecordSchema = credentialRecordSchema.pipe(
+  Schema.decodeTo(Schema.Struct({ kind: Schema.Literal('record'), record: credentialRecordSchema }), {
+    decode: SchemaGetter.transform((record: CredentialRecord) => ({ kind: 'record' as const, record })),
+    encode: SchemaGetter.transform(value => value.record),
+  }),
+)
+
+const authFileSchema = Schema.Struct({
+  apiKey: Schema.optional(Schema.String),
+  commandcode: Schema.optional(Schema.Union([commandCodeKeySchema, commandCodeRecordSchema])),
+  'command-code': Schema.optional(credentialRecordSchema),
+})
+
+const keyFromRecord = (record: CredentialRecord | undefined): string | undefined =>
   record === undefined ? undefined : record.type === 'oauth' ? record.access : (record.key ?? record.access)
 
 export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: CredentialValueResolver, authSource?: 'cli' | 'reference'): Promise<string> => {
@@ -45,15 +59,15 @@ export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: Cre
   if (named.length > 0) return named
   if (authSource === 'reference') return ''
   try {
-    const parsed = authFileSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))
-    if (!parsed.success) return ''
-    const commandcode = parsed.data.commandcode
+    const parsed = AiAccountsSchema.decodeResult(authFileSchema, JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))
+    if (parsed._tag === 'Failure') return ''
+    const commandcode = parsed.success.commandcode
     const direct = commandcode?.kind === 'key' ? commandcode.key : undefined
     return (
-      parsed.data.apiKey ??
+      parsed.success.apiKey ??
       direct ??
       keyFromRecord(commandcode?.kind === 'record' ? commandcode.record : undefined) ??
-      keyFromRecord(parsed.data['command-code']) ??
+      keyFromRecord(parsed.success['command-code']) ??
       ''
     ).trim()
   } catch {
@@ -61,29 +75,45 @@ export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: Cre
   }
 }
 
-const windowLimitSchema = z.object({
-  used: z.number().finite().optional(),
-  cap: z.number().finite().optional(),
-  exceeded: z.boolean().optional(),
-  resetAt: z.number().finite().optional(),
+const finiteNumber = Schema.Number.check(Schema.isFinite())
+
+const windowLimitSchema = Schema.Struct({
+  used: Schema.optional(finiteNumber),
+  cap: Schema.optional(finiteNumber),
+  exceeded: Schema.optional(Schema.Boolean),
+  resetAt: Schema.optional(finiteNumber),
 })
 
-const creditsSchema = z.object({
-  windowLimits: z.object({ fiveHour: windowLimitSchema.nullish(), weekly: windowLimitSchema.nullish() }).nullish(),
-  credits: z
-    .object({
-      planId: z.string().nullish(),
-      monthlyCredits: z.number().finite().nullish(),
-      purchasedCredits: z.number().finite().nullish(),
-      freeCredits: z.number().finite().nullish(),
-    })
-    .nullish(),
+const creditsSchema = Schema.Struct({
+  windowLimits: Schema.optional(
+    Schema.NullOr(Schema.Struct({ fiveHour: Schema.optional(Schema.NullOr(windowLimitSchema)), weekly: Schema.optional(Schema.NullOr(windowLimitSchema)) })),
+  ),
+  credits: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        planId: Schema.optional(Schema.NullOr(Schema.String)),
+        monthlyCredits: Schema.optional(Schema.NullOr(finiteNumber)),
+        purchasedCredits: Schema.optional(Schema.NullOr(finiteNumber)),
+        freeCredits: Schema.optional(Schema.NullOr(finiteNumber)),
+      }),
+    ),
+  ),
 })
 
-const whoamiSchema = z.object({ user: z.object({ userName: z.string().optional(), name: z.string().optional() }).nullish() })
+const whoamiSchema = Schema.Struct({
+  user: Schema.optional(Schema.NullOr(Schema.Struct({ userName: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }))),
+})
 
-const subscriptionSchema = z.object({
-  data: z.object({ planId: z.string().nullish(), status: z.string().nullish(), currentPeriodEnd: z.string().nullish() }).nullish(),
+const subscriptionSchema = Schema.Struct({
+  data: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        planId: Schema.optional(Schema.NullOr(Schema.String)),
+        status: Schema.optional(Schema.NullOr(Schema.String)),
+        currentPeriodEnd: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+    ),
+  ),
 })
 
 /** Monthly credit allowance per plan, as the official CLI 1.38.2 ships it; plan ids carry suffixes such as `-v1`. */
@@ -104,7 +134,7 @@ const MIN_SPENDABLE_CREDITS = 0.25
 const monthlyAllowance = (planId: string): number | undefined =>
   PLAN_MONTHLY_CREDITS.filter(([prefix]) => planId === prefix || planId.startsWith(`${prefix}-`)).sort(([left], [right]) => right.length - left.length)[0]?.[1]
 
-const percentLeft = (limit: z.infer<typeof windowLimitSchema>): number => {
+const percentLeft = (limit: typeof windowLimitSchema.Type): number => {
   if (limit.exceeded === true) return 0
   if (limit.cap === undefined || limit.cap <= 0) return 100
   return Math.max(0, Math.min(100, Math.round((1 - (limit.used ?? 0) / limit.cap) * 1000) / 10))
@@ -112,27 +142,27 @@ const percentLeft = (limit: z.infer<typeof windowLimitSchema>): number => {
 
 export class CommandCodeUsageModel {
   static parseUsage = (input: { readonly credits: JsonValue; readonly whoami: JsonValue; readonly subscription: JsonValue }): UsageCard => {
-    const credits = creditsSchema.safeParse(input.credits)
-    if (!credits.success) return ProviderUsageModel.emptyUsage('error', 'Command Code returned an unsupported billing response.')
+    const credits = AiAccountsSchema.decodeResult(creditsSchema, input.credits)
+    if (credits._tag === 'Failure') return ProviderUsageModel.emptyUsage('error', 'Command Code returned an unsupported billing response.')
     const windows: UsageWindow[] = []
     for (const [key, label] of [
       ['fiveHour', 'Current session'],
       ['weekly', 'Weekly limit'],
     ] as const) {
-      const limit = credits.data.windowLimits?.[key]
+      const limit = credits.success.windowLimits?.[key]
       if (limit === undefined || limit === null) continue
       windows.push({ label, percentRemaining: percentLeft(limit), resetsAt: limit.resetAt === undefined || limit.resetAt <= 0 ? null : limit.resetAt })
     }
-    const whoami = whoamiSchema.safeParse(input.whoami)
-    const subscription = subscriptionSchema.safeParse(input.subscription)
-    const user = whoami.success ? whoami.data.user : undefined
-    const plan = (subscription.success ? subscription.data.data?.planId : undefined) ?? credits.data.credits?.planId ?? null
+    const whoami = AiAccountsSchema.decodeResult(whoamiSchema, input.whoami)
+    const subscription = AiAccountsSchema.decodeResult(subscriptionSchema, input.subscription)
+    const user = whoami._tag === 'Success' ? whoami.success.user : undefined
+    const plan = (subscription._tag === 'Success' ? subscription.success.data?.planId : undefined) ?? credits.success.credits?.planId ?? null
     const allowance = plan === null ? undefined : monthlyAllowance(plan)
-    const monthly = credits.data.credits?.monthlyCredits
+    const monthly = credits.success.credits?.monthlyCredits
     if (allowance !== undefined && monthly !== undefined && monthly !== null) {
       const remaining = Math.max(0, monthly)
-      const spendable = remaining + Math.max(0, credits.data.credits?.purchasedCredits ?? 0) + Math.max(0, credits.data.credits?.freeCredits ?? 0)
-      const periodEnd = subscription.success ? Date.parse(subscription.data.data?.currentPeriodEnd ?? '') : Number.NaN
+      const spendable = remaining + Math.max(0, credits.success.credits?.purchasedCredits ?? 0) + Math.max(0, credits.success.credits?.freeCredits ?? 0)
+      const periodEnd = subscription._tag === 'Success' ? Date.parse(subscription.success.data?.currentPeriodEnd ?? '') : Number.NaN
       windows.push({
         label: 'Monthly limit',
         percentRemaining: spendable < MIN_SPENDABLE_CREDITS ? 0 : Math.min(100, Math.round((remaining / allowance) * 1000) / 10),
@@ -190,12 +220,12 @@ export const readCommandCodeUsage = async (
     ])
     if (credits.status === 401 || credits.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Command Code rejected this key.')
     if (credits.body === undefined) return ProviderUsageModel.emptyUsage('error', `Command Code returned ${String(credits.status)} for billing.`)
-    const billing = creditsSchema.safeParse(credits.body)
-    const identity = whoamiSchema.safeParse(whoami.body)
-    const entitlement = subscriptionSchema.safeParse(subscription.body)
-    if (billing.success) {
-      const limits = billing.data.windowLimits
-      const balance = billing.data.credits
+    const billing = AiAccountsSchema.decodeResult(creditsSchema, credits.body)
+    const identity = AiAccountsSchema.decodeResult(whoamiSchema, whoami.body)
+    const entitlement = AiAccountsSchema.decodeResult(subscriptionSchema, subscription.body)
+    if (billing._tag === 'Success') {
+      const limits = billing.success.windowLimits
+      const balance = billing.success.credits
       const positive =
         limits === null ||
         balance === null ||
@@ -206,8 +236,8 @@ export const readCommandCodeUsage = async (
         balance?.monthlyCredits !== undefined ||
         balance?.purchasedCredits !== undefined ||
         balance?.freeCredits !== undefined ||
-        (identity.success && (identity.data.user?.userName?.trim() || identity.data.user?.name?.trim())) ||
-        (entitlement.success && entitlement.data.data?.planId?.trim())
+        (identity._tag === 'Success' && (identity.success.user?.userName?.trim() || identity.success.user?.name?.trim())) ||
+        (entitlement._tag === 'Success' && entitlement.success.data?.planId?.trim())
       if (positive && !signal?.aborted) input.onAuthenticated?.()
     }
     return CommandCodeUsageModel.parseUsage({ credits: credits.body, whoami: whoami.body, subscription: subscription.body })

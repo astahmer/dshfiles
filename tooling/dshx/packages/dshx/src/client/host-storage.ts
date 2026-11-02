@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { ApiClientEventsModel } from '../api/client-events.js'
 import { ApiRuntimeModel, type ContextLike } from '../api/runtime.js'
@@ -134,7 +135,7 @@ const createStorageService = (input: { readonly ctx: ContextLike; readonly names
       return decoded.value
     }
     const write = (next: T): void => {
-      const value = PluginStorageContract.value.parse(next)
+      const value = Schema.decodeUnknownSync(PluginStorageContract.value)(next)
       const previous = cached.raw
       cached.raw = next
       notify(cached)
@@ -170,7 +171,7 @@ const createStorageService = (input: { readonly ctx: ContextLike; readonly names
 
   return {
     get: async key => (await api().get({ namespace, key })).entry ?? undefined,
-    set: (key, value) => api().set({ namespace, key, value: PluginStorageContract.value.parse(value) }),
+    set: (key, value) => api().set({ namespace, key, value: Schema.decodeUnknownSync(PluginStorageContract.value)(value) }),
     delete: async key => (await api().delete({ namespace, key })).deleted,
     list: (page = {}) => api().list({ ...page, namespace }),
     store: <T, const Scope extends StoreScope>(definition: HostStoreDefinition<T, Scope>): DefinedHostStore<T, Scope> => {

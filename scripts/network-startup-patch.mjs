@@ -1,8 +1,8 @@
 import { isMap, isScalar, isSeq, parseDocument, Scalar } from 'yaml'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
-const scalarString = z.string()
-const scalarBoolean = z.boolean()
+const scalarString = Schema.String
+const scalarBoolean = Schema.Boolean
 
 const jsTag = 'tag:yaml.org,2002:js'
 const managedStart = '# BEGIN NIX-MANAGED DSH PLUGINS'
@@ -29,7 +29,7 @@ const protectedRanges = text => {
   return ranges
 }
 
-const isJs = node => isScalar(node) && node.tag === jsTag && scalarString.safeParse(node.value).success
+const isJs = node => isScalar(node) && node.tag === jsTag && Schema.is(scalarString)(node.value)
 const isManaged = (node, field) => isJs(node) && node.value.startsWith(prefix(field))
 
 const fallbackExpression = (node, field, legacyPort) => {
@@ -45,7 +45,7 @@ const fallbackExpression = (node, field, legacyPort) => {
   if (node.tag !== undefined && !['tag:yaml.org,2002:str', 'tag:yaml.org,2002:int'].includes(node.tag)) {
     throw new Error(`webserver.config.${field} uses an unsupported scalar tag.`)
   }
-  if (field === 'host' && !scalarString.safeParse(node.value).success) throw new Error('webserver.config.host must be a string literal or !!js expression.')
+  if (field === 'host' && !Schema.is(scalarString)(node.value)) throw new Error('webserver.config.host must be a string literal or !!js expression.')
   if (field === 'port' && (!Number.isInteger(node.value) || node.value < 0 || node.value > 65535)) {
     throw new Error('webserver.config.port must be an integer from 0 through 65535 or a !!js expression.')
   }
@@ -86,7 +86,7 @@ const delegateWebserver = (document, protectedRegions, legacyPort) => {
     if (
       !isSeq(injection) ||
       injection.anchor ||
-      injection.items.some(item => !isScalar(item) || item.tag !== undefined || !scalarString.safeParse(item.value).success)
+      injection.items.some(item => !isScalar(item) || item.tag !== undefined || !Schema.is(scalarString)(item.value))
     ) {
       throw new Error('Explicit webserver.inject must be an array of plain service-name strings.')
     }
@@ -125,12 +125,7 @@ const suppressNativePrint = (document, protectedRegions) => {
   }
   const print = config.get('printUrl', true)
   if (print !== undefined) {
-    if (
-      !isScalar(print) ||
-      print.anchor ||
-      !scalarBoolean.safeParse(print.value).success ||
-      (print.tag !== undefined && print.tag !== 'tag:yaml.org,2002:bool')
-    ) {
+    if (!isScalar(print) || print.anchor || !Schema.is(scalarBoolean)(print.value) || (print.tag !== undefined && print.tag !== 'tag:yaml.org,2002:bool')) {
       throw new Error('web-runtime.config.printUrl must be an unanchored boolean literal.')
     }
     if (print.value === false) return false

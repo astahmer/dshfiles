@@ -1,6 +1,6 @@
 import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 /**
  * The conversation service's draft attachment registry. Draft attachments belong to one Session, so a draft moved to
@@ -14,15 +14,24 @@ interface DraftAttachments {
   readonly fileUploads: { getSnapshot(): DraftFileUploads; subscribe(listener: () => void): () => void }
 }
 
-const draftAttachmentsShape = z.object({
-  createDrafts: z.function(),
-  resolveDraftAttachments: z.function(),
-  releaseDraftAttachment: z.function(),
-  fileUploads: z.object({ getSnapshot: z.function(), subscribe: z.function() }),
+const draftAttachmentsShape = Schema.Struct({
+  createDrafts: Schema.Unknown,
+  resolveDraftAttachments: Schema.Unknown,
+  releaseDraftAttachment: Schema.Unknown,
+  fileUploads: Schema.Struct({ getSnapshot: Schema.Unknown, subscribe: Schema.Unknown }),
 })
 
 // Only the shape is checked; callers keep the original object, whose methods rely on their own `this`.
-const isDraftAttachments = (value: IConversation): value is IConversation & DraftAttachments => draftAttachmentsShape.safeParse(value).success
+const isDraftAttachments = (value: IConversation): value is IConversation & DraftAttachments => {
+  if (!Schema.is(draftAttachmentsShape)(value)) return false
+  return (
+    typeof value.createDrafts === 'function' &&
+    typeof value.resolveDraftAttachments === 'function' &&
+    typeof value.releaseDraftAttachment === 'function' &&
+    typeof value.fileUploads.getSnapshot === 'function' &&
+    typeof value.fileUploads.subscribe === 'function'
+  )
+}
 
 /** A carried file uploads again for its new Session; the prompt cites the receipt, so the send waits for it. */
 const UPLOAD_TIMEOUT_MS = 5 * 60_000

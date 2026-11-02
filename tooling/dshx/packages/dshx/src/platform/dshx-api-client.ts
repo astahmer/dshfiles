@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { ApiProtocolModel } from '../api/common.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiCallOptions, ApiCallResult, ApiClient, ApiClientContract, ApiError } from '../api/types.js'
@@ -40,7 +41,7 @@ export const connectDshxApiClient = async <
       : createDshxApiCaller({ ...target, origin: options.origin, cookie: options.cookie ?? '' })
   const invoke = async (method: string, input: unknown, callOptions?: ApiCallOptions): Promise<unknown> => {
     try {
-      return await call(method, input === undefined ? undefined : jsonValueSchema.parse(input), callOptions?.signal)
+      return await call(method, input === undefined ? undefined : Schema.decodeUnknownSync(jsonValueSchema)(input), callOptions?.signal)
     } catch (error) {
       throw apiErrorOf(error, contract, method)
     }

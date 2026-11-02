@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 
 /**
  * Session cost estimates, shared by the Host fold and the composer readout.
@@ -17,66 +18,66 @@ export const SESSION_COST_PROJECTION_KEY = 'aiAccountsCost'
 /** Every context-tier size models.dev publishes, normalized to "prompt exceeds N". */
 export const CONTEXT_BANDS = [0, 32_000, 100_000, 128_000, 200_000, 256_000, 262_144, 272_000, 512_000, 524_288, 1_000_000] as const
 
+const nonNegative = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
+const nonNegativeInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
 const rateShape = {
-  input: z.number().min(0),
-  output: z.number().min(0),
-  cacheRead: z.number().min(0).optional(),
-  cacheWrite: z.number().min(0).optional(),
+  input: nonNegative,
+  output: nonNegative,
+  cacheRead: Schema.optional(nonNegative),
+  cacheWrite: Schema.optional(nonNegative),
 }
 
-export const modelPriceSchema = z.object({
+export const modelPriceSchema = Schema.Struct({
   ...rateShape,
   /** Rates that replace the base ones once the request prompt exceeds `above` tokens. */
-  tiers: z
-    .array(z.object({ above: z.number().int().min(0), ...rateShape }))
-    .max(8)
-    .optional(),
+  tiers: Schema.optional(AiAccountsSchema.list(Schema.Struct({ above: nonNegativeInt, ...rateShape }), 8)),
 })
 
-export type ModelPrice = z.infer<typeof modelPriceSchema>
+export type ModelPrice = typeof modelPriceSchema.Type
 type ModelRates = Omit<ModelPrice, 'tiers'>
 
-export const tokenBucketsSchema = z.object({
-  uncachedInputTokens: z.number().int().min(0),
-  outputTokens: z.number().int().min(0),
-  cacheReadTokens: z.number().int().min(0),
-  cacheWriteTokens: z.number().int().min(0),
+export const tokenBucketsSchema = Schema.Struct({
+  uncachedInputTokens: nonNegativeInt,
+  outputTokens: nonNegativeInt,
+  cacheReadTokens: nonNegativeInt,
+  cacheWriteTokens: nonNegativeInt,
 })
 
-export type TokenBuckets = z.infer<typeof tokenBucketsSchema>
+export type TokenBuckets = typeof tokenBucketsSchema.Type
 
-export const costGroupSchema = z.object({
-  provider: z.string().max(128),
-  model: z.string().max(200),
-  band: z.number().int().min(0),
-  requests: z.number().int().min(0),
+export const costGroupSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isMaxLength(200)),
+  band: nonNegativeInt,
+  requests: nonNegativeInt,
   tokens: tokenBucketsSchema,
 })
 
-export type CostGroup = z.infer<typeof costGroupSchema>
+export type CostGroup = typeof costGroupSchema.Type
 
 /** What the Host projection publishes for one session: every route's tokens, and the latest turn's. */
-const turnCostGroupsSchema = z.object({ turn: z.number().int().min(0), groups: z.array(costGroupSchema).max(512) })
+const turnCostGroupsSchema = Schema.Struct({ turn: nonNegativeInt, groups: AiAccountsSchema.list(costGroupSchema, 512) })
 
-export const sessionCostViewSchema = z.object({
-  groups: z.array(costGroupSchema).max(512),
-  turn: turnCostGroupsSchema.nullable(),
-  turns: z.array(turnCostGroupsSchema).max(512).optional(),
+export const sessionCostViewSchema = Schema.Struct({
+  groups: AiAccountsSchema.list(costGroupSchema, 512),
+  turn: Schema.NullOr(turnCostGroupsSchema),
+  turns: Schema.optional(AiAccountsSchema.list(turnCostGroupsSchema, 512)),
 })
 
-export type SessionCostView = z.infer<typeof sessionCostViewSchema>
+export type SessionCostView = typeof sessionCostViewSchema.Type
 
-export const routeQuoteSchema = z.object({
-  provider: z.string().max(128),
-  model: z.string().max(200),
+export const routeQuoteSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isMaxLength(200)),
   /** `provider/model` on models.dev, or null for an explicit override price. */
-  modelsDevId: z.string().max(330).nullable(),
-  match: z.enum(['override', 'exact', 'fuzzy', 'none']),
-  free: z.boolean(),
-  price: modelPriceSchema.nullable(),
+  modelsDevId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(330))),
+  match: Schema.Literals(['override', 'exact', 'fuzzy', 'none']),
+  free: Schema.Boolean,
+  price: Schema.NullOr(modelPriceSchema),
 })
 
-export type RouteQuote = z.infer<typeof routeQuoteSchema>
+export type RouteQuote = typeof routeQuoteSchema.Type
 
 export interface CostBreakdown {
   readonly input: number

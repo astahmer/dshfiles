@@ -1,18 +1,19 @@
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
-import { receiptSchema } from './api.js'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { storedReceiptSchema } from './api.js'
 
-export const storedReceiptSchema = receiptSchema.omit({ freshness: true, configurationFreshness: true })
+export { storedReceiptSchema }
 
+/** `defineDomain` still types its record validator as `z.ZodType`; the Effect schema stays the source of truth. */
 export const projectChecksDomain = defineDomain({
   name: 'project_checks',
   version: 1,
   tables: {
-    receipts: { valueSchema: storedReceiptSchema, __key: 'receipts' },
+    receipts: { valueSchema: zodSchemaFromEffect(storedReceiptSchema), __key: 'receipts' },
   },
 })
 
-export type StoredReceipt = z.infer<typeof storedReceiptSchema>
+export type StoredReceipt = typeof storedReceiptSchema.Type
 
 const receiptKey = (receipt: StoredReceipt): string => `${encodeURIComponent(receipt.sessionId)}:${String(receipt.finishedAt).padStart(16, '0')}:${receipt.id}`
 

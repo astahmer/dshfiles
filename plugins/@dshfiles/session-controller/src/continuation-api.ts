@@ -1,5 +1,6 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
+import { method } from './api-schema.js'
 
 /** Fork one thread into another project, where its directory becomes the new thread's own working directory. */
 export const continuationApi = defineApi({
@@ -10,14 +11,12 @@ export const continuationApi = defineApi({
     continueIn: method({
       description:
         'Fork one thread into the registered project (DSH Workspace) given by workspaceId: the new thread runs in that directory and is accounted to it. includeOpenTurn cuts after the newest event instead of at the latest completed turn.',
-      input: z
-        .object({
-          sessionId: z.string().min(1).max(256),
-          workspaceId: z.string().min(1).max(256),
-          includeOpenTurn: z.boolean(),
-        })
-        .strict(),
-      output: z.object({ sessionId: z.string() }).strict(),
+      input: Schema.Struct({
+        sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+        workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+        includeOpenTurn: Schema.Boolean,
+      }),
+      output: Schema.Struct({ sessionId: Schema.String }),
     }),
   },
 })

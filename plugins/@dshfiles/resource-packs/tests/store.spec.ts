@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { Schema } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { packDefinitionSchema, type PackDefinition, type PropertyValues } from '../src/model.js'
 import { ResourceStore } from '../src/store.js'
@@ -9,7 +10,7 @@ import { ResourceStore } from '../src/store.js'
 const user = { kind: 'client' } as const
 const plugin = { kind: 'plugin', packageId: '@test/contributor' } as const
 const ref = { provider: 'native', kind: 'file', id: '/Case/Sensitive/File.md' }
-const definition = packDefinitionSchema.parse({
+const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
   id: 'all-types',
   version: 1,
   label: 'All types',
@@ -198,7 +199,7 @@ describe('persistent resource metadata', () => {
   })
 
   it('treats constructor as a normal field ID, never an inherited default', () => {
-    const pack = packDefinitionSchema.parse({
+    const pack = Schema.decodeUnknownSync(packDefinitionSchema)({
       id: 'prototype-key',
       version: 1,
       label: 'Own keys',
@@ -241,7 +242,7 @@ describe('persistent resource metadata', () => {
 describe('aggregate serialized metadata budgets', () => {
   it('rejects a pack above 128 KiB without persisting a schema', () => {
     const before = store.catalog()
-    const oversized = packDefinitionSchema.parse({
+    const oversized = Schema.decodeUnknownSync(packDefinitionSchema)({
       id: 'large-pack',
       version: 1,
       label: 'Large pack',
@@ -257,7 +258,7 @@ describe('aggregate serialized metadata budgets', () => {
   })
 
   it('rejects patches above 64 KiB and accumulated resource metadata above 256 KiB atomically', () => {
-    const pack = packDefinitionSchema.parse({
+    const pack = Schema.decodeUnknownSync(packDefinitionSchema)({
       id: 'large-values',
       version: 1,
       label: 'Large values',
@@ -317,17 +318,19 @@ describe('pack ownership and compatibility', () => {
       ...definition,
       version: 2,
       label: 'Renamed',
-      properties: definition.properties.map(property => {
-        if (property.type === 'select' || property.type === 'multiselect')
-          return {
-            ...property,
-            label: 'Renamed field',
-            options: [...property.options.map(option => ({ ...option, label: 'Renamed option' })), { id: 'three', label: 'Three' }],
-          }
-        return property
-      }),
+      properties: [
+        ...definition.properties.map(property => {
+          if (property.type === 'select' || property.type === 'multiselect')
+            return {
+              ...property,
+              label: 'Renamed field',
+              options: [...property.options.map(option => ({ ...option, label: 'Renamed option' })), { id: 'three', label: 'Three' }],
+            }
+          return property
+        }),
+        { id: 'added', label: 'Added', type: 'checkbox', readOnly: false, description: '' },
+      ],
     }
-    renamed.properties.push({ id: 'added', label: 'Added', type: 'checkbox', readOnly: false, description: '' })
     store.registerPack({ definition: renamed }, plugin)
     expect(store.get({ resourceId: resource.id }).resource).toMatchObject({
       revision: updated.revision,

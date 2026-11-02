@@ -1,6 +1,7 @@
 import { appendPluginRecord, pluginRecordOf, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { threadModelPolicySchema, type ThreadModelPolicy } from './thread-model-api.ts'
+import * as Schema from 'effect/Schema'
+import { threadModelPolicyEffectSchema, threadModelPolicySchema, type ThreadModelPolicy } from './thread-model-api.ts'
 
 export const THREAD_MODEL_RECORD = 'plugin:dshfiles/session-controller/thread-selection'
 declare module '@deepseek-ai/dsh-session/types' {
@@ -23,25 +24,25 @@ export const threadModelPolicyProjection = {
       }
     const record = pluginRecordOf(event)
     if (record?.type !== THREAD_MODEL_RECORD) return state
-    const parsed = threadModelPolicySchema.safeParse(record.data)
+    const parsed = Schema.decodeUnknownResult(threadModelPolicyEffectSchema)(record.data)
     // Only a directly adjacent annotation of this exact native selection can grant preference.
     if (
       state.selection === null ||
       state.revision === 0 ||
-      !parsed.success ||
-      parsed.data.revision !== state.revision ||
+      parsed._tag === 'Failure' ||
+      parsed.success.revision !== state.revision ||
       record.seq !== state.revision ||
-      parsed.data.selection?.provider !== state.selection?.provider ||
-      parsed.data.selection?.model !== state.selection?.model ||
-      parsed.data.selection?.reasoningEffort !== state.selection?.reasoningEffort
+      parsed.success.selection?.provider !== state.selection?.provider ||
+      parsed.success.selection?.model !== state.selection?.model ||
+      parsed.success.selection?.reasoningEffort !== state.selection?.reasoningEffort
     )
       return state
-    return parsed.data
+    return parsed.success
   },
   wire: { viewSchema: threadModelPolicySchema, view: (state: ThreadModelPolicy) => state },
 } satisfies ProjectionDefinition<'threadModelPolicy'>
 
 /** Append immediately after the native selection, without any asynchronous boundary. */
 export function annotateThreadModel(session: Session, policy: ThreadModelPolicy): void {
-  appendPluginRecord(session, THREAD_MODEL_RECORD, threadModelPolicySchema.parse(policy))
+  appendPluginRecord(session, THREAD_MODEL_RECORD, Schema.decodeUnknownSync(threadModelPolicyEffectSchema)(policy))
 }

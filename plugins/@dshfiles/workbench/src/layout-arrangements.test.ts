@@ -1,7 +1,7 @@
 import { createDockview, type DockviewApi, type SerializedDockview } from 'dockview-react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { captureLayoutArrangement, restoreLayoutArrangement, type ArrangementSurface } from './layout-arrangements.js'
-import { createLayoutStore, createNestedLayoutStores, layoutSchema } from './layout-store.js'
+import { createLayoutStore, createNestedLayoutStores, WorkbenchLayout } from './layout-store.js'
 import { createWorkbenchRegionRegistry } from './dock-regions.js'
 import { nestedPanelId } from './nested-surfaces.js'
 
@@ -17,7 +17,7 @@ afterEach(() => {
   for (const api of apis.splice(0)) api.dispose()
 })
 const layout = (id: string): SerializedDockview =>
-  layoutSchema.parse({
+  WorkbenchLayout.decodeLayout({
     grid: { root: { type: 'branch', data: [] }, width: 100, height: 100, orientation: 'HORIZONTAL' },
     panels: { [id]: { id, contentComponent: 'workbench-panel' } },
   })

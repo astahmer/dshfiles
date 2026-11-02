@@ -1,20 +1,20 @@
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import { Effect, Result, Schema } from 'effect'
 import { SIDEBAR_AUTO_COLLAPSE } from './native/client/columns.ts'
 import type { createLayoutStore } from './native/client/stores.ts'
 
 /** Browser-local geometry key: a panel width is per-browser chrome, never a Host fact. */
 export const FRAME_WIDTHS_KEY = 'dshfiles.frame-layout.v1'
 
-const frameWidthsSchema = z.object({
-  sidebar: z.number().min(0).max(10_000),
-  rightbar: z.number().min(0).max(10_000).nullable(),
+const frameWidthsSchema = Schema.Struct({
+  sidebar: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(10_000)),
+  rightbar: Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(10_000))),
   /** Last wide-frame sidebar state; a record written before this field boots open. */
-  collapsed: z.boolean().default(false),
+  collapsed: Schema.optionalKey(Schema.Boolean).pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
 })
 
 /** The stored geometry preferences of one browser. */
-export type FrameWidths = z.infer<typeof frameWidthsSchema>
+export type FrameWidths = typeof frameWidthsSchema.Type
 
 type LayoutInstance = ReturnType<ReturnType<typeof createLayoutStore>['create']>
 
@@ -33,7 +33,7 @@ export class FrameWidthsModel {
       const raw = localStorage.getItem(FRAME_WIDTHS_KEY)
       if (raw === null) return null
       const parsed = decodeJsonSafe(frameWidthsSchema, raw)
-      return parsed.success ? parsed.data : null
+      return Result.isSuccess(parsed) ? parsed.success : null
     } catch {
       return null
     }

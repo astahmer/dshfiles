@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /**
  * The jj-integration notice asks for one integrated thread to be settled through this window event (its
@@ -7,12 +8,12 @@ import { z } from 'zod'
  */
 export const SETTLE_THREAD_EVENT = 'dshfiles:thread-settle'
 
-const requestSchema = z.object({ sessionId: z.string().min(1) }).strict()
+const requestSchema = SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)) }))
 
 /** The session a `dshfiles:thread-settle` request names, or undefined for any other event or shape. */
 export const readSettleThreadRequest = (event: Event): string | undefined => {
   if (!(event instanceof CustomEvent)) return undefined
-  const request = requestSchema.safeParse(event.detail)
+  const request = SchemaHelpers.decodeUnknownSafe(requestSchema, event.detail)
   return request.success ? request.data.sessionId : undefined
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
+import { Effect } from 'effect'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSessionSourceRegistry, type MirroredSessionSource } from './index.js'
+import { createSessionSourceRegistry, SessionSources, type MirroredSessionSource } from './index.js'
 
 const id = (value: string): SessionId => value as SessionId
 
@@ -72,5 +73,21 @@ describe('session source registry', () => {
     registry.register(source('remote', ['session-a']))
     await expect(registry.resolveOwner(id('session-z'))).resolves.toBeUndefined()
     expect(registry.ownerOf(id('session-z'))).toBeUndefined()
+  })
+
+  test('Effect service adapts the Promise registry without changing its behavior', async () => {
+    const registry = createSessionSourceRegistry()
+    const remote = source('remote', ['session-a'])
+    const service = Effect.gen(function* () {
+      const sources = yield* SessionSources
+      const unregister = yield* sources.register(remote)
+      yield* sources.claim(remote, [id('session-a')])
+      const owner = yield* sources.resolveOwner(id('session-a'))
+      unregister()
+      return { owner, sources: yield* sources.sources() }
+    }).pipe(Effect.provide(SessionSources.layer(registry)))
+
+    await expect(Effect.runPromise(service)).resolves.toEqual({ owner: remote, sources: [] })
+    await expect(registry.resolveOwner(id('session-a'))).resolves.toBeUndefined()
   })
 })

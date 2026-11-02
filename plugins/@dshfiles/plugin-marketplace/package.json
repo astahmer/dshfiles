@@ -37,9 +37,9 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:",
     "execa": "catalog:",
-    "semver": "catalog:",
-    "zod": "catalog:"
+    "semver": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

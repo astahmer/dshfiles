@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { threadViewCreateSchema, threadViewDeleteSchema, threadViewUpdateSchema } from './thread-views-api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, MAX_THREAD_VIEWS, type ThreadViewSettings } from './thread-view-preferences.js'
 import { ThreadViewsController, type ThreadViewsSettingsPort } from './thread-views-host.js'
 
@@ -97,18 +98,18 @@ describe('Host saved thread views', () => {
   })
 
   it('rejects invalid commands rather than applying migration coercion', () => {
-    expect(threadViewCreateSchema.safeParse({ ...custom(), id: '../bad' }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), statusFilters: ['bogus'] }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), statusFilters: ['all'] }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), statusFilters: ['working', 'working'] }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), statusFilters: ['not-working'] }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), name: ' ' }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), name: 'a'.repeat(33) }).success).toBe(false)
-    expect(threadViewCreateSchema.safeParse({ ...custom(), id: 'a'.repeat(65) }).success).toBe(false)
-    expect(threadViewUpdateSchema.safeParse({ id: 'custom' }).success).toBe(false)
-    expect(threadViewUpdateSchema.safeParse({ id: 'custom', unknown: true }).success).toBe(false)
-    expect(threadViewDeleteSchema.safeParse({ id: 'custom' }).success).toBe(false)
-    expect(threadViewDeleteSchema.safeParse({ id: 'custom', confirm: false }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), id: '../bad' }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), statusFilters: ['bogus'] }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), statusFilters: ['all'] }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), statusFilters: ['working', 'working'] }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), statusFilters: ['not-working'] }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), name: ' ' }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), name: 'a'.repeat(33) }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewCreateSchema, { ...custom(), id: 'a'.repeat(65) }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewUpdateSchema, { id: 'custom' }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewUpdateSchema, { id: 'custom', unknown: true }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewDeleteSchema, { id: 'custom' }).success).toBe(false)
+    expect(SchemaHelpers.decodeUnknownSafe(threadViewDeleteSchema, { id: 'custom', confirm: false }).success).toBe(false)
   })
 
   it('serializes its updates and refuses concurrent external edits without losing data', async () => {

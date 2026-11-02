@@ -1,9 +1,9 @@
 import type { DockviewApi, DockviewGroupPanel, IDockviewPanel } from 'dockview-react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { WORKBENCH_COMPONENT } from './layout-store.js'
 
 const NEW_VIEW_PREFIX = 'dshfiles-workbench.new-view/'
-const sourceParams = z.object({ sourceId: z.string().min(1) })
+const sourceParams = Schema.Struct({ sourceId: Schema.String.check(Schema.isMinLength(1)) })
 
 export interface NewViewSelection {
   readonly group?: DockviewGroupPanel
@@ -19,8 +19,8 @@ export class NewViewTabs {
   /** Validate source parameters where Dockview restores untrusted browser layout data. */
   // oxlint-disable-next-line antislop/no-unknown-parameters -- Dockview persistence is the input boundary; safeParse validates it immediately below.
   static sourceId(params: unknown, fallback: string): string {
-    const parsed = sourceParams.safeParse(params)
-    return parsed.success ? parsed.data.sourceId : fallback
+    const parsed = Schema.decodeUnknownResult(sourceParams)(params)
+    return parsed._tag === 'Success' ? parsed.success.sourceId : fallback
   }
 
   static open(api: DockviewApi, group?: DockviewGroupPanel, direction: 'within' | 'right' | 'below' = 'within'): IDockviewPanel {

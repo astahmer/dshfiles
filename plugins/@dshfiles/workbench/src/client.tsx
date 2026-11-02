@@ -18,7 +18,7 @@ import { LayoutGridIcon, LayoutTemplateIcon, MoveIcon, PanelBottomIcon, PanelRig
 import type { DockviewApi, DockviewDndOverlayEvent, DockviewGroupPanel } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { demoPanels } from './demo-panels.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import { createLayoutStore, WorkbenchLayout, WORKBENCH_COMPONENT } from './layout-store.js'
@@ -36,7 +36,7 @@ import { semanticLayouts } from './semantic-layouts.js'
 import { createWorkbenchThreadPanel, WORKBENCH_CONVERSATION_SLOT, WORKBENCH_THREAD_CHILDREN, WorkbenchThreadConversation } from './thread-panel.js'
 import { WorkbenchTabDocking, workbenchTabs } from './tabs.js'
 import { canMovePanelToRegion, createNestedSurfaceRegistry, type NestedSurfaceProps } from './nested-surfaces.js'
-import { nestedLayoutStores, nestedSurfacePathSchema } from './layout-store.js'
+import { decodeNestedSurfacePath, nestedLayoutStores } from './layout-store.js'
 import { sidebarResourcePanels } from '@dshfiles/sidebar-right/resource-panels'
 import { ResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
@@ -59,7 +59,7 @@ const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID
 const RIGHT_PANE_ID = '@dshfiles/workbench/side-panel'
 const RIGHT_PANE_KIND = 'dshfiles-workbench-side-panel'
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
-const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
+const panelAsideRequestSchema = Schema.Struct({ panelId: Schema.String.check(Schema.isMinLength(1)) })
 const TOGGLE_COMMAND_ID = 'workbench.toggleSidePanel'
 const SHEET_SELECTOR = 'style[data-dshfiles-workbench-sheet]'
 
@@ -389,16 +389,16 @@ export default defineClient({
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
         if (!(event instanceof CustomEvent) || event.defaultPrevented) return
-        const request = panelAsideRequestSchema.safeParse(event.detail)
+        const request = Schema.decodeUnknownResult(panelAsideRequestSchema, { onExcessProperty: 'error' })(event.detail)
         const sessionId = ctx.sidebarRight.mounted.getSnapshot()
-        if (!request.success || sessionId === undefined) return
-        const native = NativeAsideOwners.request(request.data.panelId)
+        if (request._tag !== 'Success' || sessionId === undefined) return
+        const native = NativeAsideOwners.request(request.success.panelId)
         if (native !== 'unowned') {
           if (native === 'accepted') event.preventDefault()
           return
         }
-        const definition = registry.list().find(panel => panel.id === request.data.panelId || panel.mainPanelId === request.data.panelId)
-        if (request.data.panelId !== PANEL_ID && definition === undefined) return
+        const definition = registry.list().find(panel => panel.id === request.success.panelId || panel.mainPanelId === request.success.panelId)
+        if (request.success.panelId !== PANEL_ID && definition === undefined) return
         event.preventDefault()
         ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
         // The native pane is Session-scoped, not shell.dock. A generic registry request would select main first.
@@ -506,8 +506,7 @@ export default defineClient({
       if (dockStore.get()?.panels[panelId] !== undefined) return 'right'
       if (bottomStore.get()?.panels[panelId] !== undefined) return 'bottom'
       if (leftStore.get()?.panels[panelId] !== undefined) return 'left'
-      for (const [path, saved] of Object.entries(nestedLayoutStores.capture()))
-        if (saved?.panels[panelId] !== undefined) return nestedSurfacePathSchema.parse(path)
+      for (const [path, saved] of Object.entries(nestedLayoutStores.capture())) if (saved?.panels[panelId] !== undefined) return decodeNestedSurfacePath(path)
       return undefined
     }
     const seatSidebarPreview = (api: DockviewApi): void => {

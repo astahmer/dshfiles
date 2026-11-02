@@ -1,5 +1,5 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import { ApiProtocolModel } from '../api/common.js'
+import { ApiChannelModel } from '../api/channel.js'
 import { BROWSER_TRACES_API } from './browser-protocol.js'
 import { BrowserTracingRegistryModel, type BrowserTraceTransport } from './browser-registry.js'
 
@@ -23,7 +23,7 @@ const rpcOf = (ctx: ContextLike): Rpc | undefined => {
  * per request, so attaching reads no service until the page records its first span.
  */
 const transportOf = (rpc: Rpc | (() => Rpc | undefined)): BrowserTraceTransport => {
-  const channel = ApiProtocolModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)
+  const channel = ApiChannelModel.apiChannel(BROWSER_TRACES_API.owner, BROWSER_TRACES_API.id)
   const resolve = typeof rpc === 'function' ? rpc : () => rpc
   const invoke = async (method: 'status' | 'export', input?: unknown): Promise<unknown> => {
     const current = resolve()

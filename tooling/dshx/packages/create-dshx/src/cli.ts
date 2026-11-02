@@ -165,7 +165,7 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
         ? await clackSelect<TemplateName>({
             message: 'Project template',
             initialValue: DEFAULT_TEMPLATE,
-            options: (['basic', 'ui', 'tool', 'full-stack'] as const).map(value => ({
+            options: (['basic', 'ui', 'tool', 'effect-host', 'full-stack'] as const).map(value => ({
               value,
               label: TEMPLATE_REGISTRY[value].label,
               hint: TEMPLATE_REGISTRY[value].description,
@@ -173,13 +173,13 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
             input,
             output,
           })
-        : (await io.readLine('Project template (basic/ui/tool/full-stack): ', DEFAULT_TEMPLATE)).trim() || DEFAULT_TEMPLATE
+        : (await io.readLine('Project template (basic/ui/tool/effect-host/full-stack): ', DEFAULT_TEMPLATE)).trim() || DEFAULT_TEMPLATE
     if (isCancel(answer)) {
       writeError('Operation cancelled.\n')
       return 130
     }
     if (!Object.hasOwn(TEMPLATE_REGISTRY, answer)) {
-      writeError('Choose basic, ui, tool, or full-stack (starter/showcase also remain available).\n')
+      writeError('Choose basic, ui, tool, effect-host, or full-stack (starter/showcase also remain available).\n')
       return 2
     }
     template = answer as TemplateName

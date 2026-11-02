@@ -6,54 +6,44 @@ import {
   communicationMessageBodySchema,
   communicationMessageRecipientsSchema,
 } from '@dshfiles/dshx/communication/types'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const agentIdSchema = z.string().min(1).max(256)
-const messageIdSchema = z.string().uuid()
-const topicSchema = z.string().min(1).max(128)
+const agentIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+const messageIdSchema = Schema.String.check(Schema.isUUID())
+const topicSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
 
-const subscriptionInputSchema = z
-  .object({
-    agentId: agentIdSchema,
-    topic: topicSchema,
-  })
-  .strict()
+const subscriptionInputSchema = Schema.Struct({
+  agentId: agentIdSchema,
+  topic: topicSchema,
+})
 
-export type AgentCommunicationSubscriptionInput = z.infer<typeof subscriptionInputSchema>
+export type AgentCommunicationSubscriptionInput = typeof subscriptionInputSchema.Type
 
-export const browseMessagesInputSchema = z
-  .object({
-    topic: topicSchema.optional(),
-    agentId: agentIdSchema.optional(),
-    search: z.string().trim().min(1).max(120).optional(),
-    beforeId: messageIdSchema.optional(),
-    limit: z.number().int().min(1).max(100).optional(),
-  })
-  .strict()
-  .refine(input => input.topic === undefined || input.agentId === undefined, 'Choose a topic or direct Agent, not both.')
-export type AgentCommunicationBrowseInput = z.infer<typeof browseMessagesInputSchema>
+export const browseMessagesInputSchema = Schema.Struct({
+  topic: Schema.optional(topicSchema),
+  agentId: Schema.optional(agentIdSchema),
+  search: Schema.optional(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120))),
+  beforeId: Schema.optional(messageIdSchema),
+  limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))),
+}).check(Schema.makeFilter(input => (input.topic === undefined || input.agentId === undefined ? true : 'Choose a topic or direct Agent, not both.')))
+export type AgentCommunicationBrowseInput = typeof browseMessagesInputSchema.Type
 
-export const postMessageInputSchema = z
-  .object({
-    topic: topicSchema.optional(),
-    agentId: agentIdSchema.optional(),
-    text: z.string().trim().min(1).max(12_000),
-    intent: z.enum(['notice', 'request']).optional(),
-    priority: z.enum(['normal', 'urgent']).optional(),
-  })
-  .strict()
-  .refine(input => (input.topic === undefined) !== (input.agentId === undefined), 'Choose exactly one topic or direct Agent.')
-export type AgentCommunicationPostInput = z.infer<typeof postMessageInputSchema>
+export const postMessageInputSchema = Schema.Struct({
+  topic: Schema.optional(topicSchema),
+  agentId: Schema.optional(agentIdSchema),
+  text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(12_000)),
+  intent: Schema.optional(Schema.Literals(['notice', 'request'])),
+  priority: Schema.optional(Schema.Literals(['normal', 'urgent'])),
+}).check(Schema.makeFilter(input => ((input.topic === undefined) !== (input.agentId === undefined) ? true : 'Choose exactly one topic or direct Agent.')))
+export type AgentCommunicationPostInput = typeof postMessageInputSchema.Type
 
-export const postMessageReceiptSchema = z
-  .object({
-    messageId: messageIdSchema,
-    topic: topicSchema.nullable(),
-    intent: z.enum(['notice', 'request']),
-    recipientCount: z.number().int().nonnegative().max(512),
-    createdAt: z.number().int().nonnegative(),
-  })
-  .strict()
+export const postMessageReceiptSchema = Schema.Struct({
+  messageId: messageIdSchema,
+  topic: Schema.NullOr(topicSchema),
+  intent: Schema.Literals(['notice', 'request']),
+  recipientCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(512)),
+  createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -63,7 +53,7 @@ export const agentCommunicationApi = defineApi({
   version: 1,
   methods: {
     diagnostics: method({
-      input: z.object({ limit: z.number().int().min(1).max(100).optional() }).strict(),
+      input: Schema.Struct({ limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))) }),
       output: communicationDiagnosticsSchema,
       description:
         'Communication diagnostics: the live Agents, their workspace topic, whether a subscription is missing, and recent communication tool activity. Read-only.',
@@ -78,23 +68,23 @@ export const agentCommunicationApi = defineApi({
     }),
     postMessage: method({ input: postMessageInputSchema, output: postMessageReceiptSchema }),
     messageRecipients: method({
-      input: z.object({ messageId: messageIdSchema }).strict(),
+      input: Schema.Struct({ messageId: messageIdSchema }),
       output: communicationMessageRecipientsSchema,
       description: 'Per-recipient read and acknowledgement status of one stored message. Read-only.',
       tool: { name: 'dshx_comm_recipients', readOnly: true, render: compactJson },
     }),
     revealMessageBody: method({
-      input: z.object({ messageId: messageIdSchema }).strict(),
+      input: Schema.Struct({ messageId: messageIdSchema }),
       output: communicationMessageBodySchema,
     }),
     setSubscription: method({ input: subscriptionInputSchema, output: communicationDiagnosticSubscriptionSchema }),
     unsubscribe: method({
-      input: z.object({ agentId: agentIdSchema, topic: topicSchema }).strict(),
-      output: z.object({ removed: z.boolean() }).strict(),
+      input: Schema.Struct({ agentId: agentIdSchema, topic: topicSchema }),
+      output: Schema.Struct({ removed: Schema.Boolean }),
     }),
     acknowledge: method({
-      input: z.object({ agentId: agentIdSchema, messageId: messageIdSchema }).strict(),
-      output: z.object({ acknowledged: z.boolean() }).strict(),
+      input: Schema.Struct({ agentId: agentIdSchema, messageId: messageIdSchema }),
+      output: Schema.Struct({ acknowledged: Schema.Boolean }),
     }),
   },
 })

@@ -10,6 +10,8 @@ export type { StorageListInput, StoragePage, StoredEntry } from './storage.js'
 /** Call a registered dshx API by identity; see {@link RegisteredApiSpec}. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
 export { isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
+/** A zod-typed view of an Effect schema for the contracts that still demand `ZodType`; see its doc comment. */
+export { zodSchemaFromEffect } from './zod-view.js'
 export type {
   AnyApiEventDefinition,
   AnyApiMethodDefinition,

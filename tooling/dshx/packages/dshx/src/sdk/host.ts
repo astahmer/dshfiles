@@ -1,4 +1,5 @@
 import { SdkSetupRuntime } from './setup.js'
+import * as Schema from 'effect/Schema'
 import { HOST_CAPABILITY_INJECTIONS } from 'create-dshx/runtime-capabilities'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
@@ -21,10 +22,18 @@ export interface HostCapabilities {
 }
 
 export type HostCapability = keyof HostCapabilities
-type PluginConfigSchema = StandardSchemaV1<unknown, Readonly<Record<string, unknown>>> | undefined
-type PluginConfig<Schema extends PluginConfigSchema> = Schema extends StandardSchemaV1
-  ? StandardSchemaV1.InferOutput<Schema>
-  : Readonly<Record<string, unknown>>
+type PluginConfigSchema = Schema.ConstraintDecoder<unknown> | StandardSchemaV1<unknown, Readonly<Record<string, unknown>>> | undefined
+const isEffectConfigSchema = (value: unknown): value is Schema.ConstraintDecoder<unknown> => Schema.isSchema(value)
+const toStandardConfigSchema = (config: PluginConfigSchema): StandardSchemaV1 | undefined => {
+  if (config === undefined) return undefined
+  return isEffectConfigSchema(config) ? Schema.toStandardSchemaV1(config) : config
+}
+type PluginConfig<Config extends PluginConfigSchema> =
+  Config extends Schema.ConstraintDecoder<unknown>
+    ? Schema.Schema.Type<Config>
+    : Config extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<Config>
+      : Readonly<Record<string, unknown>>
 
 export type PluginApi<Uses extends readonly HostCapability[] = readonly [], Config = Readonly<Record<string, unknown>>> = Omit<BasePluginApi, 'config'> & {
   readonly config: Config
@@ -104,11 +113,12 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
   assertPluginId(definition.id)
   const { id, name, uses: declaredUses, setup, Config, ...contributions } = definition
   const uses = declaredUses ?? []
+  const standardConfigSchema = toStandardConfigSchema(Config)
   for (const capability of uses)
     if (!Object.hasOwn(HOST_CAPABILITY_INJECTIONS, capability)) throw new TypeError(`Unknown Host capability ${JSON.stringify(capability)}.`)
   return {
     ...contributions,
-    ...(Config !== undefined && { Config: redactConfigSchema(Config) }),
+    ...(standardConfigSchema !== undefined && { Config: redactConfigSchema(standardConfigSchema) }),
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => HOST_CAPABILITY_INJECTIONS[capability])])],
     setup: SdkSetupRuntime.adaptHost(

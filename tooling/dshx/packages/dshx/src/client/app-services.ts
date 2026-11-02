@@ -1,9 +1,13 @@
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { BrowserBroker, type Live, type Subscribable } from './broker.js'
 import { CommandChords } from './command-chords.js'
 import { HostCommandsModel } from './host-commands.js'
 import { MarkdownLinks } from './links.js'
 import { LocaleNamespaceModel } from './locale.js'
+
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(schema)(input))
 
 export interface ConfirmInput {
   readonly title: string
@@ -236,7 +240,7 @@ const isNativeShortcutCatalog = (value: unknown): value is NativeShortcutCatalog
   'getSnapshot' in value.catalog &&
   typeof value.catalog.getSnapshot === 'function'
 
-const ShortcutCatalog = z.array(z.object({ id: z.string(), binding: z.unknown(), modified: z.boolean() }))
+const ShortcutCatalog = Schema.Array(Schema.Struct({ id: Schema.String, binding: Schema.Unknown, modified: Schema.Boolean }))
 
 const createCommandKeys = (shortcuts: () => unknown): Subscribable<ReadonlyMap<string, readonly string[]>> => {
   const commands = BrowserBroker.items(Command)
@@ -247,7 +251,7 @@ const createCommandKeys = (shortcuts: () => unknown): Subscribable<ReadonlyMap<s
       const list = commands.get()
       const snapshot = isNativeShortcutCatalog(native) ? native.catalog.getSnapshot() : undefined
       if (cached !== undefined && cached.commands === list && cached.catalog === snapshot) return cached.keys
-      const userBindings = new Map((ShortcutCatalog.safeParse(snapshot).data ?? []).filter(entry => entry.modified).map(entry => [entry.id, entry.binding]))
+      const userBindings = new Map((decode(ShortcutCatalog, snapshot) ?? []).filter(entry => entry.modified).map(entry => [entry.id, entry.binding]))
       const keys = new Map(
         list.map(command => {
           const shortcutId = command.editable === true ? CommandChords.shortcutId(command.id) : undefined
@@ -479,13 +483,13 @@ export interface NotificationsService {
   notify(input: NotifyInput): boolean
 }
 
-const BrowserNotificationPermission = z.enum(['default', 'granted', 'denied'])
+const BrowserNotificationPermission = Schema.Literals(['default', 'granted', 'denied'])
 
 const browserNotification = (): typeof Notification | undefined => (typeof window !== 'undefined' && 'Notification' in window ? window.Notification : undefined)
 
 const readNotificationPermission = (): NotificationPermissionState => {
   const api = browserNotification()
-  return api === undefined ? 'unsupported' : (BrowserNotificationPermission.safeParse(api.permission).data ?? 'unsupported')
+  return api === undefined ? 'unsupported' : (decode(BrowserNotificationPermission, api.permission) ?? 'unsupported')
 }
 
 const notifications: NotificationsService = {
@@ -495,7 +499,7 @@ const notifications: NotificationsService = {
     const api = browserNotification()
     if (api === undefined) return 'unsupported'
     try {
-      return BrowserNotificationPermission.safeParse(await api.requestPermission()).data ?? readNotificationPermission()
+      return decode(BrowserNotificationPermission, await api.requestPermission()) ?? readNotificationPermission()
     } catch {
       return readNotificationPermission()
     }
@@ -560,17 +564,17 @@ const isNativeLocale = (value: unknown): value is NativeLocale =>
 const isNativeTheme = (value: unknown): value is NativeTheme =>
   typeof value === 'object' && value !== null && 'getTheme' in value && typeof value.getTheme === 'function'
 
-const LocaleSnapshot = z.object({ active: z.string().check(z.minLength(1)) })
-const ThemeSnapshot = z.object({
-  active: z.object({ colorScheme: z.enum(['light', 'dark']) }),
-  fontFamilies: z.object({ text: z.string(), code: z.string(), terminal: z.string() }),
+const LocaleSnapshot = Schema.Struct({ active: Schema.String.check(Schema.isMinLength(1)) })
+const ThemeSnapshot = Schema.Struct({
+  active: Schema.Struct({ colorScheme: Schema.Literals(['light', 'dark']) }),
+  fontFamilies: Schema.Struct({ text: Schema.String, code: Schema.String, terminal: Schema.String }),
 })
-const TextInfo = z.object({ direction: z.string() })
+const TextInfo = Schema.Struct({ direction: Schema.String })
 
-const activeLocaleOf = (snapshot: unknown): string | undefined => LocaleSnapshot.safeParse(snapshot).data?.active
+const activeLocaleOf = (snapshot: unknown): string | undefined => decode(LocaleSnapshot, snapshot)?.active
 
 const appearanceOf = (snapshot: unknown): AppearanceState | undefined => {
-  const theme = ThemeSnapshot.safeParse(snapshot).data
+  const theme = decode(ThemeSnapshot, snapshot)
   return theme === undefined ? undefined : { colorScheme: theme.active.colorScheme, fonts: theme.fontFamilies }
 }
 
@@ -580,7 +584,7 @@ const directionOf = (localeId: string): TextDirection => {
     const locale = new Intl.Locale(localeId)
     const info: unknown =
       'getTextInfo' in locale && typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : 'textInfo' in locale ? locale.textInfo : undefined
-    return TextInfo.safeParse(info).data?.direction === 'rtl' ? 'rtl' : 'ltr'
+    return decode(TextInfo, info)?.direction === 'rtl' ? 'rtl' : 'ltr'
   } catch {
     return 'ltr'
   }

@@ -1,10 +1,11 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
-import type { settingsPatchSchema } from './shell-api.js'
+import type { settingsPatchEffectSchema } from './shell-api.js'
 
 /** One namespace's field patch, derived from the contract's input schema. */
-export type SettingsPatch = z.infer<typeof settingsPatchSchema>
+export type SettingsPatch = typeof settingsPatchEffectSchema.Type
 
 /** What these tools read from one settings namespace; `SettingsDescriptor` satisfies it. */
 export interface SettingsRow {
@@ -63,16 +64,16 @@ const MAX_NAMES_IN_ERROR = 8
 const MAX_MESSAGE = 300
 const MAX_LISTED_ENTRIES = 50
 
-const failureSchema = z.looseObject({ code: z.string().optional(), message: z.string().optional() })
+const failureSchema = Schema.Struct({ code: Schema.optionalKey(Schema.String), message: Schema.optionalKey(Schema.String) })
 
 const failureCode = (error: unknown): string | undefined => {
-  const parsed = failureSchema.safeParse(error)
-  return parsed.success ? parsed.data.code : undefined
+  const parsed = Schema.decodeUnknownOption(failureSchema)(error)
+  return Option.isSome(parsed) ? parsed.value.code : undefined
 }
 
 const failureMessage = (error: unknown, fallback: string): string => {
-  const parsed = failureSchema.safeParse(error)
-  const message = parsed.success ? parsed.data.message : undefined
+  const parsed = Schema.decodeUnknownOption(failureSchema)(error)
+  const message = Option.isSome(parsed) ? parsed.value.message : undefined
   return (message ?? fallback).slice(0, MAX_MESSAGE)
 }
 

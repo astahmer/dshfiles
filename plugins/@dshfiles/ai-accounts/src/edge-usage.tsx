@@ -1,11 +1,12 @@
-import { z } from 'zod'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { createCoalescedWrite } from '@dshfiles/plugin-ui/hooks/coalesced-write'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import * as Schema from 'effect/Schema'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { asZodSchema } from './effect-zod-schema.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
@@ -47,7 +48,11 @@ interface ViewportSize {
 
 const POPOVER_SIDE = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' } as const satisfies Record<Edge, 'left' | 'right' | 'top' | 'bottom'>
 
-const positionSchema = z.object({ edge: z.enum(['left', 'right', 'top', 'bottom']), x: z.number(), y: z.number() })
+const positionSchema = Schema.Struct({
+  edge: Schema.Literals(['left', 'right', 'top', 'bottom']),
+  x: Schema.Number.check(Schema.isFinite()),
+  y: Schema.Number.check(Schema.isFinite()),
+})
 
 const clamp = (position: EdgePosition, viewport: ViewportSize): EdgePosition => ({
   edge: position.edge,
@@ -57,7 +62,7 @@ const clamp = (position: EdgePosition, viewport: ViewportSize): EdgePosition => 
 
 const viewport = (): ViewportSize => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
 
-const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: positionSchema, fallback: null })
+const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: asZodSchema(positionSchema), fallback: null })
 /** One persisted position per this window while a drag moves the widget. */
 const POSITION_WRITE_DELAY_MS = 200
 

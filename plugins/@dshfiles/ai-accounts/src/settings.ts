@@ -1,7 +1,8 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { z } from 'zod'
-import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy, type RecoveryPolicy } from './failure-policy.js'
+import * as EffectSchema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
+import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy } from './failure-policy.js'
 
 const kindPolicySetting = (fallback: KindPolicy, description: string) =>
   Schema.object({
@@ -113,13 +114,11 @@ export const DEFAULT_CLIENT_SETTINGS = {
   readonly pricingRefreshHours: number
 }
 
-const pricingSettingsSchema = z.object({
-  costEstimates: z.boolean().catch(true),
-  pricingRefreshHours: z.number().min(1).catch(24),
-  pricingOverrides: z.record(z.string(), z.string()).catch({}),
-})
-
-export type PricingSettings = z.infer<typeof pricingSettingsSchema>
+export type PricingSettings = {
+  readonly costEstimates: boolean
+  readonly pricingRefreshHours: number
+  readonly pricingOverrides: Readonly<Record<string, string>>
+}
 
 let readHostSettings: (() => unknown) | undefined
 
@@ -144,51 +143,66 @@ const readLiveSettings = (): object => {
   return typeof value === 'object' && value !== null ? value : {}
 }
 
-/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
-const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
-
-/** Live Fast mode preference; off when the namespace is not registered on this Host. */
-const readFastModeDefault = (): boolean =>
-  z
-    .object({ fastModeDefault: z.boolean().catch(false) })
-    .catch({ fastModeDefault: false })
-    .parse(readLiveSettings()).fastModeDefault
-
-/** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
-const readLunaReserveRouting = (): boolean =>
-  z
-    .object({ codexLunaReserve: z.boolean().catch(true) })
-    .catch({ codexLunaReserve: true })
-    .parse(readLiveSettings()).codexLunaReserve
-
-const recoverySettingsSchema = z.object({
-  failureRecovery: recoveryPolicySchema,
-  hiddenUsageAccounts: z.array(z.string()).catch([]),
+/** The namespace keys read below; each stays `unknown` until its own rule decides whether it is usable. */
+const liveSettingsSchema = EffectSchema.Struct({
+  costEstimates: EffectSchema.optional(EffectSchema.Unknown),
+  pricingRefreshHours: EffectSchema.optional(EffectSchema.Unknown),
+  pricingOverrides: EffectSchema.optional(EffectSchema.Unknown),
+  fastModeDefault: EffectSchema.optional(EffectSchema.Unknown),
+  codexLunaReserve: EffectSchema.optional(EffectSchema.Unknown),
+  failureRecovery: EffectSchema.optional(EffectSchema.Unknown),
+  hiddenUsageAccounts: EffectSchema.optional(EffectSchema.Unknown),
+  autoRetryQuotaDefault: EffectSchema.optional(EffectSchema.Unknown),
+  showQuotaRetryChoice: EffectSchema.optional(EffectSchema.Unknown),
 })
 
-/** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-const readRecoverySettings = (): {
-  readonly policy: RecoveryPolicy
-  readonly usageOrder: readonly string[]
-  readonly hiddenUsageAccounts: readonly string[]
-} => {
-  const parsed = recoverySettingsSchema.parse(readLiveSettings())
-  // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
-  return { policy: parsed.failureRecovery, usageOrder: [], hiddenUsageAccounts: parsed.hiddenUsageAccounts }
+type LiveSettings = typeof liveSettingsSchema.Type
+
+/** One setting, or its fallback when the value is absent, malformed, or from an older Host. */
+const decodeSetting = <S extends EffectSchema.ConstraintDecoder<unknown>>(schema: S, value: unknown, fallback: S['Type']): S['Type'] => {
+  const result = AiAccountsSchema.decodeResult(schema, value)
+  return result._tag === 'Success' ? result.success : fallback
 }
 
-const quotaRetrySettingsSchema = z.object({
-  autoRetryQuotaDefault: z.boolean().catch(true),
-  showQuotaRetryChoice: z.boolean().catch(true),
-})
+const readLiveSettingsFields = (): LiveSettings => {
+  const result = AiAccountsSchema.decodeResult(liveSettingsSchema, readLiveSettings())
+  return result._tag === 'Success' ? result.success : {}
+}
+
+/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
+const readPricingSettings = (): PricingSettings => {
+  const live = readLiveSettingsFields()
+  return {
+    costEstimates: decodeSetting(EffectSchema.Boolean, live.costEstimates, true),
+    pricingRefreshHours: decodeSetting(EffectSchema.Finite.check(EffectSchema.isGreaterThanOrEqualTo(1)), live.pricingRefreshHours, 24),
+    pricingOverrides: decodeSetting(EffectSchema.Record(EffectSchema.String, EffectSchema.String), live.pricingOverrides, {}),
+  }
+}
+
+/** Live Fast mode preference; off when the namespace is not registered on this Host. */
+const readFastModeDefault = (): boolean => decodeSetting(EffectSchema.Boolean, readLiveSettingsFields().fastModeDefault, false)
+
+/** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
+const readLunaReserveRouting = (): boolean => decodeSetting(EffectSchema.Boolean, readLiveSettingsFields().codexLunaReserve, true)
+
+/** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
+const readRecoverySettings = () => {
+  const live = readLiveSettingsFields()
+  // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
+  return {
+    policy: decodeSetting(recoveryPolicySchema, live.failureRecovery, DEFAULT_RECOVERY_POLICY),
+    usageOrder: [],
+    hiddenUsageAccounts: decodeSetting(EffectSchema.Array(EffectSchema.String), live.hiddenUsageAccounts, []),
+  }
+}
 
 /** Quota retry defaults; old or unregistered Hosts stay opted in and show the turn-level option. */
-const readQuotaRetrySettings = (): {
-  readonly autoRetryDefault: boolean
-  readonly showChoice: boolean
-} => {
-  const parsed = quotaRetrySettingsSchema.parse(readLiveSettings())
-  return { autoRetryDefault: parsed.autoRetryQuotaDefault, showChoice: parsed.showQuotaRetryChoice }
+const readQuotaRetrySettings = () => {
+  const live = readLiveSettingsFields()
+  return {
+    autoRetryDefault: decodeSetting(EffectSchema.Boolean, live.autoRetryQuotaDefault, true),
+    showChoice: decodeSetting(EffectSchema.Boolean, live.showQuotaRetryChoice, true),
+  }
 }
 
 export class AccountSettingsModel {

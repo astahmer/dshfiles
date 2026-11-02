@@ -1,23 +1,23 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
 import { MAX_VIEWED_MARKS, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
-const viewedMarkSchema = z
-  .object({
-    key: z.string().min(1),
-    version: z.number().int().positive(),
-  })
-  .strict()
+const viewedMarkSchema = Schema.Struct({
+  key: Schema.String.check(Schema.isMinLength(1)),
+  version: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+})
 
 export const viewedMarksDomain = defineDomain({
   name: 'diff_viewed',
   version: 1,
   tables: {
-    marks: { valueSchema: viewedMarkSchema, __key: 'marks' },
+    // `defineDomain` still types a table's record validator as a zod schema; the Effect schema stays the source of truth.
+    marks: { valueSchema: zodSchemaFromEffect(viewedMarkSchema), __key: 'marks' },
   },
 })
 
-export type ViewedMark = z.infer<typeof viewedMarkSchema>
+export type ViewedMark = typeof viewedMarkSchema.Type
 export type ViewedMarksTable = KvTable<string, ViewedMark>
 
 /** Monotone across Host restarts: a new mark always outranks every stored version. */

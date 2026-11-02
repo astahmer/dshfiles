@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -56,10 +57,10 @@ export const BacklogReferenceOverlay = (props: {
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = backlogReferencePreviewRequestSchema.safeParse(event.detail)
-      if (!parsed.success) return
-      setAnchor(parsed.data.anchor)
-      setRequest(parsed.data)
+      const request = Option.getOrNull(Schema.decodeUnknownOption(backlogReferencePreviewRequestSchema)(event.detail))
+      if (request === null) return
+      setAnchor(request.anchor)
+      setRequest(request)
     }
     window.addEventListener(backlogReferencePreviewEvent, open)
     return () => window.removeEventListener(backlogReferencePreviewEvent, open)

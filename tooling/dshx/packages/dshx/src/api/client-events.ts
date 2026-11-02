@@ -1,7 +1,9 @@
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiEventClientPayload, ApiEventStatus } from './types.js'
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel } from './runtime.js'
+import { ApiChannelModel } from './channel.js'
 
 interface EventSourceLike {
   readonly readyState: number
@@ -28,12 +30,12 @@ interface EventHub {
   readonly subscribers: Set<Subscriber>
 }
 
-const frameSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('catalog'), events: z.array(z.string()) }),
-  z.object({ type: z.literal('event'), key: z.string(), version: z.number(), data: z.unknown() }),
+const frameSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('catalog'), events: Schema.Array(Schema.String) }),
+  Schema.Struct({ type: Schema.Literal('event'), key: Schema.String, version: Schema.Number.check(Schema.isFinite()), data: Schema.Unknown }),
 ])
 
-type EventFrame = Extract<z.infer<typeof frameSchema>, { readonly type: 'event' }>
+type EventFrame = Extract<(typeof frameSchema)['Type'], { readonly type: 'event' }>
 
 const HUB_KEY = Symbol.for('@dshfiles/dshx.api-events.v1')
 
@@ -62,14 +64,14 @@ const receive = (hub: EventHub, raw: unknown): void => {
   } catch {
     return
   }
-  const frame = frameSchema.safeParse(parsed)
-  if (!frame.success) return
-  if (frame.data.type === 'catalog') {
-    hub.catalog = new Set(frame.data.events)
+  const frame = Schema.decodeUnknownOption(frameSchema)(parsed)
+  if (Option.isNone(frame)) return
+  if (frame.value.type === 'catalog') {
+    hub.catalog = new Set(frame.value.events)
     notifyStatus(hub)
     return
   }
-  const event = frame.data
+  const event = frame.value
   for (const subscriber of [...hub.subscribers]) if (subscriber.key === event.key) subscriber.deliver(event)
 }
 
@@ -83,7 +85,7 @@ const open = (hub: EventHub): void => {
   }
   hub.missing = false
   hub.catalog = undefined
-  const source = new EventSourceClass(ApiProtocolModel.eventsPath.slice(1))
+  const source = new EventSourceClass(ApiChannelModel.eventsPath.slice(1))
   hub.source = source
   source.onmessage = message => receive(hub, message.data)
   source.onerror = () => {
@@ -124,7 +126,7 @@ const subscribeApiEvent = <
   const definition = target?.contract.events?.[event]
   if (target === undefined || definition === undefined) throw new TypeError(`API client has no event ${JSON.stringify(event)}.`)
   const hub = eventHub()
-  const key = ApiProtocolModel.eventKey(target.owner, target.contract.id, event)
+  const key = ApiChannelModel.eventKey(target.owner, target.contract.id, event)
   let status: ApiEventStatus | undefined
   let active = true
   const subscriber: Subscriber = {

@@ -25,7 +25,8 @@ import {
   type SessionRecord,
   type SessionTitleObservationResult,
 } from '@deepseek-ai/dsh-session-query'
-import { z } from 'zod'
+import { Effect } from 'effect'
+import * as Schema from 'effect/Schema'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, SearchMatch, SessionHeaderRow } from './protocol.js'
 import { SearchWorkerClient } from './worker-client.js'
@@ -33,21 +34,24 @@ import { SearchWorkerClient } from './worker-client.js'
 /** Bounds how stale a listing may get when another process writes the same Session logs. */
 const LISTING_TTL_MS = 60_000
 
-const engineConfigSchema = z.object({
-  client: z.custom<SearchWorkerClient>(value => value instanceof SearchWorkerClient, 'a session-search worker client'),
-  defaultLimit: z.number().int().positive().default(20),
-  maxLimit: z.number().int().positive().default(100),
-  readWindowMax: z.number().int().nonnegative().default(50),
-  persistedReadConcurrency: z.number().int().positive().default(4),
-  preparedSessionCacheSize: z.number().int().positive().default(5),
+/** A config the Host row may omit: every count falls back to the value this backend has always run with. */
+const positiveCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
+const nonNegativeCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const engineConfigSchema = Schema.Struct({
+  client: Schema.instanceOf(SearchWorkerClient),
+  defaultLimit: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(20))),
+  maxLimit: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(100))),
+  readWindowMax: nonNegativeCount.pipe(Schema.withDecodingDefault(Effect.succeed(50))),
+  persistedReadConcurrency: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(4))),
+  preparedSessionCacheSize: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(5))),
 })
-export type SessionSearchEngineConfig = z.input<typeof engineConfigSchema>
+export type SessionSearchEngineConfig = typeof engineConfigSchema.Encoded
 
-const cursorPayloadSchema = z.object({
-  version: z.literal(1),
-  scope: z.enum(['sessions', 'events']),
-  fingerprint: z.string(),
-  offset: z.number().int().nonnegative(),
+const cursorPayloadSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  scope: Schema.Literals(['sessions', 'events']),
+  fingerprint: Schema.String,
+  offset: nonNegativeCount,
 })
 
 type CursorFingerprint =
@@ -82,7 +86,7 @@ export class SessionSearchEngine extends SessionQueryEngine {
   readonly _maxLimit: number
 
   constructor(ctx: Context, config: SessionSearchEngineConfig) {
-    const parsed = engineConfigSchema.parse(config)
+    const parsed = Schema.decodeUnknownSync(engineConfigSchema)(config)
     super(ctx, {
       readWindowMax: parsed.readWindowMax,
       persistedReadConcurrency: parsed.persistedReadConcurrency,
@@ -255,10 +259,10 @@ export class SessionSearchEngine extends SessionQueryEngine {
     return JSON.stringify(payload)
   }
 
-  _parseCursor(cursor: string): z.infer<typeof cursorPayloadSchema> | undefined {
+  _parseCursor(cursor: string): typeof cursorPayloadSchema.Type | undefined {
     try {
       const parsed = decodeJsonSafe(cursorPayloadSchema, Buffer.from(cursor, 'base64url').toString('utf8'))
-      return parsed.success ? parsed.data : undefined
+      return parsed._tag === 'Success' ? parsed.success : undefined
     } catch {
       return undefined
     }

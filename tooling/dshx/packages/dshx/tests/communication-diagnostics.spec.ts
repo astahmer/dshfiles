@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CommunicationService } from '../src/communication/service.js'
 import { communicationStateSchema, type CommunicationPrincipal } from '../src/communication/types.js'
@@ -117,7 +118,7 @@ describe('communication diagnostics', () => {
     expect(await readFile(path, 'utf8')).toBe(beforeReport)
 
     await service.subscribe({ kind: 'agent', id: 'agent-reader' }, { topic: 'builds.ready' })
-    const upgraded = communicationStateSchema.parse(JSON.parse(await readFile(path, 'utf8')))
+    const upgraded = Schema.decodeUnknownSync(communicationStateSchema)(JSON.parse(await readFile(path, 'utf8')))
     expect(upgraded).toMatchObject({
       schemaVersion: 4,
       activityStartedAt: null,

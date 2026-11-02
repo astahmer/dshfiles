@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { JjFilesystem } from './jj-filesystem.js'
 import { dirname, join, resolve } from 'node:path'
 
 /** Subcommands that only read the repository view, whose output is a function of the operation head. */
@@ -13,6 +13,8 @@ const MAX_ENTRIES = 512
  * misses the cache and an operation landing mid-read is paired with the older head.
  */
 export class JjReadCache<Result> {
+  constructor(private readonly filesystem: typeof JjFilesystem) {}
+
   private readonly results = new Map<string, Result>()
   private readonly inFlight = new Map<string, Promise<Result>>()
   private readonly opHeadsDirectories = new Map<string, string | null>()
@@ -34,7 +36,7 @@ export class JjReadCache<Result> {
     if (opHeads === null) return input.run()
     let heads: string
     try {
-      heads = readdirSync(opHeads).sort().join(',')
+      heads = this.filesystem.readdirSync(opHeads).sort().join(',')
     } catch {
       return input.run()
     }
@@ -62,8 +64,8 @@ export class JjReadCache<Result> {
     let found: string | null = null
     while (found === null) {
       const marker = join(directory, '.jj', 'repo')
-      if (existsSync(marker)) {
-        const store = statSync(marker).isDirectory() ? marker : resolve(dirname(marker), readFileSync(marker, 'utf8').trim())
+      if (this.filesystem.existsSync(marker)) {
+        const store = this.filesystem.statSync(marker).isDirectory() ? marker : resolve(dirname(marker), this.filesystem.readFileSync(marker, 'utf8').trim())
         found = join(store, 'op_heads', 'heads')
         break
       }

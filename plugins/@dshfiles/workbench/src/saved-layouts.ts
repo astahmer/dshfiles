@@ -1,6 +1,6 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { SerializedDockview } from 'dockview-react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { createEffectStoredValue } from './effect-stored-value.js'
 import { layoutSchema, nestedLayoutStores, nestedSurfacePathSchema, type LayoutSurface, type NestedLayouts, type NestedLayoutStores } from './layout-store.js'
 
 /** One named arrangement: whatever each region held when it was saved. A region it did not record stays as it is. */
@@ -19,21 +19,32 @@ export interface SavedLayout {
   readonly nested?: NestedLayouts | undefined
 }
 
-export const savedLayoutSchema = z.object({
-  main: layoutSchema.nullable().optional(),
-  left: layoutSchema.nullable().optional(),
-  dock: layoutSchema.nullable().optional(),
-  bottom: layoutSchema.nullable().optional(),
-  presentation: z.object({ bottomShown: z.boolean(), rightMode: z.enum(['native', 'dock']).optional() }).optional(),
-  nested: z.record(nestedSurfacePathSchema, layoutSchema.nullable()).optional(),
+const savedSurfaceSchema = Schema.optionalKey(Schema.Union([layoutSchema, Schema.Null, Schema.Undefined]))
+const savedPresentationSchema = Schema.optionalKey(
+  Schema.Union([
+    Schema.Struct({
+      bottomShown: Schema.Boolean,
+      rightMode: Schema.optionalKey(Schema.Union([Schema.Literals(['native', 'dock']), Schema.Undefined])),
+    }),
+    Schema.Undefined,
+  ]),
+)
+
+export const savedLayoutSchema = Schema.Struct({
+  main: savedSurfaceSchema,
+  left: savedSurfaceSchema,
+  dock: savedSurfaceSchema,
+  bottom: savedSurfaceSchema,
+  presentation: savedPresentationSchema,
+  nested: Schema.optionalKey(Schema.Union([Schema.Record(nestedSurfacePathSchema, Schema.NullOr(layoutSchema)), Schema.Undefined])),
 })
-const layoutsSchema = z.record(z.string().min(1).max(64), savedLayoutSchema)
+const layoutsSchema = Schema.Record(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), savedLayoutSchema)
 
 /** Nothing saved yet; one shared empty map keeps the fallback reference stable. */
 const NO_SAVED_LAYOUTS: SavedLayoutMap = {}
 
 /** Named layouts live beside the live ones in this browser: presentation state, not Host state. */
-export const savedLayouts = createStoredValue({
+export const savedLayouts = createEffectStoredValue({
   key: 'dshfiles.workbench.saved-layouts.v1',
   schema: layoutsSchema,
   fallback: NO_SAVED_LAYOUTS,

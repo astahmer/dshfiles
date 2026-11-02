@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountConnectionMethodModel } from './account-connection-method.js'
 import { AccountHomePolicy } from './account-home-policy.js'
@@ -172,7 +173,7 @@ export const createAccountSetupService = (input: {
     }),
   })
   const prepare = (raw: PrepareAccountConnectionInput): Promise<AccountConnectionSnapshot> => {
-    const request = prepareAccountConnectionInputSchema.parse(raw)
+    const request = Schema.decodeUnknownSync(prepareAccountConnectionInputSchema)(raw)
     if (request.mode !== undefined) AccountConnectionMethodModel.assertAllowed(request.kind, request.mode)
     const requestKey = request.requestId.toLowerCase()
     const existing = preparations.get(requestKey)
@@ -336,7 +337,7 @@ export const createAccountSetupService = (input: {
     get: (id: string): AccountConnectionSnapshot => snapshot(get(id)),
     configure: (id: string, raw: Omit<ConfigureAccountConnectionInput, 'operationId'>): Promise<AccountConnectionSnapshot> => {
       const operation = pending(id)
-      const configuration = configureAccountConnectionInputSchema.parse({ ...raw, operationId: operation.operationId })
+      const configuration = Schema.decodeUnknownSync(configureAccountConnectionInputSchema)({ ...raw, operationId: operation.operationId })
       if (configuration.displayName !== undefined && operation.existing !== undefined) throw new Error('Edit saved account name from settings.')
       const method = configuration.mode ?? operation.method
       AccountConnectionMethodModel.assertAllowed(operation.draft.kind, method)
@@ -352,9 +353,10 @@ export const createAccountSetupService = (input: {
         throw new Error('This connection method does not use a credential reference.')
       const methodChanged = method !== operation.method
       const base = draftForMethod(operation.draft, method, operation.operationId)
-      if (methodChanged && method === 'reference') base.apiKeyEnv = operation.existing?.apiKeyEnv ?? ''
-      const next = accountDraftSchema.parse({
+      const rebased = methodChanged && method === 'reference' ? { apiKeyEnv: operation.existing?.apiKeyEnv ?? '' } : {}
+      const next = Schema.decodeUnknownSync(accountDraftSchema)({
         ...base,
+        ...rebased,
         ...(configuration.displayName !== undefined && { displayName: configuration.displayName }),
         ...(configuration.homePath !== undefined && { homePath: configuration.homePath }),
         ...(configuration.shadowHomePath !== undefined && { shadowHomePath: configuration.shadowHomePath }),

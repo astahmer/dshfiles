@@ -2,23 +2,27 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Model, SimpleStreamOptions } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 import type { FastModeUsageObservation } from './fast-mode-usage-model.js'
 import type { FastModeStatus } from './model-fast-mode-api.js'
 
-const fastModeRequestBodySchema = z.record(z.string(), z.json().optional())
-const codexResponseEventSchema = z.object({
-  type: z.enum(['response.completed', 'response.incomplete']),
-  response: z.object({
-    status: z.string().max(64).optional(),
-    service_tier: z.string().min(1).max(32).nullable().optional(),
-    usage: z
-      .object({
-        input_tokens: z.number().int().min(0).optional().catch(0),
-        output_tokens: z.number().int().min(0).optional().catch(0),
-        input_tokens_details: z.object({ cached_tokens: z.number().int().min(0).catch(0) }).optional(),
-      })
-      .optional(),
+const fastModeRequestBodySchema = Schema.Record(Schema.String, Schema.UndefinedOr(Schema.Json))
+const tokenCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const codexResponseEventSchema = Schema.Struct({
+  type: Schema.Literals(['response.completed', 'response.incomplete']),
+  response: Schema.Struct({
+    status: Schema.optional(Schema.String.check(Schema.isMaxLength(64))),
+    service_tier: Schema.optional(Schema.NullOr(AiAccountsSchema.id(32))),
+    usage: Schema.optional(
+      Schema.Struct({
+        input_tokens: Schema.optional(tokenCount).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(0)))),
+        output_tokens: Schema.optional(tokenCount).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(0)))),
+        input_tokens_details: Schema.optional(Schema.Struct({ cached_tokens: tokenCount.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(0)))) })),
+      }),
+    ),
   }),
 })
 
@@ -124,21 +128,21 @@ export class FastModeService {
       ...options,
       onPayload: async (payload, payloadModel) => {
         const transformed = options?.onPayload === undefined ? payload : ((await options.onPayload(payload, payloadModel)) ?? payload)
-        const body = fastModeRequestBodySchema.safeParse(transformed)
-        if (!body.success) throw new Error('ai-accounts: Fast mode request payload must be a JSON object.')
-        return { ...body.data, service_tier: 'priority' }
+        const body = AiAccountsSchema.decodeResult(fastModeRequestBodySchema, transformed)
+        if (body._tag === 'Failure') throw new Error('ai-accounts: Fast mode request payload must be a JSON object.')
+        return { ...body.success, service_tier: 'priority' }
       },
       onProviderStreamEvent: async (event, eventModel) => {
         await options?.onProviderStreamEvent?.(event, eventModel)
-        const parsed = codexResponseEventSchema.safeParse(event)
-        if (!parsed.success) return
-        const response = parsed.data.response
+        const parsed = AiAccountsSchema.decodeResult(codexResponseEventSchema, event)
+        if (parsed._tag === 'Failure') return
+        const response = parsed.success.response
         try {
           await this.dependencies.recordUsage?.({
             instanceId: request.provider,
             model: request.model,
             serviceTier: response.service_tier ?? null,
-            responseStatus: parsed.data.type === 'response.incomplete' || response.status === 'incomplete' ? 'incomplete' : 'completed',
+            responseStatus: parsed.success.type === 'response.incomplete' || response.status === 'incomplete' ? 'incomplete' : 'completed',
             inputTokens: response.usage?.input_tokens ?? 0,
             outputTokens: response.usage?.output_tokens ?? 0,
             cacheReadTokens: response.usage?.input_tokens_details?.cached_tokens ?? 0,

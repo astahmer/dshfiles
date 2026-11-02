@@ -1,0 +1,2920 @@
+{
+  "id": "agents",
+  "owner": "@dshfiles/agents",
+  "version": 1,
+  "methods": [
+    {
+      "name": "list",
+      "description": "Every configured agent with its handle, instructions, model route, preset and usage. Read-only.",
+      "tool": {
+        "name": "agents_list",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "glyph": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 8
+                },
+                "description": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 200
+                },
+                "instructions": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "preset": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "route": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "reasoningEffort": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "memoryScope": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "allOf": [
+                        {
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "routine": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "delegation": {
+                  "type": "object",
+                  "properties": {
+                    "messaging": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "listed",
+                        "none"
+                      ]
+                    },
+                    "handles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "maxItems": 50
+                    },
+                    "subagents": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messaging",
+                    "handles",
+                    "subagents"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "builtIn": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "threadCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "handle",
+                "name",
+                "glyph",
+                "description",
+                "instructions",
+                "preset",
+                "route",
+                "memoryScope",
+                "routine",
+                "delegation",
+                "enabled",
+                "builtIn",
+                "createdAt",
+                "updatedAt",
+                "lastUsedAt",
+                "threadCount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "agents"
+        ]
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "glyph": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "instructions": {
+                  "type": "string"
+                },
+                "preset": {
+                  "type": "string"
+                },
+                "route": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model"
+                  ]
+                },
+                "memoryScope": {
+                  "type": "string"
+                },
+                "routine": {
+                  "type": "string"
+                },
+                "delegation": {
+                  "type": "object",
+                  "properties": {
+                    "messaging": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "listed",
+                        "none"
+                      ]
+                    },
+                    "handles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "subagents": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messaging",
+                    "handles",
+                    "subagents"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "builtIn": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "integer"
+                },
+                "updatedAt": {
+                  "type": "integer"
+                },
+                "lastUsedAt": {
+                  "type": "integer"
+                },
+                "threadCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "handle",
+                "name",
+                "glyph",
+                "description",
+                "instructions",
+                "preset",
+                "route",
+                "memoryScope",
+                "routine",
+                "delegation",
+                "enabled",
+                "builtIn",
+                "createdAt",
+                "updatedAt",
+                "lastUsedAt",
+                "threadCount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "agents"
+        ]
+      }
+    },
+    {
+      "name": "get",
+      "description": "One agent by `@handle`, or null when no agent has that handle. Read-only.",
+      "tool": {
+        "name": "agents_get",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "glyph": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 8
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 200
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "preset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "route": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "model"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memoryScope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "allOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "routine": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastUsedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "glyph": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "instructions": {
+                "type": "string"
+              },
+              "preset": {
+                "type": "string"
+              },
+              "route": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "reasoningEffort": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ]
+              },
+              "memoryScope": {
+                "type": "string"
+              },
+              "routine": {
+                "type": "string"
+              },
+              "delegation": {
+                "type": "object",
+                "properties": {
+                  "messaging": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "listed",
+                      "none"
+                    ]
+                  },
+                  "handles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "subagents": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messaging",
+                  "handles",
+                  "subagents"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "builtIn": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "integer"
+              },
+              "updatedAt": {
+                "type": "integer"
+              },
+              "lastUsedAt": {
+                "type": "integer"
+              },
+              "threadCount": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "handle",
+              "name",
+              "glyph",
+              "description",
+              "instructions",
+              "preset",
+              "route",
+              "memoryScope",
+              "routine",
+              "delegation",
+              "enabled",
+              "builtIn",
+              "createdAt",
+              "updatedAt",
+              "lastUsedAt",
+              "threadCount"
+            ]
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      }
+    },
+    {
+      "name": "presets",
+      "description": "The Agent presets this Host can start a thread with, for an agent whose preset decides its tools. Not an agent tool.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "presets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "broken": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          }
+        },
+        "required": [
+          "presets"
+        ]
+      }
+    },
+    {
+      "name": "save",
+      "description": "Create or update one agent. May run only when the user asked for that change.",
+      "tool": {
+        "name": "agents_save",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "glyph": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "instructions": {
+                "type": "string",
+                "maxLength": 8000
+              },
+              "preset": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "route": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "reasoningEffort": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memoryScope": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "routine": {
+                "type": "string",
+                "maxLength": 400
+              },
+              "delegation": {
+                "type": "object",
+                "properties": {
+                  "messaging": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "listed",
+                      "none"
+                    ]
+                  },
+                  "handles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                    },
+                    "maxItems": 50
+                  },
+                  "subagents": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messaging",
+                  "handles"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "handle",
+              "name",
+              "glyph",
+              "description",
+              "instructions",
+              "preset",
+              "route",
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "maximum": 9007199254740991,
+                "exclusiveMinimum": 0
+              },
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "handle": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "glyph": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "maxLength": 8
+                    },
+                    "description": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "maxLength": 200
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 8000
+                    },
+                    "preset": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "route": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "reasoningEffort": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "memoryScope": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "allOf": [
+                            {
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "routine": {
+                      "type": "string",
+                      "maxLength": 400
+                    },
+                    "delegation": {
+                      "type": "object",
+                      "properties": {
+                        "messaging": {
+                          "type": "string",
+                          "enum": [
+                            "any",
+                            "listed",
+                            "none"
+                          ]
+                        },
+                        "handles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "maxItems": 50
+                        },
+                        "subagents": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "messaging",
+                        "handles",
+                        "subagents"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lastUsedAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threadCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "handle",
+                    "name",
+                    "glyph",
+                    "description",
+                    "instructions",
+                    "preset",
+                    "route",
+                    "memoryScope",
+                    "routine",
+                    "delegation",
+                    "enabled",
+                    "builtIn",
+                    "createdAt",
+                    "updatedAt",
+                    "lastUsedAt",
+                    "threadCount"
+                  ]
+                }
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "glyph": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 8
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 200
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "preset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "route": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "model"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memoryScope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "allOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "routine": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastUsedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agents",
+              "agent"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "limit"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "maximum": 9007199254740991,
+                "exclusiveMinimum": 0
+              },
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "handle": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "glyph": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "maxLength": 8
+                    },
+                    "description": {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "maxLength": 200
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 8000
+                    },
+                    "preset": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "route": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "reasoningEffort": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "memoryScope": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "allOf": [
+                            {
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "routine": {
+                      "type": "string",
+                      "maxLength": 400
+                    },
+                    "delegation": {
+                      "type": "object",
+                      "properties": {
+                        "messaging": {
+                          "type": "string",
+                          "enum": [
+                            "any",
+                            "listed",
+                            "none"
+                          ]
+                        },
+                        "handles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "maxItems": 50
+                        },
+                        "subagents": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "messaging",
+                        "handles",
+                        "subagents"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lastUsedAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threadCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "handle",
+                    "name",
+                    "glyph",
+                    "description",
+                    "instructions",
+                    "preset",
+                    "route",
+                    "memoryScope",
+                    "routine",
+                    "delegation",
+                    "enabled",
+                    "builtIn",
+                    "createdAt",
+                    "updatedAt",
+                    "lastUsedAt",
+                    "threadCount"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agents"
+            ]
+          }
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "glyph": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "instructions": {
+                "type": "string"
+              },
+              "preset": {
+                "type": "string"
+              },
+              "route": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "reasoningEffort": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ]
+              },
+              "memoryScope": {
+                "type": "string"
+              },
+              "routine": {
+                "type": "string"
+              },
+              "delegation": {
+                "type": "object",
+                "properties": {
+                  "messaging": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "listed",
+                      "none"
+                    ]
+                  },
+                  "handles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "subagents": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messaging",
+                  "handles"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "handle",
+              "name",
+              "glyph",
+              "description",
+              "instructions",
+              "preset",
+              "route",
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      },
+      "toolOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {
+                "type": "integer"
+              },
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "glyph": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "instructions": {
+                      "type": "string"
+                    },
+                    "preset": {
+                      "type": "string"
+                    },
+                    "route": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ]
+                    },
+                    "memoryScope": {
+                      "type": "string"
+                    },
+                    "routine": {
+                      "type": "string"
+                    },
+                    "delegation": {
+                      "type": "object",
+                      "properties": {
+                        "messaging": {
+                          "type": "string",
+                          "enum": [
+                            "any",
+                            "listed",
+                            "none"
+                          ]
+                        },
+                        "handles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "subagents": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "messaging",
+                        "handles",
+                        "subagents"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "integer"
+                    },
+                    "updatedAt": {
+                      "type": "integer"
+                    },
+                    "lastUsedAt": {
+                      "type": "integer"
+                    },
+                    "threadCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "handle",
+                    "name",
+                    "glyph",
+                    "description",
+                    "instructions",
+                    "preset",
+                    "route",
+                    "memoryScope",
+                    "routine",
+                    "delegation",
+                    "enabled",
+                    "builtIn",
+                    "createdAt",
+                    "updatedAt",
+                    "lastUsedAt",
+                    "threadCount"
+                  ]
+                }
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "glyph": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "instructions": {
+                    "type": "string"
+                  },
+                  "preset": {
+                    "type": "string"
+                  },
+                  "route": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "reasoningEffort": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model"
+                    ]
+                  },
+                  "memoryScope": {
+                    "type": "string"
+                  },
+                  "routine": {
+                    "type": "string"
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer"
+                  },
+                  "updatedAt": {
+                    "type": "integer"
+                  },
+                  "lastUsedAt": {
+                    "type": "integer"
+                  },
+                  "threadCount": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agents",
+              "agent"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "limit"
+                ]
+              },
+              "revision": {
+                "type": "integer"
+              },
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "handle": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "glyph": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "instructions": {
+                      "type": "string"
+                    },
+                    "preset": {
+                      "type": "string"
+                    },
+                    "route": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ]
+                    },
+                    "memoryScope": {
+                      "type": "string"
+                    },
+                    "routine": {
+                      "type": "string"
+                    },
+                    "delegation": {
+                      "type": "object",
+                      "properties": {
+                        "messaging": {
+                          "type": "string",
+                          "enum": [
+                            "any",
+                            "listed",
+                            "none"
+                          ]
+                        },
+                        "handles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "subagents": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "messaging",
+                        "handles",
+                        "subagents"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "integer"
+                    },
+                    "updatedAt": {
+                      "type": "integer"
+                    },
+                    "lastUsedAt": {
+                      "type": "integer"
+                    },
+                    "threadCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "handle",
+                    "name",
+                    "glyph",
+                    "description",
+                    "instructions",
+                    "preset",
+                    "route",
+                    "memoryScope",
+                    "routine",
+                    "delegation",
+                    "enabled",
+                    "builtIn",
+                    "createdAt",
+                    "updatedAt",
+                    "lastUsedAt",
+                    "threadCount"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agents"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "remove",
+      "description": "Remove one agent. Destructive: requires `confirm: true`, which is never implied by a bare request.",
+      "tool": {
+        "name": "agents_remove",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "handle",
+          "confirm"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "built-in",
+              "missing"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "glyph": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 8
+                },
+                "description": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 200
+                },
+                "instructions": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "preset": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "route": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "reasoningEffort": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "memoryScope": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "allOf": [
+                        {
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "routine": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "delegation": {
+                  "type": "object",
+                  "properties": {
+                    "messaging": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "listed",
+                        "none"
+                      ]
+                    },
+                    "handles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "maxItems": 50
+                    },
+                    "subagents": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messaging",
+                    "handles",
+                    "subagents"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "builtIn": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "threadCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "handle",
+                "name",
+                "glyph",
+                "description",
+                "instructions",
+                "preset",
+                "route",
+                "memoryScope",
+                "routine",
+                "delegation",
+                "enabled",
+                "builtIn",
+                "createdAt",
+                "updatedAt",
+                "lastUsedAt",
+                "threadCount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "revision",
+          "agents"
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "handle",
+          "confirm"
+        ]
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "built-in",
+              "missing"
+            ]
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "glyph": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "instructions": {
+                  "type": "string"
+                },
+                "preset": {
+                  "type": "string"
+                },
+                "route": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model"
+                  ]
+                },
+                "memoryScope": {
+                  "type": "string"
+                },
+                "routine": {
+                  "type": "string"
+                },
+                "delegation": {
+                  "type": "object",
+                  "properties": {
+                    "messaging": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "listed",
+                        "none"
+                      ]
+                    },
+                    "handles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "subagents": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messaging",
+                    "handles",
+                    "subagents"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "builtIn": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "integer"
+                },
+                "updatedAt": {
+                  "type": "integer"
+                },
+                "lastUsedAt": {
+                  "type": "integer"
+                },
+                "threadCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "handle",
+                "name",
+                "glyph",
+                "description",
+                "instructions",
+                "preset",
+                "route",
+                "memoryScope",
+                "routine",
+                "delegation",
+                "enabled",
+                "builtIn",
+                "createdAt",
+                "updatedAt",
+                "lastUsedAt",
+                "threadCount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "revision",
+          "agents"
+        ]
+      }
+    },
+    {
+      "name": "recordUse",
+      "description": "Record a dispatch: bump last-used time and count, and keep the thread it opened so the panel can list it after a Host restart. Not an agent tool.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "title"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "glyph": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 8
+                },
+                "description": {
+                  "type": "string",
+                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                  "maxLength": 200
+                },
+                "instructions": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "preset": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "route": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "reasoningEffort": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "memoryScope": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "allOf": [
+                        {
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "routine": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "delegation": {
+                  "type": "object",
+                  "properties": {
+                    "messaging": {
+                      "type": "string",
+                      "enum": [
+                        "any",
+                        "listed",
+                        "none"
+                      ]
+                    },
+                    "handles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "maxItems": 50
+                    },
+                    "subagents": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messaging",
+                    "handles",
+                    "subagents"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "builtIn": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "threadCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "handle",
+                "name",
+                "glyph",
+                "description",
+                "instructions",
+                "preset",
+                "route",
+                "memoryScope",
+                "routine",
+                "delegation",
+                "enabled",
+                "builtIn",
+                "createdAt",
+                "updatedAt",
+                "lastUsedAt",
+                "threadCount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "agents"
+        ]
+      }
+    },
+    {
+      "name": "threads",
+      "description": "The threads one agent started, newest first, with their titles and start times. Read-only.",
+      "tool": {
+        "name": "agents_threads",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "startedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sessionId",
+                "handle",
+                "title",
+                "startedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "sessionId",
+                "handle",
+                "title",
+                "startedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ]
+      }
+    },
+    {
+      "name": "threadAgent",
+      "description": "The agent that started one thread, by Session id, or null for a thread no agent started. Read-only; a cross-plugin lookup, not an agent tool.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "glyph": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 8
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 200
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "preset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "route": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "model"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memoryScope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "allOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "routine": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastUsedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      }
+    }
+  ]
+}

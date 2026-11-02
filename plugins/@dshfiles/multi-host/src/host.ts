@@ -1,3 +1,6 @@
+import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
+import { MultiHostSchema } from './schema.js'
 import { randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
@@ -5,11 +8,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
-import { z } from 'zod'
+import { Effect, Layer } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
+import type { ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import {
   fileUploadValueSchema,
-  jjRepositoriesSchema,
+  jjRepositoriesEffectSchema,
   multiHostApi,
   resourceSnapshotSchema,
   type ConnectionTestStep,
@@ -57,106 +62,102 @@ import { callNativeRpc } from './native-rpc.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
 
-const profileSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 const requiredCapabilities: readonly RuntimeIdentity['capabilities'][number][] = ['workspace', 'session', 'agent']
-const configSchema = z.object({ profile: profileSchema.optional() }).strict()
-const sessionRowSchema = z
-  .object({
-    sessionId: z.string().min(1).max(256),
-    cwd: z.string().max(4096).optional(),
-    running: z.boolean(),
-    blank: z.boolean(),
-    updatedAt: z.number().finite(),
-    title: z.string().max(512).nullable().optional(),
-    // The remote list names a thread through its title projection; an untitled thread reports null there.
-    projections: z
-      .object({
-        values: z
-          .object({ title: z.string().max(512).nullable().optional() })
-          .passthrough()
-          .optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough()
-const sessionListSchema = z.object({ items: z.array(sessionRowSchema).max(10_000) }).passthrough()
-const sessionCreatedSchema = z.object({ sessionId: z.string().min(1).max(256) }).passthrough()
-const directoryListingSchema = z
-  .object({
-    path: z.string(),
-    home: z.string(),
-    crumbs: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })),
-    entries: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })).max(5_000),
-    truncated: z.boolean(),
-  })
-  .passthrough()
-const workspaceRowSchema = z
-  .object({
-    workspaceId: z.string().min(1).max(256),
-    path: z.string().min(1).max(4096),
-    title: z.string().max(512).optional(),
-    sessionIds: z.array(z.string().max(256)).max(10_000).optional(),
-  })
-  .passthrough()
-const workspaceCreatedSchema = z.object({ workspace: z.object({ workspaceId: z.string().min(1), path: z.string().min(1) }).passthrough() }).passthrough()
-const workspaceContainerSchema = z
-  .object({
-    items: z.unknown().optional(),
-    value: z.unknown().optional(),
-    workspace: z.unknown().optional(),
-    workspaces: z.unknown().optional(),
-    baseline: z.unknown().optional(),
-    snapshot: z.unknown().optional(),
-  })
-  .passthrough()
-const fileReferenceCandidatesSchema = z.array(z.object({ path: z.string().max(4096), kind: z.enum(['file', 'directory']) }).strip()).max(1000)
-const modelCatalogSchema = z
-  .object({
-    default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).passthrough().optional(),
-    routableProviders: z.array(z.string()).optional(),
-    groups: z.array(
-      z
-        .object({
-          id: z.string(),
-          name: z.string(),
-          models: z.array(
-            z
-              .object({
-                id: z.string(),
-                name: z.string(),
-                description: z.string().optional(),
-                reasoning: z
-                  .object({
-                    efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().optional() }).passthrough()),
-                    defaultEffort: z.string().optional(),
-                  })
-                  .passthrough()
-                  .optional(),
-              })
-              .passthrough(),
+const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
+const sessionRowSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  cwd: Schema.optional(Schema.String.check(Schema.isMaxLength(4096))),
+  running: Schema.Boolean,
+  blank: Schema.Boolean,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
+  title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))),
+  // The remote list names a thread through its title projection; an untitled thread reports null there.
+  projections: Schema.optional(
+    Schema.Struct({
+      values: Schema.optional(
+        Schema.Struct({ title: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))) }).pipe(MultiHostSchema.passthrough),
+      ),
+    }).pipe(MultiHostSchema.passthrough),
+  ),
+}).pipe(MultiHostSchema.passthrough)
+type MutableSessionSummary = { -readonly [Key in keyof SessionSummary]: SessionSummary[Key] }
+
+const sessionListSchema = Schema.Struct({ items: Schema.Array(sessionRowSchema).check(Schema.isMaxLength(10_000)) }).pipe(MultiHostSchema.passthrough)
+const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(MultiHostSchema.passthrough)
+const directoryListingSchema = Schema.Struct({
+  path: Schema.String,
+  home: Schema.String,
+  crumbs: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })),
+  entries: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })).check(Schema.isMaxLength(5_000)),
+  truncated: Schema.Boolean,
+}).pipe(MultiHostSchema.passthrough)
+const workspaceRowSchema = Schema.Struct({
+  workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+  title: Schema.optional(Schema.String.check(Schema.isMaxLength(512))),
+  sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000))),
+}).pipe(MultiHostSchema.passthrough)
+const workspaceCreatedSchema = Schema.Struct({
+  workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(
+    MultiHostSchema.passthrough,
+  ),
+}).pipe(MultiHostSchema.passthrough)
+const workspaceContainerSchema = Schema.Struct({
+  items: Schema.optional(Schema.Unknown),
+  value: Schema.optional(Schema.Unknown),
+  workspace: Schema.optional(Schema.Unknown),
+  workspaces: Schema.optional(Schema.Unknown),
+  baseline: Schema.optional(Schema.Unknown),
+  snapshot: Schema.optional(Schema.Unknown),
+}).pipe(MultiHostSchema.passthrough)
+const fileReferenceCandidatesSchema = Schema.Array(
+  Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
+).check(Schema.isMaxLength(1000))
+const modelCatalogSchema = Schema.Struct({
+  default: Schema.optional(
+    Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
+  ),
+  routableProviders: Schema.optional(Schema.Array(Schema.String)),
+  groups: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+      models: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          description: Schema.optional(Schema.String),
+          reasoning: Schema.optional(
+            Schema.Struct({
+              efforts: Schema.Array(
+                Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough),
+              ),
+              defaultEffort: Schema.optional(Schema.String),
+            }).pipe(MultiHostSchema.passthrough),
           ),
-        })
-        .passthrough(),
-    ),
-    failures: z.array(z.object({ id: z.string(), name: z.string(), message: z.string() }).passthrough()).optional(),
-  })
-  .passthrough()
-const sessionSnapshotSchema = z
-  .object({
-    type: z.literal('snapshot'),
-    cursor: z.number().int(),
-    header: z.object({ cwd: z.string().optional() }).passthrough().optional(),
-    records: z.array(z.unknown()).max(10_000),
-  })
-  .passthrough()
-const sessionCursorFrameSchema = z.object({ type: z.literal('snapshot'), cursor: z.number().int().safe().min(-1) }).passthrough()
-const webServerSchema = z.object({ port: z.number().int().min(1).max(65_535) }).passthrough()
+        }).pipe(MultiHostSchema.passthrough),
+      ),
+    }).pipe(MultiHostSchema.passthrough),
+  ),
+  failures: Schema.optional(Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, message: Schema.String }).pipe(MultiHostSchema.passthrough))),
+}).pipe(MultiHostSchema.passthrough)
+const sessionSnapshotSchema = Schema.Struct({
+  type: Schema.Literal('snapshot'),
+  cursor: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+  header: Schema.optional(Schema.Struct({ cwd: Schema.optional(Schema.String) }).pipe(MultiHostSchema.passthrough)),
+  records: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(10_000)),
+}).pipe(MultiHostSchema.passthrough)
+const sessionCursorFrameSchema = Schema.Struct({
+  type: Schema.Literal('snapshot'),
+  cursor: Schema.Number.check(Schema.isFinite())
+    .check(Schema.isInt())
+    .check(Schema.isBetween({ minimum: -Number.MAX_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER }))
+    .check(Schema.isGreaterThanOrEqualTo(-1)),
+}).pipe(MultiHostSchema.passthrough)
+const webServerSchema = Schema.Struct({
+  port: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(65_535)),
+}).pipe(MultiHostSchema.passthrough)
 
 /** Failures that mean the pooled connection itself is gone, so the next call should open a fresh one. */
 const transportFailures = new Set([
@@ -261,7 +262,7 @@ const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
       'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.',
     )
   }
-  const parsed = runtimeIdentitySchema.safeParse(raw)
+  const parsed = MultiHostSchema.safeDecode(runtimeIdentitySchema, raw)
   if (!parsed.success) throw new GatewayUnavailableError('identity-invalid', 'The connected runtime returned an identity outside the supported contract.')
   if (parsed.data.protocolVersion !== 1 || parsed.data.dshVersion === 'unknown' || !parsed.data.dshVersion.startsWith('0.2.')) {
     throw new GatewayUnavailableError('runtime-incompatible', 'The connected runtime does not report a supported DSH 0.2 protocol version.')
@@ -371,8 +372,8 @@ const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => 
   hidden: record.hidden,
 })
 
-const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof workspaceRowSchema.parse>[] => {
-  const results = new Map<string, ReturnType<typeof workspaceRowSchema.parse>>()
+const collectWorkspaces = (frames: readonly unknown[]): Schema.Schema.Type<typeof workspaceRowSchema>[] => {
+  const results = new Map<string, Schema.Schema.Type<typeof workspaceRowSchema>>()
   const visit = (value: unknown, depth: number): void => {
     if (depth > 16 || results.size >= 256) return
     if (Array.isArray(value)) {
@@ -380,9 +381,9 @@ const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof worksp
       return
     }
     if (typeof value !== 'object' || value === null) return
-    const workspace = workspaceRowSchema.safeParse(value)
+    const workspace = MultiHostSchema.safeDecode(workspaceRowSchema, value)
     if (workspace.success) results.set(workspace.data.workspaceId, workspace.data)
-    const record = workspaceContainerSchema.parse(value)
+    const record = MultiHostSchema.decode(workspaceContainerSchema, value)
     for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
       const child = record[key]
       if (child !== undefined) visit(child, depth + 1)
@@ -534,7 +535,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
           resourceProbeLimiter.run(async () => {
             try {
               const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
-              const parsed = resourceSnapshotSchema.safeParse(raw)
+              const parsed = MultiHostSchema.safeDecode(resourceSnapshotSchema, raw)
               if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
               return { ok: true as const, snapshot: parsed.data }
             } catch (error) {
@@ -565,7 +566,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
   return { hosts: entries, selected: ResourceSnapshotModel.selectAutoHost(entries) }
 }
 
-const multiHostHandlers = multiHostApi.host({
+const multiHostPromiseHandlers: MultiHostPromiseHandlers = {
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
   resourceSnapshot: async () => ResourceSnapshotModel.readResourceSnapshot(),
   resourcePool: async () => readResourcePool(),
@@ -700,7 +701,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   testConnection: async ({ input, signal }) => {
-    const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+    const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
     const host: HostRecord = {
       schemaVersion: 2,
       id: sshHostId(input.sshTarget),
@@ -709,7 +710,7 @@ const multiHostHandlers = multiHostApi.host({
       hidden: false,
       createdAt: new Date().toISOString(),
     }
-    const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+    const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
     try {
       const { identity, steps } = await qualifyRuntime({ host, locator, name: input.name, signal })
       return { ok: true as const, steps, identity }
@@ -719,7 +720,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   saveSshHost: async ({ input, signal }) => {
     try {
-      const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+      const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: input.sshTarget })
       const previous = input.hostId === undefined ? undefined : await HostDirectoryStore.findHost(input.hostId)
       const host: HostRecord = {
         schemaVersion: 2,
@@ -730,7 +731,7 @@ const multiHostHandlers = multiHostApi.host({
         ...(previous?.position !== undefined && { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
-      const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+      const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: input.remoteHome })
       await HostDirectoryStore.upsertHost(host)
       const runtime = await register({ host, locator, name: input.name.trim(), signal })
       // An edit that moved the host to another DSH home leaves the old runtime record behind.
@@ -744,7 +745,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   hostUpsert: async ({ input }) => {
-    const connector = hostConnectorSchema.parse(input.connector)
+    const connector = MultiHostSchema.decodeStrict(hostConnectorSchema, input.connector)
     const previous = await HostDirectoryStore.findHost(input.id)
     const record: HostRecord = {
       schemaVersion: 2,
@@ -779,7 +780,7 @@ const multiHostHandlers = multiHostApi.host({
     try {
       const host = await HostDirectoryStore.findHost(input.hostId)
       if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
-      const locator = runtimeLocatorSchema.parse(input.locator)
+      const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, input.locator)
       if (locator.kind !== host.connector.kind)
         throw new DirectoryStoreError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
       return { ok: true as const, runtime: runtimeSummary(await register({ host, locator, name: input.name.trim(), signal })) }
@@ -804,12 +805,11 @@ const multiHostHandlers = multiHostApi.host({
                 gateway.follow('workspace/follow', {}, 10_000),
                 gateway.run('session', 'list', { _request: {} }),
               ])
-              const sessions = sessionListSchema
-                .parse(sessionValue)
+              const sessions = MultiHostSchema.decode(sessionListSchema, sessionValue)
                 .items.slice(0, 500)
                 .map(item => {
                   const title = item.title ?? item.projections?.values?.title ?? undefined
-                  const summary: SessionSummary = {
+                  const summary: MutableSessionSummary = {
                     runtimeId: runtime.id,
                     sessionId: item.sessionId,
                     running: item.running,
@@ -888,7 +888,8 @@ const multiHostHandlers = multiHostApi.host({
     try {
       const listing = await withRuntime(
         input.runtimeId,
-        async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
+        async gateway =>
+          MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
         { mutation: false },
       )
       return {
@@ -907,7 +908,7 @@ const multiHostHandlers = multiHostApi.host({
     try {
       const created = await withRuntime(
         input.runtimeId,
-        async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: input.path } })),
+        async gateway => MultiHostSchema.decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: input.path } })),
         {
           mutation: true,
         },
@@ -936,9 +937,13 @@ const multiHostHandlers = multiHostApi.host({
       if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
       const host = await HostDirectoryStore.findHost(runtime.hostId)
       if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
-      const listing = await withRuntime(input.runtimeId, async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', {}, signal)), {
-        mutation: false,
-      })
+      const listing = await withRuntime(
+        input.runtimeId,
+        async gateway => MultiHostSchema.decode(directoryListingSchema, await gateway.api('listDirectory', {}, signal)),
+        {
+          mutation: false,
+        },
+      )
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
       let archive: Buffer | undefined
       if (input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0) {
@@ -984,7 +989,7 @@ const multiHostHandlers = multiHostApi.host({
       try {
         const created = await withRuntime(
           input.runtimeId,
-          async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
+          async gateway => MultiHostSchema.decode(workspaceCreatedSchema, await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
           { mutation: true },
         )
         if (copyWarning !== undefined) {
@@ -1013,7 +1018,7 @@ const multiHostHandlers = multiHostApi.host({
       const created = await withRuntime(input.runtimeId, async gateway => gateway.api('createDirectory', { path: input.path, name: input.name }), {
         mutation: true,
       })
-      return { ok: true as const, path: z.object({ path: z.string() }).parse(created).path }
+      return { ok: true as const, path: MultiHostSchema.decode(Schema.Struct({ path: Schema.String }), created).path }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -1053,7 +1058,7 @@ const multiHostHandlers = multiHostApi.host({
             args: { request: { cwd: input.cwd } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          sessionId = MultiHostSchema.decode(sessionCreatedSchema, created.value).sessionId
           await RemoteThreadStore.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: '', createdAt: new Date().toISOString() })
           return { ok: true as const, sessionId }
         },
@@ -1077,7 +1082,7 @@ const multiHostHandlers = multiHostApi.host({
             args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
-          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          sessionId = MultiHostSchema.decode(sessionCreatedSchema, created.value).sessionId
           if (input.model !== undefined) {
             const selected = await gateway.runSafe('session', 'selectModel', {
               request: {
@@ -1114,9 +1119,13 @@ const multiHostHandlers = multiHostApi.host({
   },
   runtimeModels: async ({ input, signal }) => {
     try {
-      const catalog = await withRuntime(input.runtimeId, async gateway => modelCatalogSchema.parse(await gateway.run('session', 'modelCatalog', {}, signal)), {
-        mutation: false,
-      })
+      const catalog = await withRuntime(
+        input.runtimeId,
+        async gateway => MultiHostSchema.decode(modelCatalogSchema, await gateway.run('session', 'modelCatalog', {}, signal)),
+        {
+          mutation: false,
+        },
+      )
       return {
         ok: true as const,
         default: catalog.default ?? null,
@@ -1165,7 +1174,8 @@ const multiHostHandlers = multiHostApi.host({
       const repositories = await withRuntime(
         runtimeId,
         async gateway =>
-          jjRepositoriesSchema.parse(
+          MultiHostSchema.decode(
+            jjRepositoriesEffectSchema,
             await gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}, signal),
           ),
         { mutation: false },
@@ -1191,7 +1201,7 @@ const multiHostHandlers = multiHostApi.host({
         { mutation: false, broken: result => !result.ok && transportFailures.has(result.code) },
       )
       if (!outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message }
-      const candidates = fileReferenceCandidatesSchema.parse(outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
+      const candidates = MultiHostSchema.decode(fileReferenceCandidatesSchema, outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
       return { ok: true as const, candidates }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
@@ -1211,7 +1221,8 @@ const multiHostHandlers = multiHostApi.host({
       const value = await withRuntime(
         runtime.id,
         async gateway =>
-          fileUploadValueSchema.parse(
+          MultiHostSchema.decode(
+            fileUploadValueSchema,
             await gateway.run(
               'fileUploads',
               'upload',
@@ -1240,7 +1251,7 @@ const multiHostHandlers = multiHostApi.host({
             15_000,
             signal,
           )
-          const snapshot = frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+          const snapshot = frames.map(frame => MultiHostSchema.safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
           if (snapshot === undefined)
             throw new GatewayUnavailableError('session-unavailable', 'The host did not return this thread. It may have been deleted there.')
           const reduced = reduceTranscript(snapshot.records)
@@ -1339,7 +1350,7 @@ const multiHostHandlers = multiHostApi.host({
           10_000,
           signal,
         )
-        const snapshot = frames.map(frame => sessionCursorFrameSchema.safeParse(frame)).find(result => result.success)
+        const snapshot = frames.map(frame => MultiHostSchema.safeDecode(sessionCursorFrameSchema, frame)).find(result => result.success)
         if (snapshot === undefined) throw new GatewayUnavailableError('session-cursor-unavailable', 'The runtime did not return a session history cursor.')
         return { cursor: snapshot.data.cursor }
       },
@@ -1375,7 +1386,94 @@ const multiHostHandlers = multiHostApi.host({
     }
     return { removed }
   },
+}
+
+class MultiHostHandlerError extends Schema.TaggedError<MultiHostHandlerError>()('MultiHostHandlerError', {
+  operation: Schema.String,
+  code: Schema.String,
+  message: Schema.String,
+}) {}
+
+type MultiHostMethods = typeof multiHostApi.methods
+type MultiHostEffectHandlers = {
+  readonly [Name in keyof MultiHostMethods]: (
+    context: ApiHandlerContext<ApiHostInput<MultiHostMethods[Name]>>,
+  ) => Effect.Effect<ApiHostOutput<MultiHostMethods[Name]>, MultiHostHandlerError>
+}
+
+type MultiHostPromiseHandlers = {
+  readonly [Name in keyof MultiHostMethods]: (
+    context: ApiHandlerContext<ApiHostInput<MultiHostMethods[Name]>>,
+  ) => ApiHostOutput<MultiHostMethods[Name]> | Promise<ApiHostOutput<MultiHostMethods[Name]>>
+}
+
+const effectHandler = <Input, Output>(operation: string, handler: (context: ApiHandlerContext<Input>) => Output | Promise<Output>) =>
+  Effect.fn(`multi-host ${operation}`)((context: ApiHandlerContext<Input>) =>
+    Effect.tryPromise({
+      try: signal => Promise.resolve(handler({ ...context, signal })),
+      catch: cause => {
+        const failure = safeFailure(cause)
+        return new MultiHostHandlerError({ operation, ...failure })
+      },
+    }),
+  )
+
+const effectHandlers = {
+  identity: effectHandler('identity', multiHostPromiseHandlers.identity),
+  resourceSnapshot: effectHandler('resourceSnapshot', multiHostPromiseHandlers.resourceSnapshot),
+  resourcePool: effectHandler('resourcePool', multiHostPromiseHandlers.resourcePool),
+  list: effectHandler('list', multiHostPromiseHandlers.list),
+  remoteExec: effectHandler('remoteExec', multiHostPromiseHandlers.remoteExec),
+  doctor: effectHandler('doctor', multiHostPromiseHandlers.doctor),
+  provision: effectHandler('provision', multiHostPromiseHandlers.provision),
+  remoteRuntimeStatus: effectHandler('remoteRuntimeStatus', multiHostPromiseHandlers.remoteRuntimeStatus),
+  runtimeControl: effectHandler('runtimeControl', multiHostPromiseHandlers.runtimeControl),
+  runtimeLogs: effectHandler('runtimeLogs', multiHostPromiseHandlers.runtimeLogs),
+  checkoutSync: effectHandler('checkoutSync', multiHostPromiseHandlers.checkoutSync),
+  sshConfigHosts: effectHandler('sshConfigHosts', multiHostPromiseHandlers.sshConfigHosts),
+  discoverHomes: effectHandler('discoverHomes', multiHostPromiseHandlers.discoverHomes),
+  testConnection: effectHandler('testConnection', multiHostPromiseHandlers.testConnection),
+  saveSshHost: effectHandler('saveSshHost', multiHostPromiseHandlers.saveSshHost),
+  hostUpsert: effectHandler('hostUpsert', multiHostPromiseHandlers.hostUpsert),
+  hostSetHidden: effectHandler('hostSetHidden', multiHostPromiseHandlers.hostSetHidden),
+  hostReorder: effectHandler('hostReorder', multiHostPromiseHandlers.hostReorder),
+  hostRemove: effectHandler('hostRemove', multiHostPromiseHandlers.hostRemove),
+  runtimeUpsert: effectHandler('runtimeUpsert', multiHostPromiseHandlers.runtimeUpsert),
+  runtimeStatus: effectHandler('runtimeStatus', multiHostPromiseHandlers.runtimeStatus),
+  runtimePing: effectHandler('runtimePing', multiHostPromiseHandlers.runtimePing),
+  runtimeReconnect: effectHandler('runtimeReconnect', multiHostPromiseHandlers.runtimeReconnect),
+  listDirectory: effectHandler('listDirectory', multiHostPromiseHandlers.listDirectory),
+  createDirectory: effectHandler('createDirectory', multiHostPromiseHandlers.createDirectory),
+  runtimeBrowse: effectHandler('runtimeBrowse', multiHostPromiseHandlers.runtimeBrowse),
+  runtimeOpenFolder: effectHandler('runtimeOpenFolder', multiHostPromiseHandlers.runtimeOpenFolder),
+  localProjectFiles: effectHandler('localProjectFiles', multiHostPromiseHandlers.localProjectFiles),
+  runtimeCloneProject: effectHandler('runtimeCloneProject', multiHostPromiseHandlers.runtimeCloneProject),
+  runtimeCreateDirectory: effectHandler('runtimeCreateDirectory', multiHostPromiseHandlers.runtimeCreateDirectory),
+  runtimePluginCall: effectHandler('runtimePluginCall', multiHostPromiseHandlers.runtimePluginCall),
+  threadCreate: effectHandler('threadCreate', multiHostPromiseHandlers.threadCreate),
+  threadStart: effectHandler('threadStart', multiHostPromiseHandlers.threadStart),
+  runtimeModels: effectHandler('runtimeModels', multiHostPromiseHandlers.runtimeModels),
+  sessionRuntime: effectHandler('sessionRuntime', multiHostPromiseHandlers.sessionRuntime),
+  sessionJjRepositories: effectHandler('sessionJjRepositories', multiHostPromiseHandlers.sessionJjRepositories),
+  runtimeFileReferences: effectHandler('runtimeFileReferences', multiHostPromiseHandlers.runtimeFileReferences),
+  sessionUploadFile: effectHandler('sessionUploadFile', multiHostPromiseHandlers.sessionUploadFile),
+  threadTranscript: effectHandler('threadTranscript', multiHostPromiseHandlers.threadTranscript),
+  threadList: effectHandler('threadList', multiHostPromiseHandlers.threadList),
+  threadForget: effectHandler('threadForget', multiHostPromiseHandlers.threadForget),
+  threadReply: effectHandler('threadReply', multiHostPromiseHandlers.threadReply),
+  threadStop: effectHandler('threadStop', multiHostPromiseHandlers.threadStop),
+  runtimeCall: effectHandler('runtimeCall', multiHostPromiseHandlers.runtimeCall),
+  sessionCursor: effectHandler('sessionCursor', multiHostPromiseHandlers.sessionCursor),
+  runtimeOpenView: effectHandler('runtimeOpenView', multiHostPromiseHandlers.runtimeOpenView),
+  runtimeCloseView: effectHandler('runtimeCloseView', multiHostPromiseHandlers.runtimeCloseView),
+  runtimeRemove: effectHandler('runtimeRemove', multiHostPromiseHandlers.runtimeRemove),
+} satisfies MultiHostEffectHandlers
+
+const effectPlugin = DshxEffect.plugin({
+  layer: Layer.empty,
+  setup: (ctx: Context, config: Schema.Schema.Type<typeof configSchema>) => Effect.sync(() => setupHost(ctx, config)),
 })
+const multiHostHandlers = effectPlugin.hostApi(multiHostApi, effectHandlers)
 
 // The members of the Host Loader and Connection services this plugin calls; a Host without them publishes no launch URL.
 interface LoaderSurface {
@@ -1388,71 +1486,73 @@ interface ConnectionSurface {
 
 export default defineHost({
   name: '@dshfiles/multi-host',
-  Config: configSchema,
+  Config: MultiHostSchema.strictStandardSchema(configSchema),
   apis: [multiHostHandlers],
-  setup(ctx, config) {
-    configuredProfile = configSchema.parse(config ?? {}).profile
-    // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
-    ctx.inject(['connection', 'webServer'], scoped => {
-      let launchPath: string | undefined
-      let disposed = false
-      scoped.effect(() => {
-        void (async () => {
-          const loader: LoaderSurface | undefined = scoped.get('loader')
-          await loader?.await?.()
-          const webServer = webServerSchema.safeParse(scoped.get('webServer'))
-          const connection: ConnectionSurface | undefined = scoped.get('connection')
-          const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
-          if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-          const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
-          launchPath = written
-          // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
-          process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
-        })().catch(() => undefined)
-        return () => {
-          disposed = true
-          if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
-        }
-      }, 'multi-host: launch file')
-    })
-    // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
-    // Session it does not hold, and every endpoint forwards to the runtime that owns it.
-    ctx.inject(['sessionSources'], scoped => {
-      activeSessionSources.add(scoped.sessionSources)
-      const unregister = scoped.sessionSources.register(
-        createRemoteSessionSource({
-          runtimes: {
-            list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
-            recordedSessions: async () =>
-              (await RemoteThreadStore.list()).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId, cwd: thread.cwd })),
-            acquire: runtimeId => pool.acquire(runtimeId),
-            run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
-          },
-        }),
-      )
-      const unregisterReferenceMiddleware = registerRemoteReferenceMiddleware({
-        ctx,
-        recordedThreads: () => RemoteThreadStore.list(),
-        sessionSources: () => [...activeSessionSources],
-        follow: async ({ runtimeId, sessionId, maxMessages, signal }) => {
-          const frames = await withRuntime(
-            runtimeId,
-            gateway =>
-              gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
-            { mutation: false },
-          )
-          return frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
-        },
-      })
-      scoped.effect(() => () => {
-        unregisterReferenceMiddleware()
-        unregister()
-        activeSessionSources.delete(scoped.sessionSources)
-      })
-    })
-    ctx.effect(() => async () => {
-      for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
-      await pool.close()
-    })
-  },
+  setup: effectPlugin.setup,
 })
+
+function setupHost(ctx: Context, config: Schema.Schema.Type<typeof configSchema>): void {
+  configuredProfile = MultiHostSchema.decode(configSchema, config ?? {}, { onExcessProperty: 'error' }).profile
+  // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
+  ctx.inject(['connection', 'webServer'], scoped => {
+    let launchPath: string | undefined
+    let disposed = false
+    scoped.effect(() => {
+      void (async () => {
+        const loader: LoaderSurface | undefined = scoped.get('loader')
+        await loader?.await?.()
+        const webServer = MultiHostSchema.safeDecode(webServerSchema, scoped.get('webServer'))
+        const connection: ConnectionSurface | undefined = scoped.get('connection')
+        const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
+        if (disposed || !webServer.success || typeof launchUrl !== 'string') return
+        const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+        launchPath = written
+        // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
+        process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
+      })().catch(() => undefined)
+      return () => {
+        disposed = true
+        if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
+      }
+    }, 'multi-host: launch file')
+  })
+  // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
+  // Session it does not hold, and every endpoint forwards to the runtime that owns it.
+  ctx.inject(['sessionSources'], scoped => {
+    activeSessionSources.add(scoped.sessionSources)
+    const unregister = scoped.sessionSources.register(
+      createRemoteSessionSource({
+        runtimes: {
+          list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
+          recordedSessions: async () =>
+            (await RemoteThreadStore.list()).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId, cwd: thread.cwd })),
+          acquire: runtimeId => pool.acquire(runtimeId),
+          run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
+        },
+      }),
+    )
+    const unregisterReferenceMiddleware = registerRemoteReferenceMiddleware({
+      ctx,
+      recordedThreads: () => RemoteThreadStore.list(),
+      sessionSources: () => [...activeSessionSources],
+      follow: async ({ runtimeId, sessionId, maxMessages, signal }) => {
+        const frames = await withRuntime(
+          runtimeId,
+          gateway =>
+            gateway.follow('session/follow', { request: { address: { kind: 'session', sessionId: SessionId(sessionId) }, maxMessages } }, 15_000, signal),
+          { mutation: false },
+        )
+        return frames.map(frame => MultiHostSchema.safeDecode(sessionSnapshotSchema, frame)).find(result => result.success)?.data
+      },
+    })
+    scoped.effect(() => () => {
+      unregisterReferenceMiddleware()
+      unregister()
+      activeSessionSources.delete(scoped.sessionSources)
+    })
+  })
+  ctx.effect(() => async () => {
+    for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
+    await pool.close()
+  })
+}

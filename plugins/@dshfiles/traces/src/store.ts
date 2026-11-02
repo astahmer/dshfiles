@@ -3,9 +3,10 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { decodeJson } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
 import { SpanCost } from './span-cost.js'
+import { TracesSchema } from './schema.js'
 import { buildSpanTree } from './span-tree.js'
 import { LatencyStats } from './stats.js'
 import {
@@ -150,7 +151,7 @@ const MAX_SERIES_POINTS = 500
 
 const PRUNE_TRACE_BATCH_SIZE = 128
 
-const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
+const metricTypeSchema = Schema.Literals(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
 
 export type LogSearchQuery = {
   readonly service?: string | undefined
@@ -204,63 +205,145 @@ class TraceStoreError extends Error {
 const KINDS: readonly SpanKind[] = ['unspecified', 'internal', 'server', 'client', 'producer', 'consumer']
 const STATUSES: readonly SpanStatus[] = ['unset', 'ok', 'error']
 
-const attributesJsonSchema = z.record(z.string(), attributeValueSchema)
-const eventsJsonSchema = z.array(z.object({ name: z.string(), timeUs: z.number(), attributes: attributesJsonSchema }))
+const attributesJsonSchema = Schema.Record(Schema.String, attributeValueSchema)
+const eventsJsonSchema = Schema.Array(Schema.Struct({ name: Schema.String, timeUs: Schema.Number.check(Schema.isFinite()), attributes: attributesJsonSchema }))
 
-const traceRowSchema = z.object({
-  trace_id: z.string(),
-  root_name: z.string(),
-  root_service: z.string(),
-  start_us: z.number(),
-  end_us: z.number(),
-  span_count: z.number(),
-  error_count: z.number(),
-  services: z.string(),
-  session_id: z.string().nullable(),
-  cost_usd: z.number().nullable(),
+const finiteNumber = Schema.Number.check(Schema.isFinite())
+
+const traceRowSchema = Schema.Struct({
+  trace_id: Schema.String,
+  root_name: Schema.String,
+  root_service: Schema.String,
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  span_count: finiteNumber,
+  error_count: finiteNumber,
+  services: Schema.String,
+  session_id: Schema.NullOr(Schema.String),
+  cost_usd: Schema.NullOr(finiteNumber),
 })
 
-const spanRowSchema = z.object({
-  span_id: z.string(),
-  parent_span_id: z.string().nullable(),
-  name: z.string(),
-  service: z.string(),
-  scope: z.string().nullable(),
-  kind: z.number(),
-  start_us: z.number(),
-  end_us: z.number(),
-  status_code: z.number(),
-  status_message: z.string().nullable(),
-  session_id: z.string().nullable(),
-  attributes: z.string(),
-  resource: z.string().nullable(),
-  events: z.string(),
-  link_count: z.number(),
+const spanRowSchema = Schema.Struct({
+  span_id: Schema.String,
+  parent_span_id: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  service: Schema.String,
+  scope: Schema.NullOr(Schema.String),
+  kind: finiteNumber,
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  status_code: finiteNumber,
+  status_message: Schema.NullOr(Schema.String),
+  session_id: Schema.NullOr(Schema.String),
+  attributes: Schema.String,
+  resource: Schema.NullOr(Schema.String),
+  events: Schema.String,
+  link_count: finiteNumber,
 })
 
-const countSchema = z.object({ count: z.number() })
+const countSchema = Schema.Struct({ count: finiteNumber })
 
-const oldestTraceRowSchema = z.object({
-  trace_id: z.string(),
-  span_count: z.number(),
-  received_ms: z.number(),
-  start_us: z.number(),
+const oldestTraceRowSchema = Schema.Struct({
+  trace_id: Schema.String,
+  span_count: finiteNumber,
+  received_ms: finiteNumber,
+  start_us: finiteNumber,
 })
 
-const logRowSchema = z.object({
-  id: z.number(),
-  time_us: z.number(),
-  severity_number: z.number(),
-  severity_text: z.string().nullable(),
-  body: z.string(),
-  service: z.string(),
-  scope: z.string().nullable(),
-  trace_id: z.string().nullable(),
-  span_id: z.string().nullable(),
-  event_name: z.string().nullable(),
-  attributes: z.string(),
-  resource: z.string().nullable(),
+const logRowSchema = Schema.Struct({
+  id: finiteNumber,
+  time_us: finiteNumber,
+  severity_number: finiteNumber,
+  severity_text: Schema.NullOr(Schema.String),
+  body: Schema.String,
+  service: Schema.String,
+  scope: Schema.NullOr(Schema.String),
+  trace_id: Schema.NullOr(Schema.String),
+  span_id: Schema.NullOr(Schema.String),
+  event_name: Schema.NullOr(Schema.String),
+  attributes: Schema.String,
+  resource: Schema.NullOr(Schema.String),
 })
+
+const userVersionSchema = Schema.Struct({ user_version: finiteNumber })
+const aggregateRowSchema = Schema.Struct({
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  span_count: finiteNumber,
+  error_count: finiteNumber,
+  session_id: Schema.NullOr(Schema.String),
+})
+const rootRowSchema = Schema.Struct({ name: Schema.String, service: Schema.String })
+const serviceRowSchema = Schema.Struct({ service: Schema.String })
+const traceIdRowSchema = Schema.Struct({ trace_id: Schema.String })
+const metricListRowSchema = Schema.Struct({
+  service: Schema.String,
+  name: Schema.String,
+  type: metricTypeSchema,
+  unit: Schema.NullOr(Schema.String),
+  description: Schema.NullOr(Schema.String),
+  points: finiteNumber,
+  series: finiteNumber,
+  last_us: finiteNumber,
+  last_value: Schema.NullOr(finiteNumber),
+})
+const metricPointRowSchema = Schema.Struct({
+  type: metricTypeSchema,
+  unit: Schema.NullOr(Schema.String),
+  description: Schema.NullOr(Schema.String),
+  monotonic: finiteNumber,
+  temporality: Schema.String,
+  attributes: Schema.String,
+  time_us: finiteNumber,
+  value: Schema.NullOr(finiteNumber),
+})
+const modelUsageRowSchema = Schema.Struct({
+  service: Schema.String,
+  provider: Schema.NullOr(Schema.String),
+  model: Schema.String,
+  calls: finiteNumber,
+  input_tokens: Schema.NullOr(finiteNumber),
+  output_tokens: Schema.NullOr(finiteNumber),
+  cost_usd: Schema.NullOr(finiteNumber),
+})
+const spanStatRowSchema = Schema.Struct({ service: Schema.String, name: Schema.String, duration_us: finiteNumber, status_code: finiteNumber })
+const errorSpanRowSchema = Schema.Struct({
+  service: Schema.String,
+  name: Schema.String,
+  error_type: Schema.NullOr(Schema.String),
+  status_message: Schema.NullOr(Schema.String),
+  start_us: finiteNumber,
+  trace_id: Schema.String,
+  span_id: Schema.String,
+})
+const serviceCallRowSchema = Schema.Struct({ source: Schema.String, target: Schema.String, duration_us: finiteNumber, status_code: finiteNumber })
+const sessionSpanRowSchema = Schema.Struct({
+  trace_id: Schema.String,
+  name: Schema.String,
+  service: Schema.String,
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  status_code: finiteNumber,
+  operation: Schema.NullOr(Schema.String),
+  input_tokens: Schema.NullOr(finiteNumber),
+  output_tokens: Schema.NullOr(finiteNumber),
+  cache_read_tokens: Schema.NullOr(finiteNumber),
+  reasoning_tokens: Schema.NullOr(finiteNumber),
+  cost_usd: Schema.NullOr(finiteNumber),
+  turn: Schema.NullOr(finiteNumber),
+  span_session_id: Schema.NullOr(Schema.String),
+})
+const spanSampleRowSchema = Schema.Struct({
+  trace_id: Schema.String,
+  name: Schema.String,
+  service: Schema.String,
+  duration_us: finiteNumber,
+  status_code: finiteNumber,
+  session_id: Schema.NullOr(Schema.String),
+  group_value: Schema.NullOr(Schema.String),
+  measure_value: Schema.Unknown,
+})
+const storeSummaryRowSchema = Schema.Struct({ traces: finiteNumber, oldest: Schema.NullOr(finiteNumber), newest: Schema.NullOr(finiteNumber) })
 
 type LogCursor = { readonly timeUs: number; readonly id: number }
 
@@ -306,7 +389,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   database.exec('PRAGMA busy_timeout = 5000')
   database.exec('PRAGMA journal_mode = WAL')
   database.exec('PRAGMA synchronous = NORMAL')
-  const version = z.object({ user_version: z.number() }).parse(database.prepare('PRAGMA user_version').get()).user_version
+  const version = TracesSchema.decode(userVersionSchema, database.prepare('PRAGMA user_version').get()).user_version
   for (let index = version; index < MIGRATIONS.length; index++) {
     database.exec('BEGIN IMMEDIATE')
     database.exec(MIGRATIONS[index] ?? '')
@@ -324,8 +407,8 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     return statement
   }
 
-  let storedLogCount = countSchema.parse(prepare('SELECT COUNT(*) AS count FROM logs').get()).count
-  let storedMetricPointCount = countSchema.parse(prepare('SELECT COUNT(*) AS count FROM metric_points').get()).count
+  let storedLogCount = TracesSchema.decode(countSchema, prepare('SELECT COUNT(*) AS count FROM logs').get()).count
+  let storedMetricPointCount = TracesSchema.decode(countSchema, prepare('SELECT COUNT(*) AS count FROM metric_points').get()).count
 
   const transaction = <Result>(work: () => Result): Result => {
     database.exec('BEGIN IMMEDIATE')
@@ -340,24 +423,24 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   }
 
   const refreshTrace = (traceId: string, receivedMs: number): void => {
-    const aggregate = z
-      .object({ start_us: z.number(), end_us: z.number(), span_count: z.number(), error_count: z.number(), session_id: z.string().nullable() })
-      .parse(
-        prepare(
-          'SELECT MIN(start_us) AS start_us, MAX(end_us) AS end_us, COUNT(*) AS span_count, SUM(status_code = 2) AS error_count, MAX(session_id) AS session_id FROM spans WHERE trace_id = ?',
-        ).get(traceId),
-      )
-    const root = z.object({ name: z.string(), service: z.string() }).parse(
+    const aggregate = TracesSchema.decode(
+      aggregateRowSchema,
+      prepare(
+        'SELECT MIN(start_us) AS start_us, MAX(end_us) AS end_us, COUNT(*) AS span_count, SUM(status_code = 2) AS error_count, MAX(session_id) AS session_id FROM spans WHERE trace_id = ?',
+      ).get(traceId),
+    )
+    const root = TracesSchema.decode(
+      rootRowSchema,
       prepare(
         `SELECT name, service FROM spans s WHERE s.trace_id = ?
            ORDER BY (s.parent_span_id IS NULL OR NOT EXISTS (SELECT 1 FROM spans p WHERE p.trace_id = s.trace_id AND p.span_id = s.parent_span_id)) DESC, s.start_us
            LIMIT 1`,
       ).get(traceId),
     )
-    const services = z
-      .array(z.object({ service: z.string() }))
-      .parse(prepare('SELECT DISTINCT service FROM spans WHERE trace_id = ? ORDER BY service').all(traceId))
-      .map(row => row.service)
+    const services = TracesSchema.decode(
+      Schema.Array(serviceRowSchema),
+      prepare('SELECT DISTINCT service FROM spans WHERE trace_id = ? ORDER BY service').all(traceId),
+    ).map(row => row.service)
     prepare(
       `INSERT OR REPLACE INTO traces (trace_id, root_name, root_service, start_us, end_us, span_count, error_count, services, session_id, received_ms)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -382,15 +465,14 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const spanCount = (): number => countSchema.parse(prepare('SELECT COALESCE(SUM(span_count), 0) AS count FROM traces').get()).count
+  const spanCount = (): number => TracesSchema.decode(countSchema, prepare('SELECT COALESCE(SUM(span_count), 0) AS count FROM traces').get()).count
 
   /** Retention drops whole traces, oldest received first, so a kept trace never loses part of its tree. */
   const prune = (retention: Retention): number => {
     const cutoff = now() - retention.maxAgeHours * 3_600_000
-    const expired = z
-      .array(z.object({ trace_id: z.string() }))
-      .parse(prepare('SELECT trace_id FROM traces WHERE received_ms < ?').all(cutoff))
-      .map(row => row.trace_id)
+    const expired = TracesSchema.decode(Schema.Array(traceIdRowSchema), prepare('SELECT trace_id FROM traces WHERE received_ms < ?').all(cutoff)).map(
+      row => row.trace_id,
+    )
     let removed = expired.length
     if (expired.length > 0) transaction(() => deleteTraces(expired))
     let excess = spanCount() - retention.maxSpans
@@ -398,17 +480,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       const victims: string[] = []
       let cursor: { readonly receivedMs: number; readonly startUs: number; readonly traceId: string } | undefined
       while (excess > 0) {
-        const oldest = z
-          .array(oldestTraceRowSchema)
-          .parse(
-            cursor === undefined
-              ? prepare('SELECT trace_id, span_count, received_ms, start_us FROM traces ORDER BY received_ms, start_us, trace_id LIMIT ?').all(
-                  PRUNE_TRACE_BATCH_SIZE,
-                )
-              : prepare(
-                  'SELECT trace_id, span_count, received_ms, start_us FROM traces WHERE (received_ms, start_us, trace_id) > (?, ?, ?) ORDER BY received_ms, start_us, trace_id LIMIT ?',
-                ).all(cursor.receivedMs, cursor.startUs, cursor.traceId, PRUNE_TRACE_BATCH_SIZE),
-          )
+        const oldest = TracesSchema.decode(
+          Schema.Array(oldestTraceRowSchema),
+          cursor === undefined
+            ? prepare('SELECT trace_id, span_count, received_ms, start_us FROM traces ORDER BY received_ms, start_us, trace_id LIMIT ?').all(
+                PRUNE_TRACE_BATCH_SIZE,
+              )
+            : prepare(
+                'SELECT trace_id, span_count, received_ms, start_us FROM traces WHERE (received_ms, start_us, trace_id) > (?, ?, ?) ORDER BY received_ms, start_us, trace_id LIMIT ?',
+              ).all(cursor.receivedMs, cursor.startUs, cursor.traceId, PRUNE_TRACE_BATCH_SIZE),
+        )
         if (oldest.length === 0) break
         for (const trace of oldest) {
           victims.push(trace.trace_id)
@@ -524,7 +605,8 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       parameters.push(cursor.timeUs, cursor.timeUs, cursor.id)
     }
     const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`
-    const rows = z.array(logRowSchema).parse(
+    const rows = TracesSchema.decode(
+      Schema.Array(logRowSchema),
       prepare(
         `SELECT l.id, l.time_us, l.severity_number, l.severity_text, l.body, l.service, l.scope, l.trace_id, l.span_id, l.event_name, l.attributes,
              r.attributes AS resource
@@ -599,39 +681,25 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       conditions.push("(m.name LIKE ? ESCAPE '\\' OR m.description LIKE ? ESCAPE '\\')")
       parameters.push(`%${escapeLike(query.search)}%`, `%${escapeLike(query.search)}%`)
     }
-    return z
-      .array(
-        z.object({
-          service: z.string(),
-          name: z.string(),
-          type: metricTypeSchema,
-          unit: z.string().nullable(),
-          description: z.string().nullable(),
-          points: z.number(),
-          series: z.number(),
-          last_us: z.number(),
-          last_value: z.number().nullable(),
-        }),
-      )
-      .parse(
-        prepare(
-          `SELECT m.service, m.name, MAX(m.type) AS type, MAX(m.unit) AS unit, MAX(m.description) AS description, COUNT(*) AS points,
-             COUNT(DISTINCT m.attributes) AS series, MAX(m.time_us) AS last_us,
-             (SELECT l.value FROM metric_points l WHERE l.service = m.service AND l.name = m.name ORDER BY l.time_us DESC, l.id DESC LIMIT 1) AS last_value
-           FROM metric_points m WHERE ${conditions.join(' AND ')} GROUP BY m.service, m.name ORDER BY m.service, m.name LIMIT 500`,
-        ).all(...parameters),
-      )
-      .map(row => ({
-        service: row.service,
-        name: row.name,
-        type: row.type,
-        unit: row.unit,
-        description: row.description,
-        points: row.points,
-        series: row.series,
-        lastMs: usToMs(row.last_us),
-        lastValue: row.series === 1 ? row.last_value : null,
-      }))
+    return TracesSchema.decode(
+      Schema.Array(metricListRowSchema),
+      prepare(
+        `SELECT m.service, m.name, MAX(m.type) AS type, MAX(m.unit) AS unit, MAX(m.description) AS description, COUNT(*) AS points,
+           COUNT(DISTINCT m.attributes) AS series, MAX(m.time_us) AS last_us,
+           (SELECT l.value FROM metric_points l WHERE l.service = m.service AND l.name = m.name ORDER BY l.time_us DESC, l.id DESC LIMIT 1) AS last_value
+         FROM metric_points m WHERE ${conditions.join(' AND ')} GROUP BY m.service, m.name ORDER BY m.service, m.name LIMIT 500`,
+      ).all(...parameters),
+    ).map(row => ({
+      service: row.service,
+      name: row.name,
+      type: row.type,
+      unit: row.unit,
+      description: row.description,
+      points: row.points,
+      series: row.series,
+      lastMs: usToMs(row.last_us),
+      lastValue: row.series === 1 ? row.last_value : null,
+    }))
   }
 
   /**
@@ -640,25 +708,13 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
    */
   const metricSeries = (query: { readonly name: string; readonly service: string; readonly windowMinutes: number }): MetricSeries => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
-    const rows = z
-      .array(
-        z.object({
-          type: metricTypeSchema,
-          unit: z.string().nullable(),
-          description: z.string().nullable(),
-          monotonic: z.number(),
-          temporality: z.string(),
-          attributes: z.string(),
-          time_us: z.number(),
-          value: z.number().nullable(),
-        }),
-      )
-      .parse(
-        prepare(
-          `SELECT type, unit, description, monotonic, temporality, attributes, time_us, value FROM metric_points
-           WHERE service = ? AND name = ? AND time_us >= ? ORDER BY attributes, time_us`,
-        ).all(query.service, query.name, sinceUs),
-      )
+    const rows = TracesSchema.decode(
+      Schema.Array(metricPointRowSchema),
+      prepare(
+        `SELECT type, unit, description, monotonic, temporality, attributes, time_us, value FROM metric_points
+         WHERE service = ? AND name = ? AND time_us >= ? ORDER BY attributes, time_us`,
+      ).all(query.service, query.name, sinceUs),
+    )
     const first = rows[0]
     if (first === undefined) throw new TraceStoreError('not-found', `No points for metric ${query.name} of ${query.service} in this window.`)
     const counter = first.type === 'sum' && first.monotonic === 1 && first.temporality === 'cumulative'
@@ -774,7 +830,8 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       parameters.push(cursor.startUs, cursor.startUs, cursor.traceId)
     }
     const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`
-    const rows = z.array(traceRowSchema).parse(
+    const rows = TracesSchema.decode(
+      Schema.Array(traceRowSchema),
       prepare(
         `SELECT trace_id, root_name, root_service, start_us, end_us, span_count, error_count, services, session_id,
              (SELECT SUM(${SpanCost.modelCallCost}) FROM spans s WHERE s.trace_id = t.trace_id) AS cost_usd
@@ -793,7 +850,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         durationMs: usToMs(row.end_us - row.start_us),
         spanCount: row.span_count,
         errorCount: row.error_count,
-        services: decodeJson(z.array(z.string()), row.services),
+        services: decodeJson(Schema.Array(Schema.String), row.services),
         sessionId: row.session_id,
         costUsd: row.cost_usd,
       })),
@@ -802,7 +859,8 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   }
 
   const trace = (traceId: string): TraceDetail => {
-    const rows = z.array(spanRowSchema).parse(
+    const rows = TracesSchema.decode(
+      Schema.Array(spanRowSchema),
       prepare(
         `SELECT s.span_id, s.parent_span_id, s.name, s.service, s.scope, s.kind, s.start_us, s.end_us, s.status_code, s.status_message, s.session_id,
              s.attributes, r.attributes AS resource, s.events, s.link_count
@@ -846,27 +904,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   /** Model calls per service and model over a window: calls, gen_ai.usage token sums and the dshx.cost.usd sum. */
   const modelUsageOf = (query: { readonly sinceUs: number; readonly service?: string | undefined }): ModelUsage[] => {
     const attribute = SpanCost.attribute
-    const rows = z
-      .array(
-        z.object({
-          service: z.string(),
-          provider: z.string().nullable(),
-          model: z.string(),
-          calls: z.number(),
-          input_tokens: z.number().nullable(),
-          output_tokens: z.number().nullable(),
-          cost_usd: z.number().nullable(),
-        }),
-      )
-      .parse(
-        prepare(
-          `SELECT s.service, ${attribute('gen_ai.provider.name')} AS provider, COALESCE(${attribute('gen_ai.request.model')}, s.name) AS model,
-             COUNT(*) AS calls, SUM(${attribute('gen_ai.usage.input_tokens')}) AS input_tokens,
-             SUM(${attribute('gen_ai.usage.output_tokens')}) AS output_tokens, SUM(${attribute(SpanCost.attributeKey)}) AS cost_usd
-           FROM spans s WHERE s.start_us >= ? AND ${SpanCost.isModelCall}${query.service === undefined ? '' : ' AND s.service = ?'}
-           GROUP BY 1, 2, 3 ORDER BY cost_usd IS NULL, cost_usd DESC, calls DESC LIMIT 50`,
-        ).all(query.sinceUs, ...(query.service === undefined ? [] : [query.service])),
-      )
+    const rows = TracesSchema.decode(
+      Schema.Array(modelUsageRowSchema),
+      prepare(
+        `SELECT s.service, ${attribute('gen_ai.provider.name')} AS provider, COALESCE(${attribute('gen_ai.request.model')}, s.name) AS model,
+           COUNT(*) AS calls, SUM(${attribute('gen_ai.usage.input_tokens')}) AS input_tokens,
+           SUM(${attribute('gen_ai.usage.output_tokens')}) AS output_tokens, SUM(${attribute(SpanCost.attributeKey)}) AS cost_usd
+         FROM spans s WHERE s.start_us >= ? AND ${SpanCost.isModelCall}${query.service === undefined ? '' : ' AND s.service = ?'}
+         GROUP BY 1, 2, 3 ORDER BY cost_usd IS NULL, cost_usd DESC, calls DESC LIMIT 50`,
+      ).all(query.sinceUs, ...(query.service === undefined ? [] : [query.service])),
+    )
     return rows.map(row => ({
       service: row.service,
       provider: row.provider,
@@ -880,17 +927,15 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
 
   const statsOf = (query: { readonly windowMinutes: number; readonly service?: string | undefined; readonly limit: number }): TraceStats => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
-    const samples = z
-      .array(z.object({ service: z.string(), name: z.string(), duration_us: z.number(), status_code: z.number() }))
-      .parse(
-        query.service === undefined
-          ? prepare('SELECT service, name, end_us - start_us AS duration_us, status_code FROM spans WHERE start_us >= ?').all(sinceUs)
-          : prepare('SELECT service, name, end_us - start_us AS duration_us, status_code FROM spans WHERE start_us >= ? AND service = ?').all(
-              sinceUs,
-              query.service,
-            ),
-      )
-      .map(row => ({ service: row.service, name: row.name, durationMs: usToMs(row.duration_us), error: row.status_code === 2 }))
+    const samples = TracesSchema.decode(
+      Schema.Array(spanStatRowSchema),
+      query.service === undefined
+        ? prepare('SELECT service, name, end_us - start_us AS duration_us, status_code FROM spans WHERE start_us >= ?').all(sinceUs)
+        : prepare('SELECT service, name, end_us - start_us AS duration_us, status_code FROM spans WHERE start_us >= ? AND service = ?').all(
+            sinceUs,
+            query.service,
+          ),
+    ).map(row => ({ service: row.service, name: row.name, durationMs: usToMs(row.duration_us), error: row.status_code === 2 }))
     const byCount = <Entry extends { readonly count: number }>(left: Entry, right: Entry): number => right.count - left.count
     return {
       windowMinutes: query.windowMinutes,
@@ -908,23 +953,12 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
 
   const errorGroups = (query: { readonly windowMinutes: number; readonly limit: number }): ErrorGroup[] => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
-    const rows = z
-      .array(
-        z.object({
-          service: z.string(),
-          name: z.string(),
-          error_type: z.string().nullable(),
-          status_message: z.string().nullable(),
-          start_us: z.number(),
-          trace_id: z.string(),
-          span_id: z.string(),
-        }),
-      )
-      .parse(
-        prepare(
-          'SELECT service, name, error_type, status_message, start_us, trace_id, span_id FROM spans WHERE status_code = 2 AND start_us >= ? ORDER BY start_us DESC',
-        ).all(sinceUs),
-      )
+    const rows = TracesSchema.decode(
+      Schema.Array(errorSpanRowSchema),
+      prepare(
+        'SELECT service, name, error_type, status_message, start_us, trace_id, span_id FROM spans WHERE status_code = 2 AND start_us >= ? ORDER BY start_us DESC',
+      ).all(sinceUs),
+    )
     return [...LatencyStats.groupBy(rows, row => [row.service, row.name, row.error_type ?? '', messageShape(row.status_message) ?? ''].join('\u0000')).values()]
       .flatMap(group => {
         const newest = group[0]
@@ -951,16 +985,14 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   /** Calls between services: a span whose parent belongs to another service is one call from the parent's service. */
   const serviceMap = (query: { readonly windowMinutes: number }): ServiceMap => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
-    const calls = z
-      .array(z.object({ source: z.string(), target: z.string(), duration_us: z.number(), status_code: z.number() }))
-      .parse(
-        prepare(
-          `SELECT p.service AS source, c.service AS target, c.end_us - c.start_us AS duration_us, c.status_code
-           FROM spans c JOIN spans p ON p.trace_id = c.trace_id AND p.span_id = c.parent_span_id
-           WHERE c.start_us >= ? AND p.service <> c.service`,
-        ).all(sinceUs),
-      )
-      .map(row => ({ source: row.source, target: row.target, durationMs: usToMs(row.duration_us), error: row.status_code === 2 }))
+    const calls = TracesSchema.decode(
+      Schema.Array(serviceCallRowSchema),
+      prepare(
+        `SELECT p.service AS source, c.service AS target, c.end_us - c.start_us AS duration_us, c.status_code
+         FROM spans c JOIN spans p ON p.trace_id = c.trace_id AND p.span_id = c.parent_span_id
+         WHERE c.start_us >= ? AND p.service <> c.service`,
+      ).all(sinceUs),
+    ).map(row => ({ source: row.source, target: row.target, durationMs: usToMs(row.duration_us), error: row.status_code === 2 }))
     const stats = statsOf({ windowMinutes: query.windowMinutes, limit: 1 })
     return {
       windowMinutes: query.windowMinutes,
@@ -978,38 +1010,20 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
    */
   const sessionSummary = (sessionId: string): SessionSummary => {
     const attribute = (key: string): string => `json_extract(s.attributes, '$."${key}"')`
-    const rows = z
-      .array(
-        z.object({
-          trace_id: z.string(),
-          name: z.string(),
-          service: z.string(),
-          start_us: z.number(),
-          end_us: z.number(),
-          status_code: z.number(),
-          operation: z.string().nullable(),
-          input_tokens: z.number().nullable(),
-          output_tokens: z.number().nullable(),
-          cache_read_tokens: z.number().nullable(),
-          reasoning_tokens: z.number().nullable(),
-          cost_usd: z.number().nullable(),
-          turn: z.number().nullable(),
-          span_session_id: z.string().nullable(),
-        }),
-      )
-      .parse(
-        prepare(
-          `SELECT s.trace_id, s.name, s.service, s.start_us, s.end_us, s.status_code, s.session_id AS span_session_id,
-             ${SpanCost.modelCallCost} AS cost_usd,
-             ${attribute('dsh.turn')} AS turn,
-             ${attribute('gen_ai.operation.name')} AS operation,
-             ${attribute('gen_ai.usage.input_tokens')} AS input_tokens,
-             ${attribute('gen_ai.usage.output_tokens')} AS output_tokens,
-             COALESCE(${attribute('gen_ai.usage.cache_read.input_tokens')}, ${attribute('gen_ai.usage.cache_read_input_tokens')}) AS cache_read_tokens,
-             ${attribute('gen_ai.usage.reasoning_tokens')} AS reasoning_tokens
-           FROM spans s WHERE s.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?)`,
-        ).all(sessionId),
-      )
+    const rows = TracesSchema.decode(
+      Schema.Array(sessionSpanRowSchema),
+      prepare(
+        `SELECT s.trace_id, s.name, s.service, s.start_us, s.end_us, s.status_code, s.session_id AS span_session_id,
+           ${SpanCost.modelCallCost} AS cost_usd,
+           ${attribute('dsh.turn')} AS turn,
+           ${attribute('gen_ai.operation.name')} AS operation,
+           ${attribute('gen_ai.usage.input_tokens')} AS input_tokens,
+           ${attribute('gen_ai.usage.output_tokens')} AS output_tokens,
+           COALESCE(${attribute('gen_ai.usage.cache_read.input_tokens')}, ${attribute('gen_ai.usage.cache_read_input_tokens')}) AS cache_read_tokens,
+           ${attribute('gen_ai.usage.reasoning_tokens')} AS reasoning_tokens
+         FROM spans s WHERE s.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?)`,
+      ).all(sessionId),
+    )
     const operationOf = (row: (typeof rows)[number]): 'turn' | 'model' | 'tool' | 'other' => {
       if (row.operation === 'invoke_agent') return 'turn'
       if (row.operation === 'chat' || row.operation === 'text_completion' || row.operation === 'generate_content') return 'model'
@@ -1092,26 +1106,14 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       ...(query.groupAttribute === undefined ? [] : [`$."${query.groupAttribute}"`]),
       ...(query.measureAttribute === undefined ? [] : [`$."${query.measureAttribute}"`]),
     ]
-    const rows = z
-      .array(
-        z.object({
-          trace_id: z.string(),
-          name: z.string(),
-          service: z.string(),
-          duration_us: z.number(),
-          status_code: z.number(),
-          session_id: z.string().nullable(),
-          group_value: z.string().nullable(),
-          measure_value: z.unknown(),
-        }),
-      )
-      .parse(
-        prepare(
-          `SELECT s.trace_id, s.name, s.service, s.end_us - s.start_us AS duration_us, s.status_code, COALESCE(s.session_id, t.session_id) AS session_id,
-             ${group} AS group_value, ${measure} AS measure_value
-           FROM spans s LEFT JOIN traces t ON t.trace_id = s.trace_id WHERE ${conditions.join(' AND ')} ORDER BY s.end_us DESC LIMIT ?`,
-        ).all(...selectParameters, ...parameters, query.limit + 1),
-      )
+    const rows = TracesSchema.decode(
+      Schema.Array(spanSampleRowSchema),
+      prepare(
+        `SELECT s.trace_id, s.name, s.service, s.end_us - s.start_us AS duration_us, s.status_code, COALESCE(s.session_id, t.session_id) AS session_id,
+           ${group} AS group_value, ${measure} AS measure_value
+         FROM spans s LEFT JOIN traces t ON t.trace_id = s.trace_id WHERE ${conditions.join(' AND ')} ORDER BY s.end_us DESC LIMIT ?`,
+      ).all(...selectParameters, ...parameters, query.limit + 1),
+    )
     return {
       truncated: rows.length > query.limit,
       samples: rows.slice(0, query.limit).map(row => ({
@@ -1128,9 +1130,10 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   }
 
   const summary = (): StoreSummary => {
-    const row = z
-      .object({ traces: z.number(), oldest: z.number().nullable(), newest: z.number().nullable() })
-      .parse(prepare('SELECT COUNT(*) AS traces, MIN(start_us) AS oldest, MAX(start_us) AS newest FROM traces').get())
+    const row = TracesSchema.decode(
+      storeSummaryRowSchema,
+      prepare('SELECT COUNT(*) AS traces, MIN(start_us) AS oldest, MAX(start_us) AS newest FROM traces').get(),
+    )
     return {
       spans: spanCount(),
       traces: row.traces,

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as Schema from 'effect/Schema'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { PencilIcon } from '@dshfiles/plugin-ui/icons'
@@ -25,12 +26,12 @@ const NameForm = (props: Parameters<typeof AccountNameEditor>[0]): JSX.Element =
   const [value, setValue] = useState(props.name)
   const [invalid, setInvalid] = useState(false)
   const commit = (): void => {
-    const name = accountDraftSchema.shape.displayName.safeParse(value.trim())
-    if (!name.success) {
+    const name = Schema.decodeUnknownResult(accountDraftSchema.fields.displayName)(value.trim())
+    if (name._tag === 'Failure') {
       setInvalid(true)
       return
     }
-    props.onChange(name.data)
+    props.onChange(name.success)
     props.onEditingChange(false)
   }
   return (

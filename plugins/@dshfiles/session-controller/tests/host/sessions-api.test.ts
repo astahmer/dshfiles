@@ -20,6 +20,7 @@ import { afterEach, expect, it } from 'vitest'
 import { ApiSessionAgentController } from '../../src/native/agent.ts'
 import { SessionCommandController } from '../../src/native/commands.ts'
 import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
+import { sessionControllerEffectPlugin } from '../../src/effect-runtime.ts'
 import { sessionsApi } from '../../src/sessions-api.ts'
 import { loadSessionInstructions, sessionInstructionsSection, sessionsHost } from '../../src/sessions-host.ts'
 
@@ -104,11 +105,15 @@ const fixture = async (replies: readonly string[] = []) => {
   })
   await host.mount(
     defineHost({
+      ...sessionControllerEffectPlugin,
       name: '@dshfiles/session-controller',
       inject: ['remoteAccess', 'agents'],
       apis: [sessionsHost],
       prompts: [sessionInstructionsSection],
-      setup: loadSessionInstructions,
+      setup: async (setupContext, config) => {
+        loadSessionInstructions(setupContext)
+        return sessionControllerEffectPlugin.setup(setupContext, config)
+      },
     }),
     { packageId: '@dshfiles/session-controller' },
   )
@@ -200,4 +205,11 @@ it('generates outside any thread, decoding a JSON Schema reply', async () => {
   expect(result).toMatchObject({ value: { title: 'Fix login' }, provider: 'scripted', model: 'model-a' })
   expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
   expect(model.requests[0]?.tools).toBeUndefined()
+})
+
+it('rejects a reply that does not match the requested JSON Schema', async () => {
+  const { sessions } = await fixture(['{"quantity":"many"}', '{"quantity":"many"}'])
+  await expect(
+    sessions.generate({ prompt: 'Count', jsonSchema: { type: 'object', properties: { quantity: { type: 'number' } }, required: ['quantity'] } }),
+  ).rejects.toMatchObject({ message: expect.stringContaining('did not match the requested shape') })
 })

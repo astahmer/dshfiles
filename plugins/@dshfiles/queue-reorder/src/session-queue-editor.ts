@@ -6,7 +6,8 @@ import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, SessionIn
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiClient } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { queueApi } from './api.js'
 import {
   createQueueEditor,
@@ -45,20 +46,24 @@ interface ConversationWithInput {
   readonly input: { for(ctx: Context): SessionInput }
 }
 
-const draftAttachmentApiShape = z.object({
-  createDrafts: z.function(),
-  releaseDraftAttachment: z.function(),
-  resolveDraftAttachments: z.function(),
-  serializeDraftAttachments: z.function(),
-  fileUploads: z.object({ subscribe: z.function() }),
+type AnyFunction = (...args: never[]) => void
+
+const anyFunctionSchema = Schema.declare<AnyFunction>((value): value is AnyFunction => typeof value === 'function')
+
+const draftAttachmentApiShape = Schema.Struct({
+  createDrafts: anyFunctionSchema,
+  releaseDraftAttachment: anyFunctionSchema,
+  resolveDraftAttachments: anyFunctionSchema,
+  serializeDraftAttachments: anyFunctionSchema,
+  fileUploads: Schema.Struct({ subscribe: anyFunctionSchema }),
 })
 
-const sessionInputShape = z.object({ input: z.object({ for: z.function() }) })
+const sessionInputShape = Schema.Struct({ input: Schema.Struct({ for: anyFunctionSchema }) })
 
 // Only the shape is checked; callers keep the original object, whose methods rely on their own `this`.
-const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => draftAttachmentApiShape.safeParse(value).success
+const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => Option.isSome(Schema.decodeUnknownOption(draftAttachmentApiShape)(value))
 
-const hasSessionInput = (value: unknown): value is ConversationWithInput => sessionInputShape.safeParse(value).success
+const hasSessionInput = (value: unknown): value is ConversationWithInput => Option.isSome(Schema.decodeUnknownOption(sessionInputShape)(value))
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0

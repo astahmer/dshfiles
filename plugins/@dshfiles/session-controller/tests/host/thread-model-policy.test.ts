@@ -2,9 +2,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { appendPluginRecord, pluginRecordOf, SessionId, type Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import type { ApiCaller } from '@dshfiles/dshx/api'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ThreadModelPolicy } from '../../src/thread-model-api.ts'
+import { ThreadModelSessionRequired } from '../../src/effect-runtime.ts'
 import { threadModelSessionForCaller } from '../../src/thread-model-host.ts'
 import { annotateThreadModel, THREAD_MODEL_RECORD, threadModelPolicyProjection } from '../../src/thread-model-policy.ts'
 import { installModelSelectionProjection } from '../../src/native/model-selection-projection.ts'
@@ -196,7 +197,7 @@ describe('threadModelSessionForCaller authority', () => {
 
   it.each<ApiCaller>([{ kind: 'client' }, { kind: 'plugin', packageId: '@dshfiles/test' }])('$kind callers must explicitly name their session', caller => {
     expect(threadModelSessionForCaller({ sessionId: 'target' }, caller)).toBe('target')
-    expect(() => threadModelSessionForCaller({}, caller)).toThrowError(PluginApiError)
+    expect(() => threadModelSessionForCaller({}, caller)).toThrowError(ThreadModelSessionRequired)
     expect(() => threadModelSessionForCaller({}, caller)).toThrowError(expect.objectContaining({ code: 'thread-model-session-required' }))
   })
 })

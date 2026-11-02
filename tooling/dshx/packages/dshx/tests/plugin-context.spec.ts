@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
+import * as Schema from 'effect/Schema'
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { z } from 'zod'
 import { createElement, type ComponentType } from 'react'
 import { BrowserBroker, type Live } from '../src/client/broker.js'
 import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/client/app-services.js'
@@ -548,7 +548,12 @@ describe('stores', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('reads initial, writes, notifies and removes a global store', () => {
-    const prefs = StoreModel.define({ key: '@test/prefs', scope: 'global', schema: z.object({ enabled: z.boolean() }), initial: { enabled: true } })
+    const prefs = StoreModel.define({
+      key: '@test/prefs',
+      scope: 'global',
+      schema: Schema.toStandardSchemaV1(Schema.Struct({ enabled: Schema.Boolean })),
+      initial: { enabled: true },
+    })
     const listener = vi.fn()
     prefs.subscribe(listener)
     expect(prefs.get()).toEqual({ enabled: true })
@@ -560,7 +565,7 @@ describe('stores', () => {
   })
 
   it('keeps one value per session and falls back to initial on an invalid stored value', () => {
-    const drafts = StoreModel.define({ key: '@test/draft', scope: 'session', schema: z.string(), initial: '' })
+    const drafts = StoreModel.define({ key: '@test/draft', scope: 'session', schema: Schema.toStandardSchemaV1(Schema.String), initial: '' })
     drafts('a').set('hello')
     expect(drafts('a').get()).toBe('hello')
     expect(drafts('b').get()).toBe('')
@@ -573,7 +578,7 @@ describe('stores', () => {
     const prefs = StoreModel.define({
       key: '@test/new',
       scope: 'global',
-      schema: z.object({ enabled: z.boolean() }),
+      schema: Schema.toStandardSchemaV1(Schema.Struct({ enabled: Schema.Boolean })),
       initial: { enabled: true },
       from: ['dshx:@test/old'],
     })
@@ -581,13 +586,14 @@ describe('stores', () => {
   })
 
   it('keeps a memory store on the page across a reload of the dshx copy, out of browser storage', async () => {
-    const schema = z.object({ expanded: z.array(z.string()) })
-    const before = StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial: { expanded: [] }, storage: 'memory' })
+    const schema = Schema.toStandardSchemaV1(Schema.Struct({ expanded: Schema.Array(Schema.String) }))
+    const initial = { expanded: Array.from<string>([]) }
+    const before = StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial, storage: 'memory' })
     before('p1').set({ expanded: ['src'] })
     expect(memory.size).toBe(0)
     vi.resetModules()
     const reloaded: { readonly StoreModel: typeof StoreModel } = await import('../src/client/store.js')
-    const after = reloaded.StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial: { expanded: [] }, storage: 'memory' })
+    const after = reloaded.StoreModel.define({ key: '@test/tree', scope: 'project', schema, initial, storage: 'memory' })
     expect(after('p1').get()).toEqual({ expanded: ['src'] })
     expect(after('p2').get()).toEqual({ expanded: [] })
     after('p1').remove()

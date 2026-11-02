@@ -1,20 +1,20 @@
 import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import type { RegistryToolSource } from '@dshfiles/dshx/api'
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
 import {
   JEV_INPUT_USD_PER_MILLION,
-  jevCredentialLabelSchema,
   type JevUsageBreakdown,
   type JevUsageQuery,
   type JevUsageRecord,
   type JevUsageView,
-  jevUsageOutcomeSchema,
-  jevUsageSourceSchema,
+  JEV_USAGE_OUTCOMES,
+  JEV_USAGE_SOURCES,
 } from './jev-usage.js'
+import { secretCredentialLabelSchemaEffect } from '@dshfiles/credential-port/effect'
 import { UsageFoldModel, type RequestRow, type SessionMeta, type ToolExecutionRow } from './fold.js'
 import { createOtlpMetricsRequest, type OtlpCounterInput, type OtlpHistogramInput, type OtlpTemporality } from './otel-metrics.js'
 
@@ -159,12 +159,22 @@ const projectOf = (cwd: string | null): string | null => {
   return basename(cwd)
 }
 
-const textColumn = z.string().nullable()
-const numberColumn = z.number().nullable()
+const decodeStoreValue = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) => Schema.decodeUnknownSync(schema)
 
-const requestRowSchema = z.object({
-  id: z.string(),
-  session_id: z.string(),
+const credentialLabelSchema = Schema.Union([secretCredentialLabelSchemaEffect, Schema.Literals(['Legacy / unknown', 'Other credentials'])])
+
+const textColumn = Schema.NullOr(Schema.String)
+const numberColumn = Schema.NullOr(Schema.Number)
+const integer = Schema.Number.check(Schema.isInt())
+const nonnegativeInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const OTEL_TOOL_CATEGORIES = ['api', 'mcp', 'plugin', 'tool', 'skill', 'other'] as const
+const OTEL_TOOL_OUTCOMES = ['success', 'error', 'interrupted', 'unknown', 'pending'] as const
+const toolCategory = Schema.Literals(OTEL_TOOL_CATEGORIES)
+const toolOutcome = Schema.Literals(OTEL_TOOL_OUTCOMES)
+
+const requestRowSchema = Schema.Struct({
+  id: Schema.String,
+  session_id: Schema.String,
   title: textColumn,
   parent_session: textColumn,
   project: textColumn,
@@ -173,10 +183,10 @@ const requestRowSchema = z.object({
   message_id: textColumn,
   turn: numberColumn,
   step: numberColumn,
-  purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
-  provider: z.string(),
-  model: z.string(),
-  started_at: z.number(),
+  purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+  provider: Schema.String,
+  model: Schema.String,
+  started_at: Schema.Number,
   duration_ms: numberColumn,
   ttft_ms: numberColumn,
   input: numberColumn,
@@ -184,142 +194,144 @@ const requestRowSchema = z.object({
   cache_write: numberColumn,
   output: numberColumn,
   cost: numberColumn,
-  status: z.enum(UsageFoldModel.REQUEST_STATUSES),
+  status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
   stop_reason: textColumn,
   error_code: textColumn,
 })
 
-const countRowSchema = z.object({ key: z.string(), count: z.number() })
-const fileRowSchema = z.object({ path: z.string(), offset: z.number(), size: z.number(), mtime_ms: z.number(), state: z.string() })
+const countRowSchema = Schema.Struct({ key: Schema.String, count: Schema.Number })
+const fileRowSchema = Schema.Struct({ path: Schema.String, offset: Schema.Number, size: Schema.Number, mtime_ms: Schema.Number, state: Schema.String })
 
-const bucketRowSchema = z.object({
-  start: z.number(),
-  key: z.string().nullable(),
-  cost: z.number(),
-  requests: z.number(),
-  failed: z.number(),
-  input: z.number(),
-  cache_read: z.number(),
-  cache_write: z.number(),
-  output: z.number(),
-  missing_usage: z.number(),
-  unpriced: z.number(),
+const bucketRowSchema = Schema.Struct({
+  start: Schema.Number,
+  key: textColumn,
+  cost: Schema.Number,
+  requests: Schema.Number,
+  failed: Schema.Number,
+  input: Schema.Number,
+  cache_read: Schema.Number,
+  cache_write: Schema.Number,
+  output: Schema.Number,
+  missing_usage: Schema.Number,
+  unpriced: Schema.Number,
 })
 
-const breakdownRowSchema = z.object({
-  key: z.string().nullable(),
-  cost: z.number(),
-  requests: z.number(),
-  sessions: z.number(),
-  input: z.number(),
-  cache_read: z.number(),
-  cache_write: z.number(),
-  output: z.number(),
-  tokens: z.number(),
-  missing_usage: z.number(),
-  unpriced: z.number(),
+const breakdownRowSchema = Schema.Struct({
+  key: textColumn,
+  cost: Schema.Number,
+  requests: Schema.Number,
+  sessions: Schema.Number,
+  input: Schema.Number,
+  cache_read: Schema.Number,
+  cache_write: Schema.Number,
+  output: Schema.Number,
+  tokens: Schema.Number,
+  missing_usage: Schema.Number,
+  unpriced: Schema.Number,
 })
-const latencyRowSchema = z.object({ start: z.number(), ttft_ms: numberColumn, duration_ms: numberColumn })
-const threadRowSchema = z.object({ session_id: z.string(), title: textColumn, project: textColumn, cost: z.number(), requests: z.number() })
-const toolRowSchema = z.object({
-  id: z.string(),
-  sessionId: z.string(),
-  seq: z.number().int(),
-  turn: z.number().int().nullable(),
-  step: z.number().int().nullable(),
-  name: z.string().min(1).max(120),
-  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+const latencyRowSchema = Schema.Struct({ start: Schema.Number, ttft_ms: numberColumn, duration_ms: numberColumn })
+const threadRowSchema = Schema.Struct({ session_id: Schema.String, title: textColumn, project: textColumn, cost: Schema.Number, requests: Schema.Number })
+const toolRowSchema = Schema.Struct({
+  id: Schema.String,
+  sessionId: Schema.String,
+  seq: integer,
+  turn: Schema.NullOr(integer),
+  step: Schema.NullOr(integer),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  category: toolCategory,
   owner: textColumn,
-  normalizedCommand: z.string().max(80).nullable().default(null),
-  testRunner: z.string().max(80).nullable().default(null),
-  startedAt: z.number().int(),
-  endedAt: z.number().int().nullable(),
-  outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
-  resultChars: z.number().int().min(0).max(100_000_000).nullable().default(null),
+  normalizedCommand: Schema.NullOr(Schema.String.check(Schema.isMaxLength(80))).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  testRunner: Schema.NullOr(Schema.String.check(Schema.isMaxLength(80))).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  startedAt: integer,
+  endedAt: Schema.NullOr(integer),
+  outcome: toolOutcome,
+  resultChars: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 100_000_000 }))).pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(null)),
+  ),
 })
-const durationTotalSchema = z.object({ totalDurationMs: z.number().int().nonnegative() })
-const identifierActivityRowSchema = z.object({
-  identifier: z.string(),
-  calls: z.number().int(),
-  totalDurationMs: z.number().int().nonnegative(),
-  successes: z.number().int(),
-  errors: z.number().int(),
-  interrupted: z.number().int(),
-  unknown: z.number().int(),
-  pending: z.number().int(),
+const durationTotalSchema = Schema.Struct({ totalDurationMs: nonnegativeInteger })
+const identifierActivityRowSchema = Schema.Struct({
+  identifier: Schema.String,
+  calls: integer,
+  totalDurationMs: nonnegativeInteger,
+  successes: integer,
+  errors: integer,
+  interrupted: integer,
+  unknown: integer,
+  pending: integer,
 })
-const toolActivityRowSchema = z.object({
-  name: z.string(),
-  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+const toolActivityRowSchema = Schema.Struct({
+  name: Schema.String,
+  category: toolCategory,
   owner: textColumn,
-  calls: z.number().int(),
-  successes: z.number().int(),
-  errors: z.number().int(),
-  interrupted: z.number().int(),
-  unknown: z.number().int(),
-  pending: z.number().int(),
+  calls: integer,
+  successes: integer,
+  errors: integer,
+  interrupted: integer,
+  unknown: integer,
+  pending: integer,
   firstStartedAt: numberColumn,
   lastStartedAt: numberColumn,
   firstEndedAt: numberColumn,
   lastEndedAt: numberColumn,
   averageDurationMs: numberColumn,
-  totalDurationMs: z.number().int().nonnegative(),
+  totalDurationMs: nonnegativeInteger,
   p50DurationMs: numberColumn,
   p90DurationMs: numberColumn,
   maxDurationMs: numberColumn,
-  resultChars: z.number().int().nonnegative(),
-  outputTokens: z.number().int().nonnegative(),
-  measuredCalls: z.number().int().nonnegative(),
+  resultChars: nonnegativeInteger,
+  outputTokens: nonnegativeInteger,
+  measuredCalls: nonnegativeInteger,
 })
-const activityCategoryRowSchema = z.object({
-  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
-  calls: z.number().int(),
-  successes: z.number().int(),
-  errors: z.number().int(),
-  interrupted: z.number().int(),
-  unknown: z.number().int(),
-  pending: z.number().int(),
+const activityCategoryRowSchema = Schema.Struct({
+  category: toolCategory,
+  calls: integer,
+  successes: integer,
+  errors: integer,
+  interrupted: integer,
+  unknown: integer,
+  pending: integer,
   averageDurationMs: numberColumn,
   p50DurationMs: numberColumn,
   p90DurationMs: numberColumn,
   maxDurationMs: numberColumn,
-  resultChars: z.number().int().nonnegative(),
-  outputTokens: z.number().int().nonnegative(),
-  measuredCalls: z.number().int().nonnegative(),
+  resultChars: nonnegativeInteger,
+  outputTokens: nonnegativeInteger,
+  measuredCalls: nonnegativeInteger,
 })
-const timelineRowSchema = z.object({
-  start: z.number().int(),
-  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
-  calls: z.number().int(),
-  errors: z.number().int(),
-  durationMs: z.number().int().nonnegative(),
-  outputTokens: z.number().int().nonnegative(),
+const timelineRowSchema = Schema.Struct({
+  start: integer,
+  category: toolCategory,
+  calls: integer,
+  errors: integer,
+  durationMs: nonnegativeInteger,
+  outputTokens: nonnegativeInteger,
 })
-const activityTotalsRowSchema = z.object({
-  calls: z.number().int(),
-  successes: z.number().int(),
-  errors: z.number().int(),
-  interrupted: z.number().int(),
-  unknown: z.number().int(),
-  pending: z.number().int(),
-  durationMs: z.number().int().nonnegative(),
-  outputTokens: z.number().int().nonnegative(),
-  measuredCalls: z.number().int().nonnegative(),
+const activityTotalsRowSchema = Schema.Struct({
+  calls: integer,
+  successes: integer,
+  errors: integer,
+  interrupted: integer,
+  unknown: integer,
+  pending: integer,
+  durationMs: nonnegativeInteger,
+  outputTokens: nonnegativeInteger,
+  measuredCalls: nonnegativeInteger,
 })
-const jevEventRowSchema = z.object({
-  at: z.number().int(),
-  endedAt: z.number().int(),
-  durationMs: z.number().int(),
-  source: jevUsageSourceSchema,
-  outcome: jevUsageOutcomeSchema,
+const jevEventRowSchema = Schema.Struct({
+  at: integer,
+  endedAt: integer,
+  durationMs: integer,
+  source: Schema.Literals(JEV_USAGE_SOURCES),
+  outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
 })
-const jevOutcomeRowSchema = z.object({ outcome: jevUsageOutcomeSchema, calls: z.number().int() })
-const jevActivityRowSchema = z.object({
-  calls: z.number().int(),
-  successes: z.number().int(),
-  failures: z.number().int(),
-  inputTokens: z.number().int(),
-  outputTokens: z.number().int(),
+const jevOutcomeRowSchema = Schema.Struct({ outcome: Schema.Literals(JEV_USAGE_OUTCOMES), calls: integer })
+const jevActivityRowSchema = Schema.Struct({
+  calls: integer,
+  successes: integer,
+  failures: integer,
+  inputTokens: integer,
+  outputTokens: integer,
   durationMs: numberColumn,
   maxDurationMs: numberColumn,
 })
@@ -330,39 +342,37 @@ const OTEL_DURATION_BOUNDS_MS = OTEL_DURATION_BOUNDS_SECONDS.map(seconds => seco
 const OTEL_BUCKET_SELECT = OTEL_DURATION_BOUNDS_MS.map(
   (bound, index) => `SUM(CASE WHEN duration_ms <= ${String(bound)} THEN 1 ELSE 0 END) AS bucket${String(index)}`,
 ).join(', ')
-const OTEL_BUCKET_ROW_SCHEMA = z.object({
-  bucket0: z.number().int(),
-  bucket1: z.number().int(),
-  bucket2: z.number().int(),
-  bucket3: z.number().int(),
-  bucket4: z.number().int(),
-  bucket5: z.number().int(),
-  bucket6: z.number().int(),
-  bucket7: z.number().int(),
-  bucket8: z.number().int(),
-  bucket9: z.number().int(),
-  bucket10: z.number().int(),
-  bucket11: z.number().int(),
-  bucket12: z.number().int(),
-})
-const OTEL_HISTOGRAM_BASE_ROW_SCHEMA = z.object({ calls: z.number().int(), durationSumMs: z.number() }).extend(OTEL_BUCKET_ROW_SCHEMA.shape)
-const OTEL_TOOL_CATEGORIES = ['api', 'mcp', 'plugin', 'tool', 'skill', 'other'] as const
-const OTEL_TOOL_OUTCOMES = ['success', 'error', 'interrupted', 'unknown', 'pending'] as const
+const otelBucketRowFields = {
+  bucket0: integer,
+  bucket1: integer,
+  bucket2: integer,
+  bucket3: integer,
+  bucket4: integer,
+  bucket5: integer,
+  bucket6: integer,
+  bucket7: integer,
+  bucket8: integer,
+  bucket9: integer,
+  bucket10: integer,
+  bucket11: integer,
+  bucket12: integer,
+}
+const OTEL_HISTOGRAM_BASE_ROW_SCHEMA = Schema.Struct({ calls: integer, durationSumMs: Schema.Number, ...otelBucketRowFields })
 
-const summaryRowSchema = z.object({
-  cost: z.number(),
-  requests: z.number(),
-  failed: z.number(),
-  aborted: z.number(),
-  input: z.number(),
-  cache_read: z.number(),
-  cache_write: z.number(),
-  output: z.number(),
-  unpriced: z.number(),
-  missing_usage: z.number(),
+const summaryRowSchema = Schema.Struct({
+  cost: Schema.Number,
+  requests: Schema.Number,
+  failed: Schema.Number,
+  aborted: Schema.Number,
+  input: Schema.Number,
+  cache_read: Schema.Number,
+  cache_write: Schema.Number,
+  output: Schema.Number,
+  unpriced: Schema.Number,
+  missing_usage: Schema.Number,
   average_duration_ms: numberColumn,
-  cacheSavings: z.number(),
-  turns: z.number().int(),
+  cacheSavings: Schema.Number,
+  turns: integer,
 })
 
 /** Would-be prompt cost of cache reads minus what they were billed, per route list price. */
@@ -406,7 +416,7 @@ export const openUsageStore = (path: string) => {
   database.exec('PRAGMA busy_timeout = 5000')
   database.exec('PRAGMA journal_mode = WAL')
   database.exec('PRAGMA synchronous = NORMAL')
-  const version = z.object({ user_version: z.number() }).parse(database.prepare('PRAGMA user_version').get()).user_version
+  const version = decodeStoreValue(Schema.Struct({ user_version: Schema.Number }))(database.prepare('PRAGMA user_version').get()).user_version
   for (let index = version; index < MIGRATIONS.length; index++) {
     database.exec('BEGIN IMMEDIATE')
     database.exec(MIGRATIONS[index] ?? '')
@@ -417,7 +427,7 @@ export const openUsageStore = (path: string) => {
 
   // Rows are folded once and only topped up afterwards, so a fold that reads logs differently re-reads them all.
   const foldVersion = database.prepare("SELECT value FROM meta WHERE key = 'foldVersion'").get()
-  if (z.object({ value: z.string() }).optional().parse(foldVersion)?.value !== String(FOLD_VERSION)) {
+  if (decodeStoreValue(Schema.optional(Schema.Struct({ value: Schema.String })))(foldVersion)?.value !== String(FOLD_VERSION)) {
     database.exec('BEGIN IMMEDIATE')
     database.exec(
       "DELETE FROM files; DELETE FROM requests WHERE source = 'log'; DELETE FROM tools; UPDATE requests SET merged_into = NULL, settled = 0 WHERE purpose IN ('title', 'compaction')",
@@ -500,13 +510,8 @@ export const openUsageStore = (path: string) => {
     if (usage !== null) pricedRoutes?.set(routeBandKey({ provider: row.provider, model: row.model, band }), { provider: row.provider, model: row.model, band })
   }
 
-  const upsertToolExecution = (row: z.infer<typeof toolRowSchema>): void => {
-    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner, normalized_command, test_runner, result_chars)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (id) DO UPDATE SET turn = excluded.turn, step = excluded.step, name = excluded.name,
-        started_at = excluded.started_at, ended_at = excluded.ended_at, outcome = excluded.outcome,
-        category = excluded.category, owner = excluded.owner, normalized_command = excluded.normalized_command,
-        test_runner = excluded.test_runner, result_chars = COALESCE(excluded.result_chars, tools.result_chars)`).run(
+  const upsertToolExecution = (row: Schema.Schema.Type<typeof toolRowSchema>): void => {
+    const values = [
       row.id,
       row.sessionId,
       row.seq,
@@ -521,7 +526,13 @@ export const openUsageStore = (path: string) => {
       row.normalizedCommand,
       row.testRunner,
       row.resultChars,
-    )
+    ] satisfies SQLInputValue[]
+    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner, normalized_command, test_runner, result_chars)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET turn = excluded.turn, step = excluded.step, name = excluded.name,
+        started_at = excluded.started_at, ended_at = excluded.ended_at, outcome = excluded.outcome,
+        category = excluded.category, owner = excluded.owner, normalized_command = excluded.normalized_command,
+        test_runner = excluded.test_runner, result_chars = COALESCE(excluded.result_chars, tools.result_chars)`).run(...values)
   }
 
   const upsertSession = (session: SessionMeta): void => {
@@ -532,9 +543,9 @@ export const openUsageStore = (path: string) => {
     ).run(session.id, session.cwd, projectOf(session.cwd), session.title, session.parentSession, session.subagent ? 1 : 0, session.createdAt)
   }
 
-  const fileCursor = (filePath: string): z.infer<typeof fileRowSchema> | undefined => {
+  const fileCursor = (filePath: string): Schema.Schema.Type<typeof fileRowSchema> | undefined => {
     const row = prepare('SELECT path, offset, size, mtime_ms, state FROM files WHERE path = ?').get(filePath)
-    return row === undefined ? undefined : fileRowSchema.parse(row)
+    return row === undefined ? undefined : decodeStoreValue(fileRowSchema)(row)
   }
 
   /** Commit one log slice: its rows, its session and the new cursor, or none of them. */
@@ -551,7 +562,7 @@ export const openUsageStore = (path: string) => {
   }): void =>
     transaction(() => {
       for (const row of slice.rows) upsertRequest(row, true)
-      for (const row of slice.tools ?? []) upsertToolExecution(toolRowSchema.parse(row))
+      for (const row of slice.tools ?? []) upsertToolExecution(decodeStoreValue(toolRowSchema)(row))
       pruneTelemetry()
       if (slice.session !== null) upsertSession(slice.session)
       prepare(
@@ -572,9 +583,9 @@ export const openUsageStore = (path: string) => {
    * once no log row turned up in time.
    */
   const reconcileLiveCalls = (now: number): number => {
-    const waiting = z
-      .array(z.object({ id: z.string(), session_id: z.string(), purpose: z.string(), started_at: z.number() }))
-      .parse(prepare("SELECT id, session_id, purpose, started_at FROM requests WHERE settled = 0 AND source = 'live'").all())
+    const waiting = decodeStoreValue(
+      Schema.Array(Schema.Struct({ id: Schema.String, session_id: Schema.String, purpose: Schema.String, started_at: Schema.Number })),
+    )(prepare("SELECT id, session_id, purpose, started_at FROM requests WHERE settled = 0 AND source = 'live'").all())
     let merged = 0
     transaction(() => {
       for (const live of waiting) {
@@ -583,7 +594,7 @@ export const openUsageStore = (path: string) => {
              AND NOT EXISTS (SELECT 1 FROM requests m WHERE m.merged_into = r.id)
            ORDER BY ABS(r.started_at - ?) LIMIT 1`,
         ).get(live.session_id, live.purpose, live.started_at - LIVE_MATCH_WINDOW_MS, live.started_at + LIVE_MATCH_WINDOW_MS, live.started_at)
-        const target = match === undefined ? undefined : z.object({ id: z.string() }).parse(match).id
+        const target = match === undefined ? undefined : decodeStoreValue(Schema.Struct({ id: Schema.String }))(match).id
         if (target !== undefined) {
           prepare(
             `UPDATE requests SET
@@ -607,9 +618,11 @@ export const openUsageStore = (path: string) => {
   }
 
   const routeBands = (): RouteBand[] =>
-    z
-      .array(z.object({ provider: z.string(), model: z.string(), band: z.number() }))
-      .parse(prepare('SELECT DISTINCT provider, model, band FROM requests WHERE input IS NOT NULL').all())
+    Array.from(
+      decodeStoreValue(Schema.Array(Schema.Struct({ provider: Schema.String, model: Schema.String, band: Schema.Number })))(
+        prepare('SELECT DISTINCT provider, model, band FROM requests WHERE input IS NOT NULL').all(),
+      ),
+    )
 
   /**
    * Pricing runs after every index pass and asked SQLite for the distinct routes of all 150 000 requests each time
@@ -618,10 +631,9 @@ export const openUsageStore = (path: string) => {
   const unratedRouteBands = (): RouteBand[] => {
     pricedRoutes ??= new Map(routeBands().map(route => [routeBandKey(route), route]))
     const rated = new Set(
-      z
-        .array(z.object({ provider: z.string(), model: z.string(), band: z.number() }))
-        .parse(prepare('SELECT provider, model, band FROM route_rates').all())
-        .map(routeBandKey),
+      decodeStoreValue(Schema.Array(Schema.Struct({ provider: Schema.String, model: Schema.String, band: Schema.Number })))(
+        prepare('SELECT provider, model, band FROM route_rates').all(),
+      ).map(routeBandKey),
     )
     return [...pricedRoutes.values()].filter(route => !rated.has(routeBandKey(route)))
   }
@@ -645,7 +657,7 @@ export const openUsageStore = (path: string) => {
 
   const getMeta = (key: string): string | null => {
     const row = prepare('SELECT value FROM meta WHERE key = ?').get(key)
-    return row === undefined ? null : z.object({ value: z.string() }).parse(row).value
+    return row === undefined ? null : decodeStoreValue(Schema.Struct({ value: Schema.String }))(row).value
   }
 
   const setMeta = (key: string, value: string): void => {
@@ -690,15 +702,15 @@ export const openUsageStore = (path: string) => {
   const requests = (query: RequestQuery): RequestPage => {
     const filter = requestFilter(query, true)
     const where = filter.where
-    const statusCounts = z
-      .array(countRowSchema)
-      .parse(prepare(`SELECT r.status AS key, COUNT(*) AS count FROM ${FROM_SQL} WHERE ${where} GROUP BY r.status`).all(...filter.params))
+    const statusCounts = decodeStoreValue(Schema.Array(countRowSchema))(
+      prepare(`SELECT r.status AS key, COUNT(*) AS count FROM ${FROM_SQL} WHERE ${where} GROUP BY r.status`).all(...filter.params),
+    )
     const unfiltered = requestFilter(query, false)
-    const purposeCounts = z
-      .array(countRowSchema)
-      .parse(prepare(`SELECT r.purpose AS key, COUNT(*) AS count FROM ${FROM_SQL} WHERE ${unfiltered.where} GROUP BY r.purpose`).all(...unfiltered.params))
+    const purposeCounts = decodeStoreValue(Schema.Array(countRowSchema))(
+      prepare(`SELECT r.purpose AS key, COUNT(*) AS count FROM ${FROM_SQL} WHERE ${unfiltered.where} GROUP BY r.purpose`).all(...unfiltered.params),
+    )
     const statusClause = query.status === undefined ? '' : ' AND r.status = ?'
-    const rows = z.array(requestRowSchema).parse(
+    const rows = decodeStoreValue(Schema.Array(requestRowSchema))(
       prepare(
         `SELECT r.id, r.session_id, s.title, s.parent_session, s.project, s.cwd, r.seq, r.message_id, r.turn, r.step, r.purpose, r.provider, r.model, r.started_at,
            CASE WHEN r.ended_at IS NULL THEN NULL ELSE r.ended_at - r.started_at END AS duration_ms, r.ttft_ms,
@@ -744,7 +756,7 @@ export const openUsageStore = (path: string) => {
   }
 
   const summaryOf = (filter: ReturnType<typeof rangeFilter>) =>
-    summaryRowSchema.parse(
+    decodeStoreValue(summaryRowSchema)(
       prepare(
         `SELECT COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
            COALESCE(SUM(r.status = 'failed'), 0) AS failed, COALESCE(SUM(r.status = 'aborted'), 0) AS aborted,
@@ -767,38 +779,35 @@ export const openUsageStore = (path: string) => {
     const dimensionSql = { model: 'r.model', provider: 'r.provider', project: "COALESCE(s.project, '(none)')", purpose: 'r.purpose' } as const
 
     const breakdown = (dimension: keyof typeof dimensionSql) =>
-      z
-        .array(breakdownRowSchema)
-        .parse(
-          prepare(
-            `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
+      decodeStoreValue(Schema.Array(breakdownRowSchema))(
+        prepare(
+          `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
                COUNT(DISTINCT r.session_id) AS sessions, COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
                COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
                COALESCE(SUM(r.input IS NULL OR r.output IS NULL OR r.cache_read IS NULL OR r.cache_write IS NULL), 0) AS missing_usage,
                COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
              FROM ${FROM_SQL} WHERE ${where} GROUP BY key ORDER BY cost DESC, requests DESC`,
-          ).all(...filter.params),
-        )
-        .map(row => ({
-          key: row.key ?? '(none)',
-          cost: row.cost,
-          requests: row.requests,
-          sessions: row.sessions,
-          input: row.input,
-          cacheRead: row.cache_read,
-          cacheWrite: row.cache_write,
-          output: row.output,
-          tokens: row.tokens,
-          missingUsage: row.missing_usage,
-          unpriced: row.unpriced,
-        }))
+        ).all(...filter.params),
+      ).map(row => ({
+        key: row.key ?? '(none)',
+        cost: row.cost,
+        requests: row.requests,
+        sessions: row.sessions,
+        input: row.input,
+        cacheRead: row.cache_read,
+        cacheWrite: row.cache_write,
+        output: row.output,
+        tokens: row.tokens,
+        missingUsage: row.missing_usage,
+        unpriced: row.unpriced,
+      }))
 
     const byDimension = { model: breakdown('model'), provider: breakdown('provider'), project: breakdown('project'), purpose: breakdown('purpose') }
     const ranked = query.groupBy === 'purpose' ? breakdown('purpose') : byDimension[query.groupBy]
     const leading = new Set(ranked.slice(0, ranked.length > SERIES_KEYS ? SERIES_KEYS - 1 : SERIES_KEYS).map(row => row.key))
     const keys = [...leading, ...(ranked.length > leading.size ? [OTHER_KEY] : [])]
 
-    const rawBuckets = z.array(bucketRowSchema).parse(
+    const rawBuckets = decodeStoreValue(Schema.Array(bucketRowSchema))(
       prepare(
         `SELECT ${bucketSql} AS start, ${dimensionSql[query.groupBy]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
            COALESCE(SUM(r.status = 'failed'), 0) AS failed, COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
@@ -828,7 +837,7 @@ export const openUsageStore = (path: string) => {
       })
     }
 
-    const latencyRows = z.array(latencyRowSchema).parse(
+    const latencyRows = decodeStoreValue(Schema.Array(latencyRowSchema))(
       prepare(
         `SELECT ${bucketSql} AS start, r.ttft_ms, CASE WHEN r.ended_at IS NULL THEN NULL ELSE r.ended_at - r.started_at END AS duration_ms
            FROM ${FROM_SQL} WHERE ${where} AND r.status = 'ok' ORDER BY start`,
@@ -853,15 +862,12 @@ export const openUsageStore = (path: string) => {
       }
     })
 
-    const topThreads = z
-      .array(threadRowSchema)
-      .parse(
-        prepare(
-          `SELECT r.session_id, s.title, s.project, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests
+    const topThreads = decodeStoreValue(Schema.Array(threadRowSchema))(
+      prepare(
+        `SELECT r.session_id, s.title, s.project, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests
            FROM ${FROM_SQL} WHERE ${where} GROUP BY r.session_id ORDER BY cost DESC, requests DESC LIMIT 10`,
-        ).all(...filter.params),
-      )
-      .map(row => ({ sessionId: row.session_id, title: row.title, project: row.project, cost: row.cost, requests: row.requests }))
+      ).all(...filter.params),
+    ).map(row => ({ sessionId: row.session_id, title: row.title, project: row.project, cost: row.cost, requests: row.requests }))
 
     const current = summaryOf(filter)
     const span = query.to - query.from
@@ -929,20 +935,19 @@ export const openUsageStore = (path: string) => {
     )
       .all(query.from, query.to)
       .map(row =>
-        z
-          .object({
-            credential: jevCredentialLabelSchema.or(z.literal('Other credentials')),
-            backlogCalls: z.number().int().nonnegative(),
-            memoryCalls: z.number().int().nonnegative(),
-            calls: z.number().int().nonnegative(),
-            succeeded: z.number().int().nonnegative(),
-            failed: z.number().int().nonnegative(),
-            inputTokens: z.number().int().nonnegative(),
-            outputTokens: z.number().int().nonnegative(),
-            callsWithoutInputUsage: z.number().int().nonnegative(),
-          })
-          .strict()
-          .parse(row),
+        decodeStoreValue(
+          Schema.Struct({
+            credential: credentialLabelSchema,
+            backlogCalls: nonnegativeInteger,
+            memoryCalls: nonnegativeInteger,
+            calls: nonnegativeInteger,
+            succeeded: nonnegativeInteger,
+            failed: nonnegativeInteger,
+            inputTokens: nonnegativeInteger,
+            outputTokens: nonnegativeInteger,
+            callsWithoutInputUsage: nonnegativeInteger,
+          }),
+        )(row),
       )
     const byCredential: JevUsageBreakdown[] = rows.map(row => ({
       credential: row.credential,
@@ -956,27 +961,27 @@ export const openUsageStore = (path: string) => {
       callsWithoutInputUsage: row.callsWithoutInputUsage,
       estimatedCostUsd: (row.inputTokens * JEV_INPUT_USD_PER_MILLION) / 1_000_000,
     }))
-    const omitted = z
-      .object({
-        calls: z.number().int().nonnegative(),
-        backlogCalls: z.number().int().nonnegative(),
-        memoryCalls: z.number().int().nonnegative(),
-        succeeded: z.number().int().nonnegative(),
-        failed: z.number().int().nonnegative(),
-        inputTokens: z.number().int().nonnegative(),
-        outputTokens: z.number().int().nonnegative(),
-        callsWithoutInputUsage: z.number().int().nonnegative(),
-      })
-      .parse(
-        prepare(
-          `SELECT COUNT(*) AS calls, COALESCE(SUM(source = 'backlog'), 0) AS backlogCalls, COALESCE(SUM(source = 'memory'), 0) AS memoryCalls,
+    const omitted = decodeStoreValue(
+      Schema.Struct({
+        calls: nonnegativeInteger,
+        backlogCalls: nonnegativeInteger,
+        memoryCalls: nonnegativeInteger,
+        succeeded: nonnegativeInteger,
+        failed: nonnegativeInteger,
+        inputTokens: nonnegativeInteger,
+        outputTokens: nonnegativeInteger,
+        callsWithoutInputUsage: nonnegativeInteger,
+      }),
+    )(
+      prepare(
+        `SELECT COUNT(*) AS calls, COALESCE(SUM(source = 'backlog'), 0) AS backlogCalls, COALESCE(SUM(source = 'memory'), 0) AS memoryCalls,
              COALESCE(SUM(outcome = 'success'), 0) AS succeeded, COALESCE(SUM(outcome = 'failure'), 0) AS failed,
              COALESCE(SUM(input_tokens), 0) AS inputTokens, COALESCE(SUM(output_tokens), 0) AS outputTokens,
              COALESCE(SUM(input_tokens IS NULL), 0) AS callsWithoutInputUsage
            FROM jev_requests WHERE started_at >= ? AND started_at < ? AND credential NOT IN (SELECT credential FROM jev_requests
              WHERE started_at >= ? AND started_at < ? GROUP BY credential ORDER BY credential LIMIT 19)`,
-        ).get(query.from, query.to, query.from, query.to),
-      )
+      ).get(query.from, query.to, query.from, query.to),
+    )
     if (omitted.calls > 0)
       byCredential.push({
         credential: 'Other credentials',
@@ -1035,7 +1040,7 @@ export const openUsageStore = (path: string) => {
     const bucketMs = query.bucket === 'hour' ? 3_600_000 : 86_400_000
     const offsetMs = (query.tzOffsetMinutes ?? 0) * 60_000
     const timelineBucketSql = `((started_at + ${String(offsetMs)}) / ${String(bucketMs)}) * ${String(bucketMs)} - ${String(offsetMs)}`
-    const toolRows = z.array(toolActivityRowSchema).parse(
+    const toolRows = decodeStoreValue(Schema.Array(toolActivityRowSchema))(
       prepare(`WITH durations AS (
         SELECT category, owner, name, ended_at - started_at AS duration_ms,
           ROW_NUMBER() OVER (PARTITION BY category, owner, name ORDER BY ended_at - started_at) AS rank,
@@ -1077,7 +1082,7 @@ export const openUsageStore = (path: string) => {
       ),
     )
     const identifierRows = (column: 'normalized_command' | 'test_runner') =>
-      z.array(identifierActivityRowSchema).parse(
+      decodeStoreValue(Schema.Array(identifierActivityRowSchema))(
         prepare(`SELECT ${column} AS identifier, COUNT(*) AS calls,
             COALESCE(SUM(CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at END), 0) AS totalDurationMs,
             SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END) AS successes,
@@ -1096,7 +1101,7 @@ export const openUsageStore = (path: string) => {
     const commandRows = identifierRows('normalized_command')
     const testRunRows = identifierRows('test_runner')
     const identifierDurationTotal = (column: 'normalized_command' | 'test_runner') =>
-      durationTotalSchema.parse(
+      decodeStoreValue(durationTotalSchema)(
         prepare(`SELECT COALESCE(SUM(ended_at - started_at), 0) AS totalDurationMs FROM tools
           WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL AND ${column} IS NOT NULL AND (? IS NULL OR category = ?)`).get(
           query.from,
@@ -1108,54 +1113,48 @@ export const openUsageStore = (path: string) => {
     const commandDurationTotalMs = identifierDurationTotal('normalized_command')
     const testRunDurationTotalMs = identifierDurationTotal('test_runner')
     const events = [
-      ...z
-        .array(jevEventRowSchema)
-        .parse(
-          prepare(
-            'SELECT started_at AS at, started_at + duration_ms AS endedAt, duration_ms AS durationMs, source, outcome FROM jev_requests WHERE started_at >= ? AND started_at < ? ORDER BY started_at DESC LIMIT ?',
-          ).all(query.from, query.to, query.eventLimit ?? 200),
-        )
-        .map(row => ({ kind: 'jev' as const, ...row })),
-      ...z
-        .array(
-          z.object({
-            id: z.string(),
-            session_id: z.string(),
-            seq: z.number(),
-            turn: z.number().nullable(),
-            step: z.number().nullable(),
-            name: z.string(),
-            category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+      ...decodeStoreValue(Schema.Array(jevEventRowSchema))(
+        prepare(
+          'SELECT started_at AS at, started_at + duration_ms AS endedAt, duration_ms AS durationMs, source, outcome FROM jev_requests WHERE started_at >= ? AND started_at < ? ORDER BY started_at DESC LIMIT ?',
+        ).all(query.from, query.to, query.eventLimit ?? 200),
+      ).map(row => ({ kind: 'jev' as const, ...row })),
+      ...decodeStoreValue(
+        Schema.Array(
+          Schema.Struct({
+            id: Schema.String,
+            session_id: Schema.String,
+            seq: Schema.Number,
+            turn: numberColumn,
+            step: numberColumn,
+            name: Schema.String,
+            category: toolCategory,
             owner: textColumn,
-            started_at: z.number(),
+            started_at: Schema.Number,
             ended_at: numberColumn,
-            outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+            outcome: toolOutcome,
           }),
-        )
-        .parse(
-          prepare(`SELECT id, session_id, seq, turn, step, name, category, owner, started_at, ended_at, outcome FROM tools
+        ),
+      )(
+        prepare(`SELECT id, session_id, seq, turn, step, name, category, owner, started_at, ended_at, outcome FROM tools
           WHERE started_at >= ? AND started_at < ?
           ORDER BY started_at DESC LIMIT ?`).all(query.from, query.to, query.eventLimit ?? 200),
-        )
-        .map(row => ({
-          kind: 'tool' as const,
-          at: row.started_at,
-          endedAt: row.ended_at,
-          durationMs: row.ended_at === null ? null : row.ended_at - row.started_at,
-          category: row.category,
-          name: row.name,
-          owner: row.owner,
-          outcome: row.outcome,
-          turn: row.turn,
-          step: row.step,
-        })),
+      ).map(row => ({
+        kind: 'tool' as const,
+        at: row.started_at,
+        endedAt: row.ended_at,
+        durationMs: row.ended_at === null ? null : row.ended_at - row.started_at,
+        category: row.category,
+        name: row.name,
+        owner: row.owner,
+        outcome: row.outcome,
+        turn: row.turn,
+        step: row.step,
+      })),
     ]
       .sort((left, right) => right.at - left.at)
       .slice(0, query.eventLimit ?? 50)
-    const categoryOutcomes = z
-      .array(activityCategoryRowSchema)
-      .parse(
-        prepare(`WITH durations AS (
+    const categoryOutcomes = decodeStoreValue(Schema.Array(activityCategoryRowSchema))(
+      prepare(`WITH durations AS (
       SELECT category, ended_at - started_at AS duration_ms,
         ROW_NUMBER() OVER (PARTITION BY category ORDER BY ended_at - started_at) AS rank,
         COUNT(*) OVER (PARTITION BY category) AS count
@@ -1180,26 +1179,25 @@ export const openUsageStore = (path: string) => {
       SUM(CASE WHEN t.result_chars IS NOT NULL THEN 1 ELSE 0 END) AS measuredCalls
     FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category
     WHERE t.started_at >= ? AND t.started_at < ? GROUP BY t.category ORDER BY t.category`).all(query.from, query.to, query.from, query.to),
-      )
-      .map(row => ({
-        category: row.category,
-        calls: row.calls,
-        successes: row.successes,
-        errors: row.errors,
-        interrupted: row.interrupted,
-        unknown: row.unknown,
-        pending: row.pending,
-        successRate: row.calls === 0 ? 0 : row.successes / row.calls,
-        outputTokens: row.outputTokens,
-        measuredCalls: row.measuredCalls,
-        durationMs: {
-          averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
-          p50Ms: row.p50DurationMs,
-          p90Ms: row.p90DurationMs,
-          maxMs: row.maxDurationMs,
-        },
-      }))
-    const timeline = z.array(timelineRowSchema).parse(
+    ).map(row => ({
+      category: row.category,
+      calls: row.calls,
+      successes: row.successes,
+      errors: row.errors,
+      interrupted: row.interrupted,
+      unknown: row.unknown,
+      pending: row.pending,
+      successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+      outputTokens: row.outputTokens,
+      measuredCalls: row.measuredCalls,
+      durationMs: {
+        averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+        p50Ms: row.p50DurationMs,
+        p90Ms: row.p90DurationMs,
+        maxMs: row.maxDurationMs,
+      },
+    }))
+    const timeline = decodeStoreValue(Schema.Array(timelineRowSchema))(
       prepare(`SELECT ${timelineBucketSql} AS start, category, COUNT(*) AS calls,
           SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END) AS errors,
           COALESCE(SUM(CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at END), 0) AS durationMs,
@@ -1207,7 +1205,7 @@ export const openUsageStore = (path: string) => {
         FROM tools WHERE started_at >= ? AND started_at < ? AND (? IS NULL OR category = ?)
         GROUP BY start, category ORDER BY start, category`).all(query.from, query.to, query.category ?? null, query.category ?? null),
     )
-    const totals = activityTotalsRowSchema.parse(
+    const totals = decodeStoreValue(activityTotalsRowSchema)(
       prepare(`SELECT COUNT(*) AS calls,
         COALESCE(SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END), 0) AS successes,
         COALESCE(SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END), 0) AS errors,
@@ -1224,37 +1222,36 @@ export const openUsageStore = (path: string) => {
         query.category ?? null,
       ),
     )
-    const jev = jevActivityRowSchema.parse(
+    const jev = decodeStoreValue(jevActivityRowSchema)(
       prepare(`SELECT COUNT(*) AS calls,
       COALESCE(SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END), 0) AS successes,
       COALESCE(SUM(CASE WHEN outcome != 'success' THEN 1 ELSE 0 END), 0) AS failures,
       COALESCE(SUM(input_tokens), 0) AS inputTokens, COALESCE(SUM(output_tokens), 0) AS outputTokens,
       AVG(duration_ms) AS durationMs, MAX(duration_ms) AS maxDurationMs FROM jev_requests WHERE started_at >= ? AND started_at < ?`).get(query.from, query.to),
     )
-    const jevOutcomes = z
-      .array(jevOutcomeRowSchema)
-      .parse(
-        prepare(
-          'SELECT outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY outcome ORDER BY calls DESC, outcome',
-        ).all(query.from, query.to),
-      )
-    const jevSources = z
-      .array(
-        z.object({
-          source: jevUsageSourceSchema,
-          calls: z.number(),
-          successes: z.number(),
-          failures: z.number(),
-          inputTokens: z.number(),
-          outputTokens: z.number(),
+    const jevOutcomes = decodeStoreValue(Schema.Array(jevOutcomeRowSchema))(
+      prepare('SELECT outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY outcome ORDER BY calls DESC, outcome').all(
+        query.from,
+        query.to,
+      ),
+    )
+    const jevSources = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          source: Schema.Literals(JEV_USAGE_SOURCES),
+          calls: Schema.Number,
+          successes: Schema.Number,
+          failures: Schema.Number,
+          inputTokens: Schema.Number,
+          outputTokens: Schema.Number,
           averageDurationMs: numberColumn,
           p50DurationMs: numberColumn,
           p90DurationMs: numberColumn,
           maxDurationMs: numberColumn,
         }),
-      )
-      .parse(
-        prepare(`WITH durations AS (
+      ),
+    )(
+      prepare(`WITH durations AS (
       SELECT source, duration_ms,
         ROW_NUMBER() OVER (PARTITION BY source ORDER BY duration_ms) AS rank,
         COUNT(*) OVER (PARTITION BY source) AS count
@@ -1272,23 +1269,22 @@ export const openUsageStore = (path: string) => {
       AVG(j.duration_ms) AS averageDurationMs, ds.p50DurationMs, ds.p90DurationMs, MAX(j.duration_ms) AS maxDurationMs
     FROM jev_requests j LEFT JOIN duration_stats ds ON ds.source = j.source
     WHERE j.started_at >= ? AND j.started_at < ? GROUP BY j.source ORDER BY j.source`).all(query.from, query.to, query.from, query.to),
-      )
-      .map(row => ({
-        source: row.source,
-        calls: row.calls,
-        successes: row.successes,
-        failures: row.failures,
-        successRate: row.calls === 0 ? 0 : row.successes / row.calls,
-        inputTokens: row.inputTokens,
-        outputTokens: row.outputTokens,
-        durationMs: {
-          averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
-          p50Ms: row.p50DurationMs,
-          p90Ms: row.p90DurationMs,
-          maxMs: row.maxDurationMs,
-        },
-      }))
-    const jevDurationStats = z.object({ p50DurationMs: numberColumn, p90DurationMs: numberColumn, maxDurationMs: numberColumn }).parse(
+    ).map(row => ({
+      source: row.source,
+      calls: row.calls,
+      successes: row.successes,
+      failures: row.failures,
+      successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      durationMs: {
+        averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+        p50Ms: row.p50DurationMs,
+        p90Ms: row.p90DurationMs,
+        maxMs: row.maxDurationMs,
+      },
+    }))
+    const jevDurationStats = decodeStoreValue(Schema.Struct({ p50DurationMs: numberColumn, p90DurationMs: numberColumn, maxDurationMs: numberColumn }))(
       prepare(`WITH durations AS (
       SELECT duration_ms, ROW_NUMBER() OVER (ORDER BY duration_ms) AS rank, COUNT(*) OVER () AS count
       FROM jev_requests WHERE started_at >= ? AND started_at < ?
@@ -1304,7 +1300,7 @@ export const openUsageStore = (path: string) => {
       timelineBucket: query.bucket ?? 'day',
       categories: categoryOutcomes.map(row => ({ category: row.category, calls: row.calls, outputTokens: row.outputTokens })),
       categoryOutcomes,
-      timeline,
+      timeline: [...timeline],
       totals: {
         ...totals,
         successRate: totals.calls === 0 ? 0 : totals.successes / totals.calls,
@@ -1354,7 +1350,7 @@ export const openUsageStore = (path: string) => {
         averageDurationMs: jev.durationMs === null ? null : Math.round(jev.durationMs),
         inputTokens: jev.inputTokens,
         outputTokens: jev.outputTokens,
-        byOutcome: jevOutcomes,
+        byOutcome: [...jevOutcomes],
         successRate: jev.calls === 0 ? 0 : jev.successes / jev.calls,
         bySource: jevSources,
         durationMs: {
@@ -1368,100 +1364,124 @@ export const openUsageStore = (path: string) => {
   }
 
   const otelMetrics = (range: { readonly from: number; readonly to: number; readonly temporality: OtlpTemporality; readonly serviceName: string }) => {
-    const modelCountRows = z
-      .array(
-        z.object({
-          provider: z.string().max(200),
-          model: z.string().max(200),
-          purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
-          status: z.enum(UsageFoldModel.REQUEST_STATUSES),
-          calls: z.number().int(),
+    const modelCountRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          provider: Schema.String.check(Schema.isMaxLength(200)),
+          model: Schema.String.check(Schema.isMaxLength(200)),
+          purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+          status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
+          calls: integer,
         }),
-      )
-      .parse(
-        prepare(`SELECT provider, model, purpose, status, COUNT(*) AS calls FROM requests r
+      ),
+    )(
+      prepare(`SELECT provider, model, purpose, status, COUNT(*) AS calls FROM requests r
           WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
           GROUP BY provider, model, purpose, status ORDER BY calls DESC LIMIT 1000`).all(range.from, range.to),
-      )
-    const modelTokenRows = z
-      .array(
-        z.object({
-          provider: z.string().max(200),
-          model: z.string().max(200),
-          purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
-          input: z.number().int(),
-          cacheRead: z.number().int(),
-          cacheWrite: z.number().int(),
-          output: z.number().int(),
-          reasoning: z.number().int(),
+    )
+    const modelTokenRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          provider: Schema.String.check(Schema.isMaxLength(200)),
+          model: Schema.String.check(Schema.isMaxLength(200)),
+          purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+          input: integer,
+          cacheRead: integer,
+          cacheWrite: integer,
+          output: integer,
+          reasoning: integer,
         }),
-      )
-      .parse(
-        prepare(`SELECT provider, model, purpose, COALESCE(SUM(input), 0) AS input,
+      ),
+    )(
+      prepare(`SELECT provider, model, purpose, COALESCE(SUM(input), 0) AS input,
             COALESCE(SUM(cache_read), 0) AS cacheRead, COALESCE(SUM(cache_write), 0) AS cacheWrite,
             COALESCE(SUM(output), 0) AS output, COALESCE(SUM(reasoning), 0) AS reasoning
           FROM requests r WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
           GROUP BY provider, model, purpose ORDER BY SUM(COALESCE(input, 0) + COALESCE(cache_read, 0) + COALESCE(cache_write, 0) + COALESCE(output, 0) + COALESCE(reasoning, 0)) DESC LIMIT 1000`).all(
-          range.from,
-          range.to,
-        ),
-      )
-    const modelDurationRows = z
-      .array(
-        z
-          .object({
-            provider: z.string().max(200),
-            model: z.string().max(200),
-            purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
-            status: z.enum(UsageFoldModel.REQUEST_STATUSES),
-          })
-          .extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape),
-      )
-      .parse(
-        prepare(`WITH duration_rows AS (
+        range.from,
+        range.to,
+      ),
+    )
+    const modelDurationRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          provider: Schema.String.check(Schema.isMaxLength(200)),
+          model: Schema.String.check(Schema.isMaxLength(200)),
+          purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+          status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
+          calls: integer,
+          durationSumMs: Schema.Number,
+          ...otelBucketRowFields,
+        }),
+      ),
+    )(
+      prepare(`WITH duration_rows AS (
             SELECT provider, model, purpose, status, ended_at - started_at AS duration_ms FROM requests r
             WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ? AND r.ended_at IS NOT NULL AND r.ended_at >= r.started_at
           )
           SELECT provider, model, purpose, status, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
           FROM duration_rows GROUP BY provider, model, purpose, status ORDER BY calls DESC LIMIT 1000`).all(range.from, range.to),
-      )
-    const toolCategoryRows = z.array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), outcome: z.enum(OTEL_TOOL_OUTCOMES), calls: z.number().int() })).parse(
+    )
+    const toolCategoryRows = decodeStoreValue(Schema.Array(Schema.Struct({ category: toolCategory, outcome: toolOutcome, calls: integer })))(
       prepare(`SELECT category, outcome, COUNT(*) AS calls FROM tools WHERE started_at >= ? AND started_at < ?
           GROUP BY category, outcome ORDER BY category, outcome`).all(range.from, range.to),
     )
-    const toolSourceRows = z
-      .array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), name: z.string().min(1).max(120), owner: textColumn, calls: z.number().int() }))
-      .parse(
-        prepare(`SELECT category, name, owner, COUNT(*) AS calls FROM tools WHERE started_at >= ? AND started_at < ?
+    const toolSourceRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          category: toolCategory,
+          name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+          owner: textColumn,
+          calls: integer,
+        }),
+      ),
+    )(
+      prepare(`SELECT category, name, owner, COUNT(*) AS calls FROM tools WHERE started_at >= ? AND started_at < ?
           GROUP BY category, name, owner ORDER BY calls DESC, category, owner, name LIMIT 500`).all(range.from, range.to),
-      )
-    const toolDurationRows = z
-      .array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), outcome: z.enum(OTEL_TOOL_OUTCOMES) }).extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape))
-      .parse(
-        prepare(`WITH duration_rows AS (
+    )
+    const toolDurationRows = decodeStoreValue(
+      Schema.Array(Schema.Struct({ category: toolCategory, outcome: toolOutcome, calls: integer, durationSumMs: Schema.Number, ...otelBucketRowFields })),
+    )(
+      prepare(`WITH duration_rows AS (
             SELECT category, outcome, ended_at - started_at AS duration_ms FROM tools
             WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL AND ended_at >= started_at
           )
           SELECT category, outcome, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
           FROM duration_rows GROUP BY category, outcome ORDER BY category, outcome`).all(range.from, range.to),
-      )
-    const jevCountRows = z.array(z.object({ source: jevUsageSourceSchema, outcome: jevUsageOutcomeSchema, calls: z.number().int() })).parse(
+    )
+    const jevCountRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          source: Schema.Literals(JEV_USAGE_SOURCES),
+          outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
+          calls: integer,
+        }),
+      ),
+    )(
       prepare(`SELECT source, outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ?
           GROUP BY source, outcome ORDER BY source, outcome`).all(range.from, range.to),
     )
-    const jevTokenRows = z.array(z.object({ source: jevUsageSourceSchema, input: z.number().int(), output: z.number().int() })).parse(
+    const jevTokenRows = decodeStoreValue(Schema.Array(Schema.Struct({ source: Schema.Literals(JEV_USAGE_SOURCES), input: integer, output: integer })))(
       prepare(`SELECT source, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output
           FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY source ORDER BY source`).all(range.from, range.to),
     )
-    const jevDurationRows = z
-      .array(z.object({ source: jevUsageSourceSchema, outcome: jevUsageOutcomeSchema }).extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape))
-      .parse(
-        prepare(`WITH duration_rows AS (
+    const jevDurationRows = decodeStoreValue(
+      Schema.Array(
+        Schema.Struct({
+          source: Schema.Literals(JEV_USAGE_SOURCES),
+          outcome: Schema.Literals(JEV_USAGE_OUTCOMES),
+          calls: integer,
+          durationSumMs: Schema.Number,
+          ...otelBucketRowFields,
+        }),
+      ),
+    )(
+      prepare(`WITH duration_rows AS (
             SELECT source, outcome, duration_ms FROM jev_requests WHERE started_at >= ? AND started_at < ?
           )
           SELECT source, outcome, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
           FROM duration_rows GROUP BY source, outcome ORDER BY source, outcome`).all(range.from, range.to),
-      )
+    )
 
     const counters: OtlpCounterInput[] = []
     if (modelCountRows.length > 0)
@@ -1544,7 +1564,7 @@ export const openUsageStore = (path: string) => {
         points: jevTokenPoints,
       })
 
-    const bucketCountsOf = (row: z.infer<typeof OTEL_HISTOGRAM_BASE_ROW_SCHEMA>): number[] => {
+    const bucketCountsOf = (row: Schema.Schema.Type<typeof OTEL_HISTOGRAM_BASE_ROW_SCHEMA>): number[] => {
       const cumulative = [
         row.bucket0,
         row.bucket1,
@@ -1620,9 +1640,9 @@ export const openUsageStore = (path: string) => {
   }
 
   const counts = () =>
-    z
-      .object({ files: z.number(), requests: z.number() })
-      .parse(prepare(`SELECT (SELECT COUNT(*) FROM files) AS files, (SELECT COUNT(*) FROM requests r WHERE ${VISIBLE_SQL}) AS requests`).get())
+    decodeStoreValue(Schema.Struct({ files: Schema.Number, requests: Schema.Number }))(
+      prepare(`SELECT (SELECT COUNT(*) FROM files) AS files, (SELECT COUNT(*) FROM requests r WHERE ${VISIBLE_SQL}) AS requests`).get(),
+    )
 
   return {
     fileCursor,

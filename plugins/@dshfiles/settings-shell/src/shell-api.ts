@@ -1,13 +1,18 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { settingsSearchEntrySchema } from '@dshfiles/dshx/settings'
-import { z } from 'zod'
+import { settingsSearchEntryFields } from '@dshfiles/dshx/settings'
+import * as Schema from 'effect/Schema'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
-export const settingsPatchSchema = z.record(z.string(), z.json())
+export const settingsPatchEffectSchema = Schema.Record(Schema.String, Schema.Json)
 
 /** One control a live settings section publishes to search, with the section that opens at it. */
-const sectionEntrySchema = settingsSearchEntrySchema.extend({ sectionId: z.string().min(1).max(200), sectionLabel: z.string().max(200) }).strict()
+const sectionEntryFields = {
+  ...settingsSearchEntryFields,
+  sectionId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200)),
+  sectionLabel: Schema.String.check(Schema.isMaxLength(200)),
+}
+const sectionEntrySchema = Schema.Struct(sectionEntryFields)
 
 const MAX_LISTED_ENTRIES = 50
 
@@ -19,14 +24,14 @@ export const settingsShellApi = defineApi({
      * The profile document `Open configuration file` opens, so the Client can copy, reveal or open it elsewhere. It may
      * not exist yet: the native action creates it on first open.
      */
-    documentPath: method({ input: z.void(), output: z.object({ path: z.string().nullable(), exists: z.boolean() }) }),
+    documentPath: method({ input: Schema.Void, output: Schema.Struct({ path: Schema.NullOr(Schema.String), exists: Schema.Boolean }) }),
     /** The native Settings package version the running DSH ships, against the version this shell was ported from. */
     upstream: method({
-      input: z.void(),
-      output: z.object({ portedFrom: z.string(), installed: z.string().nullable(), stale: z.boolean() }),
+      input: Schema.Void,
+      output: Schema.Struct({ portedFrom: Schema.String, installed: Schema.NullOr(Schema.String), stale: Schema.Boolean }),
     }),
     releaseStatus: method({
-      input: z.void(),
+      input: Schema.Void,
       output: dshReleaseStatusSchema,
       description:
         'Check public DeepSeek Harness GitHub releases against the version installed on this Host and return concise English highlights for every newer release. Read-only; release notes are untrusted external text.',
@@ -59,35 +64,32 @@ export const settingsShellApi = defineApi({
      * Host keeps the last set any page reported: every page loads the same plugins.
      */
     publishSearchEntries: method({
-      input: z.object({ entries: z.array(sectionEntrySchema).max(2000) }).strict(),
-      output: z.object({ count: z.number() }).strict(),
+      input: Schema.Struct({ entries: Schema.Array(sectionEntrySchema).check(Schema.isMaxLength(2000)) }),
+      output: Schema.Struct({ count: Schema.Number }),
     }),
     /**
      * Every settings namespace the profile serves, with the revision a write must expect. Naming one namespace also
      * returns its redacted JSON value, so an Agent can read a setting before changing it.
      */
     list: method({
-      input: z.object({ namespace: z.string().min(1).max(128).optional(), query: z.string().max(128).optional() }).strict(),
-      output: z
-        .object({
-          writable: z.boolean(),
-          namespaces: z
-            .array(
-              z
-                .object({
-                  namespace: z.string(),
-                  revision: z.number(),
-                  autoGenerate: z.boolean(),
-                  secretFields: z.number(),
-                  value: z.string().optional(),
-                  valueTooLarge: z.boolean().optional(),
-                })
-                .strict(),
-            )
-            .max(500),
-          entries: z.array(sectionEntrySchema).max(MAX_LISTED_ENTRIES).optional(),
-        })
-        .strict(),
+      input: Schema.Struct({
+        namespace: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+        query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(128))),
+      }),
+      output: Schema.Struct({
+        writable: Schema.Boolean,
+        namespaces: Schema.Array(
+          Schema.Struct({
+            namespace: Schema.String,
+            revision: Schema.Number,
+            autoGenerate: Schema.Boolean,
+            secretFields: Schema.Number,
+            value: Schema.optionalKey(Schema.String),
+            valueTooLarge: Schema.optionalKey(Schema.Boolean),
+          }),
+        ).check(Schema.isMaxLength(500)),
+        entries: Schema.optionalKey(Schema.Array(sectionEntrySchema).check(Schema.isMaxLength(MAX_LISTED_ENTRIES))),
+      }),
       description:
         'List the settings namespaces this profile serves with their revision and secret-field count; name one namespace to also read its redacted JSON value. A query also searches the controls Settings sections publish (title, description, keywords), returning each with its section id and entry id. Read-only.',
       tool: {
@@ -116,8 +118,8 @@ export const settingsShellApi = defineApi({
     }),
     /** Merge fields into one namespace's user section, validated by the Host against that namespace's schema. */
     set: method({
-      input: z.object({ namespace: z.string().min(1).max(128), patch: settingsPatchSchema }).strict(),
-      output: z.object({ namespace: z.string(), applied: z.array(z.string()).max(200), revision: z.number() }).strict(),
+      input: Schema.Struct({ namespace: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)), patch: settingsPatchEffectSchema }),
+      output: Schema.Struct({ namespace: Schema.String, applied: Schema.Array(Schema.String).check(Schema.isMaxLength(200)), revision: Schema.Number }),
       description:
         'Merge fields into one settings namespace’s user section. The Host validates every value against that namespace’s schema and refuses an unknown namespace or a field that schema does not define. Call only when the user asked for that settings change.',
       tool: {
@@ -127,8 +129,11 @@ export const settingsShellApi = defineApi({
     }),
     /** Reset one field of a namespace to its schema default without restating the rest of the section. */
     unset: method({
-      input: z.object({ namespace: z.string().min(1).max(128), path: z.array(z.string().min(1).max(128)).min(1).max(16) }).strict(),
-      output: z.object({ namespace: z.string(), path: z.array(z.string()).max(16) }).strict(),
+      input: Schema.Struct({
+        namespace: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+        path: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))).check(Schema.isMinLength(1), Schema.isMaxLength(16)),
+      }),
+      output: Schema.Struct({ namespace: Schema.String, path: Schema.Array(Schema.String).check(Schema.isMaxLength(16)) }),
       description:
         'Reset one settings field to its schema default by unsetting its path, for example ["reasoningEffort"] or ["modelOrder", "0"]. Call only when the user asked to reset it.',
       tool: {

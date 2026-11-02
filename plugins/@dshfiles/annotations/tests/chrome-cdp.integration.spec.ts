@@ -63,7 +63,8 @@ afterAll(async () => {
     if (server === undefined) return resolve()
     server.close(() => resolve())
   })
-  if (profileDir.length > 0) await rm(profileDir, { recursive: true, force: true })
+  // Chrome writes into its profile while it dies, so the first removal can lose the race with a fresh file.
+  if (profileDir.length > 0) await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 const waitForPicker = async ({ cdp }: { cdp: Cdp }): Promise<void> => {

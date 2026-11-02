@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Plugin } from 'vite'
-import { z } from 'zod'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -13,11 +13,12 @@ import { buildHost, watchHost } from '../src/compiler/host/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
-const hostPluginShape = z.object({
-  name: z.string(),
-  inject: z.unknown().optional(),
-  Config: z.unknown().optional(),
-  apply: z.function({ input: [z.unknown().optional(), z.unknown().optional()], output: z.unknown() }),
+const FunctionSchema = Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => void => typeof value === 'function')
+const hostPluginShape = Schema.Struct({
+  name: Schema.String,
+  inject: Schema.optionalKey(Schema.Unknown),
+  Config: Schema.optionalKey(Schema.Unknown),
+  apply: FunctionSchema,
 })
 
 interface ApplyContext {
@@ -85,7 +86,7 @@ describe('host compiler', () => {
     expect(code).not.toMatch(/from ['"]dshx\/(?:host|internal-host-runtime)['"]/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(code).toContain('src/host.ts')
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const calls: string[] = []
     const ctx = {
       calls,
@@ -133,7 +134,7 @@ describe('host compiler', () => {
     expect(code).not.toMatch(/from ['"](?:dshx\/host|dshx\/internal-host-runtime)['"]/)
     expect(code).toMatch(/from ['"]@deepseek-ai\/dsh-tools['"]/)
     expect(code.match(/from ['"]@deepseek-ai\/dsh-tools['"]/g)).toHaveLength(1)
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(resolve(root, 'dist/index.js')).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(resolve(root, 'dist/index.js')).href}?test=${Date.now()}`))
     const registered: unknown[] = []
     plugin.apply({
       tools: {
@@ -152,9 +153,9 @@ describe('host compiler', () => {
       resolve(root, 'src/host.ts'),
       [
         "import { defineHost } from '@dshfiles/dshx/host'",
-        "import { z } from 'zod'",
+        "import * as Schema from 'effect/Schema'",
         "import { defineApi, method } from '@dshfiles/dshx/api'",
-        'const Config = z.object({ servers: z.array(z.string()).default([]) })',
+        'const Config = Schema.toStandardSchemaV1(Schema.Struct({ servers: Schema.Array(Schema.String) }))',
         "const api = defineApi({ id: 'manager', version: 1, methods: { list: method() } })",
         'export default defineHost({ Config, apis: [api.host({ list() { return [] } })] })',
         '',
@@ -169,10 +170,12 @@ describe('host compiler', () => {
     })
 
     const output = resolve(root, 'dist/index.js')
-    const plugin = hostPluginShape
-      .extend({ Config: z.object({ '~standard': z.object({ version: z.number(), vendor: z.string() }) }) })
-      .parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
-    expect(plugin.Config['~standard']).toMatchObject({ version: 1, vendor: 'zod' })
+    const plugin = Schema.decodeUnknownSync(Schema.Struct({ Config: Schema.Unknown, inject: Schema.Array(Schema.String) }))(
+      await import(`${pathToFileURL(output).href}?test=${Date.now()}`),
+    )
+    if (typeof plugin.Config !== 'function' || !('~standard' in plugin.Config)) throw new Error('The generated Standard Schema Config must remain callable.')
+    const standard = Schema.decodeUnknownSync(Schema.Struct({ version: Schema.Number, vendor: Schema.String }))(plugin.Config['~standard'])
+    expect(standard).toMatchObject({ version: 1, vendor: 'effect' })
     expect(plugin.inject).toContain('connection')
   })
 
@@ -284,7 +287,7 @@ describe('host compiler', () => {
     const code = await readFile(output, 'utf8')
     expect(code).not.toContain('@dshfiles/dshx/host')
     expect(code).not.toContain('@deepseek-ai/dsh-commands')
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const registered: unknown[] = []
     plugin.apply({
       commands: {
@@ -322,7 +325,7 @@ describe('host compiler', () => {
     const code = await readFile(output, 'utf8')
     expect(code).not.toContain('@dshfiles/dshx/host')
     expect(code).not.toContain('@deepseek-ai/dsh-system-prompt')
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const registered: Array<{ kind: string; value: unknown }> = []
     plugin.apply({
       systemPrompt: {
@@ -401,9 +404,12 @@ describe('host compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
-    const map = z
-      .object({ sources: z.array(z.string()), sourcesContent: z.array(z.string().nullable()).optional() })
-      .parse(JSON.parse(await readFile(resolve(root, 'dist/index.js.map'), 'utf8')))
+    const map = Schema.decodeUnknownSync(
+      Schema.Struct({
+        sources: Schema.Array(Schema.String),
+        sourcesContent: Schema.optionalKey(Schema.Array(Schema.NullOr(Schema.String))),
+      }),
+    )(JSON.parse(await readFile(resolve(root, 'dist/index.js.map'), 'utf8')))
     expect(code).toMatch(/from ['"]node:path['"]/)
     expect(code).toContain('dshx-host')
     expect(code).toMatch(/sourceMappingURL=index\.js\.map/)
@@ -526,7 +532,7 @@ describe('host compiler', () => {
     })
     const output = resolve(root, 'dist/index.js')
     expect(await readFile(output, 'utf8')).toContain('function apply()')
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     expect(plugin.name).toBe('client-only-host')
     expect(plugin.apply()).toBeUndefined()
   })
@@ -551,7 +557,7 @@ describe('host compiler', () => {
       outDir: 'dist',
     })
     const output = resolve(root, 'dist/index.js')
-    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const ctx: ApplyContext = {}
     const config = { enabled: true }
     expect(plugin.name).toBe('native-host')
@@ -762,9 +768,13 @@ describe('host compiler', () => {
     expect(wrapper).toContain('createGenerationManager')
     expect(wrapper).toContain(`generation: ${JSON.stringify(generation)}`)
 
-    const manifest = z
-      .strictObject({ version: z.literal(1), generation: z.string(), hostContractVersion: z.string() })
-      .parse(JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')))
+    const manifest = Schema.decodeUnknownSync(
+      Schema.Struct({
+        version: Schema.Literal(1),
+        generation: Schema.String,
+        hostContractVersion: Schema.String,
+      }),
+    )(JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')))
     expect(manifest).toEqual({ version: 1, generation, hostContractVersion: 'v1' })
 
     const generationCode = await readFile(resolve(root, 'dist/.dshx-host-generations', `${generation}.js`), 'utf8')
@@ -827,10 +837,13 @@ describe('host compiler', () => {
     })
 
     const output = resolve(root, 'dist/index.js')
-    const module = hostPluginShape
-      .omit({ Config: true })
-      .extend({ inject: z.array(z.string()) })
-      .parse(await import(`${pathToFileURL(output).href}?generation=${Date.now()}`))
+    const module = Schema.decodeUnknownSync(
+      Schema.Struct({
+        name: Schema.String,
+        inject: Schema.Array(Schema.String),
+        apply: FunctionSchema,
+      }),
+    )(await import(`${pathToFileURL(output).href}?generation=${Date.now()}`))
     const registered: string[] = []
     const context = new Context()
     context.provide('tools', {

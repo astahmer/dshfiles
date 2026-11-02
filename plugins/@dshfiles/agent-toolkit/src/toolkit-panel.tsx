@@ -108,7 +108,7 @@ export const AgentToolkitPanel = (props: {
       const input = {}
       if (thread !== undefined) Object.assign(input, { sessionId: thread.id })
       if (cwd !== undefined) Object.assign(input, { cwd })
-      return AgentToolkit.listingSchema.parse(await registry.list(input, { signal }))
+      return AgentToolkit.decodeListing(await registry.list(input, { signal }))
     },
     retry: false,
   })

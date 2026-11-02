@@ -93,11 +93,9 @@ export const HeroWorkspacePicker = (
   if (destination.kind === 'runtime') {
     const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
     const hostName = directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'
-    return (
-      // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
-      <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
-        <HostChipSlot localProjectPath={localProjectPath} />
-        {bootstrapRemoteSession ? (
+    const remoteNotice = ((): JSX.Element | null => {
+      if (bootstrapRemoteSession) {
+        return (
           <RemoteSessionBootstrap
             api={multiHost}
             runtimeId={destination.runtimeId}
@@ -106,15 +104,30 @@ export const HeroWorkspacePicker = (
             prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
             onStarted={props.services.openSession}
           />
-        ) : currentSessionId !== undefined && currentSessionOwner.isError ? (
+        )
+      }
+      if (currentSessionId !== undefined && currentSessionOwner.isError) {
+        return (
           <p role="alert" className="dshx:text-xs dshx:text-destructive">
             Could not verify whether this thread is remote ({errorMessage(currentSessionOwner.error, 'unknown error')}). Reload the page to retry.
           </p>
-        ) : currentSessionId !== undefined && !currentSessionOwner.isSuccess ? (
+        )
+      }
+      if (currentSessionId !== undefined && !currentSessionOwner.isSuccess) {
+        return (
           <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
-            Checking the current thread's host…
+            Checking the current thread&apos;s host…
           </p>
-        ) : null}
+        )
+      }
+      return null
+    })()
+
+    return (
+      // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
+      <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
+        <HostChipSlot localProjectPath={localProjectPath} />
+        {remoteNotice}
 
         <RemoteDestinationChips
           api={multiHost}

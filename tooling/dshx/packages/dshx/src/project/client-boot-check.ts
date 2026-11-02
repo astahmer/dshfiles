@@ -88,6 +88,8 @@ const HOST_RESPONSE_TIMEOUT_MS = 10_000
 
 /** Time for the shell behind the first-run provider dialog to render, including its Slot entry crashes. */
 const SLOT_SETTLE_MS = 1_000
+/** A loaded runner activates a Client entry well after the shell is ready; poll instead of failing the first snapshot. */
+const CLIENT_ENTRY_SETTLE_MS = 45_000
 
 /**
  * Recover entry states from the boot card text. The card prints the summary line
@@ -210,7 +212,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     } catch {
       throw new Error('Client boot requires a prepared isolated profileRoot with package.json.')
     }
-    const executable = await resolveDshExecutable(options.executable)
+    const executable = await resolveDshExecutable(options.executable, process.env, options.projectRoot)
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,
@@ -266,6 +268,18 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 expectedClientEntries: options.expectedClientEntries,
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
               })
+              // A loaded runner can still be activating a Client entry when the shell is ready, so poll the boot manifest
+              // instead of failing the first snapshot that happens to catch it pending.
+              let settled = outcome
+              const settleDeadline = Date.now() + CLIENT_ENTRY_SETTLE_MS
+              while (Date.now() < settleDeadline && parseBootText(settled.text).some(entry => entry.state === 'pending')) {
+                await new Promise(resolve => setTimeout(resolve, 250))
+                settled = await BrowserBootModel.readOutcome(page, {
+                  timeoutMs,
+                  expectedClientEntries: options.expectedClientEntries,
+                  inspectSlotFailures: options.expectedClientEntries.length > 0,
+                })
+              }
               // A scratch home has no provider, so DSH opens its provider-setup dialog over the shell, and the Slots behind it
               // never mount: an entry that crashes while rendering there leaves no trace at all. Dismiss it, let the
               // shell render, then read the Slot traces once more without disturbing the audit read above.
@@ -277,14 +291,14 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
                 consoleMessages: consoleErrors,
               })
-              browserReady = outcome.ready
-              evidence = outcome.evidence
-              missingClientEntries = outcome.missingClientEntries
-              failureCardVisible = outcome.failureCardVisible
-              readinessError = outcome.readinessError
-              timedOut ||= outcome.timedOut
+              browserReady = settled.ready
+              evidence = settled.evidence
+              missingClientEntries = settled.missingClientEntries
+              failureCardVisible = settled.failureCardVisible
+              readinessError = settled.readinessError
+              timedOut ||= settled.timedOut
               slotFailures = mounted.slotFailures
-              entries = parseBootText(outcome.text)
+              entries = parseBootText(settled.text)
             } finally {
               await browser.close()
             }

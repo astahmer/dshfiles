@@ -1,7 +1,7 @@
-import { secretScopeSchema } from '@dshfiles/credential-port'
-import { z } from 'zod'
+import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
+import { Schema } from 'effect'
 
-const secretReferenceStateSchema = z.enum([
+const secretReferenceStateSchema = Schema.Literals([
   'resolved',
   'empty',
   'invalid-reference',
@@ -14,34 +14,34 @@ const secretReferenceStateSchema = z.enum([
   'cli-timeout',
   'cli-failed',
 ])
-export type SecretReferenceState = z.infer<typeof secretReferenceStateSchema>
+export type SecretReferenceState = typeof secretReferenceStateSchema.Type
 
 /** A same-named alias in a project or machine-local config, which a global-only resolver cannot reach. */
-const secretReferenceElsewhereSchema = z.object({
-  scope: secretScopeSchema,
-  folder: z.string().max(4096),
-  environment: z.string().max(256),
+const secretReferenceElsewhereSchema = Schema.Struct({
+  scope: secretScopeSchemaEffect,
+  folder: Schema.String.check(Schema.isMaxLength(4096)),
+  environment: Schema.String.check(Schema.isMaxLength(256)),
 })
-export type SecretReferenceElsewhere = z.infer<typeof secretReferenceElsewhereSchema>
+export type SecretReferenceElsewhere = typeof secretReferenceElsewhereSchema.Type
 
 /** Where `secret --global` writes, and the file it really lands in when that path is a symlink (e.g. Nix-managed). */
-const secretGlobalConfigSchema = z.object({
-  path: z.string().max(4096).nullable(),
-  linkedTo: z.string().max(4096).nullable(),
+const secretGlobalConfigSchema = Schema.Struct({
+  path: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+  linkedTo: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
 })
-export type SecretGlobalConfig = z.infer<typeof secretGlobalConfigSchema>
+export type SecretGlobalConfig = typeof secretGlobalConfigSchema.Type
 
-export const secretReferenceStatusSchema = z.object({
+export const secretReferenceStatusSchema = Schema.Struct({
   state: secretReferenceStateSchema,
-  reference: z.string().max(4096).nullable(),
-  alias: z.string().max(256).nullable(),
-  environment: z.string().max(256).nullable(),
-  cwd: z.string().max(4096).nullable(),
-  scope: secretScopeSchema.nullable(),
-  environments: z.array(z.string().max(256)).max(64),
-  scopes: z.array(z.string().max(64)).max(16),
-  elsewhere: z.array(secretReferenceElsewhereSchema).max(64),
-  writeScope: secretScopeSchema,
+  reference: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+  alias: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  environment: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  cwd: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+  scope: Schema.NullOr(secretScopeSchemaEffect),
+  environments: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(64)),
+  scopes: Schema.Array(Schema.String.check(Schema.isMaxLength(64))).check(Schema.isMaxLength(16)),
+  elsewhere: Schema.Array(secretReferenceElsewhereSchema).check(Schema.isMaxLength(64)),
+  writeScope: secretScopeSchemaEffect,
   globalConfig: secretGlobalConfigSchema,
 })
-export type SecretReferenceStatus = z.infer<typeof secretReferenceStatusSchema>
+export type SecretReferenceStatus = typeof secretReferenceStatusSchema.Type

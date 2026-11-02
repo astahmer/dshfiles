@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { link, lstat, mkdir, open, realpath, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { deferredFilePathSchema } from './store.js'
+import { Effect, Schema } from 'effect'
 import type { ParentQuestionOutcome } from './service.js'
 
 type DeferredParentQuestion = Extract<ParentQuestionOutcome, { readonly kind: 'deferred' }>
@@ -159,18 +160,18 @@ const writeCandidate = async (input: {
   return undefined
 }
 
-export const writeDeferredQuestionFile = async (input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }): Promise<string> => {
+const writeDeferredQuestionFilePromise = async (input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }): Promise<string> => {
   const directory = await ensureQuestionDirectory(input.workspacePath)
   const contents = markdownFor(input.question)
   const requestedFilename =
-    input.question.filePath === undefined ? filenameFor(input.question) : basename(deferredFilePathSchema.parse(input.question.filePath))
+    input.question.filePath === undefined ? filenameFor(input.question) : basename(Schema.decodeUnknownSync(deferredFilePathSchema)(input.question.filePath))
   const first = await writeCandidate({
     directory,
     filename: requestedFilename,
     contents,
     questionId: input.question.questionId,
   })
-  if (first !== undefined) return deferredFilePathSchema.parse(`questions/${first}`)
+  if (first !== undefined) return Schema.decodeUnknownSync(deferredFilePathSchema)(`questions/${first}`)
   if (input.question.filePath !== undefined) {
     throw new Error('The stored deferred-question path belongs to different content; refusing to overwrite it.')
   }
@@ -182,6 +183,17 @@ export const writeDeferredQuestionFile = async (input: { readonly workspacePath:
     contents,
     questionId: input.question.questionId,
   })
-  if (collisionSafe !== undefined) return deferredFilePathSchema.parse(`questions/${collisionSafe}`)
+  if (collisionSafe !== undefined) return Schema.decodeUnknownSync(deferredFilePathSchema)(`questions/${collisionSafe}`)
   throw new Error('A deferred-question filename collision could not be resolved safely.')
 }
+
+class DeferredQuestionFileError extends Schema.TaggedError<DeferredQuestionFileError>()('DeferredQuestionFileError', {
+  message: Schema.String,
+}) {}
+
+export const writeDeferredQuestionFile = Effect.fn('question defer')((input: { readonly workspacePath: string; readonly question: DeferredParentQuestion }) =>
+  Effect.tryPromise({
+    try: () => writeDeferredQuestionFilePromise(input),
+    catch: error => new DeferredQuestionFileError({ message: error instanceof Error ? error.message : String(error) }),
+  }),
+)

@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /**
  * Wire contract for the HMR compatibility gate.
@@ -9,20 +9,20 @@ import { z } from 'zod'
  * truth about which rebuilds wait for a Host restart.
  */
 
-const gateReasonSchema = z.literal('host-artifact-changed')
+const gateReasonSchema = Schema.Literal('host-artifact-changed')
 
-const deferredPackageSchema = z.object({
-  id: z.string().min(1).max(256),
+const deferredPackageSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   reason: gateReasonSchema,
 })
 
-const hmrGateStatusSchema = z.object({
-  deferred: z.array(deferredPackageSchema).max(64),
-  watched: z.number().int().min(0).max(4096),
+const hmrGateStatusSchema = Schema.Struct({
+  deferred: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)),
+  watched: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(4096)),
 })
 
-export type DeferredPackage = z.infer<typeof deferredPackageSchema>
-export type HmrGateStatus = z.infer<typeof hmrGateStatusSchema>
+export type DeferredPackage = typeof deferredPackageSchema.Type
+export type HmrGateStatus = typeof hmrGateStatusSchema.Type
 
 /** Model-facing text for the agent tool: names the packages a restart would apply. */
 const compactStatus = (status: HmrGateStatus): string =>
@@ -35,7 +35,7 @@ export const hmrGateApi = defineApi({
   version: 1,
   methods: {
     status: method({
-      input: z.object({}),
+      input: Schema.Struct({}),
       output: hmrGateStatusSchema,
       description: 'Plugin client rebuilds held back because their Host half changed and the running Host has not loaded it. Read-only.',
       tool: { name: 'hmr_gate_status', readOnly: true, render: compactStatus },

@@ -13,16 +13,20 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { defineApi, dshxRegistryApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
-import { tweetContextBacklogApi } from '../src/backlog-api.js'
+import { tweetContextBacklogApi, tweetContextBacklogOutputSchema } from '../src/backlog-api.js'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import hostDefinition from '../src/host.js'
 
-const listingSchema = z.object({
-  result: z.object({
-    ok: z.literal(true),
-    value: z.object({ output: z.object({ tools: z.array(z.object({ name: z.string(), source: z.string(), owner: z.string().optional() })) }) }),
+const listingSchema = Schema.Struct({
+  result: Schema.Struct({
+    ok: Schema.Literal(true),
+    value: Schema.Struct({
+      output: Schema.Struct({
+        tools: Schema.Array(Schema.Struct({ name: Schema.String, source: Schema.String, owner: Schema.optional(Schema.String) })),
+      }),
+    }),
   }),
 })
 
@@ -127,20 +131,19 @@ describe('tweet context Host integration', () => {
         version: tweetContextBacklogApi.version,
         input: { url: 'https://x.com/fixture/status/123' },
       })
-      const envelope = z
-        .object({
-          result: z.discriminatedUnion('ok', [
-            z.object({ ok: z.literal(true), value: z.object({ output: z.unknown() }) }),
-            z.object({ ok: z.literal(false), error: z.object({}).passthrough() }),
+      const envelope = Schema.decodeUnknownResult(
+        Schema.Struct({
+          result: Schema.Union([
+            Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: Schema.Unknown }) }),
+            Schema.Struct({ ok: Schema.Literal(false), error: Schema.Record(Schema.String, Schema.Unknown) }),
           ]),
-        })
-        .parse(await contextResponse.json())
-      if (!envelope.result.ok) throw new Error(`Tweet context API retrieval failed: ${JSON.stringify(envelope.result.error)}`)
-      const outputSchema = tweetContextBacklogApi.methods.retrieve.output
-      if (outputSchema === undefined) throw new Error('The tweet context API output schema was not published.')
-      const decoded = await outputSchema['~standard'].validate(envelope.result.value.output)
-      if ('issues' in decoded) throw new Error('The tweet context API returned an invalid result.')
-      const context = decoded.value
+        }),
+      )(await contextResponse.json())
+      if (envelope._tag === 'Failure') throw new Error('The tweet context API response envelope was not readable.')
+      if (!envelope.success.result.ok) throw new Error(`Tweet context API retrieval failed: ${JSON.stringify(envelope.success.result.error)}`)
+      const decoded = Schema.decodeUnknownResult(tweetContextBacklogOutputSchema)(envelope.success.result.value.output)
+      if (decoded._tag === 'Failure') throw new Error('The tweet context API returned an invalid result.')
+      const context = decoded.success
       expect(context.posts[0]?.text).toBe('Integration post')
       expect(context.images.length).toBeGreaterThan(0)
       for (const image of context.images) {
@@ -157,7 +160,7 @@ describe('tweet context Host integration', () => {
       const fixtureApi = defineApi({ id: 'fixture', version: 1, owner: '@test/fixture', methods: { ping: method<void, string>() } })
       await host.mount(defineHost({ apis: [fixtureApi.host({ ping: () => 'ok' })] }), { packageId: '@test/fixture' })
       const response = await host.connection.requestApi({ packageId: dshxRegistryApi.owner!, apiId: dshxRegistryApi.id, method: 'list', version: 1, input: {} })
-      const listing = listingSchema.parse(await response.json()).result.value.output
+      const listing = Schema.decodeUnknownSync(listingSchema)(await response.json()).result.value.output
       expect(listing.tools.find(tool => tool.name === 'tweet_context')).toMatchObject({ source: 'plugin', owner: '@dshfiles/tweet-context' })
       await mounted.dispose()
       expect(host.tools.schemas().some(tool => tool.name === 'tweet_context')).toBe(false)

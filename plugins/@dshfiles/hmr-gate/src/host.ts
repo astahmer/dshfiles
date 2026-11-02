@@ -1,8 +1,9 @@
 import { statSync } from 'node:fs'
 import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type {} from '@deepseek-ai/dsh-client-modules'
 import type {} from '@deepseek-ai/dsh-hmr'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -62,9 +63,12 @@ let runtime: GateRuntime | undefined
 
 const frame = (value: ServerFrame): string => `data: ${JSON.stringify(value)}\n\n`
 
-const errorCodeSchema = z.object({ code: z.string() })
+const errorCodeSchema = Schema.Struct({ code: Schema.String })
 
-const isEnoent = (error: unknown): boolean => errorCodeSchema.safeParse(error).data?.code === 'ENOENT'
+const isEnoent = (error: unknown): boolean => {
+  const parsed = Schema.decodeUnknownOption(errorCodeSchema)(error)
+  return Option.isSome(parsed) && parsed.value.code === 'ENOENT'
+}
 
 const registerGate = (ctx: Context): GateRuntime => {
   const gate = new HmrGateModel()

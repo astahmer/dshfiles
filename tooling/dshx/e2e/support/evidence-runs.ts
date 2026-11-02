@@ -3,7 +3,10 @@ import { lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import { decodeJsonSafe } from '../../packages/dshx/src/json.js'
+import { withUnknownProperties } from '../../packages/dshx/src/schema.js'
 
 const MAX_FRAME_BYTES = 512 * 1024
 const MAX_FRAMES = 8
@@ -13,96 +16,105 @@ const MAX_EXPECTED_STEPS = 64
 const MAX_ASSERTIONS = 64
 const MAX_RETAINED_RUNS = 10
 const MAX_RETAINED_BYTES = 20 * 1024 * 1024
-const stepIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
-const assertionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
-const evidenceAssertionSchema = z.object({ assertionId: assertionIdSchema, outcome: z.enum(['passed', 'failed']) }).strict()
-const frameSchema = z
-  .object({
-    frameId: z.string().regex(/^frame-[0-9]{3}$/),
-    stepId: stepIdSchema,
-    capturedAt: z.string().datetime(),
-    viewport: z.object({ width: z.number().int().min(0), height: z.number().int().min(0) }).strict(),
-    path: z.string().nullable(),
-    sha256: z
-      .string()
-      .regex(/^[0-9a-f]{64}$/)
-      .nullable(),
-    storedBytes: z.number().int().min(0).max(MAX_FRAME_BYTES),
-    missingReason: z.enum(['capture-failed', 'frame-too-large', 'frame-limit']).nullable(),
-  })
-  .strict()
-  .superRefine((frame, context) => {
+const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => {
+  const struct = Schema.Struct(fields)
+  return Schema.decodeTo(struct)(
+    Schema.StructWithRest(struct, [Schema.Record(Schema.String.check(Schema.makeFilter(key => !Object.hasOwn(fields, key))), Schema.Never)]),
+  )
+}
+
+/** The UTC pattern the previous datetime string rule accepted, so the converted schema accepts the same values. */
+const utcDateTimePattern =
+  /^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$/u
+const dateTimeString = Schema.String.check(Schema.makeFilter(value => utcDateTimePattern.test(value)))
+const urlString = Schema.String.check(Schema.makeFilter(value => URL.canParse(value)))
+const staticIdPattern = /^[a-z0-9][a-z0-9-]{0,63}$/u
+const stepIdSchema = Schema.String.check(Schema.isPattern(staticIdPattern))
+const assertionIdSchema = Schema.String.check(Schema.isPattern(staticIdPattern))
+const evidenceAssertionSchema = strictStruct({ assertionId: assertionIdSchema, outcome: Schema.Literals(['passed', 'failed']) })
+const frameSchema = strictStruct({
+  frameId: Schema.String.check(Schema.isPattern(/^frame-[0-9]{3}$/u)),
+  stepId: stepIdSchema,
+  capturedAt: dateTimeString,
+  viewport: strictStruct({
+    width: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    height: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  }),
+  path: Schema.NullOr(Schema.String),
+  sha256: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u))),
+  storedBytes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_FRAME_BYTES)),
+  missingReason: Schema.NullOr(Schema.Literals(['capture-failed', 'frame-too-large', 'frame-limit'])),
+}).check(
+  Schema.makeFilter(frame => {
     const hasFile = frame.path !== null && frame.sha256 !== null && frame.storedBytes > 0 && frame.missingReason === null
     const hasMissingReason = frame.path === null && frame.sha256 === null && frame.storedBytes === 0 && frame.missingReason !== null
-    if (!hasFile && !hasMissingReason) context.addIssue({ code: 'custom', message: 'frame file metadata is inconsistent' })
-    if (frame.path !== null && frame.path !== `frames/${frame.frameId}.jpg`) {
-      context.addIssue({ code: 'custom', message: 'frame path is outside its owned frame directory' })
-    }
-  })
-const evidenceManifestSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    owner: z.literal('dshx-e2e'),
-    runId: z.string().regex(/^run-[0-9a-f-]{36}$/),
-    suiteId: z.literal('client-plugin-boot'),
-    scenarioDigest: z.string().regex(/^[0-9a-f]{16}$/),
-    createdAt: z.string().datetime(),
-    sourceRun: z.string().url().nullable(),
-    sourceRunMissingReason: z.enum(['ci-metadata-absent', 'ci-metadata-invalid']).nullable(),
-    status: z.enum(['passed', 'failed', 'interrupted', 'partial', 'skipped']),
-    expectedStepIds: z.array(stepIdSchema).max(MAX_EXPECTED_STEPS),
-    completedStepIds: z.array(stepIdSchema),
-    missingStepIds: z.array(stepIdSchema),
-    assertions: z.array(evidenceAssertionSchema).max(MAX_ASSERTIONS).default([]),
-    frames: z.array(frameSchema).max(MAX_FRAMES + 1),
-  })
-  .strict()
-  .superRefine((manifest, context) => {
+    const problems: string[] = []
+    if (!hasFile && !hasMissingReason) problems.push('frame file metadata is inconsistent')
+    if (frame.path !== null && frame.path !== `frames/${frame.frameId}.jpg`) problems.push('frame path is outside its owned frame directory')
+    return problems.length === 0 ? true : problems
+  }),
+)
+const evidenceManifestSchema = strictStruct({
+  schemaVersion: Schema.Literal(1),
+  owner: Schema.Literal('dshx-e2e'),
+  runId: Schema.String.check(Schema.isPattern(/^run-[0-9a-f-]{36}$/u)),
+  suiteId: Schema.Literal('client-plugin-boot'),
+  scenarioDigest: Schema.String.check(Schema.isPattern(/^[0-9a-f]{16}$/u)),
+  createdAt: dateTimeString,
+  sourceRun: Schema.NullOr(urlString),
+  sourceRunMissingReason: Schema.NullOr(Schema.Literals(['ci-metadata-absent', 'ci-metadata-invalid'])),
+  status: Schema.Literals(['passed', 'failed', 'interrupted', 'partial', 'skipped']),
+  expectedStepIds: Schema.Array(stepIdSchema).check(Schema.isMaxLength(MAX_EXPECTED_STEPS)),
+  completedStepIds: Schema.Array(stepIdSchema),
+  missingStepIds: Schema.Array(stepIdSchema),
+  assertions: Schema.optional(Schema.Array(evidenceAssertionSchema).check(Schema.isMaxLength(MAX_ASSERTIONS))),
+  frames: Schema.Array(frameSchema).check(Schema.isMaxLength(MAX_FRAMES + 1)),
+}).check(
+  Schema.makeFilter(manifest => {
     const expected = new Set(manifest.expectedStepIds)
     const completed = new Set(manifest.completedStepIds)
     const missing = new Set(manifest.missingStepIds)
-    const assertionIds = manifest.assertions.map(assertion => assertion.assertionId)
+    const recordedAssertions = manifest.assertions ?? []
+    const assertionIds = recordedAssertions.map(assertion => assertion.assertionId)
+    const problems: string[] = []
     if (expected.size !== manifest.expectedStepIds.length || completed.size !== manifest.completedStepIds.length) {
-      context.addIssue({ code: 'custom', message: 'step ids must be unique' })
+      problems.push('step ids must be unique')
     }
-    if (new Set(assertionIds).size !== assertionIds.length) {
-      context.addIssue({ code: 'custom', message: 'assertion ids must be unique' })
+    if (new Set(assertionIds).size !== assertionIds.length) problems.push('assertion ids must be unique')
+    if (manifest.status === 'passed' && recordedAssertions.some(assertion => assertion.outcome === 'failed')) {
+      problems.push('a passed run cannot contain a failed assertion')
     }
-    if (manifest.status === 'passed' && manifest.assertions.some(assertion => assertion.outcome === 'failed')) {
-      context.addIssue({ code: 'custom', message: 'a passed run cannot contain a failed assertion' })
-    }
-    if (manifest.completedStepIds.some(stepId => !expected.has(stepId))) {
-      context.addIssue({ code: 'custom', message: 'completed steps must be expected' })
-    }
+    if (manifest.completedStepIds.some(stepId => !expected.has(stepId))) problems.push('completed steps must be expected')
     if (manifest.missingStepIds.some(stepId => !expected.has(stepId) || completed.has(stepId))) {
-      context.addIssue({ code: 'custom', message: 'missing steps must be expected and incomplete' })
+      problems.push('missing steps must be expected and incomplete')
     }
-    if (expected.size !== completed.size + missing.size) {
-      context.addIssue({ code: 'custom', message: 'every expected step must be completed or missing' })
-    }
+    if (expected.size !== completed.size + missing.size) problems.push('every expected step must be completed or missing')
     if (manifest.frames.some((frame, index) => frame.frameId !== `frame-${String(index + 1).padStart(3, '0')}`)) {
-      context.addIssue({ code: 'custom', message: 'frames must use unique ordered ids' })
+      problems.push('frames must use unique ordered ids')
     }
     if (missing.size !== manifest.missingStepIds.length || (manifest.sourceRun === null && manifest.sourceRunMissingReason === null)) {
-      context.addIssue({ code: 'custom', message: 'missing steps and source identity must be explicit' })
+      problems.push('missing steps and source identity must be explicit')
     }
     if (manifest.sourceRun !== null && manifest.sourceRunMissingReason !== null) {
-      context.addIssue({ code: 'custom', message: 'a present source run cannot have a missing reason' })
+      problems.push('a present source run cannot have a missing reason')
     }
     if ((manifest.status === 'passed' && missing.size > 0) || (manifest.status === 'partial' && missing.size === 0)) {
-      context.addIssue({ code: 'custom', message: 'status must reflect missing expected coverage' })
+      problems.push('status must reflect missing expected coverage')
     }
     if (manifest.sourceRun !== null) {
       const source = new URL(manifest.sourceRun)
       if (source.protocol !== 'https:' || source.username !== '' || source.password !== '' || source.search !== '' || source.hash !== '') {
-        context.addIssue({ code: 'custom', message: 'source run links must be credential-free HTTPS URLs' })
+        problems.push('source run links must be credential-free HTTPS URLs')
       }
     }
-  })
+    return problems.length === 0 ? true : problems
+  }),
+)
 
 export type EvidenceStatus = 'passed' | 'failed' | 'interrupted' | 'partial' | 'skipped'
-export type EvidenceManifest = z.infer<typeof evidenceManifestSchema>
-export type EvidenceAssertion = EvidenceManifest['assertions'][number]
+export type EvidenceManifest = Schema.Schema.Type<typeof evidenceManifestSchema>
+export type EvidenceAssertion = Schema.Schema.Type<typeof evidenceAssertionSchema>
+type EvidenceFrame = Schema.Schema.Type<typeof frameSchema>
 
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, character => {
@@ -175,10 +187,11 @@ export const renderEvidenceReport = (manifest: EvidenceManifest): string => {
       return `<li><span class="step-state ${recorded ? 'recorded' : 'missing'}">${recorded ? 'Recorded' : 'Missing'}</span><code>${escapeHtml(stepId)}</code></li>`
     })
     .join('\n')
+  const recordedAssertions = manifest.assertions ?? []
   const assertions =
-    manifest.assertions.length === 0
+    recordedAssertions.length === 0
       ? '<p>No individual assertion results were recorded for this run.</p>'
-      : `<ol class="assertions">${manifest.assertions
+      : `<ol class="assertions">${recordedAssertions
           .map(
             assertion =>
               `<li><span class="assertion-state ${assertion.outcome}">${assertion.outcome}</span><code>${escapeHtml(assertion.assertionId)}</code></li>`,
@@ -238,8 +251,8 @@ export interface EvidenceRun {
   readonly outputRoot: string
   readonly runDirectory: string
   readonly completedStepIds: Set<string>
-  readonly assertions: EvidenceManifest['assertions']
-  readonly frames: EvidenceManifest['frames']
+  readonly assertions: EvidenceAssertion[]
+  readonly frames: EvidenceFrame[]
 }
 
 export interface SourceRunLink {
@@ -250,10 +263,10 @@ export interface SourceRunLink {
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const defaultOutputRoot = join(workspaceRoot, 'tooling/dshx/output/e2e-evidence')
 
-const sourceRunSchema = z.object({
-  server: z.string().url(),
-  repository: z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/),
-  runId: z.string().regex(/^[0-9]+$/),
+const sourceRunSchema = withUnknownProperties({
+  server: urlString,
+  repository: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u)),
+  runId: Schema.String.check(Schema.isPattern(/^[0-9]+$/u)),
 })
 
 export const sourceRunFromEnvironment = (environment: NodeJS.ProcessEnv = process.env): SourceRunLink => {
@@ -265,15 +278,15 @@ export const sourceRunFromEnvironment = (environment: NodeJS.ProcessEnv = proces
   if (Object.values(raw).every(value => value === undefined || value === '')) {
     return { sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' }
   }
-  const parsed = sourceRunSchema.safeParse(raw)
-  if (!parsed.success) return { sourceRun: null, sourceRunMissingReason: 'ci-metadata-invalid' }
+  const parsed = Schema.decodeUnknownOption(sourceRunSchema)(raw)
+  if (Option.isNone(parsed)) return { sourceRun: null, sourceRunMissingReason: 'ci-metadata-invalid' }
 
-  const server = new URL(parsed.data.server)
+  const server = new URL(parsed.value.server)
   if (server.protocol !== 'https:' || server.username !== '' || server.password !== '' || server.search !== '' || server.hash !== '') {
     return { sourceRun: null, sourceRunMissingReason: 'ci-metadata-invalid' }
   }
   const serverPath = server.pathname.replace(/\/$/, '')
-  const sourceRun = `${server.origin}${serverPath}/${parsed.data.repository}/actions/runs/${parsed.data.runId}`
+  const sourceRun = `${server.origin}${serverPath}/${parsed.value.repository}/actions/runs/${parsed.value.runId}`
   return { sourceRun, sourceRunMissingReason: null }
 }
 
@@ -283,14 +296,12 @@ export const createEvidenceRun = async (options: {
   readonly expectedStepIds: readonly string[]
   readonly outputRoot?: string
 }): Promise<EvidenceRun> => {
-  const expectedStepIds = z
-    .array(stepIdSchema)
-    .max(MAX_EXPECTED_STEPS)
-    .superRefine((steps, context) => {
-      if (new Set(steps).size !== steps.length) context.addIssue({ code: 'custom', message: 'step ids must be unique' })
-    })
-    .safeParse(options.expectedStepIds)
-  if (!expectedStepIds.success) throw new Error('The evidence step list must contain at most 64 unique static step ids.')
+  const expectedStepIds = Schema.decodeUnknownOption(
+    Schema.Array(stepIdSchema)
+      .check(Schema.isMaxLength(MAX_EXPECTED_STEPS))
+      .check(Schema.makeFilter(steps => new Set(steps).size === steps.length || 'step ids must be unique')),
+  )(options.expectedStepIds)
+  if (Option.isNone(expectedStepIds)) throw new Error('The evidence step list must contain at most 64 unique static step ids.')
   const outputRoot = resolve(options.outputRoot ?? defaultOutputRoot)
   const runId = `run-${randomUUID()}`
   const runDirectory = join(outputRoot, runId)
@@ -300,7 +311,7 @@ export const createEvidenceRun = async (options: {
     suiteId: options.suiteId,
     scenarioDigest: createHash('sha256').update(options.scenarioPath.join('\u0000')).digest('hex').slice(0, 16),
     createdAt: new Date().toISOString(),
-    expectedStepIds: expectedStepIds.data,
+    expectedStepIds: expectedStepIds.value,
     outputRoot,
     runDirectory,
     completedStepIds: new Set(),
@@ -310,19 +321,18 @@ export const createEvidenceRun = async (options: {
 }
 
 export const completeEvidenceStep = (run: EvidenceRun, stepId: string): void => {
-  const parsed = stepIdSchema.safeParse(stepId)
-  if (!parsed.success) throw new Error('The evidence step id is not a valid static id.')
+  if (Option.isNone(Schema.decodeUnknownOption(stepIdSchema)(stepId))) throw new Error('The evidence step id is not a valid static id.')
   if (run.expectedStepIds.includes(stepId)) run.completedStepIds.add(stepId)
 }
 
 export const recordEvidenceAssertion = (run: EvidenceRun, assertionId: string, outcome: EvidenceAssertion['outcome']): void => {
-  const assertion = evidenceAssertionSchema.safeParse({ assertionId, outcome })
-  if (!assertion.success) throw new Error('The evidence assertion must use a static id and a pass/fail outcome.')
+  const assertion = Schema.decodeUnknownOption(evidenceAssertionSchema)({ assertionId, outcome })
+  if (Option.isNone(assertion)) throw new Error('The evidence assertion must use a static id and a pass/fail outcome.')
   if (run.assertions.length >= MAX_ASSERTIONS) throw new Error('The E2E evidence run exceeded its assertion limit.')
   if (run.assertions.some(recorded => recorded.assertionId === assertionId)) {
     throw new Error('The evidence assertion id must be unique within a run.')
   }
-  run.assertions.push(assertion.data)
+  run.assertions.push(assertion.value)
 }
 
 const frameMetadata = (
@@ -347,8 +357,8 @@ export const storeEvidenceFrame = async (
   bytes: Uint8Array | undefined,
   viewport: { readonly width: number; readonly height: number },
 ): Promise<void> => {
-  const parsedStepId = stepIdSchema.safeParse(stepId)
-  if (!parsedStepId.success) throw new Error('The evidence frame step id is not a valid static id.')
+  const parsedStepId = Schema.decodeUnknownOption(stepIdSchema)(stepId)
+  if (Option.isNone(parsedStepId)) throw new Error('The evidence frame step id is not a valid static id.')
   if (run.expectedStepIds.includes(stepId)) completeEvidenceStep(run, stepId)
 
   if (run.frames.length > MAX_FRAMES) return
@@ -430,6 +440,14 @@ const ownedRunBytes = async (directory: string, manifest: EvidenceManifest): Pro
   return manifestBytes + reportBytes + frameBytes.reduce<number>((total, size) => total + (size ?? 0), 0)
 }
 
+const decodeStoredManifest = (source: string) => {
+  try {
+    return decodeJsonSafe(evidenceManifestSchema, source)
+  } catch {
+    return undefined
+  }
+}
+
 export const pruneEvidenceRuns = async (outputRoot: string): Promise<void> => {
   const rootStats = await lstat(outputRoot).catch(() => undefined)
   if (rootStats === undefined || !rootStats.isDirectory() || rootStats.isSymbolicLink()) return
@@ -448,17 +466,11 @@ export const pruneEvidenceRuns = async (outputRoot: string): Promise<void> => {
             }
             const source = await readFile(manifestPath, 'utf8').catch(() => undefined)
             if (source === undefined) return undefined
-            let data: unknown
-            try {
-              data = JSON.parse(source)
-            } catch {
-              return undefined
-            }
-            const parsed = evidenceManifestSchema.safeParse(data)
-            if (!parsed.success || parsed.data.runId !== entry.name) return undefined
-            const bytes = await ownedRunBytes(directory, parsed.data)
+            const parsed = decodeStoredManifest(source)
+            if (parsed === undefined || parsed._tag !== 'Success' || parsed.success.runId !== entry.name) return undefined
+            const bytes = await ownedRunBytes(directory, parsed.success)
             if (bytes === undefined) return undefined
-            return { directory, createdAt: parsed.data.createdAt, bytes, manifest: parsed.data }
+            return { directory, createdAt: parsed.success.createdAt, bytes, manifest: parsed.success }
           },
         ]
       })
@@ -491,7 +503,7 @@ export const finishEvidenceRun = async (
   const expectedStepIds = [...run.expectedStepIds]
   const completedStepIds = expectedStepIds.filter(stepId => run.completedStepIds.has(stepId))
   const missingStepIds = expectedStepIds.filter(stepId => !run.completedStepIds.has(stepId))
-  const manifest = evidenceManifestSchema.parse({
+  const manifest = Schema.decodeUnknownSync(evidenceManifestSchema)({
     schemaVersion: 1,
     owner: 'dshx-e2e',
     runId: run.runId,

@@ -1,11 +1,13 @@
 import { access } from 'node:fs/promises'
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 import { dirname, resolve } from 'node:path'
 import { execa } from 'execa'
 import type { Writable } from 'node:stream'
 import semver from 'semver'
-import { z } from 'zod'
 import { DshxError, type DshxDiagnostic } from '../diagnostics.js'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import type { JsonObject, JsonValue } from '../json.js'
 
 export interface TestProjectOptions {
@@ -114,14 +116,14 @@ export async function packageProject(root: string, requiredFiles: readonly strin
   return resolve(root, filename)
 }
 
-const publishManifestSchema = z.looseObject({
-  name: z.string().optional(),
-  version: z.string().optional(),
-  private: z.boolean().optional(),
-  license: z.string().optional(),
-  dependencies: z.record(z.string(), z.string()).default({}),
-  optionalDependencies: z.record(z.string(), z.string()).default({}),
-  peerDependencies: z.record(z.string(), z.string()).default({}),
+const publishManifestSchema = withUnknownProperties({
+  name: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  private: Schema.optional(Schema.Boolean),
+  license: Schema.optional(Schema.String),
+  dependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
+  optionalDependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
+  peerDependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
 })
 
 export interface PublishPreview {
@@ -136,7 +138,7 @@ export interface PublishPreview {
 export const previewPublish = async (root: string, manifest: JsonObject, requiredFiles: readonly string[]): Promise<PublishPreview> => {
   const pack = await inspectPack(root, requiredFiles)
   const file = resolve(root, 'package.json')
-  const fields = publishManifestSchema.parse(manifest)
+  const fields = Schema.decodeUnknownSync(publishManifestSchema)(manifest)
   const diagnostics: DshxDiagnostic[] = []
   if (fields.private === true)
     diagnostics.push({

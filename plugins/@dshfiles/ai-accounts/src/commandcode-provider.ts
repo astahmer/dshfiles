@@ -11,11 +11,12 @@ import {
 } from '@earendil-works/pi-ai'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { AccountsRules } from './api.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { streamCommandCodeCli } from './commandcode-cli.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { isEmptyCompletion } from './empty-response.js'
 import { providerFetch } from './provider-request.js'
 
@@ -74,19 +75,18 @@ const FALLBACK: readonly CatalogEntry[] = [
   { id: 'google/gemini-3.8-flash', api: 'openai-completions' },
 ]
 
-const commandCodeCatalogResponseSchema = z.object({
-  data: z
-    .array(
-      z.object({
-        id: z.string().trim().min(1).max(200),
-        context_length: z.number().int().positive().optional(),
-        supported_endpoints: z.array(z.string()).max(20).optional(),
-      }),
-    )
-    .max(500),
+const commandCodeCatalogResponseSchema = Schema.Struct({
+  data: AiAccountsSchema.list(
+    Schema.Struct({
+      id: AiAccountsSchema.trimmedName(200),
+      context_length: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
+      supported_endpoints: Schema.optional(Schema.Array(Schema.String).check(Schema.isMaxLength(20))),
+    }),
+    500,
+  ),
 })
 
-const subscriptionSchema = z.object({ data: z.object({ planId: z.string().nullish() }).nullish() })
+const subscriptionSchema = Schema.Struct({ data: Schema.optional(Schema.NullOr(Schema.Struct({ planId: Schema.optional(Schema.NullOr(Schema.String)) }))) })
 
 export class CommandCodeConfigError extends Error {}
 
@@ -139,9 +139,9 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
     init: { headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' }, signal: options.signal ?? null },
   })
   if (!response.ok) return FALLBACK
-  const parsed = commandCodeCatalogResponseSchema.safeParse(await response.json())
-  if (!parsed.success) return FALLBACK
-  const entries: CatalogEntry[] = parsed.data.data.map(row => {
+  const parsed = AiAccountsSchema.decodeResult(commandCodeCatalogResponseSchema, await response.json())
+  if (parsed._tag !== 'Success') return FALLBACK
+  const entries: CatalogEntry[] = parsed.success.data.map(row => {
     const endpoints = row.supported_endpoints
     const messagesOnly = endpoints === undefined ? messagesOnlyById(row.id) : endpoints.includes('/messages') && !endpoints.includes('/chat/completions')
     return {
@@ -229,8 +229,8 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
           signal: AbortSignal.timeout(10_000),
         })
         if (!response.ok) return 'cli'
-        const parsed = subscriptionSchema.safeParse(await response.json())
-        const planId = parsed.success ? (parsed.data.data?.planId ?? '') : ''
+        const parsed = AiAccountsSchema.decodeResult(subscriptionSchema, await response.json())
+        const planId = parsed._tag === 'Success' ? (parsed.success.data?.planId ?? '') : ''
         return PROVIDER_API_PLAN.test(planId) ? 'provider' : 'cli'
       } catch {
         return 'cli'

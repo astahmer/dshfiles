@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { Schema } from 'effect'
 import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.ts'
 import type { DurableTaskExecutionStore } from './durable-task-store.ts'
 
@@ -38,7 +39,7 @@ export class DurableTaskRunner {
 
   async recover(): Promise<void> {
     for (const [taskId, saved] of this.options.table.entries()) {
-      const task = durableTaskSchema.parse(saved)
+      const task = Schema.decodeUnknownSync(durableTaskSchema)(saved)
       if (task.id !== taskId) throw new Error('Durable Project Checks task key does not match its record identity.')
       if (task.status === 'queued' || task.status === 'running' || task.status === 'cancel-requested' || task.status === 'unknown') this.launch(taskId)
     }
@@ -58,12 +59,12 @@ export class DurableTaskRunner {
 
   get(taskId: string): DurableTask | undefined {
     const task = this.options.table.get(taskId)
-    return task === undefined ? undefined : durableTaskSchema.parse(task)
+    return task === undefined ? undefined : Schema.decodeUnknownSync(durableTaskSchema)(task)
   }
 
   async list(sessionId: string): Promise<readonly DurableTask[]> {
     return [...this.options.table.entries()]
-      .map(([, task]) => durableTaskSchema.parse(task))
+      .map(([, task]) => Schema.decodeUnknownSync(durableTaskSchema)(task))
       .filter(task => task.sessionId === sessionId)
       .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
       .slice(0, 100)
@@ -227,7 +228,7 @@ export class DurableTaskRunner {
   private async validateTask(taskId: string): Promise<{ readonly runnable: boolean; readonly safeReplay: boolean }> {
     const task = this.options.table.get(taskId)
     if (task === undefined) throw new Error('No durable Project Checks task with that id.')
-    return this.options.validate(durableTaskSchema.parse(task))
+    return this.options.validate(Schema.decodeUnknownSync(durableTaskSchema)(task))
   }
 
   private async withAdmission<Result>(work: () => Promise<Result>): Promise<Result> {

@@ -4,29 +4,39 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
 import type { SessionCreateHandle, SessionDraft, SessionDrafts } from './draft-client.ts'
 
-const metadataSchema = z.object({
-  sessionId: z
-    .string()
-    .startsWith('session-')
-    .transform(value => brandString<SessionId>(value)),
-  workspaceId: z
-    .string()
-    .transform(value => brandString<WorkspaceId>(value))
-    .optional(),
-  cwd: z.string(),
-  agentPreset: z.string().optional(),
-  model: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).optional(),
-  preview: z.string().max(80),
+/**
+ * `createStoredValue` types its schema parameter as `ZodType`; the Effect schema stays the source of truth and
+ * `zodSchemaFromEffect` carries it across that native boundary. Stored JSON holds plain strings, so the branded ids are
+ * recovered once when a stored record enters this module.
+ */
+const metadataEffectSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isStartingWith('session-')),
+  workspaceId: Schema.optional(Schema.String),
+  cwd: Schema.String,
+  agentPreset: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) })),
+  preview: Schema.String.check(Schema.isMaxLength(80)),
 })
+const draftsSchema = zodSchemaFromEffect(Schema.Array(metadataEffectSchema))
 function sameModel(left: { provider: string; model: string; reasoningEffort?: string | undefined }, right: ModelSelection | undefined): boolean {
   return right !== undefined && left.provider === right.provider && left.model === right.model && left.reasoningEffort === right.reasoningEffort
 }
 
-const draftsSchema = z.array(metadataSchema)
-type DraftMetadata = z.output<typeof metadataSchema>
+type StoredDraftMetadata = Schema.Schema.Type<typeof metadataEffectSchema>
+type DraftMetadata = Omit<StoredDraftMetadata, 'sessionId' | 'workspaceId'> & {
+  readonly sessionId: SessionId
+  readonly workspaceId?: WorkspaceId | undefined
+}
+
+const brandedMetadata = (stored: StoredDraftMetadata): DraftMetadata => {
+  const { workspaceId, ...rest } = stored
+  const metadata: DraftMetadata = { ...rest, sessionId: brandString<SessionId>(stored.sessionId) }
+  return workspaceId === undefined ? metadata : { ...metadata, workspaceId: brandString<WorkspaceId>(workspaceId) }
+}
 
 function modelSelectionOf(model: NonNullable<DraftMetadata['model']>): ModelSelection {
   const selection = { provider: model.provider, model: model.model }
@@ -64,7 +74,7 @@ interface DraftBackend {
   selectPreset?(sessionId: SessionId, agentPreset: string): Promise<void>
   finish?(sessionId: SessionId): void
   discard?(sessionId: SessionId): void
-  lookup?(sessionId: SessionId): DraftMetadata | undefined
+  lookup?(sessionId: SessionId): StoredDraftMetadata | undefined
   failed(sessionId: SessionId, error: unknown): void
 }
 interface DraftRecord {
@@ -109,7 +119,7 @@ export class ClientSessionDrafts implements SessionDrafts {
     private readonly backend: DraftBackend,
     private readonly storage = createDraftStorage(),
   ) {
-    for (const metadata of storage.get()) this.add(metadata, true)
+    for (const metadata of storage.get()) this.add(brandedMetadata(metadata), true)
     this.publish()
   }
 
@@ -129,7 +139,7 @@ export class ClientSessionDrafts implements SessionDrafts {
       if (metadata === undefined) return
       const created = Promise.withResolvers<SessionId>()
       created.resolve(sessionId)
-      record = { metadata, created, materialized: true, hostCreated: true, revision: 0, hasContent: false }
+      record = { metadata: brandedMetadata(metadata), created, materialized: true, hostCreated: true, revision: 0, hasContent: false }
       this.records.set(sessionId, record)
     }
     const text = content.text.trim().replace(/\s+/gu, ' ')

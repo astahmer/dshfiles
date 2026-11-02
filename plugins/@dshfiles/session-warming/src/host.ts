@@ -1,10 +1,11 @@
-import type { Context } from '@deepseek-ai/cordis'
-import { isAgentLoopRequest, type GenerateOptions } from '@deepseek-ai/dsh-llm'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
+import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
-import { z } from 'zod'
+import { Effect, Queue, Schema } from 'effect'
 import { sessionWarmingSettings } from './settings.js'
 import { SessionWarming } from './warming.js'
 
@@ -21,18 +22,18 @@ const readSettings = (): WarmingSettingsValue => {
   }
 }
 
-let scheduler: ReturnType<typeof SessionWarming.scheduler<GenerateOptions>> | undefined
-
 const sessionWarmingApi = defineApi({
   id: 'session-warming',
   version: 1,
   owner: '@dshfiles/session-warming',
   methods: {
     status: method({
-      input: z.object({}).strict(),
-      output: z
-        .object({ enabled: z.boolean(), warmupsLastHour: z.number().int().nonnegative(), sessions: z.array(SessionWarming.sessionStatusSchema) })
-        .strict(),
+      input: Schema.Struct({}),
+      output: Schema.Struct({
+        enabled: Schema.Boolean,
+        warmupsLastHour: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+        sessions: Schema.Array(SessionWarming.sessionStatusSchema),
+      }),
       description:
         'Prompt-cache warming: whether it is on, warm-ups spent in the last hour, and per thread its model, warm-ups since its last prompt, the next one, the last cache reads and why it stopped. Read-only.',
       tool: {
@@ -55,11 +56,30 @@ const sessionWarmingApi = defineApi({
   },
 })
 
-const api = sessionWarmingApi.host({
-  status: () => ({ enabled: readSettings().enabled, ...(scheduler?.status() ?? { sessions: [], warmupsLastHour: 0 }) }),
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: (ctx: CordisContext) => SessionWarming.layer({ settings: readSettings, llm: ctx.llm }),
+  setup: (ctx: CordisContext) =>
+    Effect.gen(function* () {
+      const active = yield* SessionWarming
+      yield* Effect.acquireRelease(
+        Effect.sync(() => [
+          ctx.on('llm/stream', (options, next) => {
+            if (options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options))
+              Queue.offerUnsafe(active.requests, { kind: 'request', sessionId: String(options.sessionId), request: options })
+            return next()
+          }),
+          ctx.on('session/event', (session, event) => {
+            if (event.type === 'turn/start') Queue.offerUnsafe(active.requests, { kind: 'turn-start', sessionId: String(session.header.id) })
+            if (event.type === 'turn/end') Queue.offerUnsafe(active.requests, { kind: 'turn-end', sessionId: String(session.header.id) })
+          }),
+        ]),
+        disposers => Effect.sync(() => disposers.forEach(dispose => dispose())),
+      )
+    }),
 })
 
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/session-warming',
   inject: ['llm'],
   settings: [
@@ -72,25 +92,12 @@ export default defineHost({
       },
     }),
   ],
-  apis: [api],
-  setup: (ctx: Context) => {
-    const active = SessionWarming.scheduler<GenerateOptions>({ settings: readSettings, warm: request => SessionWarming.warm(ctx.llm, request) })
-    scheduler = active
-    ctx.on('llm/stream', (options, next) => {
-      if (options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options))
-        active.recordRequest(String(options.sessionId), options)
-      return next()
-    })
-    ctx.on('session/event', (session, event) => {
-      if (event.type === 'turn/start') active.turnStarted(String(session.header.id))
-      if (event.type === 'turn/end') active.turnEnded(String(session.header.id))
-    })
-    ctx.effect(
-      () => () => {
-        active.dispose()
-        if (scheduler === active) scheduler = undefined
-      },
-      'session-warming: timers',
-    )
-  },
+  apis: [
+    hostApi(sessionWarmingApi, {
+      status: Effect.fn('session-warming status')(function* () {
+        const active = yield* SessionWarming
+        return yield* active.status()
+      }),
+    }),
+  ],
 })

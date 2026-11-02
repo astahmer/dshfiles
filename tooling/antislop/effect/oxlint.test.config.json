@@ -1,0 +1,28 @@
+{
+  "jsPlugins": [
+    {
+      "name": "effect-antislop",
+      "specifier": "./oxlint/index.mjs"
+    },
+    {
+      "name": "effect-migration",
+      "specifier": "./repo-rules/index.mjs"
+    }
+  ],
+  "rules": {
+    "effect-antislop/no-domain-effect-run": [
+      "error",
+      {
+        "domainPaths": ["/tests/oxlint/domain/"],
+        "excludePaths": []
+      }
+    ],
+    "effect-migration/no-effect-api-promise-lift": "error",
+    "effect-migration/no-try-catch-around-effect": "error",
+    "effect-migration/require-curried-tagged-error": "error",
+    "effect-migration/no-raw-error-in-effect": "error",
+    "effect-migration/no-unscoped-plugin-timer": "error",
+    "effect-migration/no-run-promise-in-host-handler": "error",
+    "effect-migration/no-cordis-get-outside-root-layer": "error"
+  }
+}

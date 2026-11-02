@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { AiAccountsSchema } from './effect-schema.js'
 import { providerFetch } from './provider-request.js'
 
 /**
@@ -16,32 +17,24 @@ import { providerFetch } from './provider-request.js'
 
 const RESET_CREDITS_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits'
 
-const authSchema = z
-  .object({
-    tokens: z
-      .object({
-        access_token: z.string().min(1),
-        account_id: z.string().optional(),
-      })
-      .loose(),
-  })
-  .loose()
+const authSchema = Schema.Struct({
+  tokens: Schema.Struct({
+    access_token: Schema.String.check(Schema.isMinLength(1)),
+    account_id: Schema.optional(Schema.String),
+  }),
+})
 
-const resetCreditsSchema = z
-  .object({
-    available_count: z.number().int().nonnegative().optional(),
-    credits: z
-      .array(
-        z
-          .object({
-            status: z.string().optional(),
-            expires_at: z.string().optional(),
-          })
-          .loose(),
-      )
-      .optional(),
-  })
-  .loose()
+const resetCreditsSchema = Schema.Struct({
+  available_count: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  credits: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        status: Schema.optional(Schema.String),
+        expires_at: Schema.optional(Schema.String),
+      }),
+    ),
+  ),
+})
 
 export interface BankedReset {
   /** Epoch milliseconds, or `undefined` when the provider omits an expiry. */
@@ -56,24 +49,24 @@ export interface CodexResetCredits {
 const emptyResetCredits: CodexResetCredits = { available: 0, resets: [] }
 
 const parseCredits = (value: unknown): CodexResetCredits => {
-  const parsed = resetCreditsSchema.safeParse(value)
-  if (!parsed.success) return emptyResetCredits
-  const available = (parsed.data.credits ?? []).filter(credit => credit.status === 'available')
+  const parsed = AiAccountsSchema.decodeResult(resetCreditsSchema, value)
+  if (parsed._tag !== 'Success') return emptyResetCredits
+  const available = (parsed.success.credits ?? []).filter(credit => credit.status === 'available')
   const resets = available.flatMap(credit => {
     const parsedExpiry = credit.expires_at === undefined ? undefined : Date.parse(credit.expires_at)
     return [{ expiresAt: parsedExpiry === undefined || Number.isNaN(parsedExpiry) ? undefined : parsedExpiry }]
   })
   return {
-    available: parsed.data.available_count ?? available.length,
+    available: parsed.success.available_count ?? available.length,
     resets: resets,
   }
 }
 
 /** Read how many reset credits an account has banked, and when they expire. */
 export const readCodexResetCredits = async (codexHome: string, signal?: AbortSignal): Promise<CodexResetCredits> => {
-  let auth: z.infer<typeof authSchema>
+  let auth: typeof authSchema.Type
   try {
-    auth = authSchema.parse(JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
+    auth = AiAccountsSchema.decode(authSchema, JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
   } catch {
     return emptyResetCredits
   }

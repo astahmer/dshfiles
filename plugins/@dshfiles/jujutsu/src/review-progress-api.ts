@@ -1,23 +1,24 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { reviewFileSchema, reviewStoreSchema } from './review-progress.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const reviewProgressSnapshotSchema = z
-  .object({
+const reviewProgressSnapshotSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     /** Monotone across Host restarts so a stale read never replaces a newer write. */
-    revision: z.number().int().positive(),
+    revision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
     store: reviewStoreSchema,
-  })
-  .strict()
+  }),
+)
 
-const reviewProgressToggleSchema = z
-  .object({
-    repositoryRoot: z.string().min(1).max(2048),
-    commitId: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+const reviewProgressToggleSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    repositoryRoot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+    commitId: Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)),
     file: reviewFileSchema,
-    reviewed: z.boolean(),
-  })
-  .strict()
+    reviewed: Schema.Boolean,
+  }),
+)
 
 export const jujutsuReviewProgressApi = defineApi({
   id: 'jujutsu-review-progress',
@@ -25,7 +26,7 @@ export const jujutsuReviewProgressApi = defineApi({
   owner: '@dshfiles/jujutsu',
   methods: {
     state: method({
-      input: z.void(),
+      input: Schema.Void,
       output: reviewProgressSnapshotSchema,
       description: 'Files of which revisions were marked reviewed, keyed to the exact reviewed content. Read-only.',
     }),
@@ -37,5 +38,5 @@ export const jujutsuReviewProgressApi = defineApi({
   },
 })
 
-export type ReviewProgressSnapshot = z.infer<typeof reviewProgressSnapshotSchema>
-export type ReviewProgressToggle = z.infer<typeof reviewProgressToggleSchema>
+export type ReviewProgressSnapshot = Schema.Schema.Type<typeof reviewProgressSnapshotSchema>
+export type ReviewProgressToggle = Schema.Schema.Type<typeof reviewProgressToggleSchema>

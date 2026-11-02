@@ -1,9 +1,14 @@
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
-import { createStoredValue, type StoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import type { StoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { createEffectStoredValue } from './effect-stored-value.js'
 
 /** Browser presentation state, separate from the obsolete per-profile surface choice. */
-export const rightPaneVisibility = createStoredValue({ key: 'dshfiles.workbench.right-pane-visible.v1', schema: z.boolean().nullable(), fallback: null })
+export const rightPaneVisibility = createEffectStoredValue({
+  key: 'dshfiles.workbench.right-pane-visible.v1',
+  schema: Schema.NullOr(Schema.Boolean),
+  fallback: null,
+})
 
 export const createDockPaneActions = (visibility: StoredValue<boolean | null, null> = rightPaneVisibility): DockPaneActions => ({
   isOpen: () => visibility.get() === true,

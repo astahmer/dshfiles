@@ -1,8 +1,10 @@
 import { mkdir, readFile, rename, writeFile, chmod } from 'node:fs/promises'
 import { readFileSync, renameSync } from 'node:fs'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { dirname, join } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
+
+import { AiAccountsSchema } from './effect-schema.js'
 import { CodexHomeModel, describeCodexAuth, materializeCodexShadowHome, CodexHomeError } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
@@ -47,8 +49,9 @@ const emptyFile = (): AccountStoreFile => ({
 })
 
 /** The store schema: drafts on disk, observed fields added on read. */
-const storeFileSchema = accountsFileSchema.extend({
-  accounts: z.array(accountDraftSchema).max(64),
+const storeFileSchema = Schema.Struct({
+  ...accountsFileSchema.fields,
+  accounts: AiAccountsSchema.list(accountDraftSchema, 64),
 })
 
 const parseJson = (raw: string): unknown => {
@@ -237,8 +240,8 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
    */
   const readAccountFileSync = (): AccountStoreFile => {
     if (cachedRaw === undefined) return emptyFile()
-    const result = storeFileSchema.safeParse(parseJson(cachedRaw))
-    return result.success ? result.data : emptyFile()
+    const result = AiAccountsSchema.decodeResult(storeFileSchema, parseJson(cachedRaw))
+    return result._tag === 'Success' ? result.success : emptyFile()
   }
 
   /** Missing or unreadable storage yields defaults so first run remains usable. */
@@ -250,13 +253,13 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
       return emptyFile()
     }
     cachedRaw = raw
-    const result = storeFileSchema.safeParse(parseJson(raw))
-    return result.success ? result.data : emptyFile()
+    const result = AiAccountsSchema.decodeResult(storeFileSchema, parseJson(raw))
+    return result._tag === 'Success' ? result.success : emptyFile()
   }
 
   /** Replace the stored profiles atomically and private to this user. */
   const persistAccountFile = async (next: AccountStoreFile, claimCommit?: () => boolean, didCommit?: () => void): Promise<AccountStoreFile> => {
-    const validated = storeFileSchema.parse(next)
+    const validated = AiAccountsSchema.decode(storeFileSchema, next)
     await dependencies.fileSystem.makeDirectory(dirname(dependencies.filePath))
     const temporary = `${dependencies.filePath}.${process.pid}.tmp`
     await dependencies.fileSystem.writeText(temporary, `${JSON.stringify(validated, null, 2)}\n`)
@@ -294,7 +297,7 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
   const createSetupAccount = async (
     input: CreateSetupAccountInput,
   ): Promise<{ readonly instanceId: string; readonly draft: AccountDraft; readonly file: AccountStoreFile }> => {
-    const request = createSetupAccountInputSchema.parse(input)
+    const request = AiAccountsSchema.decode(createSetupAccountInputSchema, input)
     const instanceId = `${request.kind}_work_${request.requestId.replaceAll('-', '').toLowerCase()}`
     const file = await readAccountFile()
     if (file.accounts.some(account => account.instanceId === instanceId)) throw new Error('This account identity is already saved.')
@@ -348,18 +351,18 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
         current.apiBaseUrl !== input.existing.apiBaseUrl
       )
         throw new Error('The saved account connection settings changed. Start again.')
-      const next: AccountDraft = {
-        ...current,
+      const { authSource: _currentAuthSource, ...currentWithoutAuthSource } = current
+      // Optional ownership must be absent, not an own undefined: the committed
+      // profile is returned over the strict JSON API before any disk round-trip.
+      const committed: AccountDraft = {
+        ...currentWithoutAuthSource,
         enabled: true,
         homePath: input.draft.homePath,
         shadowHomePath: input.draft.shadowHomePath,
         apiKeyEnv: input.draft.apiKeyEnv,
-        authSource: input.draft.authSource,
         apiBaseUrl: input.draft.apiBaseUrl,
       }
-      // Optional ownership must be absent, not an own undefined: the committed
-      // profile is returned over the strict JSON API before any disk round-trip.
-      if (next.authSource === undefined) delete next.authSource
+      const next = input.draft.authSource === undefined ? committed : { ...committed, authSource: input.draft.authSource }
       await input.beforeCommit?.()
       return persistAccountFile({ ...file, accounts: file.accounts.map(account => (account === current ? next : account)) }, input.claimCommit, input.didCommit)
     })

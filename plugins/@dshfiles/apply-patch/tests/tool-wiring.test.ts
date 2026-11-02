@@ -2,33 +2,31 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import host from '../src/host.js'
 
-/**
- * The 2026-10-24 weekly review found 453 failures across 193 Sessions with
- * `cannot get property "workingDirectory" without inject`: the tool body read
- * the filesystem services off the scoped Agent context, which does not inject
- * them. These checks pin the wiring that fixed it.
- */
 const source = (file: string): string => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
 
 describe('apply_patch wiring', () => {
-  it('reads the filesystem services from the plugin context, never the Agent one', () => {
+  it('captures injected filesystem services from the plugin root Layer', () => {
     const tool = source('patch-tool.ts')
-    expect(tool).toContain('createApplyPatchTool = (ctx: Context)')
-    expect(tool).toContain('ctx.workingDirectory.ensure')
-    expect(tool).toContain('ctx.fs.resolve')
+    const hostSource = source('host.ts')
+    expect(tool).toContain('services.workingDirectory.ensure')
+    expect(tool).toContain('services.fs.resolve')
     expect(tool).not.toContain('agent.ctx')
     expect(tool).not.toContain('execution.agent?.ctx')
+    expect(tool).toContain("ctx.get('sandboxPolicy')")
+    expect(hostSource).toContain('DshxEffect.plugin({')
   })
 
   it('resolves the write sandbox from the caller Session', () => {
     const tool = source('patch-tool.ts')
-    expect(tool).toContain('ctx.sessions.get(agent.id)')
+    expect(tool).toContain('services.sessions.get(agent.id)')
     expect(tool).toContain('policy?.resolve(session === undefined ? {} : { session })')
-    expect(tool).toContain('execution.signal, sandboxPolicy)')
+    expect(tool).toContain('services.fs.writeText(target, result.value.content, undefined, signal, sandboxPolicy)')
+    expect(tool).toContain('Effect.runPromise(')
   })
 
-  it('registers the tool from setup so it closes over that context', () => {
+  it('registers the tool from scoped setup and preserves injected services', () => {
     expect(host.setup).toBeTypeOf('function')
+    expect(source('host.ts')).toContain('Effect.acquireRelease(')
     expect(source('host.ts')).not.toContain('tools: [')
     expect(host.inject).toEqual(expect.arrayContaining(['tools', 'fs', 'workingDirectory', 'sessions']))
   })

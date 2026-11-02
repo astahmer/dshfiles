@@ -1,28 +1,37 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { definePlugin, defineTool, generate } from '@dshfiles/dshx/host'
-import { pullsReviewApi, type SummarizeResult } from './api.js'
+import { Context, Effect, Layer, Schema } from 'effect'
+import { pullsReviewApi, type ReviewResult, type SummarizeResult } from './api.js'
 import { createJjRun } from './jj.js'
 import { renderScopeReport } from './report.js'
-import { ReviewWorkspaceModel } from './review.js'
-import { PullsReviewSummaryModel } from './summarize.js'
+import { ReviewWorkspaceModel, type ReviewWorkspaceInput } from './review.js'
+import { PullsReviewSummaryModel, type SummarizeWorkspaceInput } from './summarize.js'
 
-/** The thread's own provider, as its last request recorded it. */
-const providerOf = async (ctx: Context, sessionId: string): Promise<string | undefined> => {
-  const log = await ctx
-    .get('sessionQuery')
-    ?.readSession(SessionId(sessionId))
-    .catch(() => undefined)
-  const header = log?.events.findLast(event => event.type === 'request/header')
-  return header?.type === 'request/header' ? header.data.header.config.provider : undefined
-}
+type ReviewInput = Omit<ReviewWorkspaceInput, 'run'>
+type SummaryInput = Omit<SummarizeWorkspaceInput, 'run' | 'routes' | 'complete'>
+type SummarySources = Pick<SummarizeWorkspaceInput, 'routes' | 'complete'>
+
+class PullsReviewOperationError extends Schema.TaggedError<PullsReviewOperationError>()('PullsReviewOperationError', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
+
+class PullsReviewOperations extends Context.Service<
+  PullsReviewOperations,
+  {
+    readonly review: (input: ReviewInput) => Effect.Effect<ReviewResult, PullsReviewOperationError>
+    readonly summarize: (input: SummaryInput) => Effect.Effect<SummarizeResult, PullsReviewOperationError>
+  }
+>()('@dshfiles/pulls-review/Operations') {}
 
 const modelCall = async (
-  ctx: Context,
+  ctx: CordisContext,
   request: {
     readonly provider: string
     readonly model: string
@@ -44,47 +53,69 @@ const modelCall = async (
     })
   ).text
 
+const operationsLayer = (ctx: CordisContext) => {
+  const run = createJjRun(ctx)
+  const sessionQuery = ctx.get('sessionQuery')
+  const llm = ctx.get('llm')
+  const routes: SummarySources['routes'] = {
+    providerOf: async sessionId => {
+      const log = await sessionQuery?.readSession(SessionId(sessionId)).catch(() => undefined)
+      const header = log?.events.findLast(event => event.type === 'request/header')
+      return header?.type === 'request/header' ? header.data.header.config.provider : undefined
+    },
+    modelsOf: async provider => ((await llm?.listModels(provider).catch(() => [])) ?? []).map(model => model.id),
+  }
+  const complete: SummarySources['complete'] = request => modelCall(ctx, request)
+  const review = (input: ReviewInput): Effect.Effect<ReviewResult, PullsReviewOperationError> =>
+    Effect.tryPromise({
+      try: () => ReviewWorkspaceModel.review({ ...input, run }),
+      catch: () => new PullsReviewOperationError({ operation: 'review', message: 'Jujutsu could not read this workspace.' }),
+    })
+  const summarize = (input: SummaryInput): Effect.Effect<SummarizeResult, PullsReviewOperationError> =>
+    Effect.tryPromise({
+      try: async () => {
+        if (llm === undefined)
+          return { status: 'failed', reason: 'llm-unavailable', message: 'The Host has no language-model service to summarize with.' } satisfies SummarizeResult
+        try {
+          return await PullsReviewSummaryModel.summarize({ ...input, run, routes, complete })
+        } catch {
+          return { status: 'failed', reason: 'llm-failed', message: 'The model call failed; the thread model may be unavailable.' } satisfies SummarizeResult
+        }
+      },
+      catch: () => new PullsReviewOperationError({ operation: 'summarize', message: 'The model call failed; the thread model may be unavailable.' }),
+    })
+  return Layer.succeed(PullsReviewOperations, { review, summarize })
+}
+
+const effectPlugin = DshxEffect.plugin({
+  layer: operationsLayer,
+  setup: () => Effect.void,
+})
+
 export default definePlugin({
   id: 'dshfiles-pulls-review',
   uses: ['rpc', 'commands', 'tools'],
   inject: ['subprocess'],
-  setup(api) {
+  setup: async api => {
     const ctx = api.raw.ctx
     const run = createJjRun(ctx)
-
+    const disposeEffect = await effectPlugin.setup(ctx, {})
     const registration = api.rpc.register(
-      pullsReviewApi.host({
-        review: ({ input, signal }) =>
-          ReviewWorkspaceModel.review({
-            run,
-            path: input.path,
-            base: input.base,
-            fromChangeId: input.fromChangeId,
-            toChangeId: input.toChangeId,
-            signal,
-          }),
-        summarize: async ({ input, signal }): Promise<SummarizeResult> => {
-          const llm = ctx.get('llm')
-          if (llm === undefined) return { status: 'failed', reason: 'llm-unavailable', message: 'The Host has no language-model service to summarize with.' }
-          try {
-            return await PullsReviewSummaryModel.summarize({
-              run,
-              path: input.path,
-              base: input.base,
-              sessionId: input.sessionId,
-              provider: input.provider,
-              model: input.model,
-              signal,
-              routes: {
-                providerOf: sessionId => providerOf(ctx, sessionId),
-                modelsOf: async provider => (await llm.listModels(provider).catch(() => [])).map(model => model.id),
-              },
-              complete: request => modelCall(ctx, request),
-            })
-          } catch {
-            return { status: 'failed', reason: 'llm-failed', message: 'The model call failed; the thread model may be unavailable.' }
-          }
-        },
+      effectPlugin.hostApi(pullsReviewApi, {
+        review: Effect.fn('pulls-review review')(function* (request) {
+          const operations = yield* PullsReviewOperations
+          return yield* operations.review({
+            path: request.input.path,
+            base: request.input.base,
+            fromChangeId: request.input.fromChangeId,
+            toChangeId: request.input.toChangeId,
+            signal: request.signal,
+          })
+        }),
+        summarize: Effect.fn('pulls-review summarize')(function* (request) {
+          const operations = yield* PullsReviewOperations
+          return yield* operations.summarize({ ...request.input, signal: request.signal })
+        }),
       }),
     )
     void registration.catch((error: unknown) =>
@@ -112,8 +143,14 @@ export default definePlugin({
         parameters: {
           path: { type: 'string', required: true, description: 'Absolute path of the workspace to review.' },
           base: { type: 'string', description: 'Base bookmark or revision; defaults to the first of main, master or trunk.' },
-          fromChangeId: { type: 'string', description: 'Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.' },
-          toChangeId: { type: 'string', description: 'Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.' },
+          fromChangeId: {
+            type: 'string',
+            description: 'Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.',
+          },
+          toChangeId: {
+            type: 'string',
+            description: 'Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.',
+          },
         },
         output: {
           schema: { type: 'string' },
@@ -135,5 +172,6 @@ export default definePlugin({
         },
       }),
     )
+    return disposeEffect
   },
 })

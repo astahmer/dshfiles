@@ -1,4 +1,5 @@
 import { waitForManagedExit, terminateManagedProcess } from '@dshfiles/dshx/host'
+import { Schema } from 'effect'
 import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { homedir } from 'node:os'
@@ -18,12 +19,17 @@ const failureMessages = {
 } as const satisfies Record<SecretCliFailureCode, string>
 
 /** A CLI failure with a stable code, so callers can say what went wrong without parsing message text. */
-export class SecretCliError extends Error {
-  readonly code: SecretCliFailureCode
+export class SecretCliError extends Schema.TaggedError<SecretCliError>()('SecretCliError', {
+  code: Schema.Literals(['cli-missing', 'cli-timeout', 'cli-failed']),
+  cleanupConfirmed: Schema.Boolean,
+  message: Schema.String,
+}) {
   constructor(code: SecretCliFailureCode, cleanupConfirmed = true) {
-    super(cleanupConfirmed ? failureMessages[code] : `${failureMessages[code]} Process cleanup could not be confirmed.`)
-    this.name = 'SecretCliError'
-    this.code = code
+    super({
+      code,
+      cleanupConfirmed,
+      message: cleanupConfirmed ? failureMessages[code] : `${failureMessages[code]} Process cleanup could not be confirmed.`,
+    })
   }
 }
 
@@ -48,6 +54,9 @@ export const runSecretCli = (runtime: SecretSubprocess, request: SecretCliReques
 
 const runUntracedSecretCli = async (runtime: SecretSubprocess, request: SecretCliRequest, environment: SecretSessionEnvironment): Promise<string> => {
   const controller = new AbortController()
+  const abortFromRequest = (): void => controller.abort()
+  if (request.signal?.aborted === true) abortFromRequest()
+  else request.signal?.addEventListener('abort', abortFromRequest, { once: true })
   let timedOut = false
   const timeout = setTimeout(() => {
     timedOut = true
@@ -103,5 +112,6 @@ const runUntracedSecretCli = async (runtime: SecretSubprocess, request: SecretCl
     throw new SecretCliError(timedOut ? 'cli-timeout' : resolved ? 'cli-failed' : 'cli-missing', cleanupConfirmed)
   } finally {
     clearTimeout(timeout)
+    request.signal?.removeEventListener('abort', abortFromRequest)
   }
 }

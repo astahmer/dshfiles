@@ -1,11 +1,7 @@
+import { Option } from 'effect'
+
 import { AgentAnchorModel } from './agent-anchor.js'
-import {
-  agentReferenceMatches,
-  agentReferenceLabel,
-  agentReferencePreviewEvent,
-  agentReferencePreviewRequestSchema,
-  type AgentReferenceMatch,
-} from './agent-reference.js'
+import { AgentReference, type AgentReferenceMatch } from './agent-reference.js'
 
 const referenceSelector = '[data-dshfiles-agent-reference]'
 /** Inline code holds a written mention; a fenced block holds an example, and links already carry their own target. */
@@ -41,7 +37,7 @@ const linkFor = (block: Element, segment: TextSegment, match: AgentReferenceMatc
   const link = block.ownerDocument.createElement('span')
   link.setAttribute('data-dshfiles-agent-reference', match.handle)
   link.setAttribute('role', 'link')
-  link.setAttribute('aria-label', `Preview agent ${agentReferenceLabel(match.handle)}`)
+  link.setAttribute('aria-label', `Preview agent ${AgentReference.label(match.handle)}`)
   link.tabIndex = 0
   AgentAnchorModel.idOf(link)
   const range = block.ownerDocument.createRange()
@@ -58,7 +54,7 @@ const markReferences = (blocks: Iterable<Element>, handles: ReadonlySet<string>)
   for (const block of blocks) {
     const segments = textSegments(block)
     const text = segments.map(segment => segment.node.textContent ?? '').join('')
-    const matches = agentReferenceMatches(text, handles)
+    const matches = AgentReference.matches(text, handles)
     for (const match of [...matches].reverse()) {
       const segment = segments.find(candidate => match.start >= candidate.start && match.end <= candidate.end)
       if (segment !== undefined) linkFor(block, segment, match)
@@ -95,9 +91,9 @@ const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => 
 const previewAgentReference = (handle: string, element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const parsed = agentReferencePreviewRequestSchema.safeParse({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })
-  if (!parsed.success) return false
-  window.dispatchEvent(new CustomEvent(agentReferencePreviewEvent, { detail: parsed.data }))
+  const parsed = AgentReference.decodePreviewRequest({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })
+  if (Option.isNone(parsed)) return false
+  window.dispatchEvent(new CustomEvent(AgentReference.previewEvent, { detail: parsed.value }))
   return true
 }
 

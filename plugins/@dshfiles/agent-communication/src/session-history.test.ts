@@ -1,11 +1,12 @@
 import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { SessionSearchCursor, type SessionEventSearchPage } from '@deepseek-ai/dsh-session-query'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { SessionHistoryModel } from './session-history.js'
 
 describe('Agent session history search', () => {
   it('validates bounded inputs and normalizes literal queries', () => {
-    const parsed = SessionHistoryModel.searchInputSchema.parse({
+    const parsed = Schema.decodeUnknownSync(SessionHistoryModel.searchInputSchema)({
       sessionId: 'child-session',
       query: '  visible result  ',
       limit: 10,
@@ -14,14 +15,14 @@ describe('Agent session history search', () => {
 
     expect(parsed.query).toBe('visible result')
     expect(parsed.limit).toBe(10)
-    expect(SessionHistoryModel.searchInputSchema.safeParse({ sessionId: 'child-session', query: ' ' }).success).toBe(false)
-    expect(SessionHistoryModel.searchInputSchema.safeParse({ sessionId: 'child-session', query: 'x', limit: 11 }).success).toBe(false)
+    expect(Schema.is(SessionHistoryModel.searchInputSchema)({ sessionId: 'child-session', query: ' ' })).toBe(false)
+    expect(Schema.is(SessionHistoryModel.searchInputSchema)({ sessionId: 'child-session', query: 'x', limit: 11 })).toBe(false)
     expect(
-      SessionHistoryModel.searchInputSchema.safeParse({
+      Schema.is(SessionHistoryModel.searchInputSchema)({
         sessionId: 'child-session',
         query: 'x',
         cursor: 'x'.repeat(4097),
-      }).success,
+      }),
     ).toBe(false)
   })
 

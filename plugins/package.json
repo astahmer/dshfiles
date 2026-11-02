@@ -16,8 +16,7 @@
   },
   "devDependencies": {
     "@types/node": "22.20.5",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "catalog:"
   },
   "packageManager": "pnpm@12.5.1"
 }

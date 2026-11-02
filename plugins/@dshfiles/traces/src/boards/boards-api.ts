@@ -1,64 +1,58 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
-import { spanFilterSchema } from '../alerts/alert-types.js'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
+import { method } from '../api-schema.js'
+import { attributeKeySchema, spanFilterSchema } from '../alerts/alert-types.js'
 
-const attributeKeySchema = z.string().regex(/^[\w.:/-]{1,128}$/)
+const finiteNumber = Schema.Number.check(Schema.isFinite())
 
-export const breakdownInputSchema = z
-  .object({
-    windowMinutes: z
-      .number()
-      .int()
-      .min(1)
-      .max(30 * 24 * 60)
-      .describe('Spans that ended within this many minutes.'),
-    filter: spanFilterSchema,
-    groupBy: z
-      .union([
-        z.object({ kind: z.literal('service') }).strict(),
-        z.object({ kind: z.literal('operation') }).strict(),
-        z.object({ kind: z.literal('attribute'), key: attributeKeySchema }).strict(),
-      ])
-      .describe('One row per service, per span name, or per value of one attribute (spans without it group as null).'),
-    measure: z
-      .object({
-        key: attributeKeySchema.describe('A numeric span attribute, e.g. gen_ai.response.time_to_first_token.'),
-        divisor: z.number().positive().max(1e12).describe('Divide the raw value by this to get milliseconds (1e6 for nanoseconds).'),
-      })
-      .strict()
-      .optional()
-      .describe('Also report p50/p95 of one numeric attribute, in milliseconds.'),
-    sortBy: z.enum(['count', 'errorRate', 'p95']).optional().describe('Row order; defaults to count.'),
-    limit: z.number().int().min(1).max(100).optional().describe('Rows to return; defaults to 25.'),
-  })
-  .strict()
-export type BreakdownInput = z.infer<typeof breakdownInputSchema>
+export const breakdownInputSchema = Schema.Struct({
+  windowMinutes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(30 * 24 * 60)).annotate({
+    description: 'Spans that ended within this many minutes.',
+  }),
+  filter: spanFilterSchema,
+  groupBy: Schema.Union([
+    Schema.Struct({ kind: Schema.Literal('service') }),
+    Schema.Struct({ kind: Schema.Literal('operation') }),
+    Schema.Struct({ kind: Schema.Literal('attribute'), key: attributeKeySchema }),
+  ]).annotate({ description: 'One row per service, per span name, or per value of one attribute (spans without it group as null).' }),
+  measure: Schema.optional(
+    Schema.Struct({
+      key: attributeKeySchema.annotate({ description: 'A numeric span attribute, e.g. gen_ai.response.time_to_first_token.' }),
+      divisor: finiteNumber.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(1e12)).annotate({
+        description: 'Divide the raw value by this to get milliseconds (1e6 for nanoseconds).',
+      }),
+    }),
+  ).annotate({ description: 'Also report p50/p95 of one numeric attribute, in milliseconds.' }),
+  sortBy: Schema.optional(Schema.Literals(['count', 'errorRate', 'p95'])).annotate({ description: 'Row order; defaults to count.' }),
+  limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))).annotate({
+    description: 'Rows to return; defaults to 25.',
+  }),
+})
+export type BreakdownInput = Schema.Schema.Type<typeof breakdownInputSchema>
 
-const breakdownRowSchema = z
-  .object({
-    key: z.string().nullable(),
-    count: z.number().int().nonnegative(),
-    errorCount: z.number().int().nonnegative(),
-    errorRate: z.number().min(0).max(1),
-    p50Ms: z.number().nullable(),
-    p95Ms: z.number().nullable(),
-    p99Ms: z.number().nullable(),
-    maxMs: z.number().nullable(),
-    measureP50Ms: z.number().nullable(),
-    measureP95Ms: z.number().nullable(),
-  })
-  .strict()
-export type BreakdownRow = z.infer<typeof breakdownRowSchema>
+const nonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
-const breakdownSchema = z
-  .object({
-    windowMinutes: z.number().int().positive(),
-    spans: z.number().int().nonnegative(),
-    truncated: z.boolean().describe('More spans matched than were sampled (the newest 50,000 count).'),
-    rows: z.array(breakdownRowSchema),
-  })
-  .strict()
-export type Breakdown = z.infer<typeof breakdownSchema>
+const breakdownRowSchema = Schema.Struct({
+  key: Schema.NullOr(Schema.String),
+  count: nonNegativeInt,
+  errorCount: nonNegativeInt,
+  errorRate: finiteNumber.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  p50Ms: Schema.NullOr(finiteNumber),
+  p95Ms: Schema.NullOr(finiteNumber),
+  p99Ms: Schema.NullOr(finiteNumber),
+  maxMs: Schema.NullOr(finiteNumber),
+  measureP50Ms: Schema.NullOr(finiteNumber),
+  measureP95Ms: Schema.NullOr(finiteNumber),
+})
+export type BreakdownRow = Schema.Schema.Type<typeof breakdownRowSchema>
+
+const breakdownSchema = Schema.Struct({
+  windowMinutes: Schema.Int.check(Schema.isGreaterThan(0)),
+  spans: nonNegativeInt,
+  truncated: Schema.Boolean.annotate({ description: 'More spans matched than were sampled (the newest 50,000 count).' }),
+  rows: Schema.Array(breakdownRowSchema),
+})
+export type Breakdown = Schema.Schema.Type<typeof breakdownSchema>
 
 export const tracesBoardsApi = defineApi({
   id: 'traces-boards',

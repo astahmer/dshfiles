@@ -95,6 +95,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ]
     },
@@ -165,6 +177,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ],
       "reach": ["seed fake-secret-cli", "click button \"Secret Catalog: Secrets\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
@@ -239,6 +263,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ]
     },
@@ -338,6 +374,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ]
     },
@@ -405,6 +453,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ]
     },
@@ -494,6 +554,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         },
         {
           "kind": "custom",
@@ -591,6 +663,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         }
       ]
     },
@@ -666,6 +750,18 @@
           "span": "secret <verb>",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog query",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "secret catalog change",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-effect.test.ts",
+          "testName": "records query and change work spans through the dshx tracer bridge"
         },
         {
           "kind": "custom",

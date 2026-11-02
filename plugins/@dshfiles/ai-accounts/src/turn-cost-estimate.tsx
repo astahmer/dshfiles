@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import * as Schema from 'effect/Schema'
 import { useMemo } from 'react'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import type { TurnUsageCostOwnerProps } from '@dshfiles/chat/turn-usage-cost'
@@ -19,8 +20,8 @@ const TurnCostEstimateReadout = ({ turn, useProjection }: TurnUsageCostOwnerProp
   const { pricingOverrides } = usePreferences()
   const raw = useProjection(SESSION_COST_PROJECTION_KEY)
   const view = useMemo(() => {
-    const parsed = sessionCostViewSchema.safeParse(raw)
-    return parsed.success ? parsed.data : null
+    const parsed = Schema.decodeUnknownResult(sessionCostViewSchema)(raw)
+    return parsed._tag === 'Success' ? parsed.success : null
   }, [raw])
   const groups = view?.turns?.find(candidate => candidate.turn === turn)?.groups ?? (view?.turn?.turn === turn ? view.turn.groups : undefined)
   const routes = useMemo(() => {

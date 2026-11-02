@@ -1,4 +1,5 @@
-import type { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import type * as SchemaTypes from 'effect/Schema'
 import { RequestRejection, type Wire } from '../receiver.js'
 import {
   otlpLogsRequestSchema,
@@ -10,16 +11,16 @@ import {
 } from './json-schema.js'
 import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
 
-const decodeJsonBody = <Decoded>(body: Buffer, schema: z.ZodType<Decoded>, label: string): Decoded => {
+const decodeJsonBody = <Decoded>(body: Buffer, schema: SchemaTypes.ConstraintDecoder<Decoded>, label: string): Decoded => {
   let json: unknown
   try {
     json = JSON.parse(body.toString('utf8'))
   } catch {
     throw new RequestRejection(400, 'The JSON body could not be parsed.')
   }
-  const parsed = schema.safeParse(json)
-  if (!parsed.success) throw new RequestRejection(400, `The JSON body is not an OTLP ${label}.`)
-  return parsed.data
+  const parsed = Schema.decodeUnknownResult(schema)(json)
+  if (parsed._tag === 'Failure') throw new RequestRejection(400, `The JSON body is not an OTLP ${label}.`)
+  return parsed.success
 }
 
 const decodeProtobufBody = <Decoded>(body: Buffer, decode: (bytes: Uint8Array) => Decoded, label: string): Decoded => {

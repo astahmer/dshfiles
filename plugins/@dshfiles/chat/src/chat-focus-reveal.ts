@@ -1,10 +1,11 @@
 import { createContext, useEffect, useRef, useState, type RefObject } from 'react'
 import type { ConversationViewRequest } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { ChatFocusModel, type ChatFocus, type ChatTurnTailExtras } from './chat-focus.ts'
 import type { TurnRailItem } from './native/chat/turn-rail-items.ts'
 
-const focusEventDetailSchema = z.object({ sessionId: z.string() })
+const focusEventDetailSchema = Schema.Struct({ sessionId: Schema.String })
 
 const REVEAL_TIMEOUT_MS = 4_000
 const HIGHLIGHT_MS = 4_000
@@ -114,8 +115,8 @@ export const useChatFocus = (input: {
     }
     take()
     const onRequest = (event: Event): void => {
-      const detail = focusEventDetailSchema.safeParse(event instanceof CustomEvent ? event.detail : undefined)
-      if (detail.success && detail.data.sessionId === sessionId) take()
+      const detail = Schema.decodeUnknownOption(focusEventDetailSchema)(event instanceof CustomEvent ? event.detail : undefined)
+      if (Option.isSome(detail) && detail.value.sessionId === sessionId) take()
     }
     window.addEventListener(ChatFocusModel.event, onRequest)
     return () => window.removeEventListener(ChatFocusModel.event, onRequest)

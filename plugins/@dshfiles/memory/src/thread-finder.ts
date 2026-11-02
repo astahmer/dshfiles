@@ -1,7 +1,6 @@
-import { decodeJson } from '@dshfiles/dshx/json'
+import * as Schema from 'effect/Schema'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { Utf8 } from '@dshfiles/optmem-core'
-import { z } from 'zod'
 
 /** Where one finder hit was observed. A session can be found by several sources at once. */
 export type ThreadFinderSource = 'session-title' | 'session-metadata' | 'session-content' | 'memory-digest' | 'memory-message' | 'memory-note'
@@ -236,24 +235,28 @@ const overlap = (left: readonly string[], right: readonly string[]): readonly st
 const encodeCursor = (value: { readonly offset: number; readonly stamp: string }): string =>
   Buffer.from(JSON.stringify({ v: cursorVersion, offset: value.offset, stamp: value.stamp }), 'utf8').toString('base64url')
 
-const cursorPayloadSchema = z.object({ v: z.literal(cursorVersion), offset: z.number().int().nonnegative(), stamp: z.string() })
+const cursorPayloadSchema = Schema.Struct({
+  v: Schema.Literal(cursorVersion),
+  offset: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  stamp: Schema.String,
+})
 
 type CursorPayload = { readonly offset: number; readonly stamp: string }
 
 const decodeCursor = (cursor: string): CursorPayload => {
   try {
-    const parsed = decodeJson(cursorPayloadSchema, Buffer.from(cursor, 'base64url').toString('utf8'))
+    const parsed = Schema.decodeUnknownSync(cursorPayloadSchema)(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')))
     return { offset: parsed.offset, stamp: parsed.stamp }
   } catch {
     throw new ThreadFinderError('invalid-request', 'The cursor is not one this finder issued; start the search again.')
   }
 }
 
-const failureCodeSchema = z.looseObject({ code: z.string() })
+const failureCodeSchema = Schema.Struct({ code: Schema.String })
 
 const failureCode = (error: unknown): string => {
-  const parsed = failureCodeSchema.safeParse(error)
-  return parsed.success ? parsed.data.code : 'unknown'
+  const parsed = Schema.decodeUnknownResult(failureCodeSchema)(error)
+  return parsed._tag === 'Success' ? parsed.success.code : 'unknown'
 }
 
 /** The failure contract of the supported full-text backend; anything else is not retried. */

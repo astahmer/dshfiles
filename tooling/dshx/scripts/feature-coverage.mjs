@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DshxFeatureCatalogSchema, featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
+import { featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
 import { readPackageRelative, telemetryIssues } from './telemetry-coverage.mjs'
 
 const argumentsList = process.argv.slice(2)
@@ -120,24 +120,25 @@ for (const plugin of packages) {
     errors.push(`${plugin.name}: cannot read feature catalog ${featureReference}: ${error instanceof Error ? error.message : String(error)}`)
     continue
   }
-  const parsed = DshxFeatureCatalogSchema.safeParse(rawCatalog)
-  if (!parsed.success) {
-    for (const issue of parsed.error.issues) errors.push(`${plugin.name}: ${featureReference} ${issue.path.join('.')}: ${issue.message}`)
+  const schemaIssues = featureCatalogIssues(rawCatalog)
+  if (schemaIssues.length > 0) {
+    for (const issue of schemaIssues) errors.push(`${plugin.name}: ${featureReference} ${issue}`)
     continue
   }
-  const featureIssues = [...featureCatalogIssues(rawCatalog)]
+  const parsed = rawCatalog
+  const featureIssues = []
   const prefix = `${plugin.name.slice('@dshfiles/'.length)}.`
   const hasBundleMetadata = typeof plugin.manifest.dsh === 'object' && plugin.manifest.dsh !== null && !Array.isArray(plugin.manifest.dsh)
-  if (parsed.data.kind === 'bundle' && !hasBundleMetadata) featureIssues.push('bundle catalog requires package DSH bundle metadata')
-  if (parsed.data.kind === 'library' && hasBundleMetadata) featureIssues.push('library catalog cannot be attached to a DSH bundle package')
-  if (parsed.data.kind === 'infrastructure' && !hasBundleMetadata) featureIssues.push('infrastructure catalog requires package DSH bundle metadata')
-  for (const feature of parsed.data.features) {
+  if (parsed.kind === 'bundle' && !hasBundleMetadata) featureIssues.push('bundle catalog requires package DSH bundle metadata')
+  if (parsed.kind === 'library' && hasBundleMetadata) featureIssues.push('library catalog cannot be attached to a DSH bundle package')
+  if (parsed.kind === 'infrastructure' && !hasBundleMetadata) featureIssues.push('infrastructure catalog requires package DSH bundle metadata')
+  for (const feature of parsed.features) {
     const kinds = new Set(feature.verification.map(item => item.kind))
-    if (parsed.data.kind === 'bundle' && !kinds.has('gherkin') && !kinds.has('not-applicable')) {
+    if (parsed.kind === 'bundle' && !kinds.has('gherkin') && !kinds.has('not-applicable')) {
       featureIssues.push(`bundle feature ${feature.id} needs a Gherkin browser scenario or an explicit not-applicable rationale`)
     }
-    if (parsed.data.kind === 'library' && !kinds.has('unit-test')) featureIssues.push(`library feature ${feature.id} needs a package unit-test reference`)
-    if (parsed.data.kind === 'infrastructure' && !kinds.has('not-applicable')) {
+    if (parsed.kind === 'library' && !kinds.has('unit-test')) featureIssues.push(`library feature ${feature.id} needs a package unit-test reference`)
+    if (parsed.kind === 'infrastructure' && !kinds.has('not-applicable')) {
       featureIssues.push(`infrastructure feature ${feature.id} needs an explicit not-applicable rationale`)
     }
     for (const verification of feature.verification) {
@@ -162,14 +163,14 @@ for (const plugin of packages) {
       }
     }
   }
-  if (parsed.data.kind === 'infrastructure' && !parsed.data.features.some(feature => feature.verification.some(item => item.kind === 'unit-test'))) {
+  if (parsed.kind === 'infrastructure' && !parsed.features.some(feature => feature.verification.some(item => item.kind === 'unit-test'))) {
     featureIssues.push('infrastructure catalogs need at least one package unit-test reference')
   }
-  const telemetry = await telemetryIssues({ workspaceRoot, packageRoot: plugin.root, catalog: parsed.data })
+  const telemetry = await telemetryIssues({ workspaceRoot, packageRoot: plugin.root, catalog: parsed })
   featureIssues.push(...telemetry.issues)
   for (const [kind, count] of Object.entries(telemetry.counts)) telemetryCounts[kind] += count
   for (const issue of featureIssues) errors.push(`${plugin.name}: ${issue}`)
-  catalogs.push({ ...plugin, catalog: parsed.data })
+  catalogs.push({ ...plugin, catalog: parsed })
 }
 
 for (const [verificationId, featureFile] of expectedGherkin) {

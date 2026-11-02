@@ -2,10 +2,11 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
-import { z } from 'zod'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import * as Schema from 'effect/Schema'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { settingsShellApi } from './shell-api.js'
 import type { DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
@@ -13,7 +14,11 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const RELEASE_STATUS_QUERY_KEY = ['settings-shell', 'release-status'] as const
 const RELEASE_STATUS_REFRESH_MS = 6 * 60 * 60 * 1000
-const dismissedRelease = createStoredValue({ key: 'dshfiles.settings-shell.dismissed-release.v1', schema: z.string().max(100), fallback: '' })
+const dismissedRelease = createStoredValue({
+  key: 'dshfiles.settings-shell.dismissed-release.v1',
+  schema: zodSchemaFromEffect(Schema.String.check(Schema.isMaxLength(100))),
+  fallback: '',
+})
 
 const useReleaseStatus = () => {
   const api = useApi(settingsShellApi)
@@ -57,7 +62,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
   const [expanded, setExpanded] = useState(false)
   const releaseStatus = status.data
   const updateAvailable = releaseStatus?.available === true && releaseStatus.latestVersion !== dismissed
-  const highlights =
+  const highlights: { readonly section: string; readonly text: string; readonly version: string }[] =
     releaseStatus?.releases.flatMap(release => release.highlights.map(highlight => ({ ...highlight, version: release.version }))).slice(0, 8) ?? []
   return (
     <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:py-4" data-dsh-release-notice="">

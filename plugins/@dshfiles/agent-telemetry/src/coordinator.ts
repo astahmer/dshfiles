@@ -2,7 +2,9 @@
 // changed (dshx spans, active context around tool bodies and model streams, subagent parenting, wait spans).
 import type { StreamChunk, TokenUsage, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { activeSpanContext, redactIdentifier, startSpan, tracingEnabled, withActiveSpan, type Span, type SpanContext } from '@dshfiles/dshx/tracing'
-import { z } from 'zod'
+import { Effect, Option } from 'effect'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 import { CostAttributes, type PriceCall } from './cost.js'
 import {
   AGENT_SYSTEM,
@@ -132,40 +134,54 @@ interface SessionState {
 
 const DELEGATION_TOOLS = new Set(['subagent', 'subagent_fork', 'workflow', 'send_message'])
 
-const idSchema = z.union([z.string(), z.number()]).transform(String)
-const turnSchema = z.object({ turn: z.number() })
-const stepSchema = z.object({ turn: z.number(), step: z.number() })
-const turnEndSchema = z.object({
-  turn: z.number(),
-  reason: z.looseObject({ kind: z.string(), error: z.looseObject({ code: z.string().optional() }).optional() }),
+const looseObject = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+
+const idSchema = Schema.Union([Schema.String, Schema.Number]).pipe(
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transform((value: string | number) => String(value)),
+    encode: SchemaGetter.transform((value: string) => value),
+  }),
+)
+const turnSchema = Schema.Struct({ turn: Schema.Number })
+const stepSchema = Schema.Struct({ turn: Schema.Number, step: Schema.Number })
+const turnEndSchema = Schema.Struct({
+  turn: Schema.Number,
+  reason: looseObject({ kind: Schema.String, error: Schema.optionalKey(looseObject({ code: Schema.optionalKey(Schema.String) })) }),
 })
-const toolCallSchema = z.object({ turn: z.number(), step: z.number(), callId: idSchema, name: z.string(), arguments: z.string().catch('') })
-const toolResultSchema = z.object({
-  turn: z.number(),
-  step: z.number(),
+const toolCallSchema = Schema.Struct({
+  turn: Schema.Number,
+  step: Schema.Number,
+  callId: idSchema,
+  name: Schema.String,
+  arguments: Schema.String.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some('')))),
+})
+const toolResultSchema = Schema.Struct({
+  turn: Schema.Number,
+  step: Schema.Number,
   message: messageSchema,
-  error: z.looseObject({ name: z.string(), code: z.string() }).optional(),
+  error: Schema.optionalKey(looseObject({ name: Schema.String, code: Schema.String })),
 })
-const assistantMessageSchema = z.object({ turn: z.number(), step: z.number(), message: messageSchema })
-const approvalAskedSchema = z.object({ id: idSchema, toolName: z.string(), callId: idSchema.optional() })
-const approvalDecidedSchema = z.object({ id: idSchema, outcome: z.string() })
-const llmRetrySchema = z.object({
+const assistantMessageSchema = Schema.Struct({ turn: Schema.Number, step: Schema.Number, message: messageSchema })
+const approvalAskedSchema = Schema.Struct({ id: idSchema, toolName: Schema.String, callId: Schema.optionalKey(idSchema) })
+const approvalDecidedSchema = Schema.Struct({ id: idSchema, outcome: Schema.String })
+const llmRetrySchema = Schema.Struct({
   retryId: idSchema,
-  turn: z.number(),
-  step: z.number(),
-  provider: z.string(),
-  mode: z.string(),
-  retry: z.number(),
-  maxRetries: z.number().optional(),
-  delayMs: z.number(),
-  failure: z.looseObject({ code: z.string().optional() }),
+  turn: Schema.Number,
+  step: Schema.Number,
+  provider: Schema.String,
+  mode: Schema.String,
+  retry: Schema.Number,
+  maxRetries: Schema.optionalKey(Schema.Number),
+  delayMs: Schema.Number,
+  failure: looseObject({ code: Schema.optionalKey(Schema.String) }),
 })
-const llmRetryStartedSchema = z.object({ retryId: idSchema })
-const compactionStartSchema = z.object({ compactionId: idSchema, turn: z.number().nullable() })
-const compactionEndSchema = z.object({ compactionId: idSchema, error: z.string().optional() })
-const jobRegisteredSchema = z.object({ jobId: idSchema, kind: z.string(), toolCall: z.object({ callId: idSchema }).optional() })
-const jobSettledSchema = z.object({ jobId: idSchema, status: z.string(), cause: z.string(), producerReported: z.boolean() })
-const inboxSplicedSchema = z.object({ inserted: z.array(z.unknown()), outcome: z.string().optional() })
+const llmRetryStartedSchema = Schema.Struct({ retryId: idSchema })
+const compactionStartSchema = Schema.Struct({ compactionId: idSchema, turn: Schema.NullOr(Schema.Number) })
+const compactionEndSchema = Schema.Struct({ compactionId: idSchema, error: Schema.optionalKey(Schema.String) })
+const jobRegisteredSchema = Schema.Struct({ jobId: idSchema, kind: Schema.String, toolCall: Schema.optionalKey(Schema.Struct({ callId: idSchema })) })
+const jobSettledSchema = Schema.Struct({ jobId: idSchema, status: Schema.String, cause: Schema.String, producerReported: Schema.Boolean })
+const inboxSplicedSchema = Schema.Struct({ inserted: Schema.Array(Schema.Unknown), outcome: Schema.optionalKey(Schema.String) })
 
 const contextOf = (span: Span | undefined): SpanContext | null => span?.context ?? null
 
@@ -202,7 +218,7 @@ const stepAttributes = (session: ObservedSession, turn: number, step: number): A
   'dsh.step': step,
 })
 
-const turnFailure = (reason: z.infer<typeof turnEndSchema>['reason']): string | undefined => {
+const turnFailure = (reason: (typeof turnEndSchema.Type)['reason']): string | undefined => {
   if (reason.kind === 'error') return reason.error?.code ?? 'ERROR'
   if (reason.kind === 'aborted' || reason.kind === 'interrupted') return reason.kind.toUpperCase()
   return undefined
@@ -328,7 +344,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     return { span, name: input.name, startedAt: performance.now(), ended: false }
   }
 
-  const startTool = (state: SessionState, data: z.infer<typeof toolCallSchema>): void => {
+  const startTool = (state: SessionState, data: typeof toolCallSchema.Type): void => {
     const step = state.turn?.step
     if (state.turn?.turn !== data.turn || step?.step !== data.step) return
     const existing = step.tools.get(data.callId)
@@ -345,7 +361,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (options.captureContent()) tool.span.setAttribute('gen_ai.tool.call.arguments', GenAi.serializeCaptured(GenAi.parseToolArguments(raw)))
   }
 
-  const endTool = (state: SessionState, data: z.infer<typeof toolResultSchema>): void => {
+  const endTool = (state: SessionState, data: typeof toolResultSchema.Type): void => {
     const turn = state.turn
     const step = turn?.step
     if (turn?.turn !== data.turn || step?.step !== data.step) return
@@ -358,7 +374,9 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (options.captureContent()) {
       tool.span.setAttribute(
         'gen_ai.tool.call.result',
-        GenAi.serializeCaptured(GenAi.mapContent(resultBlock === undefined ? data.message.content : GenAi.contentBlocks.parse(resultBlock.content))),
+        GenAi.serializeCaptured(
+          GenAi.mapContent(resultBlock === undefined ? data.message.content : Schema.decodeUnknownSync(GenAi.contentBlocks)(resultBlock.content)),
+        ),
       )
     }
     const isError = data.error !== undefined || resultBlock?.isError === true
@@ -387,7 +405,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     turn.step = undefined
   }
 
-  const closeTurn = (state: SessionState, reason: z.infer<typeof turnEndSchema>['reason']): void => {
+  const closeTurn = (state: SessionState, reason: (typeof turnEndSchema.Type)['reason']): void => {
     const turn = state.turn
     if (turn === undefined) return
     if (turn.step !== undefined) closeStep(state, turn, 'interrupted')
@@ -419,7 +437,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (message.source.kind === 'user') state.turn.inputs.push(GenAi.inputMessage(message))
   }
 
-  const captureTurnOutput = (state: SessionState, data: z.infer<typeof assistantMessageSchema>): void => {
+  const captureTurnOutput = (state: SessionState, data: typeof assistantMessageSchema.Type): void => {
     const turn = state.turn
     if (turn?.turn !== data.turn) return
     const reason = turn.step?.step === data.step ? (turn.step.lastFinishReason ?? 'unknown') : 'unknown'
@@ -433,7 +451,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     return contextOf(tool?.span ?? step?.span ?? state.turn?.agent)
   }
 
-  const startApproval = (state: SessionState, data: z.infer<typeof approvalAskedSchema>): void => {
+  const startApproval = (state: SessionState, data: typeof approvalAskedSchema.Type): void => {
     const turn = state.turn?.turn ?? 0
     state.approvals.set(
       data.id,
@@ -450,7 +468,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     )
   }
 
-  const endApproval = (state: SessionState, data: z.infer<typeof approvalDecidedSchema>): void => {
+  const endApproval = (state: SessionState, data: typeof approvalDecidedSchema.Type): void => {
     const span = state.approvals.get(data.id)
     if (span === undefined) return
     state.approvals.delete(data.id)
@@ -458,7 +476,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     span.end()
   }
 
-  const startRetry = (state: SessionState, data: z.infer<typeof llmRetrySchema>): void => {
+  const startRetry = (state: SessionState, data: typeof llmRetrySchema.Type): void => {
     const step = state.turn?.step
     const parent = step?.turn === data.turn && step.step === data.step ? step.span : state.turn?.agent
     state.retries.set(
@@ -484,7 +502,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     state.retries.delete(retryId)
   }
 
-  const startCompaction = (state: SessionState, data: z.infer<typeof compactionStartSchema>): void => {
+  const startCompaction = (state: SessionState, data: typeof compactionStartSchema.Type): void => {
     const turn = state.turn
     const parent = turn !== undefined && (data.turn === null || data.turn === turn.turn) ? (turn.step?.span ?? turn.agent) : undefined
     state.compactions.set(
@@ -496,7 +514,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     )
   }
 
-  const endCompaction = (state: SessionState, data: z.infer<typeof compactionEndSchema>): void => {
+  const endCompaction = (state: SessionState, data: typeof compactionEndSchema.Type): void => {
     const span = state.compactions.get(data.compactionId)
     if (span === undefined) return
     state.compactions.delete(data.compactionId)
@@ -505,7 +523,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     span.end()
   }
 
-  const startJob = (state: SessionState, data: z.infer<typeof jobRegisteredSchema>): void => {
+  const startJob = (state: SessionState, data: typeof jobRegisteredSchema.Type): void => {
     const kind = redactIdentifier(data.kind) ?? 'job'
     jobs.set(
       data.jobId,
@@ -517,7 +535,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     )
   }
 
-  const endJob = (data: z.infer<typeof jobSettledSchema>): void => {
+  const endJob = (data: typeof jobSettledSchema.Type): void => {
     const span = jobs.get(data.jobId)
     if (span === undefined) return
     jobs.delete(data.jobId)
@@ -536,48 +554,48 @@ export const createCoordinator = (options: CoordinatorOptions) => {
       const state = ensure(session)
       switch (event.type) {
         case 'turn/start':
-          return startTurn(state, turnSchema.parse(event.data).turn)
+          return startTurn(state, Schema.decodeUnknownSync(turnSchema)(event.data).turn)
         case 'turn/end': {
-          const data = turnEndSchema.parse(event.data)
+          const data = Schema.decodeUnknownSync(turnEndSchema)(event.data)
           if (state.turn?.turn === data.turn) closeTurn(state, data.reason)
           return
         }
         case 'step/start': {
-          const data = stepSchema.parse(event.data)
+          const data = Schema.decodeUnknownSync(stepSchema)(event.data)
           return startStep(state, data.turn, data.step)
         }
         case 'step/end': {
-          const data = stepSchema.parse(event.data)
+          const data = Schema.decodeUnknownSync(stepSchema)(event.data)
           const step = state.turn?.step
           if (state.turn !== undefined && step?.turn === data.turn && step.step === data.step) closeStep(state, state.turn)
           return
         }
         case 'user/message':
-          return captureTurnInput(state, messageSchema.parse(event.data))
+          return captureTurnInput(state, Schema.decodeUnknownSync(messageSchema)(event.data))
         case 'assistant/message':
-          return captureTurnOutput(state, assistantMessageSchema.parse(event.data))
+          return captureTurnOutput(state, Schema.decodeUnknownSync(assistantMessageSchema)(event.data))
         case 'tool/call':
-          return startTool(state, toolCallSchema.parse(event.data))
+          return startTool(state, Schema.decodeUnknownSync(toolCallSchema)(event.data))
         case 'tool/result':
-          return endTool(state, toolResultSchema.parse(event.data))
+          return endTool(state, Schema.decodeUnknownSync(toolResultSchema)(event.data))
         case 'approval/asked':
-          return startApproval(state, approvalAskedSchema.parse(event.data))
+          return startApproval(state, Schema.decodeUnknownSync(approvalAskedSchema)(event.data))
         case 'approval/decided':
-          return endApproval(state, approvalDecidedSchema.parse(event.data))
+          return endApproval(state, Schema.decodeUnknownSync(approvalDecidedSchema)(event.data))
         case 'llm/retry':
-          return startRetry(state, llmRetrySchema.parse(event.data))
+          return startRetry(state, Schema.decodeUnknownSync(llmRetrySchema)(event.data))
         case 'llm/retry-started':
-          return endRetry(state, llmRetryStartedSchema.parse(event.data).retryId)
+          return endRetry(state, Schema.decodeUnknownSync(llmRetryStartedSchema)(event.data).retryId)
         case 'compaction/start':
-          return startCompaction(state, compactionStartSchema.parse(event.data))
+          return startCompaction(state, Schema.decodeUnknownSync(compactionStartSchema)(event.data))
         case 'compaction/end':
-          return endCompaction(state, compactionEndSchema.parse(event.data))
+          return endCompaction(state, Schema.decodeUnknownSync(compactionEndSchema)(event.data))
         case 'job/registered':
-          return startJob(state, jobRegisteredSchema.parse(event.data))
+          return startJob(state, Schema.decodeUnknownSync(jobRegisteredSchema)(event.data))
         case 'job/settled':
-          return endJob(jobSettledSchema.parse(event.data))
+          return endJob(Schema.decodeUnknownSync(jobSettledSchema)(event.data))
         case 'agent/inbox/spliced': {
-          const data = inboxSplicedSchema.parse(event.data)
+          const data = Schema.decodeUnknownSync(inboxSplicedSchema)(event.data)
           if (state.turn !== undefined && data.outcome === undefined) state.turn.splicedMessages += data.inserted.length
           return
         }
@@ -785,8 +803,8 @@ export const createCoordinator = (options: CoordinatorOptions) => {
       })
     }
     if (chunk.type === 'block-end') {
-      const block = GenAi.contentBlock.safeParse(chunk.block)
-      if (block.success) llm.blocks.push(block.data)
+      const block = Schema.decodeUnknownOption(GenAi.contentBlock)(chunk.block)
+      if (Option.isSome(block)) llm.blocks.push(block.value)
     } else if (chunk.type === 'usage') llm.usage = chunk.usage
     else if (chunk.type === 'finish') finishLlm(llm, chunk)
   }

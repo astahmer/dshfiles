@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { accountDraftSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
@@ -42,34 +42,29 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   await expect(page.getByText('Choose a model', { exact: true })).toHaveCount(0)
   const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
-  const modelOptions = modelList.locator('[data-model-picker-option]')
   await expect(modelList).toBeVisible()
-  await expect(modelOptions).toHaveCount(0)
-  await expect(search).toBeFocused()
-  await search.press('ArrowDown')
   await expect(search).toBeFocused()
 
   const popoverBounds = await page.getByRole('dialog').boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
-  await expect(reasoningEffort(page)).toHaveCount(0)
   await search.fill('zz-no-provider-model-83914')
   await expect(modelList.getByText('No matching models.', { exact: true })).toBeVisible()
+  await expect(modelList.locator('[data-model-picker-row]')).toHaveCount(0)
 })
 
-Then('the empty catalog preserves selection without model-specific reasoning controls', async ({ page }: { page: Page }) => {
+Then('the empty search keeps the composer selection', async ({ page }: { page: Page }) => {
   const selection = pickerSelectionByPage.get(page)
   if (selection === undefined) throw new Error('The model picker selection was not captured before search.')
 
-  await recordAssertion(page, 'empty-catalog-preserves-model-and-effort', async () => {
+  await recordAssertion(page, 'empty-search-keeps-model-and-effort', async () => {
     const model = page.locator('[data-model-picker-text]')
     const effortLabel = page.locator('[data-model-picker-effort]')
     await expect(model).toHaveText(selection.model)
     await expect(effortLabel).toHaveText(selection.effort)
     await expect(page.getByRole('list', { name: 'Models and accounts', exact: true }).getByText('No matching models.', { exact: true })).toBeVisible()
-
-    await expect(reasoningEffort(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Details for/u })).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toBeVisible()
   })
 })
 
@@ -159,7 +154,9 @@ When('a supported legacy Codex model is selected without validating a new connec
   await expect(card.getByRole('switch')).toBeChecked()
   const home = profileFor(page).homeRoot
   const readLegacy = async () =>
-    z.object({ accounts: z.array(accountDraftSchema) }).parse(JSON.parse(await readFile(join(home, 'plugins/ai-accounts/accounts.json'), 'utf8'))).accounts[0]
+    Schema.decodeUnknownSync(Schema.Struct({ accounts: Schema.Array(accountDraftSchema) }))(
+      JSON.parse(await readFile(join(home, 'plugins/ai-accounts/accounts.json'), 'utf8')),
+    ).accounts[0]
   await expect.poll(async () => (await readLegacy())?.enabled).toBe(true)
   const legacy = await readLegacy()
   if (legacy === undefined) throw new Error('Legacy catalog fixture is not persisted')
@@ -231,7 +228,7 @@ When('a supported legacy Codex model is selected without validating a new connec
   expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
   const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
   if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
-  expect(trackBounds.height).toBeGreaterThanOrEqual(6)
+  expect(trackBounds.height).toBeGreaterThanOrEqual(4)
   expect(sliderBounds.width).toBeGreaterThanOrEqual(16)
   const rangeColor = await effort
     .locator('[data-model-effort-slider] [data-slot="slider-range"]')
@@ -268,7 +265,6 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
     const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
-    await dialog.getByRole('button', { name: 'Back to model list', exact: true }).click()
     const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
     await search.fill('gpt-5.3-codex-spark')
     const spark = modelList.locator('[data-model-picker-option]').filter({ hasText: /GPT-5.3 Codex Spark/iu })

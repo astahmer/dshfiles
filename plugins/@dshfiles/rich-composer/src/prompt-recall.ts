@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 /**
  * ArrowUp prompt recall over the thread's own prompts, read from the Session event window the conversation already
@@ -9,25 +10,27 @@ import { z } from 'zod'
  * restores that draft at once. Editing the recalled text ends recall, so the arrows move the caret again.
  */
 
-const userPromptEventSchema = z.object({
-  type: z.literal('event'),
-  event: z.object({
-    type: z.literal('user/message'),
-    data: z.object({
-      source: z.object({ kind: z.literal('user') }),
-      content: z.array(z.unknown()),
+const userPromptEventSchema = Schema.Struct({
+  type: Schema.Literal('event'),
+  event: Schema.Struct({
+    type: Schema.Literal('user/message'),
+    data: Schema.Struct({
+      source: Schema.Struct({ kind: Schema.Literal('user') }),
+      content: Schema.Array(Schema.Unknown),
     }),
   }),
 })
 
-const textBlockSchema = z.object({ type: z.literal('text'), text: z.string() })
+const textBlockSchema = Schema.Struct({ type: Schema.Literal('text'), text: Schema.String })
 
 const promptTextOf = (content: readonly unknown[]): string =>
   content
-    .flatMap(block => {
-      const text = textBlockSchema.safeParse(block)
-      return text.success ? [text.data.text] : []
-    })
+    .flatMap(block =>
+      Option.match(Schema.decodeUnknownOption(textBlockSchema)(block), {
+        onNone: () => [],
+        onSome: text => [text.text],
+      }),
+    )
     .join('')
 
 /** The human prompts of an event window, newest first, each text once. */
@@ -35,9 +38,9 @@ const promptsOf = (entries: readonly unknown[]): readonly string[] => {
   const seen = new Set<string>()
   const prompts: string[] = []
   for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = userPromptEventSchema.safeParse(entries[index])
-    if (!entry.success) continue
-    const text = promptTextOf(entry.data.event.data.content)
+    const entry = Schema.decodeUnknownOption(userPromptEventSchema)(entries[index])
+    if (Option.isNone(entry)) continue
+    const text = promptTextOf(entry.value.event.data.content)
     if (text.trim() === '' || seen.has(text)) continue
     seen.add(text)
     prompts.push(text)

@@ -1,3 +1,4 @@
+import { Duration, Effect } from 'effect'
 import { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JobView } from '@deepseek-ai/dsh-jobs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -282,20 +283,22 @@ export class JobsBoard {
    * call, which the last week measured at 293 identical back-to-back calls in
    * 74 Sessions.
    */
-  async wait(input: JobWaitInput): Promise<JobWait> {
+  wait(input: JobWaitInput): Effect.Effect<JobWait> {
+    const currentRows = () => this.rows()
+    const now = this.now
     const until = input.until ?? 'settled'
     const timeoutMs = input.timeoutMs ?? WAIT_DEFAULT_TIMEOUT_MS
-    const startedAt = this.now()
+    const startedAt = now()
     const deadline = startedAt + timeoutMs
     const requested = input.jobIds ?? []
     const targets =
       requested.length > 0
         ? [...new Set(requested)]
-        : this.rows()
+        : currentRows()
             .filter(row => isLiveStatus(row.status))
             .map(row => row.id)
     const snapshot = (): JobWait['jobs'] => {
-      const byId = new Map(this.rows().map(row => [row.id, row]))
+      const byId = new Map(currentRows().map(row => [row.id, row]))
       return targets.map(jobId => {
         const row = byId.get(jobId)
         return {
@@ -308,23 +311,23 @@ export class JobsBoard {
       })
     }
     const settled = (jobs: JobWait['jobs']) => (until === 'any-settled' ? jobs.some(job => job.settled) : jobs.every(job => job.settled))
-    let jobs = snapshot()
-    while (targets.length > 0 && !settled(jobs)) {
-      const remaining = deadline - this.now()
-      if (remaining <= 0) break
-      await new Promise<void>(resolve => {
-        setTimeout(resolve, Math.min(WAIT_POLL_MS, remaining))
-      })
-      jobs = snapshot()
-    }
-    return {
-      startedAt,
-      waitedMs: Math.max(0, this.now() - startedAt),
-      timeoutMs,
-      until,
-      timedOut: targets.length > 0 && !settled(jobs),
-      jobs,
-      running: jobs.filter(job => !job.settled).map(job => job.jobId),
-    }
+    return Effect.gen(function* () {
+      let jobs = snapshot()
+      while (targets.length > 0 && !settled(jobs)) {
+        const remaining = deadline - now()
+        if (remaining <= 0) break
+        yield* Effect.sleep(Duration.millis(Math.min(WAIT_POLL_MS, remaining)))
+        jobs = snapshot()
+      }
+      return {
+        startedAt,
+        waitedMs: Math.max(0, now() - startedAt),
+        timeoutMs,
+        until,
+        timedOut: targets.length > 0 && !settled(jobs),
+        jobs,
+        running: jobs.filter(job => !job.settled).map(job => job.jobId),
+      }
+    })
   }
 }

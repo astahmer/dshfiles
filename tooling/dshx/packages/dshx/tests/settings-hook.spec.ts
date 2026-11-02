@@ -5,7 +5,7 @@ import type { SettingsClientRuntime } from '../src/settings/client.js'
 import { createSettingsClientRuntime, useSettings } from '../src/settings/client.js'
 import { defineSettings } from '../src/settings/index.js'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import * as EffectSchema from 'effect/Schema'
 
 type Setter<T> = T | ((previous: T) => T)
 
@@ -41,13 +41,15 @@ const fakeReact = {
 }
 
 // React 18 keeps the hook dispatcher on its internals; swapping it runs hooks without a renderer.
-const reactInternalsShape = z.object({
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: z.object({ ReactCurrentDispatcher: z.object({ current: z.unknown() }) }),
-})
-const hasReactInternals = (value: unknown): value is z.infer<typeof reactInternalsShape> => reactInternalsShape.safeParse(value).success
-if (!hasReactInternals(React)) throw new Error('React 18 dispatcher internals are unavailable.')
-const dispatcher = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+const reactInternalsShape = EffectSchema.Struct({ ReactCurrentDispatcher: EffectSchema.Struct({ current: EffectSchema.Unknown }) })
+if (!('__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED' in React)) throw new Error('React 18 dispatcher internals are unavailable.')
+const reactInternals = React['__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED']
+if (!EffectSchema.is(reactInternalsShape)(reactInternals)) throw new Error('React 18 dispatcher internals are unavailable.')
+const dispatcher = reactInternals.ReactCurrentDispatcher
 const originalDispatcher = dispatcher.current
+const setDispatcher = (value: unknown): void => {
+  if (!Reflect.set(dispatcher, 'current', value)) throw new Error('React 18 dispatcher internals are not writable.')
+}
 
 function resetRender(): void {
   stateCursor = 0
@@ -80,11 +82,11 @@ function clientWith(options: {
 }
 
 beforeEach(() => {
-  dispatcher.current = fakeReact
+  setDispatcher(fakeReact)
 })
 
 afterAll(() => {
-  dispatcher.current = originalDispatcher
+  setDispatcher(originalDispatcher)
 })
 
 describe('useSettings', () => {

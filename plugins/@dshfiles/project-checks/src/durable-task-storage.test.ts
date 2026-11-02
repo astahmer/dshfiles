@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from 'node:fs/promises'
+import { Schema } from 'effect'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -17,7 +18,7 @@ const interruptedTaskId = 'c'.repeat(64)
 const attemptId = '00000000-0000-4000-8000-000000000002'
 
 const queuedTask = (id: string, idempotencyKey: string) =>
-  durableTaskSchema.parse({
+  Schema.decodeUnknownSync(durableTaskSchema)({
     id,
     idempotencyKey,
     sessionId: 'session-storage-test',
@@ -35,7 +36,7 @@ const queuedTask = (id: string, idempotencyKey: string) =>
 const interruptedTask = () => DurableTaskModel.begin(queuedTask(interruptedTaskId, '00000000-0000-4000-8000-000000000003'), { attemptId, now: 2 })
 
 const successfulReceipt = () =>
-  storedReceiptSchema.parse({
+  Schema.decodeUnknownSync(storedReceiptSchema)({
     id: '00000000-0000-4000-8000-000000000004',
     taskId: interruptedTaskId,
     taskAttemptId: attemptId,
@@ -97,7 +98,7 @@ describe('durable Project Checks task SQLite storage', () => {
         findReceipt: async (recoveredTaskId, recoveredAttemptId) => {
           const saved = store?.findAttemptReceipt(recoveredTaskId, recoveredAttemptId)
           if (saved === undefined) return null
-          const receipt = storedReceiptSchema.parse(saved)
+          const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
           return { status: receipt.status === 'passed' ? 'succeeded' : receipt.status, exitCode: receipt.exitCode }
         },
         run: async () => {
@@ -120,7 +121,7 @@ describe('durable Project Checks task SQLite storage', () => {
 
       reopened = await DurableTaskStore.open({ root: join(root, 'sqlite') })
       expect(reopened.get(taskId)).toMatchObject({ status: 'succeeded' })
-      expect(storedReceiptSchema.parse(reopened.findAttemptReceipt(interruptedTaskId, attemptId))).toEqual(successfulReceipt())
+      expect(Schema.decodeUnknownSync(storedReceiptSchema)(reopened.findAttemptReceipt(interruptedTaskId, attemptId))).toEqual(successfulReceipt())
       expect(await reopened.createIfAbsent(queuedTask(taskId, '00000000-0000-4000-8000-000000000001'), 1_000)).toMatchObject({
         id: taskId,
         status: 'succeeded',

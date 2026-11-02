@@ -26,6 +26,12 @@
           "id": "vcs-provider-port.unclaimed",
           "file": "plugins/@dshfiles/vcs-provider-port/src/index.test.ts",
           "testName": "answers nothing when no provider claims the path or none is loaded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.effect-service",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/index.test.ts",
+          "testName": "provides the same provider resolution through the Effect service"
         }
       ],
       "telemetry": [

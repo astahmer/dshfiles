@@ -18,7 +18,7 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { z } from 'zod'
+import { Context, Effect, Layer, Option, Schema } from 'effect'
 
 /**
  * One place where Sessions live other than this Host — a DSH runtime reached through a tunnel, or anything else that can
@@ -62,6 +62,38 @@ export interface SessionSourceRegistry {
   resolveOwner(sessionId: SessionId): Promise<MirroredSessionSource | undefined>
 }
 
+export class SessionSourceRegistryError extends Schema.TaggedError<SessionSourceRegistryError>()('SessionSourceRegistryError', {
+  operation: Schema.Literals(['resolve-owner']),
+}) {}
+
+export class SessionSources extends Context.Service<
+  SessionSources,
+  {
+    register(source: MirroredSessionSource): Effect.Effect<() => void>
+    sources(): Effect.Effect<readonly MirroredSessionSource[]>
+    claim(source: MirroredSessionSource, sessionIds: readonly SessionId[]): Effect.Effect<void>
+    ownerOf(sessionId: string): Effect.Effect<MirroredSessionSource | undefined>
+    resolveOwner(sessionId: SessionId): Effect.Effect<MirroredSessionSource | undefined, SessionSourceRegistryError>
+  }
+>()('@dshfiles/session-source-port/SessionSources') {
+  static layer(registry: SessionSourceRegistry) {
+    return Layer.succeed(
+      SessionSources,
+      SessionSources.of({
+        register: source => Effect.sync(() => registry.register(source)),
+        sources: () => Effect.sync(() => registry.sources()),
+        claim: (source, sessionIds) => Effect.sync(() => registry.claim(source, sessionIds)),
+        ownerOf: sessionId => Effect.sync(() => registry.ownerOf(sessionId)),
+        resolveOwner: sessionId =>
+          Effect.tryPromise({
+            try: () => registry.resolveOwner(sessionId),
+            catch: () => new SessionSourceRegistryError({ operation: 'resolve-owner' }),
+          }),
+      }),
+    )
+  }
+}
+
 /**
  * Create the registry the Session controller provides.
  * @returns an empty registry whose claims follow its registered sources.
@@ -101,29 +133,46 @@ export const createSessionSourceRegistry = (): SessionSourceRegistry => {
   }
 }
 
-const sessionSummaryShape = z
-  .object({
-    sessionId: z.string().min(1).max(256),
-    updatedAt: z.number(),
-    running: z.boolean(),
-    blank: z.boolean(),
-    agentAvailable: z.boolean(),
-    cwd: z.string().optional(),
-    parentSessionId: z.string().optional(),
-    origin: z.literal('subagent').optional(),
-    formatStatus: z.enum(['current', 'migration-required']).optional(),
-    projections: z.object({}).passthrough().optional(),
-  })
-  .passthrough()
-const sessionFollowFrameShape = z.object({ type: z.enum(['snapshot', 'event', 'assistant-stream']) }).passthrough()
-const sessionPageShape = z.object({ records: z.array(z.unknown()).max(10_000), hasMore: z.boolean() }).passthrough()
-const acceptedShape = z.object({ accepted: z.literal(true) }).passthrough()
-const modelSelectionShape = z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).passthrough()
-const projectionsShape = z.union([
-  z.null(),
-  z.object({ kind: z.literal('sequenced'), asOfSeq: z.number() }).passthrough(),
-  z.object({ kind: z.literal('migration-required') }).passthrough(),
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+/** One runtime's payload keeps every field it sent; only the fields this Host reads are named. */
+const passthrough = <Shape extends Schema.StructWithRest.Objects>(shape: Shape) => Schema.StructWithRest(shape, [Schema.Record(Schema.String, Schema.Unknown)])
+/** Check an unknown wire payload against its shape and hand it back with the wire type it already has. */
+const wirePayload = <Wire>(shape: Schema.ConstraintDecoder<unknown>) =>
+  Schema.declare<Wire>((value): value is Wire => Option.isSome(Schema.decodeUnknownOption(shape)(value)))
+
+const sessionSummaryShape = passthrough(
+  Schema.Struct({
+    sessionId: boundedString(1, 256),
+    updatedAt: Schema.Number,
+    running: Schema.Boolean,
+    blank: Schema.Boolean,
+    agentAvailable: Schema.Boolean,
+    cwd: Schema.optionalKey(Schema.String),
+    parentSessionId: Schema.optionalKey(Schema.String),
+    origin: Schema.optionalKey(Schema.Literal('subagent')),
+    formatStatus: Schema.optionalKey(Schema.Literals(['current', 'migration-required'])),
+    projections: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  }),
+)
+const sessionSummarySchema = wirePayload<SessionSummary>(sessionSummaryShape)
+const sessionFollowFrameSchema = wirePayload<SessionFollowFrame>(
+  passthrough(Schema.Struct({ type: Schema.Literals(['snapshot', 'event', 'assistant-stream']) })),
+)
+const sessionPageSchema = wirePayload<SessionPage>(
+  passthrough(Schema.Struct({ records: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(10_000)), hasMore: Schema.Boolean })),
+)
+const acceptedShape = passthrough(Schema.Struct({ accepted: Schema.Literal(true) }))
+const sessionPromptValueSchema = wirePayload<SessionPromptValue>(acceptedShape)
+const sessionCancelValueSchema = wirePayload<SessionCancelValue>(acceptedShape)
+const sessionUpdateQueueValueSchema = wirePayload<SessionUpdateQueueValue>(acceptedShape)
+const modelSelectionShape = passthrough(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }))
+const sessionSelectModelValueSchema = wirePayload<SessionSelectModelValue>(passthrough(Schema.Struct({ selected: modelSelectionShape })))
+const projectionsShape = Schema.Union([
+  Schema.Null,
+  passthrough(Schema.Struct({ kind: Schema.Literal('sequenced'), asOfSeq: Schema.Number })),
+  passthrough(Schema.Struct({ kind: Schema.Literal('migration-required') })),
 ])
+const sessionProjectionsValueSchema = wirePayload<SessionProjectionsValue>(projectionsShape)
 
 /**
  * Decoders for the payloads a remote runtime answers with. Each one validates the fields this Host or the browser
@@ -136,10 +185,7 @@ export class SessionSourcePayload {
    * @returns the rows the browser's Session model reads.
    */
   static summaries(value: unknown): readonly SessionSummary[] {
-    return z
-      .object({ items: z.array(z.custom<SessionSummary>(row => sessionSummaryShape.safeParse(row).success)).max(10_000) })
-      .passthrough()
-      .parse(value).items
+    return Schema.decodeUnknownSync(passthrough(Schema.Struct({ items: Schema.Array(sessionSummarySchema).check(Schema.isMaxLength(10_000)) })))(value).items
   }
 
   /**
@@ -149,7 +195,7 @@ export class SessionSourcePayload {
    * @returns the same frame typed for the Session wire.
    */
   static followFrame(value: unknown): SessionFollowFrame {
-    return z.custom<SessionFollowFrame>(frame => sessionFollowFrameShape.safeParse(frame).success).parse(value)
+    return Schema.decodeUnknownSync(sessionFollowFrameSchema)(value)
   }
 
   /**
@@ -158,7 +204,7 @@ export class SessionSourcePayload {
    * @returns the page typed for the Session wire.
    */
   static page(value: unknown): SessionPage {
-    return z.custom<SessionPage>(page => sessionPageShape.safeParse(page).success).parse(value)
+    return Schema.decodeUnknownSync(sessionPageSchema)(value)
   }
 
   /**
@@ -167,27 +213,27 @@ export class SessionSourcePayload {
    * @returns the same value typed for the Session wire.
    */
   static projections(value: unknown): SessionProjectionsValue {
-    return z.custom<SessionProjectionsValue>(answer => projectionsShape.safeParse(answer).success).parse(value)
+    return Schema.decodeUnknownSync(sessionProjectionsValueSchema)(value)
   }
 
   /** Decode an admitted prompt receipt. */
   static prompt(value: unknown): SessionPromptValue {
-    return acceptedShape.parse(value)
+    return Schema.decodeUnknownSync(sessionPromptValueSchema)(value)
   }
 
   /** Decode an admitted cancellation receipt. */
   static cancel(value: unknown): SessionCancelValue {
-    return acceptedShape.parse(value)
+    return Schema.decodeUnknownSync(sessionCancelValueSchema)(value)
   }
 
   /** Decode the selected model accepted by a remote Session's runtime. */
   static selectedModel(value: unknown): SessionSelectModelValue {
-    return z.custom<SessionSelectModelValue>(answer => z.object({ selected: modelSelectionShape }).passthrough().safeParse(answer).success).parse(value)
+    return Schema.decodeUnknownSync(sessionSelectModelValueSchema)(value)
   }
 
   /** Decode an applied queue mutation receipt. */
   static queue(value: unknown): SessionUpdateQueueValue {
-    return acceptedShape.parse(value)
+    return Schema.decodeUnknownSync(sessionUpdateQueueValueSchema)(value)
   }
 }
 

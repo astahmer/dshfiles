@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 export const agentWarmupApi = defineApi({
   id: 'agent-warmup',
@@ -7,8 +7,8 @@ export const agentWarmupApi = defineApi({
   owner: '@dshfiles/rich-composer',
   methods: {
     warm: method({
-      input: z.object({ sessionId: z.string().min(1) }).strict(),
-      output: z.object({ live: z.boolean() }).strict(),
+      input: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)) }),
+      output: Schema.Struct({ live: Schema.Boolean }),
       description: 'Resume a thread’s Agent ahead of its first send. Opening a thread no longer resumes it.',
     }),
   },

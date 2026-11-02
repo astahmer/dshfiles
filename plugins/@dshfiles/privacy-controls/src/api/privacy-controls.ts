@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { PrivacyFeatureId } from '../features.js'
 
 const privacyFeatureIds = [
@@ -10,27 +10,29 @@ const privacyFeatureIds = [
   'session-log-download',
 ] as const satisfies readonly [PrivacyFeatureId, ...PrivacyFeatureId[]]
 
-const privacyFeatureIdSchema = z.enum(privacyFeatureIds)
+const privacyFeatureIdSchema = Schema.Literals(privacyFeatureIds)
 
-const featureStateSchema = z.object({
+const reasonSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(300)))
+
+const featureStateSchema = Schema.Struct({
   feature: privacyFeatureIdSchema,
-  enabled: z.boolean(),
-  available: z.boolean(),
-  mixed: z.boolean(),
-  needsRestart: z.boolean(),
-  overridden: z.boolean(),
-  reason: z.string().max(300).nullable(),
+  enabled: Schema.Boolean,
+  available: Schema.Boolean,
+  mixed: Schema.Boolean,
+  needsRestart: Schema.Boolean,
+  overridden: Schema.Boolean,
+  reason: reasonSchema,
 })
 
-const controlsSnapshotSchema = z.object({
-  available: z.boolean(),
-  liveReload: z.boolean(),
-  reason: z.string().max(300).nullable(),
-  features: z.array(featureStateSchema).length(5),
+const controlsSnapshotSchema = Schema.Struct({
+  available: Schema.Boolean,
+  liveReload: Schema.Boolean,
+  reason: reasonSchema,
+  features: Schema.Array(featureStateSchema).check(Schema.isMinLength(5), Schema.isMaxLength(5)),
 })
 
-export type PrivacyFeatureState = z.infer<typeof featureStateSchema>
-export type PrivacyControlsSnapshot = z.infer<typeof controlsSnapshotSchema>
+export type PrivacyFeatureState = typeof featureStateSchema.Type
+export type PrivacyControlsSnapshot = typeof controlsSnapshotSchema.Type
 
 export const privacyControlsApi = defineApi({
   id: 'privacy-controls',
@@ -38,17 +40,17 @@ export const privacyControlsApi = defineApi({
   owner: '@dshfiles/privacy-controls',
   methods: {
     read: method({
-      input: z.void(),
+      input: Schema.Void,
       output: controlsSnapshotSchema,
       description: 'Read the effective feedback, upload, and session-log download controls for this Web profile.',
     }),
     setFeature: method({
-      input: z.object({ feature: privacyFeatureIdSchema, enabled: z.boolean() }).strict(),
+      input: Schema.Struct({ feature: privacyFeatureIdSchema, enabled: Schema.Boolean }),
       output: controlsSnapshotSchema,
       description: 'Enable or disable one supported feedback, upload, or download feature for this Web profile.',
     }),
     setAll: method({
-      input: z.object({ enabled: z.boolean() }).strict(),
+      input: Schema.Struct({ enabled: Schema.Boolean }),
       output: controlsSnapshotSchema,
       description: 'Enable or disable all feedback and upload features without changing session-log downloads.',
     }),

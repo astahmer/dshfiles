@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import * as Schema from 'effect/Schema'
+import { asZodSchema } from './effect-zod-schema.js'
 import {
   accountAttemptSchema,
   successfulAccountSchema,
@@ -16,7 +18,7 @@ const servingAccountDomain = defineDomain({
   version: 1,
   layout: 'per-record',
   invalidRecords: 'backup-and-skip',
-  tables: { successful: { valueSchema: successfulAccountSchema, __key: 'sessionId' } },
+  tables: { successful: { valueSchema: asZodSchema(successfulAccountSchema), __key: 'sessionId' } },
 })
 
 /** Cohesive attribution policies; the service factory below owns injected storage and lifecycle. */
@@ -87,7 +89,7 @@ export const createServingAccountService = (ctx: Context, now: () => number = Da
   enqueue(prune)
   const start = (route: Omit<AccountAttempt, 'startedAt' | 'updatedAt' | 'status'>): AccountAttempt => {
     const at = now()
-    const attempt = accountAttemptSchema.parse({ ...route, startedAt: at, updatedAt: at, status: 'attempting' })
+    const attempt = Schema.decodeUnknownSync(accountAttemptSchema)({ ...route, startedAt: at, updatedAt: at, status: 'attempting' })
     attempts.set(route.sessionId, attempt)
     return attempt
   }
@@ -97,7 +99,7 @@ export const createServingAccountService = (ctx: Context, now: () => number = Da
     const updated = { ...attempt, updatedAt: now(), status: succeeded ? ('succeeded' as const) : ('failed' as const) }
     attempts.set(attempt.sessionId, updated)
     if (!succeeded) return
-    const successful = successfulAccountSchema.parse(updated)
+    const successful = Schema.decodeUnknownSync(successfulAccountSchema)(updated)
     enqueue(async () => {
       const store = await domain()
       await store?.table('successful').put(successful.sessionId, successful)

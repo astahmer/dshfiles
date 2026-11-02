@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { accountRuntime, AccountSessionWorkModel } from './account-runtime.js'
 import { accountStoreService } from './account-store.js'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { aiAccountsSessionApi } from './account-session-api.js'
+import { effectHandler } from './host-effect.js'
 import { createAccountSessionService, type AccountSessionService } from './account-session-service.js'
 import { CopilotCredentialModel } from './copilot-credentials.js'
 import { AccountHomePolicy } from './account-home-policy.js'
@@ -86,8 +88,8 @@ const serviceFor = (ctx: Context): AccountSessionService => {
   })
   return service
 }
-export const accountSessionHostApi = aiAccountsSessionApi.host({
-  capability: ({ ctx, input }) =>
+export const accountSessionHostApi = DshxEffect.host(aiAccountsSessionApi, {
+  capability: effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input }) =>
     AccountSessionWorkModel.isLocked(ctx, input.instanceId)
       ? {
           instanceId: input.instanceId,
@@ -96,7 +98,8 @@ export const accountSessionHostApi = aiAccountsSessionApi.host({
           credentialScope: null,
         }
       : serviceFor(ctx).capability(input.instanceId),
-  signOut: ({ ctx, input }) =>
+  ),
+  signOut: effectHandler(aiAccountsSessionApi, 'signOut', ({ ctx, input }) =>
     AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
       // Join any cancelled Codex subprocess that is still exiting. Never cancel a live attempt ourselves.
       const file = await accountStoreService.readAccountFile()
@@ -105,4 +108,5 @@ export const accountSessionHostApi = aiAccountsSessionApi.host({
       await accountRuntime(ctx)?.accountLogin?.settledAccount(input.instanceId)
       return serviceFor(ctx).signOut(input)
     }),
+  ),
 })

@@ -1,5 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
+import * as Option from 'effect/Option'
 import { SIDEBAR_SECTIONS, type SidebarSection } from './organization.js'
 import {
   THREAD_GROUP_BY_OPTIONS,
@@ -9,6 +11,7 @@ import {
   type ThreadStatusFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export interface ThreadBoardViewSettings extends ThreadViewPreferences {
   readonly projectFilter: string | null
@@ -25,33 +28,33 @@ export const DEFAULT_THREAD_BOARD_VIEW: ThreadBoardViewSettings = {
   collapsedSections: [],
 }
 
-const groupBySchema = z.enum(THREAD_GROUP_BY_OPTIONS)
-const sourceFilterSchema = z.enum(THREAD_SOURCE_FILTER_OPTIONS)
-const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS.filter((filter): filter is ThreadStatusFilter => filter !== 'all'))
+const groupBySchema = Schema.Literals(THREAD_GROUP_BY_OPTIONS)
+const sourceFilterSchema = Schema.Literals(THREAD_SOURCE_FILTER_OPTIONS)
+const statusFilterSchema = Schema.Literals(THREAD_STATUS_FILTER_OPTIONS.filter((filter): filter is ThreadStatusFilter => filter !== 'all'))
 
-export const threadBoardViewSchema = z
-  .object({
+export const threadBoardViewSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     groupBy: groupBySchema,
-    statusFilters: z.preprocess(
-      value => (Array.isArray(value) ? upgradeLegacyStatusFilters(value) : value),
-      z
-        .array(statusFilterSchema)
-        .max(THREAD_STATUS_FILTER_OPTIONS.length - 1)
-        .readonly(),
+    statusFilters: Schema.Array(
+      Schema.Literals([...THREAD_STATUS_FILTER_OPTIONS.filter((filter): filter is ThreadStatusFilter => filter !== 'all'), 'not-working']),
+    ).pipe(
+      Schema.decodeTo(Schema.Array(statusFilterSchema).check(Schema.isMaxLength(THREAD_STATUS_FILTER_OPTIONS.length - 1)), {
+        decode: SchemaGetter.transform(upgradeLegacyStatusFilters),
+        encode: SchemaGetter.transform(value => value),
+      }),
     ),
     sourceFilter: sourceFilterSchema,
-    projectFilter: z.string().max(200).nullable(),
-    collapsedGroups: z.array(z.string().max(160)).max(64).readonly(),
-    collapsedSections: z.array(z.enum(SIDEBAR_SECTIONS)).max(SIDEBAR_SECTIONS.length).readonly(),
-  })
-  .strict()
-  .superRefine((settings, context) => {
-    if (new Set(settings.statusFilters).size !== settings.statusFilters.length) {
-      context.addIssue({ code: 'custom', path: ['statusFilters'], message: 'Status filters must be unique.' })
-    }
-  })
+    projectFilter: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
+    collapsedGroups: Schema.Array(Schema.String.check(Schema.isMaxLength(160))).check(Schema.isMaxLength(64)),
+    collapsedSections: Schema.Array(Schema.Literals(SIDEBAR_SECTIONS)).check(Schema.isMaxLength(SIDEBAR_SECTIONS.length)),
+  }),
+).check(
+  Schema.makeFilter(settings =>
+    new Set(settings.statusFilters).size === settings.statusFilters.length ? undefined : { path: ['statusFilters'], issue: 'Status filters must be unique.' },
+  ),
+)
 
-export const storedThreadBoardView = createStoredValue({
+export const storedThreadBoardView = createEffectStoredValue({
   key: 'dshfiles.thread-sidebar.board-view.v1',
   schema: threadBoardViewSchema,
   fallback: DEFAULT_THREAD_BOARD_VIEW,
@@ -62,7 +65,7 @@ export class ThreadBoardViewModel {
     current: ThreadBoardViewSettings,
     patch: Partial<Pick<ThreadBoardViewSettings, 'groupBy' | 'statusFilters' | 'sourceFilter' | 'projectFilter' | 'collapsedGroups' | 'collapsedSections'>>,
   ): ThreadBoardViewSettings => {
-    const result = threadBoardViewSchema.safeParse({ ...current, ...patch })
-    return result.success ? result.data : current
+    const result = Schema.decodeUnknownOption(threadBoardViewSchema)({ ...current, ...patch })
+    return Option.isSome(result) ? result.value : current
   }
 }

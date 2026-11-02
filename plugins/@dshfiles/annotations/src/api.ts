@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import {
   ackInputSchema,
   attachInputSchema,
@@ -25,20 +25,24 @@ import {
   annotationSchema,
 } from './schema.js'
 
-const storeErrorSchema = z.enum(['missing', 'revision', 'limit', 'status'])
+const storeErrorSchema = Schema.Literals(['missing', 'revision', 'limit', 'status'])
 
-const annotationResultSchema = z.union([
-  z.object({ ok: z.literal(true), annotation: annotationSchema }).strict(),
-  z.object({ ok: z.literal(false), error: storeErrorSchema }).strict(),
+const annotationResultSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), annotation: annotationSchema }),
+  Schema.Struct({ ok: Schema.Literal(false), error: storeErrorSchema }),
 ])
 
-const annotationsResultSchema = z.union([
-  z.object({ ok: z.literal(true), annotations: z.array(annotationSchema).max(50) }).strict(),
-  z.object({ ok: z.literal(false), error: storeErrorSchema }).strict(),
+const annotationsResultSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), annotations: Schema.Array(annotationSchema).check(Schema.isMaxLength(50)) }),
+  Schema.Struct({ ok: Schema.Literal(false), error: storeErrorSchema }),
 ])
 
-const createdOutputSchema = z.object({ annotations: z.array(annotationSchema).max(8) }).strict()
-const tokenOutputSchema = z.object({ token: z.string().min(20).max(200), createdAt: z.number().int().nonnegative() }).strict()
+const createdOutputSchema = Schema.Struct({ annotations: Schema.Array(annotationSchema).check(Schema.isMaxLength(8)) })
+const tokenOutputSchema = Schema.Struct({
+  token: Schema.String.check(Schema.isMinLength(20), Schema.isMaxLength(200)),
+  createdAt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+const emptyInputSchema = Schema.Struct({})
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -90,22 +94,22 @@ export const annotationsApi = defineApi({
       description: 'Report that the annotated element no longer matches. Client feed; never resolves silently.',
     }),
     setup: method({
-      input: z.object({}).strict(),
+      input: emptyInputSchema,
       output: setupOutputSchema,
       description: 'Where the browser extension lives and which endpoints it talks to. Client setup, never an Agent step.',
     }),
     chromeStatus: method({
-      input: z.object({}).strict(),
+      input: emptyInputSchema,
       output: chromeStatusOutputSchema,
       description: 'Whether the no-extension picker browser is reachable, its executable and its pages. Client setup, never an Agent step.',
     }),
     chromeLaunch: method({
-      input: z.object({}).strict(),
+      input: emptyInputSchema,
       output: chromeStatusOutputSchema,
       description: 'Start the DSH-owned Chrome profile with a loopback debugging port, then report its pages.',
     }),
     chromeStop: method({
-      input: z.object({}).strict(),
+      input: emptyInputSchema,
       output: chromeStatusOutputSchema,
       description: 'Stop the picker browser this Host started. Nothing else on the machine is touched.',
     }),
@@ -145,7 +149,7 @@ export const annotationsApi = defineApi({
       description: 'Attach unassigned extension annotations to the Session the user chose. Never guesses a Session.',
     }),
     token: method({
-      input: z.object({}).strict(),
+      input: emptyInputSchema,
       output: tokenOutputSchema,
       description: 'Read the browser-extension ingest token. Not agent-actionable: the device setup is a human step.',
     }),
@@ -153,9 +157,9 @@ export const annotationsApi = defineApi({
 })
 
 function attachmentsResultSchema() {
-  return z.union([
-    z.object({ ok: z.literal(true), annotations: z.array(annotationSchema).max(50) }).strict(),
-    z.object({ ok: z.literal(false), error: storeErrorSchema }).strict(),
+  return Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), annotations: Schema.Array(annotationSchema).check(Schema.isMaxLength(50)) }),
+    Schema.Struct({ ok: Schema.Literal(false), error: storeErrorSchema }),
   ])
 }
 

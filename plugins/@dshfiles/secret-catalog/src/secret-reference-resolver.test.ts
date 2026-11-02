@@ -2,7 +2,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import type { SecretMetadata } from './secret-metadata.js'
 import { createSecretCatalogValues } from './secret-reference-resolver.js'
-import type { SecretCatalogOperations } from './secret-operations.js'
+import { createSecretCatalogOperations, type SecretCatalogOperations, type SecretCliRequest } from './secret-operations.js'
 
 const row = (overrides: Partial<SecretMetadata>): SecretMetadata => ({
   id: 'row',
@@ -35,6 +35,45 @@ describe('secret reference resolution', () => {
     const value = await fixture.values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: null })
     expect(value).toBe('resolved-secret-value')
     expect(fixture.calls).toEqual([{ alias: 'TOKEN', scope: 'global', cwd: null, environment: 'prod' }])
+  })
+
+  it('passes one request signal to both list and reveal', async () => {
+    const controller = new AbortController()
+    const receivedSignals: (AbortSignal | undefined)[] = []
+    const values = createSecretCatalogValues({
+      operations: {
+        list: async (_cwd, signal) => {
+          receivedSignals.push(signal)
+          return [row({})]
+        },
+        reveal: async (_alias, _scope, _cwd, _environment, signal) => {
+          receivedSignals.push(signal)
+          return 'resolved-secret-value'
+        },
+      },
+    })
+
+    await values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: null, signal: controller.signal })
+
+    expect(receivedSignals).toEqual([controller.signal, controller.signal])
+  })
+
+  it('aborts a value resolution when its list request is cancelled', async () => {
+    const controller = new AbortController()
+    const reason = new Error('reference request cancelled')
+    let subprocessSignal: AbortSignal | undefined
+    const operations = createSecretCatalogOperations(async (request: SecretCliRequest) => {
+      subprocessSignal = request.signal
+      const signal = request.signal
+      if (signal === undefined) throw new Error('The CLI request omitted its signal.')
+      return new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+    })
+    const values = createSecretCatalogValues({ operations })
+    const pending = values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: null, signal: controller.signal })
+
+    controller.abort(reason)
+    await expect(pending).rejects.toBe(reason)
+    expect(subprocessSignal?.aborted).toBe(true)
   })
 
   it('resolves a project alias through the caller folder', async () => {

@@ -1,5 +1,17 @@
 import { useSyncExternalStore } from 'react'
-import type { output, ZodType } from 'zod'
+
+/** The schema surface `createStoredValue` decodes through; every zod schema already satisfies it. */
+export interface StoredValueSchema<Value> {
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the decode boundary: the schema parses the stored JSON value.
+  readonly safeParse: (value: unknown) => { readonly success: true; readonly data: Value } | { readonly success: false }
+}
+
+/** The decoded value a schema reports, through either its zod view or its Standard Schema types. */
+type StoredValueOutput<Schema> = Schema extends { readonly '~standard': { readonly types?: { readonly output: infer Output } | undefined } }
+  ? Output
+  : Schema extends { readonly safeParse: (input: never) => { readonly success: true; readonly data: infer Data } | { readonly success: false } }
+    ? Data
+    : never
 
 type ValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -23,21 +35,22 @@ const browserStorage = (): ValueStorage | null => {
 }
 
 /**
- * One localStorage key behind a zod schema, shared by every reader in the bundle and kept in step across tabs through
- * the storage event. Missing, unreadable, non-JSON or invalid values read as `fallback`; a bare legacy string is still
+ * One localStorage key behind a schema, shared by every reader in the bundle and kept in step across tabs through the
+ * storage event. Missing, unreadable, non-JSON or invalid values read as `fallback`; a bare legacy string is still
  * accepted when the schema takes it.
  */
-export const createStoredValue = <Schema extends ZodType, Fallback = output<Schema>>(options: {
+export const createStoredValue = <Schema, Fallback = StoredValueOutput<Schema>>(options: {
   readonly key: string
-  readonly schema: Schema
+  readonly schema: Schema & StoredValueSchema<StoredValueOutput<Schema>>
   readonly fallback: Fallback
   readonly storage?: (() => ValueStorage | null) | undefined
-}): StoredValue<output<Schema>, Fallback> => {
+}): StoredValue<StoredValueOutput<Schema>, Fallback> => {
+  type Value = StoredValueOutput<Schema>
   const storage = options.storage ?? browserStorage
   const listeners = new Set<() => void>()
-  let cached: { readonly value: output<Schema> | Fallback } | null = null
+  let cached: { readonly value: Value | Fallback } | null = null
 
-  const decode = (raw: string): output<Schema> | Fallback => {
+  const decode = (raw: string): Value | Fallback => {
     let parsed: unknown = raw
     try {
       parsed = JSON.parse(raw)
@@ -48,7 +61,7 @@ export const createStoredValue = <Schema extends ZodType, Fallback = output<Sche
     return checked.success ? checked.data : options.fallback
   }
 
-  const read = (): output<Schema> | Fallback => {
+  const read = (): Value | Fallback => {
     try {
       const raw = storage()?.getItem(options.key) ?? null
       return raw === null ? options.fallback : decode(raw)
@@ -57,12 +70,12 @@ export const createStoredValue = <Schema extends ZodType, Fallback = output<Sche
     }
   }
 
-  const get = (): output<Schema> | Fallback => {
+  const get = (): Value | Fallback => {
     cached ??= { value: read() }
     return cached.value
   }
 
-  const publish = (value: output<Schema> | Fallback): void => {
+  const publish = (value: Value | Fallback): void => {
     cached = { value }
     for (const listener of listeners) listener()
   }
@@ -82,7 +95,7 @@ export const createStoredValue = <Schema extends ZodType, Fallback = output<Sche
     }
   }
 
-  const set = (next: output<Schema>): boolean => {
+  const set = (next: Value): boolean => {
     const checked = options.schema.safeParse(next)
     if (!checked.success) return false
     publish(checked.data)

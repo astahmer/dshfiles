@@ -1,15 +1,16 @@
 import { createServer } from 'node:http'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
-const boundPortSchema = z.object({ port: z.number().int().min(1).max(65_535) })
-const committedSessionSchema = z
-  .object({
-    result: z.object({
-      ok: z.literal(true),
-      value: z.object({ sessionId: z.string().min(1) }).passthrough(),
-    }),
-  })
-  .passthrough()
+const withUnknownProperties = fields => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const portSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535))
+const boundPortSchema = withUnknownProperties({ port: portSchema })
+const committedSessionSchema = withUnknownProperties({
+  result: withUnknownProperties({
+    ok: Schema.Literal(true),
+    value: withUnknownProperties({ sessionId: Schema.String.check(Schema.isMinLength(1)) }),
+  }),
+})
 const excludedResponseHeaders = new Set([
   'connection',
   'content-encoding',
@@ -61,14 +62,14 @@ const readResponseBody = async response => {
 }
 
 export const startMutationResponseProxy = async ({ upstreamPort }) => {
-  const validatedUpstreamPort = z.number().int().min(1).max(65_535).parse(upstreamPort)
+  const validatedUpstreamPort = Schema.decodeUnknownSync(portSchema)(upstreamPort)
   const upstreamOrigin = `http://127.0.0.1:${validatedUpstreamPort}`
   const state = { mutationRequests: 0, droppedResponses: 0, committedSessionIds: [] }
   const server = createServer(async (request, response) => {
     try {
-      const proxyAddress = boundPortSchema.safeParse(server.address())
-      if (!proxyAddress.success) throw new Error('The scratch mutation proxy is not bound.')
-      const proxyOrigin = `http://127.0.0.1:${proxyAddress.data.port}`
+      const proxyAddress = Schema.decodeUnknownOption(boundPortSchema)(server.address())
+      if (Option.isNone(proxyAddress)) throw new Error('The scratch mutation proxy is not bound.')
+      const proxyOrigin = `http://127.0.0.1:${proxyAddress.value.port}`
       const target = new URL(request.url ?? '/', proxyOrigin)
       if (target.origin !== proxyOrigin) {
         response.writeHead(400).end()
@@ -103,12 +104,12 @@ export const startMutationResponseProxy = async ({ upstreamPort }) => {
       if (isSessionCreate) {
         let responseBody
         try {
-          responseBody = committedSessionSchema.safeParse(JSON.parse(upstreamBody.toString('utf8')))
+          responseBody = Schema.decodeUnknownOption(committedSessionSchema)(JSON.parse(upstreamBody.toString('utf8')))
         } catch {
           responseBody = undefined
         }
-        if (responseBody?.success === true) {
-          state.committedSessionIds.push(responseBody.data.result.value.sessionId)
+        if (responseBody !== undefined && Option.isSome(responseBody)) {
+          state.committedSessionIds.push(responseBody.value.result.value.sessionId)
           if (state.droppedResponses === 0) {
             state.droppedResponses += 1
             response.destroy()
@@ -134,15 +135,15 @@ export const startMutationResponseProxy = async ({ upstreamPort }) => {
     server.once('error', rejectListen)
     server.listen(0, '127.0.0.1', resolveListen)
   })
-  const address = boundPortSchema.safeParse(server.address())
-  if (!address.success) {
+  const address = Schema.decodeUnknownOption(boundPortSchema)(server.address())
+  if (Option.isNone(address)) {
     await new Promise(resolveClose => server.close(resolveClose))
     throw new Error('Could not bind the scratch mutation proxy to loopback.')
   }
 
   let closed = false
   return {
-    port: address.data.port,
+    port: address.value.port,
     state: () => ({ ...state, committedSessionIds: [...state.committedSessionIds] }),
     async close() {
       if (closed) return

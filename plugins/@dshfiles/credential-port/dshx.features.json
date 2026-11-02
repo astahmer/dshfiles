@@ -5,7 +5,7 @@
     {
       "id": "secret-credential-port",
       "title": "One Host service port for credentials kept in a secrets catalog",
-      "summary": "Name the scopes a catalog can address and the two calls a credential consumer makes, so the provider and the consumer share one definition instead of depending on each other.",
+      "summary": "Name the scopes a catalog can address and the calls a credential consumer makes, with compatible Promise and opt-in Effect APIs.",
       "surfaces": ["host", "integration"],
       "configuration": [],
       "states": ["global", "project", "local", "rejected"],
@@ -26,6 +26,18 @@
           "id": "credential-port.rejected-scope",
           "file": "plugins/@dshfiles/credential-port/src/index.test.ts",
           "testName": "rejects a scope the catalog cannot address"
+        },
+        {
+          "kind": "unit-test",
+          "id": "credential-port.effect-schemas",
+          "file": "plugins/@dshfiles/credential-port/src/effect.test.ts",
+          "testName": "validates the same reference grammar as the Promise parser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "credential-port.effect-resolver",
+          "file": "plugins/@dshfiles/credential-port/src/effect.test.ts",
+          "testName": "resolves a reference and preserves the environment fallback"
         }
       ],
       "telemetry": [

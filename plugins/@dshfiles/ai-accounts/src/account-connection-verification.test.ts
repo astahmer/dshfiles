@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import type { z } from 'zod'
 import type { AccountKind, AccountProfile } from './api.js'
 import { readAccountUsage } from './account-usage.js'
 import { verifyAccountConnection } from './account-connection-verification.js'
@@ -92,7 +91,7 @@ const successfulBody = (kind: AccountKind, exhausted = false) => {
 }
 
 const network = files.network
-const networkReply = (body: z.infer<ReturnType<typeof z.json>>, status = 200): void => {
+const networkReply = (body: unknown, status = 200): void => {
   network.mockImplementation(async () => new Response(JSON.stringify(body), { status }))
 }
 

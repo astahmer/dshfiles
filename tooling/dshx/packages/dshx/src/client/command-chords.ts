@@ -1,4 +1,5 @@
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 export interface ShortcutBindingInput {
   readonly code: string
@@ -46,7 +47,7 @@ const MODIFIERS: Readonly<Record<string, ShortcutBindingInput['modifiers'][numbe
 
 const SHORTCUT_ID = /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u
 
-const NormalizedBinding = z.object({ code: z.string(), modifiers: z.array(z.enum(['control', 'alt', 'shift', 'meta'])) })
+const NormalizedBinding = Schema.Struct({ code: Schema.String, modifiers: Schema.Array(Schema.Literals(['control', 'alt', 'shift', 'meta'])) })
 
 const codeOf = (key: string): string | undefined => {
   if (/^[a-z]$/u.test(key)) return `Key${key.toUpperCase()}`
@@ -75,8 +76,9 @@ export class CommandChords {
 
   /** The chord of a Host binding, written with `Mod` for the platform's primary modifier. */
   static fromBinding = (input: { readonly binding: unknown; readonly platform: string }): string | undefined => {
-    const binding = NormalizedBinding.safeParse(input.binding).data
-    if (binding === undefined) return undefined
+    const decoded = Schema.decodeUnknownOption(NormalizedBinding)(input.binding)
+    if (!Option.isSome(decoded)) return undefined
+    const binding = decoded.value
     const key = keyOf(binding.code)
     if (key === undefined) return undefined
     const primary = input.platform === 'macos' ? 'meta' : 'control'

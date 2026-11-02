@@ -117,10 +117,9 @@ const HostRow = (props: {
       if (action === 'open' && tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
       const view = await api.runtimeOpenView({ runtimeId: runtime.id })
       if (action === 'open') {
-        const targetTab = tab
-        if (targetTab === undefined) throw new Error('Allow pop-ups to open the remote host.')
-        targetTab.opener = null
-        targetTab.location.href = view.launchUrl
+        if (tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
+        tab.opener = null
+        tab.location.href = view.launchUrl
         return 'opened'
       }
       if (!(await writeClipboard(view.launchUrl))) throw new Error('Could not copy the remote host link.')

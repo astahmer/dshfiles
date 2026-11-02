@@ -343,6 +343,11 @@ Given('the isolated plugin composition of {string} is booted with session conten
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated session-search plugin profile is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootPluginProfile('@dshfiles/session-search')
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 const privacyControlsDefaults = `- id: command-feedback
   disabled: true
 - id: message-feedback
@@ -421,6 +426,13 @@ Given('the isolated plugin composition {string} is booted with the session-conte
 Then('the content-search index exists under the isolated DSH home', async ({ page }: { page: Page }) => {
   const indexPath = join(profileFor(page).homeRoot, 'plugins', 'session-query-sqlite', 'index.sqlite')
   await recordAssertion(page, 'command-palette-content-index-is-under-the-isolated-home', () =>
+    expect.poll(async () => (await stat(indexPath).catch(() => undefined))?.isFile() ?? false).toBe(true),
+  )
+})
+
+Then('the owned session-search index exists under the isolated DSH home', async ({ page }: { page: Page }) => {
+  const indexPath = join(profileFor(page).homeRoot, 'plugins', 'session-search', 'index.sqlite')
+  await recordAssertion(page, 'owned-session-search-index-is-under-the-isolated-home', () =>
     expect.poll(async () => (await stat(indexPath).catch(() => undefined))?.isFile() ?? false).toBe(true),
   )
 })

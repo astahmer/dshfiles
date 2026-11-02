@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { UsageCard } from './api.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 import { providerFetch } from './provider-request.js'
@@ -41,11 +42,11 @@ const expandHome = (value: string): string => (value.startsWith('~/') ? join(hom
 const signedOutMessage = (configDir: string): string =>
   `Claude Code is signed out on this machine (the Claude desktop app keeps its own login, which Claude Code cannot use). Run: ${ClaudeAccountModel.claudeLoginHint(configDir)}, or store a \`claude setup-token\` token as this account's setup token.`
 
-const oauthSchema = z.object({
-  claudeAiOauth: z.object({
-    accessToken: z.string().min(1),
-    expiresAt: z.number().optional(),
-    subscriptionType: z.string().nullish(),
+const oauthSchema = Schema.Struct({
+  claudeAiOauth: Schema.Struct({
+    accessToken: Schema.String.check(Schema.isMinLength(1)),
+    expiresAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    subscriptionType: Schema.optional(Schema.NullOr(Schema.String)),
   }),
 })
 
@@ -62,12 +63,12 @@ const parseCredential = (raw: string): ClaudeCredential | undefined => {
   } catch {
     return undefined
   }
-  const parsed = oauthSchema.safeParse(json)
-  if (!parsed.success) return undefined
+  const parsed = AiAccountsSchema.decodeResult(oauthSchema, json)
+  if (parsed._tag !== 'Success') return undefined
   return {
-    accessToken: parsed.data.claudeAiOauth.accessToken,
-    expiresAt: parsed.data.claudeAiOauth.expiresAt,
-    plan: parsed.data.claudeAiOauth.subscriptionType ?? undefined,
+    accessToken: parsed.success.claudeAiOauth.accessToken,
+    expiresAt: parsed.success.claudeAiOauth.expiresAt,
+    plan: parsed.success.claudeAiOauth.subscriptionType ?? undefined,
   }
 }
 
@@ -82,16 +83,18 @@ const readClaudeLogin = async (configDir: string, dependencies: ClaudeAccountSer
   return credential === undefined ? { kind: 'signed-out' } : { kind: 'signed-in', credential }
 }
 
-const profileSchema = z.object({
-  oauthAccount: z.object({ emailAddress: z.string().optional(), organizationName: z.string().nullish() }).optional(),
+const profileSchema = Schema.Struct({
+  oauthAccount: Schema.optional(
+    Schema.Struct({ emailAddress: Schema.optional(Schema.String), organizationName: Schema.optional(Schema.NullOr(Schema.String)) }),
+  ),
 })
 
 /** The default config dir keeps its profile beside it, `~/.claude.json`; a custom one keeps it inside. */
 const readClaudeIdentity = async (configDir: string, dependencies: ClaudeAccountServiceDependencies): Promise<string | undefined> => {
   const path = configDir === DEFAULT_CONFIG_DIR ? join(homedir(), '.claude.json') : join(configDir, '.claude.json')
   try {
-    const parsed = profileSchema.safeParse(JSON.parse(await dependencies.readFile(path, 'utf8')))
-    return parsed.success ? parsed.data.oauthAccount?.emailAddress : undefined
+    const parsed = AiAccountsSchema.decodeResult(profileSchema, JSON.parse(await dependencies.readFile(path, 'utf8')))
+    return parsed._tag === 'Success' ? parsed.success.oauthAccount?.emailAddress : undefined
   } catch {
     return undefined
   }
@@ -104,14 +107,16 @@ interface ClaudeAuthView {
   readonly detail: string | undefined
 }
 
-const claudeWindowSchema = z
-  .object({
-    utilization: z.number().finite(),
-    resets_at: z.string().nullish(),
-  })
-  .nullish()
+const claudeWindowSchema = Schema.optional(
+  Schema.NullOr(
+    Schema.Struct({
+      utilization: Schema.Number.check(Schema.isFinite()),
+      resets_at: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  ),
+)
 
-const claudeUsageSchema = z.object({
+const claudeUsageSchema = Schema.Struct({
   five_hour: claudeWindowSchema,
   seven_day: claudeWindowSchema,
   seven_day_opus: claudeWindowSchema,
@@ -162,11 +167,11 @@ export class ClaudeAccountModel {
 
   /** `utilization` is percent used; a window the plan does not meter arrives as null. */
   static parseClaudeUsage = (raw: JsonValue, plan: string | undefined): UsageCard => {
-    const parsed = claudeUsageSchema.safeParse(raw)
-    if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'Claude returned an unsupported usage response.')
+    const parsed = AiAccountsSchema.decodeResult(claudeUsageSchema, raw)
+    if (parsed._tag !== 'Success') return ProviderUsageModel.emptyUsage('error', 'Claude returned an unsupported usage response.')
     const windows: UsageWindow[] = []
     for (const [key, label] of CLAUDE_WINDOWS) {
-      const window = parsed.data[key]
+      const window = parsed.success[key]
       if (window === undefined || window === null) continue
       const resetsAt = window.resets_at === undefined || window.resets_at === null ? Number.NaN : Date.parse(window.resets_at)
       windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(window.utilization), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt })
@@ -237,8 +242,11 @@ const fetchUsage = async (
       }
     if (!response.ok) return { card: ProviderUsageModel.emptyUsage('error', `Claude returned ${String(response.status)} for usage.`) }
     const raw: JsonValue = await response.json()
-    const parsed = claudeUsageSchema.safeParse(raw)
-    if (parsed.success && CLAUDE_WINDOWS.some(([key]) => parsed.data[key] !== undefined) && !signal?.aborted) onAuthenticated?.()
+    const parsed = AiAccountsSchema.decodeResult(claudeUsageSchema, raw)
+    if (parsed._tag === 'Success' && !signal?.aborted) {
+      const usage = parsed.success
+      if (CLAUDE_WINDOWS.some(([key]) => usage[key] !== undefined)) onAuthenticated?.()
+    }
     return { card: ClaudeAccountModel.parseClaudeUsage(raw, credential.plan) }
   } catch (cause) {
     return { card: ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.') }

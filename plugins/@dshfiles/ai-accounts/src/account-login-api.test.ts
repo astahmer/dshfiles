@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { accountLoginMetadata, accountLoginStateSchema, aiAccountsLoginApi, type AccountLoginState } from './account-login-api.js'
 import { AccountLoginHostModel } from './account-login-host.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 const waiting: AccountLoginState = {
   instanceId: 'work',
@@ -54,9 +55,9 @@ describe('account login typed API and agent exposure', () => {
     expect(waiting.userCode).toBe('ABCD-EFGH')
   })
   it('does not allow tokens, stdout or arbitrary authentication URLs in public state', () => {
-    expect(accountLoginStateSchema.safeParse({ ...waiting, access_token: 'fixture-not-real' }).success).toBe(false)
-    expect(accountLoginStateSchema.safeParse({ ...waiting, stdout: 'raw-output' }).success).toBe(false)
-    expect(accountLoginStateSchema.safeParse({ ...waiting, verificationUri: 'https://auth.openai.com/codex/device?token=bad' }).success).toBe(false)
-    expect(accountLoginStateSchema.safeParse({ ...waiting, userCode: 'long-token' }).success).toBe(false)
+    expect(AiAccountsSchema.acceptsStrict(accountLoginStateSchema, { ...waiting, access_token: 'fixture-not-real' })).toBe(false)
+    expect(AiAccountsSchema.acceptsStrict(accountLoginStateSchema, { ...waiting, stdout: 'raw-output' })).toBe(false)
+    expect(AiAccountsSchema.accepts(accountLoginStateSchema, { ...waiting, verificationUri: 'https://auth.openai.com/codex/device?token=bad' })).toBe(false)
+    expect(AiAccountsSchema.accepts(accountLoginStateSchema, { ...waiting, userCode: 'long-token' })).toBe(false)
   })
 })

@@ -1,52 +1,50 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { diffViewedApi } from './marks-api.js'
 import { ViewedMarksModel, viewedMarksDomain, type ViewedMarksStore } from './marks-store.js'
 
-interface OpenedViewedMarks {
-  readonly store: ViewedMarksStore
-  readonly close: () => Promise<void>
-}
+class ViewedMarksFailure extends Schema.TaggedError<ViewedMarksFailure>()('ViewedMarksFailure', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
 
-/**
- * One store per Host process, not per Cordis context: API handlers receive
- * different contexts, and a second store would keep its own record map and
- * clobber the other's durable rows.
- */
-let opening: Promise<OpenedViewedMarks> | undefined
+class ViewedMarksRuntime extends Context.Service<ViewedMarksRuntime, { readonly store: ViewedMarksStore }>()('@dshfiles/diff-viewed/Runtime') {}
 
-const openViewedMarks = async (ctx: Context): Promise<OpenedViewedMarks> => {
-  const storage = ctx.get('storageDomain')
-  if (storage === undefined) throw new Error('Viewed marks storage is unavailable.')
-  const domain = await storage.open(viewedMarksDomain)
-  return { store: ViewedMarksModel.createStore({ table: domain.table('marks') }), close: () => domain.close() }
-}
+const failure = (operation: string, error: unknown) => new ViewedMarksFailure({ operation, message: error instanceof Error ? error.message : String(error) })
 
-export const viewedMarksFor = (ctx: Context): Promise<ViewedMarksStore> => {
-  if (opening === undefined) {
-    const started = openViewedMarks(ctx)
-    opening = started
-    void started.catch(() => {
-      if (opening === started) opening = undefined
-    })
-  }
-  return opening.then(opened => opened.store)
-}
-
-export const closeViewedMarks = async (): Promise<void> => {
-  if (opening === undefined) return
-  const opened = await opening.then(
-    value => value,
-    () => undefined,
+const rootLayer = (ctx: CordisContext) =>
+  Layer.effect(
+    ViewedMarksRuntime,
+    Effect.acquireRelease(
+      Effect.gen(function* () {
+        const storage = ctx.get('storageDomain')
+        if (storage === undefined) return yield* Effect.fail(failure('open', 'Viewed marks storage is unavailable.'))
+        const domain = yield* Effect.tryPromise({ try: () => storage.open(viewedMarksDomain), catch: error => failure('open', error) })
+        return { domain, store: ViewedMarksModel.createStore({ table: domain.table('marks') }) }
+      }),
+      ({ domain, store }) =>
+        Effect.tryPromise({
+          try: async () => {
+            await store.flush()
+            await domain.close()
+          },
+          catch: error => failure('close', error),
+        }).pipe(Effect.catch(error => Effect.sync(() => ctx.logger.error(`diff-viewed: ${error.message}`)))),
+    ).pipe(Effect.map(({ store }) => ({ store }))),
   )
-  // Cleared before the store is released, so the next reader opens a fresh one.
-  opening = undefined
-  if (opened === undefined) return
-  await opened.store.flush()
-  await opened.close()
-}
 
-export const diffViewedApiHost = diffViewedApi.host({
-  state: async ({ ctx }) => (await viewedMarksFor(ctx)).snapshot(),
-  toggle: async ({ ctx, input }) => (await viewedMarksFor(ctx)).toggle(input),
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: rootLayer,
+  setup: () => ViewedMarksRuntime.use(() => Effect.void),
 })
+
+export const diffViewedApiHost = hostApi(diffViewedApi, {
+  state: Effect.fn('diff viewed state read')(() => ViewedMarksRuntime.use(runtime => Effect.sync(() => runtime.store.snapshot()))),
+  toggle: Effect.fn('diff viewed mark toggle')(({ input }) =>
+    ViewedMarksRuntime.use(runtime => Effect.tryPromise({ try: () => runtime.store.toggle(input), catch: error => failure('toggle', error) })),
+  ),
+})
+
+export { effectPlugin as diffViewedEffectPlugin }

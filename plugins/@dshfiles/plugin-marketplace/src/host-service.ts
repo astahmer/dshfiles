@@ -6,16 +6,21 @@ import type { Context } from '@deepseek-ai/cordis'
 import { readProfileManifest, resolveProfileDir, type ProfileManifest } from '@deepseek-ai/dsh-app-boot'
 import { execaNode } from 'execa'
 import { satisfies, valid, validRange } from 'semver'
-import { z } from 'zod'
 import type { MarketplaceInstallOutput, MarketplaceListInput, MarketplaceListOutput } from './api.js'
 import { DEFAULT_HUB_BASE_URL, normalizeHubBaseUrl } from './settings.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { Effect, Schema } from 'effect'
 
 const PAGE_SIZE = 24
 const HUB_TIMEOUT_MS = 15_000
 const MAX_LEGACY_SCAN_PAGES = 100
 const INSTALL_TIMEOUT_MS = 5 * 60_000
 const HOST_LOG_PREFIX = '[dshx-plugin-marketplace]'
+
+export class MarketplaceOperationError extends Schema.TaggedError<MarketplaceOperationError>()('MarketplaceOperationError', {
+  operation: Schema.Union([Schema.Literal('list'), Schema.Literal('install')]),
+  message: Schema.String,
+}) {}
 
 class HubHttpError extends Error {
   constructor(
@@ -29,64 +34,66 @@ class HubHttpError extends Error {
 
 type HubMarketplaceMode = 'dedicated' | 'legacy'
 
-const hubCategorySchema = z.object({
-  slug: z.string().min(1).max(80),
-  name: z.string().min(1).max(100),
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const absoluteUrlFilter = Schema.makeFilter((value: string) => (URL.canParse(value) ? undefined : 'Expected an absolute URL.'))
+
+const hubCategorySchema = Schema.Struct({
+  slug: boundedString(1, 80),
+  name: boundedString(1, 100),
 })
 
-const hubCardSchema = z.object({
-  slug: z.string().min(1).max(160),
-  name: z.string().min(1).max(160),
-  scope: z.string().min(1).max(240),
-  description: z.string().max(600),
-  version: z.string().min(1).max(100),
-  compat: z.string().min(1).max(160),
-  category: z.string().min(1).max(80),
-  badge: z.enum(['official', 'verified', 'community']),
-  glyph: z.string().min(1).max(4),
-  iconUrl: z.string().nullable(),
-  author: z.string().max(120).nullable().optional(),
-  stars: z.number().int().nonnegative().nullable().optional(),
-  updated: z.string().max(40).nullable().optional(),
-  publisher: z
-    .object({ avatarUrl: z.string().max(2_048).nullable().optional() })
-    .nullable()
-    .optional(),
+const statsSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
+const hubCardSchema = Schema.Struct({
+  slug: boundedString(1, 160),
+  name: boundedString(1, 160),
+  scope: boundedString(1, 240),
+  description: Schema.String.check(Schema.isMaxLength(600)),
+  version: boundedString(1, 100),
+  compat: boundedString(1, 160),
+  category: boundedString(1, 80),
+  badge: Schema.Literals(['official', 'verified', 'community']),
+  glyph: boundedString(1, 4),
+  iconUrl: Schema.NullOr(Schema.String),
+  author: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(120)))),
+  stars: Schema.optionalKey(Schema.NullOr(statsSchema)),
+  updated: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(40)))),
+  publisher: Schema.optionalKey(Schema.NullOr(Schema.Struct({ avatarUrl: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048)))) }))),
 })
 
-export const hubListResponseSchema = z.object({
-  items: z.array(hubCardSchema).max(PAGE_SIZE),
-  nextCursor: z.string().max(1000).nullable(),
+export const hubListResponseSchema = Schema.Struct({
+  items: Schema.Array(hubCardSchema).check(Schema.isMaxLength(PAGE_SIZE)),
+  nextCursor: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
   // Older Framework Hub deployments remain readable during a rolling update.
-  categories: z.array(hubCategorySchema).max(100).optional().default([]),
-  total: z.number().int().nonnegative().optional(),
+  categories: Schema.Array(hubCategorySchema)
+    .check(Schema.isMaxLength(100))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  total: Schema.optionalKey(statsSchema),
 })
 
-const installTargetSchema = z.object({
-  kind: z.enum(['npm', 'github']),
-  spec: z.string().min(1).max(1000),
-  package_name: z.string().min(1).max(240),
-  version: z.string().min(1).max(100),
-  integrity: z.string().nullable(),
-  is_primary: z.union([z.literal(0), z.literal(1), z.boolean()]),
-  status: z.string().min(1).max(40),
+const installTargetSchema = Schema.Struct({
+  kind: Schema.Literals(['npm', 'github']),
+  spec: boundedString(1, 1000),
+  package_name: boundedString(1, 240),
+  version: boundedString(1, 100),
+  integrity: Schema.NullOr(Schema.String),
+  is_primary: Schema.Union([Schema.Literal(0), Schema.Literal(1), Schema.Boolean]),
+  status: boundedString(1, 40),
 })
 
-const hubDetailResponseSchema = z.object({
+const hubDetailResponseSchema = Schema.Struct({
   plugin: hubCardSchema,
-  installTargets: z.array(installTargetSchema).max(20),
-  repositoryUrl: z.string().url().max(2_048).nullable().optional(),
-  releases: z
-    .array(
-      z.object({
-        version: z.string().min(1).max(100),
-        channel: z.enum(['stable', 'prerelease']),
-        git_tag: z.string().min(1).max(255).nullable(),
-      }),
-    )
-    .max(20)
-    .optional()
-    .default([]),
+  installTargets: Schema.Array(installTargetSchema).check(Schema.isMaxLength(20)),
+  repositoryUrl: Schema.optionalKey(Schema.NullOr(Schema.String.check(absoluteUrlFilter, Schema.isMaxLength(2_048)))),
+  releases: Schema.Array(
+    Schema.Struct({
+      version: boundedString(1, 100),
+      channel: Schema.Literals(['stable', 'prerelease']),
+      git_tag: Schema.NullOr(boundedString(1, 255)),
+    }),
+  )
+    .check(Schema.isMaxLength(20))
+    .pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
 })
 
 export interface CurrentProfile {
@@ -226,7 +233,7 @@ function isLegacyMarketplaceRedirect(error: HubHttpError, pathname: string): boo
   }
 }
 
-function isLegacyCard(item: z.infer<typeof hubCardSchema>): boolean {
+function isLegacyCard(item: typeof hubCardSchema.Type): boolean {
   return valid(item.version) !== null && validRange(item.compat) !== null
 }
 
@@ -235,7 +242,7 @@ async function fetchLegacyListPage(
   baseUrl: string,
   search: URLSearchParams,
   signal: AbortSignal,
-): Promise<z.infer<typeof hubListResponseSchema>> {
+): Promise<typeof hubListResponseSchema.Type> {
   const query = new URLSearchParams(search)
   const scanSignal = combineSignals(signal, HUB_TIMEOUT_MS)
   const seenCursors = new Set<string>()
@@ -244,7 +251,7 @@ async function fetchLegacyListPage(
 
   for (let pageNumber = 0; pageNumber < MAX_LEGACY_SCAN_PAGES; pageNumber += 1) {
     const raw = await fetchJson(dependencies, hubUrl(baseUrl, '/api/plugins', query), scanSignal)
-    const page = hubListResponseSchema.parse(raw)
+    const page = Schema.decodeUnknownSync(hubListResponseSchema)(raw)
     const items = page.items.filter(isLegacyCard)
     if (items.length > 0 || page.nextCursor === null) return { ...page, items }
     if (seenCursors.has(page.nextCursor)) throw new Error('Framework Hub returned a repeated legacy cursor.')
@@ -309,7 +316,7 @@ function githubRepositoryFullName(repositoryUrl: string | null | undefined): str
   }
 }
 
-function primaryTarget(detail: z.infer<typeof hubDetailResponseSchema>, hubBaseUrl: string) {
+function primaryTarget(detail: typeof hubDetailResponseSchema.Type, hubBaseUrl: string) {
   const candidates = detail.installTargets.filter(target => (target.is_primary === true || target.is_primary === 1) && target.status === 'active')
   if (candidates.length !== 1) return undefined
   const target = candidates[0]
@@ -331,11 +338,11 @@ function primaryTarget(detail: z.infer<typeof hubDetailResponseSchema>, hubBaseU
 async function resolveDshCli(): Promise<DshCliResolution> {
   const require = createRequire(import.meta.url)
   const manifestPath = require.resolve('@deepseek-ai/dsh/package.json')
-  const manifestSchema = z.object({
-    version: z.string().min(1),
-    bin: z.union([z.string(), z.record(z.string(), z.string())]),
+  const manifestSchema = Schema.Struct({
+    version: boundedString(1, 100),
+    bin: Schema.Union([Schema.String, Schema.Record(Schema.String, Schema.String)]),
   })
-  const manifest = manifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')))
+  const manifest = Schema.decodeUnknownSync(manifestSchema)(JSON.parse(await readFile(manifestPath, 'utf8')))
   const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin.dsh
   if (bin === undefined || bin.length === 0) throw new Error('@deepseek-ai/dsh does not declare the dsh CLI entry.')
   return {
@@ -397,7 +404,7 @@ export class MarketplaceHostService {
     return normalizeHubBaseUrl(baseUrl)
   }
 
-  private async listPage(baseUrl: string, query: URLSearchParams, signal: AbortSignal): Promise<z.infer<typeof hubListResponseSchema>> {
+  private async listPage(baseUrl: string, query: URLSearchParams, signal: AbortSignal): Promise<typeof hubListResponseSchema.Type> {
     const key = this.hubModeKey(baseUrl)
     const mode = this.hubModes.get(key)
     if (mode === 'legacy') return fetchLegacyListPage(this.dependencies, baseUrl, query, signal)
@@ -405,7 +412,7 @@ export class MarketplaceHostService {
     const pathname = '/api/marketplace/plugins'
     try {
       const raw = await fetchJson(this.dependencies, hubUrl(baseUrl, pathname, query), signal)
-      const page = hubListResponseSchema.parse(raw)
+      const page = Schema.decodeUnknownSync(hubListResponseSchema)(raw)
       this.hubModes.set(key, 'dedicated')
       return page
     } catch (error) {
@@ -443,6 +450,20 @@ export class MarketplaceHostService {
       return fetchJson(this.dependencies, hubUrl(baseUrl, `/api/plugins/${encodedSlug}`, query), signal)
     }
   }
+
+  readonly listEffect = Effect.fn('marketplace list')((input: MarketplaceListInput, ctx: Context, signal: AbortSignal) =>
+    Effect.tryPromise({
+      try: () => this.list(input, ctx, signal),
+      catch: error => new MarketplaceOperationError({ operation: 'list', message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
+
+  readonly installEffect = Effect.fn('marketplace install')((slug: string, ctx: Context, signal: AbortSignal) =>
+    Effect.tryPromise({
+      try: () => this.install(slug, ctx, signal),
+      catch: error => new MarketplaceOperationError({ operation: 'install', message: error instanceof Error ? error.message : String(error) }),
+    }),
+  )
 
   async list(input: MarketplaceListInput, ctx: Context, signal: AbortSignal): Promise<MarketplaceListOutput> {
     try {
@@ -503,11 +524,11 @@ export class MarketplaceHostService {
       }
 
       const settings = this.dependencies.settings()
-      let detail: z.infer<typeof hubDetailResponseSchema>
+      let detail: typeof hubDetailResponseSchema.Type
       try {
         const query = new URLSearchParams({ locale: 'en' })
         const raw = await this.pluginDetail(settings.hubBaseUrl, slug, query, signal)
-        detail = hubDetailResponseSchema.parse(raw)
+        detail = Schema.decodeUnknownSync(hubDetailResponseSchema)(raw)
       } catch (error) {
         this.dependencies.logError(`Failed to resolve the install target for ${slug}.`, error)
         return failed('catalog-unavailable', true)

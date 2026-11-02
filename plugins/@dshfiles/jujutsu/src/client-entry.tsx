@@ -16,13 +16,14 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels, NativeAsideOwners, type WorkbenchPanelProps } from '@dshfiles/workbench/registry'
+import * as Schema from 'effect/Schema'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
 import './client.css'
@@ -36,7 +37,7 @@ const DOCK_PANEL_ID = 'dshfiles-jujutsu.dock'
 const SOURCE_CONTROL_DOCK_PANEL_ID = 'dshfiles-jujutsu.source-control'
 /** `@dshfiles/main-tabs` asks this for the graph's right-pane view when its main tab is dropped there. */
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
-const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
+const panelAsideRequestSchema = SchemaHelpers.strictStruct(Schema.Struct({ panelId: Schema.String.check(Schema.isMinLength(1)) }))
 
 export default defineClient({
   name: '@dshfiles/jujutsu',
@@ -282,7 +283,7 @@ export default defineClient({
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
         if (!(event instanceof CustomEvent) || event.defaultPrevented) return
-        const request = panelAsideRequestSchema.safeParse(event.detail)
+        const request = SchemaHelpers.decodeSafe(panelAsideRequestSchema, event.detail)
         if (!request.success || request.data.panelId !== PANEL_ID) return
         if (openNativeAside()) event.preventDefault()
       }

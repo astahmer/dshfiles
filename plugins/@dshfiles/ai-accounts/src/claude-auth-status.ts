@@ -2,9 +2,10 @@ import { execFile } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { ClaudeAccountModel } from './claude-account.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 /** Private subprocess result: never returned from account APIs or included in an error. */
 export type ClaudeAuthStatusRunner = (input: {
@@ -13,7 +14,7 @@ export type ClaudeAuthStatusRunner = (input: {
 }) => Promise<{ readonly exitCode: number; readonly stdout: string }>
 
 const failure = (): Error => new Error('The official Claude CLI did not confirm an authenticated configuration.')
-const statusSchema = z.object({ loggedIn: z.literal(true), authMethod: z.string().optional() })
+const statusSchema = Schema.Struct({ loggedIn: Schema.Literal(true), authMethod: Schema.optional(Schema.String) })
 
 const runStatus: ClaudeAuthStatusRunner = input =>
   withSpan('claude auth status', { kind: 'client', attributes: { 'process.executable.name': 'claude' } }, async span => {
@@ -77,8 +78,8 @@ export const verifyClaudeAuthStatus = async (input: {
     const result = await Promise.race([(input.run ?? runStatus)({ environment, signal: controller.signal }), cancelled])
     controller.signal.throwIfAborted()
     if (result.exitCode !== 0) throw failure()
-    const parsed = statusSchema.safeParse(JSON.parse(result.stdout))
-    if (!parsed.success) throw failure()
+    const parsed = AiAccountsSchema.decodeResult(statusSchema, JSON.parse(result.stdout))
+    if (parsed._tag !== 'Success') throw failure()
   } catch {
     throw failure()
   } finally {

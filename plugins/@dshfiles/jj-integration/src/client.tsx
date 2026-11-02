@@ -19,11 +19,11 @@ import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, us
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
-import { jjIntegrationApi, threadWorkspaceName } from './api.js'
+import { jjIntegrationApi, threadWorkspaceNameEffect } from './api.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
@@ -54,13 +54,13 @@ const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
 const RIGHT_PANE_KIND = 'dshfiles-jj-integration-thread-workspaces'
 /** `@dshfiles/main-tabs` asks this for the panel's right-pane view when its main tab is dropped there. */
 const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
-const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
+const panelAsideRequestSchema = Schema.Struct({ panelId: Schema.String.check(Schema.isMinLength(1)) })
 // The export plugin registers its header cell at the default priority; a lower one shadows it (see SlotCore.register).
 const SESSION_LOG_SHADOW_PRIORITY = -1
 
 /** A Host that validates a request against an older schema rejects it as `contract`, never as a transport failure. */
-const contractRejectionSchema = z.looseObject({ kind: z.literal('contract') })
-const isContractRejection = (error: unknown): boolean => contractRejectionSchema.safeParse(error).success
+const contractRejectionSchema = Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('contract') }), [Schema.Record(Schema.String, Schema.Unknown)])
+const isContractRejection = (error: unknown): boolean => Schema.is(contractRejectionSchema)(error)
 
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -182,8 +182,8 @@ export default defineClient({
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
         if (!(event instanceof CustomEvent) || event.defaultPrevented) return
-        const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== PANEL_ID) return
+        const request = Schema.decodeUnknownOption(panelAsideRequestSchema)(event.detail)
+        if (request._tag !== 'Some' || request.value.panelId !== PANEL_ID) return
         if (openNativeAside()) event.preventDefault()
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
@@ -736,7 +736,7 @@ export default defineClient({
     const sharedWorkspaceMoves = new Map<string, DeferredMove>()
     const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
-      if (workspace === undefined || !threadWorkspaceName.safeParse(workspace.path.split('/').at(-1)).success) return undefined
+      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split('/').at(-1))) return undefined
       if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
       const key = `${sessionId}\u0000${workspaceId}`
       const cached = sharedWorkspaceMoves.get(key)

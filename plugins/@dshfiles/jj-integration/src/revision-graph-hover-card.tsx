@@ -11,8 +11,8 @@ export const revisionGraphQueryKey = (path: string) => ['jj-integration', 'revis
 export const RevisionGraphHoverCard = (props: {
   readonly path: string
   readonly bookmark: string
-  readonly t: JjIntegrationTranslate
   readonly disabled: boolean
+  readonly t: JjIntegrationTranslate
   readonly trigger: ReactElement
 }): JSX.Element => {
   const [open, setOpen] = useState(false)

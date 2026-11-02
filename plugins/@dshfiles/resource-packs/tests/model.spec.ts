@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { packDefinitionSchema, resourceRefSchema, trackingPack } from '../src/model.js'
 import { ResourceValidation } from '../src/validation.js'
@@ -9,7 +10,7 @@ describe('pack semantic validation beyond the wire shape', () => {
   it('accepts the built-in pack and opaque IDs without case or path normalization', () => {
     expect(ResourceValidation.parseDefinition(trackingPack)).toEqual(trackingPack)
     const ref = { provider: 'native', kind: 'file', id: '../MiXeD/Path % ? # /' }
-    expect(resourceRefSchema.parse(ref)).toEqual(ref)
+    expect(Schema.decodeUnknownSync(resourceRefSchema)(ref)).toEqual(ref)
   })
 
   it.each([
@@ -35,7 +36,7 @@ describe('pack semantic validation beyond the wire shape', () => {
   })
 
   it('distinguishes date-only from timezone-qualified datetime, preserving strings', () => {
-    const pack = packDefinitionSchema.parse({
+    const pack = Schema.decodeUnknownSync(packDefinitionSchema)({
       id: 'dates',
       version: 1,
       label: 'Dates',

@@ -1,4 +1,4 @@
-import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { isApiOwnerMissing, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -36,8 +36,8 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { Effect, Schema } from 'effect'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { z } from 'zod'
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
@@ -78,23 +78,26 @@ const views = ['feed', 'inbox', 'items', 'board', 'projects'] as const
 const viewLabels = { feed: 'Feed', inbox: 'Inbox', items: 'Items', board: 'Board', projects: 'Projects' } satisfies Record<View, string>
 const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon, board: KanbanIcon, projects: FolderKanbanIcon } as const
 
+const sortOrderSchema = Schema.Literals(['updated', 'created'])
+const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
+
+const preferencesSchema = Schema.Struct({
+  view: Schema.Literals(views),
+  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention']),
+  showDormant: Schema.Boolean,
+  statuses: Schema.Array(Schema.Literals(BacklogItems.statuses)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  project: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
+  projects: Schema.Array(Schema.NullOr(Schema.String)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  sort: Schema.Struct({
+    feed: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
+    inbox: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
+    items: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
+  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultSort))),
+})
+
 const preferences = createStoredValue({
   key: 'dshfiles.backlog.view.v2',
-  schema: z.object({
-    view: z.enum(views),
-    groupBy: z.enum(['status', 'kind', 'project', 'attention']),
-    showDormant: z.boolean(),
-    statuses: z.array(BacklogItems.statusSchema).default([]),
-    project: z.string().nullable().default(null),
-    projects: z.array(z.string().nullable()).default([]),
-    sort: z
-      .object({
-        feed: z.enum(['updated', 'created']).default('updated'),
-        inbox: z.enum(['updated', 'created']).default('updated'),
-        items: z.enum(['updated', 'created']).default('updated'),
-      })
-      .default({ feed: 'updated', inbox: 'updated', items: 'updated' }),
-  }),
+  schema: zodSchemaFromEffect(preferencesSchema),
   fallback: {
     view: 'feed' as const,
     groupBy: 'status' as const,
@@ -515,8 +518,15 @@ export const BacklogPanel = (props: {
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : []],
     queryFn: async ({ signal }) => {
-      const input: Parameters<typeof api.list>[0] = { query: debounced, kinds, ...scoped, freshness: 'all', limit: showsResults ? 200 : 2_000 }
-      if (showsResults && stored.statuses.length > 0) input.statuses = stored.statuses
+      const statuses = showsResults && stored.statuses.length > 0 ? stored.statuses : undefined
+      const input: Parameters<typeof api.list>[0] = {
+        query: debounced,
+        kinds,
+        ...scoped,
+        statuses,
+        freshness: 'all',
+        limit: showsResults ? 200 : 2_000,
+      }
       return BacklogViews.list(await api.list(input, { signal }))
     },
     placeholderData: keepPreviousData,

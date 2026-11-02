@@ -2,33 +2,31 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-llm'
 import { isTimedAskUserQuestionSchema } from '@deepseek-ai/dsh-user-questions'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { Schema } from 'effect'
 
 const maximumTimeoutSeconds = 2_147_483
 
-const questionWaitRecordSchema = z
-  .object({
-    callId: z.string().min(1).max(256),
-    waitMode: z.enum(['blocking', 'timed', 'unknown']),
-    startedAt: z.number().int().nonnegative(),
-    timeoutMs: z.number().int().positive().nullable(),
-    deadlineAt: z.number().int().nonnegative().nullable(),
-  })
-  .strict()
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const questionWaitRecordSchema = Schema.Struct({
+  callId: boundedString(1, 256),
+  waitMode: Schema.Literals(['blocking', 'timed', 'unknown']),
+  startedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  timeoutMs: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  deadlineAt: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+})
 
-const questionWaitStateSchema = z
-  .object({
-    timedToolConfigured: z.boolean(),
-    defaultTimeoutSeconds: z.number().int().min(-1).max(maximumTimeoutSeconds).nullable(),
-    active: z.array(questionWaitRecordSchema),
-  })
-  .strict()
+const questionWaitStateSchema = Schema.Struct({
+  timedToolConfigured: Schema.Boolean,
+  defaultTimeoutSeconds: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: -1, maximum: maximumTimeoutSeconds }))),
+  active: Schema.Array(questionWaitRecordSchema),
+})
 
-const questionWaitViewSchema = z.object({ active: z.array(questionWaitRecordSchema) }).strict()
+const questionWaitViewSchema = Schema.Struct({ active: Schema.Array(questionWaitRecordSchema) })
 
-export type QuestionWaitRecord = z.infer<typeof questionWaitRecordSchema>
-export type QuestionWaitState = z.infer<typeof questionWaitStateSchema>
-export type QuestionWaitView = z.infer<typeof questionWaitViewSchema>
+export type QuestionWaitRecord = typeof questionWaitRecordSchema.Type
+export type QuestionWaitState = typeof questionWaitStateSchema.Type
+export type QuestionWaitView = typeof questionWaitViewSchema.Type
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
@@ -40,27 +38,31 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   }
 }
 
-const timedParameterSchema = z
-  .object({
-    description: z.string().optional(),
-    default: z.number().int().min(-1).max(maximumTimeoutSeconds).optional(),
-  })
-  .passthrough()
-const toolParametersSchema = z.object({ properties: z.record(z.string(), z.unknown()) }).passthrough()
-
-const toolArgumentsSchema = z.object({ timeout: z.number().int().optional() }).passthrough()
-const decodeJsonText = <Schema extends z.ZodType>(schema: Schema, text: string): z.ZodSafeParseResult<z.output<Schema>> | undefined => {
+const timedParameterSchema = Schema.Struct({
+  description: Schema.optionalKey(Schema.String),
+  default: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: -1, maximum: maximumTimeoutSeconds }))),
+})
+const toolParametersSchema = Schema.Struct({ properties: Schema.Record(Schema.String, Schema.Unknown) })
+const toolArgumentsSchema = Schema.Struct({ timeout: Schema.optionalKey(Schema.Number.check(Schema.isInt())) })
+const decodePreserving = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | undefined => {
+  try {
+    return Schema.decodeUnknownSync(schema, { onExcessProperty: 'ignore' })(value)
+  } catch {
+    return undefined
+  }
+}
+const decodeJsonText = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] | undefined => {
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch {
     return undefined
   }
-  return schema.safeParse(value)
+  return decodePreserving(schema, value)
 }
 
-const pendingResultSchema = z.object({ pending: z.literal(true) }).passthrough()
-const userQuestionReplySourceSchema = z.object({ kind: z.literal('user-question-reply'), callId: z.string() }).passthrough()
+const pendingResultSchema = Schema.Struct({ pending: Schema.Literal(true) })
+const userQuestionReplySourceSchema = Schema.Struct({ kind: Schema.Literal('user-question-reply'), callId: Schema.String })
 
 export const defaultTimeoutFromDescription = (description: string | undefined): number | null => {
   if (description === undefined) return null
@@ -80,8 +82,8 @@ const unknownTimeoutSettings: TimeoutSettings = { waitMode: 'unknown', timeoutMs
 
 const timeoutSettings = (input: { readonly argumentsText: string; readonly defaultTimeoutSeconds: number | null }): TimeoutSettings => {
   const parsed = decodeJsonText(toolArgumentsSchema, input.argumentsText)
-  if (parsed?.success !== true) return unknownTimeoutSettings
-  const timeoutSeconds = parsed.data.timeout ?? input.defaultTimeoutSeconds
+  if (parsed === undefined) return unknownTimeoutSettings
+  const timeoutSeconds = parsed.timeout ?? input.defaultTimeoutSeconds
   if (timeoutSeconds === null || timeoutSeconds === undefined) return unknownTimeoutSettings
   if (timeoutSeconds === -1) return { waitMode: 'blocking', timeoutMs: null }
   if (timeoutSeconds < 1 || timeoutSeconds > maximumTimeoutSeconds) return unknownTimeoutSettings
@@ -91,7 +93,7 @@ const timeoutSettings = (input: { readonly argumentsText: string; readonly defau
 const isPendingResult = (content: readonly { readonly type: string; readonly text?: string }[]): boolean => {
   const textBlock = content.find(block => block.type === 'text')
   if (textBlock?.text === undefined) return false
-  return decodeJsonText(pendingResultSchema, textBlock.text)?.success === true
+  return decodeJsonText(pendingResultSchema, textBlock.text) !== undefined
 }
 
 const upsertWait = (input: { readonly active: readonly QuestionWaitRecord[]; readonly record: QuestionWaitRecord }): QuestionWaitRecord[] => [
@@ -102,17 +104,17 @@ const upsertWait = (input: { readonly active: readonly QuestionWaitRecord[]; rea
 export const applyQuestionWaitEvent = (state: QuestionWaitState, event: SessionEvent): QuestionWaitState => {
   if (event.type === 'request/header') {
     const tool = event.data.header.tools?.find(candidate => candidate.name === 'ask_user_question')
-    const parsedParameters = toolParametersSchema.safeParse(tool?.parameters)
-    const timeoutParameter = parsedParameters.success ? parsedParameters.data.properties.timeout : undefined
+    const parsedParameters = decodePreserving(toolParametersSchema, tool?.parameters)
+    const timeoutParameter = parsedParameters?.properties.timeout
     if (tool === undefined || !isTimedAskUserQuestionSchema(tool) || timeoutParameter === undefined) {
       return state.timedToolConfigured || state.defaultTimeoutSeconds !== null ? { ...state, timedToolConfigured: false, defaultTimeoutSeconds: null } : state
     }
 
-    const parsedParameter = timedParameterSchema.safeParse(timeoutParameter)
+    const parsedParameter = decodePreserving(timedParameterSchema, timeoutParameter)
     return {
       ...state,
       timedToolConfigured: true,
-      defaultTimeoutSeconds: parsedParameter.success ? (parsedParameter.data.default ?? defaultTimeoutFromDescription(parsedParameter.data.description)) : null,
+      defaultTimeoutSeconds: parsedParameter === undefined ? null : (parsedParameter.default ?? defaultTimeoutFromDescription(parsedParameter.description)),
     }
   }
 
@@ -160,9 +162,9 @@ export const applyQuestionWaitEvent = (state: QuestionWaitState, event: SessionE
   }
 
   if (event.type === 'user/message') {
-    const source = userQuestionReplySourceSchema.safeParse(event.data.source)
-    if (!source.success) return state
-    return { ...state, active: state.active.filter(record => record.callId !== source.data.callId) }
+    const source = decodePreserving(userQuestionReplySourceSchema, event.data.source)
+    if (source === undefined) return state
+    return { ...state, active: state.active.filter(record => record.callId !== source.callId) }
   }
 
   return state
@@ -170,11 +172,11 @@ export const applyQuestionWaitEvent = (state: QuestionWaitState, event: SessionE
 
 export const questionWaitProjectionDefinition = {
   key: 'dshfilesQuestionWaits',
-  stateSchema: questionWaitStateSchema,
+  stateSchema: zodSchemaFromEffect(questionWaitStateSchema),
   init: () => ({ timedToolConfigured: false, defaultTimeoutSeconds: null, active: [] }),
   apply: applyQuestionWaitEvent,
   wire: {
-    viewSchema: questionWaitViewSchema,
+    viewSchema: zodSchemaFromEffect(questionWaitViewSchema),
     view: (state: QuestionWaitState) => ({ active: state.active }),
   },
   stateVersion: 1,

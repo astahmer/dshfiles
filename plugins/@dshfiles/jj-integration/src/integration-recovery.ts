@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 /**
  * A Host that cannot read workspace activity in time queues the integration instead of refusing it; its RPC error
@@ -6,12 +6,15 @@ import { z } from 'zod'
  */
 const QUEUED_INTEGRATION_CODE = 'integration-queued'
 
-const remoteErrorSchema = z.object({ remoteCode: z.string() })
+const remoteErrorSchema = Schema.Struct({ remoteCode: Schema.String })
 
 export const IntegrationRecovery = {
   isQueued: (error: unknown): boolean => {
-    const parsed = remoteErrorSchema.safeParse(error)
-    return parsed.success && parsed.data.remoteCode === QUEUED_INTEGRATION_CODE
+    try {
+      return Schema.decodeUnknownSync(remoteErrorSchema)(error).remoteCode === QUEUED_INTEGRATION_CODE
+    } catch {
+      return false
+    }
   },
   /**
    * A manual request the Host cannot verify queues itself instead of dead-ending. An Agent's own call and the queued

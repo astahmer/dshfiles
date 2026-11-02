@@ -113,7 +113,7 @@ export const startScratchProfile = async (
   hostEnv: Readonly<Record<string, string>> = {},
   executableOverride?: string,
 ): Promise<BootedProfile> => {
-  const executable = await resolveDshExecutable(executableOverride)
+  const executable = await resolveDshExecutable(executableOverride, process.env, DSHFILES_ROOT)
   const validatedAt = Date.now()
   const compositionKey = await compositionKeyFor(prepared, executable)
   const known = compositionValidations.get(compositionKey)
@@ -355,7 +355,7 @@ export const bootComposedPluginProfile = async (request: {
     throw new Error('A non-empty seedKey requires a deterministic seedHome recipe.')
   }
   const composed: ComposedBootRequest = {
-    executable: await resolveDshExecutable(),
+    executable: await resolveDshExecutable(undefined, process.env, DSHFILES_ROOT),
     packageIds: request.packageIds,
     profileLabel: request.profileLabel,
     timeoutMs: request.timeoutMs ?? 90_000,

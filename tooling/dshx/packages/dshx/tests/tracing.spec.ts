@@ -1,9 +1,9 @@
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
 import { registerApi } from '../src/api/host-runtime.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import {
   commandAttributes,
   contentSize,
@@ -33,40 +33,37 @@ type ExportedValue =
   | { readonly doubleValue: number }
   | { readonly arrayValue: { readonly values: readonly ExportedValue[] } }
 
-const anyValueSchema: z.ZodType<ExportedValue> = z.lazy(() =>
-  z.union([
-    z.strictObject({ stringValue: z.string() }),
-    z.strictObject({ boolValue: z.boolean() }),
-    z.strictObject({ intValue: z.string().regex(/^-?\d+$/u) }),
-    z.strictObject({ doubleValue: z.number() }),
-    z.strictObject({ arrayValue: z.strictObject({ values: z.array(anyValueSchema) }) }),
+const anyValueSchema: Schema.Codec<ExportedValue> = Schema.suspend(() =>
+  Schema.Union([
+    Schema.Struct({ stringValue: Schema.String }),
+    Schema.Struct({ boolValue: Schema.Boolean }),
+    Schema.Struct({ intValue: Schema.String.check(Schema.isPattern(/^-?\d+$/u)) }),
+    Schema.Struct({ doubleValue: Schema.Number.check(Schema.isFinite()) }),
+    Schema.Struct({ arrayValue: Schema.Struct({ values: Schema.Array(anyValueSchema) }) }),
   ]),
 )
-const keyValueSchema = z.strictObject({ key: z.string(), value: anyValueSchema })
-const spanSchema = z.strictObject({
-  traceId: z.string().regex(/^[0-9a-f]{32}$/u),
-  spanId: z.string().regex(/^[0-9a-f]{16}$/u),
-  parentSpanId: z
-    .string()
-    .regex(/^[0-9a-f]{16}$/u)
-    .optional(),
-  name: z.string(),
-  kind: z.number().int().min(1).max(5),
-  startTimeUnixNano: z.string().regex(/^\d{19}$/u),
-  endTimeUnixNano: z.string().regex(/^\d{19}$/u),
-  attributes: z.array(keyValueSchema),
-  status: z.strictObject({ code: z.union([z.literal(0), z.literal(1), z.literal(2)]), message: z.string().optional() }),
+const keyValueSchema = Schema.Struct({ key: Schema.String, value: anyValueSchema })
+const spanSchema = Schema.Struct({
+  traceId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/u)),
+  spanId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{16}$/u)),
+  parentSpanId: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[0-9a-f]{16}$/u))),
+  name: Schema.String,
+  kind: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(5)),
+  startTimeUnixNano: Schema.String.check(Schema.isPattern(/^\d{19}$/u)),
+  endTimeUnixNano: Schema.String.check(Schema.isPattern(/^\d{19}$/u)),
+  attributes: Schema.Array(keyValueSchema),
+  status: Schema.Struct({ code: Schema.Literals([0, 1, 2]), message: Schema.optionalKey(Schema.String) }),
 })
 /** ExportTraceServiceRequest in the OTLP/HTTP JSON encoding. */
-const exportRequestSchema = z.strictObject({
-  resourceSpans: z.array(
-    z.strictObject({
-      resource: z.strictObject({ attributes: z.array(keyValueSchema) }),
-      scopeSpans: z.array(z.strictObject({ scope: z.strictObject({ name: z.string(), version: z.string() }), spans: z.array(spanSchema) })),
+const exportRequestSchema = Schema.Struct({
+  resourceSpans: Schema.Array(
+    Schema.Struct({
+      resource: Schema.Struct({ attributes: Schema.Array(keyValueSchema) }),
+      scopeSpans: Schema.Array(Schema.Struct({ scope: Schema.Struct({ name: Schema.String, version: Schema.String }), spans: Schema.Array(spanSchema) })),
     }),
   ),
 })
-type ExportedSpan = z.infer<typeof spanSchema>
+type ExportedSpan = Schema.Schema.Type<typeof spanSchema>
 
 const collector = (statuses: readonly number[] = []) => {
   const requests: { readonly url: string; readonly headers: Headers; readonly body: string }[] = []
@@ -77,7 +74,9 @@ const collector = (statuses: readonly number[] = []) => {
   }
   const spans = (): ExportedSpan[] =>
     requests.flatMap(request =>
-      exportRequestSchema.parse(JSON.parse(request.body)).resourceSpans.flatMap(resource => resource.scopeSpans.flatMap(scope => scope.spans)),
+      Schema.decodeUnknownSync(exportRequestSchema)(JSON.parse(request.body)).resourceSpans.flatMap(resource =>
+        resource.scopeSpans.flatMap(scope => scope.spans),
+      ),
     )
   return { fetch, requests, spans }
 }
@@ -219,7 +218,7 @@ describe('OTLP/HTTP JSON payload', () => {
     expect(request?.url).toBe('http://collector.test:4318/v1/traces')
     expect(request?.headers.get('content-type')).toBe('application/json')
     expect(request?.headers.get('x-api-key')).toBe('k')
-    const body = exportRequestSchema.parse(JSON.parse(request?.body ?? ''))
+    const body = Schema.decodeUnknownSync(exportRequestSchema)(JSON.parse(request?.body ?? ''))
     const resource = body.resourceSpans[0]
     expect(resource?.resource.attributes).toContainEqual({ key: 'service.name', value: { stringValue: 'dshfiles' } })
     expect(resource?.scopeSpans[0]?.scope.name).toBe('@dshfiles/dshx')
@@ -266,7 +265,10 @@ describe('OTLP/HTTP JSON payload', () => {
     expect(exported?.name).toHaveLength(128)
     expect(exported?.attributes).toHaveLength(64)
     expect(attribute(exported!, 'long')).toEqual({ stringValue: 'y'.repeat(1_024) })
-    expect(z.object({ arrayValue: z.object({ values: z.array(z.unknown()) }) }).parse(attribute(exported!, 'list')).arrayValue.values).toHaveLength(64)
+    expect(
+      Schema.decodeUnknownSync(Schema.Struct({ arrayValue: Schema.Struct({ values: Schema.Array(Schema.Unknown) }) }))(attribute(exported!, 'list')).arrayValue
+        .values,
+    ).toHaveLength(64)
   })
 })
 
@@ -602,7 +604,7 @@ const routeFixture = () => {
     payload: { readonly version: number; readonly input: { readonly alias: string } },
     traceparent?: string,
   ): Promise<void> => {
-    const endpoint = `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${methodName}`
+    const endpoint = `${ApiChannelModel.apiChannel(packageId, apiId).slice(1)}/${methodName}`
     const route = routes.get(`/api/${endpoint}`)
     if (route === undefined) throw new Error(`no route for ${endpoint}`)
     const headers = new Headers({ 'content-type': 'application/json' })

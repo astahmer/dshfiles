@@ -1,8 +1,9 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { useSyncExternalStore } from 'react'
-import { z } from 'zod'
 
 /**
  * The browser half of the gate: the stock `/plugins/events` subscriber, plus the
@@ -22,15 +23,15 @@ const RECOVERY_INTERVAL_MS = 30_000
 // Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
 const RECOVERY_DELAY_MS = 1_500
 
-const deferredPackageSchema = z.object({ id: z.string().min(1), reason: z.string().min(1) })
+const deferredPackageSchema = Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)), reason: Schema.String.check(Schema.isMinLength(1)) })
 
-const frameSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('graph'), graph: z.unknown() }),
-  z.object({ type: z.literal('rebuilt'), id: z.string().min(1), rev: z.string().min(1) }),
-  z.object({ type: z.literal('deferred'), packages: z.array(deferredPackageSchema).max(64) }),
+const frameSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('graph'), graph: Schema.Unknown }),
+  Schema.Struct({ type: Schema.Literal('rebuilt'), id: Schema.String.check(Schema.isMinLength(1)), rev: Schema.String.check(Schema.isMinLength(1)) }),
+  Schema.Struct({ type: Schema.Literal('deferred'), packages: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)) }),
 ])
 
-type DeferredPackage = z.infer<typeof deferredPackageSchema>
+type DeferredPackage = typeof deferredPackageSchema.Type
 
 let current: readonly DeferredPackage[] = []
 const listeners = new Set<() => void>()
@@ -100,21 +101,21 @@ export default defineClient({
       } catch {
         return
       }
-      const frame = frameSchema.safeParse(decoded)
-      if (!frame.success) return
-      if (frame.data.type === 'graph') {
-        void ctx.modules.entries.sync(frame.data.graph).catch((error: unknown) => {
+      const frame = Schema.decodeUnknownOption(frameSchema)(decoded)
+      if (Option.isNone(frame)) return
+      if (frame.value.type === 'graph') {
+        void ctx.modules.entries.sync(frame.value.graph).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return
       }
-      if (frame.data.type === 'rebuilt') {
-        void ctx.modules.entries.reload(frame.data.id, frame.data.rev).catch((error: unknown) => {
+      if (frame.value.type === 'rebuilt') {
+        void ctx.modules.entries.reload(frame.value.id, frame.value.rev).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return
       }
-      publish(frame.data.packages)
+      publish(frame.value.packages)
     }
 
     // A recomposition can leave a slot with no adapter or registration for one render; the stock renderer then throws

@@ -60,11 +60,12 @@ export const InlineWorkspaceRemoval = (props: {
   })
   const thread = threadQuery.data?.thread ?? null
   const missing = isWorkspaceMissing({ fetching: workspaces.isFetching, found: path !== undefined, failed: workspaces.isError })
+  const { onRemoved: onRemovedProp, repoRoot: repoRootProp } = props
   useEffect(() => {
     if (!missing) return
-    void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(props.repoRoot) })
-    props.onRemoved()
-  }, [missing, props.onRemoved, props.repoRoot, queryClient])
+    void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(repoRootProp) })
+    onRemovedProp()
+  }, [missing, onRemovedProp, repoRootProp, queryClient])
   const forget = useQuery({
     queryKey: forgetPreviewKey(props.repoRoot, props.name),
     enabled: threadQuery.data !== undefined && thread === null,

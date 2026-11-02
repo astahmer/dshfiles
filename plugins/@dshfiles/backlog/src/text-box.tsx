@@ -86,11 +86,12 @@ export const BacklogTextBox = (props: {
   )
 
   useEffect(() => {
-    if (props.onBlur === undefined) return
+    const onBlur = props.onBlur
+    if (onBlur === undefined) return
     const savePendingBlur = (): void => {
       if (!pendingBlur.current || threadMentionDrag.current) return
       pendingBlur.current = false
-      props.onBlur?.()
+      onBlur()
     }
     const onDragStart = (event: DragEvent): void => {
       if (!ThreadMentionDrag.has(event.dataTransfer)) return

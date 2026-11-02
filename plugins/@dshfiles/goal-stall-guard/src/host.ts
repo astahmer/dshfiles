@@ -1,30 +1,40 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-goal'
 import type { SessionEventMap, UserMessage } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { definePlugin } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { defineHost } from '@dshfiles/dshx/host'
+import { Context as EffectContext, Effect, Layer, Queue, Schema } from 'effect'
 import { DEFAULT_STALL_POLICY, StallDetector } from './stall.js'
 import { registerGoalContinuationTools } from './goal-continuation.js'
 
-const rowConfig = z.object({
-  /**
-   * Consecutive goal rounds that produced no assistant content before the goal
-   * is paused. Two is the floor: one empty round is ordinary provider noise.
-   */
-  stallThreshold: z.number().int().min(2).max(50).default(DEFAULT_STALL_POLICY.threshold),
-})
+const configSchema = Schema.Struct({
+  stallThreshold: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(2), Schema.isLessThanOrEqualTo(50)).pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_STALL_POLICY.threshold)),
+  ),
+}).pipe(Schema.withDecodingDefault(Effect.succeed({ stallThreshold: DEFAULT_STALL_POLICY.threshold })))
 
-/**
- * A row with no `config` key resolves to `undefined`, which the bare object
- * schema rejects outright — the entry then fails validation and never
- * activates. Accepting it here means a hand-edited row falls back to the
- * documented defaults instead of half-activating.
- */
-export const Config = z.union([rowConfig, z.undefined()]).transform(config => rowConfig.parse(config ?? {}))
+export const Config = Schema.toStandardSchemaV1(configSchema)
 
-const runtimeContextSource = z.object({ source: z.object({ kind: z.literal('runtime-context') }) })
+type PluginConfig = Schema.Schema.Type<typeof configSchema>
+
+interface PendingPause {
+  readonly agent: Agent
+  readonly consecutiveEmptyRounds: number
+  readonly round?: number
+}
+
+type GoalStallRuntime = {
+  readonly ctx: Context
+  readonly detector: ReturnType<typeof StallDetector>
+}
+
+class GoalStallGuardRuntime extends EffectContext.Service<GoalStallGuardRuntime, GoalStallRuntime>()('@dshfiles/goal-stall-guard/Runtime') {}
+
+class GoalPauseFailure extends Schema.TaggedError<GoalPauseFailure>()('GoalPauseFailure', { message: Schema.String }) {}
+
+const runtimeContextSource = Schema.Struct({ source: Schema.Struct({ kind: Schema.Literal('runtime-context') }) })
 
 /** The prompt a `user/message` event carried, as its text blocks read. */
 const promptText = (data: UserMessage): string => {
@@ -49,17 +59,47 @@ const assistantSaidAnything = (data: SessionEventMap['assistant/message']): bool
     return block.text.trim().length > 0
   })
 
-export default definePlugin({
-  id: 'goal-stall-guard',
-  name: '@dshfiles/goal-stall-guard',
-  Config,
-  inject: ['agents', 'goals', 'sessions', 'sessionProjections', 'tools'],
-  setup: api => {
-    const ctx: Context = api.raw.ctx
-    const { stallThreshold } = Config.parse(api.config)
-    registerGoalContinuationTools(ctx)
-    const detector = StallDetector({ threshold: stallThreshold })
+const rootLayer = (ctx: Context, config: PluginConfig) =>
+  Layer.succeed(GoalStallGuardRuntime, {
+    ctx,
+    detector: StallDetector({ threshold: config.stallThreshold ?? DEFAULT_STALL_POLICY.threshold }),
+  })
 
+const { hostApi: _hostApi, ...effectPlugin } = DshxEffect.plugin<PluginConfig, never, GoalStallGuardRuntime>({
+  layer: rootLayer,
+  setup: Effect.fn('goal stall guard setup')(function* (ctx: Context) {
+    const runtime = yield* GoalStallGuardRuntime
+    const detector = runtime.detector
+    const pendingPauses = yield* Queue.unbounded<PendingPause>()
+    registerGoalContinuationTools(ctx)
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.gen(function* () {
+          const pending = yield* Queue.take(pendingPauses)
+          yield* Effect.sleep('0 millis')
+          const goal = ctx.goals.get(pending.agent)
+          if (goal === undefined || goal.phase !== 'active') return
+          yield* Effect.tryPromise({
+            try: () => Promise.resolve(ctx.goals.pause(pending.agent, { id: goal.id, revision: goal.revision })),
+            catch: error => new GoalPauseFailure({ message: error instanceof Error ? error.message : String(error) }),
+          }).pipe(
+            Effect.tap(() =>
+              Effect.sync(() =>
+                ctx.logger.warn(
+                  'goal-stall-guard: paused goal "%s" after %d consecutive rounds produced no output (round %d)',
+                  goal.id,
+                  pending.consecutiveEmptyRounds,
+                  pending.round ?? 0,
+                ),
+              ),
+            ),
+            Effect.catchTag('GoalPauseFailure', error =>
+              Effect.sync(() => ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goal.id, error)),
+            ),
+          )
+        }),
+      ),
+    )
     ctx.on('session/event', (session, event) => {
       switch (event.type) {
         case 'turn/start':
@@ -68,7 +108,7 @@ export default definePlugin({
         case 'user/message': {
           // DSH appends its runtime-context snapshot after the turn's prompt; it is bookkeeping, not a new prompt, and
           // reading it as one dropped the goal round it follows.
-          if (runtimeContextSource.safeParse(event.data).success) return
+          if (Schema.is(runtimeContextSource)(event.data)) return
           const text = promptText(event.data)
           if (text.length > 0) detector.promptEntered(text)
           return
@@ -84,32 +124,25 @@ export default definePlugin({
           if (!decision.stalled) return
           const agent = ctx.agents.get(session.id)
           if (agent === undefined || agent.session !== session) return
-          // Pausing appends a goal change to this session, which it refuses while it is still publishing this
-          // turn/end ("session append cannot reenter"), so the pause runs once the publish has returned.
-          setTimeout(() => {
-            let goalId: string | undefined
-            try {
-              const goal = ctx.goals.get(agent)
-              if (goal === undefined || goal.phase !== 'active') return
-              goalId = goal.id
-              ctx.goals.pause(agent, { id: goal.id, revision: goal.revision })
-              ctx.logger.warn(
-                'goal-stall-guard: paused goal "%s" after %d consecutive rounds produced no output (round %d)',
-                goal.id,
-                decision.consecutiveEmptyRounds,
-                decision.round ?? 0,
-              )
-            } catch (error) {
-              ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goalId ?? 'unknown', error)
-            }
-          }, 0)
+          // Queue work for the scoped consumer, which waits until event publication unwinds.
+          const pending: PendingPause = { agent, consecutiveEmptyRounds: decision.consecutiveEmptyRounds }
+          if (decision.round === undefined) Queue.offerUnsafe(pendingPauses, pending)
+          else Queue.offerUnsafe(pendingPauses, { ...pending, round: decision.round })
           return
         }
         default:
           return
       }
     })
-  },
+    yield* Effect.void
+  }),
+})
+
+export default defineHost({
+  ...effectPlugin,
+  Config,
+  name: 'dshfiles-goal-stall-guard',
+  inject: ['agents', 'goals', 'sessions', 'sessionProjections', 'tools'],
 })
 
 export { SessionId }

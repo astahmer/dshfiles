@@ -1,7 +1,7 @@
 import { once } from 'node:events'
 import { createServer, type Server } from 'node:http'
 import { afterEach, describe, expect, test } from 'vitest'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { connectMultiHost } from '../src/platform/dshx-channel.js'
 
 let server: Server | undefined
@@ -18,7 +18,7 @@ describe('multi-host headless API client', () => {
     let origin: string | undefined
     let apiCookie: string | undefined
     const apiRequests: unknown[] = []
-    const channel = ApiProtocolModel.apiChannel('@dshfiles/multi-host', 'multi-host').slice(1)
+    const channel = ApiChannelModel.apiChannel('@dshfiles/multi-host', 'multi-host').slice(1)
     server = createServer(async (request, response) => {
       if (request.url === '/?token=launch-token') {
         response.writeHead(302, { location: '/', 'set-cookie': 'dsh-session=synthetic; Path=/; HttpOnly' })

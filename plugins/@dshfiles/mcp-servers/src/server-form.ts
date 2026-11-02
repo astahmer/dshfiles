@@ -1,29 +1,31 @@
-import { z } from 'zod'
-import { serverDraftSchema, type ServerDraft, type ServerView } from './api.js'
+import * as Schema from 'effect/Schema'
+import * as SchemaIssue from 'effect/SchemaIssue'
+import { httpDraftSchema, stdioDraftSchema, type ServerDraft, type ServerView } from './api.js'
 import { McpCommandLineModel } from './command-line.js'
-import { jsonTextSchema } from './json-text.js'
+import { decodeJsonText } from './json-text.js'
 
 const serverTransports = ['streamable-http', 'stdio'] as const
 
-const serverFormValuesSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  serverName: z.string(),
-  enabled: z.boolean(),
-  transport: z.enum(serverTransports),
-  url: z.string(),
-  headerRefs: z.string(),
-  oauth: z.boolean(),
-  localStart: z.boolean(),
-  startCommandLine: z.string(),
-  startCwd: z.string(),
-  startEnvRefs: z.string(),
-  commandLine: z.string(),
-  cwd: z.string(),
-  envRefs: z.string(),
+const serverFormValuesSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  serverName: Schema.String,
+  enabled: Schema.Boolean,
+  transport: Schema.Literals(serverTransports),
+  url: Schema.String,
+  headerRefs: Schema.String,
+  oauth: Schema.Boolean,
+  localStart: Schema.Boolean,
+  startCommandLine: Schema.String,
+  startCwd: Schema.String,
+  startEnvRefs: Schema.String,
+  commandLine: Schema.String,
+  cwd: Schema.String,
+  envRefs: Schema.String,
 })
 
-export type ServerFormValues = z.infer<typeof serverFormValuesSchema>
+/** The form edits mutable fields, so the decoded `readonly` struct is widened for the form store. */
+export type ServerFormValues = { -readonly [Key in keyof typeof serverFormValuesSchema.Type]: (typeof serverFormValuesSchema.Type)[Key] }
 type ServerFormField = keyof ServerFormValues
 
 interface ServerFormIssue {
@@ -33,19 +35,20 @@ interface ServerFormIssue {
 
 type ParsedServerForm = { readonly success: true; readonly draft: ServerDraft } | { readonly success: false; readonly issues: readonly ServerFormIssue[] }
 
-const referenceTextSchema = jsonTextSchema('Enter a JSON object of names to credential references.').pipe(
-  z.record(z.string(), z.string({ error: 'Every credential reference must be a string.' }), {
-    error: 'Enter a JSON object of names to credential references.',
-  }),
-)
+const referenceTextSchema = Schema.Record(Schema.String, Schema.String)
+const draftIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1()
 
 const startCommandFields = { commandLine: 'startCommandLine', cwd: 'startCwd', envRefs: 'startEnvRefs' } as const satisfies Record<string, ServerFormField>
 const draftFields = new Set<PropertyKey>(['name', 'serverName', 'url', 'headerRefs', 'commandLine', 'cwd', 'envRefs'])
 
 const isServerFormField = (key: PropertyKey | undefined): key is ServerFormField => key !== undefined && draftFields.has(key)
 
-const formFieldForDraftPath = (path: readonly PropertyKey[]): ServerFormField | undefined => {
-  const [head, nested] = path
+type IssuePathSegment = PropertyKey | { readonly key: PropertyKey }
+
+const pathKey = (segment: IssuePathSegment): PropertyKey | undefined => (typeof segment === 'object' && segment !== null ? segment.key : segment)
+
+const formFieldForDraftPath = (path: readonly IssuePathSegment[]): ServerFormField | undefined => {
+  const [head, nested] = path.map(pathKey)
   if (head === 'startCommand') return nested === 'cwd' || nested === 'envRefs' ? startCommandFields[nested] : startCommandFields.commandLine
   return isServerFormField(head) ? head : undefined
 }
@@ -133,9 +136,9 @@ export class McpServerFormModel {
   static readonly parseServerForm = (values: ServerFormValues): ParsedServerForm => {
     const issues: ServerFormIssue[] = []
     const parseReferences = (field: ServerFormField): Record<string, string> => {
-      const result = referenceTextSchema.safeParse(values[field])
-      if (result.success) return result.data
-      issues.push(...result.error.issues.map(issue => ({ field, message: issue.message })))
+      const result = decodeJsonText(values[field], referenceTextSchema, 'Enter a JSON object of names to credential references.')
+      if (result._tag === 'Success') return { ...result.success }
+      issues.push({ field, message: result.failure.message })
       return {}
     }
     const base = { id: values.id, name: values.name, serverName: values.serverName, enabled: values.enabled }
@@ -154,17 +157,16 @@ export class McpServerFormModel {
             auth: values.oauth ? ('oauth' as const) : ('none' as const),
             startCommand: values.localStart ? { commandLine: values.startCommandLine, cwd: values.startCwd, envRefs: parseReferences('startEnvRefs') } : null,
           }
-    const result = serverDraftSchema.safeParse(candidate)
-    if (!result.success) issues.push(...result.error.issues.map(issue => ({ field: formFieldForDraftPath(issue.path), message: issue.message })))
-    if (result.success && issues.length === 0) return { success: true, draft: result.data }
+    const draftSchema = values.transport === 'stdio' ? stdioDraftSchema : httpDraftSchema
+    const result = Schema.decodeUnknownResult(draftSchema, { onExcessProperty: 'error', errors: 'all' })(candidate)
+    if (result._tag === 'Failure') {
+      for (const issue of draftIssueFormatter(result.failure.issue).issues) {
+        issues.push({ field: formFieldForDraftPath(issue.path ?? []), message: issue.message })
+      }
+    }
+    if (result._tag === 'Success' && issues.length === 0) return { success: true, draft: result.success }
     return { success: false, issues }
   }
-
-  static readonly serverFormSchema = serverFormValuesSchema.superRefine((values, context) => {
-    const parsed = McpServerFormModel.parseServerForm(values)
-    if (parsed.success) return
-    for (const issue of parsed.issues) context.addIssue({ code: 'custom', message: issue.message, path: issue.field === undefined ? [] : [issue.field] })
-  })
 
   /** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
   static readonly catalogServerDraft = (input: {
@@ -183,4 +185,15 @@ export class McpServerFormModel {
     auth: input.oauth ? 'oauth' : 'none',
     startCommand: null,
   })
+
+  static readonly serverFormSchema = serverFormValuesSchema.check(
+    Schema.makeFilter((values: ServerFormValues) => {
+      const parsed = McpServerFormModel.parseServerForm(values)
+      if (parsed.success) return undefined
+      return parsed.issues.map(issue => ({ path: issue.field === undefined ? [] : [issue.field], issue: issue.message }))
+    }),
+  )
 }
+
+/** The tanstack form validator: the same Effect schema, published as Standard Schema so errors keep their field path. */
+export const serverFormValidator = Schema.toStandardSchemaV1(McpServerFormModel.serverFormSchema)

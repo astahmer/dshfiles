@@ -11,16 +11,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 
 import { AgentFocusModel } from './agent-focus.js'
-import {
-  AGENT_DELEGATION_UNRESTRICTED,
-  agentLimits,
-  Agents,
-  AGENTS_QUERY_ROOT,
-  type Agent,
-  type AgentDraft,
-  type AgentRoute,
-  type AgentThread,
-} from './agent.js'
+import { AGENT_DELEGATION_UNRESTRICTED, agentLimits, Agents, AGENTS_QUERY_ROOT, type Agent, type AgentDraft, type AgentThread } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 
@@ -417,8 +408,10 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                   patch({ route: null })
                   return
                 }
-                const route: AgentRoute = { provider: option.provider, model: option.model }
-                if (option.defaultEffort !== undefined) route.reasoningEffort = option.defaultEffort
+                const route =
+                  option.defaultEffort === undefined
+                    ? { provider: option.provider, model: option.model }
+                    : { provider: option.provider, model: option.model, reasoningEffort: option.defaultEffort }
                 patch({ route })
               }}
               options={routeOptions}

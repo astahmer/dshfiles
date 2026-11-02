@@ -1,11 +1,7 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import {
-  formatSecretReference,
-  parseSecretReference,
-  secretReferenceSchema,
-  SecretReferenceResolver,
-  type SecretReferenceResolution,
-} from './secret-reference.js'
+import { secretReferenceTextSchemaEffect } from './effect.js'
+import { formatSecretReference, parseSecretReference, SecretReferenceResolver, type SecretReferenceResolution } from './secret-reference.js'
 
 describe('secret references', () => {
   it('parses an alias and defaults its environment to prod', () => {
@@ -32,8 +28,11 @@ describe('secret references', () => {
   })
 
   it('validates a reference schema into its alias and environment', () => {
-    expect(secretReferenceSchema.parse('secret:TOKEN@staging')).toEqual({ alias: 'TOKEN', environment: 'staging' })
-    expect(secretReferenceSchema.safeParse('TOKEN').success).toBe(false)
+    expect(parseSecretReference(Schema.decodeUnknownSync(secretReferenceTextSchemaEffect)('secret:TOKEN@staging'))).toEqual({
+      alias: 'TOKEN',
+      environment: 'staging',
+    })
+    expect(Schema.is(secretReferenceTextSchemaEffect)('TOKEN')).toBe(false)
   })
 })
 
@@ -51,6 +50,20 @@ describe('SecretReferenceResolver', () => {
       SecretReferenceResolver.resolve({ referenceText: 'secret:API_KEY@dev', values: resolving('resolved-secret', calls), environmentValue: 'env-key' }),
     ).resolves.toBe('resolved-secret')
     expect(calls).toEqual([{ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null }])
+  })
+
+  it('forwards request cancellation to the value port', async () => {
+    const calls: SecretReferenceResolution[] = []
+    const controller = new AbortController()
+
+    await SecretReferenceResolver.resolve({
+      referenceText: 'secret:API_KEY',
+      values: resolving('resolved-secret', calls),
+      environmentValue: undefined,
+      signal: controller.signal,
+    })
+
+    expect(calls).toEqual([{ reference: { alias: 'API_KEY', environment: 'prod' }, cwd: null, signal: controller.signal }])
   })
 
   it('returns safe labels with the resolved credential, never with the value in the label', async () => {

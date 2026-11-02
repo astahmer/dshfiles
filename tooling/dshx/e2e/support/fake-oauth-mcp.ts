@@ -3,7 +3,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createAdaptorServer } from '@hono/node-server'
 import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 /**
  * A loopback MCP server guarded by its own OAuth 2.1 authorization server, so a journey can sign in for real: RFC 9728
@@ -30,14 +31,23 @@ interface FakeOAuthMcpState {
   readonly acceptedTokens: Set<string>
 }
 
-const registrationSchema = z.object({ client_name: z.string(), redirect_uris: z.array(z.string().url()).min(1) })
-const jsonRpcSchema = z.object({
-  jsonrpc: z.literal('2.0'),
-  id: z.union([z.string(), z.number()]).optional(),
-  method: z.string(),
-  params: z.unknown().optional(),
+const absoluteUrl = Schema.makeFilter((value: string) => {
+  const trimmed = value.trim()
+  if (!URL.canParse(trimmed)) return 'Expected an absolute URL.'
+  const { protocol } = new URL(trimmed)
+  return protocol === 'http:' || protocol === 'https:' ? undefined : 'Expected an HTTP(S) URL.'
 })
-const initializeParamsSchema = z.object({ protocolVersion: z.string() })
+const registrationSchema = Schema.Struct({
+  client_name: Schema.String,
+  redirect_uris: Schema.Array(Schema.String.check(absoluteUrl)).check(Schema.isMinLength(1)),
+})
+const jsonRpcSchema = Schema.Struct({
+  jsonrpc: Schema.Literal('2.0'),
+  id: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
+  method: Schema.String,
+  params: Schema.optional(Schema.Unknown),
+})
+const initializeParamsSchema = Schema.Struct({ protocolVersion: Schema.String })
 
 const fakes = new WeakMap<Page, FakeOAuthMcp>()
 
@@ -82,16 +92,16 @@ export const createFakeOAuthMcpApp = (state: FakeOAuthMcpState): Hono => {
     })
   })
   app.post('/register', async context => {
-    const registration = registrationSchema.safeParse(await jsonBody(context.req.raw))
-    if (!registration.success) return context.json({ error: 'invalid_client_metadata' }, 400)
+    const registration = Schema.decodeUnknownOption(registrationSchema)(await jsonBody(context.req.raw))
+    if (Option.isNone(registration)) return context.json({ error: 'invalid_client_metadata' }, 400)
     const clientId = `fake-client-${randomUUID()}`
-    state.clients.set(clientId, registration.data.redirect_uris)
-    state.registeredClientNames.push(registration.data.client_name)
+    state.clients.set(clientId, registration.value.redirect_uris)
+    state.registeredClientNames.push(registration.value.client_name)
     return context.json(
       {
         client_id: clientId,
-        client_name: registration.data.client_name,
-        redirect_uris: registration.data.redirect_uris,
+        client_name: registration.value.client_name,
+        redirect_uris: registration.value.redirect_uris,
         token_endpoint_auth_method: 'none',
       },
       201,
@@ -140,22 +150,22 @@ export const createFakeOAuthMcpApp = (state: FakeOAuthMcpState): Hono => {
     state.acceptedTokens.add(token)
     if (context.req.method === 'DELETE') return context.body(null, 200)
     if (context.req.method !== 'POST') return context.body(null, 405)
-    const message = jsonRpcSchema.safeParse(await jsonBody(context.req.raw))
-    if (!message.success) return context.json({ error: 'invalid JSON-RPC message' }, 400)
-    if (message.data.id === undefined) return context.body(null, 202)
-    const reply = (result: unknown) => context.json({ jsonrpc: '2.0', id: message.data.id, result }, 200, { 'mcp-session-id': 'fake-session' })
-    if (message.data.method === 'initialize') {
-      const params = initializeParamsSchema.safeParse(message.data.params)
+    const message = Schema.decodeUnknownOption(jsonRpcSchema)(await jsonBody(context.req.raw))
+    if (Option.isNone(message)) return context.json({ error: 'invalid JSON-RPC message' }, 400)
+    if (message.value.id === undefined) return context.body(null, 202)
+    const reply = (result: unknown) => context.json({ jsonrpc: '2.0', id: message.value.id, result }, 200, { 'mcp-session-id': 'fake-session' })
+    if (message.value.method === 'initialize') {
+      const params = Schema.decodeUnknownOption(initializeParamsSchema)(message.value.params)
       return reply({
-        protocolVersion: params.success ? params.data.protocolVersion : '2025-06-18',
+        protocolVersion: Option.isSome(params) ? params.value.protocolVersion : '2025-06-18',
         capabilities: { tools: {} },
         serverInfo: { name: 'fake-oauth-mcp', version: '1.0.0' },
       })
     }
-    if (message.data.method === 'tools/list') {
+    if (message.value.method === 'tools/list') {
       return reply({ tools: [{ name: 'whoami', description: 'Names the signed-in fake account.', inputSchema: { type: 'object', properties: {} } }] })
     }
-    return context.json({ jsonrpc: '2.0', id: message.data.id, error: { code: -32601, message: 'Method not found' } }, 200)
+    return context.json({ jsonrpc: '2.0', id: message.value.id, error: { code: -32601, message: 'Method not found' } }, 200)
   })
   app.notFound(context => context.json({ error: 'not found' }, 404))
   return app

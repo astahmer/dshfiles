@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkbenchRegionRegistry, type WorkbenchRegionSurface } from './dock-regions.js'
 import { createWorkbenchPanelRegistry } from './registry.js'
-import { layoutSchema, nestedLayoutStores } from './layout-store.js'
+import { WorkbenchLayout, nestedLayoutStores } from './layout-store.js'
 import {
   canMovePanelToRegion,
   createNestedSurface,
@@ -107,7 +107,7 @@ describe('nested surfaces', () => {
     const b = nestedSurfacePath('main', 'saved-b')
     const c = nestedSurfacePath('main', 'saved-c')
     const arrangement = (id: string) =>
-      layoutSchema.parse({
+      WorkbenchLayout.decodeLayout({
         grid: { root: { type: 'branch', data: [] }, width: 1, height: 1, orientation: 'HORIZONTAL' },
         panels: { [id]: { id, contentComponent: 'workbench-panel' } },
       })

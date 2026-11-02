@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 
 /** Why a rebuilt client bundle must wait: the Host code it pairs with is not the code the Host loaded. */
 export type GateReason = 'host-artifact-changed'
@@ -25,15 +26,15 @@ interface GateRecord {
 export type GateVerdict = { readonly action: 'apply' } | { readonly action: 'defer'; readonly reason: GateReason }
 
 /** The three shapes a package can declare its entry with, normalized to one path string. */
-const exportsEntrySchema = z.union([
-  z.string().min(1),
-  z.object({ '.': z.object({ default: z.string().min(1) }) }).transform(value => value['.'].default),
-  z.object({ '.': z.string().min(1) }).transform(value => value['.']),
+const exportsEntrySchema = Schema.Union([
+  Schema.String.check(Schema.isMinLength(1)),
+  Schema.Struct({ '.': Schema.Struct({ default: Schema.String.check(Schema.isMinLength(1)) }) }),
+  Schema.Struct({ '.': Schema.String.check(Schema.isMinLength(1)) }),
 ])
 
-const manifestSchema = z.object({
-  exports: z.unknown().optional(),
-  main: z.string().min(1).optional(),
+const manifestSchema = Schema.Struct({
+  exports: Schema.optional(Schema.Unknown),
+  main: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
 })
 
 /** Read one file's content digest, or undefined when it does not exist (a client-only package). */
@@ -53,10 +54,16 @@ const fileExists = (path: string): boolean => {
   }
 }
 
-const entryOf = (manifest: z.infer<typeof manifestSchema>): string | undefined => {
+const entryTextOf = (entry: typeof exportsEntrySchema.Type): string => {
+  if (typeof entry === 'string') return entry
+  const nested = entry['.']
+  return typeof nested === 'string' ? nested : nested.default
+}
+
+const entryOf = (manifest: typeof manifestSchema.Type): string | undefined => {
   if (manifest.exports !== undefined) {
-    const parsed = exportsEntrySchema.safeParse(manifest.exports)
-    if (parsed.success) return parsed.data
+    const parsed = Schema.decodeUnknownOption(exportsEntrySchema)(manifest.exports)
+    if (Option.isSome(parsed)) return entryTextOf(parsed.value)
   }
   return manifest.main
 }
@@ -87,8 +94,8 @@ export const hostArtifactOf = (clientPath: string): string | undefined => {
     return undefined
   }
   const manifest = decodeJsonSafe(manifestSchema, raw)
-  if (!manifest.success) return undefined
-  const entry = entryOf(manifest.data)
+  if (manifest._tag !== 'Success') return undefined
+  const entry = entryOf(manifest.success)
   if (entry === undefined) return undefined
   const absolute = isAbsolute(entry) ? entry : resolve(root, entry)
   return fileExists(absolute) ? absolute : undefined

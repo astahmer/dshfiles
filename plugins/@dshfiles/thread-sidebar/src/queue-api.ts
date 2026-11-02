@@ -1,25 +1,28 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
-const queueInputSchema = z.object({
-  sessionId: z.string().min(1).max(256).optional(),
-  itemId: z.string().min(1).max(256),
+const queueInputSchema = Schema.Struct({
+  sessionId: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))),
+  itemId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
 })
 
 /** The Host replaces a queued message's text only; more than this belongs in a file, not a queued edit. */
 const MAX_QUEUE_EDIT_CHARS = 200_000
 
-const queueEditInputSchema = queueInputSchema.extend({
-  text: z
-    .string()
-    .max(MAX_QUEUE_EDIT_CHARS)
-    .refine(text => text.trim().length > 0, 'The edited message needs some text.'),
+const queueEditInputSchema = Schema.Struct({
+  ...queueInputSchema.fields,
+  ...{
+    text: Schema.String.check(
+      Schema.isMaxLength(MAX_QUEUE_EDIT_CHARS),
+      Schema.makeFilter(text => (text.trim().length > 0 ? undefined : 'The edited message needs some text.')),
+    ),
+  },
 })
 
-const queueResultSchema = z.object({
-  sessionId: z.string().min(1).max(256),
-  itemId: z.string().min(1).max(256),
-  action: z.enum(['remove', 'steer', 'edit']),
+const queueResultSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
+  itemId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
+  action: Schema.Literals(['remove', 'steer', 'edit']),
 })
 
 export const threadQueueApi = defineApi({
@@ -52,4 +55,4 @@ export const threadQueueApi = defineApi({
   },
 })
 
-export type ThreadQueueAction = z.infer<typeof queueResultSchema>['action']
+export type ThreadQueueAction = (typeof queueResultSchema.Type)['action']

@@ -2,6 +2,7 @@ import { createActor, waitFor, type InputFrom } from '@dshfiles/plugin-ui/machin
 import { describe, expect, it } from 'vitest'
 import { previewSchema, type Mutation } from './api.js'
 import { revisionActionMachine } from './revision-action-machine.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 const rebase: Mutation = { kind: 'rebase', sourceId: 'a'.repeat(40), destinationId: 'b'.repeat(40) }
 const rebasePresentation = { kind: 'rebase', sourceId: rebase.sourceId, destinationId: rebase.destinationId } as const
@@ -12,7 +13,7 @@ const bookmarkPresentation = {
   sourceId: 'a'.repeat(40),
   destinationId: 'b'.repeat(40),
 } as const
-const preview = previewSchema.parse({
+const preview = SchemaHelpers.decode(previewSchema, {
   id: '00000000-0000-4000-8000-000000000001',
   kind: 'rebase',
   title: 'Rebase',

@@ -27,16 +27,17 @@ interface GraphNavigationInput {
   readonly revisions: readonly Revision[]
 }
 
-const readResult = <Output extends object>(result: Output | { failure: { message: string } }): Output => {
-  if ('failure' in result) throw new Error(result.failure.message)
-  return result
-}
-
 export const useGraphNavigation = (input: GraphNavigationInput) => {
   const api = useApi(jujutsuApi)
   const scope = `${input.root}:${input.repoId ?? ''}`
   const sliceClient = useMemo<GraphNavigationClient>(
-    () => ({ graphSlice: async (request: GraphSliceRequest, options) => readResult(await api.graphSlice(request, options)) }),
+    () => ({
+      graphSlice: async (request: GraphSliceRequest, options) => {
+        const result = await api.graphSlice(request, options)
+        if ('failure' in result) throw new Error(result.failure.message)
+        return result
+      },
+    }),
     [api],
   )
   const [navigationSnapshot, sendNavigation] = useMachine(graphNavigationMachine, {
@@ -65,7 +66,11 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
       repoId: input.repoId,
       refreshedAt: input.refreshedAt,
       onScreen: input.onScreen,
-      read: async (repoId, signal) => readResult(await api.graphNavigation({ repoId }, { signal })),
+      read: async (repoId, signal) => {
+        const result = await api.graphNavigation({ repoId }, { signal })
+        if ('failure' in result) throw new Error(result.failure.message)
+        return result
+      },
     }),
   )
   const extraRevisions = useMemo(
@@ -105,17 +110,18 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
 
   const relationshipQuery = useQuery({
     queryKey: ['jujutsu', input.root, 'relationship', input.repoId, comparisonRevision?.commitId, targetCommitId, input.refreshedAt],
-    queryFn: async ({ signal }) =>
-      readResult(
-        await api.revisionRelationship(
-          {
-            repoId: input.repoId ?? '',
-            commitId: comparisonRevision?.commitId ?? '',
-            targetCommitId,
-          },
-          { signal },
-        ),
-      ),
+    queryFn: async ({ signal }) => {
+      const result = await api.revisionRelationship(
+        {
+          repoId: input.repoId ?? '',
+          commitId: comparisonRevision?.commitId ?? '',
+          targetCommitId,
+        },
+        { signal },
+      )
+      if ('failure' in result) throw new Error(result.failure.message)
+      return result
+    },
     enabled: scopedComparisonOpen && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
     retry: false,
     staleTime: JUJUTSU_QUERY_STALE_TIME,

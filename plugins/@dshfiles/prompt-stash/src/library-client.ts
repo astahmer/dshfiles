@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import * as Schema from 'effect/Schema'
+import { createEffectStoredValue } from './effect-stored-value.js'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { PromptLibraryMigration, type PromptLibraryLocalStatus, type PromptLibraryMigrationClient } from './library-migration-machine.js'
@@ -176,7 +177,7 @@ const localLibraryStorage = () => {
   }
 }
 
-const storedLibrary = createStoredValue({
+const storedLibrary = createEffectStoredValue({
   key: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
   schema: PromptLibrary.schema,
   fallback: PromptLibrary.emptyStore(),
@@ -242,7 +243,7 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
     queryFn: async ({ signal }) =>
       PromptLibraryQueries.newest(
         queryClient.getQueryData<PromptStashSnapshot>(PromptLibraryQueries.key),
-        promptStashStateSchema.parse(await api.state(undefined, { signal })),
+        Schema.decodeUnknownSync(promptStashStateSchema, { onExcessProperty: 'error' })(await api.state(undefined, { signal })),
       ),
     refetchInterval: options.pollWhileOpen ? 2_000 : false,
     // Composer controls remount with every thread; this client's own writes update the cache, and an open library polls.
@@ -250,7 +251,7 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
   })
   const saveMutation = useMutation<PromptStashMutation, Error, SavePromptVariables>({
     mutationFn: async input =>
-      promptStashMutationSchema.parse(
+      Schema.decodeUnknownSync(promptStashMutationSchema, { onExcessProperty: 'error' })(
         await (input.signal === undefined
           ? api.save({ prompt: input.prompt, expectedRevision: input.expectedRevision })
           : api.save({ prompt: input.prompt, expectedRevision: input.expectedRevision }, { signal: input.signal })),
@@ -259,7 +260,7 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
   })
   const removeMutation = useMutation<PromptStashMutation, Error, RemovePromptVariables>({
     mutationFn: async input =>
-      promptStashMutationSchema.parse(
+      Schema.decodeUnknownSync(promptStashMutationSchema, { onExcessProperty: 'error' })(
         await (input.signal === undefined
           ? api.remove({ id: input.id, expectedRevision: input.expectedRevision })
           : api.remove({ id: input.id, expectedRevision: input.expectedRevision }, { signal: input.signal })),
@@ -350,7 +351,7 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
     async (options?: { readonly signal?: AbortSignal }): Promise<PromptLibraryRead> => {
       if (query.data !== undefined) {
         try {
-          const incoming = promptStashStateSchema.parse(
+          const incoming = Schema.decodeUnknownSync(promptStashStateSchema, { onExcessProperty: 'error' })(
             await (options?.signal === undefined ? api.state(undefined) : api.state(undefined, { signal: options.signal })),
           )
           let newest = incoming

@@ -1,6 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 import { PluginApiError } from '../api/common.js'
+import { zodSchemaFromEffect } from '../api/zod-view.js'
 import { PluginStorageContract, type StorageListInput, type StoragePage, type StoredEntry } from '../api/storage.js'
 
 /** The slice of `@deepseek-ai/dsh-storage-domain` this module uses; dshx does not depend on that package. */
@@ -19,8 +22,14 @@ interface StorageDomainLike {
   open(spec: typeof domainSpec): Promise<DomainLike>
 }
 
-const recordSchema = z.object({ namespace: z.string(), key: z.string(), value: z.json(), updatedAt: z.number() }).strict()
-type StoredRecord = z.infer<typeof recordSchema>
+const effectRecordSchema = Schema.Struct({
+  namespace: Schema.String,
+  key: Schema.String,
+  value: jsonValueSchema,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
+})
+type StoredRecord = { readonly namespace: string; readonly key: string; readonly value: JsonValue; readonly updatedAt: number }
+const recordSchema = { parse: (value: unknown): StoredRecord => Schema.decodeUnknownSync(effectRecordSchema)(value) }
 
 const DOMAIN_NAME = 'dshx_plugin_kv'
 
@@ -119,26 +128,28 @@ export interface PluginStorage {
  * that plugin's browser half through `hostStorage(api)`. Needs the profile's `@deepseek-ai/dsh-storage-domain` row.
  */
 const pluginStorage = (ctx: Context, namespace: string): PluginStorage => {
-  const checkedNamespace = PluginStorageContract.namespace.parse(namespace)
+  const checkedNamespace = Schema.decodeUnknownSync(PluginStorageContract.namespace)(namespace)
   return {
     get: async key =>
       withTable(ctx, table => {
-        const record = table.get(recordKey(checkedNamespace, PluginStorageContract.key.parse(key)))
+        const record = table.get(recordKey(checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.key)(key)))
         return record === undefined ? undefined : entryOf(record)
       }),
     set: async (key, value) => {
       const record: StoredRecord = {
         namespace: checkedNamespace,
-        key: PluginStorageContract.key.parse(key),
-        value: PluginStorageContract.value.parse(value),
+        key: Schema.decodeUnknownSync(PluginStorageContract.key)(key),
+        value: Schema.decodeUnknownSync(PluginStorageContract.value)(value),
         updatedAt: Date.now(),
       }
       await withTable(ctx, table => table.put(recordKey(checkedNamespace, record.key), record))
       return entryOf(record)
     },
-    delete: async key => withTable(ctx, table => table.delete(recordKey(checkedNamespace, PluginStorageContract.key.parse(key)))),
+    delete: async key => withTable(ctx, table => table.delete(recordKey(checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.key)(key)))),
     list: async (input = {}) =>
-      withTable(ctx, table => list(table, checkedNamespace, PluginStorageContract.listInput.parse({ ...input, namespace: checkedNamespace }))),
+      withTable(ctx, table =>
+        list(table, checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.listInput)({ ...input, namespace: checkedNamespace })),
+      ),
   }
 }
 
@@ -162,9 +173,18 @@ const changeOf = (change: { readonly domain: string; readonly table: string; rea
   return { namespace: change.key.slice(0, separator), key: change.key.slice(separator + 1), deleted: change.operation === 'deleted' }
 }
 
+const toStorageSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) => zodSchemaFromEffect(schema)
+
 export class PluginStorageModel {
   static readonly open = pluginStorage
   static readonly registration = storageRegistration
   static readonly domainName = DOMAIN_NAME
   static readonly changeOf = changeOf
+  static readonly toStorageSchema = toStorageSchema
 }
+
+/**
+ * A storage-domain `valueSchema` backed by an Effect schema. The storage domain
+ * still validates with zod, so a plugin that migrated its own schemas to Effect
+ * passes them through this bridge instead of keeping a zod copy.
+ */

@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { SettingsSchemaModel, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
 
 /** One settings namespace, as `settings.describe` reports it. */
@@ -27,7 +28,7 @@ export interface PluginSettingsPage {
 }
 
 const PAGE_PREFIX = 'plugin:'
-const translationsSchema = z.record(z.string(), z.string())
+const translationsSchema = Schema.Record(Schema.String, Schema.String)
 
 export class SettingsPluginPages {
   static pluginPageId = (ns: string): string => `${PAGE_PREFIX}${ns}`
@@ -65,10 +66,9 @@ export class SettingsPluginPages {
   static localizedTextReader =
     (locale: string): LocalizedTextReader =>
     value => {
-      const plain = z.string().safeParse(value)
-      if (plain.success) return plain.data
-      const translations = translationsSchema.safeParse(value)
-      if (!translations.success) return ''
-      return translations.data[locale] ?? translations.data.en ?? Object.values(translations.data)[0] ?? ''
+      if (Schema.is(Schema.String)(value)) return value
+      const translations = Schema.decodeUnknownOption(translationsSchema)(value)
+      if (Option.isNone(translations)) return ''
+      return translations.value[locale] ?? translations.value.en ?? Object.values(translations.value)[0] ?? ''
     }
 }

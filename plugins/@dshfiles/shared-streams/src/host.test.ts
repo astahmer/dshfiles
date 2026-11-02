@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import { Config } from './host.js'
 import { injectAfterHead, SHARED_EVENT_SOURCE_WORKER, SHARED_EVENT_SOURCE_WORKER_PATH, sharedEventSourceScript } from './shim.js'
 
 const INDEX_HTML =
   '<!doctype html><html><head><title>DeepSeek Harness</title><script type="module" src="./assets/index.js"></script></head><body><div id="root"></div></body></html>'
+
+describe('Host configuration', () => {
+  it('defaults an omitted row config to enabled', async () => {
+    expect(await Config['~standard'].validate(undefined)).toEqual({ value: { enabled: true } })
+  })
+
+  it('preserves an explicit disabled value', async () => {
+    expect(await Config['~standard'].validate({ enabled: false })).toEqual({ value: { enabled: false } })
+  })
+})
 
 describe('shared event source script', () => {
   it('stays safe to inline inside one script element', () => {

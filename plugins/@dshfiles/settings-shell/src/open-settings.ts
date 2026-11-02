@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /**
  * Cross-plugin entry point: any plugin opens Settings with
@@ -8,17 +8,22 @@ import { z } from 'zod'
  */
 export const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 
-export const openSettingsRequestSchema = z.object({
+export const openSettingsRequestSchema = Schema.Struct({
   /** A `settings.section` id (`general`, `models`, `plugins`, …). */
-  section: z.string().min(1).max(200).optional(),
+  section: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
   /** A settings field: the namespace (Loader entry id) and the path inside it. */
-  setting: z.object({ entryId: z.string().min(1).max(200), fieldPath: z.array(z.string().min(1).max(200)).max(16) }).optional(),
+  setting: Schema.optionalKey(
+    Schema.Struct({
+      entryId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+      fieldPath: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))).check(Schema.isMaxLength(16)),
+    }),
+  ),
   /** A search entry id `section` publishes: the section opens scrolled to that control. */
-  target: z.string().min(1).max(200).optional(),
+  target: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
   /** Search Settings for this text. */
-  query: z.string().max(200).optional(),
+  query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(200))),
   /** Force the dialog or the tab instead of the user's `openIn` preference. */
-  surface: z.enum(['modal', 'tab']).optional(),
+  surface: Schema.optionalKey(Schema.Literals(['modal', 'tab'])),
 })
 
-export type OpenSettingsRequest = z.infer<typeof openSettingsRequestSchema>
+export type OpenSettingsRequest = typeof openSettingsRequestSchema.Type

@@ -1,3 +1,5 @@
+// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
+import '@dshfiles/dshx/effect'
 import type { Context } from '@deepseek-ai/cordis'
 import { AttachmentId, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-api-session-controller'

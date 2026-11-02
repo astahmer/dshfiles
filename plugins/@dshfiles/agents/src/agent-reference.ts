@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 
 import { AGENT_HANDLE_PATTERN } from './agent.js'
 
@@ -16,7 +17,7 @@ export interface AgentReferenceMatch {
 }
 
 /** The `@handle` tokens naming one of `handles`; an unknown or disabled agent's mention stays plain text. */
-export const agentReferenceMatches = (text: string, handles: ReadonlySet<string>): readonly AgentReferenceMatch[] =>
+const agentReferenceMatches = (text: string, handles: ReadonlySet<string>): readonly AgentReferenceMatch[] =>
   [...text.matchAll(mentionPattern)].flatMap(match => {
     const handle = match[1] ?? match[2]
     if (handle === undefined || !handles.has(handle)) return []
@@ -24,26 +25,36 @@ export const agentReferenceMatches = (text: string, handles: ReadonlySet<string>
     return [{ handle, start, end: start + match[0].length }]
   })
 
-const coordinate = z.number().finite().min(-100_000).max(100_000)
+const coordinate = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(-100_000), Schema.isLessThanOrEqualTo(100_000))
 
-export const agentReferencePreviewEvent = 'dshfiles:agent-reference-preview'
+const agentReferencePreviewEvent = 'dshfiles:agent-reference-preview'
 
-export const agentReferencePreviewRequestSchema = z
-  .object({
-    handle: z.string().regex(AGENT_HANDLE_PATTERN),
-    /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
-    anchorId: z.number().int().positive(),
-    anchor: z
-      .object({
-        left: coordinate,
-        top: coordinate,
-        width: z.number().finite().min(0).max(100_000),
-        height: z.number().finite().min(0).max(100_000),
-      })
-      .strict(),
-  })
-  .strict()
+const agentReferencePreviewRequestSchema = Schema.Struct({
+  handle: Schema.String.check(Schema.isPattern(AGENT_HANDLE_PATTERN)),
+  /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
+  anchorId: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+  anchor: Schema.Struct({
+    left: coordinate,
+    top: coordinate,
+    width: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100_000)),
+    height: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100_000)),
+  }),
+})
 
-export type AgentReferencePreviewRequest = z.infer<typeof agentReferencePreviewRequestSchema>
+type AgentReferencePreviewRequest = typeof agentReferencePreviewRequestSchema.Type
 
-export const agentReferenceLabel = (handle: string): string => `@${handle}`
+const agentReferenceLabel = (handle: string): string => `@${handle}`
+
+/** The request a card receives; unknown keys still fail, as the zod strict object did. */
+const decodeAgentReferencePreviewRequest = (value: unknown): Option.Option<AgentReferencePreviewRequest> =>
+  Schema.decodeUnknownOption(agentReferencePreviewRequestSchema, { onExcessProperty: 'error' })(value)
+
+export class AgentReference {
+  static readonly matches = agentReferenceMatches
+  static readonly previewEvent = agentReferencePreviewEvent
+  static readonly previewRequestSchema = agentReferencePreviewRequestSchema
+  static readonly label = agentReferenceLabel
+  static readonly decodePreviewRequest = decodeAgentReferencePreviewRequest
+}
+
+export type { AgentReferencePreviewRequest }

@@ -6,10 +6,10 @@ import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { apiKey, apiRegistry } from '../src/api/registry.js'
 import { PluginStorageContract } from '../src/api/storage.js'
@@ -96,7 +96,7 @@ const leadingHost = async () => {
     effect: () => undefined,
   }
   Object.assign(host, { root: host })
-  const probe = defineApi({ id: 'probe', version: 1, owner: '@acme/plugin', methods: { ping: method({ output: z.literal('pong') }) } })
+  const probe = defineApi({ id: 'probe', version: 1, owner: '@acme/plugin', methods: { ping: method({ output: Schema.Literal('pong') }) } })
   await registerApi(host as never, '@acme/plugin', probe.host({ ping: () => 'pong' as const }))
   const registry = apiRegistry(host as never)
   await vi.waitFor(() => expect(registry.apis.has(apiKey(PluginStorageContract.api.owner!, 'storage'))).toBe(true))
@@ -119,7 +119,7 @@ const leadingHost = async () => {
 describe('the storage API the registry leader serves', () => {
   it('lets a browser read what the Host half wrote, and publishes each change', async () => {
     const { context, host, routes, browser } = await leadingHost()
-    expect(routes.has(ApiProtocolModel.eventsPath)).toBe(true)
+    expect(routes.has(ApiChannelModel.eventsPath)).toBe(true)
     const writes: unknown[] = []
     context.on('domain/changed', change => void writes.push(PluginStorageModel.changeOf(change)))
     await PluginStorageModel.open(host as never, '@acme/plugin').set('prefs', { theme: 'dark' })
@@ -138,7 +138,12 @@ describe('the storage API the registry leader serves', () => {
     const hostHalf = PluginStorageModel.open(host as never, '@acme/plugin')
     await hostHalf.set('store/layout', { columns: 3 })
     const storage = HostStorageModel.create({ ctx: browser, namespace: '@acme/plugin', signal: new AbortController().signal })
-    const layout = storage.store({ key: 'layout', scope: 'global', schema: z.object({ columns: z.number() }), initial: { columns: 1 } })
+    const layout = storage.store({
+      key: 'layout',
+      scope: 'global',
+      schema: Schema.toStandardSchemaV1(Schema.Struct({ columns: Schema.Number })),
+      initial: { columns: 1 },
+    })
     expect(layout.get()).toEqual({ columns: 1 })
     await layout.ready
     expect(layout.get()).toEqual({ columns: 3 })
@@ -149,7 +154,7 @@ describe('the storage API the registry leader serves', () => {
     expect(seen).toEqual([{ columns: 4 }])
     await vi.waitFor(async () => expect((await hostHalf.get('store/layout'))?.value).toEqual({ columns: 4 }))
 
-    const perSession = storage.store({ key: 'draft', scope: 'session', schema: z.string(), initial: '' })
+    const perSession = storage.store({ key: 'draft', scope: 'session', schema: Schema.toStandardSchemaV1(Schema.String), initial: '' })
     perSession('s1').set('hi')
     await vi.waitFor(async () => expect((await hostHalf.get('store/draft/session/s1'))?.value).toBe('hi'))
     layout.remove()
@@ -158,7 +163,7 @@ describe('the storage API the registry leader serves', () => {
 
   it('rejects ready when the browser has no Connection', async () => {
     const storage = HostStorageModel.create({ ctx: { get: () => undefined }, namespace: '@acme/none', signal: new AbortController().signal })
-    const store = storage.store({ key: 'x', scope: 'global', schema: z.number(), initial: 0 })
+    const store = storage.store({ key: 'x', scope: 'global', schema: Schema.toStandardSchemaV1(Schema.Number), initial: 0 })
     await expect(store.ready).rejects.toMatchObject({ kind: 'unavailable' })
     expect(store.get()).toBe(0)
   })
@@ -170,7 +175,7 @@ describe('hostStorage', () => {
     const { createTestClient } = await import('../src/testing/index.js')
     const client = await createTestClient()
     const api = PluginRuntimeModel.create({ ctx: client.ctx, packageId: '@acme/plugin', decorate: component => component }).plugin
-    const store = HostStorageModel.forPlugin(api).store({ key: 'x', scope: 'global', schema: z.number(), initial: 0 })
+    const store = HostStorageModel.forPlugin(api).store({ key: 'x', scope: 'global', schema: Schema.toStandardSchemaV1(Schema.Number), initial: 0 })
     // No Connection in this stub: the call is made, and reports it, instead of refusing the context.
     await expect(store.ready).rejects.toMatchObject({ kind: 'unavailable' })
     await client.dispose()

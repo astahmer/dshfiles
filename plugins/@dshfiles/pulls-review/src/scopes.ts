@@ -1,5 +1,6 @@
 import { createRuleBasedAdapter, type RuleKey } from '@pulls.review/core/analyze'
 import { createPasteSource } from '@pulls.review/core/paste'
+import { Option, Schema } from 'effect'
 import { MAX_FILES, scopeKeySchema, type ReviewFile, type ReviewScope } from './api.js'
 
 /** pulls.review's own rule-based copy, so a scope reads the same here and on the site. */
@@ -40,7 +41,7 @@ export const groupPatch = async (input: { readonly patch: string; readonly title
   const kept = new Set(files.map(file => file.path))
   const scopes = grouped.groups
     .map(group => {
-      const key = scopeKeySchema.safeParse(group.key)
+      const key = Schema.decodeUnknownOption(scopeKeySchema)(group.key)
       const filePaths = group.filePaths.filter(path => path.length > 0 && kept.has(path))
       let additions = 0
       let deletions = 0
@@ -49,9 +50,9 @@ export const groupPatch = async (input: { readonly patch: string; readonly title
         additions += file?.additions ?? 0
         deletions += file?.deletions ?? 0
       }
-      const fallback = RULE_TEXTS[key.success ? key.data : 'other']
+      const fallback = RULE_TEXTS[Option.isSome(key) ? key.value : 'other']
       return {
-        key: key.success ? key.data : 'other',
+        key: Option.isSome(key) ? key.value : 'other',
         category: group.category ?? 'other',
         label: group.label ?? fallback.label,
         summary: group.summary ?? fallback.summary,

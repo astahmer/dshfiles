@@ -3,8 +3,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { Composer, defineClientPlugin, useContract, useSettings } from '@dshfiles/dshx/client'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
+import { Result, Schema } from 'effect'
 import { createElement, useMemo, type ComponentType } from 'react'
-import { z } from 'zod'
 import { testRunsSettings } from './settings.js'
 import { TestRunCard, TestRunPending, type TestRunActions } from './test-run-card.js'
 import { VitestReport } from './vitest-report.js'
@@ -14,13 +14,13 @@ const REGISTRANT = '@dshfiles/test-runs'
 const PRIORITY = -10
 const TEST_COMMAND = /\b(?:vitest|(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?test(?::\w+)?)\b/
 
-const shellArgs = z.object({ command: z.string() })
+const shellArgsSchema = Schema.Struct({ command: Schema.String })
 
 const commandOf = (argsRaw: string | undefined): string | undefined => {
   if (argsRaw === undefined) return undefined
   try {
-    const parsed = decodeJsonSafe(shellArgs, argsRaw)
-    return parsed.success ? parsed.data.command : undefined
+    const parsed = decodeJsonSafe(shellArgsSchema, argsRaw)
+    return Result.isSuccess(parsed) ? parsed.success.command : undefined
   } catch {
     return undefined
   }

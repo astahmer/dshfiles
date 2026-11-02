@@ -1,6 +1,7 @@
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { settingsSearchEntriesSchema, type SettingsSearchEntry } from '@dshfiles/dshx/settings'
+import * as Schema from 'effect/Schema'
 import type { SectionRow } from './settings-view.js'
 
 /** One control a live `settings.section` publishes, with the section that opens at it. */
@@ -93,12 +94,16 @@ const sectionEntryRows = (input: {
 }): readonly SectionEntryRow[] =>
   input.sections.flatMap(section => {
     if (!input.published.has(section.id)) return []
-    const decoded = settingsSearchEntriesSchema.safeParse(input.published.get(section.id))
-    if (!decoded.success) {
-      input.onInvalid({ sectionId: section.id, message: decoded.error.message })
+    try {
+      return Schema.decodeUnknownSync(settingsSearchEntriesSchema)(input.published.get(section.id)).map(entry => ({
+        ...entry,
+        sectionId: section.id,
+        sectionLabel: section.label,
+      }))
+    } catch (error) {
+      input.onInvalid({ sectionId: section.id, message: error instanceof Error ? error.message : String(error) })
       return []
     }
-    return decoded.data.map(entry => ({ ...entry, sectionId: section.id, sectionLabel: section.label }))
   })
 
 export class SettingsSearch {

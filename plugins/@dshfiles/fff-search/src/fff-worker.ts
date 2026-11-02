@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { FffSearch } from './fff-search.js'
 
 /** An index nobody searched for this long is dropped; every jj thread workspace is its own root. */
@@ -16,7 +16,7 @@ const IDLE_INDEX_MS = 30 * 60_000
 // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot that keeps the null-check narrowing inside the message callbacks.
 const port = parentPort
 if (port === null) throw new Error('fff-search worker must run in a worker thread')
-const { stateRoot } = z.object({ stateRoot: z.string() }).parse(workerData)
+const { stateRoot } = Schema.decodeUnknownSync(Schema.Struct({ stateRoot: Schema.String }))(workerData)
 
 /** `scanned` is enough for path globs; content search waits for `contentReady`. */
 type ResidentIndex = { finder: FileFinder; scanned: Promise<unknown>; contentReady: Promise<unknown>; lastUsedAt: number }
@@ -55,9 +55,7 @@ const evictIdle = setInterval(() => {
 }, IDLE_INDEX_MS / 3)
 evictIdle.unref()
 
-const answer = async (
-  request: z.infer<typeof FffSearch.workerRequest>,
-): Promise<z.infer<typeof FffSearch.grepOutcome> | z.infer<typeof FffSearch.globOutcome> | null> => {
+const answer = async (request: typeof FffSearch.workerRequest.Type): Promise<typeof FffSearch.grepOutcome.Type | typeof FffSearch.globOutcome.Type | null> => {
   if (request.kind === 'warm') {
     indexFor(request.root)
     return null
@@ -79,7 +77,7 @@ const answer = async (
 
 // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerRequest.parse` runs on the next line.
 port.on('message', (message: unknown) => {
-  const request = FffSearch.workerRequest.parse(message)
+  const request = Schema.decodeUnknownSync(FffSearch.workerRequest)(message)
   answer(request).then(
     value => port.postMessage({ id: request.id, ok: true, value }),
     (error: unknown) => port.postMessage({ id: request.id, ok: false, error: error instanceof Error ? error.message : String(error) }),

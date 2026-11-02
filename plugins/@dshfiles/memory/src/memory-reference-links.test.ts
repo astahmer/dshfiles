@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema } from './memory-reference.ts'
+import { MemoryReferenceModel, memoryReferencePreviewEvent } from './memory-reference.ts'
 import { installMemoryReferenceLinks } from './memory-reference-links.ts'
 
 const links = (): readonly string[] => [...document.querySelectorAll('[data-dshfiles-memory-reference]')].map(element => element.textContent ?? '')
@@ -31,8 +31,8 @@ describe('memory reference links', () => {
     const requests: { readonly id: string; readonly anchorId: number }[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = memoryReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) requests.push(parsed.data)
+      const request = MemoryReferenceModel.decodePreviewRequest(event.detail)
+      if (request !== null) requests.push(request)
     }
     window.addEventListener(memoryReferencePreviewEvent, onRequest)
     const stop = installMemoryReferenceLinks()

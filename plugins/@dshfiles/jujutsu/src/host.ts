@@ -1,15 +1,18 @@
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import type { ApiHandlerContext, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
 import { defineHost, definePromptSection, waitForManagedExit } from '@dshfiles/dshx/host'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
-import { z } from 'zod'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
 import { jujutsuApi, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { registerRepositoryBatch } from './repository-batch.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
+import { SchemaHelpers } from './schema-helpers.js'
 import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { ReferenceGraphModel } from './reference-graph.js'
@@ -31,10 +34,10 @@ const MAX_REVISIONS = 500
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 
 /** One `jj evolog` row from EVOLUTION_TEMPLATE. */
-const evolutionRowSchema = z.object({ commitId: z.string(), predecessors: z.array(z.string()) })
+const evolutionRowSchema = Schema.Struct({ commitId: Schema.String, predecessors: Schema.Array(Schema.String) })
 
 /** One `jj operation log` row from OPERATION_TEMPLATE. */
-const operationRowSchema = z.object({ description: z.string(), attributes: z.string(), time: z.string() })
+const operationRowSchema = Schema.Struct({ description: Schema.String, attributes: Schema.String, time: Schema.String })
 
 interface RegisteredRepo {
   readonly id: string
@@ -53,8 +56,13 @@ interface ProcessResult {
   readonly truncated: boolean
 }
 
-const repos = new Map<string, RegisteredRepo>()
-const previews = new PreviewStore()
+interface JujutsuHostStateShape {
+  readonly repos: Map<string, RegisteredRepo>
+  readonly previews: PreviewStore
+}
+
+class JujutsuHostState extends EffectContext.Service<JujutsuHostState, JujutsuHostStateShape>()('dshfiles/jujutsu/HostState') {}
+
 let fixedJjExecutable: Promise<string> | undefined
 
 const identityAt = async (path: string): Promise<string> => {
@@ -179,7 +187,7 @@ const readWorkspaces = async (
     .map(([name = '', path = '']) => ({ name, path }))
 }
 
-const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSignal | undefined): Promise<RegisteredRepo> => {
+const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSignal | undefined, state: JujutsuHostStateShape): Promise<RegisteredRepo> => {
   const selected = JujutsuPathModel.validatedRepositoryPath(selectedPath)
   let canonicalSelection: string
   try {
@@ -211,17 +219,17 @@ const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSig
   const confirmed = await runAt(ctx, root, identity, ['root'], signal, { outputLimit: 16_000 })
   if (confirmed.truncated || (await realpath(confirmed.stdout.trim())) !== root) throw new Error('Repository root changed during registration.')
   await assertRepoIdentity(repo)
-  while (repos.size >= 32) {
-    const oldest = repos.keys().next().value
+  while (state.repos.size >= 32) {
+    const oldest = state.repos.keys().next().value
     if (oldest === undefined) break
-    repos.delete(oldest)
+    state.repos.delete(oldest)
   }
-  repos.set(repo.id, repo)
+  state.repos.set(repo.id, repo)
   return repo
 }
 
-const resolveRepo = async (ctx: Context, repoId: string, signal: AbortSignal | undefined): Promise<RegisteredRepo> => {
-  const repo = repos.get(repoId)
+const resolveRepo = async (ctx: Context, repoId: string, signal: AbortSignal | undefined, state: JujutsuHostStateShape): Promise<RegisteredRepo> => {
+  const repo = state.repos.get(repoId)
   if (repo === undefined) throw new Error('Repository registration expired. Select it again.')
   await assertRepoIdentity(repo)
   const confirmation = await runAt(ctx, repo.root, repo.identity, ['root'], signal, { outputLimit: 16_000 })
@@ -252,7 +260,7 @@ const readRevisions = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value))
   return { revisions: revisions.slice(0, limit), hasMore: revisions.length > limit }
 }
 
@@ -299,7 +307,7 @@ const readGraphPage = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision =>
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value)).filter(revision =>
     matchesRevisionSearch(revision, query),
   )
   const page = revisions.slice(0, REVISION_PAGE_SIZE)
@@ -338,7 +346,7 @@ const readEvolvedCommitIds = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      const row = evolutionRowSchema.safeParse(value)
+      const row = SchemaHelpers.decodeSafe(evolutionRowSchema, value)
       if (!row.success || !JujutsuMutationModel.isCommitId(row.data.commitId) || !row.data.predecessors.every(id => JujutsuMutationModel.isCommitId(id))) {
         throw new Error('Invalid evolution record.')
       }
@@ -392,7 +400,7 @@ const readLastPush = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const operations = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      const row = operationRowSchema.safeParse(value)
+      const row = SchemaHelpers.decodeSafe(operationRowSchema, value)
       if (!row.success) throw new Error('Invalid operation row.')
       return { attributes: row.data.attributes, time: row.data.time }
     })
@@ -469,7 +477,7 @@ const mutationRevisions = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision lookup exceeded the bounded output limit.')
-  const loaded = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const loaded = JujutsuOutputModel.parseJsonLines(result.stdout, value => SchemaHelpers.decode(revisionSchema, value))
   const evolution = await readEvolvedCommitIds(ctx, repo, loaded, signal)
   const merged = [...revisions, ...loaded.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) }))]
   for (const commitId of missingIds) findRevision(merged, commitId)
@@ -784,72 +792,94 @@ const snapshotWorkspace = async (ctx: Context, workspaceRoot: string | undefined
 }
 
 /** Hands the user-written failure messages to the Client; others stay generic and are logged on the Host. */
-const userFacing =
-  <Args, Result>(handler: (args: Args) => Promise<Result>) =>
-  async (args: Args): Promise<Result> => {
-    try {
-      return await handler(args)
-    } catch (error) {
-      throw RevisionReads.publicError(error)
-    }
-  }
+class JujutsuHandlerFailure extends Schema.TaggedError<JujutsuHandlerFailure>()('Plugin', {
+  message: Schema.String,
+}) {}
 
-const jujutsuHostApi = jujutsuApi.host({
-  openRepository: userFacing(async ({ input, ctx, signal }) => {
+type JujutsuMethod = keyof typeof jujutsuApi.methods
+type JujutsuHandlerArgs<Method extends JujutsuMethod> = ApiHandlerContext<ApiHostInput<(typeof jujutsuApi.methods)[Method]>>
+type JujutsuHandlerArgsWithState<Method extends JujutsuMethod> = JujutsuHandlerArgs<Method> & { readonly state: JujutsuHostStateShape }
+type JujutsuHandlerOutput<Method extends JujutsuMethod> = ApiHostOutput<(typeof jujutsuApi.methods)[Method]>
+
+const effectHandler = <Method extends JujutsuMethod>(
+  method: Method,
+  handler: (args: JujutsuHandlerArgsWithState<Method>) => Promise<JujutsuHandlerOutput<Method>>,
+) =>
+  Effect.fn(`jujutsu ${String(method).replace(/[A-Z]/gu, letter => ` ${letter.toLowerCase()}`)}`)(function* (args: JujutsuHandlerArgs<Method>) {
+    const state = yield* JujutsuHostState
+    return yield* Effect.tryPromise({
+      try: () => handler({ ...args, state }),
+      catch: error => new JujutsuHandlerFailure({ message: RevisionReads.publicError(error).message }),
+    })
+  })
+
+const effectPlugin = DshxEffect.plugin({
+  layer: () => Layer.sync(JujutsuHostState, () => ({ repos: new Map(), previews: new PreviewStore() })),
+  setup: ctx =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        void reviewProgressFor(ctx).catch(() => undefined)
+      }),
+      () => Effect.promise(() => closeReviewProgress()),
+    ),
+})
+
+const jujutsuHostApi = effectPlugin.hostApi(jujutsuApi, {
+  openRepository: effectHandler('openRepository', async ({ input, ctx, signal, state }) => {
     const opened = await ensureJujutsuRepository({
       path: JujutsuPathModel.validatedRepositoryPath(input.path),
       runJj: (cwd, args, commandSignal) => runAt(ctx, cwd, undefined, args, commandSignal, { outputLimit: 16_000 }),
       signal,
     })
-    const repo = await registerRepo(ctx, opened.root, signal)
+    const repo = await registerRepo(ctx, opened.root, signal, state)
     return { repoId: repo.id, root: repo.root, initialized: opened.initialized }
   }),
-  registerRepository: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await registerRepo(ctx, input.path, signal)
+  registerRepository: effectHandler('registerRepository', async ({ input, ctx, signal, state }) => {
+    const repo = await registerRepo(ctx, input.path, signal, state)
     return { repoId: repo.id, root: repo.root }
   }),
-  registerRepositories: async ({ input, ctx, signal }) => {
+  registerRepositories: effectHandler('registerRepositories', async ({ input, ctx, signal, state }) => {
     const repositories = await registerRepositoryBatch({
       paths: input.paths,
       signal,
       register: async path => {
-        const repo = await registerRepo(ctx, path, signal)
+        const repo = await registerRepo(ctx, path, signal, state)
         return { repoId: repo.id, root: repo.root }
       },
     })
     return { repositories: [...repositories] }
-  },
-  workspaces: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  }),
+  workspaces: effectHandler('workspaces', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     return { workspaces: [...(await readWorkspaces(ctx, repo, signal))] }
   }),
-  load: async ({ input, ctx, signal }) => {
+  load: effectHandler('load', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return (await snapshot(ctx, repo, input.limit, signal)).state
     } catch (error) {
       return RevisionReads.failure(error, 'Could not load this repository.')
     }
-  },
-  graphPage: async ({ input, ctx, signal }) => {
+  }),
+  graphPage: effectHandler('graphPage', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await readGraphPage(ctx, repo, input.query, input.excludeCommitIds, signal)
     } catch (error) {
       return RevisionReads.failure(error, 'Could not read the next revision graph page.')
     }
-  },
-  graphNavigation: async ({ input, ctx, signal }) => {
+  }),
+  graphNavigation: effectHandler('graphNavigation', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await GraphNavigationReads.readGraphNavigation(repoRun(ctx, repo, signal))
     } catch (error) {
       return RevisionReads.failure(error, 'Could not resolve graph landmarks.')
     }
-  },
-  revisionRelationship: async ({ input, ctx, signal }) => {
+  }),
+  revisionRelationship: effectHandler('revisionRelationship', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await GraphNavigationReads.readRevisionRelationship({
         run: repoRun(ctx, repo, signal),
         commitId: input.commitId,
@@ -858,56 +888,56 @@ const jujutsuHostApi = jujutsuApi.host({
     } catch (error) {
       return RevisionReads.failure(error, 'Could not compare revisions.')
     }
-  },
-  graphSlice: async ({ input, ctx, signal }) => {
+  }),
+  graphSlice: effectHandler('graphSlice', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await GraphNavigationReads.readGraphSlice({ run: repoRun(ctx, repo, signal), commitId: input.commitId, mode: input.mode })
     } catch (error) {
       return RevisionReads.failure(error, 'Could not read revision history.')
     }
-  },
-  referenceGraph: async ({ input, ctx, signal }) => {
+  }),
+  referenceGraph: effectHandler('referenceGraph', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await ReferenceGraphModel.read({ run: repoRun(ctx, repo, signal), reference: input.reference })
     } catch (error) {
       return RevisionReads.failure(error, 'Could not read a graph around that reference.')
     }
-  },
-  details: async ({ input, ctx, signal }) => {
+  }),
+  details: effectHandler('details', async ({ input, ctx, signal, state }) => {
     try {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
+      const repo = await resolveRepo(ctx, input.repoId, signal, state)
       return await RevisionReads.details(repoRun(ctx, repo, signal), input.commitId)
     } catch (error) {
       return RevisionReads.failure(error, 'Could not load revision details.')
     }
-  },
-  revisionFiles: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  }),
+  revisionFiles: effectHandler('revisionFiles', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     return RevisionReads.fileStats(repoRun(ctx, repo, signal), [...new Set(input.commitIds)])
   }),
-  editTimes: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  editTimes: effectHandler('editTimes', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     return { revisions: await RevisionReads.editTimes(repoRun(ctx, repo, signal), { repositoryRoot: repo.root, commitIds: input.commitIds }) }
   }),
-  workingDiff: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  workingDiff: effectHandler('workingDiff', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', '@', '--git'], signal)
     return { patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout, truncated: patch.truncated }
   }),
-  prepare: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  prepare: effectHandler('prepare', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
     const prepared = await prepareMutation(ctx, repo, current, input.action, signal)
     const id = randomUUID()
-    previews.put(id, prepared)
+    state.previews.put(id, prepared)
     return { id, kind: input.action.kind, title: prepared.title, summary: prepared.summary, detail: prepared.detail, expiresAt: prepared.expiresAt }
   }),
-  confirm: userFacing(async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
+  confirm: effectHandler('confirm', async ({ input, ctx, signal, state }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal, state)
     const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
-    const prepared = previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
+    const prepared = state.previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
     if (prepared === undefined) throw new Error('Preview expired or repository state changed. Refresh and preview again.')
     await assertRepoIdentity(repo)
     let workspacePath: string | null = null
@@ -971,11 +1001,5 @@ export default defineHost({
   ],
   prompts: [chatReferenceSection],
   settings: [jujutsuSettings],
-  setup: ctx => {
-    // Review progress belongs to the Host so every browser, plugin and CLI reads the same marks.
-    ctx.effect(() => {
-      void reviewProgressFor(ctx).catch(() => undefined)
-      return () => closeReviewProgress()
-    }, 'jujutsu: review progress store')
-  },
+  setup: effectPlugin.setup,
 })

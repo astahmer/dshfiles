@@ -16,12 +16,14 @@ if (pnpmVersion.status !== 0 || pnpmVersion.stdout.trim() !== '12.5.1') {
 }
 
 const dshOutput = spawnSync('dsh', ['--version'], { encoding: 'utf8' })
-if (dshOutput.status !== 0 || dshOutput.stdout.trim() !== '0.2.0-rc.2') {
-  throw new Error(`Scratch acceptance requires DSH 0.2.0-rc.2; found ${dshOutput.stdout.trim() || 'unavailable'}.`)
+if (dshOutput.status !== 0 || dshOutput.stdout.trim() !== '0.2.1-rc.2') {
+  throw new Error(`Scratch acceptance requires DSH 0.2.1-rc.2; found ${dshOutput.stdout.trim() || 'unavailable'}.`)
 }
 
 const helperPath = resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')
-const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = await import(pathToFileURL(helperPath).href)
+const { createScratchProfile, ScratchProfileRuntime } = await import(pathToFileURL(helperPath).href)
+const isolatedHostEnvironment = ScratchProfileRuntime.hostEnvironment
+const redactHostOutput = ScratchProfileRuntime.redactHostOutput
 const packagePath = resolve(repoRoot, 'plugins/@dshfiles/agent-questions')
 const fixturePath = resolve(repoRoot, 'plugins/@dshfiles/agent-questions/tests/fixtures/agent-questions-cold-resume-fixture')
 const profileName = 'agent-questions'

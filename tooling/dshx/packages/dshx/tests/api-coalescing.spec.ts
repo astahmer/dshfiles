@@ -1,5 +1,5 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 
@@ -17,7 +17,7 @@ const readOnlyBoardApi = defineApi({
   id: 'board',
   version: 1,
   methods: {
-    list: method({ input: z.object({ scope: z.string(), limit: z.number().optional() }), readOnly: true }),
+    list: method({ input: Schema.Struct({ scope: Schema.String, limit: Schema.optionalKey(Schema.Number) }), readOnly: true }),
     kill: method(),
   },
 })

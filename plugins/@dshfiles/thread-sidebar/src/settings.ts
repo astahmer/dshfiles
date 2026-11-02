@@ -1,4 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
+import * as EffectSchema from 'effect/Schema'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import {
   ATTENTION_COLOR_OPTIONS,
@@ -86,7 +87,7 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
     desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
-    notificationCategories: Schema.transform(Schema.any(), value => threadNotificationCategoriesSchema.parse(value))
+    notificationCategories: Schema.transform(Schema.any(), value => EffectSchema.decodeUnknownSync(threadNotificationCategoriesSchema)(value))
       .default(DEFAULT_PREFERENCES.notificationCategories)
       .hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),

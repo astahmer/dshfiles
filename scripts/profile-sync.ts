@@ -21,10 +21,10 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 // The dshx source, not its dist: this runs on checkouts where dshx is not built yet.
 import { BundleFreshness } from '../tooling/dshx/packages/dshx/src/repository/bundle-freshness.ts'
-import { decodeJson } from './json.ts'
+import { ScriptJson } from './json.ts'
 
 /**
  * Link owned bundles into a DSH profile and install it. The single reconciler for profiles: `pnpm profile:sync`, the
@@ -52,23 +52,51 @@ const patchStart = '# BEGIN NIX-MANAGED DSH PLUGINS'
 const patchEnd = '# END NIX-MANAGED DSH PLUGINS'
 const seededFiles = ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']
 
-const profileManifestSchema = z.looseObject({
-  dependencies: z.record(z.string(), z.string()).default({}),
-  dsh: z.looseObject({ profile: z.looseObject({ bundles: z.array(z.string()).default([]) }).default({ bundles: [] }) }).default({ profile: { bundles: [] } }),
+const profileManifestSchema = Schema.StructWithRest(
+  Schema.Struct({
+    dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    dsh: Schema.optionalKey(
+      Schema.StructWithRest(
+        Schema.Struct({
+          profile: Schema.optionalKey(
+            Schema.StructWithRest(Schema.Struct({ bundles: Schema.optionalKey(Schema.Array(Schema.String)) }), [Schema.Record(Schema.String, Schema.Unknown)]),
+          ),
+        }),
+        [Schema.Record(Schema.String, Schema.Unknown)],
+      ),
+    ),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
+const seedManifestSchema = Schema.StructWithRest(
+  Schema.Struct({
+    dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    dsh: Schema.Struct({ profile: Schema.Struct({ bundles: Schema.Array(Schema.String) }) }),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
+const syncStateSchema = Schema.Struct({
+  dependencies: Schema.Record(Schema.String, Schema.String),
+  bundles: Schema.Array(Schema.String),
+  installedManifestHash: Schema.optionalKey(Schema.String),
 })
-const seedManifestSchema = z.looseObject({
-  dependencies: z.record(z.string(), z.string()).default({}),
-  dsh: z.looseObject({ profile: z.looseObject({ bundles: z.array(z.string()) }) }),
-})
-const syncStateSchema = z.object({
-  dependencies: z.record(z.string(), z.string()),
-  bundles: z.array(z.string()),
-  installedManifestHash: z.string().optional(),
-})
-type SyncState = z.infer<typeof syncStateSchema>
+type SyncState = Schema.Schema.Type<typeof syncStateSchema>
+type ProfileManifest = Schema.Schema.Type<typeof profileManifestSchema>
 
-const readJson = <Schema extends z.ZodType>(schema: Schema, path: string): z.output<Schema> => decodeJson(schema, readFileSync(path, 'utf8'))
-const errorCode = (error: unknown): string | undefined => z.object({ code: z.string() }).safeParse(error).data?.code
+const readJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, path: string): S['Type'] => ScriptJson.decodeJson(schema, readFileSync(path, 'utf8'))
+const normalizedManifest = (manifest: ProfileManifest) => ({
+  ...manifest,
+  dependencies: manifest.dependencies ?? {},
+  dsh: {
+    ...manifest.dsh,
+    profile: { ...manifest.dsh?.profile, bundles: manifest.dsh?.profile?.bundles ?? [] },
+  },
+})
+const errorSchema = Schema.Struct({ code: Schema.String })
+const errorCode = (error: unknown): string | undefined => {
+  const parsed = ScriptJson.decodeUnknownSafe(errorSchema, error)
+  return parsed.success ? parsed.data.code : undefined
+}
 const isOwned = (name: string): boolean => name.startsWith('@dshfiles/')
 const sha256 = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex')
 const log = (message: string): void => console.log(`profile-sync: ${message}`)
@@ -265,7 +293,7 @@ const readState = (): SyncState | undefined => {
 
 const syncSeededProfile = async (): Promise<void> => {
   const seed = readJson(seedManifestSchema, seedManifestPath)
-  const desiredDependencies = Object.fromEntries(Object.entries(seed.dependencies).map(([name, spec]) => [name, resolveLocalSpec(spec)]))
+  const desiredDependencies = Object.fromEntries(Object.entries(seed.dependencies ?? {}).map(([name, spec]) => [name, resolveLocalSpec(spec)]))
   const desiredBundles = seed.dsh.profile.bundles
   for (const name of desiredBundles.filter(isOwned)) {
     const specifier = desiredDependencies[name]
@@ -282,7 +310,7 @@ const syncSeededProfile = async (): Promise<void> => {
 
   await withProfileLock(async () => {
     const currentText = readFileSync(manifestPath, 'utf8')
-    const manifest = decodeJson(profileManifestSchema, currentText)
+    const manifest = normalizedManifest(ScriptJson.decodeJson(profileManifestSchema, currentText))
     const previous = readState()
 
     const dependencies = { ...manifest.dependencies }
@@ -352,7 +380,7 @@ const syncOwnedBundles = async (): Promise<void> => {
   const replaced = (name: string): boolean => (selectedNames === null ? isOwned(name) : selectedNames.has(name))
 
   await withProfileLock(async () => {
-    const manifest = readJson(profileManifestSchema, manifestPath)
+    const manifest = normalizedManifest(readJson(profileManifestSchema, manifestPath))
     const dependencies = Object.fromEntries([
       ...Object.entries(manifest.dependencies).filter(([name]) => !replaced(name)),
       ...selectedBundles.map(bundle => [bundle.name, `link:${bundle.directory}`]),
@@ -372,10 +400,10 @@ const syncOwnedBundles = async (): Promise<void> => {
 /** Linked plugins whose bundle is missing or was built from a workspace source that has since changed. */
 const staleLinkedBundles = (): readonly string[] => {
   if (!existsSync(manifestPath)) return []
-  const manifest = readJson(profileManifestSchema, manifestPath)
+  const manifest = normalizedManifest(readJson(profileManifestSchema, manifestPath))
   return Object.entries(manifest.dependencies).flatMap(([name, spec]) => {
     if (!isOwned(name) || !spec.startsWith('link:')) return []
-    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)), decodeJson })
+    const report = BundleFreshness.inspect({ directory: resolve(profileDirectory, spec.slice('link:'.length)) })
     return report.status === 'stale' || report.status === 'unbuilt' ? [name] : []
   })
 }

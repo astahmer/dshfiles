@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 export const AGENT_HANDLE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u
 export const DEFAULT_AGENT_HANDLE = 'dsh'
@@ -25,93 +25,78 @@ export const AGENT_MENTION_SCOPES: readonly string[] = ['agent', 'a']
 /** The panel and the mention preview read one Host snapshot, so they share a query key. */
 export const AGENTS_QUERY_ROOT = 'dshfiles-agents'
 
-const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
-const timestampSchema = z.number().int().nonnegative()
+const handleSchema = Schema.String.check(Schema.isPattern(AGENT_HANDLE_PATTERN))
+const timestampSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 /** A memory note scope an agent owns; the notes table already stores free-form scopes, so no new table. */
-const agentMemoryScopeSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(MAX_MEMORY_SCOPE_CHARS)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u, 'A memory scope is letters, digits, ":", ".", "_", "/" or "-".')
-  .nullable()
-  // A row stored before this field existed must load: the domain validates every record with this schema at open.
-  .default(null)
+const agentMemoryScopeSchema = Schema.NullOr(
+  Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_MEMORY_SCOPE_CHARS), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u)),
+).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null)))
 
-export const agentRouteSchema = z
-  .object({
-    provider: z.string().min(1).max(MAX_PROVIDER_CHARS),
-    model: z.string().min(1).max(MAX_MODEL_CHARS),
-    reasoningEffort: z.string().min(1).max(MAX_EFFORT_CHARS).optional(),
-  })
-  .strict()
+export const agentRouteSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PROVIDER_CHARS)),
+  model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_MODEL_CHARS)),
+  reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_EFFORT_CHARS))),
+})
 
 /**
  * Which peers an agent's threads may message. `any` is the default (no rule), `listed` allows only `handles`, and
  * `none` keeps the agent's threads out of DSH's messaging tools. It constrains `dshx_comm_*`, it does not replace it.
  */
 /** An agent with no rule messages anyone, broadcasts and delegates, so adding the rule changed no behavior. */
-export const AGENT_DELEGATION_UNRESTRICTED: AgentDelegation = { messaging: 'any', handles: [], subagents: true }
+export const AGENT_DELEGATION_UNRESTRICTED = { messaging: 'any' as const, handles: [] as string[], subagents: true }
 
-export const agentDelegationSchema = z
-  .object({
-    messaging: z.enum(['any', 'listed', 'none']),
-    handles: z.array(handleSchema).max(MAX_PEER_HANDLES),
-    /** Whether this agent's threads may create subagents or fan work out through the workflow tool. */
-    subagents: z.boolean().default(true),
-  })
-  .strict()
-  // A row stored before delegation existed must load; a fresh object per parse, so no two records share one.
-  .default(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))
+export const agentDelegationSchema = Schema.Struct({
+  messaging: Schema.Literals(['any', 'listed', 'none']),
+  handles: Schema.Array(handleSchema).check(Schema.isMaxLength(MAX_PEER_HANDLES)),
+  /** Whether this agent's threads may create subagents or fan work out through the workflow tool. */
+  subagents: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
+}).pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))))
 
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
-export const agentDraftSchema = z
-  .object({
-    handle: handleSchema,
-    name: z.string().trim().min(1).max(MAX_NAME_CHARS),
-    glyph: z.string().trim().max(MAX_GLYPH_CHARS),
-    description: z.string().trim().max(MAX_DESCRIPTION_CHARS),
-    instructions: z.string().max(MAX_INSTRUCTIONS_CHARS),
-    preset: z.string().min(1).max(MAX_PRESET_CHARS).nullable(),
-    route: agentRouteSchema.nullable(),
-    /** The memory note scope this agent's threads read, or null for the project block only. */
-    memoryScope: agentMemoryScopeSchema,
-    /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
-    routine: z.string().max(MAX_ROUTINE_CHARS).default(''),
-    delegation: agentDelegationSchema,
-    enabled: z.boolean(),
-  })
-  .strict()
+const agentDraftFields = {
+  handle: handleSchema,
+  name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_NAME_CHARS)),
+  glyph: Schema.Trim.check(Schema.isMaxLength(MAX_GLYPH_CHARS)),
+  description: Schema.Trim.check(Schema.isMaxLength(MAX_DESCRIPTION_CHARS)),
+  instructions: Schema.String.check(Schema.isMaxLength(MAX_INSTRUCTIONS_CHARS)),
+  preset: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PRESET_CHARS))),
+  route: Schema.NullOr(agentRouteSchema),
+  /** The memory note scope this agent's threads read, or null for the project block only. */
+  memoryScope: agentMemoryScopeSchema,
+  /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
+  routine: Schema.String.check(Schema.isMaxLength(MAX_ROUTINE_CHARS)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))),
+  delegation: agentDelegationSchema,
+  enabled: Schema.Boolean,
+}
 
-export const agentSchema = agentDraftSchema
-  .extend({
-    builtIn: z.boolean(),
-    createdAt: timestampSchema,
-    updatedAt: timestampSchema,
-    lastUsedAt: timestampSchema.nullable(),
-    threadCount: z.number().int().nonnegative(),
-  })
-  .strict()
+export const agentDraftSchema = Schema.Struct(agentDraftFields)
+
+export const agentSchema = Schema.Struct({
+  ...agentDraftFields,
+  builtIn: Schema.Boolean,
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  lastUsedAt: Schema.NullOr(timestampSchema),
+  threadCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
 /**
  * One thread an agent started. It is a real row, not a counter: the panel lists the threads, opens one, and a Host
  * restart keeps the history because it reads the same table the dispatch wrote.
  */
-export const agentThreadSchema = z
-  .object({
-    sessionId: z.string().min(1).max(MAX_SESSION_CHARS),
-    handle: handleSchema,
-    title: z.string().max(200),
-    startedAt: timestampSchema,
-  })
-  .strict()
+export const agentThreadSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_SESSION_CHARS)),
+  handle: handleSchema,
+  title: Schema.String.check(Schema.isMaxLength(200)),
+  startedAt: timestampSchema,
+})
 
-export type AgentThread = z.infer<typeof agentThreadSchema>
+export type AgentThread = typeof agentThreadSchema.Type
 
-export type AgentRoute = z.infer<typeof agentRouteSchema>
-export type AgentDelegation = z.infer<typeof agentDelegationSchema>
-export type AgentDraft = z.infer<typeof agentDraftSchema>
-export type Agent = z.infer<typeof agentSchema>
+export type AgentRoute = typeof agentRouteSchema.Type
+export type AgentDelegation = typeof agentDelegationSchema.Type
+export type AgentDraft = typeof agentDraftSchema.Type
+export type Agent = typeof agentSchema.Type
 
 /** The fields an opening message needs; a full {@link Agent} satisfies it, so callers without usage metadata reuse the rules. */
 export interface AgentIdentity {

@@ -6,25 +6,25 @@ import type {} from '@deepseek-ai/dsh-goal'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-tools'
 import { defineTool } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 const MAX_GOAL_ROUNDS = 256
 const MAX_ROUND_EXTENSION = 32
 
-const extensionInputSchema = z
-  .object({
-    additional_rounds: z.number().int().min(1).max(MAX_ROUND_EXTENSION),
-    progress: z.string().trim().min(12).max(2_000),
-    remaining_work: z.string().trim().min(12).max(2_000),
-    justification: z.string().trim().min(12).max(2_000),
-  })
-  .strict()
+const extensionInputSchema = Schema.Struct({
+  additional_rounds: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: MAX_ROUND_EXTENSION })),
+  progress: Schema.Trim.check(Schema.isMinLength(12), Schema.isMaxLength(2_000)),
+  remaining_work: Schema.Trim.check(Schema.isMinLength(12), Schema.isMaxLength(2_000)),
+  justification: Schema.Trim.check(Schema.isMinLength(12), Schema.isMaxLength(2_000)),
+})
 
-const blockedCompletionInputSchema = z
-  .object({
-    evidence: z.string().trim().min(12).max(4_000),
-  })
-  .strict()
+const blockedCompletionInputSchema = Schema.Struct({ evidence: Schema.Trim.check(Schema.isMinLength(12), Schema.isMaxLength(4_000)) })
+
+class GoalContinuationFailure extends Schema.TaggedError<GoalContinuationFailure>()('GoalContinuationFailure', {
+  message: Schema.String,
+}) {}
+
+const continuationFailure = (error: unknown) => new GoalContinuationFailure({ message: error instanceof Error ? error.message : String(error) })
 
 const requireInitiatingAgent = (context: Context, agent: Agent | undefined): Agent => {
   if (agent === undefined) throw new Error('Goal continuation requires an active Agent.')
@@ -53,6 +53,47 @@ const isCurrentGoalRound = (context: Context, agent: Agent, goal: GoalView): boo
   }
   return false
 }
+
+const extendGoalBudget = Effect.fn('goal budget extend')(
+  ({ context, args, agent }: { readonly context: Context; readonly args: unknown; readonly agent: Agent | undefined }) =>
+    Effect.try({
+      try: () => {
+        const input = Schema.decodeUnknownSync(extensionInputSchema)(args)
+        const initiatingAgent = requireInitiatingAgent(context, agent)
+        const goal = context.goals.get(initiatingAgent)
+        if (goal === undefined) throw new Error('There is no current goal to extend.')
+        if (goal.phase !== 'active' || goal.roundsStarted !== goal.maxGoalRounds || !isCurrentGoalRound(context, initiatingAgent, goal)) {
+          throw new Error('Budget extension is allowed only during the exact final active goal round.')
+        }
+
+        const maxGoalRounds = goal.maxGoalRounds + input.additional_rounds
+        if (maxGoalRounds > MAX_GOAL_ROUNDS) throw new Error(`Goal extensions cannot exceed ${MAX_GOAL_ROUNDS} total rounds.`)
+
+        const updated = context.goals.edit(initiatingAgent, { id: goal.id, revision: goal.revision }, { maxGoalRounds })
+        return `Extended goal ${updated.id} from ${goal.maxGoalRounds} to ${updated.maxGoalRounds} rounds. The objective was unchanged.`
+      },
+      catch: continuationFailure,
+    }),
+)
+
+const completeBlockedGoal = Effect.fn('goal blocked completion')(
+  ({ context, args, agent }: { readonly context: Context; readonly args: unknown; readonly agent: Agent | undefined }) =>
+    Effect.try({
+      try: () => {
+        const input = Schema.decodeUnknownSync(blockedCompletionInputSchema)(args)
+        const initiatingAgent = requireInitiatingAgent(context, agent)
+        const goal = context.goals.get(initiatingAgent)
+        if (goal === undefined) throw new Error('There is no current goal to complete.')
+        if (goal.phase !== 'blocked' || goal.blockedReason?.code !== 'round-limit') {
+          throw new Error('This tool only completes a goal blocked by its round limit; use the native goal tool for active goals.')
+        }
+
+        const completed = context.goals.complete(initiatingAgent, { id: goal.id, revision: goal.revision })
+        return `Marked goal ${completed.id} complete. Verification evidence: ${input.evidence}`
+      },
+      catch: continuationFailure,
+    }),
+)
 
 const extendGoalBudgetTool = (context: Context) =>
   defineTool({
@@ -85,23 +126,7 @@ const extendGoalBudgetTool = (context: Context) =>
       schema: { type: 'string' },
       render: (_args, value) => [{ type: 'text', text: value }],
     },
-    execute: async (args, execution) => {
-      const input = extensionInputSchema.parse(args)
-      const agent = requireInitiatingAgent(context, execution.agent)
-      const goal = context.goals.get(agent)
-      if (goal === undefined) throw new Error('There is no current goal to extend.')
-      if (goal.phase !== 'active' || goal.roundsStarted !== goal.maxGoalRounds || !isCurrentGoalRound(context, agent, goal)) {
-        throw new Error('Budget extension is allowed only during the exact final active goal round.')
-      }
-
-      const maxGoalRounds = goal.maxGoalRounds + input.additional_rounds
-      if (maxGoalRounds > MAX_GOAL_ROUNDS) {
-        throw new Error(`Goal extensions cannot exceed ${MAX_GOAL_ROUNDS} total rounds.`)
-      }
-
-      const updated = context.goals.edit(agent, { id: goal.id, revision: goal.revision }, { maxGoalRounds })
-      return `Extended goal ${updated.id} from ${goal.maxGoalRounds} to ${updated.maxGoalRounds} rounds. The objective was unchanged.`
-    },
+    execute: (args, execution) => Effect.runPromise(extendGoalBudget({ context, args, agent: execution.agent })),
   })
 
 const completeBlockedGoalTool = (context: Context) =>
@@ -120,18 +145,7 @@ const completeBlockedGoalTool = (context: Context) =>
       schema: { type: 'string' },
       render: (_args, value) => [{ type: 'text', text: value }],
     },
-    execute: async (args, execution) => {
-      const input = blockedCompletionInputSchema.parse(args)
-      const agent = requireInitiatingAgent(context, execution.agent)
-      const goal = context.goals.get(agent)
-      if (goal === undefined) throw new Error('There is no current goal to complete.')
-      if (goal.phase !== 'blocked' || goal.blockedReason?.code !== 'round-limit') {
-        throw new Error('This tool only completes a goal blocked by its round limit; use the native goal tool for active goals.')
-      }
-
-      const completed = context.goals.complete(agent, { id: goal.id, revision: goal.revision })
-      return `Marked goal ${completed.id} complete. Verification evidence: ${input.evidence}`
-    },
+    execute: (args, execution) => Effect.runPromise(completeBlockedGoal({ context, args, agent: execution.agent })),
   })
 
 export const registerGoalContinuationTools = (context: Context): void => {

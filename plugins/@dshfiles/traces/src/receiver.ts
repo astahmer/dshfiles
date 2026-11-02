@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { gunzip, inflate } from 'node:zlib'
 import { promisify } from 'node:util'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { pluginAttributes, withSpan, type Span } from '@dshfiles/dshx/tracing'
 import type { ReceiverState, ReceiverStatus } from './types.js'
 
@@ -86,7 +86,16 @@ const decodeContent = async (body: Buffer, encoding: string | undefined): Promis
   throw new RequestRejection(415, `Unsupported content-encoding ${normalized}.`)
 }
 
-const forwardUrlSchema = z.url({ protocol: /^https?$/ })
+const forwardUrlSchema = Schema.String.check(
+  Schema.makeFilter(value => {
+    try {
+      const parsed = new URL(value)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? true : 'The forward URL must be an http(s) URL.'
+    } catch {
+      return 'The forward URL must be an http(s) URL.'
+    }
+  }),
+)
 
 /** A base URL like `http://127.0.0.1:4319`; `/v1/traces` and `/v1/metrics` are appended. Empty turns forwarding off. */
 type ForwardTarget = { readonly url: URL | null; readonly error: string | null }
@@ -94,9 +103,9 @@ type ForwardTarget = { readonly url: URL | null; readonly error: string | null }
 const parseForwardUrl = (text: string): ForwardTarget => {
   const trimmed = text.trim().replace(/\/+$/, '')
   if (trimmed.length === 0) return { url: null, error: null }
-  const parsed = forwardUrlSchema.safeParse(trimmed)
-  if (!parsed.success) return { url: null, error: 'The forward URL must be an http(s) URL.' }
-  return { url: new URL(parsed.data), error: null }
+  const parsed = Schema.decodeUnknownResult(forwardUrlSchema)(trimmed)
+  if (parsed._tag === 'Failure') return { url: null, error: 'The forward URL must be an http(s) URL.' }
+  return { url: new URL(parsed.success), error: null }
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])

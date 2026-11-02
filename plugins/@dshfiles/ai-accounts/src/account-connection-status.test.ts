@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { accountProfileSchema, accountsUsageSchema } from './api.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
+import * as Schema from 'effect/Schema'
 
-const account = accountProfileSchema.parse({
+const account = Schema.decodeUnknownSync(accountProfileSchema)({
   ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
   instanceId: 'codex_work',
   displayName: 'Work',
@@ -16,7 +17,7 @@ const account = accountProfileSchema.parse({
   detail: null,
 })
 const quota = (instanceId: string, status: 'ok' | 'unauthenticated') =>
-  accountsUsageSchema.parse({
+  Schema.decodeUnknownSync(accountsUsageSchema)({
     readAt: 1234,
     hostName: 'synthetic-host',
     cards: [

@@ -114,7 +114,7 @@ describe('client-only draft lifecycle', () => {
 
   it('preserves independent tabs on interleaved writes and removes only explicitly cleared or retired identities', async () => {
     const { drafts: firstTab, backend, storage } = fixture()
-    backend.materialize.mockImplementation(async metadata => metadata.sessionId)
+    backend.materialize.mockImplementation(async metadata => brandString<SessionId>(metadata.sessionId))
     const secondTab = new ClientSessionDrafts(backend, storage)
     const first = firstTab.create(options)
     const second = secondTab.create(options)
@@ -267,7 +267,7 @@ describe('client-only draft lifecycle', () => {
     const existingId = id(100)
     const chosen = { provider: 'account', model: 'chosen', reasoningEffort: 'high' }
     backend.lookup.mockReturnValue({ ...options, sessionId: existingId, preview: '' })
-    backend.materialize.mockImplementation(async metadata => metadata.sessionId)
+    backend.materialize.mockImplementation(async metadata => brandString<SessionId>(metadata.sessionId))
 
     drafts.update(existingId, { text: '', hasAttachments: false })
 

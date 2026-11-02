@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { z } from 'zod'
 import { DshPlatformLaunchUrl } from './client.js'
 
 const runFile = promisify(execFile)
@@ -91,14 +92,15 @@ const parseJjTimestamp = (value: string): number | undefined => {
 /** The installed `@deepseek-ai/dsh` package root inside a `dsh` command line, however pnpm laid the store out. */
 const dshPackageRoot = (commandLine: string): string | undefined => /(?:^|\s)(\S*node_modules\/@deepseek-ai\/dsh)\/lib\/bin\.js/.exec(commandLine)?.[1]
 
-const installedPackageSchema = z.object({ version: z.string().min(1) })
+const installedPackageSchema = Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1)) })
 
 const dshVersionOf = (commandLine: string): string | null => {
   const root = dshPackageRoot(commandLine)
   if (root === undefined) return null
   try {
-    const parsed = installedPackageSchema.safeParse(createRequire(import.meta.url)(join(root, 'package.json')))
-    return parsed.success ? parsed.data.version : null
+    return (
+      Option.getOrUndefined(Schema.decodeUnknownOption(installedPackageSchema)(createRequire(import.meta.url)(join(root, 'package.json'))))?.version ?? null
+    )
   } catch {
     return null
   }

@@ -1,66 +1,59 @@
-import { z } from 'zod'
-import { secretCredentialLabelSchema } from '@dshfiles/credential-port'
+import { secretCredentialLabelSchemaEffect } from '@dshfiles/credential-port/effect'
+import * as Schema from 'effect/Schema'
 
 export const JEV_INPUT_USD_PER_MILLION = 0.042
 
-export const jevUsageSourceSchema = z.enum(['backlog', 'memory'])
-export const jevCredentialLabelSchema = secretCredentialLabelSchema.or(z.literal('Legacy / unknown')).or(z.literal('Other credentials'))
-export const jevUsageOutcomeSchema = z.enum(['success', 'failure'])
+export const JEV_USAGE_SOURCES = ['backlog', 'memory'] as const
+export const JEV_USAGE_OUTCOMES = ['success', 'failure'] as const
 
-export const jevUsageRecordSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    source: jevUsageSourceSchema,
-    credential: jevCredentialLabelSchema,
-    startedAt: z.number().int().nonnegative(),
-    durationMs: z
-      .number()
-      .int()
-      .min(0)
-      .max(60 * 60_000),
-    outcome: jevUsageOutcomeSchema,
-    inputTokens: z.number().int().min(0).max(1_000_000).nullable(),
-    outputTokens: z.number().int().min(0).max(1_000_000).nullable(),
-  })
-  .strict()
+export const jevUsageSourceSchema = Schema.Literals(JEV_USAGE_SOURCES)
+export const jevCredentialLabelSchema = Schema.Union([secretCredentialLabelSchemaEffect, Schema.Literals(['Legacy / unknown', 'Other credentials'])])
+export const jevUsageOutcomeSchema = Schema.Literals(JEV_USAGE_OUTCOMES)
 
-export const jevUsageQuerySchema = z
-  .object({
-    from: z.number().int().nonnegative(),
-    to: z.number().int().positive(),
-  })
-  .strict()
-  .refine(range => range.to > range.from, { path: ['to'], message: 'The end of the range must be after the start.' })
+export const jevUsageRecordSchema = Schema.Struct({
+  requestId: Schema.String.check(Schema.isUUID()),
+  source: jevUsageSourceSchema,
+  credential: jevCredentialLabelSchema,
+  startedAt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  durationMs: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(60 * 60_000)),
+  outcome: jevUsageOutcomeSchema,
+  inputTokens: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000))),
+  outputTokens: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000))),
+})
 
-const jevUsageBreakdownSchema = z
-  .object({
-    credential: jevCredentialLabelSchema,
-    backlogCalls: z.number().int().nonnegative(),
-    memoryCalls: z.number().int().nonnegative(),
-    calls: z.number().int().nonnegative(),
-    succeeded: z.number().int().nonnegative(),
-    failed: z.number().int().nonnegative(),
-    inputTokens: z.number().int().nonnegative(),
-    outputTokens: z.number().int().nonnegative(),
-    callsWithoutInputUsage: z.number().int().nonnegative(),
-    estimatedCostUsd: z.number().nonnegative(),
-  })
-  .strict()
+export const jevUsageQuerySchema = Schema.Struct({
+  from: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  to: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+}).check(Schema.makeFilter(range => (range.to > range.from ? true : 'The end of the range must be after the start.')))
 
-export const jevUsageViewSchema = z
-  .object({
-    calls: z.number().int().nonnegative(),
-    succeeded: z.number().int().nonnegative(),
-    failed: z.number().int().nonnegative(),
-    inputTokens: z.number().int().nonnegative(),
-    outputTokens: z.number().int().nonnegative(),
-    callsWithoutInputUsage: z.number().int().nonnegative(),
-    estimatedCostUsd: z.number().nonnegative(),
-    byCredential: z.array(jevUsageBreakdownSchema).max(20),
-  })
-  .strict()
+const nonNegativeCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const nonNegativeAmount = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
 
-export type JevUsageRecord = z.infer<typeof jevUsageRecordSchema>
-export type JevUsageQuery = z.infer<typeof jevUsageQuerySchema>
-export type JevUsageBreakdown = z.infer<typeof jevUsageBreakdownSchema>
-export type JevUsageView = z.infer<typeof jevUsageViewSchema>
+const jevUsageBreakdownSchema = Schema.Struct({
+  credential: jevCredentialLabelSchema,
+  backlogCalls: nonNegativeCount,
+  memoryCalls: nonNegativeCount,
+  calls: nonNegativeCount,
+  succeeded: nonNegativeCount,
+  failed: nonNegativeCount,
+  inputTokens: nonNegativeCount,
+  outputTokens: nonNegativeCount,
+  callsWithoutInputUsage: nonNegativeCount,
+  estimatedCostUsd: nonNegativeAmount,
+})
+
+export const jevUsageViewSchema = Schema.Struct({
+  calls: nonNegativeCount,
+  succeeded: nonNegativeCount,
+  failed: nonNegativeCount,
+  inputTokens: nonNegativeCount,
+  outputTokens: nonNegativeCount,
+  callsWithoutInputUsage: nonNegativeCount,
+  estimatedCostUsd: nonNegativeAmount,
+  byCredential: Schema.Array(jevUsageBreakdownSchema).check(Schema.isMaxLength(20)),
+})
+
+export type JevUsageRecord = typeof jevUsageRecordSchema.Type
+export type JevUsageQuery = typeof jevUsageQuerySchema.Type
+export type JevUsageBreakdown = typeof jevUsageBreakdownSchema.Type
+export type JevUsageView = typeof jevUsageViewSchema.Type

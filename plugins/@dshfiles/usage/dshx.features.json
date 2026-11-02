@@ -387,7 +387,7 @@
           "kind": "custom",
           "span": "usage metrics export",
           "file": "plugins/@dshfiles/usage/src/otel-exporter.test.ts",
-          "testName": "records a usage metrics export span with the collector host and status"
+          "testName": "retains the custom export span through the Effect loop"
         }
       ]
     }

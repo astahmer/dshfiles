@@ -10,16 +10,20 @@ import { captureNetworkPreferences, Config } from './startup.js'
 import { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import hostDefinition from './host.js'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { LoopbackAccess } from './access.js'
 import { socketClosed } from './socket-closed.test-support.js'
 
 const lanHost = Object.values(networkInterfaces())
   .flat()
   .find(address => address?.family === 'IPv4' && !address.internal)?.address
-const unavailableIPv6Schema = z.object({ code: z.enum(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
-const tcpAddressSchema = z.object({ address: z.string(), port: z.number().int().min(1).max(65_535) })
+const unavailableIPv6Schema = Schema.Struct({ code: Schema.Literals(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
+const tcpAddressSchema = Schema.Struct({
+  address: Schema.String,
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
+})
+const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 const servers: Server[] = []
 const sockets = new Set<Socket>()
 const accesses: LoopbackAccess[] = []
@@ -41,9 +45,9 @@ async function listen(host: string, port = 0): Promise<Server> {
 }
 
 function portOf(server: Server): number {
-  const parsed = tcpAddressSchema.safeParse(server.address())
-  if (!parsed.success) throw new Error('Expected a TCP listener')
-  return parsed.data.port
+  const parsed = Schema.decodeUnknownResult(tcpAddressSchema)(server.address())
+  if (parsed._tag === 'Failure') throw new Error('Expected a TCP listener')
+  return parsed.success.port
 }
 
 function accessFor(host: string, backend: Server): LoopbackAccess {
@@ -58,7 +62,7 @@ async function expectPortsReleased(port: number): Promise<void> {
   try {
     await listen('::1', port)
   } catch (error) {
-    if (!unavailableIPv6Schema.safeParse(error).success) throw error
+    if (!accepts(unavailableIPv6Schema, error)) throw error
   }
 }
 

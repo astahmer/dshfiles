@@ -1,6 +1,7 @@
 import { decodeJsonSafe, type JsonValue } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { composerBaseSchema, type ComposerBase } from './composer-context-api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const COMPOSER_HEAD_TEMPLATE =
   '"{\\"changeId\\":" ++ stringify(self.change_id().shortest(8)).escape_json() ++ ' +
@@ -29,19 +30,19 @@ const defaultComposerBase: ComposerBase = { kind: 'bookmark', name: 'main' }
 const REMOTE_BASE_PREFIX = 'remote-base='
 
 export const composerBaseFromSetting = (value: JsonValue | undefined): ComposerBase => {
-  const parsed = z.string().max(512).safeParse(value)
+  const parsed = SchemaHelpers.decodeSafe(Schema.String.check(Schema.isMaxLength(512)), value)
   if (!parsed.success || parsed.data.length === 0) return defaultComposerBase
   if (parsed.data === 'trunk') return { kind: 'trunk' }
   if (parsed.data === 'parent') return { kind: 'parent' }
   if (parsed.data.startsWith(REMOTE_BASE_PREFIX)) {
     try {
       const remoteBase = decodeJsonSafe(composerBaseSchema, decodeURIComponent(parsed.data.slice(REMOTE_BASE_PREFIX.length)))
-      return remoteBase.success && remoteBase.data.kind === 'remoteBookmark' ? remoteBase.data : defaultComposerBase
+      return remoteBase._tag === 'Success' && remoteBase.success.kind === 'remoteBookmark' ? remoteBase.success : defaultComposerBase
     } catch {
       return defaultComposerBase
     }
   }
-  const bookmark = composerBaseSchema.safeParse({ kind: 'bookmark', name: parsed.data })
+  const bookmark = SchemaHelpers.decodeSafe(composerBaseSchema, { kind: 'bookmark', name: parsed.data })
   return bookmark.success ? bookmark.data : defaultComposerBase
 }
 
@@ -98,13 +99,13 @@ const parseStatTotals = (stdout: string): { files: number; additions: number; de
 }
 
 /** A quoted path in a git patch is one JSON string literal. */
-const quotedGitPathSchema = z.string()
+const quotedGitPathSchema = Schema.String
 
 const unquoteGitPath = (value: string): string => {
   if (!value.startsWith('"')) return value
   try {
     const decoded = decodeJsonSafe(quotedGitPathSchema, value)
-    return decoded.success ? decoded.data : value
+    return decoded._tag === 'Success' ? decoded.success : value
   } catch {
     return value
   }

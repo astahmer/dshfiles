@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { CommandRuntime } from '@deepseek-ai/dsh-commands'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaGetter from 'effect/SchemaGetter'
 type Agent = Parameters<CommandRuntime['find']>[0]
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { definePlugin, type PluginApi } from '../src/host/index.js'
@@ -94,15 +95,19 @@ describe('native SDK Host', () => {
   it('infers decoded Config output and validates once per native activation', async () => {
     let decodeCount = 0
     let receivedConfig: Readonly<{ enabled: boolean; label: string }> | undefined
-    const Config = z.object({
-      enabled: z.boolean(),
-      label: z
-        .string()
-        .trim()
-        .transform(value => {
-          decodeCount += 1
-          return value.toUpperCase()
+    const Config = Schema.Struct({
+      enabled: Schema.Boolean,
+      label: Schema.String.pipe(
+        Schema.decode({
+          decode: SchemaGetter.passthrough<string>().pipe(
+            SchemaGetter.map(value => {
+              decodeCount += 1
+              return value.trim().toUpperCase()
+            }),
+          ),
+          encode: SchemaGetter.passthrough<string>(),
         }),
+      ),
     })
     const definition = definePlugin({
       id: 'typed-config',
@@ -140,11 +145,7 @@ describe('native SDK Host', () => {
 
   it('redacts values from native Config validation failures', async () => {
     const secret = 'private-token-value'
-    const Config = z.object({
-      token: z.string().superRefine((value, context) => {
-        context.addIssue({ code: 'custom', message: `Rejected token ${value}` })
-      }),
-    })
+    const Config = Schema.Struct({ token: Schema.String.check(Schema.makeFilter(value => `Rejected token ${value}`)) })
     const host = await createTestHost()
     const definition = definePlugin({ id: 'invalid-config', Config, setup: () => undefined })
     const rejection = host.mount(definition, { config: { token: secret } }).then(

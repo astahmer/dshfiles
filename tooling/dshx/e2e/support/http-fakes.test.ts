@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { test } from 'node:test'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { createFakeCommandCodeApp, startFakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.ts'
 import type { FakeCommandCodeState } from '../../packages/dshx/src/scratch/fake-command-code.ts'
 import { card, createFakeHubApp, type FakeHubState } from './fake-hub.ts'
@@ -100,13 +100,15 @@ test('Framework Hub routes filter, sort, fail and serve install detail', async (
   const state = createHubState()
   const app = createFakeHubApp(state)
   const filtered = await app.request(`${origin}/api/marketplace/plugins?q=first&sort=stars`)
-  const listing = z.object({ items: z.array(z.object({ slug: z.string() })), total: z.number() }).parse(await filtered.json())
+  const listing = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(Schema.Struct({ slug: Schema.String })), total: Schema.Number }))(
+    await filtered.json(),
+  )
   assert.equal(listing.total, 1)
   assert.equal(listing.items[0]?.slug, 'first')
   assert.equal(state.queries[0]?.get('q'), 'first')
 
   const sorted = await app.request(`${origin}/api/marketplace/plugins?sort=stars`)
-  const sortedListing = z.object({ items: z.array(z.object({ slug: z.string() })) }).parse(await sorted.json())
+  const sortedListing = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(Schema.Struct({ slug: Schema.String })) }))(await sorted.json())
   assert.deepEqual(
     sortedListing.items.map(item => item.slug),
     ['second', 'first'],
@@ -116,7 +118,9 @@ test('Framework Hub routes filter, sort, fail and serve install detail', async (
   assert.equal((await app.request(`${origin}/api/marketplace/plugins`)).status, 503)
   state.failList = false
   const detail = await app.request(`${origin}/api/marketplace/plugins/first`)
-  const detailBody = z.object({ plugin: z.object({ slug: z.string() }), installTargets: z.array(z.object({ spec: z.string() })) }).parse(await detail.json())
+  const detailBody = Schema.decodeUnknownSync(
+    Schema.Struct({ plugin: Schema.Struct({ slug: Schema.String }), installTargets: Schema.Array(Schema.Struct({ spec: Schema.String })) }),
+  )(await detail.json())
   assert.equal(detailBody.plugin.slug, 'first')
   assert.equal(detailBody.installTargets[0]?.spec, state.tarball)
   state.failDetail = true
@@ -155,7 +159,7 @@ test('OAuth registration, PKCE and MCP routes enforce issued credentials', async
     body: JSON.stringify({ client_name: 'journey', redirect_uris: [redirectUri] }),
   })
   assert.equal(registration.status, 201)
-  const client = z.object({ client_id: z.string() }).parse(await registration.json())
+  const client = Schema.decodeUnknownSync(Schema.Struct({ client_id: Schema.String }))(await registration.json())
   assert.equal(state.registeredClientNames[0], 'journey')
 
   const verifier = 'the-verifier-used-by-this-route-test'
@@ -198,7 +202,7 @@ test('OAuth registration, PKCE and MCP routes enforce issued credentials', async
     }),
   })
   assert.equal(tokenResponse.status, 200)
-  const tokenData = z.object({ access_token: z.string() }).parse(await tokenResponse.json())
+  const tokenData = Schema.decodeUnknownSync(Schema.Struct({ access_token: Schema.String }))(await tokenResponse.json())
   const unauthorized = await app.request(`${origin}/mcp`)
   assert.equal(unauthorized.status, 401)
   assert.match(unauthorized.headers.get('www-authenticate') ?? '', /oauth-protected-resource\/mcp/)
@@ -210,6 +214,9 @@ test('OAuth registration, PKCE and MCP routes enforce issued credentials', async
   })
   assert.equal(initialized.status, 200)
   assert.equal(initialized.headers.get('mcp-session-id'), 'fake-session')
-  assert.equal(z.object({ result: z.object({ protocolVersion: z.string() }) }).parse(await initialized.json()).result.protocolVersion, '2025-06-18')
+  assert.equal(
+    Schema.decodeUnknownSync(Schema.Struct({ result: Schema.Struct({ protocolVersion: Schema.String }) }))(await initialized.json()).result.protocolVersion,
+    '2025-06-18',
+  )
   assert.equal(state.acceptedTokens.has(tokenData.access_token), true)
 })

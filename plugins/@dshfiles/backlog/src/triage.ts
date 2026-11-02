@@ -1,6 +1,6 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 
-import { BacklogItems, type BacklogItem, type BacklogProposal } from './item.js'
+import { BacklogItems, type BacklogItem, type BacklogKind, type BacklogProposal, type BacklogStatus } from './item.js'
 
 const MAX_CANDIDATES = 5
 const MAX_CORRECTIONS = 5
@@ -45,13 +45,33 @@ const resolvesItem: TriageQuestion = {
 
 const RESOLUTION_THRESHOLD = 0.5
 
-const modelAnswerSchema = z.object({
-  kind: BacklogItems.kindSchema.optional().catch(undefined),
-  title: z.string().min(1).max(BacklogItems.maxTitleChars).optional().catch(undefined),
-  tags: z.array(z.string().max(60)).max(20).optional().catch(undefined),
-  duplicateOf: z.number().int().positive().nullable().optional().catch(undefined),
-  confidence: z.number().min(0).max(1).catch(0.5),
-  reason: z.string().max(500).catch(''),
+const modelAnswerSchema = Schema.Struct({
+  kind: Schema.optionalKey(BacklogItems.kindSchema),
+  title: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTitleChars))),
+  tags: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(60))).check(Schema.isMaxLength(20))),
+  duplicateOf: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)))),
+  confidence: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  reason: Schema.String.check(Schema.isMaxLength(500)),
+})
+
+/** A decoded answer with the leniency the fields carry: a field the model got wrong reads as absent, not as a failed answer. */
+interface ModelAnswer {
+  readonly kind?: BacklogKind | undefined
+  readonly title?: string | undefined
+  readonly tags?: readonly string[] | undefined
+  readonly duplicateOf?: number | null | undefined
+  readonly confidence: number
+  readonly reason: string
+}
+
+/** The model's JSON, before any field is validated: a malformed field must not cost the fields that did decode. */
+const rawAnswerSchema = Schema.Struct({
+  kind: Schema.optionalKey(Schema.Unknown),
+  title: Schema.optionalKey(Schema.Unknown),
+  tags: Schema.optionalKey(Schema.Unknown),
+  duplicateOf: Schema.optionalKey(Schema.Unknown),
+  confidence: Schema.optionalKey(Schema.Unknown),
+  reason: Schema.optionalKey(Schema.Unknown),
 })
 
 const tokensOf = (text: string): Set<string> =>
@@ -117,21 +137,40 @@ const modelInput = (item: BacklogItem, candidates: readonly BacklogItem[], corre
     .filter(Boolean)
     .join('\n')
 
-const parseModelAnswer = (text: string): z.infer<typeof modelAnswerSchema> | undefined => {
+const parseModelAnswer = (text: string): ModelAnswer | undefined => {
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
   if (start === -1 || end <= start) return undefined
-  try {
-    const parsed = modelAnswerSchema.safeParse(JSON.parse(text.slice(start, end + 1)))
-    return parsed.success ? parsed.data : undefined
-  } catch {
-    return undefined
+  const raw = Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(rawAnswerSchema))(text.slice(start, end + 1)))
+  if (raw === null) return undefined
+  const fields = modelAnswerSchema.fields
+  return {
+    kind: Option.getOrElse(Schema.decodeUnknownOption(fields.kind)(raw.kind), () => undefined),
+    title: Option.getOrElse(Schema.decodeUnknownOption(fields.title)(raw.title), () => undefined),
+    tags: Option.getOrElse(Schema.decodeUnknownOption(fields.tags)(raw.tags), () => undefined),
+    duplicateOf: Option.getOrElse(Schema.decodeUnknownOption(fields.duplicateOf)(raw.duplicateOf), () => undefined),
+    confidence: Option.getOrElse(Schema.decodeUnknownOption(fields.confidence)(raw.confidence), () => 0.5),
+    reason: Option.getOrElse(Schema.decodeUnknownOption(fields.reason)(raw.reason), () => ''),
   }
+}
+
+/** The proposal as it is built up, before the readonly contract type accepts only the fields that changed. */
+type ProposalDraft = {
+  kind?: BacklogKind
+  status?: BacklogStatus
+  title?: string
+  tags?: readonly string[]
+  duplicateOf?: number
+  confidence: number
+  reason: string
+  source: BacklogProposal['source']
+  origin?: 'thread'
+  at: number
 }
 
 /** Keeps only what differs from the item, so an empty proposal means triage agrees with what is there. */
 const changesOnly = (item: BacklogItem, proposal: BacklogProposal): BacklogProposal | null => {
-  const trimmed: BacklogProposal = { confidence: proposal.confidence, reason: proposal.reason, source: proposal.source, at: proposal.at }
+  const trimmed: ProposalDraft = { confidence: proposal.confidence, reason: proposal.reason, source: proposal.source, at: proposal.at }
   if (proposal.kind !== undefined && proposal.kind !== item.kind) trimmed.kind = proposal.kind
   if (proposal.status !== undefined && proposal.status !== item.status) trimmed.status = proposal.status
   if (proposal.title !== undefined && proposal.title.trim() !== item.title) trimmed.title = proposal.title.trim()
@@ -163,14 +202,15 @@ const run = async (request: {
     const duplicate = closest === undefined ? undefined : await ask({ question: sameWork(closest.title), text }).catch(() => undefined)
     if (probability !== undefined || (closest !== undefined && duplicate !== undefined)) {
       const isWork = probability === undefined || probability >= 0.5
-      fromJev = {
+      const jev: ProposalDraft = {
         confidence: probability === undefined ? (duplicate ?? 0) : Math.max(probability, 1 - probability),
         reason: probability === undefined ? 'May duplicate an existing item.' : isWork ? 'Reads as work to do.' : 'Reads as something to keep, not work to do.',
         source: 'jev',
         at: request.now,
       }
-      if (probability !== undefined && !isWork && item.kind === 'task') fromJev.kind = 'note'
-      if (closest !== undefined && duplicate !== undefined && duplicate >= DUPLICATE_THRESHOLD) fromJev.duplicateOf = closest.id
+      if (probability !== undefined && !isWork && item.kind === 'task') jev.kind = 'note'
+      if (closest !== undefined && duplicate !== undefined && duplicate >= DUPLICATE_THRESHOLD) jev.duplicateOf = closest.id
+      fromJev = jev
     }
   }
   let fromModel: BacklogProposal | undefined
@@ -180,7 +220,7 @@ const run = async (request: {
       .then(parseModelAnswer)
       .catch(() => undefined)
     if (answer !== undefined) {
-      const model: BacklogProposal = { confidence: answer.confidence, reason: answer.reason, source: 'model', at: request.now }
+      const model: ProposalDraft = { confidence: answer.confidence, reason: answer.reason, source: 'model', at: request.now }
       if (answer.kind !== undefined) model.kind = answer.kind
       if (answer.title !== undefined) model.title = answer.title
       if (answer.tags !== undefined) model.tags = answer.tags
@@ -194,13 +234,15 @@ const run = async (request: {
   if (fromJev === undefined) return changesOnly(item, fromModel)
   // Agreement between two independent judges raises confidence; disagreement on the kind keeps the model's answer but lowers it.
   const agree = (fromModel.kind ?? item.kind) === (fromJev.kind ?? item.kind)
-  return changesOnly(item, {
+  const both: ProposalDraft = {
     ...fromJev,
     ...fromModel,
-    duplicateOf: fromModel.duplicateOf ?? fromJev.duplicateOf,
     confidence: agree ? Math.max(fromModel.confidence, fromJev.confidence) : Math.min(fromModel.confidence, fromJev.confidence),
     source: 'jev+model',
-  })
+  }
+  const duplicateOf = fromModel.duplicateOf ?? fromJev.duplicateOf
+  if (duplicateOf !== undefined) both.duplicateOf = duplicateOf
+  return changesOnly(item, both)
 }
 
 /**

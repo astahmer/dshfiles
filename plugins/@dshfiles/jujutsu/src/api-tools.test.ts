@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { graphPageOutputSchema, jujutsuApi, REVISION_PAGE_SIZE, revisionSchema } from './api.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 describe('revision graph API payload bounds', () => {
   test('caps initial and subsequent graph page outputs to ten revisions', () => {
-    const revision = revisionSchema.parse({
+    const revision = SchemaHelpers.decode(revisionSchema, {
       commitId: 'a'.repeat(40),
       changeId: 'b'.repeat(32),
       shortestChangeId: 'b',
@@ -26,11 +27,11 @@ describe('revision graph API payload bounds', () => {
 
     expect(REVISION_PAGE_SIZE).toBe(10)
     const page = { revisions: Array.from({ length: REVISION_PAGE_SIZE }, () => revision), hasMore: true }
-    expect(graphPageOutputSchema.safeParse(page).success).toBe(true)
+    expect(SchemaHelpers.decodeSafe(graphPageOutputSchema, page).success).toBe(true)
     expect(Buffer.byteLength(JSON.stringify(page))).toBeLessThan(1_048_576)
     const oversizedPage = { revisions: Array.from({ length: 100 }, () => revision), hasMore: true }
     expect(Buffer.byteLength(JSON.stringify(oversizedPage))).toBeGreaterThan(1_048_576)
-    expect(graphPageOutputSchema.safeParse({ ...page, revisions: [...page.revisions, revision] }).success).toBe(false)
+    expect(SchemaHelpers.decodeSafe(graphPageOutputSchema, { ...page, revisions: [...page.revisions, revision] }).success).toBe(false)
   })
 })
 

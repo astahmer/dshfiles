@@ -1,11 +1,11 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import * as Schema from 'effect/Schema'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { z } from 'zod'
 import { ApiClientLifecycle } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/index.js'
 import * as publicApi from '../src/api/index.js'
-import { ApiProtocolModel } from '../src/api/common.js'
+import { ApiChannelModel } from '../src/api/channel.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { registerApi } from '../src/api/host-runtime.js'
 
@@ -22,15 +22,15 @@ const api = defineApi({
   },
 })
 
-const routeResponseSchema = z.object({
-  result: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.unknown() }),
-    z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string(), details: z.looseObject({}) }) }),
+const routeResponseSchema = Schema.Struct({
+  result: Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }),
+    Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String, details: Schema.JsonObject }) }),
   ]),
 })
 
 describe('createRegisteredApiClient', () => {
-  const registeredContext = (call: (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => Promise<unknown>) => ({
+  const registeredContext = (call: (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => Promise<Schema.Json>) => ({
     get: (name: string) => (name === 'connection' ? { rpc: { call } } : undefined),
   })
 
@@ -89,7 +89,7 @@ function connectionFixture() {
     const request = new Request(`http://localhost${path}`, requestInit)
     const response = await route.fetch(request)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return routeResponseSchema.parse(await response.json()).result
+    return Schema.decodeUnknownSync(routeResponseSchema)(await response.json()).result
   })
   const context = {
     get(name: string) {
@@ -125,9 +125,9 @@ describe('generic API runtime', () => {
     expect(publicApi).not.toHaveProperty('apiChannel')
   })
   it('creates a stable single-segment channel', () => {
-    expect(ApiProtocolModel.apiChannel('@scope/plugin', 'status')).toMatch(/^\/dshx-[0-9a-f]+$/)
-    expect(ApiProtocolModel.apiChannel('@scope/plugin', 'status')).toBe(ApiProtocolModel.apiChannel('@scope/plugin', 'status'))
-    expect(ApiProtocolModel.apiChannel('@scope/plugin', 'status')).not.toBe(ApiProtocolModel.apiChannel('@scope/plugin', 'other'))
+    expect(ApiChannelModel.apiChannel('@scope/plugin', 'status')).toMatch(/^\/dshx-[0-9a-f]+$/)
+    expect(ApiChannelModel.apiChannel('@scope/plugin', 'status')).toBe(ApiChannelModel.apiChannel('@scope/plugin', 'status'))
+    expect(ApiChannelModel.apiChannel('@scope/plugin', 'status')).not.toBe(ApiChannelModel.apiChannel('@scope/plugin', 'other'))
   })
 
   it('registers handlers through the official Connection shape', async () => {
@@ -141,9 +141,9 @@ describe('generic API runtime', () => {
       },
     })
     await registerApi(fixture.context as never, '@scope/plugin', registration)
-    const statusChannel = ApiProtocolModel.apiChannel('@scope/plugin', 'status')
+    const statusChannel = ApiChannelModel.apiChannel('@scope/plugin', 'status')
     expect([...fixture.routes.keys()].filter(path => path.startsWith(`/api${statusChannel}/`))).toHaveLength(2)
-    const endpoint = `${ApiProtocolModel.apiChannel('@scope/plugin', 'status').slice(1)}/get`
+    const endpoint = `${ApiChannelModel.apiChannel('@scope/plugin', 'status').slice(1)}/get`
     await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toEqual({
       ok: true,
       value: { version: 1, output: { value: 'ready' } },
@@ -167,7 +167,7 @@ describe('generic API runtime', () => {
     // These package ids are a deterministic FNV-1a collision for the status API.
     const first = 'pkg-ppsie4'
     const second = 'pkg-1m7n0mo'
-    expect(ApiProtocolModel.apiChannel(first, 'status')).toBe(ApiProtocolModel.apiChannel(second, 'status'))
+    expect(ApiChannelModel.apiChannel(first, 'status')).toBe(ApiChannelModel.apiChannel(second, 'status'))
     await registerApi(fixture.context as never, first, registration)
     await expect(registerApi(fixture.context as never, second, registration)).rejects.toThrow('API channel collision')
     await fixture.removers[0]?.()
@@ -210,7 +210,7 @@ describe('generic API runtime', () => {
     await expect(client.refresh({ force: true })).resolves.toEqual({ value: 'refresh' })
     expect(call).toHaveBeenCalledWith(
       '/api',
-      `${ApiProtocolModel.apiChannel('@scope/plugin', 'status').slice(1)}/get`,
+      `${ApiChannelModel.apiChannel('@scope/plugin', 'status').slice(1)}/get`,
       { version: 1, input: undefined },
       undefined,
     )
@@ -347,7 +347,7 @@ describe('generic API runtime', () => {
         },
       }),
     )
-    const endpoint = `${ApiProtocolModel.apiChannel('@scope/plugin', 'transformed').slice(1)}/get`
+    const endpoint = `${ApiChannelModel.apiChannel('@scope/plugin', 'transformed').slice(1)}/get`
     await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toMatchObject({
       ok: true,
       value: { output: 'READY' },
@@ -371,7 +371,7 @@ describe('generic API runtime', () => {
     const implementation = vi.fn(({ input }: { input: { parsed: bigint } }) => input.parsed.toString())
     await registerApi(fixture.context as never, '@scope/plugin', transformed.host({ parse: implementation }))
 
-    const endpoint = `${ApiProtocolModel.apiChannel('@scope/plugin', 'host-input-transform').slice(1)}/parse`
+    const endpoint = `${ApiChannelModel.apiChannel('@scope/plugin', 'host-input-transform').slice(1)}/parse`
     await expect(fixture.call('/api', endpoint, { version: 1, input: { raw: '9007199254740993' } })).resolves.toMatchObject({
       ok: true,
       value: { output: '9007199254740993' },

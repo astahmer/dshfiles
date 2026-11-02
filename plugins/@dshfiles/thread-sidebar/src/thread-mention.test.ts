@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { ThreadMentionModel } from './thread-mention.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 test('thread reference keeps the native session mention and title presentation', () => {
   const mention = '@[Explore Agent Questions Plugin Features](dsh-session:InNlc3Npb24tZXhhbXBsZSI)'
@@ -31,7 +32,7 @@ test('thread mention requests decode only a non-empty session id', () => {
 
 test('thread mention failure diagnostics expose only safe identity fields', () => {
   const remoteFailure = Object.assign(new Error('private thread title'), { code: 'gateway/internal' })
-  const parsedFailure = ThreadMentionModel.failureCodeSchema.safeParse(remoteFailure)
+  const parsedFailure = SchemaHelpers.decodeUnknownSafe(ThreadMentionModel.failureCodeSchema, remoteFailure)
 
   assert.equal(parsedFailure.success, true)
   if (!parsedFailure.success) assert.fail('Remote failure code did not parse')

@@ -1,6 +1,10 @@
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { PluginApiError } from '@dshfiles/dshx/api'
+import { Schema } from 'effect'
 import { UndoHistory, type UndoHistoryRecord } from './undo-history.js'
+
+class Running extends Schema.TaggedError<Running>()('Running', { message: Schema.String }) {}
+class NothingToUndo extends Schema.TaggedError<NothingToUndo>()('NothingToUndo', { message: Schema.String }) {}
+class NothingToRedo extends Schema.TaggedError<NothingToRedo>()('NothingToRedo', { message: Schema.String }) {}
 
 export interface UndoFiles {
   /** Snapshot the workspace through the provider that claims it; null when none does. */
@@ -34,7 +38,7 @@ export const createUndoService = (deps: {
 
   const refuseWhileRunning = async (sessionId: string, verb: string): Promise<void> => {
     if (await deps.sessions.running(sessionId)) {
-      throw new PluginApiError(`This thread is still running; stop it or wait for its turn to end, then ${verb} again.`, { code: 'running' })
+      throw new Running({ message: `This thread is still running; stop it or wait for its turn to end, then ${verb} again.` })
     }
   }
 
@@ -91,8 +95,7 @@ export const createUndoService = (deps: {
       await refuseWhileRunning(sessionId, 'undo')
       const source = record(sessionId)
       const undone = source.checkpoints.at(-1)
-      if (undone === undefined)
-        throw new PluginApiError('There is no turn to undo in this thread since this plugin started recording it.', { code: 'nothing-to-undo' })
+      if (undone === undefined) throw new NothingToUndo({ message: 'There is no turn to undo in this thread since this plugin started recording it.' })
       const previous =
         undone.provider === null || undone.snapshot === null
           ? null
@@ -113,7 +116,7 @@ export const createUndoService = (deps: {
     redo: async (sessionId: string) => {
       const current = record(sessionId)
       if (current.redo === null) {
-        throw new PluginApiError('There is nothing to redo: this thread is not an undo, or it ran a new turn since.', { code: 'nothing-to-redo' })
+        throw new NothingToRedo({ message: 'There is nothing to redo: this thread is not an undo, or it ran a new turn since.' })
       }
       await refuseWhileRunning(sessionId, 'redo')
       const redo = current.redo

@@ -1,43 +1,46 @@
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const MAX_REVIEW_MARKS = 3_000
 export const MAX_REVIEW_STORE_BYTES = 1_200_000
 
-const reviewPathSchema = z.string().min(1).max(2048)
-const reviewDigestSchema = z.string().regex(/^[a-f0-9]{64}$/)
+const reviewPathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))
+const reviewDigestSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
 
-export const reviewFileSchema = z
-  .object({
+export const reviewFileSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     path: reviewPathSchema,
-    contentDigest: reviewDigestSchema.nullable(),
-  })
-  .strict()
+    contentDigest: Schema.NullOr(reviewDigestSchema),
+  }),
+)
 
-export const reviewMarkSchema = z
-  .object({
-    repositoryRoot: z.string().min(1).max(2048),
-    commitId: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+export const reviewMarkSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    repositoryRoot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+    commitId: Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)),
     path: reviewPathSchema,
     contentDigest: reviewDigestSchema,
-    reviewedAt: z.string().datetime(),
-  })
-  .strict()
+    reviewedAt: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/)),
+  }),
+)
 
-export const reviewStoreSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    marks: z.array(reviewMarkSchema).max(MAX_REVIEW_MARKS),
-  })
-  .strict()
-  .superRefine((store, context) => {
+const reviewStoreShape = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  marks: Schema.Array(reviewMarkSchema).check(Schema.isMaxLength(MAX_REVIEW_MARKS)),
+})
+
+export const reviewStoreSchema = SchemaHelpers.strictStruct(reviewStoreShape).check(
+  Schema.makeFilter(store => {
     const keys = store.marks.map(mark => `${mark.repositoryRoot}\u0000${mark.commitId}\u0000${mark.path}\u0000${mark.contentDigest}`)
-    if (new Set(keys).size !== keys.length) context.addIssue({ code: 'custom', message: 'Review marks must be unique.' })
-  })
+    if (new Set(keys).size === keys.length) return undefined
+    return 'Review marks must be unique.'
+  }),
+)
 
-export type ReviewFile = z.infer<typeof reviewFileSchema>
-export type ReviewMark = z.infer<typeof reviewMarkSchema>
-export type ReviewStore = z.infer<typeof reviewStoreSchema>
+export type ReviewFile = Schema.Schema.Type<typeof reviewFileSchema>
+export type ReviewMark = Schema.Schema.Type<typeof reviewMarkSchema>
+export type ReviewStore = Schema.Schema.Type<typeof reviewStoreSchema>
 
 export interface ReviewChange {
   readonly file: ReviewFile
@@ -50,7 +53,7 @@ const readReviewStore = (source: string | null): ReviewStore => {
   if (source === null || new TextEncoder().encode(source).byteLength > MAX_REVIEW_STORE_BYTES) return emptyReviewStore()
   try {
     const result = decodeJsonSafe(reviewStoreSchema, source)
-    return result.success ? result.data : emptyReviewStore()
+    return result._tag === 'Success' ? result.success : emptyReviewStore()
   } catch {
     return emptyReviewStore()
   }
@@ -82,8 +85,8 @@ const byReviewedAtDescending = (left: ReviewMark, right: ReviewMark): number => 
 
 const toggleFileReview = (store: ReviewStore, mark: ReviewMark, reviewed: boolean): ReviewStore => {
   const previous = store.marks.filter(item => item.repositoryRoot !== mark.repositoryRoot || item.commitId !== mark.commitId || item.path !== mark.path)
-  if (!reviewed) return reviewStoreSchema.parse({ schemaVersion: 1, marks: previous })
-  return reviewStoreSchema.parse({ schemaVersion: 1, marks: boundedReviewMarks([...previous, mark].sort(byReviewedAtDescending)) })
+  if (!reviewed) return SchemaHelpers.decode(reviewStoreSchema, { schemaVersion: 1, marks: previous })
+  return SchemaHelpers.decode(reviewStoreSchema, { schemaVersion: 1, marks: boundedReviewMarks([...previous, mark].sort(byReviewedAtDescending)) })
 }
 
 const applyFileReviews = ({

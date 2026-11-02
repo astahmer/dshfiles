@@ -7,15 +7,17 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { Effect, Layer, Schema } from 'effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createHash, randomUUID } from 'node:crypto'
-import { z } from 'zod'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectChecksTaskView, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
-import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type RemoteHost } from './core.js'
+import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type ProjectChecksConfig, type RemoteHost } from './core.js'
+import { exactSchema } from './contract-schema.js'
 import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './execution.js'
 import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { runManagedProcess, type ProcessResult } from './managed-process.js'
@@ -24,6 +26,7 @@ import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, sto
 import { DurableTaskRunner } from './durable-task-runner.js'
 import { DurableTaskStore } from './durable-task-store.js'
 import { durableTaskDomain } from './durable-task-domain.js'
+import { ProjectChecksOperationError, ProjectChecksRuntime, type ProjectChecksOperation } from './effect-runtime.js'
 import { durableTaskSchema, type DurableTask } from './durable-tasks.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -41,7 +44,7 @@ const MAX_HOOK_EVENTS = 12
 const REVISION_TIMEOUT_MS = 10_000
 const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
 
-export const Config = projectChecksConfigSchema
+export const Config = exactSchema(projectChecksConfigSchema)
 
 type ReceiptStage =
   | 'resolve-session-paths'
@@ -129,10 +132,10 @@ function entryFor(ctx: Context) {
   return matches[0]
 }
 
-const configFor = (ctx: Context) => {
-  const parsed = Config.safeParse(entryFor(ctx).options.config ?? {})
-  if (!parsed.success) throw new Error('Project checks profile configuration is invalid.')
-  return parsed.data
+const configFor = (ctx: Context): ProjectChecksConfig => {
+  const parsed = Schema.decodeUnknownResult(projectChecksConfigSchema, { onExcessProperty: 'error' })(entryFor(ctx).options.config ?? {})
+  if (parsed._tag === 'Failure') throw new Error('Project checks profile configuration is invalid.')
+  return parsed.success
 }
 
 const sessionPaths = async (ctx: Context, sessionId: string, action: ProjectAction): Promise<ProjectPaths> => {
@@ -146,8 +149,13 @@ const sessionPaths = async (ctx: Context, sessionId: string, action: ProjectActi
   return { root, cwd }
 }
 
+const storageDomainForContext = (ctx: Context) => ctx.get('storageDomain')
+type StorageDomainService = ReturnType<typeof storageDomainForContext>
+
+const storageServices = new WeakMap<Context, StorageDomainService>()
+
 const openProjectChecksDomain = (ctx: Context) => {
-  const storage = ctx.get('storageDomain')
+  const storage = storageServices.get(ctx)
   if (storage === undefined) throw new Error('Project checks storage is unavailable.')
   return storage.open(projectChecksDomain)
 }
@@ -168,7 +176,7 @@ const storageFor = (ctx: Context): Promise<ProjectChecksDomain> => {
 }
 
 const openDurableTaskDomain = (ctx: Context) => {
-  const storage = ctx.get('storageDomain')
+  const storage = storageServices.get(ctx)
   if (storage === undefined) throw new Error('Durable Project Checks storage is unavailable.')
   return storage.open(durableTaskDomain)
 }
@@ -262,7 +270,7 @@ const durableTaskRunnerFor = async (ctx: Context): Promise<DurableTaskRunner> =>
       findReceipt: async (taskId, attemptId) => {
         const saved = store.findAttemptReceipt(taskId, attemptId)
         if (saved === undefined) return null
-        const receipt = storedReceiptSchema.parse(saved)
+        const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
         if (receipt.taskId !== taskId || receipt.taskAttemptId !== attemptId)
           throw new Error('A stored receipt does not match the requested durable task attempt.')
         if (receipt.failure === 'process-group-failed') return { status: 'unknown', exitCode: receipt.exitCode }
@@ -334,7 +342,7 @@ const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<Stor
   const receipts = new Map<string, StoredReceipt>()
   for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
   for (const saved of taskStore.listAttemptReceipts({ sessionId, limit: MAX_RECEIPTS_PER_SESSION })) {
-    const receipt = storedReceiptSchema.parse(saved)
+    const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
     receipts.set(receipt.id, receipt)
   }
   return [...receipts.values()]
@@ -348,7 +356,7 @@ const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<rea
   const receipts = new Map<string, StoredReceipt>()
   for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
   for (const saved of taskStore.listAttemptReceipts({ since, limit: MAX_RECEIPTS_TOTAL })) {
-    const receipt = storedReceiptSchema.parse(saved)
+    const receipt = Schema.decodeUnknownSync(storedReceiptSchema)(saved)
     receipts.set(receipt.id, receipt)
   }
   return ProjectChecksReceiptModel.after(
@@ -364,7 +372,7 @@ const emitReceiptActivity = (ctx: Context, receipt: StoredReceipt): void =>
 const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<void> => {
   if (receipt.taskId !== undefined || receipt.taskAttemptId !== undefined) {
     if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) throw new Error('A durable task receipt is missing its task identity.')
-    await (await durableTaskStoreFor(ctx)).saveAttemptReceipt(storedReceiptSchema.parse(receipt))
+    await (await durableTaskStoreFor(ctx)).saveAttemptReceipt(Schema.decodeUnknownSync(storedReceiptSchema)(receipt))
     return
   }
   const table = (await storageFor(ctx)).table('receipts')
@@ -624,6 +632,12 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
 
     await options.onProgress?.('recording-result')
     const finishedAt = Date.now()
+    const receiptExtras: { -readonly [Key in keyof StoredReceipt]?: StoredReceipt[Key] } = {}
+    if (options.durableTaskId !== undefined) receiptExtras.taskId = options.durableTaskId
+    if (options.durableTaskAttemptId !== undefined) receiptExtras.taskAttemptId = options.durableTaskAttemptId
+    if (executor !== undefined) receiptExtras.executor = executor
+    if (remoteFailure !== null) receiptExtras.remoteFailure = remoteFailure
+    if (options.verificationStage !== undefined) receiptExtras.verificationStage = options.verificationStage
     const receipt: StoredReceipt = {
       id: diagnosticId,
       sessionId,
@@ -641,12 +655,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       verificationTurn: options.verificationTurn,
       automatic: options.automatic,
       attempt: options.attempt,
+      ...receiptExtras,
     }
-    if (options.durableTaskId !== undefined) receipt.taskId = options.durableTaskId
-    if (options.durableTaskAttemptId !== undefined) receipt.taskAttemptId = options.durableTaskAttemptId
-    if (executor !== undefined) receipt.executor = executor
-    if (remoteFailure !== null) receipt.remoteFailure = remoteFailure
-    if (options.verificationStage !== undefined) receipt.verificationStage = options.verificationStage
     stage = 'persist-receipt'
     await ProjectChecksActivityModel.persistAndEmit({
       receipt,
@@ -900,7 +910,7 @@ const dispatchDurableTask = async (ctx: Context, sessionId: string, actionId: st
   const paths = await sessionPaths(ctx, sessionId, action)
   const taskId = createHash('sha256').update(`${sessionId}\0${idempotencyKey}`).digest('hex')
   const now = Date.now()
-  const task = durableTaskSchema.parse({
+  const task = Schema.decodeUnknownSync(durableTaskSchema)({
     id: taskId,
     idempotencyKey,
     sessionId,
@@ -918,210 +928,255 @@ const dispatchDurableTask = async (ctx: Context, sessionId: string, actionId: st
   return durableTaskView(stored, action)
 }
 
-const hostApi = projectChecksApi.host({
-  actions: async ({ input, ctx, caller }) => apiActions(ctx, targetSessionId(input.sessionId, caller)),
-  receipts: async ({ input, ctx, caller }) => apiReceipts(ctx, targetSessionId(input.sessionId, caller)),
-  hookEvents: async ({ input, ctx, caller }) => hookEvents(ctx, targetSessionId(input.sessionId, caller)),
-  run: async ({ input, ctx, caller, signal }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    const action = configFor(ctx).actions.find(candidate => candidate.id === input.actionId)
-    if (action === undefined) throw new Error('Project action is not configured.')
-    const isVisible = (await apiActions(ctx, sessionId)).some(candidate => candidate.id === action.id)
-    if (!isVisible) throw new Error('Project action is not available in this session directory.')
-    const receipt = await runAction(ctx, sessionId, action, {
-      automatic: false,
-      attempt: 0,
-      verificationTurn: null,
-      signal,
-      requireRevision: false,
+const projectChecksEffect = <Output>(operation: ProjectChecksOperation, work: (ctx: Context, signal: AbortSignal) => Promise<Output>) =>
+  Effect.fn(`project checks ${operation}`)(function* () {
+    const runtime = yield* ProjectChecksRuntime
+    return yield* Effect.tryPromise({
+      try: signal => work(runtime.context, signal),
+      catch: () => new ProjectChecksOperationError({ operation }),
     })
-    const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
-    const freshness = ProjectChecksModel.receiptFreshness(
-      receiptRevision,
-      await (async () => {
-        try {
-          return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
-        } catch {
-          return null
-        }
-      })(),
-    )
-    return { ...receipt, configurationFreshness: 'unknown' as const, freshness }
+  })
+
+const { hostApi: makeHostApi, ...effectPlugin } = DshxEffect.plugin<ProjectChecksConfig, ProjectChecksOperationError, ProjectChecksRuntime>({
+  layer: (ctx: Context) => {
+    storageServices.set(ctx, storageDomainForContext(ctx))
+    return Layer.succeed(ProjectChecksRuntime, ProjectChecksRuntime.of({ context: ctx }))
   },
-  dispatch: async ({ input, ctx, caller }) => dispatchDurableTask(ctx, targetSessionId(input.sessionId, caller), input.actionId, input.idempotencyKey),
-  tasks: async ({ input, ctx, caller }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    const runner = await durableTaskRunnerFor(ctx)
-    return (await runner.list(sessionId)).map(task =>
-      durableTaskView(
+  setup: (ctx, config) =>
+    Effect.gen(function* () {
+      yield* Effect.acquireRelease(
+        Effect.tryPromise({
+          try: () => durableTaskRunnerFor(ctx),
+          catch: () => new ProjectChecksOperationError({ operation: 'setup' }),
+        }),
+        () =>
+          Effect.tryPromise({
+            try: async () => {
+              try {
+                await closeDurableProjectChecksTasks(ctx)
+              } finally {
+                await closeProjectChecksDomain(ctx)
+                storageServices.delete(ctx)
+              }
+            },
+            catch: () => new ProjectChecksOperationError({ operation: 'setup' }),
+          }).pipe(Effect.orDie),
+      )
+      yield* Effect.tryPromise({
+        try: async () => setupHost(ctx, config),
+        catch: () => new ProjectChecksOperationError({ operation: 'setup' }),
+      })
+    }),
+})
+
+const hostApi = makeHostApi(projectChecksApi, {
+  actions: ({ input, caller }) => projectChecksEffect('actions', ctx => apiActions(ctx, targetSessionId(input.sessionId, caller)))(),
+  receipts: ({ input, caller }) => projectChecksEffect('receipts', ctx => apiReceipts(ctx, targetSessionId(input.sessionId, caller)))(),
+  hookEvents: ({ input, caller }) => projectChecksEffect('hook-events', ctx => hookEvents(ctx, targetSessionId(input.sessionId, caller)))(),
+  run: ({ input, caller }) =>
+    projectChecksEffect('run', async (ctx, signal) => {
+      const sessionId = targetSessionId(input.sessionId, caller)
+      const action = configFor(ctx).actions.find(candidate => candidate.id === input.actionId)
+      if (action === undefined) throw new Error('Project action is not configured.')
+      const isVisible = (await apiActions(ctx, sessionId)).some(candidate => candidate.id === action.id)
+      if (!isVisible) throw new Error('Project action is not available in this session directory.')
+      const receipt = await runAction(ctx, sessionId, action, {
+        automatic: false,
+        attempt: 0,
+        verificationTurn: null,
+        signal,
+        requireRevision: false,
+      })
+      const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
+      const freshness = ProjectChecksModel.receiptFreshness(
+        receiptRevision,
+        await (async () => {
+          try {
+            return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
+          } catch {
+            return null
+          }
+        })(),
+      )
+      return { ...receipt, configurationFreshness: 'unknown' as const, freshness }
+    })(),
+  dispatch: ({ input, caller }) =>
+    projectChecksEffect('dispatch', ctx => dispatchDurableTask(ctx, targetSessionId(input.sessionId, caller), input.actionId, input.idempotencyKey))(),
+  tasks: ({ input, caller }) =>
+    projectChecksEffect('tasks', async ctx => {
+      const sessionId = targetSessionId(input.sessionId, caller)
+      const runner = await durableTaskRunnerFor(ctx)
+      return (await runner.list(sessionId)).map(task =>
+        durableTaskView(
+          task,
+          configFor(ctx).actions.find(action => action.id === task.actionId),
+        ),
+      )
+    })(),
+  cancelTask: ({ input, caller }) =>
+    projectChecksEffect('cancel-task', async ctx => {
+      const sessionId = targetSessionId(input.sessionId, caller)
+      const runner = await durableTaskRunnerFor(ctx)
+      const existing = runner.get(input.taskId)
+      if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
+      const task = await runner.cancel(input.taskId)
+      return durableTaskView(
         task,
         configFor(ctx).actions.find(action => action.id === task.actionId),
-      ),
-    )
-  },
-  cancelTask: async ({ input, ctx, caller }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    const runner = await durableTaskRunnerFor(ctx)
-    const existing = runner.get(input.taskId)
-    if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
-    const task = await runner.cancel(input.taskId)
-    return durableTaskView(
-      task,
-      configFor(ctx).actions.find(action => action.id === task.actionId),
-    )
-  },
-  retryTask: async ({ input, ctx, caller }) => {
-    const sessionId = targetSessionId(input.sessionId, caller)
-    const runner = await durableTaskRunnerFor(ctx)
-    const existing = runner.get(input.taskId)
-    if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
-    const task = await runner.retry(input.taskId, input.confirmPossibleDuplicate)
-    return durableTaskView(
-      task,
-      configFor(ctx).actions.find(action => action.id === task.actionId),
-    )
-  },
-  assertVerifiedCompletion: async ({ input, ctx, signal, caller }) => {
-    if (!mayVerifyCandidate(caller)) throw new Error('Only jj-integration may verify a completed turn.')
-    return { status: hasVerifiedCompletion(ctx, input, signal) ? 'authorized' : 'unavailable' }
-  },
-  verifyCandidate: async ({ input, ctx, signal, caller }) => {
-    if (!mayVerifyCandidate(caller)) throw new Error('Only jj-integration may verify a rebased candidate.')
-    return verifyRebasedCandidate(ctx, input, signal)
+      )
+    })(),
+  retryTask: ({ input, caller }) =>
+    projectChecksEffect('retry-task', async ctx => {
+      const sessionId = targetSessionId(input.sessionId, caller)
+      const runner = await durableTaskRunnerFor(ctx)
+      const existing = runner.get(input.taskId)
+      if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
+      const task = await runner.retry(input.taskId, input.confirmPossibleDuplicate)
+      return durableTaskView(
+        task,
+        configFor(ctx).actions.find(action => action.id === task.actionId),
+      )
+    })(),
+  assertVerifiedCompletion: ({ input, signal, caller }) =>
+    Effect.fn('project checks assert verified completion')(function* () {
+      const runtime = yield* ProjectChecksRuntime
+      if (!mayVerifyCandidate(caller)) return yield* Effect.fail(new ProjectChecksOperationError({ operation: 'assert-verified-completion' }))
+      const status: 'authorized' | 'unavailable' = hasVerifiedCompletion(runtime.context, input, signal) ? 'authorized' : 'unavailable'
+      return { status }
+    })(),
+  verifyCandidate: ({ input, caller }) => {
+    if (!mayVerifyCandidate(caller)) return Effect.fail(new ProjectChecksOperationError({ operation: 'verify-candidate' }))
+    return projectChecksEffect('verify-candidate', (ctx, signal) => verifyRebasedCandidate(ctx, input, signal))()
   },
 })
 
+const setupHost = (ctx: Context, config: ProjectChecksConfig): void => {
+  ctx.on('dshfiles/activity/backfill', payload => {
+    const parsed = Schema.decodeUnknownResult(
+      Schema.Struct({ since: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))) }),
+      {
+        onExcessProperty: 'error',
+      },
+    )(payload)
+    if (parsed._tag === 'Failure') return undefined
+    void readStoredReceiptsAfter(ctx, parsed.success.since ?? 0)
+      .then(receipts => {
+        for (const receipt of receipts) emitReceiptActivity(ctx, receipt)
+      })
+      .catch(() => undefined)
+    return undefined
+  })
+  ctx.emit('dshfiles/activity/source-ready', { source: 'project-checks-receipts', version: 1 })
+  if (!config.actions.some(action => action.verifyBeforeComplete)) return
+
+  ctx.on('agent/turn-stopping', async ({ agent, turn, signal }) => {
+    const sessionId = String(agent.session.id)
+    const actions = config.actions.filter(action => action.verifyBeforeComplete)
+    const available: ProjectAction[] = []
+    for (const action of actions) {
+      try {
+        await sessionPaths(ctx, sessionId, action)
+        available.push(action)
+      } catch {
+        continue
+      }
+    }
+    if (available.length === 0 || signal.aborted) return
+
+    const previous = await readStoredReceipts(ctx, sessionId)
+    const previousAttempts = previous
+      .filter(
+        receipt =>
+          receipt.automatic && receipt.verificationTurn === turn && (receipt.verificationStage === undefined || receipt.verificationStage === 'completion'),
+      )
+      .map(receipt => receipt.attempt)
+    const attempt = Math.max(0, ...previousAttempts) + 1
+    if (attempt > config.maxVerificationAttempts) throw new Error('Project verification attempt limit was exceeded.')
+
+    const results: StoredReceipt[] = []
+    for (const action of available) {
+      if (signal.aborted) return
+      results.push(
+        await runAction(ctx, sessionId, action, {
+          automatic: true,
+          attempt,
+          verificationTurn: turn,
+          verificationStage: 'completion',
+          signal,
+          requireRevision: true,
+        }),
+      )
+    }
+
+    if (signal.aborted) return
+    const failed = results.filter(
+      (receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed',
+    )
+    const verifiedRevision = results[0]?.sourceRevision
+    const allChecksShareRevision =
+      verifiedRevision !== undefined && verifiedRevision !== null && results.every(receipt => receipt.sourceRevision === verifiedRevision)
+    const requestAgentFix = (message: string): void => {
+      agent.steer({
+        id: MessageId(randomUUID()),
+        role: 'user',
+        content: [{ type: 'text', text: message.slice(0, 4_000) }],
+        source: { kind: 'dshfiles-project-checks' },
+      })
+    }
+
+    if (failed.length === 0 && verifiedRevision !== undefined && verifiedRevision !== null && allChecksShareRevision) {
+      const permit: CompletionVerificationPermit = {
+        turn,
+        sourceRevision: verifiedRevision,
+        signal,
+        actionIds: results.map(receipt => receipt.actionId),
+      }
+      const permits = completionPermitsFor(ctx)
+      permits.set(sessionId, permit)
+      const verifiedTurn: ProjectChecksVerifiedTurn = {
+        sessionId: SessionId(sessionId),
+        turn,
+        sourceRevision: verifiedRevision,
+        signal,
+        requestAgentFix,
+      }
+      try {
+        await ctx.serial('dshfiles/project-checks/verified', verifiedTurn)
+      } finally {
+        if (permits.get(sessionId) === permit) permits.delete(sessionId)
+      }
+      return
+    }
+
+    const failurePrompt =
+      failed.length === 0
+        ? 'Project checks did not verify one exact working-copy revision. Inspect the work and stop again so every check runs against the same revision.'
+        : ProjectChecksModel.verificationPrompt(
+            failed.map(receipt => ({
+              label: receipt.label,
+              status: receipt.status,
+              exitCode: receipt.exitCode,
+              failure: receipt.failure,
+            })),
+            attempt,
+            config.maxVerificationAttempts,
+          )
+    if (attempt < config.maxVerificationAttempts) {
+      requestAgentFix(failurePrompt)
+      return
+    }
+    throw new Error(
+      failed.length === 0
+        ? 'Project checks did not verify one exact working-copy revision; this turn cannot be marked complete.'
+        : 'Configured project checks failed; this turn cannot be marked complete.',
+    )
+  })
+}
+
 export default defineHost({
+  ...effectPlugin,
   name: PACKAGE_NAME,
   Config,
   inject: ['agents', 'configEditor', 'sessionQuery', 'storageDomain', 'subprocess'],
   apis: [hostApi],
-  setup: ctx => {
-    const config = configFor(ctx)
-    ctx.effect(() => {
-      void durableTaskRunnerFor(ctx).catch(error => reportApiFailure('durable-task', randomUUID(), 'recover-tasks', error))
-      return async () => {
-        try {
-          await closeDurableProjectChecksTasks(ctx)
-        } finally {
-          await closeProjectChecksDomain(ctx)
-        }
-      }
-    }, 'Project Checks durable task and receipt domains')
-    ctx.on('dshfiles/activity/backfill', payload => {
-      const parsed = z.object({ since: z.number().int().nonnegative().optional() }).strict().safeParse(payload)
-      if (!parsed.success) return undefined
-      void readStoredReceiptsAfter(ctx, parsed.data.since ?? 0)
-        .then(receipts => {
-          for (const receipt of receipts) emitReceiptActivity(ctx, receipt)
-        })
-        .catch(() => undefined)
-      return undefined
-    })
-    ctx.emit('dshfiles/activity/source-ready', { source: 'project-checks-receipts', version: 1 })
-    if (!config.actions.some(action => action.verifyBeforeComplete)) return
-
-    ctx.on('agent/turn-stopping', async ({ agent, turn, signal }) => {
-      const sessionId = String(agent.session.id)
-      const actions = config.actions.filter(action => action.verifyBeforeComplete)
-      const available: ProjectAction[] = []
-      for (const action of actions) {
-        try {
-          await sessionPaths(ctx, sessionId, action)
-          available.push(action)
-        } catch {
-          continue
-        }
-      }
-      if (available.length === 0 || signal.aborted) return
-
-      const previous = await readStoredReceipts(ctx, sessionId)
-      const previousAttempts = previous
-        .filter(
-          receipt =>
-            receipt.automatic && receipt.verificationTurn === turn && (receipt.verificationStage === undefined || receipt.verificationStage === 'completion'),
-        )
-        .map(receipt => receipt.attempt)
-      const attempt = Math.max(0, ...previousAttempts) + 1
-      if (attempt > config.maxVerificationAttempts) throw new Error('Project verification attempt limit was exceeded.')
-
-      const results: StoredReceipt[] = []
-      for (const action of available) {
-        if (signal.aborted) return
-        results.push(
-          await runAction(ctx, sessionId, action, {
-            automatic: true,
-            attempt,
-            verificationTurn: turn,
-            verificationStage: 'completion',
-            signal,
-            requireRevision: true,
-          }),
-        )
-      }
-
-      if (signal.aborted) return
-      const failed = results.filter(
-        (receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed',
-      )
-      const verifiedRevision = results[0]?.sourceRevision
-      const allChecksShareRevision =
-        verifiedRevision !== undefined && verifiedRevision !== null && results.every(receipt => receipt.sourceRevision === verifiedRevision)
-      const requestAgentFix = (message: string): void => {
-        agent.steer({
-          id: MessageId(randomUUID()),
-          role: 'user',
-          content: [{ type: 'text', text: message.slice(0, 4_000) }],
-          source: { kind: 'dshfiles-project-checks' },
-        })
-      }
-
-      if (failed.length === 0 && verifiedRevision !== undefined && verifiedRevision !== null && allChecksShareRevision) {
-        const permit: CompletionVerificationPermit = {
-          turn,
-          sourceRevision: verifiedRevision,
-          signal,
-          actionIds: results.map(receipt => receipt.actionId),
-        }
-        const permits = completionPermitsFor(ctx)
-        permits.set(sessionId, permit)
-        const verifiedTurn: ProjectChecksVerifiedTurn = {
-          sessionId: SessionId(sessionId),
-          turn,
-          sourceRevision: verifiedRevision,
-          signal,
-          requestAgentFix,
-        }
-        try {
-          await ctx.serial('dshfiles/project-checks/verified', verifiedTurn)
-        } finally {
-          if (permits.get(sessionId) === permit) permits.delete(sessionId)
-        }
-        return
-      }
-
-      const failurePrompt =
-        failed.length === 0
-          ? 'Project checks did not verify one exact working-copy revision. Inspect the work and stop again so every check runs against the same revision.'
-          : ProjectChecksModel.verificationPrompt(
-              failed.map(receipt => ({
-                label: receipt.label,
-                status: receipt.status,
-                exitCode: receipt.exitCode,
-                failure: receipt.failure,
-              })),
-              attempt,
-              config.maxVerificationAttempts,
-            )
-      if (attempt < config.maxVerificationAttempts) {
-        requestAgentFix(failurePrompt)
-        return
-      }
-      throw new Error(
-        failed.length === 0
-          ? 'Project checks did not verify one exact working-copy revision; this turn cannot be marked complete.'
-          : 'Configured project checks failed; this turn cannot be marked complete.',
-      )
-    })
-  },
 })

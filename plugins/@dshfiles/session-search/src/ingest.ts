@@ -9,6 +9,8 @@ import { setImmediate } from 'node:timers/promises'
 import { buildSessionEventSearchDocuments, extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
 import type { DocumentRow, SearchIndex } from './index-db.js'
 import { withoutUndefined } from './optional-fields.js'
@@ -52,8 +54,8 @@ const parseEvents = (text: string, skipHeader: boolean): readonly SessionEvent[]
 const fallbackHeader = (sessionId: string): SessionHeaderRow => ({ version: 4, id: sessionId, createdAt: 0, isSeeded: false })
 
 const toHeader = (raw: unknown, sessionId: string): SessionHeaderRow => {
-  const parsed = sessionHeaderSchema.safeParse(raw)
-  return parsed.success ? withoutUndefined(parsed.data) : fallbackHeader(sessionId)
+  const parsed = Schema.decodeUnknownOption(sessionHeaderSchema)(raw)
+  return Option.isSome(parsed) ? withoutUndefined(parsed.value) : fallbackHeader(sessionId)
 }
 
 /** Read only the byte window a pass needs: the whole 69 MB log used to be read to slice it, on every pass. */

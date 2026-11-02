@@ -1,5 +1,16 @@
 import { describe, expect, test } from 'vitest'
+import type { ApiSchema } from '@dshfiles/dshx/api'
 import { jjIntegrationApi } from './api.js'
+
+const validate = async (schema: ApiSchema | undefined, value: unknown): Promise<boolean> => {
+  if (schema === undefined || !('~standard' in schema)) throw new Error('API schema must expose Standard Schema validation')
+  const standard = schema['~standard']
+  if (typeof standard !== 'object' || standard === null || !('validate' in standard) || typeof standard.validate !== 'function') {
+    throw new Error('API schema must expose Standard Schema validation')
+  }
+  const result = await standard.validate(value)
+  return 'issues' in result
+}
 
 describe('jj-integration tool exposure', () => {
   test('every thread-workspace action a human can take is a named tool', () => {
@@ -45,70 +56,56 @@ describe('jj-integration tool exposure', () => {
   test('repository inventory accepts old Host output and reports background refresh state', async () => {
     const output = jjIntegrationApi.methods.repositories.output
     if (output === undefined) throw new Error('repositories must declare an output schema')
-    expect('issues' in (await output['~standard'].validate({ repositories: [] }))).toBe(false)
-    expect(
-      'issues' in
-        (await output['~standard'].validate({
-          repositories: [{ repoRoot: '/work/project', title: 'project', workspaceId: null, threads: [] }],
-        })),
-    ).toBe(false)
-    expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: true, refreshFailed: false }))).toBe(false)
-    expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: 'yes' }))).toBe(true)
+    expect(await validate(output, { repositories: [] })).toBe(false)
+    expect(await validate(output, { repositories: [{ repoRoot: '/work/project', title: 'project', workspaceId: null, threads: [] }] })).toBe(false)
+    expect(await validate(output, { repositories: [], refreshing: true, refreshFailed: false })).toBe(false)
+    expect(await validate(output, { repositories: [], refreshing: 'yes' })).toBe(true)
 
     const refreshOutput = jjIntegrationApi.methods.refreshRepositories.output
     if (refreshOutput === undefined) throw new Error('refreshRepositories must declare an output schema')
-    expect('issues' in (await refreshOutput['~standard'].validate({ started: true }))).toBe(false)
+    expect(await validate(refreshOutput, { started: true })).toBe(false)
   })
 
   test('removing a thread workspace never abandons work without an explicit force', async () => {
     const schema = jjIntegrationApi.methods.discard.input
     if (schema === undefined) throw new Error('discard must declare an input schema')
-    const validate = async (value: { readonly path: string; readonly force?: boolean | undefined }) => await schema['~standard'].validate(value)
-
     expect(jjIntegrationApi.methods.discard.description).toContain('Call only when the user asked')
-    expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(true)
-    expect('issues' in (await validate({ path: '/work/thread-abc123', force: false }))).toBe(false)
+    expect(await validate(schema, { path: '/work/thread-abc123' })).toBe(true)
+    expect(await validate(schema, { path: '/work/thread-abc123', force: false })).toBe(false)
   })
 
   test('batch discard requires explicit confirmation and bounds target count', async () => {
     const schema = jjIntegrationApi.methods.discardMany.input
     if (schema === undefined) throw new Error('discardMany must declare an input schema')
-    const validate = async (value: { readonly paths: readonly string[]; readonly force: boolean; readonly confirm?: true }) =>
-      await schema['~standard'].validate(value)
-
     expect(jjIntegrationApi.methods.discardMany.description).toContain('force: true only when the user explicitly authorized')
-    expect('issues' in (await validate({ paths: ['/work/thread-abc123'], force: false }))).toBe(true)
-    expect('issues' in (await validate({ paths: ['/work/thread-abc123'], force: false, confirm: true }))).toBe(false)
-    expect(
-      'issues' in (await validate({ paths: Array.from({ length: 101 }, (_, index) => `/work/thread-${String(index)}`), force: false, confirm: true })),
-    ).toBe(true)
+    expect(await validate(schema, { paths: ['/work/thread-abc123'], force: false })).toBe(true)
+    expect(await validate(schema, { paths: ['/work/thread-abc123'], force: false, confirm: true })).toBe(false)
+    expect(await validate(schema, { paths: Array.from({ length: 101 }, (_, index) => `/work/thread-${String(index)}`), force: false, confirm: true })).toBe(
+      true,
+    )
   })
 
   test('manual integration accepts an optional non-empty bookmark target', async () => {
     const schema = jjIntegrationApi.methods.land.input
     if (schema === undefined) throw new Error('land must declare an input schema')
-    const validate = async (value: { readonly path: string; readonly bookmark?: string }) => await schema['~standard'].validate(value)
-
-    expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(false)
-    expect('issues' in (await validate({ path: '/work/thread-abc123', bookmark: 'release/next' }))).toBe(false)
-    expect('issues' in (await validate({ path: '/work/thread-abc123', bookmark: '' }))).toBe(true)
+    expect(await validate(schema, { path: '/work/thread-abc123' })).toBe(false)
+    expect(await validate(schema, { path: '/work/thread-abc123', bookmark: 'release/next' })).toBe(false)
+    expect(await validate(schema, { path: '/work/thread-abc123', bookmark: '' })).toBe(true)
   })
 
   test('agent rebase tool accepts an optional bookmark override', async () => {
     const schema = jjIntegrationApi.methods.landThread.input
     if (schema === undefined) throw new Error('landThread must declare an input schema')
 
-    expect('issues' in (await schema['~standard'].validate({}))).toBe(false)
-    expect('issues' in (await schema['~standard'].validate({ bookmark: 'release/next' }))).toBe(false)
-    expect('issues' in (await schema['~standard'].validate({ bookmark: '' }))).toBe(true)
+    expect(await validate(schema, {})).toBe(false)
+    expect(await validate(schema, { bookmark: 'release/next' })).toBe(false)
+    expect(await validate(schema, { bookmark: '' })).toBe(true)
   })
 
   test('threadAt carries the reading Session and stays open to a Host that predates it', async () => {
     const schema = jjIntegrationApi.methods.threadAt.input
     if (schema === undefined) throw new Error('threadAt must declare an input schema')
-    const validate = async (value: { readonly path: string; readonly sessionId?: string }) => await schema['~standard'].validate(value)
-
-    expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(false)
-    expect('issues' in (await validate({ path: '/work/thread-abc123', sessionId: 'session-abc' }))).toBe(false)
+    expect(await validate(schema, { path: '/work/thread-abc123' })).toBe(false)
+    expect(await validate(schema, { path: '/work/thread-abc123', sessionId: 'session-abc' })).toBe(false)
   })
 })

@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import type {} from '../../../packages/dshx/src/client/broker.js'
@@ -140,9 +140,11 @@ const openNewProjectThread = async (page: Page, input: { readonly title: string;
   const call = await connectDshxApi({ url: profile.url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
   const path = join(profile.homeRoot, input.folder)
   await mkdir(path)
-  const projectId = z.object({ projectId: z.string() }).parse(await call('projectRegister', { path, title: input.folder })).projectId
+  const projectId = Schema.decodeUnknownSync(Schema.Struct({ projectId: Schema.String }))(
+    await call('projectRegister', { path, title: input.folder }),
+  ).projectId
   const created = await call('create', input.text === undefined ? { projectId, title: input.title } : { projectId, title: input.title, text: input.text })
-  const sessionId = z.object({ sessionId: z.string() }).parse(created).sessionId
+  const sessionId = Schema.decodeUnknownSync(Schema.Struct({ sessionId: Schema.String }))(created).sessionId
   const route = new URL(profile.url)
   route.searchParams.set('thread', sessionId)
   await page.goto(route.href)

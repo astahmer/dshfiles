@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 
 type ToolSearchStatus = 'loaded' | 'already_loaded' | 'unavailable'
 
@@ -21,6 +23,7 @@ interface AgentEvent {
 }
 
 interface RegisteredTool extends ToolSchema {
+  readonly output?: { readonly schema: unknown }
   readonly execute?: (
     args: { readonly query: string; readonly limit?: number },
     exec: { readonly agent?: TestAgent; readonly parent?: symbol },
@@ -49,11 +52,10 @@ interface TestHostContext {
   }
   readonly agents: { readonly list: () => TestAgent[] }
   readonly on: (name: string, listener: (payload?: AgentEvent) => void) => () => void
-  readonly effect: (setup: () => () => Promise<undefined> | undefined, label?: string) => void
 }
 
 interface BuiltPlugin {
-  readonly apply: (ctx: TestHostContext, config?: ToolSearchConfig) => void
+  readonly apply: (ctx: TestHostContext, config?: ToolSearchConfig) => Promise<() => Promise<void>>
 }
 
 const builtEntry = new URL('../dist/index.js', import.meta.url).href
@@ -65,7 +67,7 @@ const schema = (name: string, description: string): ToolSchema => ({
   parameters: { type: 'object', properties: {} },
 })
 
-const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly string[]; readonly config?: ToolSearchConfig } = {}) => {
+const harness = async (plugin: BuiltPlugin, options: { readonly restored?: readonly string[]; readonly config?: ToolSearchConfig } = {}) => {
   const schemas = new Map<string, ToolSchema>([
     ['read_file', schema('read_file', 'Read a workspace file')],
     ['write_file', schema('write_file', 'Write a workspace file')],
@@ -75,7 +77,6 @@ const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly st
   const scopedTools = new Map<TestAgent, Map<string, RegisteredTool>>()
   const restrictions = new Map<TestAgent, Set<string>[]>()
   const listeners = new Map<string, Set<(payload?: AgentEvent) => void>>()
-  const effects: Array<() => Promise<undefined> | undefined> = []
   const visibleGlobals = (agent: TestAgent): ToolSchema[] => {
     const filters = restrictions.get(agent)
     if (filters === undefined || filters.length === 0) return [...schemas.values()]
@@ -161,11 +162,8 @@ const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly st
       listeners.set(name, registered)
       return () => registered.delete(listener)
     },
-    effect: (setup: () => () => Promise<undefined> | undefined) => {
-      effects.push(setup())
-    },
   }
-  plugin.apply(root, { maxResults: 3, ...(options.config ?? {}) })
+  const dispose = await plugin.apply(root, { maxResults: 3, ...(options.config ?? {}) })
   const searchTool = (agent: TestAgent): RegisteredTool => {
     const tool = scopedTools.get(agent)?.get('tool_search')
     if (tool === undefined) throw new Error('tool_search was not registered')
@@ -199,13 +197,32 @@ const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly st
       globalTools.set(name, { ...tool })
       emit('tools/change')
     },
-    dispose: async () => {
-      await Promise.all(effects.map(effect => effect?.()))
-    },
+    dispose,
   }
 }
 
 describe('tool-search host integration', () => {
+  it('keeps the tool schema byte-identical', async () => {
+    const snapshot = await readFile(new URL('./tool-search-schema.snapshot.json', import.meta.url), 'utf8')
+    const runtime = await harness(await loadPlugin(), { config: { maxResults: 5 } })
+    const first = runtime.agents[0]!
+    const tool = runtime.searchTool(first)
+    if (tool.output === undefined) throw new Error('tool_search has no output schema')
+    const current = `${JSON.stringify(
+      {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+        output: { schema: tool.output.schema },
+      },
+      null,
+      2,
+    )}\n`
+
+    expect(current).toBe(snapshot)
+    await runtime.dispose()
+  })
+
   it('reports only aggregate schema metadata when explicitly enabled', async () => {
     const reports: string[] = []
     const originalWarn = console.warn
@@ -215,11 +232,11 @@ describe('tool-search host integration', () => {
     }
 
     try {
-      const defaultRuntime = harness(await loadPlugin())
+      const defaultRuntime = await harness(await loadPlugin())
       await defaultRuntime.dispose()
       expect(reports).toEqual([])
 
-      const enabledRuntime = harness(await loadPlugin(), { config: { reportSchemaMetrics: true } })
+      const enabledRuntime = await harness(await loadPlugin(), { config: { reportSchemaMetrics: true } })
       await enabledRuntime.dispose()
       expect(reports).toHaveLength(1)
       expect(reports[0]?.startsWith('{"event":"tool-search.schema-report","toolCount":3,"schemaBytes":')).toBe(true)
@@ -230,8 +247,31 @@ describe('tool-search host integration', () => {
     }
   })
 
+  it('records an Effect span when a tool search runs', async () => {
+    using recorder = recordSpans()
+    const runtime = await harness(await loadPlugin())
+    const first = runtime.agents[0]!
+
+    await runtime.searchTool(first).execute?.({ query: 'write_file', limit: 1 }, { agent: first })
+
+    expect(recorder.span('tool search disclose')).toBeDefined()
+    await runtime.dispose()
+  })
+
+  it('returns a tagged failure for invalid search input', async () => {
+    const runtime = await harness(await loadPlugin())
+    const first = runtime.agents[0]!
+
+    await expect(runtime.searchTool(first).execute?.({ query: '   ' }, { agent: first })).rejects.toMatchObject({
+      _tag: 'ToolSearchFailure',
+      reason: 'query',
+      message: 'tool_search query must not be blank',
+    })
+    await runtime.dispose()
+  })
+
   it('keeps discovery isolated per agent and loads a matching global tool', async () => {
-    const runtime = harness(await loadPlugin())
+    const runtime = await harness(await loadPlugin())
     const first = runtime.agents[0]!
     const second = runtime.agents[1]!
     expect(runtime.visibleSchemas(first).map(tool => tool.name)).toEqual(['tool_search'])
@@ -249,7 +289,7 @@ describe('tool-search host integration', () => {
   })
 
   it('leaves deferred tools hidden when a query has no matches', async () => {
-    const runtime = harness(await loadPlugin())
+    const runtime = await harness(await loadPlugin())
     const first = runtime.agents[0]!
     const result = await runtime.searchTool(first).execute?.({ query: 'book flight' }, { agent: first })
 
@@ -268,7 +308,7 @@ describe('tool-search host integration', () => {
   })
 
   it('retains policy denials after disclosure and reports the tool unavailable', async () => {
-    const runtime = harness(await loadPlugin())
+    const runtime = await harness(await loadPlugin())
     const first = runtime.agents[0]!
     runtime.restrictAgent(first, ['read_file', 'search_threads'])
     const result = await runtime.searchTool(first).execute?.({ query: 'write_file', limit: 1 }, { agent: first })
@@ -278,7 +318,7 @@ describe('tool-search host integration', () => {
   })
 
   it('restores prior disclosure from the durable request header and tracks late global MCP tools', async () => {
-    const runtime = harness(await loadPlugin(), { restored: ['write_file'] })
+    const runtime = await harness(await loadPlugin(), { restored: ['write_file'] })
     const first = runtime.agents[0]!
     expect(
       runtime
@@ -294,7 +334,7 @@ describe('tool-search host integration', () => {
   })
 
   it('attaches new agents and detaches disposed agents', async () => {
-    const runtime = harness(await loadPlugin())
+    const runtime = await harness(await loadPlugin())
     const agent = runtime.createAgent('late')
     expect(runtime.visibleSchemas(agent).map(tool => tool.name)).toEqual(['tool_search'])
     runtime.disposeAgent(agent)
@@ -308,7 +348,7 @@ describe('tool-search host integration', () => {
   })
 
   it('rejects nested Code Mode search and unload removes only its own scope contributions', async () => {
-    const runtime = harness(await loadPlugin())
+    const runtime = await harness(await loadPlugin())
     const first = runtime.agents[0]!
     await expect(runtime.searchTool(first).execute?.({ query: 'read_file' }, { agent: first, parent: Symbol('run_code') })).rejects.toThrow(
       'Native Tool Mode only',

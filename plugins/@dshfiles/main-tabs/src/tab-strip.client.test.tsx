@@ -136,7 +136,11 @@ describe('TabStrip layout', () => {
   it('lets long tab titles shrink inside the capped tab width', () => {
     const longTitle = 'A conversation title that is much wider than the tab strip should allow'
     const longTabs = tabs.map(tab => (tab.id === 'thread:thread-1' ? { ...tab, title: longTitle } : tab))
-    mount(() => {}, async () => {}, longTabs)
+    mount(
+      () => {},
+      async () => {},
+      longTabs,
+    )
 
     const title = screen.getByText(longTitle)
 

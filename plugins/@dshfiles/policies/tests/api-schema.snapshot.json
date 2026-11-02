@@ -1,0 +1,133 @@
+{
+  "id": "policies",
+  "owner": "@dshfiles/policies",
+  "version": 1,
+  "methods": [
+    {
+      "name": "list",
+      "description": "List the deny policies the user set: tool pattern, argument pattern, reason and whether each is on. Read-only.",
+      "tool": {
+        "name": "policies_list",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "tool": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "match": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "tool",
+                "match",
+                "reason",
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "check",
+      "description": "Whether a tool call with these arguments would be denied by a policy, without running it. Read-only.",
+      "tool": {
+        "name": "policy_check",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "arguments": {}
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "denied": {
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "denied",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {}
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -18,8 +18,9 @@ import {
   type Tool,
   type TranscriptContext,
 } from '@earendil-works/pi-ai'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { ClaudeAccountModel } from './claude-account.js'
+import { AiAccountsSchema } from './effect-schema.js'
 
 /**
  * Claude through the official Claude Code CLI instead of the Messages API.
@@ -73,68 +74,73 @@ createInterface({ input: process.stdin }).on('line', line => {
 `
 
 /** One line the CLI or the bridge wrote, decoded; a non-JSON line (a warning, a stray log) fails like a malformed one. */
-const decodeJsonLine = <Output>(schema: z.ZodType<Output>, line: string): z.ZodSafeParseResult<Output> => {
+const decodeJsonLine = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, line: string) => {
+  let parsed: unknown
   try {
-    return schema.safeParse(JSON.parse(line))
+    parsed = JSON.parse(line)
   } catch {
-    return schema.safeParse(undefined)
+    parsed = undefined
   }
+  return AiAccountsSchema.decodeResult(schema, parsed)
 }
 
 /** A tool_use block's streamed input: JSON text holding an object. */
-const toolInputSchema = z
-  .string()
-  .transform((text, context) => {
-    try {
-      return JSON.parse(text)
-    } catch {
-      context.addIssue({ code: 'custom', message: 'tool input is not JSON' })
-      return z.NEVER
-    }
-  })
-  .pipe(z.record(z.string(), z.json()))
+const toolInputSchema = Schema.Record(Schema.String, Schema.Json)
 
-const bridgeCallSchema = z.object({ id: z.union([z.string(), z.number()]), name: z.string(), arguments: z.record(z.string(), z.unknown()) })
+const bridgeCallSchema = Schema.Struct({
+  id: Schema.Union([Schema.String, Schema.Number]),
+  name: Schema.String,
+  arguments: Schema.Record(Schema.String, Schema.Unknown),
+})
 
-const contentBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text') }),
-  z.object({ type: z.literal('thinking') }),
-  z.object({ type: z.literal('redacted_thinking') }),
-  z.object({ type: z.literal('tool_use'), id: z.string(), name: z.string() }),
+const contentBlockSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('text') }),
+  Schema.Struct({ type: Schema.Literal('thinking') }),
+  Schema.Struct({ type: Schema.Literal('redacted_thinking') }),
+  Schema.Struct({ type: Schema.Literal('tool_use'), id: Schema.String, name: Schema.String }),
 ])
-const usageSchema = z
-  .object({
-    input_tokens: z.number().optional(),
-    output_tokens: z.number().optional(),
-    cache_read_input_tokens: z.number().optional(),
-    cache_creation_input_tokens: z.number().optional(),
-  })
-  .optional()
-const streamEventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('message_start'), message: z.object({ usage: usageSchema }) }),
-  z.object({ type: z.literal('content_block_start'), index: z.number(), content_block: contentBlockSchema }),
-  z.object({
-    type: z.literal('content_block_delta'),
-    index: z.number(),
-    delta: z.discriminatedUnion('type', [
-      z.object({ type: z.literal('text_delta'), text: z.string() }),
-      z.object({ type: z.literal('thinking_delta'), thinking: z.string() }),
-      z.object({ type: z.literal('input_json_delta'), partial_json: z.string() }),
-      z.object({ type: z.literal('signature_delta') }),
-      z.object({ type: z.literal('citations_delta') }),
+const usageSchema = Schema.optional(
+  Schema.Struct({
+    input_tokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    output_tokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    cache_read_input_tokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    cache_creation_input_tokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  }),
+)
+const streamEventSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('message_start'), message: Schema.Struct({ usage: usageSchema }) }),
+  Schema.Struct({ type: Schema.Literal('content_block_start'), index: Schema.Number.check(Schema.isFinite()), content_block: contentBlockSchema }),
+  Schema.Struct({
+    type: Schema.Literal('content_block_delta'),
+    index: Schema.Number.check(Schema.isFinite()),
+    delta: Schema.Union([
+      Schema.Struct({ type: Schema.Literal('text_delta'), text: Schema.String }),
+      Schema.Struct({ type: Schema.Literal('thinking_delta'), thinking: Schema.String }),
+      Schema.Struct({ type: Schema.Literal('input_json_delta'), partial_json: Schema.String }),
+      Schema.Struct({ type: Schema.Literal('signature_delta') }),
+      Schema.Struct({ type: Schema.Literal('citations_delta') }),
     ]),
   }),
-  z.object({ type: z.literal('content_block_stop'), index: z.number() }),
-  z.object({ type: z.literal('message_delta'), delta: z.object({ stop_reason: z.string().nullable().optional() }), usage: usageSchema }),
-  z.object({ type: z.literal('message_stop') }),
-  z.object({ type: z.literal('ping') }),
+  Schema.Struct({ type: Schema.Literal('content_block_stop'), index: Schema.Number.check(Schema.isFinite()) }),
+  Schema.Struct({
+    type: Schema.Literal('message_delta'),
+    delta: Schema.Struct({ stop_reason: Schema.optional(Schema.NullOr(Schema.String)) }),
+    usage: usageSchema,
+  }),
+  Schema.Struct({ type: Schema.Literal('message_stop') }),
+  Schema.Struct({ type: Schema.Literal('ping') }),
 ])
-type StreamEvent = z.infer<typeof streamEventSchema>
+type StreamEvent = typeof streamEventSchema.Type
 
-const cliLineSchema = z.union([
-  z.object({ type: z.literal('stream_event'), event: z.unknown() }),
-  z.object({ type: z.literal('result'), is_error: z.boolean().optional(), subtype: z.string().optional(), result: z.string().optional() }),
-  z.object({ type: z.string() }),
+const cliLineSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('stream_event'), event: Schema.Unknown }),
+  Schema.Struct({
+    type: Schema.Literal('result'),
+    is_error: Schema.optional(Schema.Boolean),
+    subtype: Schema.optional(Schema.String),
+    result: Schema.optional(Schema.String),
+  }),
+  Schema.Struct({ type: Schema.String }),
 ])
 
 /** Where a held tool call stands: Claude asked for it, DSH answered it, or both (then it is released). */
@@ -475,11 +481,11 @@ export class ClaudeCliSessions {
         while (newline >= 0) {
           const parsed = decodeJsonLine(bridgeCallSchema, buffer.slice(0, newline))
           buffer = buffer.slice(newline + 1)
-          if (parsed.success)
+          if (parsed._tag === 'Success')
             this.matchCall(session, {
-              name: parsed.data.name,
-              argumentsJson: JSON.stringify(parsed.data.arguments),
-              bridgeId: parsed.data.id,
+              name: parsed.success.name,
+              argumentsJson: JSON.stringify(parsed.success.arguments),
+              bridgeId: parsed.success.id,
               socket,
             })
           newline = buffer.indexOf('\n')
@@ -499,11 +505,11 @@ export class ClaudeCliSessions {
     createInterface({ input: child.stdout }).on('line', line => {
       if (line.trim() === '') return
       const parsed = decodeJsonLine(cliLineSchema, line)
-      if (!parsed.success) return
-      const value = parsed.data
+      if (parsed._tag !== 'Success') return
+      const value = parsed.success
       if (value.type === 'stream_event' && 'event' in value) {
-        const event = streamEventSchema.safeParse(value.event)
-        if (event.success) emit({ kind: 'stream', event: event.data })
+        const event = AiAccountsSchema.decodeResult(streamEventSchema, value.event)
+        if (event._tag === 'Success') emit({ kind: 'stream', event: event.success })
         return
       }
       if (value.type === 'result' && 'is_error' in value && value.is_error === true)
@@ -627,8 +633,8 @@ export class ClaudeCliSessions {
           if (target.type === 'text') stream.push({ type: 'text_end', contentIndex: block.contentIndex, content: target.text, partial: output })
           if (target.type === 'thinking') stream.push({ type: 'thinking_end', contentIndex: block.contentIndex, content: target.thinking, partial: output })
           if (target.type === 'toolCall') {
-            const parsed = toolInputSchema.safeParse(block.json === '' ? '{}' : block.json)
-            target.arguments = parsed.success ? parsed.data : {}
+            const parsed = decodeJsonLine(toolInputSchema, block.json === '' ? '{}' : block.json)
+            target.arguments = parsed._tag === 'Success' ? parsed.success : {}
             session.emittedToolUses.push({ id: target.id, name: target.name, argumentsJson: JSON.stringify(target.arguments) })
             const pending = session.unmatchedCalls.splice(0)
             for (const call of pending) this.matchCall(session, call)

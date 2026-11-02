@@ -1,57 +1,71 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import type { JsonObject } from '../json.js'
 import type { JsonValue, SessionSummary } from './client.js'
 
-const eventRecordSchema = z.object({
-  type: z.literal('event'),
-  event: z.object({
-    type: z.string(),
-    seq: z.number(),
-    time: z.number().optional(),
-    data: z.unknown().optional(),
+const eventRecordSchema = Schema.Struct({
+  type: Schema.Literal('event'),
+  event: Schema.Struct({
+    type: Schema.String,
+    seq: Schema.Number.check(Schema.isFinite()),
+    time: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    data: Schema.optional(Schema.Unknown),
   }),
 })
 
-const textPartsSchema = z.array(z.object({ type: z.string(), text: z.string().optional() }).passthrough())
-const toolCallSchema = z.object({ name: z.string(), callId: z.string(), arguments: z.string().optional() })
-const toolResultSchema = z.object({
-  message: z.object({ toolCallId: z.string(), isError: z.boolean().optional(), content: textPartsSchema }),
+const textPartsSchema = Schema.Array(withUnknownProperties({ type: Schema.String, text: Schema.optional(Schema.String) }))
+const toolCallSchema = Schema.Struct({ name: Schema.String, callId: Schema.String, arguments: Schema.optional(Schema.String) })
+const toolResultSchema = Schema.Struct({
+  message: Schema.Struct({ toolCallId: Schema.String, isError: Schema.optional(Schema.Boolean), content: textPartsSchema }),
 })
-const assistantMessageSchema = z.object({ message: z.object({ content: textPartsSchema }) })
-const userMessageSchema = z.object({ content: textPartsSchema, source: z.object({ kind: z.string() }).passthrough().optional() })
-const todoListSchema = z.array(z.object({ content: z.string(), status: z.string() }))
-const goalSchema = z.object({ objective: z.string(), phase: z.string().optional() })
-const goalChangeSchema = z.object({ operation: z.string().optional(), goal: goalSchema.optional() })
-const failureSchema = z.object({ message: z.string(), code: z.string().optional() })
-const turnEndSchema = z.object({ turn: z.number().optional(), reason: z.object({ kind: z.string(), error: failureSchema.optional() }) })
-const retrySchema = z.object({ retry: z.number().optional(), maxRetries: z.number().optional(), failure: failureSchema })
-const subagentCatalogSchema = z.object({ childId: z.string(), label: z.string().optional() })
-const modelSelectionSchema = z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() })
-const titleSchema = z.object({ title: z.string() })
-const tokenUsageSchema = z.object({
-  uncachedInputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number().optional(),
-  cacheWriteTokens: z.number().optional(),
+const assistantMessageSchema = Schema.Struct({ message: Schema.Struct({ content: textPartsSchema }) })
+const userMessageSchema = Schema.Struct({ content: textPartsSchema, source: Schema.optional(withUnknownProperties({ kind: Schema.String })) })
+const todoListSchema = Schema.Array(Schema.Struct({ content: Schema.String, status: Schema.String }))
+const todosEventSchema = Schema.Struct({ todos: todoListSchema })
+const turnStartSchema = Schema.Struct({ turn: Schema.Number.check(Schema.isFinite()) })
+const goalSchema = Schema.Struct({ objective: Schema.String, phase: Schema.optional(Schema.String) })
+const goalChangeSchema = Schema.Struct({ operation: Schema.optional(Schema.String), goal: Schema.optional(goalSchema) })
+const failureSchema = Schema.Struct({ message: Schema.String, code: Schema.optional(Schema.String) })
+const turnEndSchema = Schema.Struct({
+  turn: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  reason: Schema.Struct({ kind: Schema.String, error: Schema.optional(failureSchema) }),
 })
-const projectionValuesSchema = z
-  .object({
-    values: z
-      .object({
-        title: z.string().nullish(),
-        goal: z.object({ goal: goalSchema }).nullish(),
-        todos: todoListSchema.nullish(),
-        tokenUsage: tokenUsageSchema.nullish(),
-        contextPressure: z.object({ projectedTokens: z.number(), contextWindow: z.number() }).nullish(),
-        sessionStats: z.object({ turns: z.number(), steps: z.number() }).nullish(),
-        modelSelection: z.object({ lastUsed: modelSelectionSchema.nullish() }).nullish(),
-      })
-      .partial(),
-  })
-  .partial()
+const retrySchema = Schema.Struct({
+  retry: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  maxRetries: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  failure: failureSchema,
+})
+const subagentCatalogSchema = Schema.Struct({ childId: Schema.String, label: Schema.optional(Schema.String) })
+const modelSelectionSchema = Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) })
+const titleSchema = Schema.Struct({ title: Schema.String })
+const tokenUsageSchema = Schema.Struct({
+  uncachedInputTokens: Schema.Number.check(Schema.isFinite()),
+  outputTokens: Schema.Number.check(Schema.isFinite()),
+  cacheReadTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  cacheWriteTokens: Schema.optional(Schema.Number.check(Schema.isFinite())),
+})
+const projectionValuesSchema = Schema.Struct({
+  values: Schema.optional(
+    Schema.Struct({
+      title: Schema.optional(Schema.NullOr(Schema.String)),
+      goal: Schema.optional(Schema.NullOr(Schema.Struct({ goal: goalSchema }))),
+      todos: Schema.optional(Schema.NullOr(todoListSchema)),
+      tokenUsage: Schema.optional(Schema.NullOr(tokenUsageSchema)),
+      contextPressure: Schema.optional(
+        Schema.NullOr(Schema.Struct({ projectedTokens: Schema.Number.check(Schema.isFinite()), contextWindow: Schema.Number.check(Schema.isFinite()) })),
+      ),
+      sessionStats: Schema.optional(
+        Schema.NullOr(Schema.Struct({ turns: Schema.Number.check(Schema.isFinite()), steps: Schema.Number.check(Schema.isFinite()) })),
+      ),
+      modelSelection: Schema.optional(Schema.NullOr(Schema.Struct({ lastUsed: Schema.optional(Schema.NullOr(modelSelectionSchema)) }))),
+    }),
+  ),
+})
 
-type SessionEvent = z.infer<typeof eventRecordSchema>['event']
+type SessionEvent = (typeof eventRecordSchema)['Type']['event']
+
+const decodeResult = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown) => Schema.decodeUnknownResult(schema)(value)
 
 /** Event types `tail` hides unless `--types` asks for them: per-step bookkeeping and request plumbing. */
 const noiseEventTypes = new Set([
@@ -138,8 +152,8 @@ export type SessionDigestRecord =
   | { readonly type: 'event'; readonly event: { readonly type: string; readonly seq: number; readonly time?: number | undefined; readonly data?: unknown } }
 
 const decodeEvent = (record: SessionDigestRecord): SessionEvent | undefined => {
-  const parsed = eventRecordSchema.safeParse(record)
-  return parsed.success ? parsed.data.event : undefined
+  const parsed = decodeResult(eventRecordSchema, record)
+  return parsed._tag === 'Success' ? parsed.success.event : undefined
 }
 
 const oneLine = (value: string, max: number): string => {
@@ -155,7 +169,7 @@ const parseArguments = (value: string | undefined): JsonObject => {
   if (value === undefined) return {}
   try {
     const parsed = decodeJsonSafe(jsonObjectSchema, value)
-    return parsed.success ? parsed.data : {}
+    return parsed._tag === 'Success' ? parsed.success : {}
   } catch {
     return {}
   }
@@ -169,7 +183,7 @@ const stringArgument = (args: JsonObject, ...names: string[]): string | undefine
   return undefined
 }
 
-const textOf = (parts: z.infer<typeof textPartsSchema>, type = 'text'): string =>
+const textOf = (parts: (typeof textPartsSchema)['Type'], type = 'text'): string =>
   parts
     .filter(part => part.type === type)
     .map(part => part.text ?? '')
@@ -248,68 +262,76 @@ const createSessionEventDescriber = (): ((
     const describe = (): string => {
       const data = event.data
       if (event.type === 'tool/call') {
-        const call = toolCallSchema.safeParse(data)
-        if (!call.success) return ''
-        calls.set(call.data.callId, { name: call.data.name, ...(event.time !== undefined && { time: event.time }) })
-        return describeToolCall(call.data.name, parseArguments(call.data.arguments), homeRelative)
+        const call = decodeResult(toolCallSchema, data)
+        if (call._tag === 'Failure') return ''
+        calls.set(call.success.callId, { name: call.success.name, ...(event.time !== undefined && { time: event.time }) })
+        return describeToolCall(call.success.name, parseArguments(call.success.arguments), homeRelative)
       }
       if (event.type === 'tool/result') {
-        const result = toolResultSchema.safeParse(data)
-        if (!result.success) return ''
-        const call = calls.get(result.data.message.toolCallId)
-        const text = textOf(result.data.message.content)
-        const failure = result.data.message.isError === true ? 'ERR' : shellFailure(text) === undefined ? 'ok' : `ERR ${shellFailure(text)}`
+        const result = decodeResult(toolResultSchema, data)
+        if (result._tag === 'Failure') return ''
+        const call = calls.get(result.success.message.toolCallId)
+        const text = textOf(result.success.message.content)
+        const failure = result.success.message.isError === true ? 'ERR' : shellFailure(text) === undefined ? 'ok' : `ERR ${shellFailure(text)}`
         const elapsed = call?.time !== undefined && event.time !== undefined ? ` ${((event.time - call.time) / 1000).toFixed(1)}s` : ''
-        const headline = resultHeadline(text, result.data.message.isError === true ? 'tool-error' : failure === 'ok' ? 'ok' : 'shell-failure')
+        const headline = resultHeadline(text, result.success.message.isError === true ? 'tool-error' : failure === 'ok' ? 'ok' : 'shell-failure')
         return `↳ ${call?.name ?? 'tool'} ${failure}${elapsed}${headline === '' ? '' : `: ${oneLine(homeRelative(headline), 110)}`}`
       }
       if (event.type === 'assistant/message') {
-        const message = assistantMessageSchema.safeParse(data)
-        if (!message.success) return ''
-        const text = textOf(message.data.message.content).trim()
+        const message = decodeResult(assistantMessageSchema, data)
+        if (message._tag === 'Failure') return ''
+        const text = textOf(message.success.message.content).trim()
         if (text.length > 0) return `says: ${oneLine(text, 140)}`
-        const headlines = reasoningHeadlines(textOf(message.data.message.content, 'reasoning'))
-        const toolCalls = message.data.message.content.filter(part => part.type === 'tool-call').length
+        const headlines = reasoningHeadlines(textOf(message.success.message.content, 'reasoning'))
+        const toolCalls = message.success.message.content.filter(part => part.type === 'tool-call').length
         return `${headlines.length > 0 ? `thinks: ${oneLine(headlines.join(' · '), 110)}` : 'thinks'}${toolCalls > 0 ? ` → ${toolCalls} tool call${toolCalls === 1 ? '' : 's'}` : ''}`
       }
       if (event.type === 'user/message') {
-        const message = userMessageSchema.safeParse(data)
-        if (!message.success) return ''
-        return `${message.data.source?.kind ?? 'user'}: ${oneLine(textOf(message.data.content), 140)}`
+        const message = decodeResult(userMessageSchema, data)
+        if (message._tag === 'Failure') return ''
+        return `${message.success.source?.kind ?? 'user'}: ${oneLine(textOf(message.success.content), 140)}`
       }
       if (event.type === 'todo/write') {
-        const todos = z.object({ todos: todoListSchema }).safeParse(data)
-        if (!todos.success) return ''
-        const active = todos.data.todos.find(todo => todo.status === 'in_progress')
-        const done = todos.data.todos.filter(todo => todo.status === 'completed').length
-        return `${done}/${todos.data.todos.length} done${active === undefined ? '' : `; now: ${oneLine(active.content, 100)}`}`
+        const todos = decodeResult(todosEventSchema, data)
+        if (todos._tag === 'Failure') return ''
+        const active = todos.success.todos.find(todo => todo.status === 'in_progress')
+        const done = todos.success.todos.filter(todo => todo.status === 'completed').length
+        return `${done}/${todos.success.todos.length} done${active === undefined ? '' : `; now: ${oneLine(active.content, 100)}`}`
       }
       if (event.type === 'goal/change') {
-        const change = goalChangeSchema.safeParse(data)
-        if (!change.success || change.data.goal === undefined) return ''
-        return `${change.data.operation ?? 'change'} [${change.data.goal.phase ?? '?'}]: ${oneLine(change.data.goal.objective, 120)}`
+        const change = decodeResult(goalChangeSchema, data)
+        if (change._tag === 'Failure' || change.success.goal === undefined) return ''
+        return `${change.success.operation ?? 'change'} [${change.success.goal.phase ?? '?'}]: ${oneLine(change.success.goal.objective, 120)}`
       }
-      if (event.type === 'turn/start') return `turn ${z.object({ turn: z.number() }).safeParse(data).data?.turn ?? '?'}`
+      if (event.type === 'turn/start') {
+        const start = decodeResult(turnStartSchema, data)
+        return `turn ${start._tag === 'Success' ? start.success.turn : '?'}`
+      }
       if (event.type === 'turn/end') {
-        const end = turnEndSchema.safeParse(data)
-        if (!end.success) return ''
-        return `turn ${end.data.turn ?? '?'} ${end.data.reason.kind}${end.data.reason.error === undefined ? '' : `: ${oneLine(end.data.reason.error.message, 120)}`}`
+        const end = decodeResult(turnEndSchema, data)
+        if (end._tag === 'Failure') return ''
+        return `turn ${end.success.turn ?? '?'} ${end.success.reason.kind}${end.success.reason.error === undefined ? '' : `: ${oneLine(end.success.reason.error.message, 120)}`}`
       }
       if (event.type === 'llm/retry') {
-        const retry = retrySchema.safeParse(data)
-        return retry.success ? `retry ${retry.data.retry ?? '?'}/${retry.data.maxRetries ?? '?'}: ${oneLine(retry.data.failure.message, 110)}` : ''
+        const retry = decodeResult(retrySchema, data)
+        return retry._tag === 'Success'
+          ? `retry ${retry.success.retry ?? '?'}/${retry.success.maxRetries ?? '?'}: ${oneLine(retry.success.failure.message, 110)}`
+          : ''
       }
-      if (event.type === 'session/title') return titleSchema.safeParse(data).data?.title ?? ''
+      if (event.type === 'session/title') {
+        const title = decodeResult(titleSchema, data)
+        return title._tag === 'Success' ? title.success.title : ''
+      }
       if (event.type === 'model/selection') {
-        const model = modelSelectionSchema.safeParse(data)
-        return model.success
-          ? `${model.data.provider}/${model.data.model}${model.data.reasoningEffort === undefined ? '' : ` ${model.data.reasoningEffort}`}`
+        const model = decodeResult(modelSelectionSchema, data)
+        return model._tag === 'Success'
+          ? `${model.success.provider}/${model.success.model}${model.success.reasoningEffort === undefined ? '' : ` ${model.success.reasoningEffort}`}`
           : ''
       }
       if (event.type === 'compaction/summary') return 'context compacted'
       if (event.type === 'subagent/catalog') {
-        const child = subagentCatalogSchema.safeParse(data)
-        return child.success ? `${child.data.label ?? 'subagent'} (${child.data.childId})` : ''
+        const child = decodeResult(subagentCatalogSchema, data)
+        return child._tag === 'Success' ? `${child.success.label ?? 'subagent'} (${child.success.childId})` : ''
       }
       const compact = data === undefined ? '' : JSON.stringify(data)
       return oneLine(compact, 120)
@@ -332,7 +354,8 @@ const isNoiseSessionEvent = (record: JsonValue): boolean => {
   const event = decodeEvent(record)
   if (event === undefined) return false
   if (noiseEventTypes.has(event.type)) return true
-  const kind = event.type === 'user/message' ? userMessageSchema.safeParse(event.data).data?.source?.kind : undefined
+  const message = event.type === 'user/message' ? decodeResult(userMessageSchema, event.data) : undefined
+  const kind = message?._tag === 'Success' ? message.success.source?.kind : undefined
   return kind !== undefined && injectedMessageKinds.has(kind)
 }
 
@@ -350,15 +373,16 @@ export const digestSession = (input: {
     const event = decodeEvent(record)
     return event === undefined ? [] : [event]
   })
-  const projections = projectionValuesSchema.safeParse(input.summary.projections).data?.values ?? {}
+  const projectionsResult = decodeResult(projectionValuesSchema, input.summary.projections)
+  const projections = projectionsResult._tag === 'Success' ? (projectionsResult.success.values ?? {}) : {}
   const cwd = input.summary.cwd
 
   const directoryCounts = new Map<string, number>()
   for (const event of events) {
     if (event.type !== 'tool/call') continue
-    const call = toolCallSchema.safeParse(event.data)
-    if (!call.success || !shellTools.has(call.data.name)) continue
-    const directory = shellDirectory(parseArguments(call.data.arguments))
+    const call = decodeResult(toolCallSchema, event.data)
+    if (call._tag === 'Failure' || !shellTools.has(call.success.name)) continue
+    const directory = shellDirectory(parseArguments(call.success.arguments))
     if (directory !== undefined) {
       const absolute = cwd === undefined ? directory : joinPath(cwd, directory)
       directoryCounts.set(absolute, (directoryCounts.get(absolute) ?? 0) + 1)
@@ -376,9 +400,9 @@ export const digestSession = (input: {
   const results = new Map<string, { readonly isError: boolean; readonly text: string }>()
   for (const event of events) {
     if (event.type !== 'tool/result') continue
-    const result = toolResultSchema.safeParse(event.data)
-    if (result.success)
-      results.set(result.data.message.toolCallId, { isError: result.data.message.isError === true, text: textOf(result.data.message.content) })
+    const result = decodeResult(toolResultSchema, event.data)
+    if (result._tag === 'Success')
+      results.set(result.success.message.toolCallId, { isError: result.success.message.isError === true, text: textOf(result.success.message.content) })
   }
 
   const actions: (SessionDigestAction & { readonly callKey: string })[] = []
@@ -405,10 +429,10 @@ export const digestSession = (input: {
   for (const event of events) {
     const data = event.data
     if (event.type === 'tool/call') {
-      const call = toolCallSchema.safeParse(data)
-      if (!call.success) continue
-      const args = parseArguments(call.data.arguments)
-      const result = results.get(call.data.callId)
+      const call = decodeResult(toolCallSchema, data)
+      if (call._tag === 'Failure') continue
+      const args = parseArguments(call.success.arguments)
+      const result = results.get(call.success.callId)
       const exit = result === undefined || result.isError ? undefined : shellFailure(result.text)
       let failure: string | undefined
       if (result?.isError) failure = oneLine(stripRoot(resultHeadline(result.text, 'tool-error')), 160)
@@ -416,18 +440,18 @@ export const digestSession = (input: {
       const status = result === undefined ? 'pending' : failure === undefined ? 'ok' : 'error'
       actions.push({
         ...at(event),
-        callKey: `${call.data.name} ${call.data.arguments ?? ''}`,
-        tool: call.data.name,
-        summary: describeToolCall(call.data.name, args, display, workRoot),
+        callKey: `${call.success.name} ${call.success.arguments ?? ''}`,
+        tool: call.success.name,
+        summary: describeToolCall(call.success.name, args, display, workRoot),
         status,
         ...(failure !== undefined && { error: failure }),
       })
       const path = stringArgument(args, 'file_path', 'path', 'filePath')
-      if (mutatingFileTools.has(call.data.name) && path !== undefined && status !== 'error') {
+      if (mutatingFileTools.has(call.success.name) && path !== undefined && status !== 'error') {
         const key = display(path)
         files.set(key, { edits: (files.get(key)?.edits ?? 0) + 1, lastSeq: event.seq })
       }
-      const command = shellTools.has(call.data.name) ? stringArgument(args, 'command') : undefined
+      const command = shellTools.has(call.success.name) ? stringArgument(args, 'command') : undefined
       for (const match of command?.matchAll(vcsCommandPattern) ?? []) {
         const message = vcsMessage(match[2] ?? '')
         revisions.push({ seq: event.seq, command: `jj ${(match[1] ?? '').replace(/\s+/g, ' ')}`, ...(message !== undefined && { message }), status })
@@ -435,42 +459,42 @@ export const digestSession = (input: {
       continue
     }
     if (event.type === 'assistant/message') {
-      const message = assistantMessageSchema.safeParse(data)
-      if (!message.success) continue
-      const text = textOf(message.data.message.content).trim()
+      const message = decodeResult(assistantMessageSchema, data)
+      if (message._tag === 'Failure') continue
+      const text = textOf(message.success.message.content).trim()
       if (text.length > 0) lastAssistantText = { ...at(event), text }
-      for (const headline of reasoningHeadlines(textOf(message.data.message.content, 'reasoning'))) {
+      for (const headline of reasoningHeadlines(textOf(message.success.message.content, 'reasoning'))) {
         if (intents.at(-1) !== headline) intents.push(headline)
       }
       continue
     }
     if (event.type === 'user/message') {
-      const message = userMessageSchema.safeParse(data)
-      if (!message.success) continue
-      const kind = message.data.source?.kind ?? 'user'
-      const text = textOf(message.data.content).trim()
+      const message = decodeResult(userMessageSchema, data)
+      if (message._tag === 'Failure') continue
+      const kind = message.success.source?.kind ?? 'user'
+      const text = textOf(message.success.content).trim()
       if (kind === 'user') lastUserPrompt = { ...at(event), text }
       if (kind === 'agent-message' || kind === 'subagent-settled') lastAgentMessage = { ...at(event), from: kind, text }
       continue
     }
     if (event.type === 'todo/write') {
-      const parsed = z.object({ todos: todoListSchema }).safeParse(data)
-      if (parsed.success) todos = parsed.data.todos
+      const parsed = decodeResult(todosEventSchema, data)
+      if (parsed._tag === 'Success') todos = parsed.success.todos
       continue
     }
     if (event.type === 'goal/change') {
-      const parsed = goalChangeSchema.safeParse(data)
-      if (parsed.success && parsed.data.goal !== undefined) goal = parsed.data.goal
+      const parsed = decodeResult(goalChangeSchema, data)
+      if (parsed._tag === 'Success' && parsed.success.goal !== undefined) goal = parsed.success.goal
       continue
     }
     if (event.type === 'turn/end') {
-      const parsed = turnEndSchema.safeParse(data)
-      if (!parsed.success) continue
-      if (parsed.data.reason.kind === 'error') failedTurns += 1
+      const parsed = decodeResult(turnEndSchema, data)
+      if (parsed._tag === 'Failure') continue
+      if (parsed.success.reason.kind === 'error') failedTurns += 1
       lastTurnEnd = {
         seq: event.seq,
-        kind: parsed.data.reason.kind,
-        ...(parsed.data.reason.error !== undefined && { error: parsed.data.reason.error.message }),
+        kind: parsed.success.reason.kind,
+        ...(parsed.success.reason.error !== undefined && { error: parsed.success.reason.error.message }),
       }
       continue
     }
@@ -480,15 +504,18 @@ export const digestSession = (input: {
     }
     if (event.type === 'llm/retry') retries += 1
     if (event.type === 'compaction/start') compactions += 1
-    if (event.type === 'session/title') title = titleSchema.safeParse(data).data?.title ?? title
+    if (event.type === 'session/title') {
+      const parsed = decodeResult(titleSchema, data)
+      if (parsed._tag === 'Success') title = parsed.success.title
+    }
     if (event.type === 'model/selection') {
-      const parsed = modelSelectionSchema.safeParse(data)
-      if (parsed.success)
-        model = `${parsed.data.provider}/${parsed.data.model}${parsed.data.reasoningEffort === undefined ? '' : ` (${parsed.data.reasoningEffort})`}`
+      const parsed = decodeResult(modelSelectionSchema, data)
+      if (parsed._tag === 'Success')
+        model = `${parsed.success.provider}/${parsed.success.model}${parsed.success.reasoningEffort === undefined ? '' : ` (${parsed.success.reasoningEffort})`}`
     }
     if (event.type === 'subagent/catalog') {
-      const parsed = subagentCatalogSchema.safeParse(data)
-      if (parsed.success) subagents.set(parsed.data.childId, parsed.data.label)
+      const parsed = decodeResult(subagentCatalogSchema, data)
+      if (parsed._tag === 'Success') subagents.set(parsed.success.childId, parsed.success.label)
     }
   }
 

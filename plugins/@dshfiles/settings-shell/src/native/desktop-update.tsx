@@ -6,7 +6,8 @@ import type { DesktopUpdateBridge, DesktopUpdatePresentation, DesktopUpdateView 
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { IconDownloadOutlineRegular, IconLoadingOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as Option from 'effect/Option'
 import type { ShellTranslate } from './locales.js'
 
 const BUSY_PHASES: ReadonlySet<DesktopUpdatePresentation['phase']> = new Set(['checking', 'downloading', 'verifying', 'installing'])
@@ -15,19 +16,28 @@ interface DesktopGlobal {
   readonly dshDesktop: { readonly protocolVersion: 1; readonly updates: DesktopUpdateBridge }
 }
 
-const desktopGlobalShape = z.object({
-  dshDesktop: z.object({
-    protocolVersion: z.literal(1),
-    updates: z.object({ status: z.function(), open: z.function(), subscribe: z.function() }),
-  }),
+const desktopGlobalSchema = Schema.declare<DesktopGlobal>((value): value is DesktopGlobal => {
+  if (typeof value !== 'object' || value === null || !('dshDesktop' in value)) return false
+  const desktop: unknown = value.dshDesktop
+  if (typeof desktop !== 'object' || desktop === null || !('protocolVersion' in desktop) || desktop.protocolVersion !== 1 || !('updates' in desktop))
+    return false
+  const updates: unknown = desktop.updates
+  return (
+    typeof updates === 'object' &&
+    updates !== null &&
+    'status' in updates &&
+    typeof updates.status === 'function' &&
+    'open' in updates &&
+    typeof updates.open === 'function' &&
+    'subscribe' in updates &&
+    typeof updates.subscribe === 'function'
+  )
 })
-/** `z.custom` keeps the preload's own objects: the bridge methods may rely on their `this`. */
-const desktopGlobalSchema = z.custom<DesktopGlobal>(value => desktopGlobalShape.safeParse(value).success)
 
 /** The Desktop preload's update carrier, or undefined in a browser or an unknown protocol. */
 export const desktopUpdateBridge = (): DesktopUpdateBridge | undefined => {
-  const desktop = desktopGlobalSchema.safeParse(globalThis)
-  return desktop.success ? desktop.data.dshDesktop.updates : undefined
+  const desktop = Option.getOrUndefined(Schema.decodeUnknownOption(desktopGlobalSchema)(globalThis))
+  return desktop?.dshDesktop.updates
 }
 
 interface UpdateCopy {

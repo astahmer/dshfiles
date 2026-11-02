@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto'
+import * as Schema from 'effect/Schema'
+import * as Result from 'effect/Result'
 import { readFile, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { z } from 'zod'
 import { JsonText } from './json-text.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /** The slice of the Host's client module registry used to locate each loaded plugin package. */
 export interface PluginRegistry {
@@ -10,11 +12,11 @@ export interface PluginRegistry {
   readonly clientPath: (id: string) => string | undefined
 }
 
-const entryTargetSchema = z.union([z.string(), z.object({ import: z.string().optional(), default: z.string().optional() })])
-const manifestSchema = z.object({
-  name: z.string(),
-  main: z.string().optional(),
-  exports: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+const entryTargetSchema = Schema.Union([Schema.String, Schema.Struct({ import: Schema.optional(Schema.String), default: Schema.optional(Schema.String) })])
+const manifestSchema = Schema.Struct({
+  name: Schema.String,
+  main: Schema.optional(Schema.String),
+  exports: Schema.optional(Schema.Union([Schema.String, Schema.Record(Schema.String, Schema.Unknown)])),
 })
 
 const readOptional = async (path: string): Promise<string> => readFile(path, 'utf8').catch(() => '')
@@ -61,15 +63,23 @@ const fingerprint = async (
   for (;;) {
     if (hostEntry !== undefined && resolved !== undefined) break
     const raw = await readOptional(join(directory, 'package.json'))
-    const manifest = JsonText.decode(manifestSchema, raw)
-    if (manifest?.success === true && manifest.data.name === id) {
-      const exported = typeof manifest.data.exports === 'string' ? manifest.data.exports : entryTargetSchema.safeParse(manifest.data.exports?.['.']).data
-      hostEntry = typeof exported === 'string' ? exported : (exported?.import ?? exported?.default ?? manifest.data.main ?? 'index.js')
+    const manifest = JsonText.decodeEffect(manifestSchema, raw)
+    if (manifest === undefined || Result.isFailure(manifest) || manifest.success.name !== id) {
+      const parent = dirname(directory)
+      if (parent === directory) return null
+      directory = parent
+      continue
+    }
+    const manifestData = manifest.success
+    if (typeof manifestData.exports === 'string') {
+      hostEntry = manifestData.exports
       break
     }
-    const parent = dirname(directory)
-    if (parent === directory) return null
-    directory = parent
+    const exportTarget = manifestData.exports?.['.']
+    const exportedResult = SchemaHelpers.decodeUnknownSafe(entryTargetSchema, exportTarget)
+    const exported = exportedResult.success ? exportedResult.data : undefined
+    hostEntry = typeof exported === 'string' ? exported : (exported?.import ?? exported?.default ?? manifestData.main ?? 'index.js')
+    break
   }
   if (hostEntry === undefined) return null
   const paths = [join(directory, 'package.json'), join(directory, hostEntry), join(directory, 'cordis.patch.yml')]

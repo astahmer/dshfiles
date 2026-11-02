@@ -1,0 +1,4033 @@
+[
+  {
+    "id": "jujutsu",
+    "owner": "@dshfiles/jujutsu",
+    "version": 1,
+    "methods": [
+      {
+        "name": "openRepository",
+        "description": "Open a repository for Jujutsu. Automatically initialize colocated JJ metadata for an existing Git checkout; preserve Git history and files. Does not create Git repositories, fetch or push. Call only when the user asked to open or enable Jujutsu for that folder.",
+        "tool": {
+          "name": "jj_open_repository",
+          "readOnly": false
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "path"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "root": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "initialized": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "repoId",
+            "root",
+            "initialized"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "initialized": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "repoId",
+            "root",
+            "initialized"
+          ]
+        }
+      },
+      {
+        "name": "registerRepository",
+        "description": "Resolve a folder to its jj repository and return the repoId every other jujutsu tool takes. Read-only.",
+        "tool": {
+          "name": "jj_register_repository",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "path"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "root": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "repoId",
+            "root"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "root"
+          ]
+        }
+      },
+      {
+        "name": "registerRepositories",
+        "description": "Resolve up to 31 folders to their jj repositories in one call, reporting a null row per non-repository path instead of failing the batch. Read-only.",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "minItems": 1,
+              "maxItems": 31
+            }
+          },
+          "required": [
+            "paths"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repositories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "repoId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                        "format": "uuid"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "root": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "repoId",
+                  "root"
+                ]
+              },
+              "maxItems": 31
+            }
+          },
+          "required": [
+            "repositories"
+          ]
+        }
+      },
+      {
+        "name": "load",
+        "description": "Repository status and the first page of the revision graph: root, revisions, changed paths, remotes and the last push. Read-only.",
+        "tool": {
+          "name": "jj_load",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "limit": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "root": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "changeId": {
+                        "type": "string"
+                      },
+                      "shortestChangeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 1000000
+                      },
+                      "author": {
+                        "type": "string",
+                        "maxLength": 320
+                      },
+                      "authorTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "committerTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "parents": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 16
+                      },
+                      "bookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "localBookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "remoteBookmarksText": {
+                        "type": "string",
+                        "maxLength": 32768
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "workspaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1024
+                      },
+                      "workingCopy": {
+                        "type": "boolean"
+                      },
+                      "mine": {
+                        "type": "boolean"
+                      },
+                      "immutable": {
+                        "type": "boolean"
+                      },
+                      "divergent": {
+                        "type": "boolean"
+                      },
+                      "empty": {
+                        "type": "boolean"
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "evolved": {
+                        "type": "boolean"
+                      },
+                      "changeOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "commitId",
+                      "changeId",
+                      "shortestChangeId",
+                      "description",
+                      "author",
+                      "authorTime",
+                      "parents",
+                      "bookmarks",
+                      "localBookmarks",
+                      "remoteBookmarksText",
+                      "tags",
+                      "workspaces",
+                      "workingCopy",
+                      "mine",
+                      "immutable",
+                      "divergent",
+                      "empty",
+                      "conflict",
+                      "evolved",
+                      "changeOffset"
+                    ]
+                  },
+                  "maxItems": 500
+                },
+                "graphHasMore": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "maxLength": 80000
+                },
+                "changedPaths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "maxItems": 1000
+                },
+                "remoteNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "maxItems": 64
+                },
+                "lastPushAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastPushDescription": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastPushHistoryTruncated": {
+                  "type": "boolean"
+                },
+                "evolutionHistoryTruncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "root",
+                "revisions",
+                "graphHasMore",
+                "status",
+                "changedPaths",
+                "remoteNames",
+                "lastPushAt",
+                "lastPushDescription",
+                "lastPushHistoryTruncated",
+                "evolutionHistoryTruncated"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "graphPage",
+        "description": "Load the next revision graph page, or search all visible revisions with a query. Read-only.",
+        "tool": {
+          "name": "jj_graph_page",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "query": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "excludeCommitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 10000
+            }
+          },
+          "required": [
+            "repoId",
+            "excludeCommitIds"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "changeId": {
+                        "type": "string"
+                      },
+                      "shortestChangeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 1000000
+                      },
+                      "author": {
+                        "type": "string",
+                        "maxLength": 320
+                      },
+                      "authorTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "committerTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "parents": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 16
+                      },
+                      "bookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "localBookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "remoteBookmarksText": {
+                        "type": "string",
+                        "maxLength": 32768
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "workspaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1024
+                      },
+                      "workingCopy": {
+                        "type": "boolean"
+                      },
+                      "mine": {
+                        "type": "boolean"
+                      },
+                      "immutable": {
+                        "type": "boolean"
+                      },
+                      "divergent": {
+                        "type": "boolean"
+                      },
+                      "empty": {
+                        "type": "boolean"
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "evolved": {
+                        "type": "boolean"
+                      },
+                      "changeOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "commitId",
+                      "changeId",
+                      "shortestChangeId",
+                      "description",
+                      "author",
+                      "authorTime",
+                      "parents",
+                      "bookmarks",
+                      "localBookmarks",
+                      "remoteBookmarksText",
+                      "tags",
+                      "workspaces",
+                      "workingCopy",
+                      "mine",
+                      "immutable",
+                      "divergent",
+                      "empty",
+                      "conflict",
+                      "evolved",
+                      "changeOffset"
+                    ]
+                  },
+                  "maxItems": 10
+                },
+                "hasMore": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "revisions",
+                "hasMore"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "excludeCommitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "repoId",
+            "excludeCommitIds"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "workspaces",
+        "description": "Every Jujutsu workspace of this repository with its folder, including workspaces no DSH project is registered for. Read-only.",
+        "tool": {
+          "name": "jj_workspaces",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                },
+                "required": [
+                  "name",
+                  "path"
+                ]
+              },
+              "maxItems": 64
+            }
+          },
+          "required": [
+            "workspaces"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "path"
+                ]
+              }
+            }
+          },
+          "required": [
+            "workspaces"
+          ]
+        }
+      },
+      {
+        "name": "graphNavigation",
+        "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.",
+        "tool": {
+          "name": "jj_graph_navigation",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operationId": {
+                  "type": "string"
+                },
+                "landmarks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "current",
+                          "main-origin",
+                          "main",
+                          "default"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "resolved",
+                          "missing",
+                          "ambiguous"
+                        ]
+                      },
+                      "revisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "commitId": {
+                              "type": "string"
+                            },
+                            "changeId": {
+                              "type": "string"
+                            },
+                            "shortestChangeId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32
+                            },
+                            "description": {
+                              "type": "string",
+                              "maxLength": 1000000
+                            },
+                            "author": {
+                              "type": "string",
+                              "maxLength": 320
+                            },
+                            "authorTime": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "committerTime": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "parents": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "maxItems": 16
+                            },
+                            "bookmarks": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 256
+                              },
+                              "maxItems": 64
+                            },
+                            "localBookmarks": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 256
+                              },
+                              "maxItems": 64
+                            },
+                            "remoteBookmarksText": {
+                              "type": "string",
+                              "maxLength": 32768
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 256
+                              },
+                              "maxItems": 64
+                            },
+                            "workspaces": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 128
+                              },
+                              "maxItems": 1024
+                            },
+                            "workingCopy": {
+                              "type": "boolean"
+                            },
+                            "mine": {
+                              "type": "boolean"
+                            },
+                            "immutable": {
+                              "type": "boolean"
+                            },
+                            "divergent": {
+                              "type": "boolean"
+                            },
+                            "empty": {
+                              "type": "boolean"
+                            },
+                            "conflict": {
+                              "type": "boolean"
+                            },
+                            "evolved": {
+                              "type": "boolean"
+                            },
+                            "changeOffset": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            }
+                          },
+                          "required": [
+                            "commitId",
+                            "changeId",
+                            "shortestChangeId",
+                            "description",
+                            "author",
+                            "authorTime",
+                            "parents",
+                            "bookmarks",
+                            "localBookmarks",
+                            "remoteBookmarksText",
+                            "tags",
+                            "workspaces",
+                            "workingCopy",
+                            "mine",
+                            "immutable",
+                            "divergent",
+                            "empty",
+                            "conflict",
+                            "evolved",
+                            "changeOffset"
+                          ]
+                        },
+                        "maxItems": 500
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label",
+                      "status",
+                      "revisions"
+                    ]
+                  },
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "operationId",
+                "landmarks"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "revisionRelationship",
+        "description": "Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. Read-only.",
+        "tool": {
+          "name": "jj_revision_relationship",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "commitId": {
+              "type": "string"
+            },
+            "targetCommitId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId",
+            "targetCommitId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operationId": {
+                  "type": "string"
+                },
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "changeId": {
+                        "type": "string"
+                      },
+                      "shortestChangeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 1000000
+                      },
+                      "author": {
+                        "type": "string",
+                        "maxLength": 320
+                      },
+                      "authorTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "committerTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "parents": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 16
+                      },
+                      "bookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "localBookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "remoteBookmarksText": {
+                        "type": "string",
+                        "maxLength": 32768
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "workspaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1024
+                      },
+                      "workingCopy": {
+                        "type": "boolean"
+                      },
+                      "mine": {
+                        "type": "boolean"
+                      },
+                      "immutable": {
+                        "type": "boolean"
+                      },
+                      "divergent": {
+                        "type": "boolean"
+                      },
+                      "empty": {
+                        "type": "boolean"
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "evolved": {
+                        "type": "boolean"
+                      },
+                      "changeOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "commitId",
+                      "changeId",
+                      "shortestChangeId",
+                      "description",
+                      "author",
+                      "authorTime",
+                      "parents",
+                      "bookmarks",
+                      "localBookmarks",
+                      "remoteBookmarksText",
+                      "tags",
+                      "workspaces",
+                      "workingCopy",
+                      "mine",
+                      "immutable",
+                      "divergent",
+                      "empty",
+                      "conflict",
+                      "evolved",
+                      "changeOffset"
+                    ]
+                  },
+                  "maxItems": 500
+                },
+                "truncated": {
+                  "type": "boolean"
+                },
+                "commitId": {
+                  "type": "string"
+                },
+                "targetCommitId": {
+                  "type": "string"
+                },
+                "relation": {
+                  "type": "string",
+                  "enum": [
+                    "same",
+                    "ancestor",
+                    "descendant",
+                    "diverged",
+                    "no-common-ancestor"
+                  ]
+                },
+                "selectedOnlyCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "targetOnlyCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "commonAncestorIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500
+                },
+                "commonAncestorsTruncated": {
+                  "type": "boolean"
+                },
+                "connectionIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500
+                },
+                "differenceIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 500
+                }
+              },
+              "required": [
+                "operationId",
+                "revisions",
+                "truncated",
+                "commitId",
+                "targetCommitId",
+                "relation",
+                "selectedOnlyCount",
+                "targetOnlyCount",
+                "commonAncestorIds",
+                "commonAncestorsTruncated",
+                "connectionIds",
+                "differenceIds"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "commitId": {
+              "type": "string"
+            },
+            "targetCommitId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId",
+            "targetCommitId"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "graphSlice",
+        "description": "One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Read-only.",
+        "tool": {
+          "name": "jj_graph_slice",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "commitId": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "history",
+                "exclusive"
+              ]
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId",
+            "mode"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operationId": {
+                  "type": "string"
+                },
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "changeId": {
+                        "type": "string"
+                      },
+                      "shortestChangeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 1000000
+                      },
+                      "author": {
+                        "type": "string",
+                        "maxLength": 320
+                      },
+                      "authorTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "committerTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "parents": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 16
+                      },
+                      "bookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "localBookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "remoteBookmarksText": {
+                        "type": "string",
+                        "maxLength": 32768
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "workspaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1024
+                      },
+                      "workingCopy": {
+                        "type": "boolean"
+                      },
+                      "mine": {
+                        "type": "boolean"
+                      },
+                      "immutable": {
+                        "type": "boolean"
+                      },
+                      "divergent": {
+                        "type": "boolean"
+                      },
+                      "empty": {
+                        "type": "boolean"
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "evolved": {
+                        "type": "boolean"
+                      },
+                      "changeOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "commitId",
+                      "changeId",
+                      "shortestChangeId",
+                      "description",
+                      "author",
+                      "authorTime",
+                      "parents",
+                      "bookmarks",
+                      "localBookmarks",
+                      "remoteBookmarksText",
+                      "tags",
+                      "workspaces",
+                      "workingCopy",
+                      "mine",
+                      "immutable",
+                      "divergent",
+                      "empty",
+                      "conflict",
+                      "evolved",
+                      "changeOffset"
+                    ]
+                  },
+                  "maxItems": 500
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "operationId",
+                "revisions",
+                "truncated"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "commitId": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "history",
+                "exclusive"
+              ]
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId",
+            "mode"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "referenceGraph",
+        "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.",
+        "tool": {
+          "name": "jj_reference_graph",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          },
+          "required": [
+            "repoId",
+            "reference"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "commitId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "changeId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                "graph": {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                "listedCommitIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 20
+                },
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "changeId": {
+                        "type": "string"
+                      },
+                      "shortestChangeId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 1000000
+                      },
+                      "author": {
+                        "type": "string",
+                        "maxLength": 320
+                      },
+                      "authorTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "committerTime": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "parents": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 16
+                      },
+                      "bookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "localBookmarks": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "remoteBookmarksText": {
+                        "type": "string",
+                        "maxLength": 32768
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "maxItems": 64
+                      },
+                      "workspaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1024
+                      },
+                      "workingCopy": {
+                        "type": "boolean"
+                      },
+                      "mine": {
+                        "type": "boolean"
+                      },
+                      "immutable": {
+                        "type": "boolean"
+                      },
+                      "divergent": {
+                        "type": "boolean"
+                      },
+                      "empty": {
+                        "type": "boolean"
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "evolved": {
+                        "type": "boolean"
+                      },
+                      "changeOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "commitId",
+                      "changeId",
+                      "shortestChangeId",
+                      "description",
+                      "author",
+                      "authorTime",
+                      "parents",
+                      "bookmarks",
+                      "localBookmarks",
+                      "remoteBookmarksText",
+                      "tags",
+                      "workspaces",
+                      "workingCopy",
+                      "mine",
+                      "immutable",
+                      "divergent",
+                      "empty",
+                      "conflict",
+                      "evolved",
+                      "changeOffset"
+                    ]
+                  },
+                  "maxItems": 400
+                },
+                "defaultCommitId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "commitId",
+                "changeId",
+                "graph"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "reference": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "reference"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "details",
+        "description": "One revision: its description, files, patch and evolution log. Read-only.",
+        "tool": {
+          "name": "jj_details",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "commitId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "M",
+                          "A",
+                          "D",
+                          "R",
+                          "C"
+                        ]
+                      },
+                      "additions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "deletions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "conflict": {
+                        "type": "boolean"
+                      },
+                      "contentDigest": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "status",
+                      "additions",
+                      "deletions",
+                      "contentDigest"
+                    ]
+                  },
+                  "maxItems": 1000
+                },
+                "additions": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "deletions": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "patch": {
+                  "type": "string",
+                  "maxLength": 1200000
+                },
+                "truncated": {
+                  "type": "boolean"
+                },
+                "evolution": {
+                  "type": "string",
+                  "maxLength": 120000
+                }
+              },
+              "required": [
+                "files",
+                "additions",
+                "deletions",
+                "patch",
+                "truncated",
+                "evolution"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "commitId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "commitId"
+          ]
+        },
+        "toolOutput": {}
+      },
+      {
+        "name": "revisionFiles",
+        "description": "Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them. Read-only.",
+        "tool": {
+          "name": "jj_revision_files",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 40
+            }
+          },
+          "required": [
+            "repoId",
+            "commitIds"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "revisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "commitId": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "maxLength": 2048
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "M",
+                            "A",
+                            "D",
+                            "R",
+                            "C"
+                          ]
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "conflict": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "status",
+                        "additions",
+                        "deletions"
+                      ]
+                    },
+                    "maxItems": 2000
+                  }
+                },
+                "required": [
+                  "commitId",
+                  "files"
+                ]
+              },
+              "maxItems": 40
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "revisions",
+            "truncated"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "repoId",
+            "commitIds"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "revisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "commitId": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "M",
+                            "A",
+                            "D",
+                            "R",
+                            "C"
+                          ]
+                        },
+                        "additions": {
+                          "type": "integer"
+                        },
+                        "deletions": {
+                          "type": "integer"
+                        },
+                        "conflict": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "status",
+                        "additions",
+                        "deletions"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "commitId",
+                  "files"
+                ]
+              }
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "revisions",
+            "truncated"
+          ]
+        }
+      },
+      {
+        "name": "editTimes",
+        "description": "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",
+        "tool": {
+          "name": "jj_edit_times",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          },
+          "required": [
+            "repoId",
+            "commitIds"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "revisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "commitId": {
+                    "type": "string"
+                  },
+                  "editedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "commitId",
+                  "editedAt"
+                ]
+              },
+              "maxItems": 100
+            }
+          },
+          "required": [
+            "revisions"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "repoId",
+            "commitIds"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "revisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "commitId": {
+                    "type": "string"
+                  },
+                  "editedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commitId",
+                  "editedAt"
+                ]
+              }
+            }
+          },
+          "required": [
+            "revisions"
+          ]
+        }
+      },
+      {
+        "name": "workingDiff",
+        "description": "The working-copy patch, for reading uncommitted changes without shelling out. Read-only.",
+        "tool": {
+          "name": "jj_working_diff",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "patch": {
+              "type": "string",
+              "maxLength": 1200000
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "patch",
+            "truncated"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "patch": {
+              "type": "string"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "patch",
+            "truncated"
+          ]
+        }
+      },
+      {
+        "name": "prepare",
+        "description": "Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.",
+        "tool": {
+          "name": "jj_prepare_action"
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "action": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "describe"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "split"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "paths",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "squash"
+                      ]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "sourceId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "rebase"
+                      ]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "sourceId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-move"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-set"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-delete"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "fetch"
+                      ]
+                    },
+                    "remote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "remote"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "push"
+                      ]
+                    },
+                    "remote": {
+                      "type": "string"
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "remote",
+                    "bookmark"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-add"
+                      ]
+                    },
+                    "parentPath": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "parentPath",
+                    "name",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-forget"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-edit"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "edit"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "new"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "commit"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "duplicate"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "abandon"
+                      ]
+                    },
+                    "commitIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "maxItems": 50
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitIds"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "revert"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "restore"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "paths"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "repoId",
+            "action"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "describe",
+                "split",
+                "squash",
+                "rebase",
+                "bookmark-move",
+                "bookmark-set",
+                "bookmark-delete",
+                "fetch",
+                "push",
+                "workspace-add",
+                "workspace-forget",
+                "workspace-edit",
+                "edit",
+                "new",
+                "commit",
+                "duplicate",
+                "abandon",
+                "revert",
+                "restore"
+              ]
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "summary": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "expiresAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "title",
+            "summary",
+            "detail",
+            "expiresAt"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "action": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "describe"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "split"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "paths",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "squash"
+                      ]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "sourceId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "rebase"
+                      ]
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "sourceId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-move"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-set"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark-delete"
+                      ]
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "bookmark"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "fetch"
+                      ]
+                    },
+                    "remote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "remote"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "push"
+                      ]
+                    },
+                    "remote": {
+                      "type": "string"
+                    },
+                    "bookmark": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "remote",
+                    "bookmark"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-add"
+                      ]
+                    },
+                    "parentPath": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "parentPath",
+                    "name",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-forget"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "workspace-edit"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "edit"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "new"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "commit"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "message"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "duplicate"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "abandon"
+                      ]
+                    },
+                    "commitIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitIds"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "revert"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "destinationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "destinationId"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "restore"
+                      ]
+                    },
+                    "commitId": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "commitId",
+                    "paths"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "repoId",
+            "action"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "describe",
+                "split",
+                "squash",
+                "rebase",
+                "bookmark-move",
+                "bookmark-set",
+                "bookmark-delete",
+                "fetch",
+                "push",
+                "workspace-add",
+                "workspace-forget",
+                "workspace-edit",
+                "edit",
+                "new",
+                "commit",
+                "duplicate",
+                "abandon",
+                "revert",
+                "restore"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "expiresAt": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "title",
+            "summary",
+            "detail",
+            "expiresAt"
+          ]
+        }
+      },
+      {
+        "name": "confirm",
+        "description": "Apply one prepared jujutsu action by its previewId and return the command message and output. Call only when the user asked, after jj_prepare_action showed them the plan.",
+        "tool": {
+          "name": "jj_confirm_action"
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            },
+            "previewId": {
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "repoId",
+            "previewId"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "output": {
+              "type": "string",
+              "maxLength": 12000
+            },
+            "workspacePath": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "message",
+            "output",
+            "workspacePath"
+          ]
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "repoId": {
+              "type": "string"
+            },
+            "previewId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repoId",
+            "previewId"
+          ]
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string"
+            },
+            "workspacePath": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message",
+            "output",
+            "workspacePath"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "jujutsu-composer",
+    "version": 1,
+    "methods": [
+      {
+        "name": "context",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "base": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "parent"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "trunk"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "remoteBookmark"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "remote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name",
+                    "remote"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "cwd",
+            "base"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "repository": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "root": {
+                      "type": "string",
+                      "maxLength": 2048
+                    },
+                    "workspace": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "changeId": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "commitId": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "empty": {
+                      "type": "boolean"
+                    },
+                    "conflict": {
+                      "type": "boolean"
+                    },
+                    "bookmarks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "maxItems": 32
+                    },
+                    "nearestBookmarks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "maxItems": 32
+                    },
+                    "base": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "maxLength": 256
+                        },
+                        "found": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "found"
+                      ]
+                    },
+                    "revisionCounts": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "ahead": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "behind": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "ahead",
+                            "behind"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "totals": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "files": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "additions": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "deletions": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "files",
+                            "additions",
+                            "deletions"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "maxLength": 2048
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "M",
+                              "A",
+                              "D",
+                              "R",
+                              "C"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "status"
+                        ]
+                      },
+                      "maxItems": 500
+                    },
+                    "filesTruncated": {
+                      "type": "boolean"
+                    },
+                    "localBookmarks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "maxItems": 200
+                    },
+                    "remoteBookmarks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "maxLength": 256
+                          },
+                          "remote": {
+                            "type": "string",
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "remote"
+                        ]
+                      },
+                      "maxItems": 200
+                    }
+                  },
+                  "required": [
+                    "root",
+                    "workspace",
+                    "changeId",
+                    "commitId",
+                    "description",
+                    "empty",
+                    "conflict",
+                    "bookmarks",
+                    "nearestBookmarks",
+                    "base",
+                    "totals",
+                    "files",
+                    "filesTruncated",
+                    "localBookmarks"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "repository"
+          ]
+        }
+      },
+      {
+        "name": "diff",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "base": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "parent"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "trunk"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "bookmark"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "remoteBookmark"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "remote": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name",
+                    "remote"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "cwd",
+            "base"
+          ]
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "patch": {
+              "type": "string",
+              "maxLength": 1200000
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "additions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "deletions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "additions",
+                  "deletions"
+                ]
+              },
+              "maxItems": 2000
+            }
+          },
+          "required": [
+            "patch",
+            "truncated",
+            "files"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "jujutsu-review-progress",
+    "owner": "@dshfiles/jujutsu",
+    "version": 1,
+    "methods": [
+      {
+        "name": "state",
+        "description": "Files of which revisions were marked reviewed, keyed to the exact reviewed content. Read-only.",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "null"
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": 0
+            },
+            "store": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "enum": [
+                    1
+                  ]
+                },
+                "marks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repositoryRoot": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "contentDigest": {
+                        "type": "string"
+                      },
+                      "reviewedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repositoryRoot",
+                      "commitId",
+                      "path",
+                      "contentDigest",
+                      "reviewedAt"
+                    ]
+                  },
+                  "maxItems": 3000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "marks"
+              ]
+            }
+          },
+          "required": [
+            "revision",
+            "store"
+          ]
+        }
+      },
+      {
+        "name": "toggle",
+        "description": "Mark or unmark one file of one revision reviewed. The Host stamps the review time.",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": 0
+            },
+            "store": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "enum": [
+                    1
+                  ]
+                },
+                "marks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repositoryRoot": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "commitId": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "contentDigest": {
+                        "type": "string"
+                      },
+                      "reviewedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repositoryRoot",
+                      "commitId",
+                      "path",
+                      "contentDigest",
+                      "reviewedAt"
+                    ]
+                  },
+                  "maxItems": 3000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "marks"
+              ]
+            }
+          },
+          "required": [
+            "revision",
+            "store"
+          ]
+        }
+      }
+    ]
+  }
+]

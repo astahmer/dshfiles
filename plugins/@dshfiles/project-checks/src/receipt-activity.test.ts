@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Schema } from 'effect'
 import { ProjectChecksActivityModel, projectChecksActivityEventSchema } from './receipt-activity.js'
 import type { StoredReceipt } from './store.js'
 
@@ -47,8 +48,13 @@ describe('Project Checks activity summary', () => {
       },
     })
     expect(JSON.stringify(event)).not.toMatch(/command|args|stdout|stderr|environment|prompt/i)
-    expect(projectChecksActivityEventSchema.safeParse({ ...event, version: 2 }).success).toBe(false)
-    expect(projectChecksActivityEventSchema.safeParse({ ...event, value: { ...event.value, stdout: 'private output' } }).success).toBe(false)
+    expect(Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({ ...event, version: 2 })._tag === 'Success').toBe(false)
+    expect(
+      Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({
+        ...event,
+        value: { ...event.value, stdout: 'private output' },
+      })._tag === 'Success',
+    ).toBe(false)
   })
 
   it('waits for durable receipt persistence before publishing and keeps projection failures optional', async () => {

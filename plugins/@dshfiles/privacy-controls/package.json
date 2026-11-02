@@ -30,8 +30,8 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
-    "yaml": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

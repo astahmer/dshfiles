@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /**
  * Wire contract for queue reordering.
@@ -9,40 +9,40 @@ import { z } from 'zod'
  * different behaviour.
  */
 
-const moveDirectionSchema = z.enum(['up', 'down'])
+const moveDirectionSchema = Schema.Literals(['up', 'down'])
 
-const queueMoveInputSchema = z.object({
-  sessionId: z.string().min(1).max(128),
-  itemId: z.string().min(1).max(128),
+const queueMoveInputSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  itemId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
   direction: moveDirectionSchema,
 })
 
-const queuePositionSchema = z.object({
-  sessionId: z.string().min(1).max(128),
-  itemId: z.string().min(1).max(128),
-  index: z.number().int().min(0),
-  total: z.number().int().min(0),
-  target: z.enum(['next-turn', 'next-step']),
-  first: z.boolean(),
-  last: z.boolean(),
+const queuePositionSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  itemId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  index: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  total: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  target: Schema.Literals(['next-turn', 'next-step']),
+  first: Schema.Boolean,
+  last: Schema.Boolean,
 })
 
-const queueEntrySchema = z.object({
-  target: z.enum(['next-turn', 'next-step']),
-  items: z.array(z.string()).max(256),
+const queueEntrySchema = Schema.Struct({
+  target: Schema.Literals(['next-turn', 'next-step']),
+  items: Schema.Array(Schema.String).check(Schema.isMaxLength(256)),
 })
 
 /** Largest queued file the dock copies back into the composer; base64 crosses the wire as one JSON string. */
 export const MAX_QUEUE_FILE_BYTES = 25 * 1024 * 1024
 
-const queueFileAttachmentSchema = z.object({
-  attachmentId: z.string().min(1).max(256),
-  name: z.string().min(1).max(512),
-  bytes: z.number().int().min(0).max(MAX_QUEUE_FILE_BYTES),
+const queueFileAttachmentSchema = Schema.Struct({
+  attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  bytes: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_QUEUE_FILE_BYTES)),
 })
 
-export type QueueMoveInput = z.infer<typeof queueMoveInputSchema>
-export type QueuePosition = z.infer<typeof queuePositionSchema>
+export type QueueMoveInput = typeof queueMoveInputSchema.Type
+export type QueuePosition = typeof queuePositionSchema.Type
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -53,15 +53,18 @@ export const queueApi = defineApi({
   methods: {
     move: method({ input: queueMoveInputSchema, output: queuePositionSchema }),
     describe: method({
-      input: z.object({ sessionId: z.string().min(1).max(128) }),
-      output: z.array(queueEntrySchema).max(4),
+      input: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
+      output: Schema.Array(queueEntrySchema).check(Schema.isMaxLength(4)),
       description: 'The messages queued for one thread, in order, with their previews and whether each carries attachments. Read-only.',
       tool: { name: 'queue_describe', readOnly: true, render: compactJson },
     }),
     // Added after the first release: a Host started before it answers with an unknown-endpoint error.
     readFile: method({
-      input: z.object({ sessionId: z.string().min(1).max(128), attachment: queueFileAttachmentSchema }),
-      output: z.object({ name: z.string().min(1).max(512), data: z.string().max(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4) }),
+      input: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)), attachment: queueFileAttachmentSchema }),
+      output: Schema.Struct({
+        name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+        data: Schema.String.check(Schema.isMaxLength(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4)),
+      }),
     }),
   },
 })

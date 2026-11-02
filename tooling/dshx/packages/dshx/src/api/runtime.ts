@@ -5,6 +5,7 @@ import { ApiProtocolModel, ContractViolation } from './common.js'
 import type { BrowserSpan } from '../tracing/browser.js'
 import { BrowserTracingRegistryModel } from '../tracing/browser-registry.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
+import { ApiChannelModel } from './channel.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
@@ -146,7 +147,7 @@ function createApiClient<
   const Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
 >(context: ContextLike | Context | undefined, contract: ApiClientContract<Methods, Events>, packageId = 'plugin'): ApiClient<Methods, Events> {
   const connection = context === undefined || typeof context.get !== 'function' ? undefined : (context.get('connection') as ClientConnectionLike | undefined)
-  const channel = ApiProtocolModel.apiChannel(contract.owner ?? packageId, contract.id)
+  const channel = ApiChannelModel.apiChannel(contract.owner ?? packageId, contract.id)
   const call = async (name: string, input: unknown, options?: ApiCallOptions): Promise<unknown> => {
     const rpc = connection?.rpc
     if (rpc?.call === undefined) throw ApiProtocolModel.error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)

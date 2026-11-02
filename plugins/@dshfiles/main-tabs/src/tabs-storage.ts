@@ -1,29 +1,29 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
 import type { PersistedTabs } from './tabs-machine.js'
 
-const idSchema = z.string().min(1).max(512)
-const targetSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('panel'), panelId: idSchema, scope: idSchema.optional() }),
-  z.object({ kind: z.literal('thread'), sessionId: idSchema }),
+const idSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))
+const targetSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('panel'), panelId: idSchema, scope: Schema.optional(idSchema) }),
+  Schema.Struct({ kind: Schema.Literal('thread'), sessionId: idSchema }),
 ])
-const tabSchema = z.object({
+const tabSchema = Schema.Struct({
   id: idSchema,
   target: targetSchema,
-  pinned: z.boolean(),
-  preview: z.boolean(),
-  usedAt: z.number().int().nonnegative(),
-  title: idSchema.optional(),
+  pinned: Schema.Boolean,
+  preview: Schema.Boolean,
+  usedAt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  title: Schema.optional(idSchema),
 })
-const setSchema = z.object({ tabs: z.array(tabSchema).max(200), activeTabId: idSchema.nullable() })
+const tabSetSchema = Schema.Struct({ tabs: Schema.Array(tabSchema).check(Schema.isMaxLength(200)), activeTabId: Schema.NullOr(idSchema) })
+const tabSets = Schema.Record(idSchema, tabSetSchema)
+const atMostStoredSets = Schema.makeFilter<typeof tabSets.Type>(sets => (Object.keys(sets).length <= 500 ? true : 'At most 500 project tab sets are stored.'))
 
 /** One document for every scope (global and each project) so switching the persistence setting loses nothing. */
 export const storedTabs = createStoredValue({
   key: 'dshfiles.main-tabs.v1',
-  schema: z.object({
-    lastProjectKey: idSchema.nullable(),
-    sets: z.record(idSchema, setSchema).refine(sets => Object.keys(sets).length <= 500),
-  }),
+  schema: zodSchemaFromEffect(Schema.Struct({ lastProjectKey: Schema.NullOr(idSchema), sets: tabSets.check(atMostStoredSets) })),
   fallback: null,
 })
 

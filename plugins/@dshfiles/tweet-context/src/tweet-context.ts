@@ -7,8 +7,9 @@ import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json
 import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { trimmedUrlString, urlString } from './schema.js'
 
 const MAX_API_RESPONSE_BYTES = 4_000_000
 const MAX_VIDEO_BYTES = 25_000_000
@@ -29,57 +30,61 @@ const FFMPEG_MAX_ALLOC_BYTES = 128_000_000
 const FFMPEG_MAX_PIXELS = 16_000_000
 const FRAME_EDGE_PIXELS = 960
 
-const tweetUrlSchema = z.string().trim().min(1).max(2_048).url()
-const samplingOptionsSchema = z
-  .object({
-    maxFrames: z.number().int().min(0).max(MAX_VIDEO_FRAMES).optional(),
-    startSeconds: z.number().finite().min(0).max(MAX_VIDEO_DURATION_SECONDS).optional(),
-    endSeconds: z.number().finite().min(0).max(MAX_VIDEO_DURATION_SECONDS).optional(),
-  })
-  .strict()
-const videoFormatSchema = z.object({
-  url: z.string().url().max(2_048),
-  container: z.string().max(32),
-  codec: z.string().max(32).optional(),
-  bitrate: z.number().finite().positive().optional(),
+const nonNegativeVideoSeconds = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_VIDEO_DURATION_SECONDS))
+const samplingOptionsSchema = Schema.Struct({
+  maxFrames: Schema.optional(
+    Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_VIDEO_FRAMES)),
+  ),
+  startSeconds: Schema.optional(nonNegativeVideoSeconds),
+  endSeconds: Schema.optional(nonNegativeVideoSeconds),
 })
-const videoSchema = z.object({
-  duration: z.number().finite().positive().max(3_600),
-  formats: z.array(videoFormatSchema).max(32),
+const videoFormatSchema = Schema.Struct({
+  url: urlString,
+  container: Schema.String.check(Schema.isMaxLength(32)),
+  codec: Schema.optional(Schema.String.check(Schema.isMaxLength(32))),
+  bitrate: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))),
 })
-const photoSchema = z.object({
-  url: z.string().url().max(2_048),
-  altText: z.string().max(12_000).optional(),
+const videoSchema = Schema.Struct({
+  duration: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(3_600)),
+  formats: Schema.Array(videoFormatSchema).check(Schema.isMaxLength(32)),
 })
-const mediaSchema = z
-  .object({
-    all: z.array(z.unknown()).optional(),
-    photos: z.array(z.unknown()).optional(),
-    videos: z.array(z.unknown()).optional(),
-  })
-  .nullable()
-  .optional()
-const postSchema = z.object({
-  id: z
-    .string()
-    .regex(/^\d{1,25}$/)
-    .optional(),
-  text: z.string().max(100_000),
-  created_at: z.string().max(128).optional(),
-  author: z.object({
-    id: z
-      .string()
-      .regex(/^\d{1,25}$/)
-      .optional(),
-    name: z.string().max(300),
-    screen_name: z.string().min(1).max(100),
+const photoSchema = Schema.Struct({
+  url: urlString,
+  altText: Schema.optional(Schema.String.check(Schema.isMaxLength(12_000))),
+})
+const mediaSchema = Schema.optional(
+  Schema.NullOr(
+    Schema.Struct({
+      all: Schema.optional(Schema.Array(Schema.Unknown)),
+      photos: Schema.optional(Schema.Array(Schema.Unknown)),
+      videos: Schema.optional(Schema.Array(Schema.Unknown)),
+    }),
+  ),
+)
+const postIdSchema = Schema.optional(Schema.String.check(Schema.isPattern(/^\d{1,25}$/)))
+const postSchema = Schema.Struct({
+  id: postIdSchema,
+  text: Schema.String.check(Schema.isMaxLength(100_000)),
+  created_at: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+  author: Schema.Struct({
+    id: postIdSchema,
+    name: Schema.String.check(Schema.isMaxLength(300)),
+    screen_name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   }),
   media: mediaSchema,
 })
-const tweetResponseSchema = z.object({
-  code: z.number().int(),
-  status: postSchema.extend({ quote: z.unknown().optional() }),
-  thread: z.array(postSchema).max(200).nullable().optional(),
+const quotedPostSchema = Schema.Struct({ ...postSchema.fields, quote: Schema.optional(Schema.Unknown) })
+const tweetResponseSchema = Schema.Struct({
+  code: Schema.Number.check(Schema.isInt()),
+  status: quotedPostSchema,
+  thread: Schema.optional(Schema.NullOr(Schema.Array(postSchema).check(Schema.isMaxLength(200)))),
+})
+const videoByteLengthSchema = Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_VIDEO_BYTES))
+const imageMediaTypeSchema = Schema.Literals(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const photoMarkerSchema = Schema.Struct({ type: Schema.Literal('photo') })
+const quoteTombstoneSchema = Schema.Struct({
+  reason: Schema.optional(Schema.String.check(Schema.isMaxLength(300))),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(1_000))),
 })
 
 const frameAttachmentSchema = {
@@ -159,9 +164,9 @@ const outputSchema = {
 type TweetContextOutput = InferValue<typeof outputSchema>
 type PostOutput = Omit<TweetContextOutput, 'quote' | 'quoteUnavailable' | 'threadPosts' | 'threadWarning'>
 type TweetContextFrame = PostOutput['videos'][number]['frames'][number]
-type FxPost = z.infer<typeof postSchema>
-type FxVideo = z.infer<typeof videoSchema>
-type FxVideoFormat = z.infer<typeof videoFormatSchema>
+type FxPost = typeof postSchema.Type
+type FxVideo = typeof videoSchema.Type
+type FxVideoFormat = typeof videoFormatSchema.Type
 
 interface TweetReference {
   readonly id: string
@@ -174,10 +179,10 @@ interface SampledFrame {
 }
 
 const parseTweetUrl = (input: string): TweetReference => {
-  const parsedInput = tweetUrlSchema.safeParse(input)
-  if (!parsedInput.success) throw new Error('Provide an HTTPS X/Twitter post URL containing /status/<id>.')
+  const parsedInput = Schema.decodeUnknownResult(trimmedUrlString)(input)
+  if (parsedInput._tag === 'Failure') throw new Error('Provide an HTTPS X/Twitter post URL containing /status/<id>.')
 
-  const tweetUrl = new URL(parsedInput.data)
+  const tweetUrl = new URL(parsedInput.success)
   const allowedHosts = new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'])
   if (tweetUrl.protocol !== 'https:' || !allowedHosts.has(tweetUrl.hostname) || tweetUrl.port !== '' || tweetUrl.username !== '' || tweetUrl.password !== '') {
     throw new Error('Provide an HTTPS X/Twitter post URL containing /status/<id>.')
@@ -232,7 +237,7 @@ const fetchTweet = async (input: {
   readonly tweet: TweetReference
   readonly signal: AbortSignal
   readonly fetcher: typeof fetch
-}): Promise<{ readonly status: z.infer<typeof tweetResponseSchema>['status']; readonly thread: readonly FxPost[] }> => {
+}): Promise<{ readonly status: (typeof tweetResponseSchema.Type)['status']; readonly thread: readonly FxPost[] }> => {
   const signal = AbortSignal.any([input.signal, AbortSignal.timeout(API_TIMEOUT_MS)])
   let response: Response
   try {
@@ -253,11 +258,11 @@ const fetchTweet = async (input: {
   } catch {
     throw new Error('FxEmbed returned an unreadable post response.')
   }
-  const payload = tweetResponseSchema.safeParse(json)
-  if (!payload.success || payload.data.code !== 200) {
+  const payload = Schema.decodeUnknownResult(tweetResponseSchema)(json)
+  if (payload._tag === 'Failure' || payload.success.code !== 200) {
     throw new Error('FxEmbed returned an unsupported or unavailable post response.')
   }
-  return { status: payload.data.status, thread: payload.data.thread ?? [] }
+  return { status: payload.success.status, thread: payload.success.thread ?? [] }
 }
 
 const safeVideoUrl = (rawUrl: string): URL => {
@@ -311,7 +316,7 @@ const downloadVideo = async (input: {
   if (mediaType !== 'video/mp4') throw new Error('The X video response was not an MP4 file.')
 
   const contentLength = response.headers.get('content-length')
-  if (contentLength !== null && !z.coerce.number().int().nonnegative().max(MAX_VIDEO_BYTES).safeParse(contentLength).success) {
+  if (contentLength !== null && Schema.decodeUnknownResult(videoByteLengthSchema)(contentLength)._tag === 'Failure') {
     throw new Error('The X video exceeds the 25 MB download limit.')
   }
   if (response.body === null) throw new Error('The X video response was empty.')
@@ -594,8 +599,8 @@ const sampleVideoFrames = async (input: {
     scanFps,
     signal: input.signal,
   })
-  const frameNameSchema = z.string().regex(/^frame-\d{2}\.jpg$/)
-  const frameNames = (await readdir(input.frameDirectory)).filter(name => frameNameSchema.safeParse(name).success).sort()
+  const frameNameSchema = Schema.String.check(Schema.isPattern(/^frame-\d{2}\.jpg$/))
+  const frameNames = (await readdir(input.frameDirectory)).filter(name => Schema.is(frameNameSchema)(name)).sort()
   if (frameNames.length === 0) throw new Error('ffmpeg did not produce any selected video frames.')
   return Promise.all(
     frameNames.map(async (name, index) => ({
@@ -671,7 +676,7 @@ const limitedText = (text: string): string => {
 }
 
 type MediaItem =
-  | { readonly kind: 'photo'; readonly photo: z.infer<typeof photoSchema> }
+  | { readonly kind: 'photo'; readonly photo: typeof photoSchema.Type }
   | { readonly kind: 'video'; readonly video: FxVideo }
   | { readonly kind: 'unsupported' }
 
@@ -683,11 +688,14 @@ const postMedia = (post: FxPost): MediaItem[] => {
       ? media.all.map(entry => ({ entry, collection: 'all' }))
       : [...(media.photos ?? []).map(entry => ({ entry, collection: 'photos' })), ...(media.videos ?? []).map(entry => ({ entry, collection: 'videos' }))]
   return entries.map(({ entry, collection }) => {
-    const video = videoSchema.safeParse(entry)
-    if (video.success) return { kind: 'video', video: video.data }
-    const photo = photoSchema.safeParse(entry)
-    if (photo.success && (collection === 'photos' || (collection === 'all' && z.object({ type: z.literal('photo') }).safeParse(entry).success)))
-      return { kind: 'photo', photo: photo.data }
+    const video = Schema.decodeUnknownResult(videoSchema)(entry)
+    if (video._tag === 'Success') return { kind: 'video', video: video.success }
+    const photo = Schema.decodeUnknownResult(photoSchema)(entry)
+    if (
+      photo._tag === 'Success' &&
+      (collection === 'photos' || (collection === 'all' && Schema.decodeUnknownResult(photoMarkerSchema)(entry)._tag === 'Success'))
+    )
+      return { kind: 'photo', photo: photo.success }
     return { kind: 'unsupported' }
   })
 }
@@ -718,8 +726,8 @@ const fetchPhoto = async (input: {
     }
     if (!response.ok) throw new Error(`X photo download failed (HTTP ${String(response.status)}).`)
     const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
-    const mediaType = z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']).safeParse(contentType)
-    if (!mediaType.success || response.body === null) throw new Error('The X photo response was not a supported image.')
+    const mediaType = Schema.decodeUnknownResult(imageMediaTypeSchema)(contentType)
+    if (mediaType._tag === 'Failure' || response.body === null) throw new Error('The X photo response was not a supported image.')
     const reader = response.body.getReader()
     const chunks: Uint8Array[] = []
     let bytes = 0
@@ -738,7 +746,7 @@ const fetchPhoto = async (input: {
       reader.releaseLock()
     }
     if (bytes === 0) throw new Error('The X photo response was empty.')
-    return { data: Buffer.concat(chunks), mediaType: mediaType.data }
+    return { data: Buffer.concat(chunks), mediaType: mediaType.success }
   }
   throw new Error('The photo host redirected too many times.')
 }
@@ -796,12 +804,16 @@ const fetchTweetContext = async (input: {
   readonly startSeconds?: number
   readonly endSeconds?: number
 }): Promise<TweetContextOutput> => {
-  const options = samplingOptionsSchema.safeParse({ maxFrames: input.maxFrames, startSeconds: input.startSeconds, endSeconds: input.endSeconds })
-  if (!options.success) throw new Error('Video sampling options must use maxFrames 0–24 and timestamps within the 10-minute video limit.')
+  const options = Schema.decodeUnknownResult(samplingOptionsSchema, { onExcessProperty: 'error' })({
+    maxFrames: input.maxFrames,
+    startSeconds: input.startSeconds,
+    endSeconds: input.endSeconds,
+  })
+  if (options._tag === 'Failure') throw new Error('Video sampling options must use maxFrames 0–24 and timestamps within the 10-minute video limit.')
   const tweet = parseTweetUrl(input.url)
   const fetched = await fetchTweet({ tweet, signal: input.signal, fetcher: input.fetcher })
   const post = fetched.status
-  const quoted = post.quote === undefined || post.quote === null ? undefined : postSchema.safeParse(post.quote)
+  const quoted = post.quote === undefined || post.quote === null ? undefined : Schema.decodeUnknownResult(postSchema)(post.quote)
   const seenThreadIds = new Set([tweet.id])
   const threadPosts = fetched.thread.filter(threadPost => {
     const sameAuthor =
@@ -814,7 +826,7 @@ const fetchTweetContext = async (input: {
   })
   const posts = [
     { post, id: tweet.id },
-    ...(quoted?.success === true && quoted.data.id !== undefined ? [{ post: quoted.data, id: quoted.data.id }] : []),
+    ...(quoted?._tag === 'Success' && quoted.success.id !== undefined ? [{ post: quoted.success, id: quoted.success.id }] : []),
     ...threadPosts.slice(0, MAX_THREAD_POSTS).flatMap(threadPost => (threadPost.id === undefined ? [] : [{ post: threadPost, id: threadPost.id }])),
   ]
   const allMedia = posts.map(item => postMedia(item.post))
@@ -899,14 +911,15 @@ const fetchTweetContext = async (input: {
   const primary = outputs[0]
   if (primary === undefined) throw new Error('The post response was empty.')
   const result: TweetContextOutput = { ...primary, threadPosts: [] }
-  const hasQuotedPost = quoted?.success === true && quoted.data.id !== undefined
+  const hasQuotedPost = quoted?._tag === 'Success' && quoted.success.id !== undefined
   const quoteOutput = hasQuotedPost ? outputs[1] : undefined
   if (quoteOutput !== undefined) result.quote = quoteOutput
   result.threadPosts = outputs.slice(hasQuotedPost ? 2 : 1)
   if (threadPosts.length > MAX_THREAD_POSTS) result.threadWarning = `Thread was truncated to ${String(MAX_THREAD_POSTS)} same-author follow-up posts.`
-  if (quoted !== undefined && (!quoted.success || quoted.data.id === undefined)) {
-    const tombstone = z.object({ reason: z.string().max(300).optional(), message: z.string().max(1_000).optional() }).safeParse(post.quote)
-    result.quoteUnavailable = tombstone.success ? (tombstone.data.message ?? tombstone.data.reason ?? 'Unavailable') : 'Unsupported quoted post'
+  if (quoted !== undefined && (quoted._tag === 'Failure' || quoted.success.id === undefined)) {
+    const tombstone = Schema.decodeUnknownResult(quoteTombstoneSchema)(post.quote)
+    result.quoteUnavailable =
+      tombstone._tag === 'Success' ? (tombstone.success.message ?? tombstone.success.reason ?? 'Unavailable') : 'Unsupported quoted post'
   }
   return result
 }

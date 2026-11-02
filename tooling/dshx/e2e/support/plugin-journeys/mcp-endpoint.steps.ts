@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { createScratchDirectory } from '../threads.js'
@@ -13,18 +13,21 @@ const threads = new WeakMap<Page, string>()
 const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true })
 const endpointOf = (page: Page): string => `${new URL(page.url()).origin}/mcp`
 
-const toolArgumentsSchema = z.record(z.string(), z.json())
+const toolArgumentsSchema = Schema.Record(Schema.String, Schema.Json)
 
-const toolResultSchema = z.object({
-  result: z.object({ content: z.array(z.object({ type: z.literal('text'), text: z.string() })), isError: z.boolean().optional() }),
+const toolResultSchema = Schema.Struct({
+  result: Schema.Struct({
+    content: Schema.Array(Schema.Struct({ type: Schema.Literal('text'), text: Schema.String })),
+    isError: Schema.optional(Schema.Boolean),
+  }),
 })
 
 /** One MCP tools/call from this Node process, as Claude Code sends it: no cookie, only the bearer header. */
 const callTool = async <Output>(input: {
   readonly page: Page
   readonly name: string
-  readonly args: z.infer<typeof toolArgumentsSchema>
-  readonly output: z.ZodType<Output>
+  readonly args: Schema.Schema.Type<typeof toolArgumentsSchema>
+  readonly output: Schema.ConstraintDecoder<Output>
 }): Promise<Output> => {
   const token = tokens.get(input.page)
   if (token === undefined) throw new Error('No MCP token was generated in this scenario.')
@@ -34,10 +37,10 @@ const callTool = async <Output>(input: {
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: input.name, arguments: input.args } }),
   })
   expect(response.status).toBe(200)
-  const parsed = toolResultSchema.parse(await response.json()).result
+  const parsed = Schema.decodeUnknownSync(toolResultSchema)(await response.json()).result
   const text = parsed.content[0]?.text ?? ''
   if (parsed.isError === true) throw new Error(`${input.name} failed: ${text}`)
-  return input.output.parse(JSON.parse(text))
+  return Schema.decodeUnknownSync(input.output)(JSON.parse(text))
 }
 
 Then('the MCP endpoint refuses a client without a token', async ({ page }: { page: Page }) => {
@@ -88,14 +91,14 @@ When('an MCP client with that token starts a thread with a first prompt', async 
     page,
     name: 'create_thread',
     args: { cwd, title: TITLE, model: { provider: 'commandcode_work', model: 'gpt-6-luna' }, prompt: `[[answer ${ANSWER}]]` },
-    output: z.object({ sessionId: z.string() }),
+    output: Schema.Struct({ sessionId: Schema.String }),
   })
   threads.set(page, created.sessionId)
   const waited = await callTool({
     page,
     name: 'wait_for_turn',
     args: { sessionId: created.sessionId, timeoutMs: 60_000 },
-    output: z.object({ status: z.string() }),
+    output: Schema.Struct({ status: Schema.String }),
   })
   expect(waited).toEqual({ status: 'idle' })
 })
@@ -108,14 +111,14 @@ Then('the MCP client lists the thread and reads the answer to its prompt', async
       page,
       name: 'list_threads',
       args: {},
-      output: z.object({ threads: z.array(z.object({ sessionId: z.string(), title: z.string().optional() })) }),
+      output: Schema.Struct({ threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, title: Schema.optional(Schema.String) })) }),
     })
     expect(listed.threads).toContainEqual(expect.objectContaining({ sessionId, title: TITLE }))
     const read = await callTool({
       page,
       name: 'read_thread',
       args: { sessionId },
-      output: z.object({ entries: z.array(z.object({ role: z.string(), text: z.string() })) }),
+      output: Schema.Struct({ entries: Schema.Array(Schema.Struct({ role: Schema.String, text: Schema.String })) }),
     })
     expect(read.entries.at(-1)).toEqual({ role: 'assistant', text: ANSWER })
   })

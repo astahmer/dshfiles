@@ -1,14 +1,9 @@
 import type {} from '@deepseek-ai/cordis'
-import { z } from 'zod'
 
 export {
   DEFAULT_SECRET_ENVIRONMENT,
   formatSecretReference,
   parseSecretReference,
-  secretAliasSchema,
-  secretEnvironmentSchema,
-  secretReferenceSchema,
-  secretCredentialLabelSchema,
   SecretReferenceResolver,
   type SecretCatalogValues,
   type SecretReference,
@@ -22,8 +17,8 @@ export {
  * chain, and one such edge closed a task-graph cycle that pnpm and Turbo refuse to build.
  */
 
-export const secretScopeSchema = z.enum(['global', 'project', 'local'])
-export type SecretScope = z.infer<typeof secretScopeSchema>
+/** The scopes a secrets catalog can address; the Effect form of this grammar is `secretScopeSchemaEffect` in `./effect.js`. */
+export type SecretScope = 'global' | 'project' | 'local'
 
 export interface SecretCatalogKeyOption {
   readonly alias: string
@@ -36,15 +31,18 @@ export interface SecretCatalogKeyOption {
 }
 
 export interface SecretCatalogCredentialBridge {
-  listKeys(cwd: string | null): Promise<readonly SecretCatalogKeyOption[]>
-  importKey(input: {
-    readonly alias: string
-    readonly environment: string
-    readonly scope: SecretScope
-    readonly cwd: string | null
-    readonly targetRef: string
-    readonly replaceExisting?: boolean | undefined
-  }): Promise<void>
+  listKeys(cwd: string | null, signal?: AbortSignal): Promise<readonly SecretCatalogKeyOption[]>
+  importKey(
+    input: {
+      readonly alias: string
+      readonly environment: string
+      readonly scope: SecretScope
+      readonly cwd: string | null
+      readonly targetRef: string
+      readonly replaceExisting?: boolean | undefined
+    },
+    signal?: AbortSignal,
+  ): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {

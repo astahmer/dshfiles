@@ -1,10 +1,10 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 export const threadSidebarMachineApi = defineApi({
   id: 'thread-sidebar-machine',
   version: 1,
   methods: {
-    name: method({ input: z.void(), output: z.object({ name: z.string() }) }),
+    name: method({ input: Schema.Void, output: Schema.Struct({ name: Schema.String }) }),
   },
 })

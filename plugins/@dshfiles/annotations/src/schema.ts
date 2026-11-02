@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 const MAX_NOTE_CHARS = 2000
 export const MAX_TEXT_CHARS = 240
@@ -14,284 +14,242 @@ export const MAX_THREAD_MESSAGES = 50
 export const MAX_ANNOTATIONS_PER_SESSION = 2000
 export const MAX_UNASSIGNED = 100
 
-const annotationStatusSchema = z.enum(['pending', 'acknowledged', 'resolved', 'dismissed', 'stale'])
-const annotationIntentSchema = z.enum(['fix', 'change', 'question', 'approve'])
-const annotationSeveritySchema = z.enum(['blocking', 'important', 'suggestion'])
-const annotationSurfaceSchema = z.enum(['dsh', 'preview', 'external'])
-const annotationKindSchema = z.enum(['element', 'region', 'text'])
-const annotationStaleReasonSchema = z.enum(['element-missing', 'text-changed', 'route-changed'])
-const annotationOriginSchema = z.enum(['dsh', 'extension'])
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const nonNegativeInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const positiveInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
+const annotationIdSchema = Schema.String.check(Schema.isPattern(/^ann_[1-9][0-9]*$/u))
+const unassignedIdSchema = Schema.String.check(Schema.isPattern(/^ext_[1-9][0-9]*$/u))
 
-const annotationRectSchema = z
-  .object({
-    x: z.number(),
-    y: z.number(),
-    width: z.number().nonnegative(),
-    height: z.number().nonnegative(),
-  })
-  .strict()
+const annotationStatusSchema = Schema.Literals(['pending', 'acknowledged', 'resolved', 'dismissed', 'stale'])
+const annotationIntentSchema = Schema.Literals(['fix', 'change', 'question', 'approve'])
+const annotationSeveritySchema = Schema.Literals(['blocking', 'important', 'suggestion'])
+const annotationSurfaceSchema = Schema.Literals(['dsh', 'preview', 'external'])
+const annotationKindSchema = Schema.Literals(['element', 'region', 'text'])
+const annotationStaleReasonSchema = Schema.Literals(['element-missing', 'text-changed', 'route-changed'])
+const annotationOriginSchema = Schema.Literals(['dsh', 'extension'])
 
-const annotationSourceSchema = z
-  .object({
-    file: z.string().min(1).max(400),
-    line: z.number().int().positive(),
-    column: z.number().int().nonnegative(),
-    confidence: z.enum(['map', 'text', 'file']),
-  })
-  .strict()
+const annotationRectSchema = Schema.Struct({
+  x: Schema.Number.check(Schema.isFinite()),
+  y: Schema.Number.check(Schema.isFinite()),
+  width: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  height: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
-export const annotationTargetSchema = z
-  .object({
-    surface: annotationSurfaceSchema,
-    url: z.string().max(MAX_URL_CHARS),
-    selector: z.string().min(1).max(MAX_SELECTOR_CHARS),
-    tag: z.string().min(1).max(40),
-    text: z.string().max(MAX_TEXT_CHARS).optional(),
-    attributes: z.record(z.string().max(60), z.string().max(MAX_ATTRIBUTE_CHARS)).optional(),
-    styles: z.record(z.string().max(40), z.string().max(120)).optional(),
-    rect: annotationRectSchema,
-    source: annotationSourceSchema.optional(),
-    staleReason: annotationStaleReasonSchema.optional(),
-  })
-  .strict()
+const annotationSourceSchema = Schema.Struct({
+  file: boundedString(1, 400),
+  line: positiveInt,
+  column: nonNegativeInt,
+  confidence: Schema.Literals(['map', 'text', 'file']),
+})
 
-const annotationThreadMessageSchema = z
-  .object({
-    id: z.string().min(1).max(40),
-    role: z.enum(['human', 'agent']),
-    body: z.string().min(1).max(MAX_NOTE_CHARS),
-    at: z.number().int().nonnegative(),
-  })
-  .strict()
+export const annotationTargetSchema = Schema.Struct({
+  surface: annotationSurfaceSchema,
+  url: Schema.String.check(Schema.isMaxLength(MAX_URL_CHARS)),
+  selector: boundedString(1, MAX_SELECTOR_CHARS),
+  tag: boundedString(1, 40),
+  text: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_TEXT_CHARS))),
+  attributes: Schema.optionalKey(Schema.Record(Schema.String.check(Schema.isMaxLength(60)), Schema.String.check(Schema.isMaxLength(MAX_ATTRIBUTE_CHARS)))),
+  styles: Schema.optionalKey(Schema.Record(Schema.String.check(Schema.isMaxLength(40)), Schema.String.check(Schema.isMaxLength(120)))),
+  rect: annotationRectSchema,
+  source: Schema.optionalKey(annotationSourceSchema),
+  staleReason: Schema.optionalKey(annotationStaleReasonSchema),
+})
 
-export const annotationSchema = z
-  .object({
-    id: z.string().regex(/^ann_[1-9][0-9]*$/),
-    sessionId: z.string().min(1).max(200),
-    revision: z.number().int().positive(),
-    status: annotationStatusSchema,
-    kind: annotationKindSchema,
-    target: annotationTargetSchema,
-    note: z.string().max(MAX_NOTE_CHARS),
-    intent: annotationIntentSchema.optional(),
-    severity: annotationSeveritySchema.optional(),
-    thread: z.array(annotationThreadMessageSchema).max(MAX_THREAD_MESSAGES),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-    resolvedAt: z.number().int().nonnegative().optional(),
-    resolvedBy: z.enum(['human', 'agent']).optional(),
-    resolution: z
-      .object({ revision: z.number().int().positive(), summary: z.string().max(MAX_NOTE_CHARS).optional() })
-      .strict()
-      .optional(),
-    origin: annotationOriginSchema,
-  })
-  .strict()
+const annotationThreadMessageSchema = Schema.Struct({
+  id: boundedString(1, 40),
+  role: Schema.Literals(['human', 'agent']),
+  body: boundedString(1, MAX_NOTE_CHARS),
+  at: nonNegativeInt,
+})
 
-export const annotationDraftSchema = z
-  .object({
-    kind: annotationKindSchema,
-    target: annotationTargetSchema,
-    note: z.string().max(MAX_NOTE_CHARS),
-    intent: annotationIntentSchema.optional(),
-    severity: annotationSeveritySchema.optional(),
-  })
-  .strict()
+export const annotationSchema = Schema.Struct({
+  id: annotationIdSchema,
+  sessionId: boundedString(1, 200),
+  revision: positiveInt,
+  status: annotationStatusSchema,
+  kind: annotationKindSchema,
+  target: annotationTargetSchema,
+  note: Schema.String.check(Schema.isMaxLength(MAX_NOTE_CHARS)),
+  intent: Schema.optionalKey(annotationIntentSchema),
+  severity: Schema.optionalKey(annotationSeveritySchema),
+  thread: Schema.Array(annotationThreadMessageSchema).check(Schema.isMaxLength(MAX_THREAD_MESSAGES)),
+  createdAt: nonNegativeInt,
+  updatedAt: nonNegativeInt,
+  resolvedAt: Schema.optionalKey(nonNegativeInt),
+  resolvedBy: Schema.optionalKey(Schema.Literals(['human', 'agent'])),
+  resolution: Schema.optionalKey(
+    Schema.Struct({
+      revision: positiveInt,
+      summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_NOTE_CHARS))),
+    }),
+  ),
+  origin: annotationOriginSchema,
+})
 
-const annotationCountsSchema = z
-  .object({
-    pending: z.number().int().nonnegative(),
-    acknowledged: z.number().int().nonnegative(),
-    stale: z.number().int().nonnegative(),
-    resolved: z.number().int().nonnegative(),
-    dismissed: z.number().int().nonnegative(),
-  })
-  .strict()
+export const annotationDraftSchema = Schema.Struct({
+  kind: annotationKindSchema,
+  target: annotationTargetSchema,
+  note: Schema.String.check(Schema.isMaxLength(MAX_NOTE_CHARS)),
+  intent: Schema.optionalKey(annotationIntentSchema),
+  severity: Schema.optionalKey(annotationSeveritySchema),
+})
 
-export const createInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    items: z.array(annotationDraftSchema).min(1).max(MAX_ITEMS_PER_CREATE),
-    origin: annotationOriginSchema.optional(),
-  })
-  .strict()
+const annotationCountsSchema = Schema.Struct({
+  pending: nonNegativeInt,
+  acknowledged: nonNegativeInt,
+  stale: nonNegativeInt,
+  resolved: nonNegativeInt,
+  dismissed: nonNegativeInt,
+})
 
-export const listInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    statuses: z.array(annotationStatusSchema).max(5).optional(),
-    limit: z.number().int().min(1).max(200).optional(),
-  })
-  .strict()
+export const createInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  items: Schema.Array(annotationDraftSchema).check(Schema.isMinLength(1), Schema.isMaxLength(MAX_ITEMS_PER_CREATE)),
+  origin: Schema.optionalKey(annotationOriginSchema),
+})
 
-export const shownOutputSchema = z
-  .object({
-    annotations: z.array(annotationSchema).max(200),
-    counts: annotationCountsSchema,
-  })
-  .strict()
+export const listInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  statuses: Schema.optionalKey(Schema.Array(annotationStatusSchema).check(Schema.isMaxLength(5))),
+  limit: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200))),
+})
 
-export const ackInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    ids: z
-      .array(z.string().regex(/^ann_[1-9][0-9]*$/))
-      .min(1)
-      .max(50),
-  })
-  .strict()
+export const shownOutputSchema = Schema.Struct({
+  annotations: Schema.Array(annotationSchema).check(Schema.isMaxLength(200)),
+  counts: annotationCountsSchema,
+})
 
-export const resolveInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    id: z.string().regex(/^ann_[1-9][0-9]*$/),
-    revision: z.number().int().positive(),
-    summary: z.string().max(MAX_NOTE_CHARS).optional(),
-  })
-  .strict()
+export const ackInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  ids: Schema.Array(annotationIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
+})
 
-export const dismissInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    id: z.string().regex(/^ann_[1-9][0-9]*$/),
-    reason: z.string().min(1).max(MAX_NOTE_CHARS),
-  })
-  .strict()
+export const resolveInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  id: annotationIdSchema,
+  revision: positiveInt,
+  summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_NOTE_CHARS))),
+})
 
-export const staleInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    id: z.string().regex(/^ann_[1-9][0-9]*$/),
-    reason: annotationStaleReasonSchema,
-  })
-  .strict()
+export const dismissInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  id: annotationIdSchema,
+  reason: boundedString(1, MAX_NOTE_CHARS),
+})
 
-export const replyInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    id: z.string().regex(/^ann_[1-9][0-9]*$/),
-    body: z.string().min(1).max(MAX_NOTE_CHARS),
-    role: z.enum(['human', 'agent']).optional(),
-  })
-  .strict()
+export const staleInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  id: annotationIdSchema,
+  reason: annotationStaleReasonSchema,
+})
 
-export const previewInputSchema = z.object({ path: z.string().min(1).max(400) }).strict()
+export const replyInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  id: annotationIdSchema,
+  body: boundedString(1, MAX_NOTE_CHARS),
+  role: Schema.optionalKey(Schema.Literals(['human', 'agent'])),
+})
 
-export const previewOutputSchema = z.union([
-  z.object({ ok: z.literal(true), path: z.string(), html: z.string(), truncated: z.boolean() }).strict(),
-  z.object({ ok: z.literal(false), error: z.enum(['outside-workspace', 'unsupported', 'missing', 'too-large']) }).strict(),
+export const previewInputSchema = Schema.Struct({ path: boundedString(1, 400) })
+
+export const previewOutputSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), path: Schema.String, html: Schema.String, truncated: Schema.Boolean }),
+  Schema.Struct({ ok: Schema.Literal(false), error: Schema.Literals(['outside-workspace', 'unsupported', 'missing', 'too-large']) }),
 ])
 
-const chromePageSchema = z.object({ id: z.string().max(200), title: z.string().max(400), url: z.string().max(600) }).strict()
+const chromePageSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMaxLength(200)),
+  title: Schema.String.check(Schema.isMaxLength(400)),
+  url: Schema.String.check(Schema.isMaxLength(600)),
+})
 
-export const chromeStatusOutputSchema = z
-  .object({
-    running: z.boolean(),
-    endpoint: z.string().max(200),
-    executable: z.string().max(400),
-    pages: z.array(chromePageSchema).max(50),
-  })
-  .strict()
+export const chromeStatusOutputSchema = Schema.Struct({
+  running: Schema.Boolean,
+  endpoint: Schema.String.check(Schema.isMaxLength(200)),
+  executable: Schema.String.check(Schema.isMaxLength(400)),
+  pages: Schema.Array(chromePageSchema).check(Schema.isMaxLength(50)),
+})
 
-export const chromePickInputSchema = z.object({ pageId: z.string().min(1).max(200).optional() }).strict()
+export const chromePickInputSchema = Schema.Struct({ pageId: Schema.optionalKey(boundedString(1, 200)) })
 
-export const chromePickOutputSchema = z.union([
-  z
-    .object({
-      ok: z.literal(true),
-      target: annotationTargetSchema,
-      point: z.object({ x: z.number(), y: z.number() }).strict(),
-    })
-    .strict(),
-  z.object({ ok: z.literal(false), reason: z.enum(['cancelled', 'timeout', 'unavailable', 'no-page']) }).strict(),
+export const chromePickOutputSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    target: annotationTargetSchema,
+    point: Schema.Struct({ x: Schema.Number.check(Schema.isFinite()), y: Schema.Number.check(Schema.isFinite()) }),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literals(['cancelled', 'timeout', 'unavailable', 'no-page']) }),
 ])
 
-export const pairInputSchema = z.object({ action: z.enum(['arm', 'status']) }).strict()
+export const pairInputSchema = Schema.Struct({ action: Schema.Literals(['arm', 'status']) })
 
-export const pairOutputSchema = z
-  .object({
-    armed: z.boolean(),
-    expiresAt: z.number().int().nonnegative().optional(),
-    pairedAt: z.number().int().nonnegative().optional(),
-  })
-  .strict()
+export const pairOutputSchema = Schema.Struct({
+  armed: Schema.Boolean,
+  expiresAt: Schema.optionalKey(nonNegativeInt),
+  pairedAt: Schema.optionalKey(nonNegativeInt),
+})
 
-export const setupOutputSchema = z
-  .object({
-    extensionPath: z.string().max(400),
-    extensionId: z.string().max(64),
-    chromePath: z.string().max(400),
-    pickActiveTab: z.boolean(),
-    startUrl: z.string().max(600),
-  })
-  .strict()
+export const setupOutputSchema = Schema.Struct({
+  extensionPath: Schema.String.check(Schema.isMaxLength(400)),
+  extensionId: Schema.String.check(Schema.isMaxLength(64)),
+  chromePath: Schema.String.check(Schema.isMaxLength(400)),
+  pickActiveTab: Schema.Boolean,
+  startUrl: Schema.String.check(Schema.isMaxLength(600)),
+})
 
-export const sourceInputSchema = z
-  .object({
-    names: z.array(z.string().min(1).max(MAX_SELECTOR_CHARS)).min(1).max(20),
-  })
-  .strict()
+export const sourceInputSchema = Schema.Struct({
+  names: Schema.Array(boundedString(1, MAX_SELECTOR_CHARS)).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
+})
 
-const sourceMatchSchema = z
-  .object({
-    name: z.string().min(1).max(MAX_SELECTOR_CHARS),
-    file: z.string().min(1).max(400),
-    line: z.number().int().positive(),
-    column: z.number().int().nonnegative(),
-    confidence: z.enum(['map', 'text', 'file']),
-  })
-  .strict()
+const sourceMatchSchema = Schema.Struct({
+  name: boundedString(1, MAX_SELECTOR_CHARS),
+  file: boundedString(1, 400),
+  line: positiveInt,
+  column: nonNegativeInt,
+  confidence: Schema.Literals(['map', 'text', 'file']),
+})
 
-export const sourceOutputSchema = z.object({ matches: z.array(sourceMatchSchema).max(20) }).strict()
+export const sourceOutputSchema = Schema.Struct({ matches: Schema.Array(sourceMatchSchema).check(Schema.isMaxLength(20)) })
 
-export const intakeInputSchema = z.object({ limit: z.number().int().min(1).max(100).optional() }).strict()
+export const intakeInputSchema = Schema.Struct({
+  limit: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))),
+})
 
-const unassignedIdSchema = z.string().regex(/^ext_[1-9][0-9]*$/)
+export const attachInputSchema = Schema.Struct({
+  sessionId: boundedString(1, 200),
+  ids: Schema.Array(Schema.Union([unassignedIdSchema, annotationIdSchema])).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
+})
 
-export const attachInputSchema = z
-  .object({
-    sessionId: z.string().min(1).max(200),
-    ids: z
-      .array(z.union([unassignedIdSchema, z.string().regex(/^ann_[1-9][0-9]*$/)]))
-      .min(1)
-      .max(50),
-  })
-  .strict()
+export const unassignedSchema = Schema.Struct({
+  id: unassignedIdSchema,
+  draft: annotationDraftSchema,
+  receivedAt: nonNegativeInt,
+  extensionOrigin: Schema.String.check(Schema.isMaxLength(200)),
+})
 
-export const unassignedSchema = z
-  .object({
-    id: z.string().regex(/^ext_[1-9][0-9]*$/),
-    draft: annotationDraftSchema,
-    receivedAt: z.number().int().nonnegative(),
-    extensionOrigin: z.string().max(200),
-  })
-  .strict()
+export const intakeOutputSchema = Schema.Struct({ items: Schema.Array(unassignedSchema).check(Schema.isMaxLength(100)) })
 
-export const intakeOutputSchema = z.object({ items: z.array(unassignedSchema).max(100) }).strict()
+export const metaSchema = Schema.Struct({
+  schemaVersion: positiveInt,
+  token: boundedString(20, 200),
+  tokenCreatedAt: nonNegativeInt,
+  sequence: nonNegativeInt,
+  extensionTokenRevokedAt: Schema.optionalKey(nonNegativeInt),
+})
 
-export const metaSchema = z
-  .object({
-    schemaVersion: z.number().int().positive(),
-    token: z.string().min(20).max(200),
-    tokenCreatedAt: z.number().int().nonnegative(),
-    sequence: z.number().int().nonnegative(),
-    extensionTokenRevokedAt: z.number().int().nonnegative().optional(),
-  })
-  .strict()
-
-export type Annotation = z.infer<typeof annotationSchema>
-export type AnnotationDraft = z.infer<typeof annotationDraftSchema>
-export type AnnotationStatus = z.infer<typeof annotationStatusSchema>
-export type AnnotationTarget = z.infer<typeof annotationTargetSchema>
-export type AnnotationSource = z.infer<typeof annotationSourceSchema>
-export type AnnotationCounts = z.infer<typeof annotationCountsSchema>
-export type AnnotationKind = z.infer<typeof annotationKindSchema>
-export type AnnotationIntent = z.infer<typeof annotationIntentSchema>
-export type AnnotationSeverity = z.infer<typeof annotationSeveritySchema>
-export type AnnotationSurface = z.infer<typeof annotationSurfaceSchema>
-export type AnnotationOrigin = z.infer<typeof annotationOriginSchema>
-export type AnnotationThreadMessage = z.infer<typeof annotationThreadMessageSchema>
-export type AnnotationStaleReason = z.infer<typeof annotationStaleReasonSchema>
-export type UnassignedAnnotation = z.infer<typeof unassignedSchema>
-export type AnnotationMeta = z.infer<typeof metaSchema>
-export type SourceMatch = z.infer<typeof sourceMatchSchema>
+export type Annotation = typeof annotationSchema.Type
+export type AnnotationDraft = typeof annotationDraftSchema.Type
+export type AnnotationStatus = typeof annotationStatusSchema.Type
+export type AnnotationTarget = typeof annotationTargetSchema.Type
+export type AnnotationSource = typeof annotationSourceSchema.Type
+export type AnnotationCounts = typeof annotationCountsSchema.Type
+export type AnnotationKind = typeof annotationKindSchema.Type
+export type AnnotationIntent = typeof annotationIntentSchema.Type
+export type AnnotationSeverity = typeof annotationSeveritySchema.Type
+export type AnnotationSurface = typeof annotationSurfaceSchema.Type
+export type AnnotationOrigin = typeof annotationOriginSchema.Type
+export type AnnotationThreadMessage = typeof annotationThreadMessageSchema.Type
+export type AnnotationStaleReason = typeof annotationStaleReasonSchema.Type
+export type UnassignedAnnotation = typeof unassignedSchema.Type
+export type AnnotationMeta = typeof metaSchema.Type
+export type SourceMatch = typeof sourceMatchSchema.Type

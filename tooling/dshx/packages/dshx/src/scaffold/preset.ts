@@ -1,9 +1,10 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import * as Schema from 'effect/Schema'
 import { dirname, relative, resolve } from 'node:path'
 import type { ArrayExpression, Expression, ObjectExpression, Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
 import { jsonObjectSchema } from '../json.js'
-import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES, SDK_RUNTIME_DEPENDENCIES } from 'create-dshx/capabilities'
+import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES } from 'create-dshx/capabilities'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { DshCompatibility } from '../compat/types.js'
@@ -111,7 +112,7 @@ const updateManifestForPreset = (manifest: Record<string, unknown>, preset: AddP
   if (preset === 'api') {
     if (updated.dependencies !== undefined && record(updated.dependencies) === undefined) return undefined
     const dependencies = copyRecord(updated.dependencies)
-    dependencies.zod ??= SDK_RUNTIME_DEPENDENCIES.zod
+    dependencies.effect ??= '^4.1.0'
     updated.dependencies = dependencies
   }
 
@@ -551,7 +552,11 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(
-      { ...project, ...(clientEntryForCheck !== undefined && { clientEntry: clientEntryForCheck }), manifest: jsonObjectSchema.parse(updatedManifest) },
+      {
+        ...project,
+        ...(clientEntryForCheck !== undefined && { clientEntry: clientEntryForCheck }),
+        manifest: Schema.decodeUnknownSync(jsonObjectSchema)(updatedManifest),
+      },
       { compatibility },
     )
   } catch (cause) {

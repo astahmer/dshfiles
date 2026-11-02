@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 const memoryCitationPattern = /\bmemory:\s*((?:`?(?:t:[A-Za-z0-9_-]+(?:#\d+)?|n:[1-9]\d*)`?)(?:\s*[,;]\s*`?(?:t:[A-Za-z0-9_-]+(?:#\d+)?|n:[1-9]\d*)`?)*)/giu
 const memoryIdPattern = /(?:t:[A-Za-z0-9_-]+(?:#\d+)?|n:[1-9]\d*)/giu
@@ -35,36 +35,37 @@ export const memoryReferenceMatches = (text: string): readonly MemoryReferenceMa
   return matches
 }
 
-const referenceId = z
-  .string()
-  .regex(/^(?:t:[A-Za-z0-9_-]+|n:[1-9]\d*)$/u)
-  .refine(id => !id.startsWith('n:') || Number.isSafeInteger(Number(id.slice(2))))
-const eventSequence = z
-  .string()
-  .regex(/^(?:0|[1-9]\d*)$/u)
-  .refine(sequence => Number.isSafeInteger(Number(sequence)))
-const coordinate = z.number().finite().min(-100_000).max(100_000)
+const referenceId = Schema.String.check(
+  Schema.isPattern(/^(?:t:[A-Za-z0-9_-]+|n:[1-9]\d*)$/u),
+  Schema.makeFilter((id: string) => (!id.startsWith('n:') || Number.isSafeInteger(Number(id.slice(2))) ? undefined : 'The note id is not a safe integer.')),
+)
+const eventSequence = Schema.String.check(
+  Schema.isPattern(/^(?:0|[1-9]\d*)$/u),
+  Schema.makeFilter((sequence: string) => (Number.isSafeInteger(Number(sequence)) ? undefined : 'The event sequence is not a safe integer.')),
+)
+const coordinate = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(-100_000), Schema.isLessThanOrEqualTo(100_000))
+const extent = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100_000))
 
 export const memoryReferencePreviewEvent = 'dshfiles:memory-reference-preview'
 
-export const memoryReferencePreviewRequestSchema = z
-  .object({
-    id: referenceId,
-    range: eventSequence.optional(),
-    /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
-    anchorId: z.number().int().positive(),
-    anchor: z
-      .object({
-        left: coordinate,
-        top: coordinate,
-        width: z.number().finite().min(0).max(100_000),
-        height: z.number().finite().min(0).max(100_000),
-      })
-      .strict(),
-  })
-  .strict()
+export const memoryReferencePreviewRequestSchema = Schema.Struct({
+  id: referenceId,
+  range: Schema.optional(eventSequence),
+  /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
+  anchorId: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+  anchor: Schema.Struct({ left: coordinate, top: coordinate, width: extent, height: extent }),
+})
 
-export type MemoryReferencePreviewRequest = z.infer<typeof memoryReferencePreviewRequestSchema>
+export type MemoryReferencePreviewRequest = typeof memoryReferencePreviewRequestSchema.Type
+
+export class MemoryReferenceModel {
+  /** Decodes one page event; unknown keys and an out-of-range anchor both discard it. */
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the page event carries unknown data
+  static readonly decodePreviewRequest = (value: unknown): MemoryReferencePreviewRequest | null => {
+    const parsed = Schema.decodeUnknownResult(memoryReferencePreviewRequestSchema, { onExcessProperty: 'error' })(value)
+    return parsed._tag === 'Success' ? parsed.success : null
+  }
+}
 
 /** The stored item a citation names, whether or not it still exists; a range only names part of a thread's log. */
 export type MemoryReferenceKey =

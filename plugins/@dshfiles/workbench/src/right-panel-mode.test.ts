@@ -1,6 +1,6 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import { createEffectStoredValue } from './effect-stored-value.js'
 import { createDockPaneActions, migrateDockVisibility } from './right-panel-mode.js'
 
 const fixture = () => {
@@ -14,7 +14,7 @@ const fixture = () => {
       values.delete(key)
     },
   })
-  const visibility = createStoredValue({ key: 'visibility', schema: z.boolean().nullable(), fallback: null, storage })
+  const visibility = createEffectStoredValue({ key: 'visibility', schema: Schema.NullOr(Schema.Boolean), fallback: null, storage })
   return { visibility, actions: createDockPaneActions(visibility), storage }
 }
 
@@ -43,7 +43,7 @@ describe('one tabbed right pane', () => {
     actions.close()
     migrateDockVisibility('dock', visibility)
     expect(actions.isOpen()).toBe(false)
-    expect(createStoredValue({ key: 'visibility', schema: z.boolean().nullable(), fallback: null, storage }).get()).toBe(false)
+    expect(createEffectStoredValue({ key: 'visibility', schema: Schema.NullOr(Schema.Boolean), fallback: null, storage }).get()).toBe(false)
   })
 
   it('migrates legacy native to a closed tabbed pane, not an alternate native renderer', () => {

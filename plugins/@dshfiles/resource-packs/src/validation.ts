@@ -1,5 +1,5 @@
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import {
   packDefinitionSchema,
   propertyValuesSchema,
@@ -13,11 +13,16 @@ import {
 
 type ResourceMetadataPayload = PackDefinition | ResourceRecord | PropertyValues
 
+/** ISO calendar dates, including leap years, exactly as the registry has always accepted them. */
+const dateSource =
+  /(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))/u
+const dateOnly = Schema.String.check(Schema.isPattern(new RegExp(`^${dateSource.source}$`, 'u')))
+const dateTime = Schema.String.check(
+  Schema.isPattern(new RegExp(`^${dateSource.source}T(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$`, 'u')),
+)
+
 /** Shape parsing, domain compatibility and owner policy for resource metadata. */
 export class ResourceValidation {
-  private static readonly dateOnly = z.iso.date()
-  private static readonly dateTime = z.iso.datetime({ offset: true })
-
   static refuse(code: string, message: string): never {
     throw new PluginApiError(message, { code })
   }
@@ -38,12 +43,12 @@ export class ResourceValidation {
     return caller.packageId
   }
 
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the Zod parsing boundary for submitted or persisted pack definitions, not an unparsed domain operation.
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the Effect Schema parsing boundary for submitted or persisted pack definitions, not an unparsed domain operation.
   static parseDefinition(input: unknown): PackDefinition {
-    const result = packDefinitionSchema.safeParse(input)
-    if (!result.success)
+    const result = Schema.decodeUnknownResult(packDefinitionSchema, { onExcessProperty: 'error' })(input)
+    if (result._tag === 'Failure')
       return ResourceValidation.refuse('invalid-definition', 'Invalid pack definition. Use bounded, typed properties without required fields or defaults.')
-    const definition = result.data
+    const definition = result.success
     ResourceValidation.assertPayloadSize(definition, 128 * 1024, 'The pack definition')
     const fields = new Set<string>()
     for (const property of definition.properties) {
@@ -83,9 +88,9 @@ export class ResourceValidation {
       case 'checkbox':
         return typeof value === 'boolean'
       case 'date':
-        return ResourceValidation.dateOnly.safeParse(value).success
+        return Schema.is(dateOnly)(value)
       case 'datetime':
-        return ResourceValidation.dateTime.safeParse(value).success
+        return Schema.is(dateTime)(value)
       case 'select':
         return typeof value === 'string' && property.options.some(option => option.id === value)
       case 'multiselect': {
@@ -95,9 +100,9 @@ export class ResourceValidation {
         return strings.length === value.length && new Set(strings).size === value.length && strings.every(option => options.has(option))
       }
       case 'reference':
-        return resourceRefSchema.safeParse(value).success
+        return Schema.is(resourceRefSchema)(value)
       case 'references': {
-        if (!Array.isArray(value) || !value.every(ref => resourceRefSchema.safeParse(ref).success)) return false
+        if (!Array.isArray(value) || !value.every(ref => Schema.is(resourceRefSchema)(ref))) return false
         const keys = value.map(ref => JSON.stringify(ref))
         return new Set(keys).size === keys.length
       }
@@ -106,10 +111,11 @@ export class ResourceValidation {
 
   // oxlint-disable-next-line antislop/no-unknown-parameters -- Submitted patches and SQLite JSON are parsed here before any domain checks or persistence.
   static parseValues(definition: PackDefinition, input: unknown, caller?: ApiCaller, owner?: string): PropertyValues {
-    const result = propertyValuesSchema.safeParse(input)
-    if (!result.success) return ResourceValidation.refuse('invalid-value', 'Invalid property values. Use the declared property types and bounded values.')
-    if (caller !== undefined) ResourceValidation.assertPayloadSize(result.data, 64 * 1024, 'The property patch')
-    for (const [id, value] of Object.entries(result.data)) {
+    const result = Schema.decodeUnknownResult(propertyValuesSchema, { onExcessProperty: 'error' })(input)
+    if (result._tag === 'Failure')
+      return ResourceValidation.refuse('invalid-value', 'Invalid property values. Use the declared property types and bounded values.')
+    if (caller !== undefined) ResourceValidation.assertPayloadSize(result.success, 64 * 1024, 'The property patch')
+    for (const [id, value] of Object.entries(result.success)) {
       const property = definition.properties.find(property => property.id === id)
       if (property === undefined) ResourceValidation.refuse('unknown-property', 'The pack does not define one of these property IDs.')
       if (caller !== undefined && property.readOnly && (caller.kind !== 'plugin' || ResourceValidation.ownerOf(caller) !== owner)) {
@@ -118,7 +124,7 @@ export class ResourceValidation {
       if (!ResourceValidation.validValue(property, value))
         ResourceValidation.refuse('invalid-value', `The value does not match the declared ${property.type} property type or options.`)
     }
-    return result.data
+    return result.success
   }
 
   static fillMissing(definition: PackDefinition, values: PropertyValues): PropertyValues {

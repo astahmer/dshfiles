@@ -10,6 +10,7 @@ import {
   type CommunicationPrincipal,
   type CommunicationService,
 } from '@dshfiles/dshx/communication'
+import { Schema } from 'effect'
 import {
   postMessageReceiptSchema,
   type AgentCommunicationBrowseInput,
@@ -53,7 +54,7 @@ export const createAgentCommunicationOperations = (input: {
       } else {
         throw new CommunicationError('invalid-message-target', 'Choose a topic or direct Agent.')
       }
-      return postMessageReceiptSchema.parse({
+      return Schema.decodeUnknownSync(postMessageReceiptSchema)({
         messageId: message.id,
         topic: message.topic,
         intent: message.intent,

@@ -1,22 +1,25 @@
-import { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference, secretAliasSchema, secretEnvironmentSchema, secretScopeSchema } from '@dshfiles/credential-port'
+import { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference } from '@dshfiles/credential-port'
 import type { SecretReference } from '@dshfiles/credential-port'
-import { z } from 'zod'
+import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect, secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
+import { Schema } from 'effect'
 import type { SecretMetadata } from './secret-metadata.js'
 import type { SecretCreateInput } from './secret-operations.js'
 
 const secretSetupValueLimit = 262_144
-const secretSetupDraftSchema = z.object({
-  alias: secretAliasSchema,
-  environment: secretEnvironmentSchema,
-  scope: secretScopeSchema,
-  value: z.string().min(1).max(secretSetupValueLimit),
-})
 
-export type SecretSetupDraft = z.infer<typeof secretSetupDraftSchema>
+const secretSetupDraftFields = {
+  alias: secretAliasSchemaEffect,
+  environment: secretEnvironmentSchemaEffect,
+  scope: secretScopeSchemaEffect,
+  value: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(secretSetupValueLimit)),
+}
+const secretSetupDraftEffectSchema = Schema.Struct(secretSetupDraftFields)
+
+export type SecretSetupDraft = typeof secretSetupDraftEffectSchema.Type
 export type SecretSetupIssue = 'alias' | 'environment' | 'value' | 'folder' | 'duplicate'
 
 export class SecretSetupModel {
-  static readonly draftSchema = secretSetupDraftSchema
+  static readonly draftSchema = Schema.toStandardSchemaV1(secretSetupDraftEffectSchema)
   static readonly valueLimit = secretSetupValueLimit
 
   static draftDefaults(input: {
@@ -33,11 +36,10 @@ export class SecretSetupModel {
   }
 
   static issue(input: { readonly draft: SecretSetupDraft; readonly cwd: string | null; readonly rows: readonly SecretMetadata[] }): SecretSetupIssue | null {
-    const parsed = SecretSetupModel.draftSchema.safeParse(input.draft)
-    if (!parsed.success) {
-      const path = parsed.error.issues[0]?.path[0]
-      if (path === 'alias') return 'alias'
-      if (path === 'environment') return 'environment'
+    const parsed = Schema.decodeUnknownResult(secretSetupDraftEffectSchema)(input.draft)
+    if (parsed._tag === 'Failure') {
+      if (!Schema.is(secretSetupDraftFields.alias)(input.draft.alias)) return 'alias'
+      if (!Schema.is(secretSetupDraftFields.environment)(input.draft.environment)) return 'environment'
       return 'value'
     }
     if (input.draft.scope !== 'global' && input.cwd === null) return 'folder'
@@ -46,7 +48,7 @@ export class SecretSetupModel {
   }
 
   static createInput(input: { readonly draft: SecretSetupDraft; readonly cwd: string | null }): SecretCreateInput {
-    const draft = SecretSetupModel.draftSchema.parse(input.draft)
+    const draft = Schema.decodeUnknownSync(secretSetupDraftEffectSchema)(input.draft)
     if (draft.scope !== 'global' && input.cwd === null) throw new Error('Choose a project folder before using this scope.')
     return {
       alias: draft.alias,

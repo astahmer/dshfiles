@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { useAppForm } from '@dshfiles/plugin-ui/form'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
+import { Schema } from 'effect'
 import { packDefinitionSchema, resourceRefSchema, type PackDefinition, type PropertyDefinition, type ResourceRecord, type StoredPack } from './model.js'
 import { ResourceUiModel, type ResourcePacksClient } from './ui-helpers.js'
 
@@ -38,7 +39,10 @@ export function MutationError(props: { error: Error | null }): JSX.Element | nul
 export function AddResourceDialog(props: { api: ResourcePacksClient; onClose: () => void; onCreated: (resource: ResourceRecord) => void }): JSX.Element {
   const mutation = useMutation({
     mutationFn: async (value: { provider: string; kind: string; id: string; label: string }) =>
-      props.api.registerResource({ ref: resourceRefSchema.parse({ provider: value.provider, kind: value.kind, id: value.id }), label: value.label }),
+      props.api.registerResource({
+        ref: Schema.decodeUnknownSync(resourceRefSchema)({ provider: value.provider, kind: value.kind, id: value.id }),
+        label: value.label,
+      }),
     onSuccess: props.onCreated,
   })
   const form = useAppForm({
@@ -212,7 +216,7 @@ function PackFieldRow(props: {
 }
 
 function packFromDraft(value: PackDraft): PackDefinition {
-  const definition = packDefinitionSchema.parse({
+  const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
     id: value.id,
     label: value.label,
     version: 1,

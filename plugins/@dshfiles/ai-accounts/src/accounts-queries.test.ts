@@ -183,7 +183,7 @@ describe('ai-accounts queries', () => {
   })
 
   it('batches forecast histories into bounded calls and forwards cancellation', async () => {
-    const calls: string[][] = []
+    const calls: (readonly string[])[] = []
     const signals: (AbortSignal | undefined)[] = []
     const options = aiAccountsQueries.forecastHistories(
       {

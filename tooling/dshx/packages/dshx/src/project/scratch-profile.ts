@@ -1,26 +1,27 @@
 import { spawn } from 'node:child_process'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
 
 const dshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const workspacePolicyPath = join(dshxRoot, 'scratch-pnpm-policy.yaml')
-const sourceManifestSchema = z.object({
-  dependencies: z.record(z.string(), z.string()).optional(),
-  dsh: z.object({ profile: z.object({ bundles: z.array(z.string()).optional() }).optional() }).optional(),
+const sourceManifestSchema = Schema.Struct({
+  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  dsh: Schema.optional(Schema.Struct({ profile: Schema.optional(Schema.Struct({ bundles: Schema.optional(Schema.Array(Schema.String)) })) })),
 })
-const profileNameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
-const dependencySpecifierSchema = z
-  .string()
-  .min(1)
-  .refine(specifier => {
+const profileNameSchema = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,31}$/))
+const dependencySpecifierSchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.makeFilter(specifier => {
     if (/[\r\n]|:\/\//.test(specifier)) return false
     const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(specifier)?.[1]?.toLowerCase()
     return scheme === undefined || ['link', 'file', 'workspace', 'npm'].includes(scheme)
-  })
+  }),
+)
 
 export interface ScratchProfileOptions {
   readonly profileName: string
@@ -38,7 +39,7 @@ export interface ScratchProfile {
 }
 
 const resolvePathSpec = async (name: string, specifier: string, sourceRoot: string): Promise<string> => {
-  if (!dependencySpecifierSchema.safeParse(specifier).success) {
+  if (!Option.isSome(Schema.decodeUnknownOption(dependencySpecifierSchema)(specifier))) {
     throw new Error(`The ${name} dependency uses a URL or unsupported protocol in the isolated profile.`)
   }
   const protocol = specifier.startsWith('link:') ? 'link:' : specifier.startsWith('file:') ? 'file:' : undefined
@@ -95,8 +96,8 @@ const installProfile = async (profileRoot: string, home: string): Promise<void> 
   })
 
 export const createScratchProfile = async (options: ScratchProfileOptions): Promise<ScratchProfile> => {
-  const parsedName = profileNameSchema.safeParse(options.profileName)
-  if (!parsedName.success) throw new Error('The E2E scratch profile name is invalid.')
+  const parsedName = Schema.decodeUnknownOption(profileNameSchema)(options.profileName)
+  if (!Option.isSome(parsedName)) throw new Error('The E2E scratch profile name is invalid.')
   const sourceRoot = resolve(options.sourceProfileRoot ?? process.env.DSH_E2E_SOURCE_PROFILE_ROOT ?? join(homedir(), '.dsh/profiles/web'))
   const home = await mkdtemp(join(tmpdir(), 'dshx-e2e-home-'))
   const profileRoot = join(home, 'profiles', options.profileName)
@@ -104,18 +105,21 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
   try {
     const sourceText = await readFile(join(sourceRoot, 'package.json'), 'utf8')
     const sourceData = decodeJson(jsonValueSchema, sourceText)
-    const parsedSource = sourceManifestSchema.safeParse(sourceData)
-    if (!parsedSource.success) throw new Error('The E2E source profile package.json has an invalid shape.')
+    const parsedSource = Schema.decodeUnknownOption(sourceManifestSchema)(sourceData)
+    if (!Option.isSome(parsedSource)) throw new Error('The E2E source profile package.json has an invalid shape.')
 
     const excludedPrefixes = options.excludedDependencyPrefixes ?? []
     const requestedBundles = options.bundleIds === undefined ? undefined : new Set(options.bundleIds)
     const dependencies = Object.fromEntries(
       await Promise.all(
-        Object.entries(parsedSource.data.dependencies ?? {})
+        Object.entries(parsedSource.value.dependencies ?? {})
           .filter(([name]) => !excludedPrefixes.some(prefix => name.startsWith(prefix)))
           // With an explicit bundle list, a source dependency fetched from a URL (e.g. a GitHub plugin) is never
           // loaded, so it is left out rather than refusing the whole profile.
-          .filter(([name, specifier]) => requestedBundles === undefined || requestedBundles.has(name) || dependencySpecifierSchema.safeParse(specifier).success)
+          .filter(
+            ([name, specifier]) =>
+              requestedBundles === undefined || requestedBundles.has(name) || Option.isSome(Schema.decodeUnknownOption(dependencySpecifierSchema)(specifier)),
+          )
           .map(async ([name, specifier]) => [name, await resolvePathSpec(name, specifier, sourceRoot)]),
       ),
     )
@@ -123,7 +127,7 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
       dependencies[name] = await resolvePathSpec(name, specifier, sourceRoot)
     }
 
-    const bundles = options.bundleIds ?? parsedSource.data.dsh?.profile?.bundles ?? []
+    const bundles = options.bundleIds ?? parsedSource.value.dsh?.profile?.bundles ?? []
     await mkdir(profileRoot, { recursive: true })
     await writeFile(
       join(profileRoot, 'package.json'),

@@ -12,7 +12,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
@@ -33,7 +33,7 @@ export interface ThreadWorkspaceControlProps {
 }
 
 const noCwd = (): null => null
-const contractRejectionSchema = z.looseObject({ kind: z.literal('contract') })
+const contractRejectionSchema = Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('contract') }), [Schema.Record(Schema.String, Schema.Unknown)])
 
 /** A Session the client already sees keeping this workspace busy, so the hint can name it instead of blaming "this thread". */
 interface WorkspaceBlocker {
@@ -70,7 +70,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       const read = (input: { readonly path: string; readonly sessionId?: SessionSummary['id'] }) =>
         runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt(input, { signal: hostSignal }) })
       const current = await read({ path: cwd ?? '', sessionId: props.sessionId }).catch(error => {
-        if (!contractRejectionSchema.safeParse(error).success) throw error
+        if (!Schema.is(contractRejectionSchema)(error)) throw error
         return read({ path: cwd ?? '' })
       })
       if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()

@@ -25,12 +25,38 @@ describe('create-dshx', () => {
     expect(exitCode).toBe(0)
     expect(Buffer.concat(chunks).toString()).toContain('USAGE dshx create [OPTIONS] [NAME]')
     expect(Buffer.concat(chunks).toString()).toContain('--template=<')
+    expect(Buffer.concat(chunks).toString()).toContain('effect-host')
     expect(Buffer.concat(chunks).toString()).toContain('--package-manager=<pnpm|yarn|npm>')
   })
 
   it('keeps generated DSH defaults aligned with the core compatibility registry', () => {
     expect(DEFAULT_DSH_RANGE).toBe(DEFAULT_COMPATIBILITY.dshRange)
     expect(DEFAULT_DSH_VERSION).toBe(DEFAULT_COMPATIBILITY.verified.latest)
+  })
+
+  it('renders the Effect Host starter with aligned runtime dependencies', () => {
+    const files = renderProjectTemplate(
+      {
+        packageId: '@dshfiles/example',
+        dshxVersion: CreateProjectModel.packageVersion(),
+        dshVersion: DEFAULT_DSH_VERSION,
+        dshRange: DEFAULT_DSH_RANGE,
+      },
+      'effect-host',
+      'none',
+    )
+    const host = files.find(file => file.path === 'src/host.ts')?.contents
+    const manifestText = files.find(file => file.path === 'package.json')?.contents ?? ''
+    const manifest = JSON.parse(manifestText) as {
+      devDependencies: Record<string, string>
+      peerDependencies: Record<string, string>
+    }
+    expect(host).toContain("import { DshxEffect } from '@dshfiles/dshx/effect'")
+    expect(host).toContain('const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })')
+    expect(host).toContain("apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })]")
+    expect(manifest.devDependencies.effect).toBe('4.1.0')
+    expect(manifest.peerDependencies.effect).toBe('^4.1.0')
+    expect(files.some(file => file.path === 'src/client.tsx')).toBe(false)
   })
 
   it('keeps the scope in generated Cordis loader ids', () => {
@@ -332,7 +358,7 @@ describe('create-dshx', () => {
       return answers.shift() ?? ''
     }
     await expect(runCreate(['interactive-demo', '--cwd', root, '--no-install'], { stdin: input, stdout: output, stderr: output, readLine })).resolves.toBe(0)
-    expect(questions).toEqual(['Project template (basic/ui/tool/full-stack): ', 'Client style (css-modules/tailwind/none): '])
+    expect(questions).toEqual(['Project template (basic/ui/tool/effect-host/full-stack): ', 'Client style (css-modules/tailwind/none): '])
     expect(await readFile(resolve(root, 'interactive-demo/src/api/status.ts'), 'utf8')).toContain('defineApi')
     expect(await readFile(resolve(root, 'interactive-demo/src/styles.css'), 'utf8')).toContain('prefix(dshx)')
 

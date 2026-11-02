@@ -5,13 +5,13 @@ import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle, PeerScope } from '@deepseek-ai/dsh-client-connection'
-import { ApiProtocolModel } from '../api/common.js'
 import { ApiDefinitionModel } from '../api/define.js'
 import { PluginStorageContract } from '../api/storage.js'
 import { BROWSER_TRACES_API } from '../tracing/browser-protocol.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
 import { createClientModuleLoader } from './client-module.js'
+import { ApiChannelModel } from '../api/channel.js'
 
 export interface MountedPlugin {
   readonly ctx: Context
@@ -105,12 +105,12 @@ export function provideTestConnection(ctx: Context): TestConnection {
     /** Routes the mounted plugins registered, without the registry listing, browser-traces and plugin-storage APIs and event stream dshx serves on the first one's behalf. */
     get routeCount() {
       const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id, PluginStorageContract.api.id].map(
-        apiId => `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
+        apiId => `/api${ApiChannelModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
       )
-      return [...routes.keys()].filter(path => path !== ApiProtocolModel.eventsPath && !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
+      return [...routes.keys()].filter(path => path !== ApiChannelModel.eventsPath && !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
     },
     requestApi: ({ packageId, apiId, method, version, input }) =>
-      requestRpc({ endpoint: `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),
+      requestRpc({ endpoint: `${ApiChannelModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),
     requestRpc,
     fetch: (input, init) => handler.fetch(new Request(input, init), peer),
     dispose,

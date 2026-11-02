@@ -1,6 +1,7 @@
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import * as Schema from 'effect/Schema'
 import { type Dispatch, type SetStateAction, useEffect, useState, useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import { SchemaHelpers } from './schema-helpers.js'
+import { createEffectStoredValue } from './stored-value.js'
 
 /**
  * One Jujutsu panel, several contexts. The main view shows a single panel per key, so a tab that asks for another
@@ -18,7 +19,9 @@ const PANEL_SCOPE_EVENT = 'dshfiles:panel-scope'
 const PANEL_TAB_TITLE_EVENT = 'dshfiles:panel-tab-title'
 const OPEN_PANEL_TAB_EVENT = 'dshfiles:open-panel-tab'
 
-const scopeEventSchema = z.object({ panelId: z.string().min(1), scope: z.string().min(1).nullable() }).strict()
+const scopeEventSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ panelId: Schema.String.check(Schema.isMinLength(1)), scope: Schema.NullOr(Schema.String.check(Schema.isMinLength(1))) }),
+)
 
 const scopeListeners = new Set<() => void>()
 let activeScope = DEFAULT_PANEL_SCOPE
@@ -41,19 +44,19 @@ export const useActiveJujutsuScope = (): string => useSyncExternalStore(activeJu
 const PANEL_SCOPE_STATE_KEY = 'dshfiles.jujutsu.panel-scopes.v1'
 const PANEL_SCOPE_STATE_LIMIT = 40
 
-const panelScopeStateSchema = z.record(
-  z.string().max(200),
-  z.object({
-    path: z.string().max(4096).optional(),
-    view: z.enum(['graph', 'source']).optional(),
+const panelScopeStateSchema = Schema.Record(
+  Schema.String.check(Schema.isMaxLength(200)),
+  Schema.Struct({
+    path: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(4096))),
+    view: Schema.optionalKey(Schema.Literals(['graph', 'source'])),
   }),
 )
 
-export type PanelScopeState = z.infer<typeof panelScopeStateSchema>[string]
+export type PanelScopeState = Schema.Schema.Type<typeof panelScopeStateSchema>[string]
 export type PanelScopeView = NonNullable<PanelScopeState['view']>
 
 const NO_PANEL_SCOPES: Record<string, PanelScopeState> = {}
-const storedPanelScopes = createStoredValue({ key: PANEL_SCOPE_STATE_KEY, schema: panelScopeStateSchema, fallback: NO_PANEL_SCOPES })
+const storedPanelScopes = createEffectStoredValue({ key: PANEL_SCOPE_STATE_KEY, schema: panelScopeStateSchema, fallback: NO_PANEL_SCOPES })
 
 /** Panel state that belongs to one scope rather than the browser: filters, selection and expanded rows. */
 const scopeMemory = new Map<string, Map<string, unknown>>()
@@ -71,7 +74,7 @@ export class PanelScopes {
   /** A scope announcement aimed at another panel is not ours. */
   static read(event: Event): string | undefined {
     if (!(event instanceof CustomEvent)) return undefined
-    const parsed = scopeEventSchema.safeParse(event.detail)
+    const parsed = SchemaHelpers.decodeSafe(scopeEventSchema, event.detail)
     if (!parsed.success || parsed.data.panelId !== JUJUTSU_PANEL_ID) return undefined
     return parsed.data.scope ?? DEFAULT_PANEL_SCOPE
   }

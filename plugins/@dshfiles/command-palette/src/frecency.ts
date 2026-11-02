@@ -1,23 +1,29 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 const MAX_ENTRIES = 200
 const HOUR_MS = 3_600_000
 
-const frecencySchema = z
-  .array(
-    z.object({
-      id: z.string().min(1).max(4200),
-      count: z.number().int().min(1).max(100_000),
-      lastUsedAt: z.number().int().nonnegative(),
-    }),
-  )
-  .max(MAX_ENTRIES)
+const frecencySchema = Schema.Array(
+  Schema.Struct({
+    id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4200)),
+    count: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100_000)),
+    lastUsedAt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  }),
+).check(Schema.isMaxLength(MAX_ENTRIES))
 
-export type FrecencyEntries = z.infer<typeof frecencySchema>
+export type FrecencyEntries = typeof frecencySchema.Type
 
-/** Palette picks (actions, Host commands, files) in this browser; threads keep their own recency ranking. */
-export const paletteFrecency = createStoredValue({ key: 'dshfiles.thread-sidebar.palette-frecency.v1', schema: frecencySchema, fallback: [] })
+/**
+ * Palette picks (actions, Host commands, files) in this browser; threads keep their own recency ranking. The stored-value
+ * hook still takes a zod-shaped schema, so the Effect schema is the source of truth behind `zodSchemaFromEffect`.
+ */
+export const paletteFrecency = createStoredValue({
+  key: 'dshfiles.thread-sidebar.palette-frecency.v1',
+  schema: zodSchemaFromEffect(frecencySchema),
+  fallback: [],
+})
 
 const recencyWeight = (ageMs: number): number => {
   if (ageMs < 4 * HOUR_MS) return 4

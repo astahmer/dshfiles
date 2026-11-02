@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@ff-labs/fff-node": "0.11.0",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

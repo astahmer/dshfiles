@@ -14,7 +14,7 @@ export const listDirectory = async (requested: string | undefined): Promise<Dire
   if (requested !== undefined && !isAbsolute(requested)) throw new Error('Folder paths must be absolute.')
   const path = await realpath(requested ?? home)
   const children = await readdir(path, { withFileTypes: true })
-  const entries: DirectoryListing['entries'] = []
+  const entries: Array<DirectoryListing['entries'][number]> = []
   for (const child of children) {
     const childPath = join(path, child.name)
     const isDirectory =

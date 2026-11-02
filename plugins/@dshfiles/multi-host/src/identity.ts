@@ -1,25 +1,19 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { chmod, link, lstat, mkdir, open, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { z } from 'zod'
 import { HostDirectoryStore } from './store.js'
+import { MultiHostSchema } from './schema.js'
 import { runtimeIdentitySchema, type RuntimeIdentity } from './records.js'
 
-const persistedIdentitySchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    runtimeId: z.string().uuid(),
-    profile: z.string().min(1).max(64),
-  })
-  .strict()
-const profileSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const persistedIdentitySchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  runtimeId: Schema.String.check(Schema.isUUID()),
+  profile: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+})
+const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
 export class RuntimeIdentityError extends Error {
   constructor(
@@ -60,7 +54,7 @@ const dshVersion = (): string => {
     const require = createRequire(import.meta.url)
     const packagePath = require.resolve('@deepseek-ai/dsh/package.json')
     const packageValue: unknown = JSON.parse(readFileSync(packagePath, 'utf8'))
-    const parsed = z.object({ version: z.string().min(1).max(80) }).safeParse(packageValue)
+    const parsed = MultiHostSchema.safeDecode(Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }), packageValue)
     return parsed.success ? parsed.data.version : 'unknown'
   } catch {
     return 'unknown'
@@ -89,7 +83,7 @@ const secureIdentityPath = async (path: string): Promise<void> => {
   }
 }
 
-const readPersistedIdentity = async (path: string): Promise<z.infer<typeof persistedIdentitySchema> | undefined> => {
+const readPersistedIdentity = async (path: string): Promise<Schema.Schema.Type<typeof persistedIdentitySchema> | undefined> => {
   await secureIdentityPath(path)
   let content: string
   try {
@@ -104,12 +98,12 @@ const readPersistedIdentity = async (path: string): Promise<z.infer<typeof persi
   } catch {
     throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file contains invalid JSON and was left untouched.')
   }
-  const result = persistedIdentitySchema.safeParse(parsed)
+  const result = MultiHostSchema.safeDecodeStrict(persistedIdentitySchema, parsed)
   if (!result.success) throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file has an unsupported shape and was left untouched.')
   return result.data
 }
 
-const persistIdentity = async (path: string, value: z.infer<typeof persistedIdentitySchema>): Promise<void> => {
+const persistIdentity = async (path: string, value: Schema.Schema.Type<typeof persistedIdentitySchema>): Promise<void> => {
   const parent = dirname(path)
   await mkdir(parent, { recursive: true, mode: 0o700 })
   await secureIdentityPath(path)
@@ -140,7 +134,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
   if (discoveredProfile !== undefined && configuredProfile !== undefined && discoveredProfile !== configuredProfile) {
     throw new RuntimeIdentityError('profile-mismatch', 'The multi-host profile setting does not match the running DSH profile.')
   }
-  const profile = profileSchema.parse(reportedProfile)
+  const profile = MultiHostSchema.decode(profileSchema, reportedProfile)
   const path = HostDirectoryStore.pluginDataPath(join('runtime-identities', profile + '.json'))
   let persisted = await readPersistedIdentity(path)
   if (persisted === undefined) {
@@ -157,7 +151,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
   if (persisted.profile !== profile) {
     throw new RuntimeIdentityError('profile-mismatch', 'The recorded runtime identity belongs to a different DSH profile.')
   }
-  return runtimeIdentitySchema.parse({
+  return MultiHostSchema.decodeStrict(runtimeIdentitySchema, {
     protocolVersion: 1,
     runtimeId: persisted.runtimeId,
     profile: persisted.profile,

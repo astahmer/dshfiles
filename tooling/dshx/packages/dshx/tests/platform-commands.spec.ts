@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream'
+import * as Schema from 'effect/Schema'
 import { jsonValueSchema } from '../src/json.js'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { parseCliArgs } from '../src/cli/args.js'
 import { runPlatformCli } from '../src/cli/platform.js'
 import type { PlatformCliRuntime } from '../src/cli/platform.js'
@@ -51,14 +51,18 @@ const run = async ({
   return { code, ...captured.read() }
 }
 
-const envelopeSchema = z.object({ ok: z.boolean(), data: z.unknown().optional(), error: z.object({ code: z.string(), message: z.string() }).optional() })
-
-const doctorDataSchema = z.object({
-  dshCliVersion: z.string().nullable(),
-  checks: z.array(z.object({ id: z.string(), status: z.enum(['pass', 'fail', 'unknown']), detail: z.string() })),
+const envelopeSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  data: Schema.optionalKey(Schema.Unknown),
+  error: Schema.optionalKey(Schema.Struct({ code: Schema.String, message: Schema.String })),
 })
 
-const doctorChecks = (stdout: string) => doctorDataSchema.parse(envelopeSchema.parse(JSON.parse(stdout)).data).checks
+const doctorDataSchema = Schema.Struct({
+  dshCliVersion: Schema.NullOr(Schema.String),
+  checks: Schema.Array(Schema.Struct({ id: Schema.String, status: Schema.Literals(['pass', 'fail', 'unknown']), detail: Schema.String })),
+})
+
+const doctorChecks = (stdout: string) => Schema.decodeUnknownSync(doctorDataSchema)(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(stdout)).data).checks
 
 const bundleRow = (overrides: { readonly name?: string; readonly installed?: boolean; readonly error?: { readonly code: string } } = {}) => ({
   name: '@sample/bundle',
@@ -126,10 +130,10 @@ const inventoryRpc =
   async (namespace, method) => {
     const name = `${namespace}/${method}`
     if (failing.includes(name)) throw new DshPlatformError('rpc-http-error', `${name} failed`)
-    if (name === 'session/list') return jsonValueSchema.parse({ items: [] })
-    if (name === 'pluginManager/listPlugins') return jsonValueSchema.parse(plugins)
-    if (name === 'pluginManager/listBundles') return jsonValueSchema.parse(bundles)
-    if (name === 'settings/describe') return jsonValueSchema.parse(settingsDescription())
+    if (name === 'session/list') return Schema.decodeUnknownSync(jsonValueSchema)({ items: [] })
+    if (name === 'pluginManager/listPlugins') return Schema.decodeUnknownSync(jsonValueSchema)(plugins)
+    if (name === 'pluginManager/listBundles') return Schema.decodeUnknownSync(jsonValueSchema)(bundles)
+    if (name === 'settings/describe') return Schema.decodeUnknownSync(jsonValueSchema)(settingsDescription())
     throw new Error(`Unexpected RPC ${name}`)
   }
 
@@ -192,7 +196,7 @@ describe('dshx status', () => {
     const result = await run({ argv: ['status', '--json'], client: clientWith({ rpc: inventoryRpc() }), inspectInstance: async () => liveInstance() })
 
     expect(result.code).toBe(0)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).data).toMatchObject({
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).data).toMatchObject({
       connected: true,
       sessions: 0,
       plugins: 1,
@@ -247,7 +251,7 @@ describe('dshx status', () => {
   it('reports a Host response outside the API contract as invalid-response', async () => {
     const rpc = inventoryRpc({ plugins: [{ entryId: 7, moduleName: '@sample/plugin' }] })
     const result = await run({ argv: ['plugins', 'list', '--json'], client: clientWith({ rpc }) })
-    const envelope = envelopeSchema.parse(JSON.parse(result.stdout))
+    const envelope = Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout))
 
     expect(result.code).toBe(1)
     expect(envelope.error).toMatchObject({ code: 'invalid-response', message: expect.stringContaining('DSH returned data outside its API contract') })
@@ -273,7 +277,12 @@ describe('dshx config get/set', () => {
     const result = await run({ argv: ['config', 'get', 'plugin', 'servers.0.name', '--json'], client: settingsRpc().client })
 
     expect(result.code).toBe(0)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).data).toEqual({ namespace: 'plugin', path: 'servers.0.name', revision: 3, value: 'alpha' })
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).data).toEqual({
+      namespace: 'plugin',
+      path: 'servers.0.name',
+      revision: 3,
+      value: 'alpha',
+    })
   })
 
   it.each([
@@ -284,14 +293,14 @@ describe('dshx config get/set', () => {
     const result = await run({ argv: ['config', 'get', 'plugin', path, '--json'], client: settingsRpc().client })
 
     expect(result.code).toBe(exitCode)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).error).toMatchObject({ code })
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).error).toMatchObject({ code })
   })
 
   it('rejects an unknown namespace', async () => {
     const result = await run({ argv: ['config', 'get', 'missing', '--json'], client: settingsRpc().client })
 
     expect(result.code).toBe(4)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).error).toMatchObject({ code: 'not-found' })
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).error).toMatchObject({ code: 'not-found' })
   })
 
   it('refuses a value that is not JSON before mutating anything', async () => {
@@ -299,7 +308,7 @@ describe('dshx config get/set', () => {
     const result = await run({ argv: ['config', 'set', 'plugin', 'enabled', 'not-json', '--json'], client: settings.client })
 
     expect(result.code).toBe(1)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).error).toMatchObject({ code: 'invalid-json-value' })
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).error).toMatchObject({ code: 'invalid-json-value' })
     expect(settings.mutate).not.toHaveBeenCalled()
   })
 
@@ -308,7 +317,7 @@ describe('dshx config get/set', () => {
     const result = await run({ argv: ['config', 'set', 'plugin', 'enabled', 'true', '--json'], client: settings.client })
 
     expect(result.code).toBe(1)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).error).toMatchObject({ code: 'read-only' })
+    expect(Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(result.stdout)).error).toMatchObject({ code: 'read-only' })
     expect(settings.mutate).not.toHaveBeenCalled()
   })
 
@@ -329,14 +338,14 @@ describe('dshx config get/set', () => {
 describe('connectDshPlatformClient', () => {
   const launchUrl = 'http://127.0.0.1:3080/?token=synthetic-token'
   const authenticated = () => new Response(null, { status: 302, headers: { 'set-cookie': 'dsh.session=cookie; Path=/; HttpOnly' } })
-  const rpcRequestSchema = z.object({ rpcId: z.string() })
+  const rpcRequestSchema = Schema.Struct({ rpcId: Schema.String })
 
   const connectWith = ({ api }: { readonly api: (rpcId: string) => Response }) =>
     connectDshPlatformClient({
       url: launchUrl,
       fetch: async (input, init) => {
         if (String(input).includes('?token=')) return authenticated()
-        return api(rpcRequestSchema.parse(JSON.parse(String(init?.body))).rpcId)
+        return api(Schema.decodeUnknownSync(rpcRequestSchema)(JSON.parse(String(init?.body))).rpcId)
       },
     })
 

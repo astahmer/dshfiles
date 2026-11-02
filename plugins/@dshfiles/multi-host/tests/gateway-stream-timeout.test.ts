@@ -1,10 +1,10 @@
 import { createServer, type Server } from 'node:http'
 import type { Socket } from 'node:net'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, test } from 'vitest'
-import { z } from 'zod'
 import { connectGateway } from '../src/connectors/gateway.js'
 
-const addressSchema = z.object({ port: z.number().int().min(0).max(65_535) })
+const addressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)) })
 
 const settleTicks = async (): Promise<void> => {
   await new Promise(resolve => setTimeout(resolve, 20))
@@ -30,9 +30,9 @@ describe('runtime stream follow', () => {
       held.push(socket)
     })
     await new Promise<void>(resolve => server?.listen(0, '127.0.0.1', resolve))
-    const address = addressSchema.safeParse(server.address())
-    if (!address.success) throw new Error('The loopback fixture did not bind.')
-    const launchUrl = `http://127.0.0.1:${address.data.port}/?token=fixture-token-12345678`
+    const address = Schema.decodeUnknownResult(addressSchema)(server.address())
+    if (address._tag === 'Failure') throw new Error('The loopback fixture did not bind.')
+    const launchUrl = `http://127.0.0.1:${address.success.port}/?token=fixture-token-12345678`
     const gateway = await connectGateway({
       launchUrl,
       createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }),

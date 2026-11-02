@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import { LlmAdapter, LlmRuntime, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { generate } from '../src/host/generate.js'
 
 /** Answers each call with the next scripted reply, or fails with the scripted failure code. */
@@ -33,6 +33,13 @@ const host = async (replies: readonly (string | { readonly failure: string })[])
 }
 
 const model = { provider: 'scripted', model: 'scripted-1' }
+const titleSchema = Schema.Struct({ title: Schema.String })
+const standardTitleSchema = Schema.toStandardSchemaV1(titleSchema)
+const titleSchemaJsonSchema = Schema.toStandardJSONSchemaV1(titleSchema)['~standard'].jsonSchema
+const titleSchemaWithJsonSchema = {
+  ...standardTitleSchema,
+  '~standard': { ...standardTitleSchema['~standard'], jsonSchema: titleSchemaJsonSchema },
+}
 
 describe('generate', () => {
   it('returns the text of one side call with the system prompt it was given', async () => {
@@ -45,7 +52,7 @@ describe('generate', () => {
 
   it('decodes a schema reply, asking once again with the issues when the first does not match', async () => {
     const { ctx, adapter } = await host(['{"title": 3}', '```json\n{"title": "Fix login"}\n```'])
-    const result = await generate(ctx, { prompt: 'Title this', model, schema: z.object({ title: z.string() }) })
+    const result = await generate(ctx, { prompt: 'Title this', model, schema: titleSchemaWithJsonSchema })
     expect(result.value).toEqual({ title: 'Fix login' })
     expect(adapter.calls[0]?.system).toContain('"title"')
     const correction = adapter.calls[1]?.messages.at(-1)?.content[0]
@@ -54,7 +61,9 @@ describe('generate', () => {
 
   it('fails with the issues after one correction', async () => {
     const { ctx } = await host(['nope', 'still nope'])
-    await expect(generate(ctx, { prompt: 'x', model, schema: z.number() })).rejects.toMatchObject({ code: 'generate-invalid-output' })
+    await expect(generate(ctx, { prompt: 'x', model, schema: Schema.toStandardSchemaV1(Schema.Number.check(Schema.isFinite())) })).rejects.toMatchObject({
+      code: 'generate-invalid-output',
+    })
   })
 
   it('drops a reasoning effort the model refuses, and reports other failures', async () => {

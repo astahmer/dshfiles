@@ -14,6 +14,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { Schema } from 'effect'
 import { useId, useState } from 'react'
 import { claudeCommand } from './claude-command.js'
 import { endpointStatusSchema, mcpEndpointApi, type EndpointStatus } from './endpoint-api.js'
@@ -75,18 +76,18 @@ const EndpointControls = (props: { readonly status: EndpointStatus }): JSX.Eleme
     mutationFn: async () => api.rotateToken({}),
     onSuccess: result => {
       setIssuedToken(result.token)
-      publish(endpointStatusSchema.parse(result.status))
+      publish(Schema.decodeUnknownSync(endpointStatusSchema)(result.status))
     },
   })
   const revoke = useMutation({
-    mutationFn: async () => endpointStatusSchema.parse(await api.revokeToken({ confirm: true })),
+    mutationFn: async () => Schema.decodeUnknownSync(endpointStatusSchema)(await api.revokeToken({ confirm: true })),
     onSuccess: status => {
       setIssuedToken(undefined)
       publish(status)
     },
   })
   const lan = useMutation({
-    mutationFn: async (enabled: boolean) => endpointStatusSchema.parse(await api.setLanAccess({ enabled })),
+    mutationFn: async (enabled: boolean) => Schema.decodeUnknownSync(endpointStatusSchema)(await api.setLanAccess({ enabled })),
     onSuccess: publish,
   })
   const { status } = props
@@ -163,7 +164,7 @@ export const EndpointSection = (): JSX.Element => {
   const query = useQuery({
     queryKey: statusKey,
     retry: false,
-    queryFn: async ({ signal }) => endpointStatusSchema.parse(await api.status({}, { signal })),
+    queryFn: async ({ signal }) => Schema.decodeUnknownSync(endpointStatusSchema)(await api.status({}, { signal })),
   })
   return (
     <section className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:max-w-2xl dshx:flex-col dshx:gap-4">

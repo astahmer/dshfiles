@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import * as Schema from 'effect/Schema'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-user-questions'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -10,8 +11,8 @@ import { hostname } from 'node:os'
 import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
-import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { SchemaHelpers } from './schema-helpers.js'
 import { attentionFor, closeAttention, threadAttentionApiHost } from './attention-host.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import { createAutoSettleScanner, type AutoSettleScanner, type AutoSettleSources } from './auto-settle-host.js'
@@ -66,7 +67,7 @@ const DRAIN_LIMIT_MS = 30 * 60_000
  * queued follow-up that starts right after a turn ends is not cut off; past the limit it restarts anyway, and the
  * managed restart records whatever still runs so it resumes after boot.
  */
-let pendingRestart: { readonly since: number; readonly timer: NodeJS.Timeout } | undefined
+let pendingRestart: { readonly ctx: Context; readonly since: number; readonly timer: NodeJS.Timeout } | undefined
 
 const runningTurns = (ctx: Context): number => activeRestartSessionIds(ctx.agents.list()).length
 
@@ -91,7 +92,7 @@ const restartWhenIdle = (ctx: Context): void => {
     }
   }, DRAIN_POLL_MS)
   timer.unref()
-  pendingRestart = { since, timer }
+  pendingRestart = { ctx, since, timer }
 }
 
 const restartApi = threadSidebarRestartApi.host({
@@ -189,7 +190,7 @@ const recoveryApi = threadSidebarRecoveryApi.host({
 
 const execFileAsync = promisify(execFile)
 
-const graphIdsSchema = z.object({ entries: z.array(z.object({ id: z.string(), rev: z.string().optional() })) })
+const graphIdsSchema = Schema.Struct({ entries: Schema.Array(Schema.Struct({ id: Schema.String, rev: Schema.optional(Schema.String) })) })
 
 /** The Finder computer name ("MacBook Pro de Alexandre") on macOS; elsewhere the short hostname. */
 const readMachineName = async (): Promise<string> => {
@@ -335,6 +336,14 @@ export default defineHost({
   setup: ctx => {
     setThreadActionsContext(ctx)
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
+    ctx.effect(
+      () => () => {
+        if (pendingRestart?.ctx !== ctx) return
+        clearInterval(pendingRestart.timer)
+        pendingRestart = undefined
+      },
+      'thread-sidebar: pending restart timer',
+    )
     // One durable attention record per session, written where the turn actually ends, so every browser,
     // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
     ctx.effect(() => {
@@ -403,7 +412,7 @@ export default defineHost({
       const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
       if (registry?.graph === undefined || registry.clientPath === undefined) return
       const entries = (): readonly { readonly id: string; readonly rev?: string | undefined }[] =>
-        graphIdsSchema.catch({ entries: [] }).parse(registry.graph?.()).entries
+        SchemaHelpers.decodeUnknownOr(graphIdsSchema, registry.graph?.(), { entries: [] }).entries
       const served = (): readonly ClientEntryRevision[] => entries().flatMap(entry => (entry.rev === undefined ? [] : [{ id: entry.id, rev: entry.rev }]))
       const watch = createPluginUpdateWatch({
         ids: () => entries().map(entry => entry.id),

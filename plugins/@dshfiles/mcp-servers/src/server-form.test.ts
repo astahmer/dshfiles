@@ -1,4 +1,6 @@
 import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
+import * as Schema from 'effect/Schema'
+import * as SchemaIssue from 'effect/SchemaIssue'
 import { describe, expect, it } from 'vitest'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { McpServerStateModel } from './server-state.js'
@@ -6,6 +8,14 @@ import { McpServerStateModel } from './server-state.js'
 const issueFields = (values: Parameters<typeof McpServerFormModel.parseServerForm>[0]): readonly (string | undefined)[] => {
   const parsed = McpServerFormModel.parseServerForm(values)
   return parsed.success ? [] : parsed.issues.map(issue => issue.field)
+}
+
+const formIssueFields = (values: ServerFormValues): readonly (PropertyKey | undefined)[] => {
+  const result = Schema.decodeUnknownResult(McpServerFormModel.serverFormSchema)(values)
+  if (result._tag === 'Success') return []
+  return SchemaIssue.makeFormatterStandardSchemaV1()(result.failure.issue)
+    .issues.map(issue => issue.path?.[0])
+    .map(segment => (typeof segment === 'object' && segment !== null ? segment.key : segment))
 }
 
 describe('server editor form', () => {
@@ -56,7 +66,7 @@ describe('server editor form', () => {
     expect(
       issueFields({ ...McpServerFormModel.blankServerForm({ name: 'Remote', endpoint: 'https://example.com/mcp' }), headerRefs: '{"Authorization": 42}' }),
     ).toEqual(['headerRefs'])
-    expect(McpServerFormModel.serverFormSchema.safeParse(values).error?.issues.map(issue => issue.path[0])).toContain('headerRefs')
+    expect(formIssueFields(values)).toContain('headerRefs')
   })
 
   it('edits a saved server through reference names only, never resolved values', () => {
@@ -91,7 +101,7 @@ describe('server editor form', () => {
       commandLine: 'node ~/dev/dadabase/dist/mcp/stdio.js',
     }
     expect(issueFields(values)).toContain('commandLine')
-    expect(McpServerFormModel.serverFormSchema.safeParse(values).error?.issues.some(issue => issue.path[0] === 'commandLine')).toBe(true)
+    expect(formIssueFields(values)).toContain('commandLine')
     expect(issueFields({ ...values, commandLine: 'node /home/user/dev/dadabase/dist/mcp/stdio.js' })).not.toContain('commandLine')
     expect(issueFields({ ...values, commandLine: 'node server.js --home ~/data' })).toContain('commandLine')
   })

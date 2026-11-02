@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { MAX_FILES, reviewResultSchema } from '../src/api.js'
 import { groupPatch } from '../src/scopes.js'
@@ -79,7 +80,7 @@ describe('groupPatch', () => {
     }
 
     expect(grouped.files.map(file => file.path)).toEqual(['src/app.ts'])
-    expect(reviewResultSchema.safeParse(result).success).toBe(true)
+    expect(Option.isSome(Schema.decodeUnknownOption(reviewResultSchema)(result))).toBe(true)
   })
 
   it('caps the listed files and scales each scope down to what it still lists', async () => {

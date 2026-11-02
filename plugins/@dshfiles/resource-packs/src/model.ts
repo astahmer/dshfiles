@@ -1,103 +1,107 @@
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 
 /** Opaque native ids keep case, paths and punctuation; the registry never rewrites a resource's native content. */
-const slugSchema = z.string().regex(/^[a-z][a-z0-9._-]{0,79}$/)
-export const resourceRefSchema = z
-  .object({
-    provider: slugSchema,
-    kind: slugSchema,
-    id: z.string().min(1).max(2_000),
-  })
-  .strict()
+const slugSchema = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9._-]{0,79}$/u))
+const boundedText = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const trimmedText = (minimum: number, maximum: number) => Schema.Trim.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const positiveInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
+const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
-export const propertyValueSchema = z.union([
-  z.string().max(20_000),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-  z.array(z.string().max(200)).max(100),
+/** A decoded value fills an absent field, so a stored record carries every declared property. */
+const defaultedText = (maximum: number, fallback: string) =>
+  Schema.String.check(Schema.isMaxLength(maximum)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(fallback)))
+const defaultedBoolean = (fallback: boolean) => Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(fallback)))
+
+export const resourceRefSchema = Schema.Struct({
+  provider: slugSchema,
+  kind: slugSchema,
+  id: boundedText(1, 2_000),
+})
+
+export const propertyValueSchema = Schema.Union([
+  Schema.String.check(Schema.isMaxLength(20_000)),
+  Schema.Number.check(Schema.isFinite()),
+  Schema.Boolean,
+  Schema.Null,
+  Schema.Array(Schema.String.check(Schema.isMaxLength(200))).check(Schema.isMaxLength(100)),
   resourceRefSchema,
-  z.array(resourceRefSchema).max(100),
+  Schema.Array(resourceRefSchema).check(Schema.isMaxLength(100)),
 ])
-export const propertyValuesSchema = z.record(slugSchema, propertyValueSchema)
+export const propertyValuesSchema = Schema.Record(slugSchema, propertyValueSchema)
+
+export const propertyTypes = ['text', 'number', 'checkbox', 'date', 'datetime', 'select', 'multiselect', 'reference', 'references'] as const
 
 const propertyBase = {
   id: slugSchema,
-  label: z.string().trim().min(1).max(100),
-  description: z.string().max(500).default(''),
+  label: trimmedText(1, 100),
+  description: defaultedText(500, ''),
   /** A stored owner-written value, NOT an arbitrary computed JavaScript callback. */
-  readOnly: z.boolean().default(false),
+  readOnly: defaultedBoolean(false),
 }
-export const optionSchema = z.object({ id: slugSchema, label: z.string().trim().min(1).max(100) }).strict()
-const choices = z.array(optionSchema).min(1).max(100)
-export const propertyDefinitionSchema = z.discriminatedUnion('type', [
-  z.object({ ...propertyBase, type: z.literal('text') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('number') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('checkbox') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('date') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('datetime') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('select'), options: choices }).strict(),
-  z.object({ ...propertyBase, type: z.literal('multiselect'), options: choices }).strict(),
-  z.object({ ...propertyBase, type: z.literal('reference') }).strict(),
-  z.object({ ...propertyBase, type: z.literal('references') }).strict(),
+export const optionSchema = Schema.Struct({ id: slugSchema, label: trimmedText(1, 100) })
+const choices = Schema.Array(optionSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100))
+const propertyType = <Type extends string>(type: Type) => Schema.Struct({ ...propertyBase, type: Schema.Literal(type) })
+
+export const propertyDefinitionSchema = Schema.Union([
+  propertyType('text'),
+  propertyType('number'),
+  propertyType('checkbox'),
+  propertyType('date'),
+  propertyType('datetime'),
+  Schema.Struct({ ...propertyBase, type: Schema.Literal('select'), options: choices }),
+  Schema.Struct({ ...propertyBase, type: Schema.Literal('multiselect'), options: choices }),
+  propertyType('reference'),
+  propertyType('references'),
 ])
-export const packDefinitionSchema = z
-  .object({
-    id: slugSchema,
-    version: z.number().int().positive(),
-    label: z.string().trim().min(1).max(100),
-    description: z.string().max(1_000).default(''),
-    properties: z.array(propertyDefinitionSchema).min(1).max(40),
-  })
-  .strict()
 
-export const storedPackSchema = z
-  .object({
-    definition: packDefinitionSchema,
-    owner: z.string().min(1).max(200),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strict()
-export const attachmentSchema = z
-  .object({
-    packId: slugSchema,
-    values: propertyValuesSchema,
-    attached: z.boolean(),
-  })
-  .strict()
-export const resourceSchema = z
-  .object({
-    id: z.string().uuid(),
-    ref: resourceRefSchema,
-    label: z.string().trim().min(1).max(200),
-    revision: z.number().int().positive(),
-    attachments: z.array(attachmentSchema).max(40),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strict()
-export const resourceEventSchema = z
-  .object({
-    id: z.string().uuid(),
-    resourceId: z.string().uuid(),
-    revision: z.number().int().positive(),
-    actor: z.string().min(1).max(200),
-    action: z.enum(['created', 'attached', 'detached', 'values-updated']),
-    packId: slugSchema.nullable(),
-    at: z.number().int().nonnegative(),
-  })
-  .strict()
+export const packDefinitionSchema = Schema.Struct({
+  id: slugSchema,
+  version: positiveInt,
+  label: trimmedText(1, 100),
+  description: defaultedText(1_000, ''),
+  properties: Schema.Array(propertyDefinitionSchema).check(Schema.isMinLength(1), Schema.isMaxLength(40)),
+})
 
-export type ResourceRef = z.infer<typeof resourceRefSchema>
-export type PropertyValue = z.infer<typeof propertyValueSchema>
-export type PropertyValues = z.infer<typeof propertyValuesSchema>
-export type PropertyDefinition = z.infer<typeof propertyDefinitionSchema>
-export type PackDefinition = z.infer<typeof packDefinitionSchema>
-export type StoredPack = z.infer<typeof storedPackSchema>
-export type ResourceAttachment = z.infer<typeof attachmentSchema>
-export type ResourceRecord = z.infer<typeof resourceSchema>
-export type ResourceEvent = z.infer<typeof resourceEventSchema>
+export const storedPackSchema = Schema.Struct({
+  definition: packDefinitionSchema,
+  owner: boundedText(1, 200),
+  createdAt: countInt,
+  updatedAt: countInt,
+})
+export const attachmentSchema = Schema.Struct({
+  packId: slugSchema,
+  values: propertyValuesSchema,
+  attached: Schema.Boolean,
+})
+export const resourceLabelSchema = trimmedText(1, 200)
+export const resourceSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isUUID()),
+  ref: resourceRefSchema,
+  label: resourceLabelSchema,
+  revision: positiveInt,
+  attachments: Schema.Array(attachmentSchema).check(Schema.isMaxLength(40)),
+  createdAt: countInt,
+  updatedAt: countInt,
+})
+export const resourceEventSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isUUID()),
+  resourceId: Schema.String.check(Schema.isUUID()),
+  revision: positiveInt,
+  actor: boundedText(1, 200),
+  action: Schema.Literals(['created', 'attached', 'detached', 'values-updated']),
+  packId: Schema.NullOr(slugSchema),
+  at: countInt,
+})
+
+export type ResourceRef = typeof resourceRefSchema.Type
+export type PropertyValue = typeof propertyValueSchema.Type
+export type PropertyValues = typeof propertyValuesSchema.Type
+export type PropertyDefinition = typeof propertyDefinitionSchema.Type
+export type PackDefinition = typeof packDefinitionSchema.Type
+export type StoredPack = typeof storedPackSchema.Type
+export type ResourceAttachment = typeof attachmentSchema.Type
+export type ResourceRecord = typeof resourceSchema.Type
+export type ResourceEvent = typeof resourceEventSchema.Type
 
 export const trackingPack: PackDefinition = {
   id: 'tracking',

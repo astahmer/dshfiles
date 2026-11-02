@@ -35,7 +35,7 @@ export type InstallProgressEvent =
   | { readonly phase: 'start'; readonly packageManager: PackageManager }
   | { readonly phase: 'success'; readonly packageManager: PackageManager }
   | { readonly phase: 'failure'; readonly packageManager: PackageManager }
-export type TemplateName = 'basic' | 'ui' | 'tool' | 'full-stack' | 'starter' | 'showcase'
+export type TemplateName = 'basic' | 'ui' | 'tool' | 'effect-host' | 'full-stack' | 'starter' | 'showcase'
 export type ProjectStyle = 'css-modules' | 'tailwind' | 'none'
 export interface CreateProjectOptions {
   readonly name: string

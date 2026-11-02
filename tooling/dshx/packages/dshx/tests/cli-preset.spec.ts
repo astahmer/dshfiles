@@ -5,8 +5,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { PassThrough } from 'node:stream'
 import { runInNewContext } from 'node:vm'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { parseCliArgs } from '../src/cli/args.js'
 import { runCli } from '../src/cli/run.js'
 import type { CliIO } from '../src/cli/run.js'
@@ -84,6 +84,7 @@ const setupBasicTemplate = async () => {
   await symlink(resolvedPackageDirectory('@types/react'), resolve(root, 'node_modules/@types/react'))
   await symlink(resolvedPackageDirectory('@types/node'), resolve(root, 'node_modules/@types/node'))
   await symlink(resolvedPackageDirectory('zod'), resolve(root, 'node_modules/zod'))
+  await symlink(resolvedPackageDirectory('effect'), resolve(root, 'node_modules/effect'))
   const project = await resolveDshxConfig({ cwd: root })
   return { root: project.root, project, cleanup: () => rm(root, { recursive: true, force: true }) }
 }
@@ -181,13 +182,13 @@ describe('add panel/api CLI', () => {
       expect(client).toContain("'panels'")
       expect(client).toContain("api.panels.register({ id: 'usage-history', title: 'usage-history', component: UsageHistoryPanel })")
       expect(client).toContain("import type {} from '@deepseek-ai/dsh-client-ui-layout/client'")
-      const manifest = z
-        .object({
-          dsh: z.object({ client: z.object({ inject: z.array(z.string()) }) }),
-          devDependencies: z.record(z.string(), z.string()),
-          peerDependencies: z.record(z.string(), z.string()),
-        })
-        .parse(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
+      const manifest = Schema.decodeUnknownSync(
+        Schema.Struct({
+          dsh: Schema.Struct({ client: Schema.Struct({ inject: Schema.Array(Schema.String) }) }),
+          devDependencies: Schema.Record(Schema.String, Schema.String),
+          peerDependencies: Schema.Record(Schema.String, Schema.String),
+        }),
+      )(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
       expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-layout')
       expect(manifest.devDependencies.react).toBeDefined()
       expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-layout']).toBeDefined()
@@ -224,18 +225,18 @@ describe('add panel/api CLI', () => {
       expect(first.changedFiles).toContain(resolve(value.root, 'src/status-host.ts'))
       const contract = await readFile(resolve(value.root, 'src/api/status.ts'), 'utf8')
       expect(contract).toContain("id: 'status'")
-      expect(contract).toContain('z.string().trim().min(1)')
+      expect(contract).toContain('Schema.Trim.check(Schema.isMinLength(1))')
       const host = await readFile(resolve(value.root, 'src/host.ts'), 'utf8')
       expect(host).toContain("import { StatusApiHost } from './status-host.js'")
       expect(host).toContain('apis: [StatusApiHost]')
       expect(host).toContain('statusTool')
-      const manifest = z
-        .object({
-          dependencies: z.record(z.string(), z.string()),
-          peerDependencies: z.record(z.string(), z.string()),
-        })
-        .parse(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
-      expect(manifest.dependencies.zod).toBeDefined()
+      const manifest = Schema.decodeUnknownSync(
+        Schema.Struct({
+          dependencies: Schema.Record(Schema.String, Schema.String),
+          peerDependencies: Schema.Record(Schema.String, Schema.String),
+        }),
+      )(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
+      expect(manifest.dependencies.effect).toBeDefined()
       expect(manifest.peerDependencies['@deepseek-ai/dsh-client-connection']).toBeDefined()
 
       const second = await createPresetScaffold({ project: value.project, preset: 'api', id: 'usage-history' })
@@ -288,13 +289,13 @@ describe('add panel/api CLI', () => {
       const generatedPanelTest = await readFile(resolve(value.root, 'tests/usage-history.spec.ts'), 'utf8')
       expect(generatedPanelTest).toContain("import type {} from '@deepseek-ai/dsh-client-ui-layout/client'")
       expect(generatedPanelTest).toContain("import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'")
-      const manifest = z
-        .object({
-          dsh: z.object({ client: z.object({ inject: z.array(z.string()) }) }),
-          exports: z.record(z.string(), z.unknown()),
-          devDependencies: z.record(z.string(), z.string()),
-        })
-        .parse(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
+      const manifest = Schema.decodeUnknownSync(
+        Schema.Struct({
+          dsh: Schema.Struct({ client: Schema.Struct({ inject: Schema.Array(Schema.String) }) }),
+          exports: Schema.Record(Schema.String, Schema.Unknown),
+          devDependencies: Schema.Record(Schema.String, Schema.String),
+        }),
+      )(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')))
       expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-sidebar')
       expect(manifest.devDependencies['@deepseek-ai/dsh-client-ui-slots']).toBe('0.2.0-rc.2')
       expect(manifest.exports['./client']).toBeDefined()

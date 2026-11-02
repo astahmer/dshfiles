@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
-import { z } from 'zod'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
@@ -12,6 +13,7 @@ import { decodeJson, decodeJsonSafe, jsonObjectSchema, jsonValueSchema } from '.
 import type { JsonObject, JsonValue } from '../json.js'
 import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
 import { featureCatalogIssues } from './features.js'
+import { withUnknownProperties } from '../schema.js'
 
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -21,14 +23,14 @@ function issue(code: string, severity: DshxDiagnosticSeverity, message: string, 
   return { code, severity, message, file, hint }
 }
 
-const conditionalTargetObjectSchema = z.looseObject({ default: z.string() })
-const conditionalTargetStringSchema = z.string()
+const conditionalTargetObjectSchema = withUnknownProperties({ default: Schema.String })
+const conditionalTargetStringSchema = Schema.String
 
 function parseConditionalTarget(value: unknown): string | undefined {
-  const target = conditionalTargetStringSchema.safeParse(value)
-  if (target.success) return target.data
-  const conditional = conditionalTargetObjectSchema.safeParse(value)
-  return conditional.success ? conditional.data.default : undefined
+  const target = Schema.decodeUnknownOption(conditionalTargetStringSchema)(value)
+  if (Option.isSome(target)) return target.value
+  const conditional = Schema.decodeUnknownOption(conditionalTargetObjectSchema)(value)
+  return Option.isSome(conditional) ? conditional.value.default : undefined
 }
 
 function parseExportTarget(exportsField: unknown, subpath: string): string | undefined {
@@ -535,7 +537,7 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
   let manifest: JsonObject | undefined
   try {
     const decoded = decodeJsonSafe(jsonObjectSchema, source)
-    if (decoded.success) manifest = decoded.data
+    if (decoded._tag === 'Success') manifest = decoded.success
   } catch (error) {
     return [
       issue(

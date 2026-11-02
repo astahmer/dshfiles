@@ -42,7 +42,13 @@ describe('ImageReferenceTextNode', () => {
     const projection = editor.getEditorState().read(() => {
       const node = $getRoot().getFirstDescendant()
       if (!$isImageReferenceTextNode(node)) return null
-      return { text: $getRoot().getTextContent(), mode: node.getMode(), attachmentId: node.getAttachmentId(), entity: node.isTextEntity(), valid: node.isValid() }
+      return {
+        text: $getRoot().getTextContent(),
+        mode: node.getMode(),
+        attachmentId: node.getAttachmentId(),
+        entity: node.isTextEntity(),
+        valid: node.isValid(),
+      }
     })
 
     expect(projection).toEqual({

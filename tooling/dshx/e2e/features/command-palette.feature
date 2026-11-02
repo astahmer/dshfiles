@@ -21,6 +21,11 @@ Feature: Command palette
     Then thread content search finds the message and opens its thread
     Then the content-search index exists under the isolated DSH home
 
+  @scenario:session-search.index-lifecycle
+  Scenario: Session-search starts its worker index in a scratch DSH
+    Given the isolated session-search plugin profile is booted
+    Then the owned session-search index exists under the isolated DSH home
+
   @scenario:command-palette.file-search
   Scenario: File search explains that the Editor integration is unavailable
     Given the isolated plugin profile "@dshfiles/command-palette" is booted

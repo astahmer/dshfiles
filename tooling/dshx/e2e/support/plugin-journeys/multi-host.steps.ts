@@ -7,7 +7,7 @@ import { createServer } from 'node:https'
 import { chmod, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile, type BootedProfile } from '../boot.js'
 import { startMutationResponseProxy } from '../mutation-response-proxy.mjs'
@@ -15,6 +15,7 @@ import { reserveLoopbackPort, startLoopbackSshd } from '../loopback-sshd.mjs'
 import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
+import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
 import { startFakeCommandCode } from '../fake-command-code.js'
@@ -23,101 +24,120 @@ const multiHostPackageId = '@dshfiles/multi-host'
 const multiHostApiId = 'multi-host'
 const scratchRemoteName = 'Scratch SSH runtime'
 
-const nativeCreateSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.object({ sessionId: z.string() }).passthrough() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const positiveIntegerSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
+const nonNegativeIntegerSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
+const nativeCreateSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: withUnknownProperties({ sessionId: Schema.String }) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const threadCreateSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), sessionId: z.string() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string(), sessionId: z.string().optional() }),
+const threadCreateSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), sessionId: Schema.String }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String, sessionId: Schema.optional(Schema.String) }),
 ])
 
-const nativeSessionListSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.object({ items: z.array(z.object({ sessionId: z.string(), blank: z.boolean() }).passthrough()) }).passthrough() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const nativeSessionListSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    value: withUnknownProperties({ items: Schema.Array(withUnknownProperties({ sessionId: Schema.String, blank: Schema.Boolean })) }),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const runtimePingSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const runtimePingSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), ms: nonNegativeIntegerSchema }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const runtimeReconnectSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true) }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const runtimeReconnectSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const connectionTestSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true) }).passthrough(),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
+const connectionTestSchema = Schema.Union([
+  withUnknownProperties({ ok: Schema.Literal(true) }),
+  withUnknownProperties({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const transcriptSchema = z.discriminatedUnion('ok', [
-  z
-    .object({
-      ok: z.literal(true),
-      cwd: z.string(),
-      entries: z.array(
-        z
-          .object({
-            seq: z.number().int(),
-            kind: z.enum(['user', 'assistant', 'tool', 'status']),
-            text: z.string(),
-          })
-          .passthrough(),
-      ),
-    })
-    .passthrough(),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
+const transcriptSchema = Schema.Union([
+  withUnknownProperties({
+    ok: Schema.Literal(true),
+    cwd: Schema.String,
+    entries: Schema.Array(
+      withUnknownProperties({
+        seq: Schema.Number.check(Schema.isInt()),
+        kind: Schema.Literals(['user', 'assistant', 'tool', 'status']),
+        text: Schema.String,
+      }),
+    ),
+  }),
+  withUnknownProperties({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const sessionRuntimeSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), runtimeId: z.string().nullable() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const sessionRuntimeSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), runtimeId: Schema.NullOr(Schema.String) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const fileReferencesSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), candidates: z.array(z.object({ path: z.string(), kind: z.enum(['file', 'directory']) })) }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const fileReferencesSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    candidates: Schema.Array(Schema.Struct({ path: Schema.String, kind: Schema.Literals(['file', 'directory']) })),
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const fileUploadSchema = z.discriminatedUnion('ok', [
-  z.object({
-    ok: z.literal(true),
-    value: z.object({
-      receiptId: z.string().min(1),
-      file: z.object({ attachmentId: z.string().min(1), name: z.string(), bytes: z.number().int().nonnegative() }),
+const fileUploadSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    value: Schema.Struct({
+      receiptId: Schema.String.check(Schema.isMinLength(1)),
+      file: Schema.Struct({
+        attachmentId: Schema.String.check(Schema.isMinLength(1)),
+        name: Schema.String,
+        bytes: nonNegativeIntegerSchema,
+      }),
     }),
   }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const runtimeDirectorySchema = z.object({
-  hosts: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()),
-  runtimes: z.array(z.object({ id: z.string(), hostId: z.string(), name: z.string(), remoteHome: z.string(), connected: z.boolean() }).passthrough()),
+const runtimeDirectorySchema = Schema.Struct({
+  hosts: Schema.Array(withUnknownProperties({ id: Schema.String, name: Schema.String })),
+  runtimes: Schema.Array(
+    withUnknownProperties({ id: Schema.String, hostId: Schema.String, name: Schema.String, remoteHome: Schema.String, connected: Schema.Boolean }),
+  ),
 })
 
-const runtimeOpenViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
+const runtimeOpenViewSchema = Schema.Struct({
+  leaseId: Schema.String.check(Schema.isUUID()),
+  launchUrl: Schema.String.check(Schema.makeFilter(value => URL.canParse(value))),
+})
 
-const promptAcceptedSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.object({ accepted: z.literal(true) }).passthrough() }),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+const promptAcceptedSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: withUnknownProperties({ accepted: Schema.Literal(true) }) }),
+  Schema.Struct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const inventoryStatusSchema = z.discriminatedUnion('ok', [
-  z
-    .object({
-      ok: z.literal(true),
-      runtime: z.object({ hostId: z.string(), name: z.string() }).passthrough(),
-      sessions: z.array(z.object({ sessionId: z.string(), blank: z.boolean(), running: z.boolean(), cwd: z.string().optional() }).passthrough()),
-    })
-    .passthrough(),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
+const inventoryStatusSchema = Schema.Union([
+  withUnknownProperties({
+    ok: Schema.Literal(true),
+    runtime: withUnknownProperties({ hostId: Schema.String, name: Schema.String }),
+    sessions: Schema.Array(
+      withUnknownProperties({
+        sessionId: Schema.String,
+        blank: Schema.Boolean,
+        running: Schema.Boolean,
+        cwd: Schema.optional(Schema.String),
+      }),
+    ),
+  }),
+  withUnknownProperties({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
 
-const remoteThreadListSchema = z.object({
-  threads: z.array(z.object({ runtimeId: z.string(), sessionId: z.string(), mention: z.string().optional() }).passthrough()),
+const remoteThreadListSchema = Schema.Struct({
+  threads: Schema.Array(withUnknownProperties({ runtimeId: Schema.String, sessionId: Schema.String, mention: Schema.optional(Schema.String) })),
 })
 
 type InventoryObservation = {
@@ -175,18 +195,18 @@ const updateObservation = (page: Page, update: Partial<JourneyObservation>): voi
   observations.set(page, { ...previous, ...update })
 }
 
-const tunnelProcessRecordSchema = z.object({ marker: z.literal('persistent-forward'), processId: z.number().int().positive() })
-const tunnelProcessRecordsSchema = z.array(tunnelProcessRecordSchema)
-const processDetailsSchema = z.object({
-  parentProcessId: z.number().int().positive(),
-  processGroupId: z.number().int().positive(),
-  commandName: z.string().min(1),
+const tunnelProcessRecordSchema = Schema.Struct({ marker: Schema.Literal('persistent-forward'), processId: positiveIntegerSchema })
+const tunnelProcessRecordsSchema = Schema.Array(tunnelProcessRecordSchema)
+const processDetailsSchema = Schema.Struct({
+  parentProcessId: positiveIntegerSchema,
+  processGroupId: positiveIntegerSchema,
+  commandName: Schema.String.check(Schema.isMinLength(1)),
 })
 
 const readTunnelProcessRecords = async (path: string) => {
   const log = (await readFile(path, 'utf8')).trim()
   if (log === '') return []
-  return tunnelProcessRecordsSchema.parse(
+  return Schema.decodeUnknownSync(tunnelProcessRecordsSchema)(
     log.split(/\r?\n/).map(line => {
       const [marker, processId] = line.split(' ')
       return { marker, processId: Number(processId) }
@@ -201,7 +221,7 @@ const readProcessDetails = (processId: number) => {
   if (parentProcessId === undefined || processGroupId === undefined || commandName.length === 0) {
     throw new Error('The scratch tunnel process is no longer listed.')
   }
-  return processDetailsSchema.parse({
+  return Schema.decodeUnknownSync(processDetailsSchema)({
     parentProcessId: Number(parentProcessId),
     processGroupId: Number(processGroupId),
     commandName: basename(commandName.join(' ')),
@@ -443,12 +463,12 @@ When('Auto creates a thread through the remote folder picker', async ({ page }: 
   })
   const pair = pairFor(page)
   const call = await hostApi(pair.manager)
-  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const directory = Schema.decodeUnknownSync(runtimeDirectorySchema)(await call('list'))
   const host = directory.hosts.find(item => item.name === scratchRemoteName)
   if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
   const runtime = directory.runtimes.find(item => item.hostId === host.id)
   if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
-  const previousSessionIds = remoteThreadListSchema.parse(await call('threadList')).threads.map(thread => thread.sessionId)
+  const previousSessionIds = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads.map(thread => thread.sessionId)
   const folderPath = join(pair.remote.homeRoot, 'projects', `auto-${randomUUID()}`)
   await mkdir(folderPath, { recursive: true })
   const canonicalFolderPath = await realpath(folderPath)
@@ -477,9 +497,9 @@ When('Auto creates a thread through the remote folder picker', async ({ page }: 
   await expect
     .poll(
       async () => {
-        remoteSessionId = remoteThreadListSchema
-          .parse(await call('threadList'))
-          .threads.find(thread => !previousSessionIds.includes(thread.sessionId))?.sessionId
+        remoteSessionId = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads.find(
+          thread => !previousSessionIds.includes(thread.sessionId),
+        )?.sessionId
         return remoteSessionId
       },
       { timeout: 30_000 },
@@ -539,7 +559,7 @@ When('the manager composer selects the recorded remote thread mention', async ({
   const observation = autoDestinationObservations.get(page)
   if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
   const call = await hostApi(pairFor(page).manager)
-  const created = remoteThreadListSchema.parse(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId)
+  const created = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId)
   if (created === undefined || created.mention === undefined) throw new Error('The manager did not expose a canonical mention for the remote thread.')
 
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
@@ -561,21 +581,24 @@ Then('the new thread is owned by the automatically selected remote runtime', asy
   if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
   const call = await hostApi(pairFor(page).manager)
   await expect
-    .poll(async () => remoteThreadListSchema.parse(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId), {
-      timeout: 30_000,
-    })
+    .poll(
+      async () => Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId),
+      {
+        timeout: 30_000,
+      },
+    )
     .toBeDefined()
-  const threads = remoteThreadListSchema.parse(await call('threadList')).threads
+  const threads = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads
   const created = threads.find(thread => thread.sessionId === observation.sessionId)
   if (created === undefined) throw new Error('The manager did not list the new remote thread.')
   expect(created.runtimeId).toBe(observation.runtimeId)
-  const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: SessionId(created.sessionId) }))
+  const ownership = Schema.decodeUnknownSync(sessionRuntimeSchema)(await call('sessionRuntime', { sessionId: SessionId(created.sessionId) }))
   expect(ownership).toMatchObject({ ok: true, runtimeId: observation.runtimeId })
   if (observation.prompt === undefined) throw new Error('The native composer did not submit a prompt.')
   await expect
     .poll(
       async () => {
-        const transcript = transcriptSchema.parse(
+        const transcript = Schema.decodeUnknownSync(transcriptSchema)(
           await call('threadTranscript', {
             runtimeId: observation.runtimeId,
             sessionId: observation.sessionId,
@@ -654,20 +677,20 @@ When('a Git project is cloned with selected local files', async ({ page }: { rea
 When('a remote thread is created and read over SSH', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
   const call = await hostApi(pair.manager)
-  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const directory = Schema.decodeUnknownSync(runtimeDirectorySchema)(await call('list'))
   const host = directory.hosts.find(item => item.name === scratchRemoteName)
   if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
   const runtime = directory.runtimes.find(item => item.hostId === host.id)
   if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
 
   await writeFile(join(pair.remote.homeRoot, 'remote-composer-reference.txt'), 'remote attachment references belong to the owning Host.\n')
-  const created = threadCreateSchema.parse(await call('threadCreate', { runtimeId: runtime.id, cwd: pair.remote.homeRoot }))
+  const created = Schema.decodeUnknownSync(threadCreateSchema)(await call('threadCreate', { runtimeId: runtime.id, cwd: pair.remote.homeRoot }))
   if (!created.ok) throw new Error(`The empty remote thread could not be created: ${created.code}.`)
   const sessionId = created.sessionId
-  const transcript = transcriptSchema.parse(await call('threadTranscript', { runtimeId: runtime.id, sessionId }))
+  const transcript = Schema.decodeUnknownSync(transcriptSchema)(await call('threadTranscript', { runtimeId: runtime.id, sessionId }))
   if (!transcript.ok) throw new Error(`The remote thread transcript could not be read: ${transcript.code}.`)
   expect(transcript.entries).toEqual([])
-  const sessions = nativeSessionListSchema.parse(
+  const sessions = Schema.decodeUnknownSync(nativeSessionListSchema)(
     await call('runtimeCall', {
       runtimeId: runtime.id,
       request: { namespace: 'session', method: 'list', args: { _request: {} } },
@@ -692,7 +715,9 @@ When('the mirrored thread opens its owning host UI', async ({ page }: { readonly
   const openRemoteHost = page.getByRole('button', { name: 'Open on remote host', exact: true })
   await expect(openRemoteHost).toBeVisible({ timeout: 30_000 })
   const call = await hostApi(pairFor(page).manager)
-  const view = runtimeOpenViewSchema.parse(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+  const view = Schema.decodeUnknownSync(runtimeOpenViewSchema, { onExcessProperty: 'error' })(
+    await call('runtimeOpenView', { runtimeId: observation.runtimeId }),
+  )
   allowLoopbackBrowserOrigin(page, view.launchUrl)
   const [remotePage] = await Promise.all([page.context().waitForEvent('page', { timeout: 30_000 }), openRemoteHost.click()])
   await expect.poll(() => remotePage.url(), { timeout: 30_000 }).not.toBe('about:blank')
@@ -706,10 +731,10 @@ When('the remote composer resolves @file suggestions on SSH', async ({ page }: {
   const observation = observations.get(page)
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
-  const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: observation.sessionId }))
+  const ownership = Schema.decodeUnknownSync(sessionRuntimeSchema)(await call('sessionRuntime', { sessionId: observation.sessionId }))
   if (!ownership.ok) throw new Error(`The owning runtime could not be resolved: ${ownership.code}.`)
   expect(ownership.runtimeId).toBe(observation.runtimeId)
-  const result = fileReferencesSchema.parse(
+  const result = Schema.decodeUnknownSync(fileReferencesSchema)(
     await call('runtimeFileReferences', {
       runtimeId: observation.runtimeId,
       sessionId: SessionId(observation.sessionId),
@@ -728,7 +753,7 @@ When('a remote file attachment is staged on its owning SSH host', async ({ page 
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
   const content = 'A file staged by the native remote composer.\n'
-  const result = fileUploadSchema.parse(
+  const result = Schema.decodeUnknownSync(fileUploadSchema)(
     await call('sessionUploadFile', {
       runtimeId: observation.runtimeId,
       sessionId: observation.sessionId,
@@ -745,7 +770,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   const observation = observations.get(page)
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
-  const readyBeforeDrop = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  const readyBeforeDrop = Schema.decodeUnknownSync(runtimePingSchema)(await call('runtimePing', { runtimeId: observation.runtimeId }))
   if (!readyBeforeDrop.ok) throw new Error(`The scratch runtime was not ready before tunnel loss: ${readyBeforeDrop.code}.`)
   const tunnelProcessRecordsBeforeDrop = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
   const tunnelProcessRecord = tunnelProcessRecordsBeforeDrop.at(-1)
@@ -770,7 +795,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   for (let attempt = 0; attempt < 100 && isProcessRunning(tunnelProcessId); attempt += 1) await delay(25)
   expect(isProcessRunning(tunnelProcessId)).toBe(false)
 
-  const readyAfterDrop = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  const readyAfterDrop = Schema.decodeUnknownSync(runtimePingSchema)(await call('runtimePing', { runtimeId: observation.runtimeId }))
   if (!readyAfterDrop.ok) throw new Error(`The scratch tunnel did not recover after loss: ${readyAfterDrop.code}.`)
   const tunnelProcessRecordsAfterDrop = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
   expect(tunnelProcessRecordsAfterDrop.length).toBeGreaterThan(tunnelProcessRecordsBeforeDrop.length)
@@ -789,9 +814,9 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
     throw new Error('The restarted SSH tunnel process was not owned by the manager DSH.')
   }
 
-  const reconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+  const reconnect = Schema.decodeUnknownSync(runtimeReconnectSchema)(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
   if (!reconnect.ok) throw new Error(`The scratch SSH tunnel did not reconnect: ${reconnect.code}.`)
-  const pingAfterReconnect = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  const pingAfterReconnect = Schema.decodeUnknownSync(runtimePingSchema)(await call('runtimePing', { runtimeId: observation.runtimeId }))
   expect(pingAfterReconnect.ok).toBe(true)
   updateObservation(page, { tunnelReconnected: true })
 })
@@ -811,7 +836,7 @@ When('stale SSH launch metadata is rejected', async ({ page }: { readonly page: 
     await chmod(staleLaunchPath, 0o600)
     expect((await stat(staleLaunchPath)).mode & 0o777).toBe(0o600)
     const call = await hostApi(pair.manager)
-    const result = connectionTestSchema.parse(
+    const result = Schema.decodeUnknownSync(connectionTestSchema)(
       await call('testConnection', { name: 'Stale scratch runtime', sshTarget: pair.sshd.targetAlias, remoteHome: staleHome }),
     )
     if (result.ok) throw new Error('The manager accepted a launch URL with no DSH listener.')
@@ -877,7 +902,7 @@ When('a lost mutation response is reconciled without replay', async ({ page }: {
   const processId = pair.remote.host.pid
   if (processId === undefined) throw new Error('The scratch DSH process did not expose its pid.')
   const call = await hostApi(pair.manager)
-  const sessionsBeforeMutation = nativeSessionListSchema.parse(
+  const sessionsBeforeMutation = Schema.decodeUnknownSync(nativeSessionListSchema)(
     await call('runtimeCall', {
       runtimeId: observation.runtimeId,
       request: { namespace: 'session', method: 'list', args: { _request: {} } },
@@ -898,9 +923,9 @@ When('a lost mutation response is reconciled without replay', async ({ page }: {
     await chmod(launchFilePath, 0o600)
     expect((await stat(launchFilePath)).mode & 0o777).toBe(0o600)
 
-    const reconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+    const reconnect = Schema.decodeUnknownSync(runtimeReconnectSchema)(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
     if (!reconnect.ok) throw new Error(`The scratch runtime did not reconnect through the local proxy: ${reconnect.code}.`)
-    const mutation = nativeCreateSchema.parse(
+    const mutation = Schema.decodeUnknownSync(nativeCreateSchema)(
       await call('runtimeCall', {
         runtimeId: observation.runtimeId,
         request: { namespace: 'session', method: 'create', args: { request: { cwd: pair.remote.homeRoot } } },
@@ -914,7 +939,7 @@ When('a lost mutation response is reconciled without replay', async ({ page }: {
     expect(firstProxyState.committedSessionIds).toHaveLength(1)
     const admittedSessionId = firstProxyState.committedSessionIds[0]
     if (admittedSessionId === undefined) throw new Error('The remote DSH did not commit the lost-response session.')
-    const sessions = nativeSessionListSchema.parse(
+    const sessions = Schema.decodeUnknownSync(nativeSessionListSchema)(
       await call('runtimeCall', {
         runtimeId: observation.runtimeId,
         request: { namespace: 'session', method: 'list', args: { _request: {} } },
@@ -937,9 +962,9 @@ When('a lost mutation response is reconciled without replay', async ({ page }: {
       }
     }
   }
-  const actualReconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+  const actualReconnect = Schema.decodeUnknownSync(runtimeReconnectSchema)(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
   if (!actualReconnect.ok) throw new Error(`The scratch DSH did not reconnect after proxy cleanup: ${actualReconnect.code}.`)
-  const pingAfterProxyCleanup = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  const pingAfterProxyCleanup = Schema.decodeUnknownSync(runtimePingSchema)(await call('runtimePing', { runtimeId: observation.runtimeId }))
   if (!pingAfterProxyCleanup.ok) throw new Error(`The scratch DSH was not ready after proxy cleanup: ${pingAfterProxyCleanup.code}.`)
   updateObservation(page, { mutationReconciled: true, remoteReadyAfterMutation: true })
 })
@@ -960,13 +985,13 @@ When('the remote DSH crashes and its scratch home is cleaned', async ({ page }: 
 When('a thread is started directly on the scratch remote', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
   const call = await hostApi(pair.manager)
-  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const directory = Schema.decodeUnknownSync(runtimeDirectorySchema)(await call('list'))
   const host = directory.hosts.find(item => item.name === scratchRemoteName)
   if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
   const runtime = directory.runtimes.find(item => item.hostId === host.id)
   if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
 
-  const created = nativeCreateSchema.parse(
+  const created = Schema.decodeUnknownSync(nativeCreateSchema)(
     await call('runtimeCall', {
       runtimeId: runtime.id,
       request: { namespace: 'session', method: 'create', args: { request: { cwd: pair.remote.homeRoot } } },
@@ -974,7 +999,7 @@ When('a thread is started directly on the scratch remote', async ({ page }: { re
   )
   if (!created.ok) throw new Error(`The remote session could not be created: ${created.code}.`)
   const sessionId = created.value.sessionId
-  const prompted = promptAcceptedSchema.parse(
+  const prompted = Schema.decodeUnknownSync(promptAcceptedSchema)(
     await call('runtimeCall', {
       runtimeId: runtime.id,
       request: {
@@ -985,7 +1010,7 @@ When('a thread is started directly on the scratch remote', async ({ page }: { re
     }),
   )
   if (!prompted.ok) throw new Error(`The remote session did not accept its first message: ${prompted.code}.`)
-  const listed = remoteThreadListSchema.parse(await call('threadList'))
+  const listed = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList'))
   expect(listed.threads.some(thread => thread.runtimeId === runtime.id && thread.sessionId === sessionId)).toBe(false)
   inventoryObservations.set(page, { runtimeId: runtime.id, sessionId, startedHere: false, hostName: scratchRemoteName })
 })
@@ -995,13 +1020,13 @@ Then('the manager lists it as started on the host', async ({ page }: { readonly 
   const observed = inventoryObservations.get(page)
   if (observed === undefined) throw new Error('The inventory journey did not observe a remote-started thread.')
   const call = await hostApi(pair.manager)
-  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const directory = Schema.decodeUnknownSync(runtimeDirectorySchema)(await call('list'))
   const hostName = observed.hostName
   // The Host answers `runtime-status-refreshing` while its first snapshot loads asynchronously, so one call is not a verdict.
-  let status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  let status = Schema.decodeUnknownSync(inventoryStatusSchema)(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
   for (let attempt = 0; attempt < 40 && !status.ok && status.code === 'runtime-status-refreshing'; attempt += 1) {
     await delay(500)
-    status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+    status = Schema.decodeUnknownSync(inventoryStatusSchema)(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
   }
   if (!status.ok) throw new Error(`The scratch runtime status was unavailable: ${status.code}.`)
   expect(directory.hosts.some(host => host.name === hostName)).toBe(true)

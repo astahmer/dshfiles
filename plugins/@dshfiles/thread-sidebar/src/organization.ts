@@ -1,5 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadDelay } from './thread-delays.js'
@@ -7,6 +7,7 @@ import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories, type ThreadNotificationPlacement } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 import { WorkspacePaths } from './workspace-paths.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 /** Render order: settled sits right before archived, since both are storage rather than places to work. */
 export const SIDEBAR_SECTIONS = ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'] as const
@@ -553,10 +554,10 @@ const reorderSections = (options: {
 }
 
 /** The client's WorkspaceArchiveError carries the Host refusal as `rpcError`. */
-const parkedRecoveryRefusal = z.object({
-  rpcError: z.object({
-    code: z.literal('workspace/session-active'),
-    details: z.object({ activity: z.array(z.object({ kind: z.literal('quota-continuation') })).min(1) }),
+const parkedRecoveryRefusal = Schema.Struct({
+  rpcError: Schema.Struct({
+    code: Schema.Literal('workspace/session-active'),
+    details: Schema.Struct({ activity: Schema.Array(Schema.Struct({ kind: Schema.Literal('quota-continuation') })).check(Schema.isMinLength(1)) }),
   }),
 })
 
@@ -572,7 +573,7 @@ const archiveWithoutStopping = async <SessionId extends string>(
   try {
     await archive(sessionId, { stopActivity: false })
   } catch (error) {
-    if (!parkedRecoveryRefusal.safeParse(error).success) throw error
+    if (!SchemaHelpers.decodeUnknownSafe(parkedRecoveryRefusal, error).success) throw error
     await archive(sessionId, { stopActivity: true })
   }
 }

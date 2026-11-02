@@ -12,7 +12,8 @@
  *
  * The pending requests live on `globalThis` because every client bundle that imports this module gets its own copy.
  */
-import { z } from 'zod/mini'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 const CHAT_VIEW_ID = 'chat'
@@ -20,13 +21,17 @@ const CHAT_FOCUS_EVENT = 'dshfiles-chat:focus'
 const CHAT_FOCUS_TTL_MS = 30_000
 const FOCUS_PREFIX = 'dshfiles-chat-focus:'
 
-const chatFocusSchema = z.strictObject({
-  turn: z.int().check(z.nonnegative()),
-  step: z.optional(z.int().check(z.nonnegative())),
-  toolCallId: z.optional(z.string().check(z.minLength(1), z.maxLength(256))),
+const chatFocusSchema = Schema.Struct({
+  turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  step: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  toolCallId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
 })
 
-export type ChatFocus = z.infer<typeof chatFocusSchema>
+export type ChatFocus = Schema.Schema.Type<typeof chatFocusSchema>
+
+/** The contract rejects unknown keys, so a stale writer cannot smuggle fields through the opaque string. */
+const decodeFocus = Schema.decodeUnknownSync(chatFocusSchema, { onExcessProperty: 'error' })
+const decodeFocusOption = Schema.decodeUnknownOption(chatFocusSchema, { onExcessProperty: 'error' })
 
 interface PendingFocus {
   readonly focus: ChatFocus
@@ -44,13 +49,13 @@ const pendingRequests = (): Map<string, PendingFocus> => {
 }
 
 /** The opaque `focus` string of a Conversation View request addressed to Chat. */
-const encode = (focus: ChatFocus): string => `${FOCUS_PREFIX}${JSON.stringify(chatFocusSchema.parse(focus))}`
+const encode = (focus: ChatFocus): string => `${FOCUS_PREFIX}${JSON.stringify(decodeFocus(focus))}`
 
 const decode = (value: string): ChatFocus | null => {
   if (!value.startsWith(FOCUS_PREFIX)) return null
   try {
-    const parsed = chatFocusSchema.safeParse(JSON.parse(value.slice(FOCUS_PREFIX.length)))
-    return parsed.success ? parsed.data : null
+    const parsed = decodeFocusOption(JSON.parse(value.slice(FOCUS_PREFIX.length)))
+    return Option.isSome(parsed) ? parsed.value : null
   } catch {
     return null
   }
@@ -58,7 +63,7 @@ const decode = (value: string): ChatFocus | null => {
 
 /** Address one focus to a thread's Chat view, whether or not it is mounted yet. */
 const request = (input: { readonly sessionId: string; readonly focus: ChatFocus; readonly now?: number }): void => {
-  const focus = chatFocusSchema.parse(input.focus)
+  const focus = decodeFocus(input.focus)
   pendingRequests().set(input.sessionId, { focus, expiresAt: (input.now ?? Date.now()) + CHAT_FOCUS_TTL_MS })
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHAT_FOCUS_EVENT, { detail: { sessionId: input.sessionId } }))
 }

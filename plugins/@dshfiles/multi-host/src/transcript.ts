@@ -1,30 +1,53 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { MultiHostSchema } from './schema.js'
 import type { ModelSelection, TranscriptEntry } from './api.js'
 
-const eventSchema = z.object({ type: z.string(), seq: z.number().int(), data: z.unknown() }).passthrough()
-const recordSchema = z.object({ type: z.literal('event'), event: eventSchema }).passthrough()
-const textBlockSchema = z.object({ type: z.string(), text: z.string().optional(), name: z.string().optional() }).passthrough()
-const messageSchema = z.object({ content: z.array(textBlockSchema).max(512).optional() }).passthrough()
-const userMessageSchema = messageSchema.extend({ source: z.object({ kind: z.string() }).passthrough().optional() })
-const assistantSchema = z.object({ message: messageSchema }).passthrough()
-const toolCallSchema = z.object({ callId: z.string(), name: z.string(), arguments: z.string().optional() }).passthrough()
-const toolArgumentsSchema = z.object({ command: z.string().optional(), description: z.string().optional(), path: z.string().optional() }).passthrough()
-const toolResultSchema = z
-  .object({ message: z.object({ toolCallId: z.string(), isError: z.boolean().optional(), content: z.array(textBlockSchema).optional() }).passthrough() })
-  .passthrough()
-const turnEndSchema = z.object({ reason: z.object({ kind: z.string() }).passthrough().optional() }).passthrough()
-const titleSchema = z.object({ title: z.string() }).passthrough()
-const requestHeaderSchema = z
-  .object({ header: z.object({ config: z.object({ provider: z.string(), model: z.string() }).passthrough() }).passthrough() })
-  .passthrough()
+const eventSchema = Schema.Struct({ type: Schema.String, seq: Schema.Number.check(Schema.isFinite(), Schema.isInt()), data: Schema.Unknown }).pipe(
+  MultiHostSchema.passthrough,
+)
+const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: eventSchema }).pipe(MultiHostSchema.passthrough)
+const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }).pipe(
+  MultiHostSchema.passthrough,
+)
+const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(
+  MultiHostSchema.passthrough,
+)
+const userMessageSchema = Schema.Struct({
+  content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))),
+  source: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)),
+}).pipe(MultiHostSchema.passthrough)
+const assistantSchema = Schema.Struct({ message: messageSchema }).pipe(MultiHostSchema.passthrough)
+const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(
+  MultiHostSchema.passthrough,
+)
+const toolArgumentsSchema = Schema.Struct({
+  command: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  path: Schema.optional(Schema.String),
+}).pipe(MultiHostSchema.passthrough)
+const toolResultSchema = Schema.Struct({
+  message: Schema.Struct({ toolCallId: Schema.String, isError: Schema.optional(Schema.Boolean), content: Schema.optional(Schema.Array(textBlockSchema)) }).pipe(
+    MultiHostSchema.passthrough,
+  ),
+}).pipe(MultiHostSchema.passthrough)
+const turnEndSchema = Schema.Struct({ reason: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(MultiHostSchema.passthrough)) }).pipe(
+  MultiHostSchema.passthrough,
+)
+const titleSchema = Schema.Struct({ title: Schema.String }).pipe(MultiHostSchema.passthrough)
+const requestHeaderSchema = Schema.Struct({
+  header: Schema.Struct({ config: Schema.Struct({ provider: Schema.String, model: Schema.String }).pipe(MultiHostSchema.passthrough) }).pipe(
+    MultiHostSchema.passthrough,
+  ),
+}).pipe(MultiHostSchema.passthrough)
 
 const maxText = 8_000
 const maxToolOutput = 1_200
 
-const toolSummary = (call: z.infer<typeof toolCallSchema>): string => {
-  let parsed: z.infer<typeof toolArgumentsSchema> | undefined
+const toolSummary = (call: Schema.Schema.Type<typeof toolCallSchema>): string => {
+  let parsed: Schema.Schema.Type<typeof toolArgumentsSchema> | undefined
   try {
-    parsed = toolArgumentsSchema.safeParse(JSON.parse(call.arguments ?? '{}')).data
+    const result = MultiHostSchema.safeDecode(toolArgumentsSchema, JSON.parse(call.arguments ?? '{}'))
+    parsed = result.success ? result.data : undefined
   } catch {
     parsed = undefined
   }
@@ -32,7 +55,7 @@ const toolSummary = (call: z.infer<typeof toolCallSchema>): string => {
   return detail === undefined ? call.name : `${call.name}: ${detail.split('\n', 1)[0]?.slice(0, 200) ?? ''}`
 }
 const clip = (text: string): string => (text.length > maxText ? `${text.slice(0, maxText)}…` : text)
-const texts = (blocks: readonly z.infer<typeof textBlockSchema>[] | undefined): string =>
+const texts = (blocks: readonly Schema.Schema.Type<typeof textBlockSchema>[] | undefined): string =>
   (blocks ?? [])
     .filter(block => block.type === 'text' && block.text !== undefined)
     .map(block => block.text)
@@ -63,51 +86,55 @@ export const reduceTranscript = (
   let title: string | undefined
   let model: ModelSelection | undefined
   let lastCall: { readonly callId: string; readonly name: string; readonly seq: number } | undefined
-  const toolEntries = new Map<string, TranscriptEntry>()
+  const toolEntries = new Map<string, number>()
   const resolvedCalls = new Set<string>()
   for (const raw of records) {
-    const record = recordSchema.safeParse(raw)
+    const record = MultiHostSchema.safeDecode(recordSchema, raw)
     if (!record.success) continue
     const { type, seq, data } = record.data.event
     if (type === 'turn/start') running = true
     if (type === 'turn/end') {
       running = false
-      const reason = turnEndSchema.safeParse(data).data?.reason?.kind
+      const reason = MultiHostSchema.safeDecode(turnEndSchema, data).data?.reason?.kind
       if (reason !== undefined && reason !== 'completed') entries.push({ seq, kind: 'status', text: `Turn ended: ${reason}` })
     }
-    if (type === 'session/title') title = titleSchema.safeParse(data).data?.title ?? title
+    if (type === 'session/title') title = MultiHostSchema.safeDecode(titleSchema, data).data?.title ?? title
     if (type === 'request/header') {
-      const config = requestHeaderSchema.safeParse(data).data?.header.config
+      const config = MultiHostSchema.safeDecode(requestHeaderSchema, data).data?.header.config
       if (config !== undefined) model = { provider: config.provider, model: config.model }
     }
     if (type === 'user/message') {
-      const message = userMessageSchema.safeParse(data)
+      const message = MultiHostSchema.safeDecode(userMessageSchema, data)
       if (!message.success || message.data.source?.kind !== 'user') continue
       const text = texts(message.data.content)
       if (text !== '') entries.push({ seq, kind: 'user', text: clip(text) })
     }
     if (type === 'assistant/message') {
-      const message = assistantSchema.safeParse(data)
+      const message = MultiHostSchema.safeDecode(assistantSchema, data)
       if (!message.success) continue
       const text = texts(message.data.message.content)
       if (text !== '') entries.push({ seq, kind: 'assistant', text: clip(text) })
     }
     if (type === 'tool/call') {
-      const call = toolCallSchema.safeParse(data)
+      const call = MultiHostSchema.safeDecode(toolCallSchema, data)
       if (!call.success) continue
       const entry: TranscriptEntry = { seq, kind: 'tool', text: toolSummary(call.data) }
       entries.push(entry)
-      toolEntries.set(call.data.callId, entry)
+      toolEntries.set(call.data.callId, entries.length - 1)
       lastCall = { callId: call.data.callId, name: call.data.name, seq }
     }
     if (type === 'tool/result') {
-      const result = toolResultSchema.safeParse(data)
+      const result = MultiHostSchema.safeDecode(toolResultSchema, data)
       if (result.success) resolvedCalls.add(result.data.message.toolCallId)
-      const entry = result.success ? toolEntries.get(result.data.message.toolCallId) : undefined
-      if (result.data === undefined || entry === undefined) continue
+      const entryIndex = result.success ? toolEntries.get(result.data.message.toolCallId) : undefined
+      const entry = entryIndex === undefined ? undefined : entries[entryIndex]
+      if (result.data === undefined || entryIndex === undefined || entry === undefined) continue
       const output = texts(result.data.message.content)
       const shown = output.length > maxToolOutput ? `${output.slice(0, maxToolOutput)}…` : output
-      entry.text = `${entry.text}${result.data.message.isError === true ? ' (failed)' : ''}${shown === '' ? '' : `\n${shown}`}`
+      entries[entryIndex] = {
+        ...entry,
+        text: `${entry.text}${result.data.message.isError === true ? ' (failed)' : ''}${shown === '' ? '' : `\n${shown}`}`,
+      }
     }
   }
   const waiting: TranscriptWaiting | undefined =

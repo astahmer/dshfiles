@@ -1,4 +1,6 @@
 import { parseArgs } from 'node:util'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import type { Writable } from 'node:stream'
 import { DEFAULT_IDLE_TIMEOUT_MINUTES, DEFAULT_WARN_MINUTES, ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
 
@@ -254,9 +256,8 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       ),
     )
   }
-  const name = scratchNameSchema.safeParse(values.name)
-  if (!name.success)
-    return fail(new ScratchError('usage', `--name ${String(values.name)}: ${name.error.issues[0]?.message ?? 'invalid'}.`, 'Use e.g. --name jj-check.'))
+  const name = Schema.decodeUnknownResult(scratchNameSchema)(values.name)
+  if (Result.isFailure(name)) return fail(new ScratchError('usage', `--name ${String(values.name)}: ${name.failure.message}.`, 'Use e.g. --name jj-check.'))
   const numberOption = (option: string, fallback: number): number | ScratchError => {
     const raw = values[option]
     if (raw === undefined) return fallback
@@ -266,7 +267,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       : new ScratchError('usage', `--${option} requires a positive integer.`, `Run "dshx dev ${action} --help".`)
   }
   const stateDir = ScratchStateRuntime.resolveStateDir({
-    name: name.data,
+    name: name.success,
     ...(typeof values['state-dir'] === 'string' && { stateDir: values['state-dir'] }),
   })
 
@@ -284,7 +285,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         return fail(new ScratchError('usage', '--warn-minutes requires a whole number of minutes (0 = stop at once).', 'Run "dshx dev up --help".'))
       const { scratchUp } = await import('../scratch/up.js')
       const { state, swept, warned } = await scratchUp({
-        name: name.data,
+        name: name.success,
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
         bundles: Array.isArray(values.bundle) ? values.bundle : [],
@@ -323,7 +324,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         `${sweptLines}${warnedLines}Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\n  stops    ${autoStop} (watchdog pid ${shown.watchdogPid ?? 'none'})\n  keep     dshx dev keep --name ${shown.name} [--forever]\nNext: dshx dev doctor\n`,
       )
     }
-    const readState = await ScratchStateRuntime.read(stateDir, name.data)
+    const readState = await ScratchStateRuntime.read(stateDir, name.success)
     if (action === 'keep') {
       const result = await ScratchStateRuntime.keepScratch({ state: readState, forever: values.forever === true })
       const kept = ScratchStateRuntime.publicState(result.state)

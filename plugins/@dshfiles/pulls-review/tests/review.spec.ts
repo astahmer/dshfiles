@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Option, Schema } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { JjCommandError, JjUnavailableError, type JjRun, type JjRunInput } from '../src/jj.js'
 import { MAX_FILES, reviewResultSchema } from '../src/api.js'
@@ -122,7 +123,6 @@ describe('reviewWorkspace', () => {
     const result = await ReviewWorkspaceModel.review({ run, path: workspace })
     expect(result).toMatchObject({ status: 'ok', fileCount: MAX_FILES + 1, truncated: true })
     expect(result.status === 'ok' ? result.files : []).toHaveLength(MAX_FILES)
-    const parsed = reviewResultSchema.safeParse(result)
-    expect(parsed.success ? undefined : parsed.error.issues).toBeUndefined()
+    expect(Option.isSome(Schema.decodeUnknownOption(reviewResultSchema)(result))).toBe(true)
   })
 })

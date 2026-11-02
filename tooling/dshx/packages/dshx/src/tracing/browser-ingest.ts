@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { ApiDefinitionModel } from '../api/define.js'
 import type { ApiHostRegistration } from '../api/types.js'
 import {
@@ -13,42 +13,51 @@ import {
 import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
 import { OtlpTraceExport, type BatchExporter, type FinishedSpan, type SpanAttributeValue } from './otlp-exporter.js'
 
-const attributeKeySchema = z
-  .string()
-  .max(128)
-  .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/u)
-const attributeValueSchema = z.union([z.string().max(BROWSER_TRACES_LIMITS.stringLength), z.number(), z.boolean()])
+const attributeKeySchema = Schema.String.check(Schema.isMaxLength(128), Schema.isPattern(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/u))
+const attributeValueSchema = Schema.Union([
+  Schema.String.check(Schema.isMaxLength(BROWSER_TRACES_LIMITS.stringLength)),
+  Schema.Number.check(Schema.isFinite()),
+  Schema.Boolean,
+])
 const attributesSchema = (max: number) =>
-  z.record(attributeKeySchema, attributeValueSchema).refine(attributes => Object.keys(attributes).length <= max, `at most ${String(max)} attributes`)
-const timeSchema = z.number().nonnegative()
+  Schema.Record(Schema.String, attributeValueSchema).check(
+    Schema.makeFilter(
+      attributes => Object.keys(attributes).every(key => Schema.is(attributeKeySchema)(key)) || 'Attribute keys do not match the browser telemetry contract.',
+    ),
+    Schema.makeFilter(attributes => Object.keys(attributes).length <= max),
+  )
+const timeSchema = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
 
-const spanSchema = z.object({
-  traceId: z.string().regex(/^(?!0{32})[0-9a-f]{32}$/u),
-  spanId: z.string().regex(/^(?!0{16})[0-9a-f]{16}$/u),
-  parentSpanId: z
-    .string()
-    .regex(/^(?!0{16})[0-9a-f]{16}$/u)
-    .optional(),
-  name: z.string().min(1).max(BROWSER_TRACES_LIMITS.nameLength),
-  kind: z.enum(['internal', 'client']),
+const spanSchema = Schema.Struct({
+  traceId: Schema.String.check(Schema.isPattern(/^(?!0{32})[0-9a-f]{32}$/u)),
+  spanId: Schema.String.check(Schema.isPattern(/^(?!0{16})[0-9a-f]{16}$/u)),
+  parentSpanId: Schema.optional(Schema.String.check(Schema.isPattern(/^(?!0{16})[0-9a-f]{16}$/u))),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BROWSER_TRACES_LIMITS.nameLength)),
+  kind: Schema.Literals(['internal', 'client']),
   startTimeMs: timeSchema,
   endTimeMs: timeSchema,
   attributes: attributesSchema(BROWSER_TRACES_LIMITS.attributesPerSpan),
-  status: z.object({ code: z.enum(['unset', 'ok', 'error']), message: z.string().max(BROWSER_TRACES_LIMITS.statusMessageLength).optional() }),
-  events: z
-    .array(
-      z.object({
-        name: z.string().min(1).max(BROWSER_TRACES_LIMITS.nameLength),
-        timeMs: timeSchema,
-        attributes: attributesSchema(BROWSER_TRACES_LIMITS.attributesPerEvent),
-      }),
-    )
-    .max(BROWSER_TRACES_LIMITS.eventsPerSpan),
+  status: Schema.Struct({
+    code: Schema.Literals(['unset', 'ok', 'error']),
+    message: Schema.optional(Schema.String.check(Schema.isMaxLength(BROWSER_TRACES_LIMITS.statusMessageLength))),
+  }),
+  events: Schema.Array(
+    Schema.Struct({
+      name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BROWSER_TRACES_LIMITS.nameLength)),
+      timeMs: timeSchema,
+      attributes: attributesSchema(BROWSER_TRACES_LIMITS.attributesPerEvent),
+    }),
+  ).check(Schema.isMaxLength(BROWSER_TRACES_LIMITS.eventsPerSpan)),
 })
 
-const resourceSchema = z.object({ engine: z.enum(['chromium', 'firefox', 'webkit', 'other']), mobile: z.boolean() })
+const resourceSchema = Schema.Struct({ engine: Schema.Literals(['chromium', 'firefox', 'webkit', 'other']), mobile: Schema.Boolean })
 
-const statusSchema = z.object({ enabled: z.boolean(), sampleRatio: z.number().min(0).max(1), maxRootSpansPerMinute: z.number().int().nonnegative() })
+const statusSchema = Schema.Struct({
+  enabled: Schema.Boolean,
+  sampleRatio: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  maxRootSpansPerMinute: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+const apiSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) => Schema.toStandardSchemaV1(schema)
 
 /**
  * The browser half's way out: the page never talks to an OTLP endpoint (no CORS, no collector credentials in the
@@ -59,10 +68,20 @@ const browserTracesApi = ApiDefinitionModel.define({
   version: BROWSER_TRACES_API.version,
   owner: BROWSER_TRACES_API.owner,
   methods: {
-    status: ApiDefinitionModel.method({ output: statusSchema, description: 'Whether browser spans are forwarded now, and the sampling the page applies.' }),
+    status: ApiDefinitionModel.method({
+      output: apiSchema(statusSchema),
+      description: 'Whether browser spans are forwarded now, and the sampling the page applies.',
+    }),
     export: ApiDefinitionModel.method({
-      input: z.object({ resource: resourceSchema, spans: z.array(spanSchema).max(BROWSER_TRACES_LIMITS.spansPerExport) }),
-      output: z.object({ accepted: z.number().int().nonnegative(), dropped: z.number().int().nonnegative() }),
+      input: apiSchema(
+        Schema.Struct({ resource: resourceSchema, spans: Schema.Array(spanSchema).check(Schema.isMaxLength(BROWSER_TRACES_LIMITS.spansPerExport)) }),
+      ),
+      output: apiSchema(
+        Schema.Struct({
+          accepted: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+          dropped: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+        }),
+      ),
       description: 'Forward one batch of bounded, metadata-only browser spans to the Host OTLP traces target.',
     }),
   },

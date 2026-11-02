@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { remoteHostSchema } from './core.js'
 import { runProcess } from './process-runner.js'
 import { PeerSnapshotModel, type PeerShellRunner } from './remote.js'
@@ -17,7 +18,7 @@ describe.skipIf(!spike)('peer host spike', () => {
   // Parse only when an opted-in test runs. Every remote target must be supplied
   // explicitly; collecting this skipped suite must not select a maintainer's host.
   const configuredPeer = () =>
-    remoteHostSchema.parse({
+    Schema.decodeUnknownSync(remoteHostSchema)({
       id: 'peer',
       sshTarget: process.env.DSH_PEER_SSH,
       gitRemote: process.env.DSH_PEER_GIT_REMOTE,

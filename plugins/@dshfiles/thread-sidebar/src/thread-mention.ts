@@ -1,6 +1,8 @@
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-api-remotes/client'
+import * as Schema from 'effect/Schema'
 import type { ReferenceInsert } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { z } from 'zod'
+import * as Result from 'effect/Result'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export type ThreadMentionFailurePhase = 'remote-result' | 'resolver-exception' | 'candidate-processing-exception' | 'insertion-exception'
 export type ThreadMentionFailureKind =
@@ -25,14 +27,16 @@ export type ThreadMentionFailureDiagnostic = {
   failureKind?: ThreadMentionFailureKind
 }
 
-const sessionIdSchema = z.string().min(1).max(512)
-const threadMentionRequestSchema = z.strictObject({ sessionId: sessionIdSchema })
-const threadMentionInsertRequestSchema = z.strictObject({ sessionId: sessionIdSchema, hostSessionId: sessionIdSchema.optional() })
-const threadMentionDragPayloadSchema = z.strictObject({ sessionId: sessionIdSchema })
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))
+const threadMentionRequestSchema = SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema }))
+const threadMentionInsertRequestSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ sessionId: sessionIdSchema, hostSessionId: Schema.optional(sessionIdSchema) }),
+)
+const threadMentionDragPayloadSchema = SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema }))
 
 /** A composer session plus the thread it should mention; the host is absent for an unaddressed request. */
-export type ThreadMentionInsertRequest = z.infer<typeof threadMentionInsertRequestSchema>
-export type ThreadMentionDragPayload = z.infer<typeof threadMentionDragPayloadSchema>
+export type ThreadMentionInsertRequest = Schema.Schema.Type<typeof threadMentionInsertRequestSchema>
+export type ThreadMentionDragPayload = Schema.Schema.Type<typeof threadMentionDragPayloadSchema>
 
 /** The slice of a drag transfer a mention source writes to. */
 export interface ThreadMentionDragSink {
@@ -47,14 +51,14 @@ export interface ThreadMentionDragSource {
 }
 
 const decodeMentionSessionIdInput = (value: unknown): string | null => {
-  const parsed = threadMentionRequestSchema.safeParse(value)
-  if (!parsed.success) return null
-  return parsed.data.sessionId
+  const parsed = Schema.decodeUnknownResult(threadMentionRequestSchema)(value)
+  if (Result.isFailure(parsed)) return null
+  return parsed.success.sessionId
 }
 
 const decodeMentionInsertRequest = (value: unknown): ThreadMentionInsertRequest | null => {
-  const parsed = threadMentionInsertRequestSchema.safeParse(value)
-  return parsed.success ? parsed.data : null
+  const parsed = Schema.decodeUnknownResult(threadMentionInsertRequestSchema)(value)
+  return Result.isSuccess(parsed) ? parsed.success : null
 }
 
 /** The seat a Composer drag lands on: one conversation's composer, never the attachment rail or the dock. */
@@ -73,8 +77,8 @@ export class ThreadMentionModel {
   static readonly THREAD_MENTION_MIME = 'application/x-dshfiles-thread-mention'
   static readonly THREAD_MENTION_TARGET_ATTRIBUTE = 'data-dshfiles-mention-target'
 
-  static readonly failureCodeSchema = z.object({ code: z.string() })
-  private static readonly failureMessageSchema = z.object({ message: z.string().max(512) })
+  static readonly failureCodeSchema = Schema.Struct({ code: Schema.String })
+  private static readonly failureMessageSchema = Schema.Struct({ message: Schema.String.check(Schema.isMaxLength(512)) })
 
   static readonly decodeThreadMentionSessionId = decodeMentionSessionIdInput
   static readonly decodeThreadMentionInsertRequest = decodeMentionInsertRequest
@@ -87,8 +91,8 @@ export class ThreadMentionModel {
     } catch {
       return null
     }
-    const parsed = threadMentionDragPayloadSchema.safeParse(payload)
-    return parsed.success ? parsed.data.sessionId : null
+    const parsed = Schema.decodeUnknownResult(threadMentionDragPayloadSchema)(payload)
+    return Result.isSuccess(parsed) ? parsed.success.sessionId : null
   }
 
   /** Put one thread on the drag payload a Composer accepts, without plain text that a rich editor would insert. */
@@ -127,9 +131,9 @@ export class ThreadMentionModel {
   })
 
   static readonly classifyThreadMentionFailure = (error: unknown): ThreadMentionFailureKind => {
-    const parsedFailure = ThreadMentionModel.failureMessageSchema.safeParse(error)
-    if (!parsedFailure.success) return 'unclassified'
-    const message = parsedFailure.data.message
+    const parsedFailure = Schema.decodeUnknownResult(ThreadMentionModel.failureMessageSchema)(error)
+    if (Result.isFailure(parsedFailure)) return 'unclassified'
+    const message = parsedFailure.success.message
     if (message.includes('expected') && message.includes(' argument(s)')) return 'argument-count-mismatch'
     if (message.includes('Remote method is no longer mounted')) return 'method-unmounted'
     if (message.includes('has no active Connection')) return 'connection-unavailable'

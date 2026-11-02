@@ -1,10 +1,10 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /** A JSON value as it crosses the worker boundary. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
+const jsonValueSchema: Schema.ConstraintDecoder<JsonValue> = Schema.suspend(() =>
+  Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null, Schema.Array(jsonValueSchema), Schema.Record(Schema.String, jsonValueSchema)]),
 )
 
 /**
@@ -17,83 +17,103 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
  * The host maps core's own filter clauses onto these, so the two callers that matter (`@dshfiles/memory` and the
  * session controller) filter exactly as they do against the stock backend.
  */
-const eventFilterClauseSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('type'), values: z.array(z.string().min(1)).readonly() }),
-  z.object({ kind: z.literal('surface'), values: z.array(z.string().min(1)).readonly() }),
-  z.object({ kind: z.literal('seq'), from: z.number().int().optional(), to: z.number().int().optional() }).readonly(),
-  z.object({ kind: z.literal('time'), from: z.number().optional(), to: z.number().optional() }).readonly(),
+const eventFilterClauseSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('type'), values: Schema.Array(Schema.String.check(Schema.isMinLength(1))) }),
+  Schema.Struct({ kind: Schema.Literal('surface'), values: Schema.Array(Schema.String.check(Schema.isMinLength(1))) }),
+  Schema.Struct({
+    kind: Schema.Literal('seq'),
+    from: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt())),
+    to: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt())),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('time'),
+    from: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    to: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  }),
 ])
-const eventFiltersSchema = z.array(eventFilterClauseSchema).readonly()
-export type EventFilters = z.infer<typeof eventFiltersSchema>
 
-const sessionSearchRequestSchema = z.object({
-  query: z.string().min(1),
-  limit: z.number().int().min(1).max(100),
+const eventFiltersSchema = Schema.Array(eventFilterClauseSchema)
+export type EventFilters = typeof eventFiltersSchema.Type
+
+const sessionSearchRequestSchema = Schema.Struct({
+  query: Schema.String.check(Schema.isMinLength(1)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)),
   /** Offset into the ranked result set; the host keeps cursors opaque. */
-  cursor: z.number().int().nonnegative().optional(),
-  sessionIds: z.array(z.string().min(1)).readonly().optional(),
-  cwd: z.string().min(1).optional(),
-  filters: eventFiltersSchema.optional(),
+  cursor: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  sessionIds: Schema.optional(Schema.Array(Schema.String.check(Schema.isMinLength(1)))),
+  cwd: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+  filters: Schema.optional(eventFiltersSchema),
 })
-export type SessionSearchRequest = z.infer<typeof sessionSearchRequestSchema>
+export type SessionSearchRequest = typeof sessionSearchRequestSchema.Type
 
-const sessionEventSearchRequestSchema = z.object({
-  sessionId: z.string().min(1),
-  query: z.string().min(1),
-  limit: z.number().int().min(1).max(100),
-  cursor: z.number().int().nonnegative().optional(),
-  filters: eventFiltersSchema.optional(),
+const sessionEventSearchRequestSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1)),
+  query: Schema.String.check(Schema.isMinLength(1)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100)),
+  cursor: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  filters: Schema.optional(eventFiltersSchema),
 })
-export type SessionEventSearchRequest = z.infer<typeof sessionEventSearchRequestSchema>
+export type SessionEventSearchRequest = typeof sessionEventSearchRequestSchema.Type
 
-export const indexHealthSchema = z.object({
-  sessions: z.number().int().nonnegative(),
-  documents: z.number().int().nonnegative(),
-  indexBytes: z.number().int().nonnegative(),
-  behindSessions: z.number().int().nonnegative(),
-  behindBytes: z.number().int().nonnegative(),
-  ingesting: z.boolean(),
-  lastIngestMs: z.number().nonnegative(),
+const countSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const durationSchema = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
+
+export const indexHealthSchema = Schema.Struct({
+  sessions: countSchema,
+  documents: countSchema,
+  indexBytes: countSchema,
+  behindSessions: countSchema,
+  behindBytes: countSchema,
+  ingesting: Schema.Boolean,
+  lastIngestMs: durationSchema,
   /** Slowest ingest pass since the worker started; a search waits behind a running pass. */
-  slowestIngestMs: z.number().nonnegative(),
-  lastSearchMs: z.number().nonnegative(),
-  slowestSearchMs: z.number().nonnegative(),
-  lastError: z.string().nullable(),
+  slowestIngestMs: durationSchema,
+  lastSearchMs: durationSchema,
+  slowestSearchMs: durationSchema,
+  lastError: Schema.NullOr(Schema.String),
 })
-export type IndexHealth = z.infer<typeof indexHealthSchema>
+export type IndexHealth = typeof indexHealthSchema.Type
 
-export const sessionHeaderSchema = z.object({
-  version: z.number().int(),
-  id: z.string().min(1),
-  createdAt: z.number(),
-  cwd: z.string().optional(),
-  parentSession: z.string().optional(),
-  isSeeded: z.boolean(),
-  delegationDepth: z.number().int().optional(),
-  agentPreset: z.string().optional(),
+export const sessionHeaderSchema = Schema.Struct({
+  version: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+  id: Schema.String.check(Schema.isMinLength(1)),
+  createdAt: Schema.Number.check(Schema.isFinite()),
+  cwd: Schema.optional(Schema.String),
+  parentSession: Schema.optional(Schema.String),
+  isSeeded: Schema.Boolean,
+  delegationDepth: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt())),
+  agentPreset: Schema.optional(Schema.String),
 })
-export type SessionHeaderRow = z.infer<typeof sessionHeaderSchema>
+export type SessionHeaderRow = typeof sessionHeaderSchema.Type
 
-const searchMatchSchema = z.object({
-  sessionId: z.string(),
-  seq: z.number().int(),
-  type: z.string(),
-  time: z.number(),
-  surface: z.string(),
-  snippet: z.string(),
+const searchMatchSchema = Schema.Struct({
+  sessionId: Schema.String,
+  seq: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+  type: Schema.String,
+  time: Schema.Number.check(Schema.isFinite()),
+  surface: Schema.String,
+  snippet: Schema.String,
   header: sessionHeaderSchema,
 })
-export type SearchMatch = z.infer<typeof searchMatchSchema>
+export type SearchMatch = typeof searchMatchSchema.Type
 
-export const workerRequestSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('search-sessions'), id: z.number().int(), request: sessionSearchRequestSchema }),
-  z.object({ kind: z.literal('search-events'), id: z.number().int(), request: sessionEventSearchRequestSchema }),
-  z.object({ kind: z.literal('ingest'), id: z.number().int(), root: z.string().min(1) }),
-  z.object({ kind: z.literal('health'), id: z.number().int() }),
-  z.object({ kind: z.literal('nudge'), id: z.number().int() }),
-  z.object({ kind: z.literal('close'), id: z.number().int() }),
+export const workerRequestSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('search-sessions'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), request: sessionSearchRequestSchema }),
+  Schema.Struct({
+    kind: Schema.Literal('search-events'),
+    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+    request: sessionEventSearchRequestSchema,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('ingest'),
+    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+    root: Schema.String.check(Schema.isMinLength(1)),
+  }),
+  Schema.Struct({ kind: Schema.Literal('health'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
+  Schema.Struct({ kind: Schema.Literal('nudge'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
+  Schema.Struct({ kind: Schema.Literal('close'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
 ])
-export type WorkerRequest = z.infer<typeof workerRequestSchema>
+export type WorkerRequest = typeof workerRequestSchema.Type
 
 /** The same union without the correlation id, which the client assigns per request. */
 export type WorkerRequestInput =
@@ -104,20 +124,20 @@ export type WorkerRequestInput =
   | { readonly kind: 'nudge' }
   | { readonly kind: 'close' }
 
-export const workerReplySchema = z.union([
-  z.object({ id: z.number().int(), ok: z.literal(true), value: jsonValueSchema }),
-  z.object({ id: z.number().int(), ok: z.literal(false), code: z.string(), message: z.string() }),
-  z.object({ kind: z.literal('progress'), health: indexHealthSchema }),
+export const workerReplySchema = Schema.Union([
+  Schema.Struct({ id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), ok: Schema.Literal(true), value: jsonValueSchema }),
+  Schema.Struct({ id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('progress'), health: indexHealthSchema }),
 ])
-export type WorkerReply = z.infer<typeof workerReplySchema>
+export type WorkerReply = typeof workerReplySchema.Type
 
-export const searchSessionsResultSchema = z.object({ matches: z.array(searchMatchSchema), hasMore: z.boolean() })
-export type SearchSessionsResult = z.infer<typeof searchSessionsResultSchema>
+export const searchSessionsResultSchema = Schema.Struct({ matches: Schema.Array(searchMatchSchema), hasMore: Schema.Boolean })
+export type SearchSessionsResult = typeof searchSessionsResultSchema.Type
 
-export const searchEventsResultSchema = z.object({
-  sessionId: z.string(),
-  header: sessionHeaderSchema.nullable(),
-  matches: z.array(searchMatchSchema),
-  hasMore: z.boolean(),
+export const searchEventsResultSchema = Schema.Struct({
+  sessionId: Schema.String,
+  header: Schema.NullOr(sessionHeaderSchema),
+  matches: Schema.Array(searchMatchSchema),
+  hasMore: Schema.Boolean,
 })
-export type SearchEventsResult = z.infer<typeof searchEventsResultSchema>
+export type SearchEventsResult = typeof searchEventsResultSchema.Type

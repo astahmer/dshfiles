@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { Schema } from 'effect'
 import { remoteHostSchema, type ExecutionPolicy, type RemoteHost } from './core.js'
 import { ExecutionModel, type ExecutionSelection, type RemoteEndpointState } from './execution.js'
 
 const remote = (id: string, priority = 1): RemoteHost =>
-  remoteHostSchema.parse({ id, sshTarget: `host-${id}`, gitRemote: id, workspace: `/work/${id}`, priority })
+  Schema.decodeUnknownSync(remoteHostSchema)({ id, sshTarget: `host-${id}`, gitRemote: id, workspace: `/work/${id}`, priority })
 
 const policy = (patch: Partial<ExecutionPolicy>): ExecutionPolicy => ({ target: 'local', onRemoteFailure: 'local', ...patch })
 
@@ -29,7 +30,7 @@ describe('project check execution policy', () => {
 
   it('picks the highest-priority enabled remote and skips cooling remotes', () => {
     const remotes = [remote('slow', 5), remote('fast', 1), remote('off', 1)]
-    remotes[2] = remoteHostSchema.parse({ ...remotes[2], enabled: false })
+    remotes[2] = Schema.decodeUnknownSync(remoteHostSchema)({ ...remotes[2], enabled: false })
     const states = new Map([['fast', state(0, 2_000)]])
     expect(ExecutionModel.choose(selection({ policy: policy({ target: 'remote' }), remotes, states }))).toEqual({
       endpoint: { kind: 'remote', remote: remotes[0] },

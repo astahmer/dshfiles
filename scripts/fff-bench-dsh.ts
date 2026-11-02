@@ -16,59 +16,56 @@ import { execFile } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
-import { z } from 'zod'
-import { decodeJson } from './json.ts'
+import { Result } from 'effect'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 
 const run = promisify(execFile)
 const dshxBin = new URL('../tooling/dshx/packages/dshx/dist/cli/bin.js', import.meta.url).pathname
 const turnTimeoutMs = 5 * 60_000
 const answerRule = 'Answer from the repository only. End with one line starting `ANSWER:` that lists the repo-relative path(s) and any value asked for.'
 
-const Task = z.object({
-  id: z.string(),
-  prompt: z.string(),
-  expect: z.array(z.string()).optional(),
-  recall: z.array(z.string()).optional(),
+const Task = Schema.Struct({
+  id: Schema.String,
+  prompt: Schema.String,
+  expect: Schema.optionalKey(Schema.Array(Schema.String)),
+  recall: Schema.optionalKey(Schema.Array(Schema.String)),
 })
-type Task = z.infer<typeof Task>
-const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
+type Task = Schema.Schema.Type<typeof Task>
+const TaskFile = Schema.Struct({ corpus: Schema.String, tasks: Schema.Array(Task) })
 
-const Created = z.object({ data: z.object({ sessionId: z.string() }) })
-const Digest = z.object({
-  data: z.object({
-    running: z.boolean(),
-    lastTurnEnd: z.object({ kind: z.string() }).nullish(),
-    lastAssistantText: z.object({ text: z.string() }).nullish(),
+const Created = Schema.Struct({ data: Schema.Struct({ sessionId: Schema.String }) })
+const Digest = Schema.Struct({
+  data: Schema.Struct({
+    running: Schema.Boolean,
+    lastTurnEnd: Schema.optionalKey(Schema.NullishOr(Schema.Struct({ kind: Schema.String }))),
+    lastAssistantText: Schema.optionalKey(Schema.NullishOr(Schema.Struct({ text: Schema.String }))),
   }),
 })
-const SessionEvent = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('turn/start'), time: z.number() }),
-  z.object({ type: z.literal('turn/end'), time: z.number() }),
-  z.object({
-    type: z.literal('assistant/message'),
-    data: z.object({
-      usage: z
-        .object({
-          inputTokens: z.number().default(0),
-          outputTokens: z.number().default(0),
-          cacheReadTokens: z.number().default(0),
-          cacheWriteTokens: z.number().default(0),
-        })
-        .optional(),
+const SessionEvent = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('turn/start'), time: Schema.Number }),
+  Schema.Struct({ type: Schema.Literal('turn/end'), time: Schema.Number }),
+  Schema.Struct({
+    type: Schema.Literal('assistant/message'),
+    data: Schema.Struct({
+      usage: Schema.optionalKey(
+        Schema.Struct({
+          inputTokens: Schema.optionalKey(Schema.Number),
+          outputTokens: Schema.optionalKey(Schema.Number),
+          cacheReadTokens: Schema.optionalKey(Schema.Number),
+          cacheWriteTokens: Schema.optionalKey(Schema.Number),
+        }),
+      ),
     }),
   }),
-  z.object({ type: z.literal('tool/call'), data: z.object({ name: z.string() }) }),
-  z.object({
-    type: z.literal('tool/result'),
-    data: z.object({
-      message: z.object({
-        content: z.array(z.looseObject({ text: z.string().optional() })).transform(parts => parts.reduce((sum, part) => sum + (part.text?.length ?? 0), 0)),
-      }),
-    }),
+  Schema.Struct({ type: Schema.Literal('tool/call'), data: Schema.Struct({ name: Schema.String }) }),
+  Schema.Struct({
+    type: Schema.Literal('tool/result'),
+    data: Schema.Struct({ message: Schema.Struct({ content: Schema.Array(Schema.Struct({ text: Schema.optionalKey(Schema.String) })) }) }),
   }),
 ])
-const Export = z.object({
-  data: z.object({ records: z.array(z.looseObject({ event: z.looseObject({ type: z.string() }).optional() })) }),
+const Export = Schema.Struct({
+  data: Schema.Struct({ records: Schema.Array(Schema.Struct({ event: Schema.optionalKey(Schema.Struct({ type: Schema.String })) })) }),
 })
 
 const score = (task: Task, answer: string): number => {
@@ -86,18 +83,18 @@ const dshx = async (args: string[]): Promise<string> => {
 
 const runOnce = async (options: { task: Task; arm: string; rep: number; corpus: string; provider: string; model: string; effort: string; rawDir: string }) => {
   const startedAt = performance.now()
-  const sessionId = decodeJson(Created, await dshx(['sessions', 'create', '--cwd', options.corpus, '--json'])).data.sessionId
+  const sessionId = ScriptJson.decodeJson(Created, await dshx(['sessions', 'create', '--cwd', options.corpus, '--json'])).data.sessionId
   await dshx(['models', 'select', '--session', sessionId, '--reasoning-effort', options.effort, options.provider, options.model])
   await dshx(['sessions', 'prompt', sessionId, `${options.task.prompt}\n\n${answerRule}`])
 
-  let digest = decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
+  let digest = ScriptJson.decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
   while (digest.data.running || digest.data.lastTurnEnd == null) {
     if (performance.now() - startedAt > turnTimeoutMs) {
       await dshx(['sessions', 'cancel', sessionId])
       break
     }
     await new Promise(wake => setTimeout(wake, 2000))
-    digest = decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
+    digest = ScriptJson.decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
   }
   const wallMs = Math.round(performance.now() - startedAt)
 
@@ -110,14 +107,14 @@ const runOnce = async (options: { task: Task; arm: string; rep: number; corpus: 
   let turns = 0
   let inputTokens = 0
   let outputTokens = 0
-  for (const record of decodeJson(Export, exported).data.records) {
-    const parsed = SessionEvent.safeParse(record.event)
-    if (!parsed.success) continue
-    const event = parsed.data
+  for (const record of ScriptJson.decodeJson(Export, exported).data.records) {
+    const parsed = Schema.decodeUnknownResult(SessionEvent)(record.event)
+    if (!Result.isSuccess(parsed)) continue
+    const event = parsed.success
     if (event.type === 'turn/start' && turnStart === 0) turnStart = event.time
     if (event.type === 'turn/end') turnEnd = event.time
     if (event.type === 'tool/call') toolCalls[event.data.name] = (toolCalls[event.data.name] ?? 0) + 1
-    if (event.type === 'tool/result') toolResultChars += event.data.message.content
+    if (event.type === 'tool/result') toolResultChars += event.data.message.content.reduce((sum, part) => sum + (part.text?.length ?? 0), 0)
     if (event.type === 'assistant/message') {
       turns += 1
       const usage = event.data.usage
@@ -150,18 +147,18 @@ const runOnce = async (options: { task: Task; arm: string; rep: number; corpus: 
   }
 }
 
-const Options = z.object({
-  corpus: z.string().transform(path => resolve(path)),
-  arm: z.string().regex(/^[a-z0-9-]+$/),
-  out: z.string().transform(path => resolve(path)),
-  provider: z.string(),
-  model: z.string(),
-  effort: z.string(),
-  reps: z.coerce.number().int().positive(),
-  parallel: z.coerce.number().int().positive(),
-  only: z.string().optional(),
+const Options = Schema.Struct({
+  corpus: Schema.String,
+  arm: Schema.String.check(Schema.isPattern(/^[a-z0-9-]+$/u)),
+  out: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  effort: Schema.String,
+  reps: Schema.NumberFromString.check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+  parallel: Schema.NumberFromString.check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+  only: Schema.optionalKey(Schema.String),
 })
-const options = Options.parse(
+const parsedOptions = Schema.decodeUnknownSync(Options)(
   parseArgs({
     options: {
       corpus: { type: 'string' },
@@ -176,9 +173,10 @@ const options = Options.parse(
     },
   }).values,
 )
+const options = { ...parsedOptions, corpus: resolve(parsedOptions.corpus), out: resolve(parsedOptions.out) }
 if (process.env.DSHX_URL === undefined) throw new Error('Set DSHX_URL to the scratch DSH launch URL (dshx dev state.json).')
 
-const taskFile = decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
+const taskFile = ScriptJson.decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
 const tasks = taskFile.tasks.filter(task => options.only === undefined || task.id === options.only)
 const rawDir = join(options.out, 'sessions')
 mkdirSync(rawDir, { recursive: true })
@@ -189,7 +187,7 @@ const done = new Set(
         .split('\n')
         .filter(line => line.trim() !== '')
         .map(line => {
-          const record = decodeJson(z.object({ task: z.string(), arm: z.string(), rep: z.number() }), line)
+          const record = ScriptJson.decodeJson(Schema.Struct({ task: Schema.String, arm: Schema.String, rep: Schema.Number }), line)
           return `${record.task}.${record.arm}.${record.rep}`
         })
     : [],

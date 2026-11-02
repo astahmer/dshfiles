@@ -8,6 +8,7 @@ import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { revisionSchema } from './api.js'
 import { REVISION_TEMPLATE } from './jj-templates.js'
 import type { JjRun } from './revision-reads.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
 const fixture = async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-graph-'))
@@ -95,7 +96,7 @@ test('main@origin resolves the exact fetched remote bookmark independently of lo
     .jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', `${localTip} | ${remoteTip}`, '--template', REVISION_TEMPLATE])
     .trim()
     .split('\n')
-    .map(line => revisionSchema.parse(JSON.parse(line)))
+    .map(line => SchemaHelpers.decode(revisionSchema, JSON.parse(line)))
   assert.deepEqual(revisions.find(revision => revision.commitId === localTip)?.bookmarks, ['main'])
   assert.equal(revisions.find(revision => revision.commitId === remoteTip)?.remoteBookmarksText, 'main@origin')
 }, 30_000)

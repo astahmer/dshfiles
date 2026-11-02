@@ -1,5 +1,6 @@
+import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { createParentFeedbackService, type ParentFeedbackAgent, type ParentFeedbackRuntime } from './revisioned-feedback.js'
+import { createParentFeedbackEffectService, createParentFeedbackService, type ParentFeedbackAgent, type ParentFeedbackRuntime } from './revisioned-feedback.js'
 import type { MarkdownFeedbackAnchor, RevisionedFeedbackRecord, RevisionedFeedbackTable } from './store.js'
 
 const root: ParentFeedbackAgent = { id: 'root-session' }
@@ -113,6 +114,29 @@ const answerMany = (
 ) => service.answerMany({ agent, responses, signal: new AbortController().signal })
 
 describe('revisioned Markdown feedback', () => {
+  it('runs the domain service through typed Effect operations', async () => {
+    const table = createMemoryTable()
+    const runtime = createRuntime()
+    runtime.setRevision(firstChild.id, 'docs/guide.md', firstRevision)
+    const service = createParentFeedbackEffectService({ table: async () => table, runtime: runtime.runtime, now: () => 1_000 })
+    const record = await Effect.runPromise(
+      service.submit({
+        agent: firstChild,
+        operationId: 'effect-call',
+        anchor: anchorFor(),
+        comment: 'Clarify Effect adapter behavior.',
+        signal: new AbortController().signal,
+      }),
+    )
+
+    expect(record.status).toBe('pending')
+    await expect(Effect.runPromise(service.read({ agent: unrelatedAgent, feedbackId: record.feedbackId }))).rejects.toMatchObject({
+      _tag: 'ParentFeedbackServiceError',
+      operation: 'read',
+    })
+    await Effect.runPromise(service.close())
+  })
+
   it('stores an exact direct-parent request and deduplicates the parent wakeup', async () => {
     const table = createMemoryTable()
     const runtime = createRuntime()

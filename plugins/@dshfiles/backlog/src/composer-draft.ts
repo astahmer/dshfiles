@@ -1,9 +1,11 @@
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { Schema } from 'effect'
 import { useCallback, useState } from 'react'
-import { z } from 'zod'
 
-const draftsSchema = z.record(z.string(), z.string().max(20_000))
-const noDrafts: z.infer<typeof draftsSchema> = {}
+const draftsRecordSchema = Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(20_000)))
+const draftsSchema = zodSchemaFromEffect(draftsRecordSchema)
+const noDrafts: typeof draftsRecordSchema.Type = {}
 const drafts = createStoredValue({ key: 'dshfiles.backlog.draft.v1', schema: draftsSchema, fallback: noDrafts })
 
 export const useComposerDraft = (draftKey: string) => {

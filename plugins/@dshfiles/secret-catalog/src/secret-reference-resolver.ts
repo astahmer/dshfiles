@@ -1,6 +1,7 @@
 import type { SecretCatalogValues, SecretReference } from '@dshfiles/credential-port'
 import { withSpan } from '@dshfiles/dshx/tracing'
-import { secretScopeSchema } from '@dshfiles/credential-port'
+import * as Schema from 'effect/Schema'
+import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import type { SecretMetadata } from './secret-metadata.js'
 import type { SecretCatalogOperations } from './secret-operations.js'
 
@@ -25,16 +26,16 @@ const uniqueMatch = (rows: readonly SecretMetadata[], reference: SecretReference
  */
 export const createSecretCatalogValues = (input: { readonly operations: Pick<SecretCatalogOperations, 'list' | 'reveal'> }): SecretCatalogValues => ({
   supportsExpectedScope: true,
-  resolve: ({ reference, cwd, expectedScope }) =>
+  resolve: ({ reference, cwd, expectedScope, signal }) =>
     withSpan(
       'secret resolve',
       { attributes: { 'secret.alias': reference.alias, 'secret.environment': reference.environment, 'secret.project_scoped': cwd !== null } },
       async span => {
-        const match = uniqueMatch(await input.operations.list(cwd), reference)
-        const scope = secretScopeSchema.parse(match.scope)
+        const match = uniqueMatch(await input.operations.list(cwd, signal), reference)
+        const scope = Schema.decodeUnknownSync(secretScopeSchemaEffect)(match.scope)
         if (expectedScope !== undefined && scope !== expectedScope) throw new Error('The selected secret scope changed. Select the alias again.')
         span.setAttribute('secret.scope', scope)
-        return input.operations.reveal(reference.alias, scope, cwd, reference.environment)
+        return input.operations.reveal(reference.alias, scope, cwd, reference.environment, signal)
       },
     ),
 })

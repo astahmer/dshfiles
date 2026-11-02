@@ -20,12 +20,14 @@ import { ApiDefinitionModel } from './define.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
+import { resolveApiSchema } from './schema.js'
 import { HostApiEventsModel } from './host-events.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
 import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
 import { PluginStorageModel } from '../host/plugin-storage.js'
 import { PluginStorageContract } from './storage.js'
+import { ApiChannelModel } from './channel.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -220,7 +222,7 @@ const agentCaller = (agent: ToolAgent): ApiCaller => {
 
 /** A `z.void()`-style input has no JSON Schema; it is a no-argument tool when it accepts `undefined` synchronously. */
 const acceptsNoInput = (schema: ApiSchema): boolean => {
-  const result = schema['~standard'].validate(undefined)
+  const result = resolveApiSchema(schema)['~standard'].validate(undefined)
   return !(result instanceof Promise) && result.issues === undefined
 }
 
@@ -231,7 +233,7 @@ function apiTool(contract: ApiContract, method: string, definition: AnyApiMethod
   const inputSchema = publishedJsonSchema(definition.input, 'input')
   if (definition.input !== undefined && inputSchema === undefined && !acceptsNoInput(definition.input)) {
     throw new Error(
-      `API ${contract.id}.${method} cannot become tool ${exposure.name}: its input schema publishes no Standard JSON Schema (use zod 4.2+ or remove tool).`,
+      `API ${contract.id}.${method} cannot become tool ${exposure.name}: its input schema publishes no Standard JSON Schema (use a supported Effect or Standard Schema adapter, or remove tool).`,
     )
   }
   const parameters = toToolSchema(inputSchema)
@@ -524,7 +526,7 @@ async function mountApi(
   const registry = apiRegistry(ctx)
   const key = apiKey(packageId, contract.id)
   if (registry.apis.has(key)) throw new Error(`API ${contract.id} of ${packageId} is already served in this process.`)
-  const channel = ApiProtocolModel.apiChannel(packageId, contract.id)
+  const channel = ApiChannelModel.apiChannel(packageId, contract.id)
   const root = ctx.root ?? ctx
   const owners = channelOwners.get(root) ?? new Map<string, string>()
   const owner = `${packageId}:${contract.id}`

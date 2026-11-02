@@ -1,25 +1,28 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import * as SchemaIssue from 'effect/SchemaIssue'
 import { KIND_ACCENT, KIND_LABEL } from './account-labels.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { PROVIDER_ICONS, accountDraftSchema, type AccountDraft, type AccountKind, type AccountProfile } from './api.js'
 
 export const ROUTE_SLUG_HINT = 'Starts with a letter; letters, digits, dash and underscore. Appears as the provider in the model picker.'
 
 /** What the editor may submit: the wire draft, plus the slug rule the route registry enforces. */
-export const accountRouteSlugSchema = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u, ROUTE_SLUG_HINT)
+export const accountRouteSlugSchema = AiAccountsSchema.trimmedString.check(Schema.isPattern(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u, { message: ROUTE_SLUG_HINT }))
 
-const accountEditorSchema = accountDraftSchema.extend({
+const accountEditorSchema = Schema.Struct({
+  ...accountDraftSchema.fields,
   instanceId: accountRouteSlugSchema,
-  displayName: z.string().trim().min(1, 'Give the account a display name.').max(120),
+  displayName: AiAccountsSchema.trimmedString.check(Schema.isMaxLength(120), Schema.isMinLength(1, { message: 'Give the account a display name.' })),
 })
+
+/** The editor reports one sentence, so it reads the first formatted issue rather than the whole `SchemaError.message`. */
+const formatFirstIssue = SchemaIssue.makeFormatterStandardSchemaV1()
 
 export class AccountDraftModel {
   /** The first problem that would make the Host refuse this draft, or null when it can be saved. */
   static draftProblem = (draft: AccountDraft): string | null => {
-    const result = accountEditorSchema.safeParse(draft)
-    return result.success ? null : (result.error.issues[0]?.message ?? 'This account cannot be saved yet.')
+    const result = AiAccountsSchema.decodeResult(accountEditorSchema, draft)
+    return result._tag === 'Success' ? null : (formatFirstIssue(result.failure.issue).issues[0]?.message ?? 'This account cannot be saved yet.')
   }
 
   private static defaultHome = {

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { z } from 'zod'
-import { decodeJson } from './json.ts'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 
 const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts']
 
@@ -20,6 +20,8 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/plugin-ui/src/virtual.ts',
   'plugins/@dshfiles/plugin-ui/src/icons.ts',
   'plugins/@dshfiles/project-folder-picker/src/index.ts',
+  'plugins/@dshfiles/project-checks/src/api.ts',
+  'tooling/dshx/packages/dshx/src/effect/index.ts',
   'plugins/@dshfiles/usage/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
   'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',
@@ -59,32 +61,32 @@ const astGrepVendored = [
   'plugins/@dshfiles/workspace-nav/src/host.ts',
 ]
 
-const ruleCapsSchema = z.record(z.string(), z.number().int().nonnegative())
-const capsSchema = z.object({ oxlint: ruleCapsSchema, 'ast-grep': ruleCapsSchema })
+const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))
+const capsSchema = Schema.Struct({ oxlint: ruleCapsSchema, 'ast-grep': ruleCapsSchema })
 
-const oxlintReportSchema = z.object({
-  diagnostics: z.array(
-    z.object({
-      code: z.string().optional(),
-      message: z.string(),
-      severity: z.string(),
-      filename: z.string(),
-      labels: z.array(z.object({ span: z.object({ line: z.number(), column: z.number() }) })).optional(),
+const oxlintReportSchema = Schema.Struct({
+  diagnostics: Schema.Array(
+    Schema.Struct({
+      code: Schema.optionalKey(Schema.String),
+      message: Schema.String,
+      severity: Schema.String,
+      filename: Schema.String,
+      labels: Schema.optionalKey(Schema.Array(Schema.Struct({ span: Schema.Struct({ line: Schema.Number, column: Schema.Number }) }))),
     }),
   ),
 })
 
-const astGrepMatchSchema = z.object({
-  ruleId: z.string(),
-  message: z.string(),
-  file: z.string(),
-  range: z.object({ start: z.object({ line: z.number(), column: z.number() }) }),
+const astGrepMatchSchema = Schema.Struct({
+  ruleId: Schema.String,
+  message: Schema.String,
+  file: Schema.String,
+  range: Schema.Struct({ start: Schema.Struct({ line: Schema.Number, column: Schema.Number }) }),
 })
 
 type Finding = { readonly rule: string; readonly message: string; readonly location: string }
 
-const tool = z.enum(['oxlint', 'ast-grep']).parse(process.argv[2])
-const caps = decodeJson(capsSchema, readFileSync(new URL('./lint-ratchet.json', import.meta.url), 'utf8'))[tool]
+const tool = Schema.decodeUnknownSync(Schema.Literals(['oxlint', 'ast-grep']))(process.argv[2])
+const caps = ScriptJson.decodeJson(capsSchema, readFileSync(new URL('./lint-ratchet.json', import.meta.url), 'utf8'))[tool]
 
 const run = (args: ReadonlyArray<string>): string => {
   const result = spawnSync('pnpm', ['exec', ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
@@ -95,7 +97,7 @@ const run = (args: ReadonlyArray<string>): string => {
 const readFindings = (): ReadonlyArray<Finding> => {
   if (tool === 'oxlint') {
     const output = run(['oxlint', ...lintRoots, '--config', '.oxlintrc.json', '--report-unused-disable-directives', '--format', 'json'])
-    return decodeJson(oxlintReportSchema, output).diagnostics.map(diagnostic => {
+    return ScriptJson.decodeJson(oxlintReportSchema, output).diagnostics.map(diagnostic => {
       const span = diagnostic.labels?.[0]?.span
       return {
         rule: diagnostic.severity === 'error' ? 'error' : (diagnostic.code ?? diagnostic.message),
@@ -109,7 +111,7 @@ const readFindings = (): ReadonlyArray<Finding> => {
     .split('\n')
     .filter(Boolean)
     .map(line => {
-      const match = decodeJson(astGrepMatchSchema, line)
+      const match = ScriptJson.decodeJson(astGrepMatchSchema, line)
       return { rule: match.ruleId, message: match.message, location: `${match.file}:${match.range.start.line + 1}:${match.range.start.column + 1}` }
     })
 }

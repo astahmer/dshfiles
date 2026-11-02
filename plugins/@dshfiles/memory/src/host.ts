@@ -10,12 +10,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { createRouteResolver, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
-import type { ApiCaller } from '@dshfiles/dshx/api'
+import { PluginApiError, type ApiCaller, type ApiHandlerContext } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost, isApiServed } from '@dshfiles/dshx/host'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
-import { z } from 'zod'
+import { Context as EffectContext, Duration, Effect, Layer, Schedule, Schema } from 'effect'
 
 import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
 import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
@@ -69,7 +70,7 @@ const textOf = (blocks: readonly { readonly type: string; readonly text?: string
 
 const embedders = new Map<string, Promise<MemoryEmbedder>>()
 
-const listedTitleSchema = z.string().min(1)
+const listedTitleSchema = Schema.String.check(Schema.isMinLength(1))
 
 /** A thread workspace's project scripts, or null outside a project with a lockfile or when they cannot be written. */
 const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceScripts | null> => {
@@ -86,20 +87,7 @@ const agentScopes = new Map<string, Promise<string | null>>()
  * A subagent's parent: the live Agent registry first (no I/O), then its Session log, which is the only source once the
  * parent went cold. Cached with the scope, so a thread pays this at most once.
  */
-const parentOf = async (ctx: Context, sessionId: string): Promise<string | undefined> => {
-  const live = ctx
-    .get('agents')
-    ?.list()
-    .find(agent => agent.id === sessionId)
-  if (live !== undefined) return live.session.header.parentSession
-  const log = await ctx
-    .get('sessionQuery')
-    ?.readSession(SessionId(sessionId))
-    .catch(() => undefined)
-  return log?.session.parentSession
-}
-
-const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> => {
+const agentScopeOf = (ctx: Context, sessionId: string, parentOf: (sessionId: string) => Promise<string | undefined>): Promise<string | null> => {
   const cached = agentScopes.get(sessionId)
   if (cached !== undefined) return cached
   const pending = (async () => {
@@ -114,7 +102,7 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
           const agent = result.ok ? result.value.agent : null
           return agent === null ? null : { memoryScope: agent.memoryScope }
         },
-        parentOf: id => parentOf(ctx, id),
+        parentOf,
       },
     })
   })().catch(() => null)
@@ -124,10 +112,20 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
 
 const hostServices = (ctx: Context): MemoryServices => {
   const jevUsageClient = createHostApiClient(ctx, usageApi, '@dshfiles/memory')
+  const agents = ctx.get('agents')
+  const sessionQueryService = ctx.get('sessionQuery')
+  const llm = ctx.get('llm')
+  const sessionController = ctx.get('sessionController')
+  const secretCatalogValues = ctx.get('secretCatalogValues')
   const sessionQuery = () => {
-    const service = ctx.get('sessionQuery')
-    if (!service) throw new Error('the DSH sessionQuery service is unavailable')
-    return service
+    if (!sessionQueryService) throw new Error('the DSH sessionQuery service is unavailable')
+    return sessionQueryService
+  }
+  const parentOf = async (sessionId: string): Promise<string | undefined> => {
+    const live = agents?.list().find(agent => agent.id === sessionId)
+    if (live !== undefined) return live.session.header.parentSession
+    const log = await sessionQueryService?.readSession(SessionId(sessionId)).catch(() => undefined)
+    return log?.session.parentSession
   }
   const sessionList = new MemorySessionList({
     listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live, persisted: record.persisted })),
@@ -148,22 +146,13 @@ const hostServices = (ctx: Context): MemoryServices => {
     },
     catalog: () => ({
       sessionProvider: async conversationId => {
-        const log = await ctx
-          .get('sessionQuery')
-          ?.readSession(SessionId(conversationId))
-          .catch(() => undefined)
+        const log = await sessionQueryService?.readSession(SessionId(conversationId)).catch(() => undefined)
         const header = log?.events.findLast(event => event.type === 'request/header')
         return header?.type === 'request/header' ? header.data.header.config.provider : undefined
       },
       // Cheap models match the provider id or its kind prefix (`opencode-go-pi` → `opencode-go`); AI Accounts' file is not read.
       providerKind: async () => undefined,
-      models: async provider =>
-        (
-          (await ctx
-            .get('llm')
-            ?.listModels(provider)
-            .catch(() => [])) ?? []
-        ).map(model => model.id),
+      models: async provider => ((await llm?.listModels(provider).catch(() => [])) ?? []).map(model => model.id),
     }),
   })
   return {
@@ -171,7 +160,7 @@ const hostServices = (ctx: Context): MemoryServices => {
       await projectNormalization
       return projectPathFor(cwd)
     },
-    agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId),
+    agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId, parentOf),
     listSessions: () => sessionList.listSessions(),
     readSessionTitles: async (sessionIds, signal) => {
       if (sessionIds.length === 0) return []
@@ -180,17 +169,14 @@ const hostServices = (ctx: Context): MemoryServices => {
       // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
       const timeout = AbortSignal.timeout(10_000)
       const readSignal = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
-      const listed = await ctx
-        .get('sessionController')
-        ?.list(sessionTitleListRequest, readSignal)
-        .catch(() => {
-          signal?.throwIfAborted()
-          return undefined
-        })
+      const listed = await sessionController?.list(sessionTitleListRequest, readSignal).catch(() => {
+        signal?.throwIfAborted()
+        return undefined
+      })
       const fromList = new Map<string, SessionTitleRead>()
       for (const item of listed?.items ?? []) {
-        const title = listedTitleSchema.safeParse(item.projections?.values.title)
-        if (title.success) fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.data, updatedAt: item.updatedAt })
+        const title = Schema.decodeUnknownResult(listedTitleSchema)(item.projections?.values.title)
+        if (title._tag === 'Success') fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.success, updatedAt: item.updatedAt })
       }
       return sessionIds.map(id => fromList.get(id) ?? { sessionId: id, title: undefined, updatedAt: undefined })
     },
@@ -213,7 +199,6 @@ const hostServices = (ctx: Context): MemoryServices => {
       return { header: log.session, inheritedEventCount: log.inheritedEventCount, events: log.events }
     },
     summarize: async request => {
-      const llm = ctx.get('llm')
       if (!llm) throw new Error('the DSH llm service is unavailable')
       const state = await routes.resolve(request.conversationId)
       if (state.kind !== 'ready') throw new Error(state.kind === 'unavailable' ? state.reason : 'no route resolved')
@@ -271,7 +256,7 @@ const hostServices = (ctx: Context): MemoryServices => {
     jevCredential: async () =>
       SecretReferenceResolver.resolveWithLabel({
         referenceText: currentSettings().jevSecret,
-        values: ctx.get('secretCatalogValues'),
+        values: secretCatalogValues,
         environmentValue: process.env[TYPESAFE_ENV_KEY],
         environmentVariableName: TYPESAFE_ENV_KEY,
       }),
@@ -491,23 +476,8 @@ const panelThread = (thread: StoredThread): PanelThread => ({
   citations: thread.uses,
 })
 
-const noteType = z.enum(['user', 'feedback', 'project', 'reference'])
 /** The panel sends every filter field; an empty string means "any". */
-const anyWhenEmpty = (max: number) =>
-  z
-    .string()
-    .max(max)
-    .transform(value => (value.trim() === '' ? undefined : value))
-const notesFilter = z.object({
-  project: anyWhenEmpty(4_096),
-  scope: anyWhenEmpty(256),
-  type: z.union([noteType, z.literal('').transform(() => undefined)]),
-  query: anyWhenEmpty(256),
-  thread: anyWhenEmpty(200),
-  includeInvalid: z.boolean(),
-})
-const noteId = z.number().int().positive()
-const reason = z.string().trim().max(500).optional()
+const emptyToUndefined = (value: string): string | undefined => (value.trim() === '' ? undefined : value)
 
 /** The calling thread for memory's agent tools; a Client or plugin caller searches as no particular thread. */
 const callerOf = (caller: ApiCaller): Caller => {
@@ -541,11 +511,25 @@ const instant = (value: string | undefined, endOfDay: boolean): number | undefin
   return dateOnly && endOfDay ? parsed + dayMs - 1 : parsed
 }
 
-const workspaceScriptsHost = workspaceScriptsApi.host({
-  scripts: async ({ input }) => workspaceScriptsFor(input.cwd),
-})
+class MemoryOperationError extends Schema.TaggedError<MemoryOperationError>()('MemoryOperationError', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
 
-const panelApi = memoryApi.host({
+const memoryOperationError = (operation: string, error: unknown) =>
+  error instanceof PluginApiError ? error : new MemoryOperationError({ operation, message: error instanceof Error ? error.message : String(error) })
+
+const liftHandler = <Input, Output>(operation: string, handler: (context: ApiHandlerContext<Input>) => Output | Promise<Output>) =>
+  Effect.fn(`memory ${operation}`)((context: ApiHandlerContext<Input>) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(handler(context)),
+      catch: error => memoryOperationError(operation, error),
+    }),
+  )
+
+const workspaceScriptsHandler: Parameters<typeof workspaceScriptsApi.host>[0]['scripts'] = async ({ input }) => workspaceScriptsFor(input.cwd)
+
+const panelHandlers: Parameters<typeof memoryApi.host>[0] = {
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
   findThreads: ({ input, caller, signal }) =>
     withMemory(active =>
@@ -595,15 +579,14 @@ const panelApi = memoryApi.host({
   },
   notes: async ({ input }) => {
     await projectNormalization
-    const filter = notesFilter.parse(input)
     const notes = requireStore()
       .listNotes({
-        project: filter.project,
-        scope: filter.scope,
-        category: filter.type,
-        query: filter.query,
-        thread: filter.thread,
-        includeInvalid: filter.includeInvalid,
+        project: emptyToUndefined(input.project),
+        scope: emptyToUndefined(input.scope),
+        category: input.type === '' ? undefined : input.type,
+        query: emptyToUndefined(input.query),
+        thread: emptyToUndefined(input.thread),
+        includeInvalid: input.includeInvalid,
         limit: 500,
       })
       .map(panelNote)
@@ -611,15 +594,14 @@ const panelApi = memoryApi.host({
   },
   panelNotes: async ({ input }) => {
     await projectNormalization
-    const filter = notesFilter.parse(input)
     return requireStore()
       .listNotes({
-        project: filter.project,
-        scope: filter.scope,
-        category: filter.type,
-        query: filter.query,
-        thread: filter.thread,
-        includeInvalid: filter.includeInvalid,
+        project: emptyToUndefined(input.project),
+        scope: emptyToUndefined(input.scope),
+        category: input.type === '' ? undefined : input.type,
+        query: emptyToUndefined(input.query),
+        thread: emptyToUndefined(input.thread),
+        includeInvalid: input.includeInvalid,
         includeArchived: true,
         limit: 500,
       })
@@ -628,33 +610,23 @@ const panelApi = memoryApi.host({
   reviewNotes: ({ input, caller }) =>
     withMemory(active =>
       active.reviewNotes(callerOf(caller), {
-        project: anyWhenEmpty(4_096).parse(input.project),
+        project: emptyToUndefined(input.project),
         afterId: input.afterId,
         limit: input.limit,
       }),
     ),
   noteCounts: async ({ input }) => {
     await projectNormalization
-    return requireStore().noteStatusCounts(anyWhenEmpty(4_096).parse(input.project))
+    return requireStore().noteStatusCounts(emptyToUndefined(input.project))
   },
   createNote: async ({ input }) => {
     await projectNormalization
-    const parsed = z
-      .object({
-        project: z.string().min(1).max(4_096),
-        text: z.string().trim().min(1).max(2_000),
-        type: noteType,
-        scope: z.string().trim().min(1).max(256),
-        confidence: z.enum(['stated', 'inferred']),
-      })
-      .strict()
-      .parse(input)
     const saved = requireStore().addNote({
-      project: parsed.project,
-      text: parsed.text,
-      category: parsed.type,
-      scope: parsed.scope,
-      confidence: parsed.confidence,
+      project: input.project,
+      text: input.text,
+      category: input.type,
+      scope: input.scope,
+      confidence: input.confidence,
       sourceThread: null,
       sourceSeq: null,
       origin: 'panel',
@@ -668,26 +640,23 @@ const panelApi = memoryApi.host({
   },
   noteHistory: ({ input }) => [
     ...requireStore()
-      .noteHistory(noteId.parse(input.id))
+      .noteHistory(input.id)
       .filter(note => note.archivedAt === null)
       .map(panelNote),
   ],
-  panelNoteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
+  panelNoteHistory: ({ input }) => [...requireStore().noteHistory(input.id).map(panelNote)],
   editNote: ({ input }) => {
-    const parsed = z
-      .object({ id: noteId, text: z.string().trim().min(1).max(2_000), type: noteType.optional(), scope: z.string().trim().min(1).max(256).optional(), reason })
-      .parse(input)
     const updated = requireStore().updateNote({
-      id: parsed.id,
-      text: parsed.text,
-      category: parsed.type,
-      scope: parsed.scope,
-      reason: parsed.reason || 'edited in the Memory panel',
+      id: input.id,
+      text: input.text,
+      category: input.type,
+      scope: input.scope,
+      reason: input.reason || 'edited in the Memory panel',
       sourceThread: null,
       sourceSeq: null,
       origin: 'panel',
     })
-    if (!updated) throw new Error(`Note n:${parsed.id} is no longer valid; refresh the list.`)
+    if (!updated) throw new Error(`Note n:${input.id} is no longer valid; refresh the list.`)
     const record = requireStore()
       .noteHistory(updated.id)
       .find(note => note.id === updated.id)
@@ -695,11 +664,10 @@ const panelApi = memoryApi.host({
     return panelNote(record)
   },
   forgetNote: ({ input }) => {
-    const parsed = z.object({ id: noteId, reason }).parse(input)
-    return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
+    return { forgotten: requireStore().forgetNote({ id: input.id, reason: input.reason || 'removed in the Memory panel' }) }
   },
-  archiveNote: ({ input }) => ({ archived: requireStore().archiveNote(noteId.parse(input.id)) }),
-  restoreNote: ({ input }) => ({ restored: requireStore().restoreNote(noteId.parse(input.id)) }),
+  archiveNote: ({ input }) => ({ archived: requireStore().archiveNote(input.id) }),
+  restoreNote: ({ input }) => ({ restored: requireStore().restoreNote(input.id) }),
   citations: ({ input }) => [
     ...requireStore().recentCitations({
       limit: 100,
@@ -707,13 +675,10 @@ const panelApi = memoryApi.host({
       ref: input.ref === undefined || input.ref.length === 0 ? undefined : input.ref,
     }),
   ],
-  rateCitation: ({ input }) => {
-    const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
-    return { rated: requireStore().rateCitation(parsed) }
-  },
+  rateCitation: ({ input }) => ({ rated: requireStore().rateCitation({ id: input.id, rating: input.rating }) }),
   threads: async ({ input }) => {
     await projectNormalization
-    const project = anyWhenEmpty(4_096).parse(input.project)
+    const project = emptyToUndefined(input.project)
     const stored = requireStore().listThreads({ project, limit: 500 }).map(panelThread)
     if (input.includeUndigested !== true) return [...stored]
     const digested = new Set(stored.map(thread => thread.id))
@@ -740,7 +705,7 @@ const panelApi = memoryApi.host({
   },
   threadDetail: ({ input }) => withMemory(active => active.threadDetail(input.id)),
   redigest: ({ input }) => withRuntime(active => active.digest(input.id)).then(result => ({ outcome: result.summary })),
-})
+}
 
 const normalizeProjectPaths = async (opened: MemoryStore) => {
   const mappings: { from: string; to: string }[] = []
@@ -759,7 +724,7 @@ const normalizeProjectPaths = async (opened: MemoryStore) => {
   }
 }
 
-const setup = (ctx: Context): void => {
+const setup = (ctx: Context, services: MemoryServices): void => {
   const logger = ctx.logger('memory')
   let opened: MemoryStore
   try {
@@ -785,7 +750,7 @@ const setup = (ctx: Context): void => {
     })
     .catch(() => logger.warn('memory: JJ workspace memory backfill failed; remaining entries stay separate'))
   projectNormalization = normalization
-  const active = createMemoryRuntime({ services: hostServices(ctx), store: opened, settings: currentSettings, logger })
+  const active = createMemoryRuntime({ services, store: opened, settings: currentSettings, logger })
   runtime = active
 
   ctx.on('session/event', (session, event) => active.onSessionEvent(session, event))
@@ -798,7 +763,7 @@ const setup = (ctx: Context): void => {
     if (!agent) return assembled
     try {
       const text = await active.startBlock(agent, async () => {
-        const log = await ctx.get('sessionQuery')?.readSession(agent.session.id)
+        const log = await services.readSession(agent.session.id)
         const first = log?.events.find(event => event.type === 'user/message' && event.data.source.kind === 'user')
         return first?.type === 'user/message' ? textOf(first.data.content) : undefined
       })
@@ -815,43 +780,102 @@ const setup = (ctx: Context): void => {
       return assembled
     }
   })
-
-  ctx.effect(() => {
-    const maintain = (): void => {
-      try {
-        const pruned = opened.prune(currentSettings().retentionDays)
-        if (pruned.threads + pruned.messages > 0)
-          logger.info('memory: retention dropped %d digest(s) and %d indexed message(s)', pruned.threads, pruned.messages)
-      } catch (error) {
-        logger.warn('memory: retention pass failed: %s', error instanceof Error ? error.message : String(error))
-      }
-    }
-    // Catch-up waits for boot to settle, then digests a bounded batch of sessions never seen before.
-    const catchUp = setTimeout(() => {
-      maintain()
-      void active
-        .catchUp(25)
-        .then(count => count > 0 && logger.info('memory: caught up %d earlier session(s)', count))
-        .catch((error: unknown) => logger.warn('memory: catch-up failed: %s', error instanceof Error ? error.message : String(error)))
-    }, 30_000)
-    const daily = setInterval(maintain, dayMs)
-    return () => {
-      clearTimeout(catchUp)
-      clearInterval(daily)
-      active.stop()
-      if (runtime === active) runtime = undefined
-      if (store === opened) store = undefined
-      if (projectNormalization === normalization) projectNormalization = Promise.resolve()
-      void normalization
-        .finally(() => opened.close())
-        .catch((error: unknown) => logger.warn('memory: closing the store failed: %s', error instanceof Error ? error.message : String(error)))
-    }
-  }, 'memory runtime')
 }
 
+class MemoryHostServices extends EffectContext.Service<MemoryHostServices, MemoryServices>()('dshfiles/memory/MemoryHostServices') {}
+
+const { hostApi, ...effectPlugin } = DshxEffect.plugin({
+  layer: (ctx: Context) => Layer.succeed(MemoryHostServices, hostServices(ctx)),
+  setup: Effect.fn('memory setup')(function* (ctx: Context) {
+    const services = yield* MemoryHostServices
+    yield* Effect.sync(() => setup(ctx, services))
+    const initialized = (() => {
+      if (runtime === undefined || store === undefined) return null
+      return Object.freeze({ runtime, store, projectNormalization })
+    })()
+    if (initialized === null) return
+    const logger = ctx.logger('memory')
+    const maintain = Effect.try({
+      try: () => {
+        const pruned = initialized.store.prune(currentSettings().retentionDays)
+        if (pruned.threads + pruned.messages > 0)
+          logger.info('memory: retention dropped %d digest(s) and %d indexed message(s)', pruned.threads, pruned.messages)
+      },
+      catch: error => memoryOperationError('retention pass', error),
+    }).pipe(Effect.catchTag('MemoryOperationError', error => Effect.sync(() => logger.warn('memory: %s failed: %s', error.operation, error.message))))
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(async () => {
+        initialized.runtime?.stop()
+        if (runtime === initialized.runtime) runtime = undefined
+        if (store === initialized.store) store = undefined
+        if (projectNormalization === initialized.projectNormalization) projectNormalization = Promise.resolve()
+        await initialized.projectNormalization
+          .finally(() => initialized.store?.close())
+          .catch(error => {
+            logger.warn('memory: closing the store failed: %s', error instanceof Error ? error.message : String(error))
+          })
+      }),
+    )
+    yield* Effect.forkScoped(
+      Effect.sleep(Duration.seconds(30)).pipe(
+        Effect.andThen(maintain),
+        Effect.andThen(
+          Effect.tryPromise({
+            try: () => initialized.runtime?.catchUp(25) ?? Promise.resolve(0),
+            catch: error => memoryOperationError('catch-up', error),
+          }).pipe(
+            Effect.catchTag('MemoryOperationError', error =>
+              Effect.sync(() => logger.warn('memory: %s failed: %s', error.operation, error.message)).pipe(Effect.as(0)),
+            ),
+            Effect.tap(count =>
+              Effect.sync(() => {
+                if (count > 0) logger.info('memory: caught up %d earlier session(s)', count)
+              }),
+            ),
+          ),
+        ),
+      ),
+    )
+    yield* Effect.forkScoped(Effect.repeat(Effect.sleep(Duration.millis(dayMs)).pipe(Effect.andThen(maintain)), Schedule.forever))
+  }),
+})
+
+const workspaceScriptsHost = hostApi(workspaceScriptsApi, {
+  scripts: liftHandler('workspace scripts', workspaceScriptsHandler),
+})
+
+const panelApi = hostApi(memoryApi, {
+  search: liftHandler('search', panelHandlers.search),
+  findThreads: liftHandler('find threads', panelHandlers.findThreads),
+  relatedThreads: liftHandler('related threads', panelHandlers.relatedThreads),
+  read: liftHandler('read', panelHandlers.read),
+  preview: liftHandler('preview', panelHandlers.preview),
+  note: liftHandler('note', panelHandlers.note),
+  usage: liftHandler('usage', panelHandlers.usage),
+  usageSummary: liftHandler('usage summary', panelHandlers.usageSummary),
+  projects: liftHandler('projects', panelHandlers.projects),
+  startBlock: liftHandler('start block', panelHandlers.startBlock),
+  notes: liftHandler('notes', panelHandlers.notes),
+  panelNotes: liftHandler('panel notes', panelHandlers.panelNotes),
+  reviewNotes: liftHandler('review notes', panelHandlers.reviewNotes),
+  noteCounts: liftHandler('note counts', panelHandlers.noteCounts),
+  createNote: liftHandler('create note', panelHandlers.createNote),
+  noteHistory: liftHandler('note history', panelHandlers.noteHistory),
+  panelNoteHistory: liftHandler('panel note history', panelHandlers.panelNoteHistory),
+  editNote: liftHandler('edit note', panelHandlers.editNote),
+  forgetNote: liftHandler('forget note', panelHandlers.forgetNote),
+  archiveNote: liftHandler('archive note', panelHandlers.archiveNote),
+  restoreNote: liftHandler('restore note', panelHandlers.restoreNote),
+  citations: liftHandler('citations', panelHandlers.citations),
+  rateCitation: liftHandler('rate citation', panelHandlers.rateCitation),
+  threads: liftHandler('threads', panelHandlers.threads),
+  threadDetail: liftHandler('thread detail', panelHandlers.threadDetail),
+  redigest: liftHandler('redigest', panelHandlers.redigest),
+})
+
 export default defineHost({
+  ...effectPlugin,
   name: '@dshfiles/memory',
   settings: [ownedSettings],
   apis: [panelApi, workspaceScriptsHost],
-  setup,
 })

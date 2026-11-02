@@ -19,7 +19,11 @@ const VIRTUAL_HOST_NATIVE_RPC_PUBLIC = '\0virtual:dshx-host-native-rpc-public'
 const VIRTUAL_HOST_SESSION_DIGEST_PUBLIC = '\0virtual:dshx-host-session-digest-public'
 const VIRTUAL_HOST_TRACING_PUBLIC = '\0virtual:dshx-host-tracing-public'
 const VIRTUAL_HOST_JSON_PUBLIC = '\0virtual:dshx-host-json-public'
+const VIRTUAL_HOST_EFFECT_PUBLIC = '\0virtual:dshx-host-effect-public'
+const VIRTUAL_HOST_EFFECT_SERVICES_PUBLIC = '\0virtual:dshx-host-effect-services-public'
 const DSHX_HOST_PUBLIC = '@dshfiles/dshx/host'
+const DSHX_EFFECT_PUBLIC = '@dshfiles/dshx/effect'
+const DSHX_EFFECT_SERVICES_PUBLIC = '@dshfiles/dshx/effect/services'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
 const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
 const DSHX_COMMUNICATION_PUBLIC = '@dshfiles/dshx/communication'
@@ -36,6 +40,7 @@ const HOST_WEB_STARTUP_PATH = fileURLToPath(new URL('../../host/web-startup.js',
 const HOST_OUTSIDE_RELOAD_PATH = fileURLToPath(new URL('../../host/outside-reload.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
+const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
@@ -50,6 +55,8 @@ const NATIVE_RPC_SCHEMA_PATH = fileURLToPath(new URL('../../platform/native-rpc.
 const SESSION_DIGEST_PATH = fileURLToPath(new URL('../../platform/session-digest.js', import.meta.url))
 const TRACING_PATH = fileURLToPath(new URL('../../tracing/index.js', import.meta.url))
 const JSON_PATH = fileURLToPath(new URL('../../json.js', import.meta.url))
+const EFFECT_PATH = fileURLToPath(new URL('../../effect/index.js', import.meta.url))
+const EFFECT_SERVICES_PATH = fileURLToPath(new URL('../../effect/services.js', import.meta.url))
 const HOST_GENERATION_PATH = fileURLToPath(new URL('../../host/generation.js', import.meta.url))
 
 /** Opt-in in-process Host replacement: publish immutable generations behind a stable wrapper. */
@@ -70,6 +77,8 @@ export interface BuildHostOptions {
   readonly vite?: ViteExtensionOptions
   readonly compatibility?: DshCompatibility
   readonly generation?: HostGenerationBuild
+  readonly schemaSnapshot?: boolean
+  readonly schemaSnapshotAliases?: readonly { readonly find: string; readonly replacement: string }[]
 }
 
 export type HostBuildResult = BuildReport
@@ -77,6 +86,8 @@ export type HostBuildResult = BuildReport
 /** Public dshx entry points a Host bundle may import, each inlined through its own virtual module. */
 const VIRTUAL_DSHX_PUBLIC_MODULES: ReadonlyMap<string, string> = new Map([
   [DSHX_HOST_PUBLIC, VIRTUAL_HOST_PUBLIC],
+  [DSHX_EFFECT_PUBLIC, VIRTUAL_HOST_EFFECT_PUBLIC],
+  [DSHX_EFFECT_SERVICES_PUBLIC, VIRTUAL_HOST_EFFECT_SERVICES_PUBLIC],
   [DSHX_API_PUBLIC, `${VIRTUAL_HOST_PUBLIC}-api`],
   [DSHX_SETTINGS_PUBLIC, `${VIRTUAL_HOST_PUBLIC}-settings`],
   [DSHX_COMMUNICATION_PUBLIC, VIRTUAL_HOST_COMMUNICATION_PUBLIC],
@@ -135,11 +146,14 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const publishApiEvent = HostApiEventsModel.publish',
           `import { PluginStorageModel } from ${JSON.stringify(HOST_PLUGIN_STORAGE_PATH)}`,
           'export const pluginStorage = PluginStorageModel.open',
+          'export const toStorageSchema = PluginStorageModel.toStorageSchema',
           // A named function export, not a static class member, so a Host that never calls it drops its dsh-llm import.
           `export { generate } from ${JSON.stringify(HOST_GENERATE_PATH)}`,
           '',
         ].join('\n')
       }
+      if (id === VIRTUAL_HOST_EFFECT_PUBLIC) return `export * from ${JSON.stringify(EFFECT_PATH)}\n`
+      if (id === VIRTUAL_HOST_EFFECT_SERVICES_PUBLIC) return `export * from ${JSON.stringify(EFFECT_SERVICES_PATH)}\n`
       if (id === `${VIRTUAL_HOST_PUBLIC}-api`) {
         return [
           `import { ApiDefinitionModel } from ${JSON.stringify(API_DEFINE_PATH)}`,
@@ -149,6 +163,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const method = ApiDefinitionModel.method',
           'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
+          `export { zodSchemaFromEffect } from ${JSON.stringify(API_ZOD_VIEW_PATH)}`,
           '',
         ].join('\n')
       }
@@ -156,7 +171,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
-          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
+          `export { settingsSearchEntriesSchema, settingsSearchEntryFields, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }
@@ -196,12 +211,21 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         `import * as source from ${JSON.stringify(paths.entry)}`,
         `import { createHostModule } from ${JSON.stringify(HOST_RUNTIME_PATH)}`,
         ...(rootUrl === undefined ? [] : [`import { fileURLToPath as dshxFileURLToPath } from 'node:url'`]),
+        ...(options.schemaSnapshot ? [`import { ApiDefinitionModel as dshxApiDefinitionModel } from ${JSON.stringify(API_DEFINE_PATH)}`] : []),
         `const pluginMetadata = ${metadataExpression}`,
         'const plugin = createHostModule(source, pluginMetadata)',
       ]
       if (options.generation !== undefined) {
         return [
           ...createModule,
+          ...(options.schemaSnapshot
+            ? [
+                'const dshxSchemaSource = source.default',
+                'export const __dshxDefinition = dshxSchemaSource',
+                'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
+                'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
+              ]
+            : []),
           `import { createHostGenerationPlugin } from ${JSON.stringify(HOST_GENERATION_PATH)}`,
           'export const implementation = plugin',
           'export const createGenerationManager = options => createHostGenerationPlugin({ ...options, metadata: pluginMetadata, implementation: plugin })',
@@ -214,6 +238,14 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       return [
         ...createModule,
+        ...(options.schemaSnapshot
+          ? [
+              'const dshxSchemaSource = source.default',
+              'export const __dshxDefinition = dshxSchemaSource',
+              'export const __dshxApiBindingCounts = Array.isArray(dshxSchemaSource?.apis) ? dshxSchemaSource.apis.map(registration => { const { contract } = dshxApiDefinitionModel.hostRegistrationParts(registration); const methods = Object.values(contract.methods); return { contractId: contract.id, methodCount: methods.length, toolMethodCount: methods.filter(method => method.tool !== undefined).length, toolNames: methods.filter(method => method.tool !== undefined).map(method => method.tool.name) } }) : []',
+              'export const __dshxSchemaPlugin = typeof dshxSchemaSource === "object" && dshxSchemaSource !== null && (Array.isArray(dshxSchemaSource.tools) || Array.isArray(dshxSchemaSource.apis)) ? createHostModule({ default: { ...(dshxSchemaSource.name === undefined ? {} : { name: dshxSchemaSource.name }), ...(dshxSchemaSource.inject === undefined ? {} : { inject: dshxSchemaSource.inject }), ...(dshxSchemaSource.tools === undefined ? {} : { tools: dshxSchemaSource.tools }), ...(dshxSchemaSource.apis === undefined ? {} : { apis: dshxSchemaSource.apis }) } }, pluginMetadata) : undefined',
+            ]
+          : []),
         'export const name = plugin.name',
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
@@ -325,7 +357,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     exports: 'named',
   } as const
   const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
-  return {
+  const config: InlineConfig = {
     root: paths.root,
     configFile: false,
     publicDir: false,
@@ -381,6 +413,8 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       },
     },
   }
+  if (options.schemaSnapshotAliases !== undefined) config.resolve = { alias: [...options.schemaSnapshotAliases] }
+  return config
 }
 
 /** Start a Host watcher without awaiting a successful initial build. */

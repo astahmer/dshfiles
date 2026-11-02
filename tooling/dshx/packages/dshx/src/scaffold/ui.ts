@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module'
+import * as Schema from 'effect/Schema'
 import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
-import { z } from 'zod'
 import { SourceSyntax } from '../project/syntax.js'
 import { jsonObjectSchema } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -141,12 +142,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-const slotMetadataSchema = z.object({ catalog: z.object({}).catchall(z.unknown()) })
-const registrationMetadataSchema = z.object({ replaceRisk: z.string(), registration: z.array(z.unknown()) })
-const registrationFieldSchema = z.object({
-  name: z.string().refine(value => value.trim() !== ''),
-  required: z.boolean(),
-  type: z.string().optional(),
+const slotMetadataSchema = Schema.Struct({ catalog: withUnknownProperties({}) })
+const registrationMetadataSchema = Schema.Struct({ replaceRisk: Schema.String, registration: Schema.Array(Schema.Unknown) })
+const registrationFieldSchema = Schema.Struct({
+  name: Schema.String.check(Schema.makeFilter(value => value.trim() !== '')),
+  required: Schema.Boolean,
+  type: Schema.optional(Schema.String),
 })
 
 function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions): SlotContractResult {
@@ -170,8 +171,8 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
       ),
     }
   }
-  const metadata = slotMetadataSchema.safeParse(slot.metadata)
-  if (!metadata.success) {
+  const metadata = Schema.decodeUnknownResult(slotMetadataSchema)(slot.metadata)
+  if (metadata._tag === 'Failure') {
     return {
       diagnostic: diagnostic(
         'DSHX6111',
@@ -181,8 +182,8 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
       ),
     }
   }
-  const catalog = registrationMetadataSchema.safeParse(metadata.data.catalog)
-  if (!catalog.success) {
+  const catalog = Schema.decodeUnknownResult(registrationMetadataSchema)(metadata.success.catalog)
+  if (catalog._tag === 'Failure') {
     return {
       diagnostic: diagnostic(
         'DSHX6111',
@@ -193,9 +194,9 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
     }
   }
   const registration: string[] = []
-  for (const raw of catalog.data.registration) {
-    const field = registrationFieldSchema.safeParse(raw)
-    if (!field.success) {
+  for (const raw of catalog.success.registration) {
+    const field = Schema.decodeUnknownResult(registrationFieldSchema)(raw)
+    if (field._tag === 'Failure') {
       return {
         diagnostic: diagnostic(
           'DSHX6111',
@@ -205,7 +206,7 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
         ),
       }
     }
-    const entry = field.data
+    const entry = field.success
     registration.push(entry.name)
     if (entry.required && !['id', 'order'].includes(entry.name)) {
       return {
@@ -700,7 +701,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   const postProject: ResolvedDshxConfig = {
     ...project,
     ...(clientBefore === undefined && { clientEntry: clientFile }),
-    manifest: jsonObjectSchema.parse(manifest),
+    manifest: Schema.decodeUnknownSync(jsonObjectSchema)(manifest),
   }
   const compatibility = dependencies.compatibility ?? inspect.dsh?.compatibility ?? DEFAULT_COMPATIBILITY
   let postDiagnostics: readonly DshxDiagnostic[]

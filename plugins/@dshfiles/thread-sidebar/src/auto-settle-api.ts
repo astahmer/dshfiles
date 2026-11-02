@@ -1,64 +1,65 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const sessionIdSchema = z.string().min(1).max(256)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 
-const settleReasonSchema = z.string().min(1).max(200)
+const settleReasonSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))
 
-const settleSourceSchema = z.string().min(1).max(120)
+const settleSourceSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(120))
 
-const settleEntrySchema = z
-  .object({
+const settleEntrySchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     sessionId: sessionIdSchema,
     reason: settleReasonSchema,
     source: settleSourceSchema,
-    at: z.number(),
-  })
-  .strict()
+    at: Schema.Number.check(Schema.isFinite()),
+  }),
+)
 
-const scanSchema = z
-  .object({
-    at: z.number(),
-    durationMs: z.number(),
-    idleSettled: z.number().int().nonnegative(),
-    rebasedSettled: z.number().int().nonnegative(),
-    error: z.string().max(500).optional(),
-  })
-  .strict()
+const scanSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    at: Schema.Number.check(Schema.isFinite()),
+    durationMs: Schema.Number.check(Schema.isFinite()),
+    idleSettled: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    rebasedSettled: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    error: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
+  }),
+)
 
-const skipSchema = z.enum(['unknown', 'running', 'running-descendant', 'pending-question', 'blank', 'archived', 'pinned', 'opted-out'])
+const skipSchema = Schema.Literals(['unknown', 'running', 'running-descendant', 'pending-question', 'blank', 'archived', 'pinned', 'opted-out'])
 
-export const autoSettleStatusSchema = z
-  .object({
+export const autoSettleStatusSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
     /** The Host scans on its own; a browser with this answer runs no scan of its own. */
-    hostScan: z.literal(true),
+    hostScan: Schema.Literal(true),
     /** Whether idle or rebased auto-settle is switched on in the sidebar settings. */
-    active: z.boolean(),
-    intervalMinutes: z.number().int().positive(),
-    nextScanAt: z.number().nullable(),
-    lastScan: scanSchema.nullable(),
+    active: Schema.Boolean,
+    intervalMinutes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+    nextScanAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+    lastScan: Schema.NullOr(scanSchema),
     /** The newest automatic settles, newest first, with the trigger that asked for each. */
-    recent: z.array(settleEntrySchema).max(50),
-  })
-  .strict()
+    recent: Schema.Array(settleEntrySchema).check(Schema.isMaxLength(50)),
+  }),
+)
 
-export type AutoSettleStatus = z.infer<typeof autoSettleStatusSchema>
+export type AutoSettleStatus = Schema.Schema.Type<typeof autoSettleStatusSchema>
 
-export const settleRequestResultSchema = z
-  .object({
-    results: z.array(
-      z
-        .object({
+export const settleRequestResultSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    results: Schema.Array(
+      SchemaHelpers.strictStruct(
+        Schema.Struct({
           sessionId: sessionIdSchema,
-          outcome: z.enum(['settled', 'already-settled', 'skipped']),
-          skipReason: skipSchema.optional(),
-        })
-        .strict(),
+          outcome: Schema.Literals(['settled', 'already-settled', 'skipped']),
+          skipReason: Schema.optional(skipSchema),
+        }),
+      ),
     ),
-  })
-  .strict()
+  }),
+)
 
-export type SettleRequestResult = z.infer<typeof settleRequestResultSchema>
+export type SettleRequestResult = Schema.Schema.Type<typeof settleRequestResultSchema>
 
 const renderStatus = (status: AutoSettleStatus): string => {
   const lines = [
@@ -88,22 +89,22 @@ export const threadSidebarAutoSettleApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     status: method({
-      input: z.object({}).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({})),
       output: autoSettleStatusSchema,
       description:
         'Read the Host auto-settle state: whether idle or rebased auto-settle is on, the scan interval, the last and next scan, and the newest automatic settles with the trigger and reason behind each. Read-only.',
       tool: { name: 'thread_auto_settle_status', readOnly: true, render: renderStatus },
     }),
     requestSettle: method({
-      input: z
-        .object({
-          sessionIds: z.array(sessionIdSchema).min(1).max(100),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionIds: Schema.Array(sessionIdSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(100)),
           /** Why the thread should settle, shown with the automatic settle ("pull request #12 merged"). */
           reason: settleReasonSchema,
           /** The package or trigger asking, e.g. "@dshfiles/pull-requests". */
           source: settleSourceSchema,
-        })
-        .strict(),
+        }),
+      ),
       output: settleRequestResultSchema,
       description:
         'Ask the thread sidebar to settle threads for an automatic trigger. Running, waiting, blank, archived, pinned and opted-out threads (and ones with a running subagent) are skipped and reported, never settled.',

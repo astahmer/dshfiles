@@ -21,7 +21,7 @@ export type RemoteSidebarThread = {
   readonly workspaceTitle: string | undefined
 }
 
-export const filterRemoteSidebarThreads = (input: {
+const filterRemoteSidebarThreads = (input: {
   readonly threads: readonly RemoteSidebarThread[]
   readonly filters: ThreadStatusFilters
   readonly sourceFilter: ThreadSourceFilter
@@ -55,7 +55,7 @@ const folderName = (path: string | undefined): string | undefined => path?.split
 const validTimestamp = (timestamp: number): number => (Number.isFinite(timestamp) ? timestamp : 0)
 const createdTimestamp = (createdAt: string): number => validTimestamp(Date.parse(createdAt))
 
-export const runtimesWithStartedThreads = <Runtime extends { readonly id: string }>(
+const runtimesWithStartedThreads = <Runtime extends { readonly id: string }>(
   runtimes: readonly Runtime[],
   threads: readonly Pick<RemoteThreadSummary, 'runtimeId'>[],
 ): readonly Runtime[] => {
@@ -64,7 +64,7 @@ export const runtimesWithStartedThreads = <Runtime extends { readonly id: string
 }
 
 /** Project started-here remote threads, enriching their rows with live runtime details when available. */
-export const buildRemoteSidebarThreads = (input: {
+const buildRemoteSidebarThreads = (input: {
   readonly startedHere: readonly RemoteThreadSummary[]
   readonly statuses: readonly RemoteRuntimeStatusEntry[]
 }): readonly RemoteSidebarThread[] => {
@@ -123,6 +123,12 @@ export const buildRemoteSidebarThreads = (input: {
 }
 
 /** Remote threads started here join the current view unless the user explicitly separates them. */
+export class RemoteThreadInventoryModel {
+  static readonly filter = filterRemoteSidebarThreads
+  static readonly build = buildRemoteSidebarThreads
+  static readonly runtimesWithStartedThreads = runtimesWithStartedThreads
+}
+
 export const useRemoteSidebarThreads = (enabled: boolean): readonly RemoteSidebarThread[] => {
   const api = useApi(multiHostApi)
   const startedHere = useQuery({

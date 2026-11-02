@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 export interface ChatReference {
   readonly value: string
@@ -77,31 +77,40 @@ export const chatReferencePreviewDismissEvent = 'dshfiles:jujutsu-reference-prev
 export const chatReferenceTitleRequestEvent = 'dshfiles:jujutsu-reference-title-request'
 export const chatReferenceTitleResolvedEvent = 'dshfiles:jujutsu-reference-title-resolved'
 
-const sessionIdSchema = z.string().min(1).max(256)
-const referenceIdentitySchema = z.object({ value: z.string().min(1).max(255), kind: z.enum(['revision', 'bookmark']) })
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+const referenceIdentitySchema = Schema.Struct({
+  value: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  kind: Schema.Literals(['revision', 'bookmark']),
+})
 
-export const chatReferencePreviewRequestSchema = z.object({
+export const chatReferencePreviewRequestSchema = Schema.Struct({
   sessionId: sessionIdSchema,
   /** The Session repository the reference is read in; the Host resolves its repoId from this path. */
-  cwd: z.string().min(1).max(2048),
+  cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
   reference: referenceIdentitySchema,
-  anchor: z.object({ left: z.number(), top: z.number(), width: z.number(), height: z.number() }),
+  anchor: Schema.Struct({
+    left: Schema.Number.check(Schema.isFinite()),
+    top: Schema.Number.check(Schema.isFinite()),
+    width: Schema.Number.check(Schema.isFinite()),
+    height: Schema.Number.check(Schema.isFinite()),
+  }),
 })
 
-export const chatReferenceTitleRequestSchema = z.object({
+export const chatReferenceTitleRequestSchema = Schema.Struct({
   sessionId: sessionIdSchema,
-  cwd: z.string().min(1).max(2048),
+  cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
   reference: referenceIdentitySchema,
 })
 
-export const chatReferenceTitleResolvedSchema = chatReferenceTitleRequestSchema.extend({
-  title: z.string().min(1).max(255),
-  targetPath: z.string().min(1).max(2048).nullable().optional(),
+export const chatReferenceTitleResolvedSchema = Schema.Struct({
+  ...chatReferenceTitleRequestSchema.fields,
+  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  targetPath: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)))),
 })
 
-export type ChatReferencePreviewRequest = z.infer<typeof chatReferencePreviewRequestSchema>
-export type ChatReferenceTitleRequest = z.infer<typeof chatReferenceTitleRequestSchema>
-export type ChatReferenceTitleResolved = z.infer<typeof chatReferenceTitleResolvedSchema>
+export type ChatReferencePreviewRequest = Schema.Schema.Type<typeof chatReferencePreviewRequestSchema>
+export type ChatReferenceTitleRequest = Schema.Schema.Type<typeof chatReferenceTitleRequestSchema>
+export type ChatReferenceTitleResolved = Schema.Schema.Type<typeof chatReferenceTitleResolvedSchema>
 
 const CHAT_REFERENCE_TITLE_LIMIT = 52
 

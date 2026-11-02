@@ -1,3 +1,4 @@
+import { MultiHostSchema } from '../schema.js'
 import { runtimeLocatorSchema } from '../records.js'
 import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
 import { createLoopbackForward } from './loopback.js'
@@ -11,7 +12,7 @@ export const connectLocal = ({
   readonly originPort?: number
   readonly signal?: AbortSignal | undefined
 }): Promise<Gateway> => {
-  const locator = runtimeLocatorSchema.parse({ kind: 'local', launchUrl })
+  const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl })
   if (locator.kind !== 'local') throw new GatewayUnavailableError('invalid-runtime-locator', 'The local runtime locator is invalid.')
   return connectGateway({
     launchUrl: locator.launchUrl,

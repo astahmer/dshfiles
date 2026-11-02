@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const threadSidebarSessionArchiveApi = defineApi({
   id: 'thread-sidebar-session-archive',
@@ -7,8 +8,14 @@ export const threadSidebarSessionArchiveApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     status: method({
-      input: z.object({ sessionIds: z.array(z.string().min(1).max(256)).max(10_000) }).strict(),
-      output: z.object({ archivedSessionIds: z.array(z.string().min(1).max(256)).max(10_000) }),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionIds: Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000)),
+        }),
+      ),
+      output: Schema.Struct({
+        archivedSessionIds: Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000)),
+      }),
       description: 'Return archived membership for the requested Session IDs.',
     }),
   },

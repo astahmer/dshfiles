@@ -1,16 +1,18 @@
-import { z } from 'zod'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
 import type { ThreadSidebarModelRoute } from './projection-types.js'
 
-const subagentIdentitySchema = z
-  .object({
-    mode: z.string().optional(),
-    provider: z.string().optional(),
-    agentProvider: z.string().optional(),
-    agentModel: z.string().optional(),
-  })
-  .passthrough()
+const subagentIdentitySchema = Schema.StructWithRest(
+  Schema.Struct({
+    mode: Schema.optional(Schema.String),
+    provider: Schema.optional(Schema.String),
+    agentProvider: Schema.optional(Schema.String),
+    agentModel: Schema.optional(Schema.String),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
-type SubagentIdentity = z.input<typeof subagentIdentitySchema>
+type SubagentIdentity = Schema.Schema.Type<typeof subagentIdentitySchema>
 
 export class SubagentRouteLabelModel {
   private static readonly routePartPattern = /^[a-z\d][a-z\d._:-]{0,95}$/iu
@@ -37,20 +39,20 @@ export class SubagentRouteLabelModel {
   }
 
   static readonly projectedRouteLabel = (value: ThreadSidebarModelRoute | undefined): string | undefined => {
-    const parsed = z.string().max(193).safeParse(value)
-    if (!parsed.success) return undefined
-    const separator = parsed.data.indexOf('/')
-    if (separator <= 0 || separator !== parsed.data.lastIndexOf('/')) return undefined
-    return SubagentRouteLabelModel.providerModelLabel(parsed.data.slice(0, separator), parsed.data.slice(separator + 1))
+    const parsed = Schema.decodeUnknownResult(Schema.String.check(Schema.isMaxLength(193)))(value)
+    if (Result.isFailure(parsed)) return undefined
+    const separator = parsed.success.indexOf('/')
+    if (separator <= 0 || separator !== parsed.success.lastIndexOf('/')) return undefined
+    return SubagentRouteLabelModel.providerModelLabel(parsed.success.slice(0, separator), parsed.success.slice(separator + 1))
   }
 
   static readonly agentIdentityLabel = (identity: SubagentIdentity | null | undefined): string | undefined => {
-    const parsed = subagentIdentitySchema.safeParse(identity)
-    if (!parsed.success) return undefined
-    if (parsed.data.mode === 'one-shot') return SubagentRouteLabelModel.visibleRoutePart(parsed.data.provider)
+    const parsed = Schema.decodeUnknownResult(subagentIdentitySchema)(identity)
+    if (Result.isFailure(parsed)) return undefined
+    if (parsed.success.mode === 'one-shot') return SubagentRouteLabelModel.visibleRoutePart(parsed.success.provider)
     return (
-      SubagentRouteLabelModel.providerModelLabel(parsed.data.agentProvider, parsed.data.agentModel) ??
-      SubagentRouteLabelModel.visibleRoutePart(parsed.data.provider)
+      SubagentRouteLabelModel.providerModelLabel(parsed.success.agentProvider, parsed.success.agentModel) ??
+      SubagentRouteLabelModel.visibleRoutePart(parsed.success.provider)
     )
   }
 

@@ -73,17 +73,17 @@ export const RequestLog = (props: {
   const [notice, setNotice] = useState<string | null>(null)
   const [mountedAt] = useState(() => Date.now())
   const search = useDebouncedValue({ value: props.search.trim(), delayMs: 200 })
-  const query: RequestQuery = {
+  let query: RequestQuery = {
     from: props.range.from,
     to: props.range.to,
     sort: sort.column,
     direction: sort.direction,
     limit: PAGE_SIZE,
   }
-  if (props.purposes !== undefined) query.purposes = [...props.purposes]
-  if (props.sessionId !== undefined) query.sessionId = props.sessionId
-  if (search.length > 0) query.search = search
-  if (status !== 'all') query.status = status
+  if (props.purposes !== undefined) query = { ...query, purposes: [...props.purposes] }
+  if (props.sessionId !== undefined) query = { ...query, sessionId: props.sessionId }
+  if (search.length > 0) query = { ...query, search }
+  if (status !== 'all') query = { ...query, status }
   const page = useQuery({
     queryKey: ['dshfiles-usage', 'requests', query],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.requests(query, { signal: hostSignal }) }),

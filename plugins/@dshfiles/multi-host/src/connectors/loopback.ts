@@ -1,8 +1,11 @@
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { MultiHostSchema } from '../schema.js'
 import { GatewayUnavailableError } from './gateway.js'
 
-const boundAddressSchema = z.object({ port: z.number().int().min(0).max(65_535) })
+const boundAddressSchema = Schema.Struct({
+  port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)),
+})
 
 export type LoopbackEndpoint = {
   readonly address: string
@@ -30,7 +33,7 @@ export const reserveLoopbackEndpoint = async (port = 0): Promise<LoopbackEndpoin
   const probe = createServer()
   try {
     await listen(probe, address, port)
-    const bound = boundAddressSchema.safeParse(probe.address())
+    const bound = MultiHostSchema.safeDecode(boundAddressSchema, probe.address())
     if (!bound.success) throw new Error('No TCP address was allocated.')
     await closeServer(probe)
     return { address, port: bound.data.port, release: () => {} }

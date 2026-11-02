@@ -1,74 +1,71 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { receiptExecutorSchema, receiptRemoteFailureSchema } from './api.js'
 import type { StoredReceipt } from './store.js'
 
-const revisionSchema = z
-  .string()
-  .regex(/^[a-f0-9]{40,64}$/)
-  .nullable()
+const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const revisionSchema = Schema.NullOr(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/u)))
 
-const projectChecksActivitySummarySchema = z
-  .object({
-    receiptId: z.string().uuid(),
-    sessionId: z.string().min(1).max(128),
-    actionId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
-    label: z
-      .string()
-      .min(1)
-      .max(80)
-      .regex(/^[^\p{Cc}]+$/u),
-    status: z.enum(['passed', 'failed', 'cancelled', 'timed-out']),
-    failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']).nullable(),
-    executor: receiptExecutorSchema.optional(),
-    remoteFailure: receiptRemoteFailureSchema.nullable().optional(),
-    startedAt: z.number().int().nonnegative(),
-    finishedAt: z.number().int().nonnegative(),
-    durationMs: z.number().int().nonnegative(),
-    exitCode: z.number().int().nullable(),
-    automatic: z.boolean(),
-    verificationTurn: z.number().int().nonnegative().nullable(),
-    attempt: z.number().int().min(0).max(2),
-    sourceRevisionBefore: revisionSchema,
-    sourceRevisionAfter: revisionSchema,
-  })
-  .strict()
+const projectChecksActivitySummarySchema = Schema.Struct({
+  receiptId: Schema.String.check(Schema.isUUID()),
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  actionId: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/u)),
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80), Schema.isPattern(/^[^\p{Cc}]+$/u)),
+  status: Schema.Literals(['passed', 'failed', 'cancelled', 'timed-out']),
+  failure: Schema.NullOr(
+    Schema.Literals(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']),
+  ),
+  executor: Schema.optionalKey(receiptExecutorSchema),
+  remoteFailure: Schema.optionalKey(Schema.NullOr(receiptRemoteFailureSchema)),
+  startedAt: countInt,
+  finishedAt: countInt,
+  durationMs: countInt,
+  exitCode: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt())),
+  automatic: Schema.Boolean,
+  verificationTurn: Schema.NullOr(countInt),
+  attempt: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(2)),
+  sourceRevisionBefore: revisionSchema,
+  sourceRevisionAfter: revisionSchema,
+})
 
-export const projectChecksActivityEventSchema = z
-  .object({
-    kind: z.literal('verification-receipt'),
-    version: z.literal(1),
-    value: projectChecksActivitySummarySchema,
-  })
-  .strict()
+export const projectChecksActivityEventSchema = Schema.Struct({
+  kind: Schema.Literal('verification-receipt'),
+  version: Schema.Literal(1),
+  value: projectChecksActivitySummarySchema,
+})
 
-export type ProjectChecksActivityEvent = z.infer<typeof projectChecksActivityEventSchema>
+export type ProjectChecksActivityEvent = typeof projectChecksActivityEventSchema.Type
 
 const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent => {
-  const summary: z.infer<typeof projectChecksActivitySummarySchema> = {
-    receiptId: receipt.id,
-    sessionId: receipt.sessionId,
-    actionId: receipt.actionId,
-    label:
-      receipt.label
-        .replace(/\p{Cc}/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 80) || receipt.actionId,
-    status: receipt.status,
-    failure: receipt.failure,
-    startedAt: receipt.startedAt,
-    finishedAt: receipt.finishedAt,
-    durationMs: receipt.durationMs,
-    exitCode: receipt.exitCode,
-    automatic: receipt.automatic,
-    verificationTurn: receipt.verificationTurn,
-    attempt: receipt.attempt,
-    sourceRevisionBefore: receipt.sourceRevisionBefore ?? null,
-    sourceRevisionAfter: receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter,
-  }
-  if (receipt.executor !== undefined) summary.executor = receipt.executor
-  if (receipt.remoteFailure !== undefined) summary.remoteFailure = receipt.remoteFailure
-  return projectChecksActivityEventSchema.parse({ kind: 'verification-receipt', version: 1, value: summary })
+  const summaryExtras: { -readonly [Key in keyof ProjectChecksActivityEvent['value']]?: ProjectChecksActivityEvent['value'][Key] } = {}
+  if (receipt.executor !== undefined) summaryExtras.executor = receipt.executor
+  if (receipt.remoteFailure !== undefined) summaryExtras.remoteFailure = receipt.remoteFailure
+  return Schema.decodeUnknownSync(projectChecksActivityEventSchema)({
+    kind: 'verification-receipt',
+    version: 1,
+    value: {
+      receiptId: receipt.id,
+      sessionId: receipt.sessionId,
+      actionId: receipt.actionId,
+      label:
+        receipt.label
+          .replace(/\p{Cc}/gu, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 80) || receipt.actionId,
+      status: receipt.status,
+      failure: receipt.failure,
+      startedAt: receipt.startedAt,
+      finishedAt: receipt.finishedAt,
+      durationMs: receipt.durationMs,
+      exitCode: receipt.exitCode,
+      automatic: receipt.automatic,
+      verificationTurn: receipt.verificationTurn,
+      attempt: receipt.attempt,
+      sourceRevisionBefore: receipt.sourceRevisionBefore ?? null,
+      sourceRevisionAfter: receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter,
+      ...summaryExtras,
+    },
+  })
 }
 
 const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: ProjectChecksActivityEvent) => void): void => {

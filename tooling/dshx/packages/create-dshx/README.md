@@ -14,6 +14,7 @@ Choose a feature template and an independent Client styling setup:
 dshx create my-plugin --template starter --style css-modules
 dshx create my-plugin --template showcase --style tailwind
 dshx create my-plugin --template starter --style none
+dshx create my-plugin --template effect-host
 ```
 
 - `starter` contains one Host Tool and one localized visible Client Slot. Its `defineLocale()` contribution supplies typed `zh`/`en` copy without `LocaleNamespaceMap` declaration merging.
@@ -35,7 +36,7 @@ dshx create my-plugin --package-manager pnpm
 
 - `--yes` disables interactive questions.
 - `--yes` defaults to `starter` with `css-modules` when no selectors are passed.
-- `--template starter|showcase` selects the feature set.
+- `--template basic|ui|tool|effect-host|full-stack|starter|showcase` selects the feature set. `effect-host` generates an opt-in Effect Host API, `ManagedRuntime` Layer, and exact `effect@4.1.0` dependency.
 - `--style css-modules|tailwind|none` selects the styling setup.
 - `--install` and `--no-install` explicitly control dependency installation.
 - `--package-manager pnpm|yarn|npm` overrides detection.

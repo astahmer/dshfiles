@@ -1,37 +1,54 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_OPTIONS } from './thread-view.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const viewIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u)
-const fields = {
-  name: z.string().trim().min(1).max(32).nullable(),
-  enabled: z.boolean(),
-  groupBy: z.enum(THREAD_GROUP_BY_OPTIONS),
-  statusFilters: z
-    .array(z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all')))
-    .refine(filters => new Set(filters).size === filters.length, 'Filters must be unique.'),
-  sourceFilter: z.enum(THREAD_SOURCE_FILTER_OPTIONS),
+const viewIdSchema = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u))
+const statusFiltersSchema = Schema.Array(Schema.Literals(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))).check(
+  Schema.makeFilter(filters => (new Set(filters).size === filters.length ? undefined : 'Filters must be unique.')),
+)
+const viewFields = {
+  name: Schema.NullOr(Schema.Trim.check(Schema.isMinLength(1)).check(Schema.isMaxLength(32))),
+  enabled: Schema.Boolean,
+  groupBy: Schema.Literals(THREAD_GROUP_BY_OPTIONS),
+  statusFilters: statusFiltersSchema,
+  sourceFilter: Schema.Literals(THREAD_SOURCE_FILTER_OPTIONS),
 }
-export const threadViewCreateSchema = z.object({ id: viewIdSchema, ...fields }).strict()
-export const threadViewUpdateSchema = z
-  .object({ id: viewIdSchema, ...z.object(fields).partial().shape })
-  .strict()
-  .refine(input => Object.keys(input).length > 1, 'Provide a view change.')
-export const threadViewIdSchema = z.object({ id: viewIdSchema }).strict()
-export const threadViewDeleteSchema = threadViewIdSchema.extend({ confirm: z.literal(true) })
-export const threadViewMoveSchema = threadViewIdSchema.extend({ direction: z.enum(['earlier', 'later']) })
-export const threadViewSelectSchema = z
-  .object({ id: viewIdSchema.optional(), showGroupControl: z.boolean().optional(), showFilterControl: z.boolean().optional() })
-  .strict()
-  .refine(input => Object.keys(input).length > 0, 'Provide a view or visibility change.')
+const threadViewCreateFields = { id: viewIdSchema, ...viewFields }
+const threadViewUpdateFields = {
+  id: viewIdSchema,
+  name: Schema.optional(viewFields.name),
+  enabled: Schema.optional(viewFields.enabled),
+  groupBy: Schema.optional(viewFields.groupBy),
+  statusFilters: Schema.optional(viewFields.statusFilters),
+  sourceFilter: Schema.optional(viewFields.sourceFilter),
+}
 
-const output = z.object({ settings: threadViewSettingsSchema, revision: z.number().int().nonnegative() })
-const viewOutput = z.object({
-  view: threadViewCreateSchema.extend({ statusFilters: fields.statusFilters.readonly() }),
-  revision: z.number().int().nonnegative(),
+export const threadViewCreateSchema = SchemaHelpers.strictStruct(Schema.Struct(threadViewCreateFields))
+export const threadViewUpdateSchema = SchemaHelpers.strictStruct(Schema.Struct(threadViewUpdateFields)).check(
+  Schema.makeFilter(input => (Object.keys(input).length > 1 ? undefined : 'Provide a view change.')),
+)
+export const threadViewIdSchema = SchemaHelpers.strictStruct(Schema.Struct({ id: viewIdSchema }))
+export const threadViewDeleteSchema = SchemaHelpers.strictStruct(Schema.Struct({ id: viewIdSchema, confirm: Schema.Literal(true) }))
+export const threadViewMoveSchema = SchemaHelpers.strictStruct(Schema.Struct({ id: viewIdSchema, direction: Schema.Literals(['earlier', 'later']) }))
+export const threadViewSelectSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    id: Schema.optional(viewIdSchema),
+    showGroupControl: Schema.optional(Schema.Boolean),
+    showFilterControl: Schema.optional(Schema.Boolean),
+  }),
+).check(Schema.makeFilter(input => (Object.keys(input).length > 0 ? undefined : 'Provide a view or visibility change.')))
+
+const output = Schema.Struct({
+  settings: threadViewSettingsSchema,
+  revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
 })
-const render = (result: z.infer<typeof output>) => `${result.settings.views.length} saved thread views; selected ${result.settings.activeViewId}.`
+const viewOutput = Schema.Struct({
+  view: SchemaHelpers.strictStruct(Schema.Struct(threadViewCreateFields)),
+  revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+})
+const render = (result: typeof output.Type) => `${result.settings.views.length} saved thread views; selected ${result.settings.activeViewId}.`
 
 export const threadViewsApi = defineApi({
   id: 'thread-sidebar-views',
@@ -39,7 +56,7 @@ export const threadViewsApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     list: method({
-      input: z.object({}).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({})),
       output,
       description: 'Read saved thread sidebar views, their order, active view and control visibility. Read-only.',
       tool: { name: 'thread_views_list', readOnly: true, render: result => JSON.stringify(result) },

@@ -18,7 +18,7 @@ import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
 import { useSelector } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
 import { createBtwSource } from './btw-source.js'
 import { mainViewThreadId } from './main-view-thread.js'
@@ -62,15 +62,22 @@ const addressOf = (childId: string): string => `${ADDRESS_PREFIX}${encodeURIComp
 const childIdOf = (address: string): string | undefined =>
   address.startsWith(ADDRESS_PREFIX) ? decodeURIComponent(address.slice(ADDRESS_PREFIX.length)) || undefined : undefined
 
-const routeSchema = z.object({ provider: z.string().min(1), model: z.string().min(1), reasoningEffort: z.string().optional() })
-const selectionSchema = z.object({ next: routeSchema.nullable().optional(), lastUsed: routeSchema.nullable().optional() })
-const closeHandlerSchema = z.object({ registerCloseHandler: z.instanceof(Function) })
+const routeSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1)),
+  model: Schema.String.check(Schema.isMinLength(1)),
+  reasoningEffort: Schema.optional(Schema.String),
+})
+const selectionSchema = Schema.Struct({
+  next: Schema.optional(Schema.NullOr(routeSchema)),
+  lastUsed: Schema.optional(Schema.NullOr(routeSchema)),
+})
+const closeHandlerSchema = Schema.Struct({ registerCloseHandler: Schema.instanceOf(Function) })
 
 interface CloseHandlerHost {
   registerCloseHandler(kind: string, handler: (sessionId: SessionId, tab: { readonly contentId: string }) => void): () => void
 }
 // The concrete right-sidebar controller has it; the typed `ISidebarRight` face does not.
-const hasCloseHandlers = (value: unknown): value is CloseHandlerHost => closeHandlerSchema.safeParse(value).success
+const hasCloseHandlers = (value: unknown): value is CloseHandlerHost => Schema.is(closeHandlerSchema)(value)
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
 /** Live side chats of this page, by fork id: the tab's close and the panel header find their flow here. */
@@ -125,9 +132,9 @@ export default defineClient({
 
     const routeOf = (sessionId: SessionId): ModelRoute | null => {
       const face = ctx.sessions.binding(sessionId)?.session.projections.faceOf('modelSelection')
-      const parsed = selectionSchema.safeParse(face?.getSnapshot())
-      if (!parsed.success) return null
-      return parsed.data.next ?? parsed.data.lastUsed ?? null
+      const parsed = Schema.decodeUnknownOption(selectionSchema)(face?.getSnapshot())
+      if (Option.isNone(parsed)) return null
+      return parsed.value.next ?? parsed.value.lastUsed ?? null
     }
 
     const startBtw = (sourceId: SessionId, question: string): SideChatActor => {

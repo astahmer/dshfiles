@@ -1,8 +1,10 @@
 import { existsSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Route } from 'playwright-core'
-import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import type { JsonValue } from '@dshfiles/dshx/json'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { PreviewSettings } from './settings.js'
 import { checkPreviewUrl } from './url-policy.js'
 
@@ -43,20 +45,31 @@ export class PreviewError extends Error {
   override readonly name = 'PreviewError'
 }
 
-const aiSnapshotSchema = z.union([z.string(), z.object({ full: z.string() }).transform(value => value.full)])
-const aiSnapshotOwnerSchema = z.object({
-  _snapshotForAI: z.custom<(options: { readonly timeout: number }) => Promise<z.input<typeof aiSnapshotSchema>>>(value => typeof value === 'function'),
-})
+interface AiSnapshotOwner {
+  readonly _snapshotForAI: (options: { readonly timeout: number }) => Promise<JsonValue>
+}
+
+const aiSnapshotSchema = Schema.Union([Schema.String, Schema.Struct({ full: Schema.String })])
+
+const aiSnapshotOwnerSchema = Schema.declare<AiSnapshotOwner>(
+  (value): value is AiSnapshotOwner => typeof value === 'object' && value !== null && '_snapshotForAI' in value && typeof value._snapshotForAI === 'function',
+)
+
+const snapshotTextOf = (value: JsonValue): string | undefined => {
+  const decoded = Schema.decodeUnknownOption(aiSnapshotSchema)(value)
+  if (Option.isNone(decoded)) return undefined
+  return typeof decoded.value === 'string' ? decoded.value : decoded.value.full
+}
 
 /**
  * playwright-core keeps the ref-producing snapshot that playwright-mcp uses off its public types; its `[ref=e5]` marks
  * resolve through the `aria-ref=` selector. The public aria snapshot is the fallback when a release drops it.
  */
 const snapshotWithRefs = async (page: Page): Promise<{ readonly text: string; readonly refs: boolean }> => {
-  const owner = aiSnapshotOwnerSchema.safeParse(page)
-  if (owner.success) {
-    const parsed = aiSnapshotSchema.safeParse(await owner.data._snapshotForAI.call(page, { timeout: SNAPSHOT_TIMEOUT_MS }))
-    if (parsed.success) return { text: parsed.data, refs: true }
+  const owner = Schema.decodeUnknownOption(aiSnapshotOwnerSchema)(page)
+  if (Option.isSome(owner)) {
+    const parsed = snapshotTextOf(await owner.value._snapshotForAI.call(page, { timeout: SNAPSHOT_TIMEOUT_MS }))
+    if (parsed !== undefined) return { text: parsed, refs: true }
   }
   return { text: await page.locator('body').ariaSnapshot({ timeout: SNAPSHOT_TIMEOUT_MS }), refs: false }
 }

@@ -1,5 +1,5 @@
 import { decodeJson } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 /**
  * A plugin's settings, read from the serialized schemastery schema `settings.describe` sends (`schema.toJSON()`: a
@@ -11,8 +11,8 @@ import { z } from 'zod'
 type JsonPrimitive = string | number | boolean | null
 
 /** Settings values cross the wire as JSON; everything here reads them through this one type. */
-export const jsonValueSchema = z.json()
-export type JsonValue = z.infer<typeof jsonValueSchema>
+export const jsonValueSchema = Schema.Json
+export type JsonValue = typeof jsonValueSchema.Type
 
 export interface ChoiceOption {
   readonly value: JsonPrimitive
@@ -79,20 +79,20 @@ const MAX_DEPTH = 4
 const MAX_SEGMENTED_OPTIONS = 4
 const MAX_SEGMENTED_LABEL = 18
 
-const metaSchema = z.record(z.string(), jsonValueSchema).catch({})
-const referenceSchema = z.union([z.number().int(), z.record(z.string(), jsonValueSchema)])
-const nodeSchema = z.object({
-  type: z.string(),
-  meta: metaSchema.default({}),
-  dict: z.record(z.string(), referenceSchema).optional(),
-  list: z.array(referenceSchema).optional(),
-  inner: referenceSchema.optional(),
-  value: jsonValueSchema.optional(),
+const metaSchema = Schema.Record(Schema.String, jsonValueSchema)
+const referenceSchema = Schema.Union([Schema.Number.check(Schema.isInt()), Schema.Record(Schema.String, jsonValueSchema)])
+const nodeSchema = Schema.Struct({
+  type: Schema.String,
+  meta: Schema.optionalKey(metaSchema),
+  dict: Schema.optionalKey(Schema.Record(Schema.String, referenceSchema)),
+  list: Schema.optionalKey(Schema.Array(referenceSchema)),
+  inner: Schema.optionalKey(referenceSchema),
+  value: Schema.optionalKey(jsonValueSchema),
 })
-type SchemaNode = z.infer<typeof nodeSchema>
-const envelopeSchema = z.object({ uid: z.number().int(), refs: z.record(z.string(), jsonValueSchema) })
-const primitiveSchema = z.union([z.string(), z.number(), z.boolean(), z.null()])
-const numberMeta = z.object({ min: z.number().optional(), max: z.number().optional(), step: z.number().optional() })
+type SchemaNode = typeof nodeSchema.Type & { readonly meta: Readonly<Record<string, JsonValue>> }
+const envelopeSchema = Schema.Struct({ uid: Schema.Number.check(Schema.isInt()), refs: Schema.Record(Schema.String, jsonValueSchema) })
+const primitiveSchema = Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null])
+const numberMeta = Schema.Struct({ min: Schema.optionalKey(Schema.Number), max: Schema.optionalKey(Schema.Number), step: Schema.optionalKey(Schema.Number) })
 
 interface Walk {
   readonly refs: Readonly<Record<string, JsonValue>>
@@ -100,12 +100,19 @@ interface Walk {
   readonly secrets: readonly (readonly string[])[]
 }
 
-const uidSchema = z.number().int()
+const uidSchema = Schema.Number.check(Schema.isInt())
+const decoded = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] | undefined => {
+  try {
+    return Schema.decodeUnknownSync(schema)(input)
+  } catch {
+    return undefined
+  }
+}
 
 const resolve = (walk: Walk, reference: JsonValue | undefined): SchemaNode | undefined => {
-  const uid = uidSchema.safeParse(reference)
-  const node = nodeSchema.safeParse(uid.success ? walk.refs[String(uid.data)] : reference)
-  return node.success ? node.data : undefined
+  const uid = decoded(uidSchema, reference)
+  const node = decoded(nodeSchema, uid === undefined ? reference : walk.refs[String(uid)])
+  return node === undefined ? undefined : { ...node, meta: node.meta ?? {} }
 }
 
 /** `maxTabs` → "Max tabs", `archive-undo` → "Archive undo". */
@@ -136,8 +143,8 @@ const unitOfKey = (key: string): string | undefined => UNIT_SUFFIXES.find(([patt
 
 const choiceOptions = (walk: Walk, node: SchemaNode): readonly ChoiceOption[] | undefined => {
   if (node.type === 'const') {
-    const value = primitiveSchema.safeParse(node.value)
-    return value.success ? [{ value: value.data, ...choiceText(walk.text(node.meta.description), value.data) }] : undefined
+    const value = decoded(primitiveSchema, node.value)
+    return value === undefined ? undefined : [{ value, ...choiceText(walk.text(node.meta.description), value) }]
   }
   if (node.type !== 'union' || node.list === undefined || node.list.length === 0) return undefined
   const options: ChoiceOption[] = []
@@ -157,7 +164,7 @@ const scalarControl = (walk: Walk, node: SchemaNode, key: string): ScalarControl
     return { kind: 'text', multiline: node.meta.role === 'textarea' }
   }
   if (node.type === 'number' || node.type === 'natural' || node.type === 'percent') {
-    const bounds = numberMeta.catch({}).parse(node.meta)
+    const bounds = decoded(numberMeta, node.meta) ?? {}
     const percent = node.type === 'percent' || (node.meta.role === 'slider' && bounds.min === 0 && bounds.max === 1)
     const unit = percent ? '%' : unitOfKey(key)
     const control: NumberControl = { kind: 'number', percent }
@@ -216,10 +223,10 @@ const settingFields = (input: {
   readonly secrets?: readonly { readonly path: readonly string[] }[]
   readonly text: LocalizedTextReader
 }): readonly SettingField[] => {
-  const envelope = envelopeSchema.safeParse(input.schema)
-  if (!envelope.success) return []
-  const walk: Walk = { refs: envelope.data.refs, text: input.text, secrets: (input.secrets ?? []).map(secret => secret.path) }
-  const root = resolve(walk, envelope.data.uid)
+  const envelope = decoded(envelopeSchema, input.schema)
+  if (envelope === undefined) return []
+  const walk: Walk = { refs: envelope.refs, text: input.text, secrets: (input.secrets ?? []).map(secret => secret.path) }
+  const root = resolve(walk, envelope.uid)
   return root === undefined ? [] : collect(walk, root, [], [], 0)
 }
 
@@ -230,9 +237,9 @@ interface NamespaceText {
 
 /** The namespace's own title and description, from its root node; empty strings when it declares none. */
 const namespaceText = (input: { readonly schema: JsonValue; readonly text: LocalizedTextReader }): NamespaceText => {
-  const envelope = envelopeSchema.safeParse(input.schema)
-  if (!envelope.success) return { title: '', description: '' }
-  const root = resolve({ refs: envelope.data.refs, text: input.text, secrets: [] }, envelope.data.uid)
+  const envelope = decoded(envelopeSchema, input.schema)
+  if (envelope === undefined) return { title: '', description: '' }
+  const root = resolve({ refs: envelope.refs, text: input.text, secrets: [] }, envelope.uid)
   return { title: input.text(root?.meta.label) || input.text(root?.meta.title), description: input.text(root?.meta.description) }
 }
 
@@ -240,8 +247,8 @@ const namespaceText = (input: { readonly schema: JsonValue; readonly text: Local
 const choiceDisplay = (options: readonly ChoiceOption[]): 'segmented' | 'select' =>
   options.length <= MAX_SEGMENTED_OPTIONS && options.every(option => option.label.length <= MAX_SEGMENTED_LABEL) ? 'segmented' : 'select'
 
-const recordValueSchema = z.record(z.string(), jsonValueSchema)
-const indexSchema = z.coerce.number().int().nonnegative()
+const recordValueSchema = Schema.Record(Schema.String, jsonValueSchema)
+const indexSchema = Schema.NumberFromString.check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))
 
 interface Step {
   readonly found: boolean
@@ -250,11 +257,11 @@ interface Step {
 
 const step = (value: JsonValue | undefined, segment: string): Step => {
   if (Array.isArray(value)) {
-    const index = indexSchema.safeParse(segment)
-    return index.success && index.data < value.length ? { found: true, value: value[index.data] } : { found: false, value: undefined }
+    const index = decoded(indexSchema, segment)
+    return index !== undefined && index < value.length ? { found: true, value: value[index] } : { found: false, value: undefined }
   }
-  const record = recordValueSchema.safeParse(value)
-  return record.success && Object.hasOwn(record.data, segment) ? { found: true, value: record.data[segment] } : { found: false, value: undefined }
+  const record = decoded(recordValueSchema, value)
+  return record !== undefined && Object.hasOwn(record, segment) ? { found: true, value: record[segment] } : { found: false, value: undefined }
 }
 
 /** The value at a settings path, or undefined when any segment is missing. */

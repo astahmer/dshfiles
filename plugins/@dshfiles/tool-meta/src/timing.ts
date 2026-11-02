@@ -1,5 +1,6 @@
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { ToolMetaTranslate } from './locales.js'
 
 export type TimeFormat = 'absolute' | 'relative'
@@ -20,31 +21,34 @@ export interface WaitTimer {
  * The slice of the native `tool.call.toolview` owner this plugin reads. A dispatched call carries its `tool/call` time;
  * a result carries its own `tool/result` time and, while the call is still in the loaded window, the call's time.
  */
-const toolCallOwnerSchema = z.discriminatedUnion('phase', [
-  z.object({ phase: z.literal('preparing') }),
-  z.object({ phase: z.literal('start'), block: z.object({ time: z.number() }) }),
-  z.object({ phase: z.literal('result'), block: z.object({ time: z.number(), callTime: z.number().nullable() }) }),
+const toolCallOwnerSchema = Schema.Union([
+  Schema.Struct({ phase: Schema.Literal('preparing') }),
+  Schema.Struct({ phase: Schema.Literal('start'), block: Schema.Struct({ time: Schema.Number.check(Schema.isFinite()) }) }),
+  Schema.Struct({
+    phase: Schema.Literal('result'),
+    block: Schema.Struct({ time: Schema.Number, callTime: Schema.NullOr(Schema.Number.check(Schema.isFinite())) }),
+  }),
 ])
 
-const waitCallOwnerSchema = z.object({
-  phase: z.literal('start'),
-  toolName: z.enum(['job_output', 'background_jobs_wait']),
-  block: z.object({ time: z.number().finite(), argsRaw: z.string() }),
+const waitCallOwnerSchema = Schema.Struct({
+  phase: Schema.Literal('start'),
+  toolName: Schema.Literals(['job_output', 'background_jobs_wait']),
+  block: Schema.Struct({ time: Schema.Number.check(Schema.isFinite()), argsRaw: Schema.String }),
 })
 
-export type WaitTimerOwner = z.input<typeof waitCallOwnerSchema>
+export type WaitTimerOwner = Schema.Codec.Encoded<typeof waitCallOwnerSchema>
 
-const waitArgumentsSchema = z.object({
-  wait: z.boolean().optional(),
-  jobId: z.string().optional(),
-  jobIds: z.array(z.string()).max(20).optional(),
-  until: z.enum(['settled', 'any-settled']).optional(),
-  timeout_ms: z.number().int().positive().max(3_600_000).optional(),
-  timeoutMs: z.number().int().positive().max(3_600_000).optional(),
+const waitArgumentsSchema = Schema.Struct({
+  wait: Schema.optional(Schema.Boolean),
+  jobId: Schema.optional(Schema.String),
+  jobIds: Schema.optional(Schema.Array(Schema.String).check(Schema.isMaxLength(20))),
+  until: Schema.optional(Schema.Literals(['settled', 'any-settled'])),
+  timeout_ms: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(3_600_000))),
+  timeoutMs: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(3_600_000))),
 })
 
 /** What this plugin needs of a `ToolCallOwnerProps`; the native owner satisfies it. */
-export type ToolCallTimes = z.input<typeof toolCallOwnerSchema>
+export type ToolCallTimes = Schema.Codec.Encoded<typeof toolCallOwnerSchema>
 
 export class ToolTimingModel {
   private static readonly clockFormat = new Intl.DateTimeFormat(undefined, {
@@ -61,9 +65,9 @@ export class ToolTimingModel {
    * The owner comes from another package at runtime, so its declared type is checked rather than trusted.
    */
   static readonly toolTimingOf = (owner: ToolCallTimes): ToolTiming | null | undefined => {
-    const parsed = toolCallOwnerSchema.safeParse(owner)
-    if (!parsed.success) return undefined
-    const call = parsed.data
+    const parsed = Schema.decodeUnknownOption(toolCallOwnerSchema)(owner)
+    if (Option.isNone(parsed)) return undefined
+    const call = parsed.value
     if (call.phase === 'preparing') return null
     if (call.phase === 'start') return { kind: 'running', startedAt: call.block.time }
     if (call.block.callTime === null) return { kind: 'ended', endedAt: call.block.time }
@@ -72,25 +76,25 @@ export class ToolTimingModel {
 
   /** Show wait progress without inventing a deadline when the call has no explicit timeout. */
   static readonly waitTimerOf = (owner: WaitTimerOwner, now: number): WaitTimer | undefined => {
-    const parsedOwner = waitCallOwnerSchema.safeParse(owner)
-    if (!parsedOwner.success) return undefined
+    const parsedOwner = Schema.decodeUnknownOption(waitCallOwnerSchema)(owner)
+    if (Option.isNone(parsedOwner)) return undefined
     let rawArguments: JsonValue
     try {
-      rawArguments = decodeJson(jsonValueSchema, parsedOwner.data.block.argsRaw)
+      rawArguments = decodeJson(jsonValueSchema, parsedOwner.value.block.argsRaw)
     } catch {
       return undefined
     }
-    const parsedArguments = waitArgumentsSchema.safeParse(rawArguments)
-    if (!parsedArguments.success) return undefined
-    if (parsedOwner.data.toolName === 'job_output' && parsedArguments.data.wait !== true) return undefined
-    const timeoutMs = parsedArguments.data.timeoutMs ?? parsedArguments.data.timeout_ms
-    const elapsedMs = Math.max(0, now - parsedOwner.data.block.time)
+    const parsedArguments = Schema.decodeUnknownOption(waitArgumentsSchema)(rawArguments)
+    if (Option.isNone(parsedArguments)) return undefined
+    if (parsedOwner.value.toolName === 'job_output' && parsedArguments.value.wait !== true) return undefined
+    const timeoutMs = parsedArguments.value.timeoutMs ?? parsedArguments.value.timeout_ms
+    const elapsedMs = Math.max(0, now - parsedOwner.value.block.time)
     const waitingFor =
-      parsedOwner.data.toolName === 'job_output'
+      parsedOwner.value.toolName === 'job_output'
         ? 'job-output'
-        : parsedArguments.data.jobIds === undefined
+        : parsedArguments.value.jobIds === undefined
           ? 'all-jobs'
-          : { kind: 'jobs' as const, count: parsedArguments.data.jobIds.length, until: parsedArguments.data.until ?? 'settled' }
+          : { kind: 'jobs' as const, count: parsedArguments.value.jobIds.length, until: parsedArguments.value.until ?? 'settled' }
     return {
       timeoutMs,
       elapsedMs,

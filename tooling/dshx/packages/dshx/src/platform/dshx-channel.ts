@@ -1,82 +1,102 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError } from './client.js'
 import { connectDshxApi } from './dshx-api.js'
 import type { NativeRpcRequest } from './native-rpc.js'
 
-const idSchema = z.string().min(1).max(64)
-const profileSchema = z.string().min(1).max(64)
-const connectorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local') }).strict(),
-  z.object({ kind: z.literal('ssh'), sshTarget: z.string().min(1).max(255) }).strict(),
+const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => {
+  const struct = Schema.Struct(fields)
+  return Schema.decodeTo(struct)(
+    Schema.StructWithRest(struct, [
+      Schema.Record(Schema.String.check(Schema.makeFilter(key => !Object.prototype.hasOwnProperty.call(fields, key))), Schema.Never),
+    ]),
+  )
+}
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(value)
+
+const idSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+const profileSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+const connectorSchema = Schema.Union([
+  strictStruct({ kind: Schema.Literal('local') }),
+  strictStruct({ kind: Schema.Literal('ssh'), sshTarget: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)) }),
 ])
-const identitySchema = z
-  .object({
-    protocolVersion: z.literal(1),
-    runtimeId: z.string().uuid(),
-    profile: profileSchema,
-    homeLeaf: z.string().min(1).max(128),
-    dshVersion: z.string().min(1).max(80),
-    capabilities: z.array(z.enum(['workspace', 'session', 'agent'])).max(8),
-  })
-  .strict()
-const hostSummarySchema = z.object({
-  id: idSchema,
-  name: z.string().min(1).max(120),
-  connector: connectorSchema,
-  runtimeCount: z.number().int().nonnegative(),
+const identitySchema = strictStruct({
+  protocolVersion: Schema.Literal(1),
+  runtimeId: Schema.String.check(Schema.isUUID()),
+  profile: profileSchema,
+  homeLeaf: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  dshVersion: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  capabilities: Schema.Array(Schema.Literals(['workspace', 'session', 'agent'])).check(Schema.isMaxLength(8)),
 })
-const runtimeSummarySchema = z.object({
+const hostSummarySchema = Schema.Struct({
+  id: idSchema,
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  connector: connectorSchema,
+  runtimeCount: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+const isUtcDateTime = (value: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u.test(value)) return false
+  const parsed = new Date(value)
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 19) === value.slice(0, 19)
+}
+const runtimeSummarySchema = Schema.Struct({
   id: idSchema,
   hostId: idSchema,
-  name: z.string().min(1).max(120),
-  identity: identitySchema.nullable(),
-  lastSeenAt: z.string().datetime().optional(),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  identity: Schema.NullOr(identitySchema),
+  lastSeenAt: Schema.optional(Schema.String.check(Schema.makeFilter(isUtcDateTime))),
 })
-const workspaceSchema = z.object({
+const workspaceSchema = Schema.Struct({
   runtimeId: idSchema,
-  workspaceId: z.string(),
-  path: z.string(),
-  title: z.string(),
-  sessionIds: z.array(z.string()),
+  workspaceId: Schema.String,
+  path: Schema.String,
+  title: Schema.String,
+  sessionIds: Schema.Array(Schema.String),
 })
-const sessionSummarySchema = z.object({
+const sessionSummarySchema = Schema.Struct({
   runtimeId: idSchema,
-  sessionId: z.string(),
-  cwd: z.string().optional(),
-  running: z.boolean(),
-  blank: z.boolean(),
-  updatedAt: z.number(),
+  sessionId: Schema.String,
+  cwd: Schema.optional(Schema.String),
+  running: Schema.Boolean,
+  blank: Schema.Boolean,
+  updatedAt: Schema.Number.check(Schema.isFinite()),
 })
-const runtimeStatusSchema = z.discriminatedUnion('ok', [
-  z.object({
-    ok: z.literal(true),
+const runtimeStatusSchema = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
     host: hostSummarySchema,
     runtime: runtimeSummarySchema,
     identity: identitySchema,
-    workspaces: z.array(workspaceSchema),
-    sessions: z.array(sessionSummarySchema),
+    workspaces: Schema.Array(workspaceSchema),
+    sessions: Schema.Array(sessionSummarySchema),
   }),
-  z.object({
-    ok: z.literal(false),
+  Schema.Struct({
+    ok: Schema.Literal(false),
     hostId: idSchema,
     runtimeId: idSchema,
-    code: z.string(),
-    message: z.string(),
-    stale: z.literal(true),
-    lastSeenAt: z.string().datetime().optional(),
+    code: Schema.String,
+    message: Schema.String,
+    stale: Schema.Literal(true),
+    lastSeenAt: Schema.optional(Schema.String.check(Schema.makeFilter(isUtcDateTime))),
   }),
 ])
-const runtimeRegistrationSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }).strict(),
-  z.object({ ok: z.literal(false), code: z.string().min(1).max(128), message: z.string().max(2048) }).strict(),
+const runtimeRegistrationSchema = Schema.Union([
+  strictStruct({ ok: Schema.Literal(true), runtime: runtimeSummarySchema }),
+  strictStruct({
+    ok: Schema.Literal(false),
+    code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+    message: Schema.String.check(Schema.isMaxLength(2048)),
+  }),
 ])
-const nativeRpcResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: jsonValueSchema }).strict(),
-  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
+const nativeRpcResultSchema = Schema.Union([
+  strictStruct({ ok: Schema.Literal(true), value: jsonValueSchema }),
+  strictStruct({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
-const runtimeViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
+const runtimeViewSchema = strictStruct({
+  leaseId: Schema.String.check(Schema.isUUID()),
+  launchUrl: Schema.String.check(Schema.makeFilter(value => URL.canParse(value))),
+})
 
 const toJsonValue = (value: unknown): JsonValue => {
   try {
@@ -86,15 +106,15 @@ const toJsonValue = (value: unknown): JsonValue => {
   }
 }
 
-export type HostConnector = z.infer<typeof connectorSchema>
-export type RuntimeIdentity = z.infer<typeof identitySchema>
-export type HostSummary = z.infer<typeof hostSummarySchema>
-export type RuntimeSummary = z.infer<typeof runtimeSummarySchema>
-export type WorkspaceSummary = z.infer<typeof workspaceSchema>
-export type SessionSummaryRow = z.infer<typeof sessionSummarySchema>
-export type RuntimeStatusValue = z.infer<typeof runtimeStatusSchema>
-export type RuntimeRegistrationResult = z.infer<typeof runtimeRegistrationSchema>
-export type NativeRpcResult = z.infer<typeof nativeRpcResultSchema>
+export type HostConnector = Schema.Schema.Type<typeof connectorSchema>
+export type RuntimeIdentity = Schema.Schema.Type<typeof identitySchema>
+export type HostSummary = Schema.Schema.Type<typeof hostSummarySchema>
+export type RuntimeSummary = Schema.Schema.Type<typeof runtimeSummarySchema>
+export type WorkspaceSummary = Schema.Schema.Type<typeof workspaceSchema>
+export type SessionSummaryRow = Schema.Schema.Type<typeof sessionSummarySchema>
+export type RuntimeStatusValue = Schema.Schema.Type<typeof runtimeStatusSchema>
+export type RuntimeRegistrationResult = Schema.Schema.Type<typeof runtimeRegistrationSchema>
+export type NativeRpcResult = Schema.Schema.Type<typeof nativeRpcResultSchema>
 
 export interface MultiHost {
   list(): Promise<{ readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }>
@@ -123,19 +143,25 @@ export const connectMultiHost = async (options: { readonly url?: string }): Prom
     ...(options.url !== undefined && { url: options.url }),
   })
   return {
-    list: async () => z.object({ hosts: z.array(hostSummarySchema), runtimes: z.array(runtimeSummarySchema) }).parse(await call('list')),
-    hostUpsert: async input => hostSummarySchema.parse(await call('hostUpsert', input)),
-    hostRemove: async (id, removeDirectory = false) => z.object({ removed: z.boolean() }).parse(await call('hostRemove', { id, removeDirectory })),
-    runtimeList: async hostId => z.object({ runtimes: z.array(runtimeSummarySchema) }).parse(await call('runtimeList', hostId === undefined ? {} : { hostId })),
-    runtimeUpsert: async input => runtimeRegistrationSchema.parse(await call('runtimeUpsert', input)),
-    runtimeStatus: async runtimeId => runtimeStatusSchema.parse(await call('runtimeStatus', { runtimeId })),
-    workspaceOpen: async (runtimeId, path) => workspaceSchema.parse(await call('workspaceOpen', { runtimeId, path })),
-    runtimeCall: async (runtimeId, request, signal) => nativeRpcResultSchema.parse(await call('runtimeCall', toJsonValue({ runtimeId, request }), signal)),
+    list: async () => decode(Schema.Struct({ hosts: Schema.Array(hostSummarySchema), runtimes: Schema.Array(runtimeSummarySchema) }), await call('list')),
+    hostUpsert: async input => decode(hostSummarySchema, await call('hostUpsert', input)),
+    hostRemove: async (id, removeDirectory = false) => decode(Schema.Struct({ removed: Schema.Boolean }), await call('hostRemove', { id, removeDirectory })),
+    runtimeList: async hostId =>
+      decode(Schema.Struct({ runtimes: Schema.Array(runtimeSummarySchema) }), await call('runtimeList', hostId === undefined ? {} : { hostId })),
+    runtimeUpsert: async input => decode(runtimeRegistrationSchema, await call('runtimeUpsert', input)),
+    runtimeStatus: async runtimeId => decode(runtimeStatusSchema, await call('runtimeStatus', { runtimeId })),
+    workspaceOpen: async (runtimeId, path) => decode(workspaceSchema, await call('workspaceOpen', { runtimeId, path })),
+    runtimeCall: async (runtimeId, request, signal) => decode(nativeRpcResultSchema, await call('runtimeCall', toJsonValue({ runtimeId, request }), signal)),
     sessionCursor: async (runtimeId, sessionId) =>
-      z.object({ cursor: z.number().int().safe().min(-1) }).parse(await call('sessionCursor', { runtimeId, sessionId })),
-    runtimeOpenView: async runtimeId => runtimeViewSchema.parse(await call('runtimeOpenView', { runtimeId })),
-    runtimeCloseView: async leaseId => z.object({ closed: z.boolean() }).parse(await call('runtimeCloseView', { leaseId })),
-    runtimeRemove: async runtimeId => z.object({ removed: z.boolean() }).parse(await call('runtimeRemove', { runtimeId })),
+      decode(
+        Schema.Struct({
+          cursor: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.makeFilter(Number.isSafeInteger), Schema.isGreaterThanOrEqualTo(-1)),
+        }),
+        await call('sessionCursor', { runtimeId, sessionId }),
+      ),
+    runtimeOpenView: async runtimeId => decode(runtimeViewSchema, await call('runtimeOpenView', { runtimeId })),
+    runtimeCloseView: async leaseId => decode(Schema.Struct({ closed: Schema.Boolean }), await call('runtimeCloseView', { leaseId })),
+    runtimeRemove: async runtimeId => decode(Schema.Struct({ removed: Schema.Boolean }), await call('runtimeRemove', { runtimeId })),
   }
 }
 

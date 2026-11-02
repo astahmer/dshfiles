@@ -1,50 +1,53 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const sessionIdSchema = z.string().min(1).max(256)
-const projectIdSchema = z.string().min(1).max(256)
+const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
+const projectIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 
-const threadRowSchema = z
-  .object({
-    sessionId: z.string(),
-    title: z.string().optional(),
-    projectId: z.string().optional(),
-    projectTitle: z.string().optional(),
-    cwd: z.string().optional(),
-    running: z.boolean(),
-    liveAgent: z.boolean(),
-    archived: z.boolean(),
-    pinned: z.boolean(),
-    settled: z.boolean(),
-    updatedAt: z.number().optional(),
-  })
-  .strict()
+const threadRowSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    sessionId: Schema.String,
+    title: Schema.optional(Schema.String),
+    projectId: Schema.optional(Schema.String),
+    projectTitle: Schema.optional(Schema.String),
+    cwd: Schema.optional(Schema.String),
+    running: Schema.Boolean,
+    liveAgent: Schema.Boolean,
+    archived: Schema.Boolean,
+    pinned: Schema.Boolean,
+    settled: Schema.Boolean,
+    updatedAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  }),
+)
 
-const archivedSetSchema = z.object({ archivedSessionIds: z.array(z.string()).max(2000) }).strict()
-const pinnedSetSchema = z.object({ pinnedSessionIds: z.array(z.string()).max(2000) }).strict()
-const settledSetSchema = z.object({ settledSessionIds: z.array(z.string()).max(2000) }).strict()
+const archivedSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
+const pinnedSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
+const settledSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
 
-const projectRowSchema = z.object({ projectId: z.string(), title: z.string(), path: z.string(), threadCount: z.number() }).strict()
+const projectRowSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({ projectId: Schema.String, title: Schema.String, path: Schema.String, threadCount: Schema.Number.check(Schema.isFinite()) }),
+)
 
-const threadReferenceRowSchema = z
-  .object({
-    sessionId: z.string(),
-    title: z.string().optional(),
-    updatedAt: z.number().optional(),
-    relation: z.enum(['fork', 'subagent', 'mention']),
-  })
-  .strict()
+const threadReferenceRowSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    sessionId: Schema.String,
+    title: Schema.optional(Schema.String),
+    updatedAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    relation: Schema.Literals(['fork', 'subagent', 'mention']),
+  }),
+)
 
-const threadReferencesSchema = z
-  .object({
-    sessionId: z.string(),
-    references: z.array(threadReferenceRowSchema).max(20),
-    omitted: z.number().int().min(0),
-    degraded: z.boolean(),
-  })
-  .strict()
+const threadReferencesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    sessionId: Schema.String,
+    references: Schema.Array(threadReferenceRowSchema).check(Schema.isMaxLength(20)),
+    omitted: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    degraded: Schema.Boolean,
+  }),
+)
 
-const renderReferences = (output: z.infer<typeof threadReferencesSchema>): string => {
+const renderReferences = (output: Schema.Schema.Type<typeof threadReferencesSchema>): string => {
   const header = `Threads that reference ${output.sessionId}${output.degraded ? ' (lineage only: the content search could not answer)' : ''}:`
   const rows = output.references.map(row => `${row.sessionId} · ${row.title ?? '(untitled)'} · ${row.relation}`)
   if (rows.length === 0) return `${header} none yet.`
@@ -52,14 +55,14 @@ const renderReferences = (output: z.infer<typeof threadReferencesSchema>): strin
   return `${header}\n${rows.join('\n')}${omitted}`
 }
 
-const archiveResultSchema = z
-  .object({
-    status: z.enum(['archived', 'refused-active']),
-    sessionId: z.string(),
-    archivedSessionIds: z.array(z.string()).max(2000),
-    activity: z.array(z.string()).max(16),
-  })
-  .strict()
+const archiveResultSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    status: Schema.Literals(['archived', 'refused-active']),
+    sessionId: Schema.String,
+    archivedSessionIds: Schema.Array(Schema.String).check(Schema.isMaxLength(2000)),
+    activity: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
+  }),
+)
 
 const ONLY_WHEN_ASKED = 'Call only when the user asked for this.'
 
@@ -70,14 +73,22 @@ export const threadActionsApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     list: method({
-      input: z
-        .object({
-          query: z.string().max(200).optional(),
-          includeArchived: z.boolean().optional(),
-          limit: z.number().int().min(1).max(200).optional(),
-        })
-        .strict(),
-      output: z.object({ threads: z.array(threadRowSchema).max(200), total: z.number(), truncated: z.boolean() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          query: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
+          includeArchived: Schema.optional(Schema.Boolean),
+          limit: Schema.optional(
+            Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(200)),
+          ),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          threads: Schema.Array(threadRowSchema).check(Schema.isMaxLength(200)),
+          total: Schema.Number.check(Schema.isFinite()),
+          truncated: Schema.Boolean,
+        }),
+      ),
       description:
         'List threads (DSH Sessions) with title, project, running and pinned/archived/settled state. A settled thread is listed and openable but runs no model step until thread_unsettle. Use it to resolve which thread the user means before another thread_* or move call. Read-only.',
       tool: {
@@ -98,7 +109,7 @@ export const threadActionsApi = defineApi({
       },
     }),
     archive: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), stopActivity: z.boolean().optional() }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.optional(sessionIdSchema), stopActivity: Schema.optional(Schema.Boolean) })),
       output: archiveResultSchema,
       description: `Archive one thread: it leaves the sidebar and its project groups until restored, and later wake-ups for it are blocked. Defaults to the calling thread when sessionId is omitted. A thread with running work is refused with the work named; pass stopActivity: true only when the user also asked to stop it, which stops its turn, subagent descendants, background jobs and schedules first — the sidebar's stop-and-archive confirmation. Archiving the calling thread always needs stopActivity: true and ends this turn. ${ONLY_WHEN_ASKED}`,
       tool: {
@@ -110,44 +121,51 @@ export const threadActionsApi = defineApi({
       },
     }),
     unarchive: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: z.string(), archivedSessionIds: archivedSetSchema.shape.archivedSessionIds }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, archivedSessionIds: archivedSessionIdsSchema })),
       description: `Restore an archived thread to its recorded place in the sidebar. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unarchive', render: output => `Restored thread ${output.sessionId}.` },
     }),
     settle: method({
-      input: z.object({ sessionId: sessionIdSchema.optional() }).strict(),
-      output: z.object({ sessionId: z.string(), settledSessionIds: settledSetSchema.shape.settledSessionIds }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, settledSessionIds: settledSessionIdsSchema })),
       description: `Settle one thread: it stays listed and openable, but no model step starts — not from a message, a subagent settlement, a reminder or a queued follow-up — until thread_unsettle. Refuse while its own turn runs; stop it first. Defaults to the calling thread when sessionId is omitted. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_settle', render: output => `Settled thread ${output.sessionId}.` },
     }),
     unsettle: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: z.string(), settledSessionIds: settledSetSchema.shape.settledSessionIds }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, settledSessionIds: settledSessionIdsSchema })),
       description: `Unsettle a settled thread so it can run model steps again. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unsettle', render: output => `Unsettled thread ${output.sessionId}.` },
     }),
     pin: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: z.string(), pinnedSessionIds: pinnedSetSchema.shape.pinnedSessionIds }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, pinnedSessionIds: pinnedSessionIdsSchema })),
       description: `Pin one thread ahead of the unpinned threads of its project. Refused while the thread is archived. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_pin', render: output => `Pinned thread ${output.sessionId}.` },
     }),
     unpin: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: z.string(), pinnedSessionIds: pinnedSetSchema.shape.pinnedSessionIds }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, pinnedSessionIds: pinnedSessionIdsSchema })),
       description: `Remove one thread's pin. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unpin', render: output => `Unpinned thread ${output.sessionId}.` },
     }),
     rename: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), title: z.string().min(1).max(200) }).strict(),
-      output: z.object({ sessionId: z.string(), title: z.string() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({ sessionId: Schema.optional(sessionIdSchema), title: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200)) }),
+      ),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, title: Schema.String })),
       description: `Rename one thread (its sidebar title). Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_rename', render: output => `Renamed thread ${output.sessionId} to “${output.title}”.` },
     }),
     fork: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), atSeq: z.number().int().min(0).optional() }).strict(),
-      output: z.object({ sessionId: z.string(), forkedSessionId: z.string() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.optional(sessionIdSchema),
+          atSeq: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, forkedSessionId: Schema.String })),
       description: `Fork one thread into a new independent thread at its latest completed turn, or at an exact inclusive event sequence with atSeq. Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_fork',
@@ -155,24 +173,24 @@ export const threadActionsApi = defineApi({
       },
     }),
     continueIn: method({
-      input: z
-        .object({
-          sessionId: sessionIdSchema.optional(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.optional(sessionIdSchema),
           projectId: projectIdSchema,
-          text: z.string().min(1).max(20_000).optional(),
-        })
-        .strict(),
-      output: z
-        .object({
-          sessionId: z.string(),
-          continuedSessionId: z.string(),
-          projectId: z.string(),
-          workspaceId: z.string(),
-          settled: z.boolean(),
-          prompt: z.enum(['accepted', 'refused']).optional(),
-          promptError: z.string().optional(),
-        })
-        .strict(),
+          text: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000))),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.String,
+          continuedSessionId: Schema.String,
+          projectId: Schema.String,
+          workspaceId: Schema.String,
+          settled: Schema.Boolean,
+          prompt: Schema.optional(Schema.Literals(['accepted', 'refused'])),
+          promptError: Schema.optional(Schema.String),
+        }),
+      ),
       description: `Continue one thread in another project: fork its conversation into a new thread that runs in that project's own workspace (its isolated jj workspace when the project isolates new threads), then settle the original so it stays readable but runs no further step. Use it when a thread was started in the wrong folder or its work moved to another repository. Defaults to the calling thread: from inside a turn the new thread keeps this turn too, and this thread stops after the call. Another thread must be idle. text is queued as the new thread's first message. Get projectId from project_list. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_continue_in',
@@ -186,24 +204,24 @@ export const threadActionsApi = defineApi({
       },
     }),
     create: method({
-      input: z
-        .object({
-          projectId: projectIdSchema.optional(),
-          cwd: z.string().min(1).max(1024).optional(),
-          title: z.string().min(1).max(200).optional(),
-          agentPreset: z.string().min(1).max(128).optional(),
-          text: z.string().min(1).max(20_000).optional(),
-        })
-        .strict(),
-      output: z
-        .object({
-          sessionId: z.string(),
-          title: z.string().optional(),
-          agentPreset: z.string().optional(),
-          prompt: z.enum(['accepted', 'refused']).optional(),
-          promptError: z.string().optional(),
-        })
-        .strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          projectId: Schema.optional(projectIdSchema),
+          cwd: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(1024))),
+          title: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))),
+          agentPreset: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))),
+          text: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000))),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.String,
+          title: Schema.optional(Schema.String),
+          agentPreset: Schema.optional(Schema.String),
+          prompt: Schema.optional(Schema.Literals(['accepted', 'refused'])),
+          promptError: Schema.optional(Schema.String),
+        }),
+      ),
       description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_create',
@@ -218,14 +236,16 @@ export const threadActionsApi = defineApi({
       },
     }),
     prompt: method({
-      input: z
-        .object({
-          sessionId: sessionIdSchema.optional(),
-          text: z.string().min(1).max(20_000),
-          mode: z.enum(['queue', 'steer']).optional(),
-        })
-        .strict(),
-      output: z.object({ sessionId: z.string(), mode: z.enum(['queue', 'steer']), accepted: z.literal(true) }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.optional(sessionIdSchema),
+          text: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000)),
+          mode: Schema.optional(Schema.Literals(['queue', 'steer'])),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({ sessionId: Schema.String, mode: Schema.Literals(['queue', 'steer']), accepted: Schema.Literal(true) }),
+      ),
       description: `Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_prompt',
@@ -233,28 +253,28 @@ export const threadActionsApi = defineApi({
       },
     }),
     stop: method({
-      input: z.object({ sessionId: sessionIdSchema }).strict(),
-      output: z.object({ sessionId: z.string(), accepted: z.literal(true) }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: Schema.String, accepted: Schema.Literal(true) })),
       description: `Stop one thread's running work through the same cancel path as the sidebar's stop: its current turn ends and the thread stays available. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_stop', render: output => `Asked thread ${output.sessionId} to stop.` },
     }),
     selectModel: method({
-      input: z
-        .object({
-          sessionId: sessionIdSchema.optional(),
-          provider: z.string().min(1).max(128),
-          model: z.string().min(1).max(256),
-          reasoningEffort: z.string().min(1).max(64).optional(),
-        })
-        .strict(),
-      output: z
-        .object({
-          sessionId: z.string(),
-          provider: z.string(),
-          model: z.string(),
-          reasoningEffort: z.string().optional(),
-        })
-        .strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.optional(sessionIdSchema),
+          provider: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128)),
+          model: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
+          reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64))),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.String,
+          provider: Schema.String,
+          model: Schema.String,
+          reasoningEffort: Schema.optional(Schema.String),
+        }),
+      ),
       description: `Choose the provider, model and optional reasoning effort one thread uses for its next request. Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_select_model',
@@ -263,15 +283,22 @@ export const threadActionsApi = defineApi({
       },
     }),
     references: method({
-      input: z.object({ sessionId: sessionIdSchema.optional(), limit: z.number().int().min(1).max(20).optional() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          sessionId: Schema.optional(sessionIdSchema),
+          limit: Schema.optional(
+            Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(20)),
+          ),
+        }),
+      ),
       output: threadReferencesSchema,
       description:
         'Threads that reference one thread (DSH Session): its forked and subagent children, plus the threads whose messages pulled it in as referenced context. Reports degraded: true with lineage only when the Host cannot search session content. Defaults to the calling thread. Read-only.',
       tool: { name: 'thread_references', readOnly: true, render: renderReferences },
     }),
     projectList: method({
-      input: z.object({}).strict(),
-      output: z.object({ projects: z.array(projectRowSchema).max(1000) }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({})),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ projects: Schema.Array(projectRowSchema).check(Schema.isMaxLength(1000)) })),
       description: 'List registered projects (DSH Workspaces): id, title, path and thread count. Read-only.',
       tool: {
         name: 'project_list',
@@ -282,8 +309,13 @@ export const threadActionsApi = defineApi({
       },
     }),
     projectRegister: method({
-      input: z.object({ path: z.string().min(1).max(1024), title: z.string().min(1).max(200).optional() }).strict(),
-      output: z.object({ projectId: z.string(), title: z.string(), path: z.string(), created: z.boolean() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
+          path: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(1024)),
+          title: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ projectId: Schema.String, title: Schema.String, path: Schema.String, created: Schema.Boolean })),
       description: `Register an existing directory as a project so threads can live in it. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'project_register',
@@ -291,8 +323,10 @@ export const threadActionsApi = defineApi({
       },
     }),
     projectRename: method({
-      input: z.object({ projectId: projectIdSchema, title: z.string().min(1).max(200) }).strict(),
-      output: z.object({ projectId: z.string(), title: z.string() }).strict(),
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({ projectId: projectIdSchema, title: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200)) }),
+      ),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ projectId: Schema.String, title: Schema.String })),
       description: `Rename one project (its sidebar title); titles must be unique. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'project_rename',
@@ -300,8 +334,8 @@ export const threadActionsApi = defineApi({
       },
     }),
     projectDelete: method({
-      input: z.object({ projectId: projectIdSchema }).strict(),
-      output: z.object({ projectId: z.string(), deleted: z.literal(true) }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ projectId: projectIdSchema })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ projectId: Schema.String, deleted: Schema.Literal(true) })),
       description: `Remove one project registration: its directory and threads are kept, its threads simply lose the project grouping. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'project_delete',
@@ -309,8 +343,8 @@ export const threadActionsApi = defineApi({
       },
     }),
     projectReorder: method({
-      input: z.object({ projectId: projectIdSchema, beforeProjectId: projectIdSchema.optional() }).strict(),
-      output: z.object({ projectIds: z.array(z.string()).max(1000) }).strict(),
+      input: SchemaHelpers.strictStruct(Schema.Struct({ projectId: projectIdSchema, beforeProjectId: Schema.optional(projectIdSchema) })),
+      output: SchemaHelpers.strictStruct(Schema.Struct({ projectIds: Schema.Array(Schema.String).check(Schema.isMaxLength(1000)) })),
       description: `Move one project within the sidebar order: before another project, or to the end when beforeProjectId is omitted. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'project_reorder',
@@ -318,14 +352,16 @@ export const threadActionsApi = defineApi({
       },
     }),
     move: method({
-      input: z
-        .object({
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({
           sessionId: sessionIdSchema,
           projectId: projectIdSchema,
-          beforeSessionId: sessionIdSchema.optional(),
-        })
-        .strict(),
-      output: z.object({ sessionId: z.string(), projectId: z.string(), sessionIds: z.array(z.string()).max(5000) }).strict(),
+          beforeSessionId: Schema.optional(sessionIdSchema),
+        }),
+      ),
+      output: SchemaHelpers.strictStruct(
+        Schema.Struct({ sessionId: Schema.String, projectId: Schema.String, sessionIds: Schema.Array(Schema.String).check(Schema.isMaxLength(5000)) }),
+      ),
       description: `Reorder one thread within the project that already holds it, optionally before another thread of that project. It cannot move a thread to another project; thread_continue_in does that. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_move',

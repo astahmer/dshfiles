@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
+import { MultiHostSchema } from '../schema.js'
 import { hostConnectorSchema } from '../records.js'
 import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
 import { reserveLoopbackEndpoint } from './loopback.js'
@@ -10,7 +11,7 @@ const outputLimit = 128 * 1024
 const inputLimit = 60 * 1024 * 1024
 
 const sshTargetOf = (value: string): string => {
-  const parsed = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: value })
+  const parsed = MultiHostSchema.decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: value })
   if (parsed.kind !== 'ssh') throw new GatewayUnavailableError('invalid-ssh-target', 'The SSH target is invalid.')
   return parsed.sshTarget
 }

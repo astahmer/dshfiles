@@ -1,17 +1,17 @@
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const effortSchema = z.object({ id: z.string(), name: z.string(), description: z.string().optional() })
-const modelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  reasoning: z.object({ efforts: z.array(effortSchema), defaultEffort: z.string().optional() }).optional(),
+const effortSchema = Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optionalKey(Schema.String) })
+const modelSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optionalKey(Schema.String),
+  reasoning: Schema.optionalKey(Schema.Struct({ efforts: Schema.Array(effortSchema), defaultEffort: Schema.optionalKey(Schema.String) })),
 })
-const catalogSchema = z.object({
-  default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }),
-  groups: z.array(z.object({ id: z.string(), name: z.string(), models: z.array(modelSchema) })),
+const catalogSchema = Schema.Struct({
+  default: Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }),
+  groups: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, models: Schema.Array(modelSchema) })),
 })
 
 /** One registered project (DSH Workspace) a thread can be started in. */
@@ -140,7 +140,7 @@ const titleWithoutImages = (title: string): string =>
 export class StartThreadForm {
   /** Decode the Host catalog, keeping only routable groups and their advertised efforts. */
   static catalog(value: ModelCatalog): StartThreadCatalog {
-    const parsed = catalogSchema.parse(value)
+    const parsed = Schema.decodeUnknownSync(catalogSchema)(value)
     return {
       defaultProvider: parsed.default.provider,
       defaultModel: parsed.default.model,

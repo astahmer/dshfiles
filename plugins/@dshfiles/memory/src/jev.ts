@@ -1,16 +1,25 @@
 import { Utf8 } from '@dshfiles/optmem-core'
-import { z } from 'zod'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import * as Schema from 'effect/Schema'
 
-const answerSchema = z.object({
-  model: z.string(),
-  answers: z.object({ verdict: z.object({ type: z.literal('noul'), noul: z.number().min(0).max(1) }) }),
-  usage: z
-    .object({
-      input_tokens: z.number().int().min(0).max(1_000_000).optional(),
-      output_tokens: z.number().int().min(0).max(1_000_000).optional(),
-    })
-    .optional(),
+const answerSchema = Schema.Struct({
+  model: Schema.String,
+  answers: Schema.Struct({
+    verdict: Schema.Struct({
+      type: Schema.Literal('noul'),
+      noul: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+    }),
+  }),
+  usage: Schema.optional(
+    Schema.Struct({
+      input_tokens: Schema.optional(
+        Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000)),
+      ),
+      output_tokens: Schema.optional(
+        Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000)),
+      ),
+    }),
+  ),
 })
 
 export type JevVerdict = { readonly probability: number; readonly inputTokens: number | null; readonly outputTokens: number | null }
@@ -78,7 +87,7 @@ export class JevClassifier {
         })
         span.setAttribute('http.response.status_code', response.status)
         if (!response.ok) throw new Error(`jev answered HTTP ${response.status}`)
-        const parsed = answerSchema.parse(await response.json())
+        const parsed = Schema.decodeUnknownSync(answerSchema)(await response.json())
         span.setAttributes({
           'gen_ai.response.model': parsed.model,
           'gen_ai.usage.input_tokens': parsed.usage?.input_tokens,

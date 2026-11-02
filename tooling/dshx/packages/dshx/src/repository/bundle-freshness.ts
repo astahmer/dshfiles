@@ -1,18 +1,18 @@
 import { createHash } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { z } from 'zod'
 
 /**
- * Whether a plugin's bundles still match the sources their last build read. Kept free of relative imports so
- * scripts/profile-sync.ts can load this source file under Node type stripping on a checkout where dshx is not built;
- * callers hand in their own JSON decode boundary.
+ * Whether a plugin's bundles still match the sources their last build read. This source file can load under Node type
+ * stripping so scripts/profile-sync.ts can use it on a checkout where dshx is not built.
  */
 
-type DecodeJson = <Schema extends z.ZodType>(schema: Schema, text: string) => z.output<Schema>
-
-const dependencyManifestSchema = z.object({ sources: z.array(z.string()), hashes: z.record(z.string(), z.string().nullable()).optional() })
-const packageScriptsSchema = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
+const dependencyManifestSchema = Schema.Struct({
+  sources: Schema.Array(Schema.String),
+  hashes: Schema.optional(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
+})
+const packageScriptsSchema = Schema.Struct({ scripts: Schema.optional(Schema.Record(Schema.String, Schema.String)) })
 
 export type BundleFreshnessReport =
   | { readonly status: 'fresh' | 'not-buildable' | 'unbuilt' }
@@ -30,9 +30,14 @@ export type BundleFreshnessReport =
  * fails on imports. A source newer than its bundle counts only when its content differs from the hash the build
  * recorded, since a jj checkout rewrites files it leaves unchanged.
  */
-const inspect = (input: { readonly directory: string; readonly decodeJson: DecodeJson }): BundleFreshnessReport => {
+const decodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] => {
+  const value: unknown = JSON.parse(text)
+  return Schema.decodeUnknownSync(schema)(value)
+}
+
+const inspect = (input: { readonly directory: string }): BundleFreshnessReport => {
   const packagePath = join(input.directory, 'package.json')
-  if (!existsSync(packagePath) || input.decodeJson(packageScriptsSchema, readFileSync(packagePath, 'utf8')).scripts.build === undefined)
+  if (!existsSync(packagePath) || decodeJson(packageScriptsSchema, readFileSync(packagePath, 'utf8')).scripts?.build === undefined)
     return { status: 'not-buildable' }
   const distDirectory = join(input.directory, 'dist')
   if (!existsSync(join(distDirectory, 'index.js'))) return { status: 'unbuilt' }
@@ -41,7 +46,7 @@ const inspect = (input: { readonly directory: string; readonly decodeJson: Decod
     const bundlePath = join(distDirectory, bundle)
     if (!existsSync(bundlePath)) return { status: 'stale', bundle, source: null, reason: 'bundle-missing' }
     const builtAt = statSync(bundlePath).mtimeMs
-    const manifest = input.decodeJson(dependencyManifestSchema, readFileSync(join(distDirectory, manifestFile), 'utf8'))
+    const manifest = decodeJson(dependencyManifestSchema, readFileSync(join(distDirectory, manifestFile), 'utf8'))
     for (const source of manifest.sources.filter(path => !path.includes('node_modules/'))) {
       const sourcePath = resolve(input.directory, source)
       if (!existsSync(sourcePath)) return { status: 'stale', bundle, source, reason: 'source-missing' }

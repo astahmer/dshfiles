@@ -220,6 +220,8 @@ Then('its row shows the edit, the creation, or both as the Revision date setting
     await expect(age).toHaveText(/^(now|\d+m)$/)
     await age.hover()
     await expect(page.getByRole('tooltip')).toHaveText(/^Created .*2020.*Last edited .*Last rewritten .*$/su)
+    await revisionRow(page, 'Feature').locator('time').first().hover()
+    await expect(page.getByRole('tooltip')).toHaveCount(1)
   })
   await chooseRevisionDate('Created')
   await recordAssertion(page, 'jujutsu-row-age-can-show-the-creation', async () => {

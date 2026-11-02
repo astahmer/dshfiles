@@ -200,7 +200,8 @@ const apiFiles = (options: PresetOptions): readonly PresetFile[] => {
   return [
     {
       path: `src/api/${apiId}.ts`,
-      content: `import { z } from 'zod'
+      content: `import * as Schema from 'effect/Schema'
+import '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
 
 /**
@@ -216,8 +217,8 @@ export const ${apiSymbol} = defineApi({
   version: 1,
   methods: {
     read: method({
-      input: z.object({ name: z.string().trim().min(1) }),
-      output: z.object({ greeting: z.string(), readyAt: z.string() }),
+      input: Schema.Struct({ name: Schema.Trim.check(Schema.isMinLength(1)) }),
+      output: Schema.Struct({ greeting: Schema.String, readyAt: Schema.String }),
     }),
   },
 })
@@ -268,21 +269,24 @@ export const ${pascal(apiId)}Usage = (): JSX.Element => {
     {
       path: `tests/${apiId}.spec.ts`,
       content: `import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { ${apiSymbol} } from '../src/api/${apiId}.js'
 import { ${hostSymbol} } from '../src/${apiId}-host.js'
 
-const responseSchema = z.object({
-  type: z.literal('server-response'),
-  rpcId: z.string(),
-  result: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.object({
-      version: z.number(),
-      output: z.object({ greeting: z.string(), readyAt: z.string() }),
-    }) }),
-    z.object({ ok: z.literal(false), error: z.object({ code: z.string() }) }),
+const responseSchema = Schema.Struct({
+  type: Schema.Literal('server-response'),
+  rpcId: Schema.String,
+  result: Schema.Union([
+    Schema.Struct({
+      ok: Schema.Literal(true),
+      value: Schema.Struct({
+        version: Schema.Number,
+        output: Schema.Struct({ greeting: Schema.String, readyAt: Schema.String }),
+      }),
+    }),
+    Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String }) }),
   ]),
 })
 
@@ -296,11 +300,11 @@ describe('the ${apiId} API', () => {
         { packageId: '${options.packageId}' },
       )
       const response = await connection.requestApi({ packageId: '${options.packageId}', apiId: '${apiId}', method: 'read', version: 1, input: { name: '  Author  ' } })
-      const body = responseSchema.parse(await response.json())
+      const body = Schema.decodeUnknownSync(responseSchema)(await response.json())
       expect(body.result).toMatchObject({ ok: true, value: { output: { greeting: 'Hello Author' } } })
 
       const invalidResponse = await connection.requestApi({ packageId: '${options.packageId}', apiId: '${apiId}', method: 'read', version: 1, input: { name: 42 } })
-      const invalidBody = responseSchema.parse(await invalidResponse.json())
+      const invalidBody = Schema.decodeUnknownSync(responseSchema)(await invalidResponse.json())
       expect(invalidBody.result).toMatchObject({ ok: false, error: { code: 'contract' } })
 
       await mounted.reload()

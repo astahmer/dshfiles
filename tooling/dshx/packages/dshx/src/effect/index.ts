@@ -1,17 +1,15 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { Cause, Effect, Exit, Queue, Schema, Scope, Stream } from 'effect'
-import { z } from 'zod'
-import type { ManagedRuntime } from 'effect'
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Queue, Schema, Scope, Stream } from 'effect'
+import { effectClient } from './client.js'
+import { provideDshxTracer, tracerLayer } from './tracer.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
-import { ApiProtocolModel, PluginApiError } from '../api/common.js'
+import { registerEffectApiSchemaConverter } from '../api/schema.js'
+import { PluginApiError } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
   AnyApiEventDefinition,
   AnyApiMethodDefinition,
-  ApiCallOptions,
   ApiClient,
-  ApiClientInput,
-  ApiClientOutput,
   ApiContract,
   ApiEventClientPayload,
   ApiEventHostPayload,
@@ -22,14 +20,8 @@ import type {
 } from '../api/types.js'
 
 /** A failed dshx API call, with the same fields as the thrown `ApiError` so it can be matched by `_tag` and `kind`. */
-export class ApiCallError extends Schema.TaggedError<ApiCallError>()('ApiCallError', {
-  message: Schema.String,
-  kind: Schema.Literals(['transport', 'remote', 'contract', 'aborted', 'unavailable']),
-  apiId: Schema.String,
-  method: Schema.String,
-  retryable: Schema.Boolean,
-  remoteCode: Schema.optional(Schema.String),
-}) {}
+export { ApiCallError } from './client.js'
+export type { EffectApiClient } from './client.js'
 
 /** The Host refused to publish an event: the contract declares no such event, its payload failed the schema, or the API is not served. */
 export class PublishEventError extends Schema.TaggedError<PublishEventError>()('PublishEventError', {
@@ -38,23 +30,49 @@ export class PublishEventError extends Schema.TaggedError<PublishEventError>()('
   event: Schema.String,
 }) {}
 
-type EffectHandlers<Methods extends Record<string, AnyApiMethodDefinition>, R> = {
-  readonly [K in keyof Methods]: (context: ApiHandlerContext<ApiHostInput<Methods[K]>>) => Effect.Effect<ApiHostOutput<Methods[K]>, unknown, R>
+type EffectHandlers<Methods extends Record<string, AnyApiMethodDefinition>, R, E> = {
+  readonly [K in keyof Methods]: (context: ApiHandlerContext<ApiHostInput<Methods[K]>>) => Effect.Effect<ApiHostOutput<Methods[K]>, E, R>
 }
 
 type HostOptions<R> = [R] extends [never]
   ? [options?: { readonly runtime?: ManagedRuntime.ManagedRuntime<R, unknown> }]
   : [options: { readonly runtime: ManagedRuntime.ManagedRuntime<R, unknown> }]
 
-type EffectApiClient<Methods extends Record<string, AnyApiMethodDefinition>> = {
-  readonly [K in keyof Methods]: ApiClientInput<Methods[K]> extends void
-    ? (input?: undefined) => Effect.Effect<ApiClientOutput<Methods[K]>, ApiCallError>
-    : (input: ApiClientInput<Methods[K]>) => Effect.Effect<ApiClientOutput<Methods[K]>, ApiCallError>
+type AnyManagedRuntime = ManagedRuntime.ManagedRuntime<never, unknown>
+const pluginRuntimes = new WeakMap<Context, AnyManagedRuntime>()
+
+const omitDefaultAdditionalProperties = <T>(document: T): T => {
+  const copy = structuredClone(document)
+  const visit = (value: unknown): void => {
+    if (typeof value !== 'object' || value === null) return
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry)
+      return
+    }
+    // SAFETY: the object was validated as a non-null, non-array JSON Schema record above.
+    const record = value as Record<string, unknown>
+    if (record.additionalProperties === true) delete record.additionalProperties
+    for (const entry of Object.values(record)) visit(entry)
+  }
+  visit(copy)
+  return copy
 }
 
-/** A dshx client method as the wrapper calls it: input first, then the call options carrying the abort signal. */
-type ClientMethod = (input: unknown, options: ApiCallOptions) => Promise<unknown>
-const clientMethodSchema = z.custom<ClientMethod>(value => typeof value === 'function', 'API client has no such method.')
+registerEffectApiSchemaConverter(schema => {
+  if (!Schema.isSchema(schema)) throw new TypeError('The Effect Schema adapter received a non-Effect schema.')
+  const standard = Schema.toStandardSchemaV1(schema)
+  const jsonSchema = Schema.toStandardJSONSchemaV1(schema)['~standard'].jsonSchema
+  return {
+    ...standard,
+    '~standard': {
+      ...standard['~standard'],
+      jsonSchema: {
+        input: (options: Parameters<typeof jsonSchema.input>[0]) => omitDefaultAdditionalProperties(jsonSchema.input(options)),
+        output: (options: Parameters<typeof jsonSchema.output>[0]) => omitDefaultAdditionalProperties(jsonSchema.output(options)),
+      },
+    },
+  }
+})
 
 const taggedFailure = Schema.Struct({ _tag: Schema.String, message: Schema.optional(Schema.String) })
 const isTaggedFailure = Schema.is(taggedFailure)
@@ -82,26 +100,47 @@ const settle = <A, E>(exit: Exit.Exit<A, E>): A => {
 }
 
 /** Serve a contract from handlers that return Effects; the call's AbortSignal interrupts the handler fiber. */
-const host = <const Methods extends Record<string, AnyApiMethodDefinition>, R = never>(
+const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDefinition>, R, E>(
   contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
-  handlers: EffectHandlers<Methods, R>,
-  ...[options]: HostOptions<R>
+  handlers: EffectHandlers<Methods, R, E>,
+  runtimeForContext: (ctx: Context) => AnyManagedRuntime | undefined,
+  requirePluginRuntime: boolean,
 ): ApiHostRegistration<Methods> => {
-  const runtime: ManagedRuntime.ManagedRuntime<R, unknown> | undefined = options?.runtime
-  const run = (effect: Effect.Effect<unknown, unknown, R>, signal: AbortSignal) =>
-    runtime === undefined
-      ? // SAFETY: HostOptions makes `runtime` required whenever the handlers need services, so without one R is never.
-        Effect.runPromiseExit(effect as Effect.Effect<unknown, unknown>, { signal })
-      : runtime.runPromiseExit(effect, { signal })
+  const run = (effect: Effect.Effect<unknown, unknown, R>, signal: AbortSignal, ctx: Context) => {
+    const runtime = runtimeForContext(ctx)
+    if (runtime === undefined) {
+      if (requirePluginRuntime) throw new Error('DshxEffect.plugin runtime is not active for this Host context.')
+      // SAFETY: the public host helper allows a missing runtime only when R is never.
+      return Effect.runPromiseExit(provideDshxTracer(effect as Effect.Effect<unknown, unknown>), { signal })
+    }
+    // SAFETY: explicit runtimes and DshxEffect.plugin runtimes provide the handler's declared environment.
+    return runtime.runPromiseExit(effect as Effect.Effect<unknown, unknown>, { signal })
+  }
   const promised = Object.fromEntries(
     Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers).map(([name, handler]) => [
       name,
-      async (context: ApiHandlerContext<never>) => settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal)),
+      async (context: ApiHandlerContext<never>) =>
+        settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx)),
     ]),
   )
   // SAFETY: every method key of `handlers` (typed against the contract's methods) maps to a Promise handler of the same input and output.
   return contract.host(promised as Parameters<ApiContract<Methods>['host']>[0])
 }
+
+const host = <const Methods extends Record<string, AnyApiMethodDefinition>, E, R = never>(
+  contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
+  handlers: EffectHandlers<Methods, R, E>,
+  ...[options]: HostOptions<R>
+): ApiHostRegistration<Methods> =>
+  registerEffectHost(
+    contract,
+    handlers,
+    ctx => {
+      // SAFETY: explicit runtimes match R; context runtimes are created by DshxEffect.plugin for the same plugin instance.
+      return (options?.runtime as AnyManagedRuntime | undefined) ?? pluginRuntimes.get(ctx)
+    },
+    false,
+  )
 
 /**
  * A Host `setup` whose plugin lifetime is an Effect Scope: resources acquired with `Effect.acquireRelease`,
@@ -111,7 +150,7 @@ const setup =
   <Config, E>(program: (ctx: Context, config: Config) => Effect.Effect<void, E, Scope.Scope>) =>
   async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
     const scope = Effect.runSync(Scope.make())
-    const started = await Effect.runPromiseExit(Effect.withSpan(Scope.provide(scope)(program(ctx, config)), 'dshx-effect setup'))
+    const started = await Effect.runPromiseExit(provideDshxTracer(Effect.withSpan(Scope.provide(scope)(program(ctx, config)), 'dshx-effect setup')))
     if (Exit.isFailure(started)) {
       await Effect.runPromise(Scope.close(scope, started))
       throw Cause.squash(started.cause)
@@ -119,30 +158,37 @@ const setup =
     return () => Effect.runPromise(Scope.close(scope, Exit.void))
   }
 
-/** The same client, each method returning an Effect that fails with `ApiCallError`; interrupting it aborts the call. */
-const client = <const Methods extends Record<string, AnyApiMethodDefinition>>(
-  api: ApiClient<Methods, Record<string, AnyApiEventDefinition>>,
-): EffectApiClient<Methods> => {
-  const methods = new Map(Object.entries(api))
-  const call = (name: string, input: unknown) =>
-    Effect.tryPromise({
-      try: signal => clientMethodSchema.parse(methods.get(name))(input, { signal }),
-      catch: error =>
-        ApiProtocolModel.isApiError(error)
-          ? new ApiCallError({
-              message: error.message,
-              kind: error.kind,
-              apiId: error.apiId,
-              method: error.method,
-              retryable: error.retryable,
-              ...(error.remoteCode !== undefined && { remoteCode: error.remoteCode }),
-            })
-          : new ApiCallError({ message: String(error), kind: 'transport', apiId: '', method: name, retryable: true }),
-    })
-  const effects = Object.fromEntries([...methods.keys()].filter(name => name !== 'safe').map(name => [name, (input?: unknown) => call(name, input)]))
-  // SAFETY: every method of the wrapped client is mapped above to an Effect of the same input and output.
-  return effects as EffectApiClient<Methods>
-}
+const plugin = <Config, E, R>(options: {
+  readonly layer: Layer.Layer<R, E, never> | ((ctx: Context, config: Config) => Layer.Layer<R, E, never>)
+  readonly setup: (ctx: Context, config: Config) => Effect.Effect<void, E, R | Scope.Scope>
+}) => ({
+  hostApi: <const Methods extends Record<string, AnyApiMethodDefinition>, HandlerError>(
+    contract: ApiContract<Methods, Record<string, AnyApiEventDefinition>>,
+    handlers: EffectHandlers<Methods, R, HandlerError>,
+  ): ApiHostRegistration<Methods> => registerEffectHost(contract, handlers, ctx => pluginRuntimes.get(ctx), true),
+  setup: async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
+    const layer = typeof options.layer === 'function' ? options.layer(ctx, config) : options.layer
+    const runtime = ManagedRuntime.make(Layer.merge(layer, tracerLayer))
+    const scope = Effect.runSync(Scope.make())
+    // SAFETY: the runtime is stored only for runtime lookup; the handler adapter supplies its effect environment at execution.
+    pluginRuntimes.set(ctx, runtime as AnyManagedRuntime)
+    const started = await runtime.runPromiseExit(Scope.provide(scope)(options.setup(ctx, config)))
+    if (Exit.isFailure(started)) {
+      pluginRuntimes.delete(ctx)
+      await runtime.runPromise(Scope.close(scope, started))
+      await runtime.dispose()
+      throw Cause.squash(started.cause)
+    }
+    return async () => {
+      pluginRuntimes.delete(ctx)
+      try {
+        await runtime.runPromise(Scope.close(scope, Exit.void))
+      } finally {
+        await runtime.dispose()
+      }
+    }
+  },
+})
 
 /** A browser Stream of one API event; the subscription opens on first pull and closes when the Stream ends or is interrupted. */
 const events = <
@@ -179,7 +225,9 @@ const publish = <const Events extends Record<string, AnyApiEventDefinition>, K e
 export class DshxEffect {
   static readonly host = host
   static readonly setup = setup
-  static readonly client = client
+  static readonly plugin = plugin
+  static readonly client = effectClient
   static readonly events = events
   static readonly publish = publish
+  static readonly tracerLayer = tracerLayer
 }

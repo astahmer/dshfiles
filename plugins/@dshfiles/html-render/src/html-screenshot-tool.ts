@@ -4,20 +4,21 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { InferValue } from '@deepseek-ai/dsh-tools'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineTool } from '@dshfiles/dshx/host'
+import { Effect, Schema } from 'effect'
 import { previewRenderApi } from '@dshfiles/preview/render-api'
-import { z } from 'zod'
-import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HTML_SCREENSHOT_TOOL, HtmlPageLimits } from './html-page.js'
+import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HTML_SCREENSHOT_TOOL, HtmlPageLimits, decodeToolArguments } from './html-page.js'
 import type { HtmlPageStore } from './html-page-store.js'
 import { SandboxedDocument } from './sandboxed-document.js'
+import type { HtmlRenderEffectRunner } from './effect-runner.js'
 
 const PACKAGE_ID = '@dshfiles/html-render'
 const DEFAULT_WIDTH = 800
 
-const argsSchema = z.object({
-  callId: z.string().min(1).max(200).optional(),
-  fullPage: z.boolean().optional(),
-  colorScheme: z.enum(['light', 'dark']).optional(),
-  width: z.number().int().min(320).max(1920).optional(),
+const argsSchema = Schema.Struct({
+  callId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+  fullPage: Schema.optional(Schema.Boolean),
+  colorScheme: Schema.optional(Schema.Literals(['light', 'dark'])),
+  width: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(320), Schema.isLessThanOrEqualTo(1920))),
 })
 
 const outputSchema = {
@@ -61,12 +62,77 @@ const render = (output: ScreenshotOutput): ContentBlock[] => [
   },
 ]
 
+class HtmlScreenshotFailure extends Schema.TaggedError<HtmlScreenshotFailure>()('HtmlScreenshotFailure', { message: Schema.String }) {}
+
 const fail = (message: string): never => {
-  throw new Error(message)
+  throw new HtmlScreenshotFailure({ message })
 }
 
 /** Built from the plugin's own context so the attachment store it injects is readable during the call. */
-export const createHtmlScreenshotTool = (input: { readonly ctx: Context; readonly pages: HtmlPageStore }) =>
+const captureHtmlScreenshot = Effect.fn('html page screenshot')(function* (input: {
+  readonly input: { readonly ctx: Context; readonly pages: HtmlPageStore; readonly runEffect?: HtmlRenderEffectRunner | undefined }
+  readonly rawArgs: unknown
+  readonly execution: {
+    readonly agent?: Parameters<Context['workingDirectory']['ensure']>[0] | undefined
+    readonly callId: string
+    readonly signal: AbortSignal
+  }
+}) {
+  return yield* Effect.tryPromise({
+    try: async () => {
+      const parsedArgs = decodeToolArguments(argsSchema, input.rawArgs)
+      if (!parsedArgs.ok) return fail(parsedArgs.error)
+      const args = parsedArgs.value
+      const agent = input.execution.agent ?? fail(`${HTML_SCREENSHOT_TOOL} runs only on behalf of an Agent.`)
+      const found =
+        input.input.pages.find({ sessionId: agent.id, callId: args.callId }) ??
+        fail(
+          args.callId === undefined
+            ? `This thread has no ${HTML_RENDER_TOOL} or ${HTML_PREVIEW_TOOL} page in this DSH run. Publish one first, then take the screenshot.`
+            : `No ${HTML_RENDER_TOOL} or ${HTML_PREVIEW_TOOL} page with call id ${args.callId} in this thread during this DSH run. Pass the id of a call this thread made since DSH started, omit callId for the latest page, or publish the page again.`,
+        )
+      const scheme = found.page.theme === 'auto' ? (args.colorScheme ?? 'light') : found.page.theme
+      const document = SandboxedDocument.buildStatic({ html: found.page.html, scheme, tokens: SandboxedDocument.fallbackTokens[scheme] })
+      const preview = createHostApiClient(input.input.ctx, previewRenderApi, PACKAGE_ID)
+      const shot = await preview
+        .screenshotHtml(
+          {
+            document,
+            width: args.width ?? DEFAULT_WIDTH,
+            height: Math.max(200, Math.min(HtmlPageLimits.maxHeight, found.page.height)),
+            fullPage: args.fullPage ?? false,
+            colorScheme: scheme,
+          },
+          { signal: input.execution.signal },
+        )
+        .catch((error: unknown) =>
+          fail(
+            error instanceof Error && isApiOwnerMissing(error)
+              ? `${HTML_SCREENSHOT_TOOL} renders through the @dshfiles/preview plugin, which is not loaded. Ask the user to enable it in Settings › Plugins (and install its browser), then retry.`
+              : `The page could not be rendered: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        )
+      const [image] = await input.input.ctx.attachments.saveImages([
+        { data: Buffer.from(shot.image, 'base64'), mediaType: shot.mediaType, name: `html-page-${found.callId}.jpg` },
+      ])
+      if (image === undefined) return fail('The attachment store did not keep the screenshot; retry once.')
+      return {
+        callId: found.callId,
+        title: found.page.title,
+        colorScheme: scheme,
+        image: { attachmentId: image.attachmentId, mediaType: image.mediaType, bytes: image.bytes, width: image.width, height: image.height },
+      }
+    },
+    catch: error =>
+      error instanceof HtmlScreenshotFailure ? error : new HtmlScreenshotFailure({ message: error instanceof Error ? error.message : String(error) }),
+  })
+})
+
+export const createHtmlScreenshotTool = (input: {
+  readonly ctx: Context
+  readonly pages: HtmlPageStore
+  readonly runEffect?: HtmlRenderEffectRunner | undefined
+}) =>
   defineTool({
     name: HTML_SCREENSHOT_TOOL,
     description: [
@@ -87,47 +153,6 @@ export const createHtmlScreenshotTool = (input: { readonly ctx: Context; readonl
     isConcurrencySafe: () => true,
     timeoutMs: 60_000,
     async execute(rawArgs, execution) {
-      const parsed = argsSchema.safeParse(rawArgs)
-      if (!parsed.success) return fail(parsed.error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; '))
-      const args = parsed.data
-      const agent = execution.agent ?? fail(`${HTML_SCREENSHOT_TOOL} runs only on behalf of an Agent.`)
-      const found =
-        input.pages.find({ sessionId: agent.id, callId: args.callId }) ??
-        fail(
-          args.callId === undefined
-            ? `This thread has no ${HTML_RENDER_TOOL} or ${HTML_PREVIEW_TOOL} page in this DSH run. Publish one first, then take the screenshot.`
-            : `No ${HTML_RENDER_TOOL} or ${HTML_PREVIEW_TOOL} page with call id ${args.callId} in this thread during this DSH run. Pass the id of a call this thread made since DSH started, omit callId for the latest page, or publish the page again.`,
-        )
-      const scheme = found.page.theme === 'auto' ? (args.colorScheme ?? 'light') : found.page.theme
-      const document = SandboxedDocument.buildStatic({ html: found.page.html, scheme, tokens: SandboxedDocument.fallbackTokens[scheme] })
-      const preview = createHostApiClient(input.ctx, previewRenderApi, PACKAGE_ID)
-      const shot = await preview
-        .screenshotHtml(
-          {
-            document,
-            width: args.width ?? DEFAULT_WIDTH,
-            height: Math.max(200, Math.min(HtmlPageLimits.maxHeight, found.page.height)),
-            fullPage: args.fullPage ?? false,
-            colorScheme: scheme,
-          },
-          { signal: execution.signal },
-        )
-        .catch((error: unknown) =>
-          fail(
-            error instanceof Error && isApiOwnerMissing(error)
-              ? `${HTML_SCREENSHOT_TOOL} renders through the @dshfiles/preview plugin, which is not loaded. Ask the user to enable it in Settings › Plugins (and install its browser), then retry.`
-              : `The page could not be rendered: ${error instanceof Error ? error.message : String(error)}`,
-          ),
-        )
-      const [image] = await input.ctx.attachments.saveImages([
-        { data: Buffer.from(shot.image, 'base64'), mediaType: shot.mediaType, name: `html-page-${found.callId}.jpg` },
-      ])
-      if (image === undefined) return fail('The attachment store did not keep the screenshot; retry once.')
-      return {
-        callId: found.callId,
-        title: found.page.title,
-        colorScheme: scheme,
-        image: { attachmentId: image.attachmentId, mediaType: image.mediaType, bytes: image.bytes, width: image.width, height: image.height },
-      }
+      return (input.runEffect ?? Effect.runPromise)(captureHtmlScreenshot({ input, rawArgs, execution }), { signal: execution.signal })
     },
   })

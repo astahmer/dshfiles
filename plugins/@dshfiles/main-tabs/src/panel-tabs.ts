@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
+import { Schema } from 'effect'
 
 /**
  * A panel tab may name a scope: one panel plugin showing a different subject per tab (Jujutsu on two repositories).
@@ -10,10 +10,10 @@ export const OPEN_PANEL_TAB_EVENT = 'dshfiles:open-panel-tab'
 export const PANEL_SCOPE_EVENT = 'dshfiles:panel-scope'
 export const PANEL_TAB_TITLE_EVENT = 'dshfiles:panel-tab-title'
 
-const idSchema = z.string().min(1).max(512)
-const titleSchema = z.string().min(1).max(200)
-const openPanelTabSchema = z.object({ panelId: idSchema, scope: idSchema, title: titleSchema.optional() }).strict()
-const panelTabTitleSchema = z.object({ panelId: idSchema, scope: idSchema, title: titleSchema }).strict()
+const idSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))
+const titleSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))
+const openPanelTabSchema = Schema.Struct({ panelId: idSchema, scope: idSchema, title: Schema.optional(titleSchema) })
+const panelTabTitleSchema = Schema.Struct({ panelId: idSchema, scope: idSchema, title: titleSchema })
 
 export interface OpenPanelTabRequest {
   readonly panelId: string
@@ -36,8 +36,8 @@ export class PanelTabs {
 
   static readRequest(event: Event): OpenPanelTabRequest | undefined {
     if (!(event instanceof CustomEvent)) return undefined
-    const parsed = openPanelTabSchema.safeParse(event.detail)
-    return parsed.success ? parsed.data : undefined
+    const decoded = Schema.decodeUnknownResult(openPanelTabSchema, { onExcessProperty: 'error' })(event.detail)
+    return decoded._tag === 'Success' ? decoded.success : undefined
   }
 
   /** Tell the panel plugin which of its scopes the main view now shows; `null` means its own default. */
@@ -52,8 +52,8 @@ export class PanelTabs {
 
   static readTitle(event: Event): PanelTabTitle | undefined {
     if (!(event instanceof CustomEvent)) return undefined
-    const parsed = panelTabTitleSchema.safeParse(event.detail)
-    return parsed.success ? parsed.data : undefined
+    const decoded = Schema.decodeUnknownResult(panelTabTitleSchema, { onExcessProperty: 'error' })(event.detail)
+    return decoded._tag === 'Success' ? decoded.success : undefined
   }
 
   static tabId(panelId: string, scope: string): string {

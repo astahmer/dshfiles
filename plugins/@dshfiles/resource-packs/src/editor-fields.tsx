@@ -3,8 +3,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import type { PropertyDefinition, PropertyValue, ResourceRecord, ResourceRef } from './model.js'
+import { type PropertyDefinition, type PropertyValue, type ResourceRecord, type ResourceRef } from './model.js'
 import { ResourceUiModel } from './ui-helpers.js'
+
+/** A reference row being edited, including the empty placeholder the Add button inserts before validation. */
+const isReferenceRow = (value: unknown): value is ResourceRef =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) && 'provider' in value && 'kind' in value && 'id' in value
 
 function ReferenceInput(props: {
   label: string
@@ -59,8 +63,8 @@ export function PropertyInput(props: {
   const { property, value, onChange } = props
   const id = useId()
   const disabled = property.readOnly
-  const ref = typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null
-  const refs = Array.isArray(value) ? value.filter((item): item is ResourceRef => typeof item !== 'string') : []
+  const ref = isReferenceRow(value) ? value : null
+  const refs = Array.isArray(value) ? value.filter((item: unknown): item is ResourceRef => isReferenceRow(item)) : []
   const string = typeof value === 'string' || typeof value === 'number' ? String(value) : ''
   let input: JSX.Element
   switch (property.type) {

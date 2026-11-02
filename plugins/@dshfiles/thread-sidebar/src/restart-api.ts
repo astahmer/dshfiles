@@ -1,23 +1,30 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 export const threadSidebarRestartApi = defineApi({
   id: 'thread-sidebar-restart',
   version: 1,
   methods: {
     availability: method({
-      input: z.void(),
-      output: z.object({
-        available: z.boolean(),
+      input: Schema.Void,
+      output: Schema.Struct({
+        available: Schema.Boolean,
         /** A restart waiting for running turns to finish: since when, and how many turns are still running. */
-        pending: z.object({ since: z.number(), running: z.number().int().nonnegative() }).nullable().optional(),
+        pending: Schema.optional(
+          Schema.NullOr(
+            Schema.Struct({
+              since: Schema.Number.check(Schema.isFinite()),
+              running: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+            }),
+          ),
+        ),
       }),
     }),
-    requestRestart: method({ input: z.void(), output: z.object({ accepted: z.literal(true) }) }),
+    requestRestart: method({ input: Schema.Void, output: Schema.Struct({ accepted: Schema.Literal(true) }) }),
     /** Restart once no turn is running (or after a long wait), so working threads finish instead of being cut off. */
-    requestRestartWhenIdle: method({ input: z.void(), output: z.object({ accepted: z.literal(true) }) }),
-    cancelPendingRestart: method({ input: z.void(), output: z.object({ canceled: z.boolean() }) }),
+    requestRestartWhenIdle: method({ input: Schema.Void, output: Schema.Struct({ accepted: Schema.Literal(true) }) }),
+    cancelPendingRestart: method({ input: Schema.Void, output: Schema.Struct({ canceled: Schema.Boolean }) }),
     /** The tokenized launch URL the dsh-web supervisor recorded, to hand to an agent or `dshx`. */
-    launchUrl: method({ input: z.void(), output: z.object({ url: z.string().nullable() }) }),
+    launchUrl: method({ input: Schema.Void, output: Schema.Struct({ url: Schema.NullOr(Schema.String) }) }),
   },
 })

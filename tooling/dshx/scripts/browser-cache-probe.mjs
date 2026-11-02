@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import { pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 export const probeBrowserCache = async () => {
   const assetCount = 12
@@ -26,7 +26,7 @@ export const probeBrowserCache = async () => {
       server.once('error', reject)
       server.listen(0, '127.0.0.1', resolve)
     })
-    const address = z.object({ port: z.number().int().positive() }).parse(server.address())
+    const address = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)) }))(server.address())
     const origin = `http://127.0.0.1:${address.port}`
     browser = await chromium.launch()
     const scenarios = []

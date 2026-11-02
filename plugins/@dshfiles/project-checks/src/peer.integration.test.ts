@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { Schema } from 'effect'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -45,6 +46,9 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
     runProcess({ file: 'jj', args, cwd: local, timeoutMs })
 
   beforeAll(async () => {
+    // jj refuses to push a commit without an author, and a CI runner has no jj identity of its own.
+    process.env.JJ_USER ??= 'Peer Check'
+    process.env.JJ_EMAIL ??= 'peer-check@example.invalid'
     root = await mkdtemp(join(tmpdir(), 'peer-check-'))
     local = join(root, 'local')
     peer = join(root, 'peer')
@@ -64,7 +68,7 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
     await jj(root, ['git', 'init', peer])
     await jj(root, ['-R', peer, 'git', 'remote', 'add', 'origin', bare])
 
-    remote = remoteHostSchema.parse({
+    remote = Schema.decodeUnknownSync(remoteHostSchema)({
       id: 'peer',
       sshTarget: 'peer-host',
       gitRemote: 'peer',
@@ -92,7 +96,7 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
       runPeerShell: runPeer,
     })
 
-    expect(outcome).toMatchObject({ ok: true, exitCode: 0, stdout: 'checked' })
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({ ok: true, exitCode: 0, stdout: 'checked' })
     expect(await revisionOf(peer)).toBe(firstRevision)
     expect(await readFile(join(peer, 'a.txt'), 'utf8')).toBe('first\n')
   }, 120_000)
@@ -114,7 +118,7 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
       runPeerShell: runPeer,
     })
 
-    expect(outcome).toMatchObject({ ok: true, exitCode: 0 })
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({ ok: true, exitCode: 0 })
     expect(await revisionOf(peer)).toBe(secondRevision)
     expect(await readFile(join(peer, 'a.txt'), 'utf8')).toBe('second\n')
     expect(await readFile(join(peer, 'node_modules', 'marker.txt'), 'utf8')).toBe('cached\n')
@@ -129,7 +133,7 @@ describe.skipIf(!(await available()))('peer checker integration', () => {
       runLocalGit,
       runPeerShell: runPeer,
     })
-    expect(failing).toMatchObject({ ok: true, exitCode: 3 })
+    expect(failing, JSON.stringify(failing)).toMatchObject({ ok: true, exitCode: 3 })
 
     const mutating = await runPeerSnapshot({
       remote,

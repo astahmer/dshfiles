@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 import {
   threadViewsApi,
   threadViewCreateSchema,
@@ -15,7 +15,7 @@ export interface ThreadViewsSettingsPort {
   update(namespace: string, patch: { readonly threadViews: ThreadViewSettings }, expectedRevision?: number): Promise<void>
 }
 
-const namespaceSchema = z.object({ threadViews: z.unknown().optional() })
+const namespaceSchema = Schema.Struct({ threadViews: Schema.optional(Schema.Unknown) })
 
 export class ThreadViewsController {
   readonly #settings: ThreadViewsSettingsPort
@@ -28,12 +28,12 @@ export class ThreadViewsController {
   list = () => {
     const descriptor = this.#settings.describe().find(entry => entry.ns === 'thread-sidebar')
     if (descriptor === undefined) throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
-    const document = namespaceSchema.parse(descriptor.value)
-    return { settings: threadViewSettingsSchema.parse(document.threadViews ?? DEFAULT_THREAD_VIEW_SETTINGS), revision: descriptor.revision }
+    const document = Schema.decodeUnknownSync(namespaceSchema)(descriptor.value)
+    return { settings: Schema.decodeUnknownSync(threadViewSettingsSchema)(document.threadViews ?? DEFAULT_THREAD_VIEW_SETTINGS), revision: descriptor.revision }
   }
 
-  get = (input: z.infer<typeof threadViewIdSchema>) => {
-    const parsed = threadViewIdSchema.parse(input)
+  get = (input: Schema.Schema.Type<typeof threadViewIdSchema>) => {
+    const parsed = Schema.decodeUnknownSync(threadViewIdSchema)(input)
     const current = this.list()
     return { view: this.#view(current.settings, parsed.id), revision: current.revision }
   }
@@ -47,7 +47,7 @@ export class ThreadViewsController {
   #change = (operation: (settings: ThreadViewSettings) => ThreadViewSettings) => {
     const changed = this.#pending.then(async () => {
       const current = this.list()
-      const next = threadViewSettingsSchema.parse(operation(current.settings))
+      const next = Schema.decodeUnknownSync(threadViewSettingsSchema)(operation(current.settings))
       await this.#settings.update('thread-sidebar', { threadViews: next }, current.revision)
       return this.list()
     })
@@ -55,16 +55,16 @@ export class ThreadViewsController {
     return changed
   }
 
-  create = (input: z.infer<typeof threadViewCreateSchema>) => {
-    const view = threadViewCreateSchema.parse(input)
+  create = (input: Schema.Schema.Type<typeof threadViewCreateSchema>) => {
+    const view = Schema.decodeUnknownSync(threadViewCreateSchema)(input)
     return this.#change(settings => {
       if (settings.views.some(candidate => candidate.id === view.id)) throw new Error(`Saved thread view ${JSON.stringify(view.id)} already exists.`)
       return ThreadViewPreferencesModel.saveThreadView(settings, view)
     })
   }
 
-  update = (input: z.infer<typeof threadViewUpdateSchema>) => {
-    const patch = threadViewUpdateSchema.parse(input)
+  update = (input: Schema.Schema.Type<typeof threadViewUpdateSchema>) => {
+    const patch = Schema.decodeUnknownSync(threadViewUpdateSchema)(input)
     return this.#change(settings => {
       const view = this.#view(settings, patch.id)
       if (patch.enabled === false && view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1) {
@@ -83,8 +83,8 @@ export class ThreadViewsController {
     })
   }
 
-  delete = (input: z.infer<typeof threadViewDeleteSchema>) => {
-    const parsed = threadViewDeleteSchema.parse(input)
+  delete = (input: Schema.Schema.Type<typeof threadViewDeleteSchema>) => {
+    const parsed = Schema.decodeUnknownSync(threadViewDeleteSchema)(input)
     return this.#change(settings => {
       const view = this.#view(settings, parsed.id)
       if (settings.views.length === 1 || (view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1)) {
@@ -94,16 +94,16 @@ export class ThreadViewsController {
     })
   }
 
-  move = (input: z.infer<typeof threadViewMoveSchema>) => {
-    const parsed = threadViewMoveSchema.parse(input)
+  move = (input: Schema.Schema.Type<typeof threadViewMoveSchema>) => {
+    const parsed = Schema.decodeUnknownSync(threadViewMoveSchema)(input)
     return this.#change(settings => {
       this.#view(settings, parsed.id)
       return ThreadViewPreferencesModel.moveThreadView(settings, parsed.id, parsed.direction === 'earlier' ? -1 : 1)
     })
   }
 
-  select = (input: z.infer<typeof threadViewSelectSchema>) => {
-    const parsed = threadViewSelectSchema.parse(input)
+  select = (input: Schema.Schema.Type<typeof threadViewSelectSchema>) => {
+    const parsed = Schema.decodeUnknownSync(threadViewSelectSchema)(input)
     return this.#change(settings => {
       if (parsed.id !== undefined && !this.#view(settings, parsed.id).enabled) throw new Error('Cannot select a disabled thread view.')
       const selected = parsed.id === undefined ? settings : ThreadViewPreferencesModel.selectThreadView(settings, parsed.id)

@@ -1,0 +1,840 @@
+{
+  "id": "loopback-access",
+  "owner": "@dshfiles/loopback-access",
+  "version": 1,
+  "methods": [
+    {
+      "name": "network",
+      "description": "Read Network access settings, concrete local address choices, actual listening URLs, CLI overrides and pending restart state. Read-only.",
+      "tool": {
+        "name": "network_access_settings",
+        "readOnly": true
+      },
+      "input": {
+        "type": "null"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "localhostEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "type": "string"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "saveNetwork",
+      "description": "Save validated Network access choices for the next DSH startup without restarting or rebinding the running server. May run only when the user asks to change network settings; expectedRevision prevents overwriting concurrent edits.",
+      "tool": {
+        "name": "network_access_save",
+        "readOnly": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "lanEnabled": {
+            "type": "boolean"
+          },
+          "bindAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "localhostEnabled": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "lanEnabled",
+          "bindAddress",
+          "port",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "localhostEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "lanEnabled": {
+            "type": "boolean"
+          },
+          "bindAddress": {
+            "type": "string"
+          },
+          "localhostEnabled": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "port": {
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lanEnabled",
+          "bindAddress",
+          "port",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "lanEnabled": {
+                "type": "boolean"
+              },
+              "bindAddress": {
+                "type": "string"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lanEnabled",
+              "bindAddress",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "active": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "localhostEnabled": {
+                "type": "boolean"
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "localhostEnabled",
+              "urls"
+            ],
+            "additionalProperties": false
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "interfaceName": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "IPv4",
+                    "IPv6"
+                  ]
+                }
+              },
+              "required": [
+                "address",
+                "interfaceName",
+                "family"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cliOverrides": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          "pendingRestart": {
+            "type": "boolean"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "needs-setup",
+              "unsupported"
+            ]
+          },
+          "unavailableReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "writable",
+          "saved",
+          "active",
+          "addresses",
+          "cliOverrides",
+          "pendingRestart",
+          "integration",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "status",
+      "description": "Read whether the LAN-bound DSH also has localhost access, its non-secret origins and actual loopback listeners. Read-only.",
+      "tool": {
+        "name": "loopback_access_status",
+        "readOnly": true
+      },
+      "input": {
+        "type": "null"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "native-loopback",
+              "forwarding",
+              "disabled",
+              "stopped",
+              "failed"
+            ]
+          },
+          "upstreamOrigin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "localhostOrigin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "listeners": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "enum": [
+                    "127.0.0.1",
+                    "::1"
+                  ]
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                }
+              },
+              "required": [
+                "host",
+                "port"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "state",
+          "upstreamOrigin",
+          "localhostOrigin",
+          "listeners"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "native-loopback",
+              "forwarding",
+              "disabled",
+              "stopped",
+              "failed"
+            ]
+          },
+          "upstreamOrigin": {
+            "type": "string"
+          },
+          "localhostOrigin": {
+            "type": "string"
+          },
+          "listeners": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "enum": [
+                    "127.0.0.1",
+                    "::1"
+                  ]
+                },
+                "port": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "host",
+                "port"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "state",
+          "upstreamOrigin",
+          "localhostOrigin",
+          "listeners"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,13 +1,21 @@
 import { withSpan } from '@dshfiles/dshx/tracing'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { CleanupResult, CleanupTarget } from './api.js'
 import type { CleanupKind } from './workspace-cleanup.js'
 
 /** Namespace whose `settledSessionIds` field records settled threads; thread-sidebar owns it. */
 export const SETTLED_THREADS_NAMESPACE = 'thread-sidebar'
 
-/** Decodes the settings document; an unknown shape reads as none settled. */
-export const settledStatusSchema = z.object({ settledSessionIds: z.array(z.string()).catch([]) }).catch({ settledSessionIds: [] })
+const settledStatusSchema = Schema.Struct({ settledSessionIds: Schema.optional(Schema.Array(Schema.String)) })
+
+export const parseSettledStatus = (value: unknown): { readonly settledSessionIds: readonly string[] } => {
+  try {
+    const parsed = Schema.decodeUnknownSync(settledStatusSchema)(value)
+    return { settledSessionIds: parsed.settledSessionIds ?? [] }
+  } catch {
+    return { settledSessionIds: [] }
+  }
+}
 
 interface SettleCleanupThread {
   readonly name: string

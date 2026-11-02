@@ -448,6 +448,33 @@ export default definePlugin({
 `
 }
 
+function renderEffectHost(context: TemplateContext): string {
+  return `import { Effect, Layer, Schema } from 'effect'
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { defineHost } from '@dshfiles/dshx/host'
+
+const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })
+
+const statusApi = defineApi({
+  id: 'status',
+  version: 1,
+  methods: {
+    status: method({
+      output: Schema.String,
+      description: 'Report whether this plugin is ready.',
+      tool: { name: '${toolName(context.packageId)}', readOnly: true },
+    }),
+  },
+})
+
+export default defineHost({
+  setup,
+  apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })],
+})
+`
+}
+
 function renderPanelClient(context: TemplateContext, style: ProjectStyle): string {
   return `import { defineClientPlugin, type PanelProps } from '@dshfiles/dshx/client'
 ${styleImport(style)}
@@ -475,6 +502,15 @@ export const TEMPLATE_REGISTRY = {
     devDependencies: context => ({ ...sdkDependencies(context), '@deepseek-ai/dsh-commands': context.dshVersion }),
     peerDependencies: context => ({ '@deepseek-ai/dsh': context.dshRange, '@deepseek-ai/dsh-commands': context.dshRange }),
     files: context => [{ path: 'src/host.ts', contents: renderBasicHost(context) }],
+  },
+  'effect-host': {
+    label: 'Effect Host plugin',
+    description: 'A typed dshx API and tool using an Effect-managed plugin runtime.',
+    hostOnly: true,
+    clientProviders: [],
+    devDependencies: context => ({ ...sdkDependencies(context), effect: '4.1.0', '@deepseek-ai/dsh-tools': context.dshVersion }),
+    peerDependencies: context => ({ '@deepseek-ai/dsh': context.dshRange, '@deepseek-ai/dsh-tools': context.dshRange, effect: '^4.1.0' }),
+    files: context => [{ path: 'src/host.ts', contents: renderEffectHost(context) }],
   },
   tool: {
     label: 'Tool plugin',

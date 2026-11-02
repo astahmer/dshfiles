@@ -1,5 +1,5 @@
 import type { InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
@@ -10,16 +10,12 @@ const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
 const MIXED_LIMIT = 5
 const SCOPED_LIMIT = 40
 
-const refSchema = z.object({ id: z.number().int().positive(), title: z.string().max(BacklogItems.maxTitleChars) }).strict()
+const refSchema = Schema.Struct({
+  id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars)),
+})
 
-const decodeRef = (ref: string): z.infer<typeof refSchema> | null => {
-  try {
-    const parsed = refSchema.safeParse(JSON.parse(ref))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
+const decodeRef = (ref: string): typeof refSchema.Type | null => Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(refSchema))(ref))
 
 /** The text after `@b:`/`@backlog:`, the whole query for plain `@`, or undefined while another source's scope is typed. */
 const scopedQuery = (query: string): { readonly text: string; readonly scoped: boolean } | undefined => {

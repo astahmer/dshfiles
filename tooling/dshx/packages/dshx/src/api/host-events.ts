@@ -3,6 +3,7 @@ import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiContract, ApiEventHostPayload } from './types.js'
 import { ApiProtocolModel } from './common.js'
 import { apiRegistry, type ApiEventStream, type ApiRegistry } from './registry.js'
+import { ApiChannelModel } from './channel.js'
 
 /** What the browser hub decodes: the events served now, or one published event. */
 type EventStreamFrame =
@@ -14,7 +15,7 @@ const frame = (value: EventStreamFrame): string => `data: ${JSON.stringify(value
 const catalogFrame = (registry: ApiRegistry): string =>
   frame({
     type: 'catalog',
-    events: [...registry.apis.values()].flatMap(api => Object.keys(api.events ?? {}).map(event => ApiProtocolModel.eventKey(api.owner, api.id, event))),
+    events: [...registry.apis.values()].flatMap(api => Object.keys(api.events ?? {}).map(event => ApiChannelModel.eventKey(api.owner, api.id, event))),
   })
 
 const streamsOf = (registry: ApiRegistry): Set<ApiEventStream> => {
@@ -37,7 +38,7 @@ const announceCatalog = (registry: ApiRegistry): void => {
 const eventsRoute = (registry: ApiRegistry): { readonly route: ConnectionFetchRoute; readonly closeStreams: () => void } => {
   const opened = new Set<ApiEventStream>()
   const route: ConnectionFetchRoute = {
-    path: ApiProtocolModel.eventsPath,
+    path: ApiChannelModel.eventsPath,
     methods: ['GET'],
     requestBody: 'buffered',
     fetch: async request => {
@@ -98,7 +99,7 @@ const publishApiEvent = async <const Events extends Record<string, AnyApiEventDe
   // The served entry is found by its methods object, so the caller never restates its package id.
   const served = [...registry.apis.values()].find(api => api.id === contract.id && api.methods === contract.methods)
   if (served === undefined || registry.eventStreams === undefined || registry.eventStreams.size === 0) return
-  const chunk = frame({ type: 'event', key: ApiProtocolModel.eventKey(served.owner, served.id, event), version: contract.version, data })
+  const chunk = frame({ type: 'event', key: ApiChannelModel.eventKey(served.owner, served.id, event), version: contract.version, data })
   for (const stream of registry.eventStreams) stream.write(chunk)
 }
 

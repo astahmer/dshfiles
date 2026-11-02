@@ -5,11 +5,11 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { fieldErrorMessages, revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { useId, useRef, useState, type ReactNode } from 'react'
-import { z } from 'zod'
 import { loopbackAccessApi } from './api.js'
 import type { NetworkTranslate } from './locales.js'
-import { networkFormSchema, networkSnapshotSchema, type NetworkForm, type NetworkSnapshot } from './network-api.js'
+import { decodeNetworkSnapshot, networkFormSchema, type NetworkForm, type NetworkSnapshot } from './network-api.js'
 
 const networkQueryKey = ['loopback-access', 'network'] as const
 
@@ -47,20 +47,22 @@ export const NetworkPreferences = (props: {
   const save = useMutation({ mutationFn: (input: NetworkSaveInput) => props.save(input) })
   const readOnly = !snapshot.writable || snapshot.integration !== 'managed' || props.unavailable === true
   const disabled = readOnly || save.isPending
-  const draftSchema = networkFormSchema
-    .omit({ localhostEnabled: true })
-    .extend({
-      port: z.string().refine(value => /^\d+$/u.test(value) && Number(value) <= 65535, t('invalidPort')),
-    })
-    .superRefine((value, context) => {
-      if (value.lanEnabled && !snapshot.addresses.some(item => item.address === value.bindAddress)) {
-        context.addIssue({ code: 'custom', path: ['bindAddress'], message: t('addressRequired') })
-      }
-    })
+  const draftSchema = Schema.Struct({
+    lanEnabled: networkFormSchema.fields.lanEnabled,
+    bindAddress: networkFormSchema.fields.bindAddress,
+    port: Schema.String.check(Schema.makeFilter((value: string) => (/^\d+$/u.test(value) && Number(value) <= 65_535 ? undefined : t('invalidPort')))),
+  }).check(
+    Schema.makeFilter((value: { readonly lanEnabled: boolean; readonly bindAddress: string | null }) =>
+      value.lanEnabled && !snapshot.addresses.some(item => item.address === value.bindAddress)
+        ? { path: ['bindAddress'], issue: t('addressRequired') }
+        : undefined,
+    ),
+  )
+  const draftValidator = Schema.toStandardSchemaV1(draftSchema)
   const form = useAppForm({
     defaultValues: initial,
     validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
-    validators: { onDynamic: draftSchema },
+    validators: { onDynamic: draftValidator },
     onSubmit: async ({ value, formApi }) => {
       try {
         const result = await save.mutateAsync({
@@ -271,7 +273,7 @@ export const NetworkSection = (props: { readonly t: NetworkTranslate }): JSX.Ele
   const query = useQuery({
     queryKey: networkQueryKey,
     retry: false,
-    queryFn: async ({ signal }) => networkSnapshotSchema.parse(await api.network(undefined, { signal })),
+    queryFn: async ({ signal }) => decodeNetworkSnapshot(await api.network(undefined, { signal })),
   })
   return (
     <section className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:max-w-2xl dshx:flex-col dshx:gap-4">
@@ -298,7 +300,7 @@ export const NetworkSection = (props: { readonly t: NetworkTranslate }): JSX.Ele
           snapshot={query.data}
           unavailable={query.isError}
           save={async input => {
-            const snapshot = networkSnapshotSchema.parse(await api.saveNetwork(input))
+            const snapshot = decodeNetworkSnapshot(await api.saveNetwork(input))
             queryClient.setQueryData(networkQueryKey, snapshot)
             return snapshot
           }}

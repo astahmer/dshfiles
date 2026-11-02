@@ -1,6 +1,6 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
-import { Config } from './host.js'
-import { decodeSnapshot } from './api.js'
+import { decodeSnapshot, preferencesSchema } from './api.js'
 import { McpCatalogModel } from './catalog.js'
 
 describe('client snapshot decode', () => {
@@ -48,10 +48,12 @@ describe('client snapshot decode', () => {
 
 describe('preferences stored in the Loader row', () => {
   it('keeps saved values and resets only a field that is out of range', () => {
-    const row = Config.parse({
-      servers: [],
-      preferences: { connectOnStartup: false, toolCallTimeoutSeconds: 9_999, registrySearch: false, oauthClientName: 'Mine' },
+    const preferences = Schema.decodeUnknownSync(preferencesSchema)({
+      connectOnStartup: false,
+      toolCallTimeoutSeconds: 9_999,
+      registrySearch: false,
+      oauthClientName: 'Mine',
     })
-    expect(row.preferences).toEqual({ connectOnStartup: false, toolCallTimeoutSeconds: 30, registrySearch: false, oauthClientName: 'Mine' })
+    expect(preferences).toEqual({ connectOnStartup: false, toolCallTimeoutSeconds: 30, registrySearch: false, oauthClientName: 'Mine' })
   })
 })

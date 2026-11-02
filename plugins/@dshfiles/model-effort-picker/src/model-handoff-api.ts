@@ -1,12 +1,10 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
-const routeSchema = z
-  .object({
-    provider: z.string().min(1).max(128),
-    model: z.string().min(1).max(256),
-  })
-  .strict()
+const routeSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+})
 
 export const modelHandoffApi = defineApi({
   id: 'model-handoff',
@@ -15,7 +13,7 @@ export const modelHandoffApi = defineApi({
   methods: {
     contextWindow: method({
       input: routeSchema,
-      output: z.number().int().positive().nullable(),
+      output: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
       description: 'Read the advertised context capacity for one exact provider/model route. Returns null when the route does not publish a capacity.',
       tool: {
         name: 'model_handoff_context_window',

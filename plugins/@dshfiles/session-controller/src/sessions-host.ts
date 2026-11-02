@@ -7,12 +7,23 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
+import { Effect, Schema } from 'effect'
 import { definePromptSection, generate, pluginStorage } from '@dshfiles/dshx/host'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
 import type { SessionRequestId } from './native/types.ts'
 import { recentTranscript } from './session-transcript.ts'
 import { sessionsApi } from './sessions-api.ts'
+import {
+  AgentPresetsUnavailable,
+  CommandUnavailable,
+  ControllerUnavailable,
+  SessionControllerHostRuntime,
+  ThreadNotFound,
+  ThreadUnavailable,
+  sessionControllerHostApi,
+  trySessionControllerOperation,
+} from './effect-runtime.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -86,33 +97,34 @@ const native = async <T>(call: () => T | Promise<T>): Promise<T> => {
   }
 }
 
-const notFound = (): PluginApiError => new PluginApiError('No thread with that id exists.', { code: 'thread-not-found' })
+const notFound = (): ThreadNotFound => new ThreadNotFound({ message: 'No thread with that id exists.', code: 'thread-not-found' })
 
-const controllerOf = (ctx: Context) => {
-  const controller = ctx.get('sessionController')
-  if (controller === undefined) throw new PluginApiError('The Session controller is not running.', { code: 'controller-unavailable' })
+const controllerOf = (runtime: typeof SessionControllerHostRuntime.Service) => {
+  const controller = runtime.sessionController
+  if (controller === undefined) throw new ControllerUnavailable({ message: 'The Session controller is not running.', code: 'controller-unavailable' })
   return controller
 }
 
-const allowed = (ctx: Context, sessionId: string): SessionId => {
+const allowed = (runtime: typeof SessionControllerHostRuntime.Service, sessionId: string): SessionId => {
   const id = SessionId(sessionId)
-  if (!ctx.remoteAccess.allows({ kind: 'session', id })) throw notFound()
+  if (!runtime.ctx.remoteAccess.allows({ kind: 'session', id })) throw notFound()
   return id
 }
 
-const agentOf = async (ctx: Context, sessionId: string): Promise<Agent> => {
-  const resolved = await native(() => controllerOf(ctx).resolveAgent(allowed(ctx, sessionId)))
-  if ('error' in resolved) throw new PluginApiError(resolved.error.message, { code: 'thread-unavailable' })
+const agentOf = async (runtime: typeof SessionControllerHostRuntime.Service, sessionId: string): Promise<Agent> => {
+  const resolved = await native(() => controllerOf(runtime).resolveAgent(allowed(runtime, sessionId)))
+  if ('error' in resolved) throw new ThreadUnavailable({ message: resolved.error.message, code: 'thread-unavailable' })
   return resolved.agent
 }
 
-const runCommand = async (ctx: Context, sessionId: string, line: string, signal: AbortSignal) => {
-  const agent = await agentOf(ctx, sessionId)
-  const commands = ctx.get('commands')
-  if (commands === undefined) throw new PluginApiError('This Host has no command runtime.', { code: 'command-unavailable' })
+const runCommand = async (runtime: typeof SessionControllerHostRuntime.Service, sessionId: string, line: string, signal: AbortSignal) => {
+  const agent = await agentOf(runtime, sessionId)
+  const commands = runtime.commands
+  if (commands === undefined) throw new CommandUnavailable({ message: 'This Host has no command runtime.', code: 'command-unavailable' })
   const execution = await native(() => commands.execute(agent, line, [], signal))
   if (execution === undefined) {
-    throw new PluginApiError(`No command ${line.split(/\s/, 1)[0]} is available in this thread. List the thread's commands in its composer.`, {
+    throw new CommandUnavailable({
+      message: `No command ${line.split(/\s/, 1)[0]} is available in this thread. List the thread's commands in its composer.`,
       code: 'command-unavailable',
     })
   }
@@ -124,14 +136,20 @@ const senderOf = (caller: ApiCaller): string =>
 
 const isBusy = (agent: Agent): boolean => agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0
 
-const sendPrompt = async (ctx: Context, sessionId: SessionId, text: string, mode: 'queue' | 'steer', signal: AbortSignal): Promise<void> => {
+const sendPrompt = async (
+  runtime: typeof SessionControllerHostRuntime.Service,
+  sessionId: SessionId,
+  text: string,
+  mode: 'queue' | 'steer',
+  signal: AbortSignal,
+): Promise<void> => {
   // SAFETY: SessionRequestId is a type-only brand over a caller-minted unique id.
   const requestId = randomUUID() as SessionRequestId
-  await native(() => controllerOf(ctx).prompt({ requestId, sessionId, mode, content: [{ type: 'text', text }] }, signal))
+  await native(() => controllerOf(runtime).prompt({ requestId, sessionId, mode, content: [{ type: 'text', text }] }, signal))
 }
 
-const projectsBySession = (ctx: Context) => {
-  const registry = ctx.get('workspaceRegistry')
+const projectsBySession = (runtime: typeof SessionControllerHostRuntime.Service) => {
+  const registry = runtime.workspaceRegistry
   const projects = new Map<string, { readonly projectId: string; readonly projectTitle: string }>()
   for (const workspace of registry?.list() ?? []) {
     for (const id of workspace.sessionIds) projects.set(id, { projectId: workspace.id, projectTitle: workspace.title })
@@ -139,9 +157,13 @@ const projectsBySession = (ctx: Context) => {
   return { projects, archived: new Set<string>(registry?.archivedSessionIds ?? []) }
 }
 
-const readTitles = async (ctx: Context, sessionIds: readonly SessionId[], signal: AbortSignal): Promise<Map<string, string>> => {
+const readTitles = async (
+  runtime: typeof SessionControllerHostRuntime.Service,
+  sessionIds: readonly SessionId[],
+  signal: AbortSignal,
+): Promise<Map<string, string>> => {
   const titles = new Map<string, string>()
-  const query = ctx.get('sessionQuery')
+  const query = runtime.sessionQuery
   if (query === undefined || sessionIds.length === 0) return titles
   for (const result of await query.readTitleSnapshots(sessionIds, signal)) {
     if (result.status === 'fulfilled' && result.value.title !== undefined) titles.set(result.sessionId, result.value.title.title)
@@ -149,176 +171,250 @@ const readTitles = async (ctx: Context, sessionIds: readonly SessionId[], signal
   return titles
 }
 
-const sessionQueryNotFound = z.object({ code: z.literal('SESSION_QUERY_SESSION_NOT_FOUND') })
+const isSessionQueryNotFound = (error: unknown): boolean =>
+  Schema.decodeUnknownResult(Schema.Struct({ code: Schema.Literal('SESSION_QUERY_SESSION_NOT_FOUND') }))(error)._tag === 'Success'
 
-const eventsOf = async (ctx: Context, id: SessionId): Promise<readonly SessionEvent[]> => {
-  const live = ctx.agents.get(id)
+/** A caller's JSON Schema as the standard schema `generate` publishes and validates the reply with. */
+const standardSchemaOf = (jsonSchema: Record<string, Schema.Schema.Type<typeof Schema.Json>>) => {
+  assertSupportedJsonSchema(jsonSchema)
+  return {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'dsh',
+      validate: (value: unknown) => {
+        const violations = validateJsonSchemaValue(jsonSchema, value)
+        return violations.length === 0 ? { value } : { issues: violations.map(message => ({ message })) }
+      },
+      jsonSchema: { input: () => jsonSchema, output: () => jsonSchema },
+    },
+  }
+}
+
+const eventsOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId): Promise<readonly SessionEvent[]> => {
+  const live = runtime.ctx.agents.get(id)
   if (live !== undefined) return live.session.snapshotEvents()
-  const query = ctx.get('sessionQuery')
+  const query = runtime.sessionQuery
   if (query === undefined) throw notFound()
   try {
     return (await query.readSession(id)).events
   } catch (error) {
-    if (sessionQueryNotFound.safeParse(error).success) throw notFound()
+    if (isSessionQueryNotFound(error)) throw notFound()
     throw error
   }
 }
 
-export const sessionsHost = sessionsApi.host({
-  list: async ({ ctx, input, signal }) => {
-    const { items } = await native(() => controllerOf(ctx).list({ projections: [] }, signal))
-    const { projects, archived } = projectsBySession(ctx)
-    const candidates = items
-      .filter(item => !item.blank && item.origin !== 'subagent' && (input.includeArchived || !archived.has(item.sessionId)))
-      .filter(item => input.projectId === undefined || projects.get(item.sessionId)?.projectId === input.projectId)
-      .toSorted((left, right) => right.updatedAt - left.updatedAt)
-    const query = input.query?.toLowerCase()
-    // Only a query needs every title; otherwise the page alone is read.
-    const titles = await readTitles(
-      ctx,
-      (query === undefined || query === '' ? candidates.slice(0, input.limit) : candidates).map(item => item.sessionId),
-      signal,
-    )
-    const rows = candidates.map(item => {
-      const project = projects.get(item.sessionId)
-      const title = titles.get(item.sessionId)
-      return {
-        sessionId: item.sessionId,
-        ...(title === undefined ? undefined : { title }),
-        ...(item.cwd === undefined ? undefined : { cwd: item.cwd }),
-        ...project,
-        running: item.running,
-        updatedAt: item.updatedAt,
-      }
-    })
-    const matching =
-      query === undefined || query === ''
-        ? rows
-        : rows.filter(row => [row.title, row.cwd, row.projectTitle].some(field => field?.toLowerCase().includes(query) === true))
-    return { threads: matching.slice(0, input.limit), total: matching.length, truncated: matching.length > input.limit }
-  },
-  messages: async ({ ctx, input }) => {
-    const id = allowed(ctx, input.sessionId)
-    const transcript = recentTranscript({ events: await eventsOf(ctx, id), limit: input.limit })
-    const agent = ctx.agents.get(id)
-    return { sessionId: id, running: agent !== undefined && isBusy(agent), ...transcript }
-  },
-  create: async ({ ctx, input, signal }) => {
-    const controller = controllerOf(ctx)
-    const created = await native(() =>
-      controller.create({
-        ...(input.projectId === undefined ? undefined : { workspaceId: WorkspaceId(input.projectId) }),
-        ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
-        ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
+export const sessionsHost = sessionControllerHostApi(sessionsApi, {
+  list: Effect.fn('sessions list')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const { items } = await native(() => controllerOf(runtime).list({ projections: [] }, signal))
+        const { projects, archived } = projectsBySession(runtime)
+        const candidates = items
+          .filter(item => !item.blank && item.origin !== 'subagent' && (input.includeArchived || !archived.has(item.sessionId)))
+          .filter(item => input.projectId === undefined || projects.get(item.sessionId)?.projectId === input.projectId)
+          .toSorted((left, right) => right.updatedAt - left.updatedAt)
+        const query = input.query?.toLowerCase()
+        // Only a query needs every title; otherwise the page alone is read.
+        const titles = await readTitles(
+          runtime,
+          (query === undefined || query === '' ? candidates.slice(0, input.limit) : candidates).map(item => item.sessionId),
+          signal,
+        )
+        const rows = candidates.map(item => {
+          const project = projects.get(item.sessionId)
+          const title = titles.get(item.sessionId)
+          return {
+            sessionId: item.sessionId,
+            ...(title === undefined ? undefined : { title }),
+            ...(item.cwd === undefined ? undefined : { cwd: item.cwd }),
+            ...project,
+            running: item.running,
+            updatedAt: item.updatedAt,
+          }
+        })
+        const matching =
+          query === undefined || query === ''
+            ? rows
+            : rows.filter(row => [row.title, row.cwd, row.projectTitle].some(field => field?.toLowerCase().includes(query) === true))
+        return { threads: matching.slice(0, input.limit), total: matching.length, truncated: matching.length > input.limit }
       }),
-    )
-    if (input.model !== undefined) {
-      const model = input.model
-      await native(() =>
-        controller.selectModel({
-          sessionId: created.sessionId,
-          provider: model.provider,
-          model: model.model,
-          ...(model.reasoningEffort === undefined ? undefined : { reasoningEffort: ReasoningEffortId(model.reasoningEffort) }),
-        }),
-      )
-    }
-    const title = input.title
-    if (title !== undefined) await native(() => controller.rename({ sessionId: created.sessionId, title }))
-    if (input.prompt !== undefined) await sendPrompt(ctx, created.sessionId, input.prompt, 'queue', signal)
-    return { sessionId: created.sessionId }
-  },
-  prompt: async ({ ctx, input, signal }) => {
-    await sendPrompt(ctx, allowed(ctx, input.sessionId), input.text, input.mode, signal)
-    return { accepted: true as const }
-  },
-  command: ({ ctx, input, signal }) => runCommand(ctx, input.sessionId, input.line, signal),
-  message: async ({ ctx, input, caller }) => {
-    const agent = await agentOf(ctx, input.sessionId)
-    const messageId = MessageId(randomUUID())
-    agent.send(
-      { id: messageId, role: 'user', content: [{ type: 'text', text: input.text }], source: { kind: 'dshfiles-plugin-message', from: senderOf(caller) } },
-      input.target,
-      input.wake,
-    )
-    return { messageId }
-  },
-  compact: ({ ctx, input, signal }) => runCommand(ctx, input.sessionId, '/compact', signal),
-  interrupt: async ({ ctx, input }) => {
-    await native(() => controllerOf(ctx).cancel({ sessionId: allowed(ctx, input.sessionId) }))
-    return { interrupted: true as const }
-  },
-  wait: async ({ ctx, input, signal }) => {
-    const id = allowed(ctx, input.sessionId)
+    ),
+  ),
+  messages: Effect.fn('sessions messages read')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const id = allowed(runtime, input.sessionId)
+        const transcript = recentTranscript({ events: await eventsOf(runtime, id), limit: input.limit })
+        const agent = runtime.ctx.agents.get(id)
+        return { sessionId: id, running: agent !== undefined && isBusy(agent), ...transcript }
+      }),
+    ),
+  ),
+  create: Effect.fn('sessions thread create')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const controller = controllerOf(runtime)
+        const created = await native(() =>
+          controller.create({
+            ...(input.projectId === undefined ? undefined : { workspaceId: WorkspaceId(input.projectId) }),
+            ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
+            ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
+          }),
+        )
+        if (input.model !== undefined) {
+          const model = input.model
+          await native(() =>
+            controller.selectModel({
+              sessionId: created.sessionId,
+              provider: model.provider,
+              model: model.model,
+              ...(model.reasoningEffort === undefined ? undefined : { reasoningEffort: ReasoningEffortId(model.reasoningEffort) }),
+            }),
+          )
+        }
+        const title = input.title
+        if (title !== undefined) await native(() => controller.rename({ sessionId: created.sessionId, title }))
+        if (input.prompt !== undefined) await sendPrompt(runtime, created.sessionId, input.prompt, 'queue', signal)
+        return { sessionId: created.sessionId }
+      }),
+    ),
+  ),
+  prompt: Effect.fn('sessions prompt')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        await sendPrompt(runtime, allowed(runtime, input.sessionId), input.text, input.mode, signal)
+        return { accepted: true as const }
+      }),
+    ),
+  ),
+  command: Effect.fn('sessions command')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('execute session command', () => runCommand(runtime, input.sessionId, input.line, signal)),
+    ),
+  ),
+  message: Effect.fn('sessions message send')(({ input, caller }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const agent = await agentOf(runtime, input.sessionId)
+        const messageId = MessageId(randomUUID())
+        agent.send(
+          { id: messageId, role: 'user', content: [{ type: 'text', text: input.text }], source: { kind: 'dshfiles-plugin-message', from: senderOf(caller) } },
+          input.target,
+          input.wake,
+        )
+        return { messageId }
+      }),
+    ),
+  ),
+  compact: Effect.fn('sessions compact')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('compact session', () => runCommand(runtime, input.sessionId, '/compact', signal)),
+    ),
+  ),
+  interrupt: Effect.fn('sessions interrupt')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        await native(() => controllerOf(runtime).cancel({ sessionId: allowed(runtime, input.sessionId) }))
+        return { interrupted: true as const }
+      }),
+    ),
+  ),
+  wait: Effect.fn('sessions wait')(function* ({ input }) {
+    const runtime = yield* SessionControllerHostRuntime
+    const id = allowed(runtime, input.sessionId)
     const deadline = Date.now() + input.timeoutMs
-    // A cold thread runs nothing: no Agent means idle.
-    for (let agent = ctx.agents.get(id); agent !== undefined && isBusy(agent); agent = ctx.agents.get(id)) {
-      signal.throwIfAborted()
+    let agent = runtime.ctx.agents.get(id)
+    while (agent !== undefined && isBusy(agent)) {
       const remaining = deadline - Date.now()
       if (remaining <= 0) return { status: 'running' as const }
-      // whenIdle settles at the end of a turn, but a queued prompt starts the next one: look again at least every second.
-      await Promise.race([agent.whenIdle(), new Promise(resolve => setTimeout(resolve, Math.min(remaining, 1_000)))])
+      yield* Effect.race(
+        Effect.promise(() => runtime.ctx.agents.get(id)?.whenIdle() ?? Promise.resolve()),
+        Effect.sleep(Math.min(remaining, 1_000)),
+      )
+      agent = runtime.ctx.agents.get(id)
     }
     return { status: 'idle' as const }
-  },
-  selectModel: async ({ ctx, input }) => {
-    const value = await native(() =>
-      controllerOf(ctx).selectModel({
-        sessionId: allowed(ctx, input.sessionId),
-        provider: input.provider,
-        model: input.model,
-        ...(input.reasoningEffort === undefined ? undefined : { reasoningEffort: ReasoningEffortId(input.reasoningEffort) }),
+  }),
+  selectModel: Effect.fn('sessions model select')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const value = await native(() =>
+          controllerOf(runtime).selectModel({
+            sessionId: allowed(runtime, input.sessionId),
+            provider: input.provider,
+            model: input.model,
+            ...(input.reasoningEffort === undefined ? undefined : { reasoningEffort: ReasoningEffortId(input.reasoningEffort) }),
+          }),
+        )
+        return {
+          provider: value.selected.provider,
+          model: value.selected.model,
+          ...(value.selected.reasoningEffort === undefined ? undefined : { reasoningEffort: value.selected.reasoningEffort }),
+        }
       }),
-    )
-    return {
-      provider: value.selected.provider,
-      model: value.selected.model,
-      ...(value.selected.reasoningEffort === undefined ? undefined : { reasoningEffort: value.selected.reasoningEffort }),
-    }
-  },
-  selectAgent: async ({ ctx, input }) => {
-    const presets = ctx.get('agentPresets')
-    if (presets === undefined) throw new PluginApiError('This Host composes no agent presets.', { code: 'agent-presets-unavailable' })
-    const agent = await agentOf(ctx, input.sessionId)
-    return { agentPreset: await native(() => presets.select(agent, input.agentPreset)) }
-  },
-  instructions: async ({ ctx, input }) => {
-    allowed(ctx, input.sessionId)
-    await loadInstructions(ctx)
-    return { entries: entriesOf(input.sessionId) }
-  },
-  setInstruction: async ({ ctx, input }) => {
-    allowed(ctx, input.sessionId)
-    await loadInstructions(ctx)
-    const storage = pluginStorage(ctx, STORAGE_NAMESPACE)
-    const session = instructions.get(input.sessionId) ?? new Map<string, string>()
-    if (input.text === null) {
-      await storage.delete(instructionKey(input.sessionId, input.key))
-      session.delete(input.key)
-    } else {
-      await storage.set(instructionKey(input.sessionId, input.key), input.text)
-      session.set(input.key, input.text)
-    }
-    if (session.size === 0) instructions.delete(input.sessionId)
-    else instructions.set(input.sessionId, session)
-    return { entries: entriesOf(input.sessionId) }
-  },
-  generate: async ({ ctx, input, signal }) => {
-    const base = {
-      prompt: input.prompt,
-      signal,
-      ...(input.system === undefined ? undefined : { system: input.system }),
-      ...(input.model === undefined ? undefined : { model: input.model }),
-      ...(input.sessionId === undefined ? undefined : { sessionId: allowed(ctx, input.sessionId) }),
-      ...(input.maxTokens === undefined ? undefined : { maxTokens: input.maxTokens }),
-    }
-    if (input.jsonSchema === undefined) {
-      const result = await generate(ctx, base)
-      return { text: result.text, provider: result.provider, model: result.model }
-    }
-    const result = await generate(ctx, { ...base, schema: z.fromJSONSchema(input.jsonSchema) })
-    return { text: result.text, value: z.json().parse(result.value), provider: result.provider, model: result.model }
-  },
+    ),
+  ),
+  selectAgent: Effect.fn('sessions agent select')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const presets = runtime.agentPresets
+        if (presets === undefined) {
+          throw new AgentPresetsUnavailable({ message: 'This Host composes no agent presets.', code: 'agent-presets-unavailable' })
+        }
+        const agent = await agentOf(runtime, input.sessionId)
+        return { agentPreset: await native(() => presets.select(agent, input.agentPreset)) }
+      }),
+    ),
+  ),
+  instructions: Effect.fn('sessions instructions read')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        allowed(runtime, input.sessionId)
+        await loadInstructions(runtime.ctx)
+        return { entries: entriesOf(input.sessionId) }
+      }),
+    ),
+  ),
+  setInstruction: Effect.fn('sessions instruction set')(({ input }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        allowed(runtime, input.sessionId)
+        await loadInstructions(runtime.ctx)
+        const storage = pluginStorage(runtime.ctx, STORAGE_NAMESPACE)
+        const session = instructions.get(input.sessionId) ?? new Map<string, string>()
+        if (input.text === null) {
+          await storage.delete(instructionKey(input.sessionId, input.key))
+          session.delete(input.key)
+        } else {
+          await storage.set(instructionKey(input.sessionId, input.key), input.text)
+          session.set(input.key, input.text)
+        }
+        if (session.size === 0) instructions.delete(input.sessionId)
+        else instructions.set(input.sessionId, session)
+        return { entries: entriesOf(input.sessionId) }
+      }),
+    ),
+  ),
+  generate: Effect.fn('sessions generate')(({ input, signal }) =>
+    SessionControllerHostRuntime.use(runtime =>
+      trySessionControllerOperation('sessions API operation', async () => {
+        const base = {
+          prompt: input.prompt,
+          signal,
+          ...(input.system === undefined ? undefined : { system: input.system }),
+          ...(input.model === undefined ? undefined : { model: input.model }),
+          ...(input.sessionId === undefined ? undefined : { sessionId: allowed(runtime, input.sessionId) }),
+          ...(input.maxTokens === undefined ? undefined : { maxTokens: input.maxTokens }),
+        }
+        if (input.jsonSchema === undefined) {
+          const result = await generate(runtime.ctx, base)
+          return { text: result.text, provider: result.provider, model: result.model }
+        }
+        const result = await generate(runtime.ctx, { ...base, schema: standardSchemaOf(input.jsonSchema) })
+        return { text: result.text, value: Schema.decodeUnknownSync(Schema.Json)(result.value), provider: result.provider, model: result.model }
+      }),
+    ),
+  ),
 })
 
 /** Load the stored instructions with the Host, so the first request of a thread already carries them. */

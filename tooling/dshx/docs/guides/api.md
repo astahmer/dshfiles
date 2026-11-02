@@ -366,7 +366,7 @@ A Host call fails with `ApiError { kind: 'unavailable', remoteCode: 'owner-missi
 
 `tool: { name, description?, readOnly?, render? }` registers a native tool when the Host loads (dshx adds `tools` to `inject`). Requirements and behavior:
 
-- The method needs a `description` (or `tool.description`) and, when it takes input, a schema that publishes Standard JSON Schema (zod 4.2+). The model sees that schema projected onto the DSH tool subset; unsupported keywords are dropped, and the contract schema still validates every call, so the projection only loosens.
+- The method needs a `description` (or `tool.description`) and, when it takes input, a schema that publishes Standard JSON Schema (Effect Schema or a compatible Standard Schema adapter, including zod 4.2+). The model sees that schema projected onto the DSH tool subset; unsupported keywords are dropped, and the contract schema still validates every call, so the projection only loosens.
 - Input must be an object (or absent). The handler gets `caller: { kind: 'agent', sessionId, cwd }`, so a method can default to the calling Session's working directory.
 - The call goes through `ctx.tools.execute`: `tools/pre-execute` policies, `ctx.tools.guard` guards and approval apply as to any tool. `readOnly: true` lets it run beside sibling calls; omit it for anything that writes.
 - A tool name collision or an unrepresentable schema logs a warning and leaves the method callable by plugins and Clients; it never fails the Host.

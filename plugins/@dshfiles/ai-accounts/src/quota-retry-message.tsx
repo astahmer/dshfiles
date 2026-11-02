@@ -6,6 +6,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { aiAccountsKeys } from './accounts-queries.js'
+
 import { aiAccountsApi, type QuotaRecoveryModelCatalog, type QuotaRecoveryModelSelection } from './api.js'
 import { useQuotaContinuations, waitingContinuationFor } from './quota-continuations-query.js'
 import { suggestedQuotaRecoverySelection } from './quota-recovery-selection.js'
@@ -34,9 +35,9 @@ const modelFor = (catalog: ModelCatalog | undefined, selection: ModelSelection) 
   catalog?.groups.find(group => group.id === selection.provider)?.models.find(model => model.id === selection.model)
 
 const selectionForModel = (provider: string, model: NonNullable<ReturnType<typeof modelFor>>): ModelSelection => {
-  const selection: ModelSelection = { provider, model: model.id }
-  if (model.reasoning?.defaultEffort !== undefined) selection.reasoningEffort = model.reasoning.defaultEffort
-  return selection
+  const selection = { provider, model: model.id }
+  if (model.reasoning?.defaultEffort === undefined) return selection
+  return { ...selection, reasoningEffort: model.reasoning.defaultEffort }
 }
 
 export const QuotaRetryMessage = (props: { readonly turn: TurnLocation; readonly sessionId: string }): JSX.Element | null => {
@@ -170,9 +171,8 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
               {activeModel?.reasoning?.efforts.length ? (
                 <Select
                   onValueChange={effort => {
-                    const nextSelection: ModelSelection = { provider: selection.provider, model: selection.model }
-                    if (effort !== PROVIDER_DEFAULT_EFFORT) nextSelection.reasoningEffort = effort
-                    setSelectionOverride(nextSelection)
+                    const baseSelection = { provider: selection.provider, model: selection.model }
+                    setSelectionOverride(effort === PROVIDER_DEFAULT_EFFORT ? baseSelection : { ...baseSelection, reasoningEffort: effort })
                   }}
                   value={selection.reasoningEffort ?? PROVIDER_DEFAULT_EFFORT}
                 >

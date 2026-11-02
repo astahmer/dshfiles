@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { join, relative, resolve } from 'node:path'
-import { z } from 'zod'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep, type ReachPosition } from '../project/features.js'
@@ -25,9 +26,9 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
     const catalogFile = join(pluginsRoot, entry.name, 'dshx.features.json')
     const source = await readFile(catalogFile, 'utf8').catch(() => undefined)
     if (source === undefined) continue
-    const catalog = DshxFeatureCatalogSchema.safeParse(decodeJson(jsonValueSchema, source))
-    if (!catalog.success) continue
-    for (const feature of catalog.data.features) {
+    const catalog = Schema.decodeUnknownOption(DshxFeatureCatalogSchema)(decodeJson(jsonValueSchema, source))
+    if (Option.isNone(catalog)) continue
+    for (const feature of catalog.value.features) {
       features.push({
         packageId: `@dshfiles/${entry.name}`,
         catalogFile,
@@ -246,9 +247,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
   }
 }
 
-const browserEventSchema = z.object({ at: z.string(), kind: z.string(), detail: z.string() })
+const browserEventSchema = Schema.Struct({ at: Schema.String, kind: Schema.String, detail: Schema.String })
 
-type BrowserEvent = z.infer<typeof browserEventSchema>
+type BrowserEvent = Schema.Schema.Type<typeof browserEventSchema>
 
 export interface ShotResult {
   readonly screenshot: string

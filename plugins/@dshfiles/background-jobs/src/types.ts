@@ -1,176 +1,169 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { jobCategoryValues } from './classify.js'
 
-const jobCategorySchema = z.enum(jobCategoryValues)
-const jobStatusSchema = z.enum(['running', 'stopping', 'completed', 'killed', 'failed', 'interrupted'])
-export type JobStatus = z.infer<typeof jobStatusSchema>
-const jobScopeSchema = z.enum(['running', 'finished', 'all'])
-export type JobScope = z.infer<typeof jobScopeSchema>
+const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
+const boundedText = (maximum: number) => Schema.String.check(Schema.isMaxLength(maximum))
+const nonnegativeInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const boundedArray = <Item extends Schema.Constraint>(item: Item, maximum: number) => Schema.Array(item).check(Schema.isMaxLength(maximum))
+const struct = <Fields extends Schema.Struct.Fields>(fields: Fields) => Schema.Struct(fields)
 
-export const jobSessionSchema = z
-  .object({
-    id: z.string().min(1).max(256),
-    title: z.string().max(300).nullable(),
-    cwd: z.string().max(1000).nullable(),
-    project: z.string().max(300).nullable(),
-  })
-  .strict()
-export type JobSession = z.infer<typeof jobSessionSchema>
+const jobCategorySchema = Schema.Literals(jobCategoryValues)
+const jobStatusSchema = Schema.Literals(['running', 'stopping', 'completed', 'killed', 'failed', 'interrupted'])
+export type JobStatus = Schema.Schema.Type<typeof jobStatusSchema>
+const jobScopeSchema = Schema.Literals(['running', 'finished', 'all'])
+export type JobScope = Schema.Schema.Type<typeof jobScopeSchema>
 
-const jobRowSchema = z
-  .object({
-    id: z.string().min(1).max(128),
-    kind: z.string().min(1).max(64),
-    label: z.string().max(2000),
-    owner: z.string().min(1).max(256).nullable(),
-    status: jobStatusSchema,
-    progress: z.string().max(300).nullable(),
-    detail: z.string().max(500).nullable(),
-    startedAt: z.number().int().nonnegative(),
-    finishedAt: z.number().int().nonnegative().nullable(),
-    durationMs: z.number().int().nonnegative().nullable(),
-    category: jobCategorySchema,
-    live: z.boolean(),
-    outputTotal: z.number().int().nonnegative(),
-    spillPaths: z.array(z.string().max(1000)).max(8),
-  })
-  .strict()
-export type JobRow = z.infer<typeof jobRowSchema>
+export const jobSessionSchema = struct({
+  id: boundedString(1, 256),
+  title: Schema.NullOr(boundedText(300)),
+  cwd: Schema.NullOr(boundedText(1000)),
+  project: Schema.NullOr(boundedText(300)),
+})
+export type JobSession = Schema.Schema.Type<typeof jobSessionSchema>
 
-export const jobBoardFilterSchema = z
-  .object({
-    scope: jobScopeSchema.optional().describe('running (default), finished, or all.'),
-    categories: z.array(jobCategorySchema).max(jobCategoryValues.length).optional().describe('Only jobs in these categories.'),
-    sessionId: z.string().min(1).max(256).optional().describe('Only jobs owned by this Session.'),
-    search: z.string().trim().min(1).max(200).optional().describe('Case-insensitive literal search over the label, kind, id, and status detail.'),
-    cursor: z.string().min(1).max(256).optional().describe('Opaque cursor from a previous page.'),
-    limit: z.number().int().min(1).max(200).optional().describe('Rows per page, 1 to 200; defaults to 100.'),
-  })
-  .strict()
-export type JobBoardFilter = z.infer<typeof jobBoardFilterSchema>
+const jobRowSchema = struct({
+  id: boundedString(1, 128),
+  kind: boundedString(1, 64),
+  label: boundedText(2000),
+  owner: Schema.NullOr(boundedString(1, 256)),
+  status: jobStatusSchema,
+  progress: Schema.NullOr(boundedText(300)),
+  detail: Schema.NullOr(boundedText(500)),
+  startedAt: nonnegativeInteger,
+  finishedAt: Schema.NullOr(nonnegativeInteger),
+  durationMs: Schema.NullOr(nonnegativeInteger),
+  category: jobCategorySchema,
+  live: Schema.Boolean,
+  outputTotal: nonnegativeInteger,
+  spillPaths: boundedArray(boundedText(1000), 8),
+})
+export type JobRow = Schema.Schema.Type<typeof jobRowSchema>
 
-export const jobIndexingSchema = z
-  .object({
-    active: z.boolean(),
-    caughtUp: z.boolean(),
-    files: z.number().int().nonnegative(),
-    indexedFiles: z.number().int().nonnegative(),
-    historyRows: z.number().int().nonnegative(),
-    lastIndexedAt: z.number().int().nonnegative().nullable(),
-    lastError: z.string().max(500).nullable(),
-  })
-  .strict()
-export type JobIndexing = z.infer<typeof jobIndexingSchema>
+export const jobBoardFilterSchema = struct({
+  scope: Schema.optional(jobScopeSchema.annotate({ description: 'running (default), finished, or all.' })),
+  categories: Schema.optional(boundedArray(jobCategorySchema, jobCategoryValues.length).annotate({ description: 'Only jobs in these categories.' })),
+  sessionId: Schema.optional(boundedString(1, 256).annotate({ description: 'Only jobs owned by this Session.' })),
+  search: Schema.optional(
+    Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({
+      description: 'Case-insensitive literal search over the label, kind, id, and status detail.',
+    }),
+  ),
+  cursor: Schema.optional(boundedString(1, 256).annotate({ description: 'Opaque cursor from a previous page.' })),
+  limit: Schema.optional(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200)).annotate({
+      description: 'Rows per page, 1 to 200; defaults to 100.',
+    }),
+  ),
+})
+export type JobBoardFilter = Schema.Schema.Type<typeof jobBoardFilterSchema>
 
-export const jobBoardSchema = z
-  .object({
-    rows: z.array(jobRowSchema).max(200),
-    total: z.number().int().nonnegative(),
-    hasMore: z.boolean(),
-    nextCursor: z.string().min(1).max(256).nullable(),
-    categoryCounts: z.record(jobCategorySchema, z.number().int().nonnegative()),
-    runningCount: z.number().int().nonnegative(),
-    finishedCount: z.number().int().nonnegative(),
-    sessions: z.array(jobSessionSchema).max(200),
-    indexing: jobIndexingSchema,
-    liveAvailable: z.boolean(),
-    generatedAt: z.number().int().nonnegative(),
-  })
-  .strict()
-export type JobBoard = z.infer<typeof jobBoardSchema>
+export const jobIndexingSchema = struct({
+  active: Schema.Boolean,
+  caughtUp: Schema.Boolean,
+  files: nonnegativeInteger,
+  indexedFiles: nonnegativeInteger,
+  historyRows: nonnegativeInteger,
+  lastIndexedAt: Schema.NullOr(nonnegativeInteger),
+  lastError: Schema.NullOr(boundedText(500)),
+})
+export type JobIndexing = Schema.Schema.Type<typeof jobIndexingSchema>
 
-export const jobOutputSchema = z
-  .object({
-    jobId: z.string().min(1).max(128),
-    available: z.boolean(),
-    reason: z.string().max(300).nullable(),
-    chunks: z
-      .array(
-        z
-          .object({
-            at: z.number().int().nonnegative(),
-            channel: z.string().max(32).nullable(),
-            text: z.string().max(20000),
-          })
-          .strict(),
-      )
-      .max(200),
-    next: z.number().int().nonnegative(),
-    lossy: z.boolean(),
-    spilled: z.array(z.string().max(1000)).max(8),
-  })
-  .strict()
-export type JobOutput = z.infer<typeof jobOutputSchema>
+export const jobBoardSchema = struct({
+  rows: boundedArray(jobRowSchema, 200),
+  total: nonnegativeInteger,
+  hasMore: Schema.Boolean,
+  nextCursor: Schema.NullOr(boundedString(1, 256)),
+  categoryCounts: Schema.Record(jobCategorySchema, nonnegativeInteger),
+  runningCount: nonnegativeInteger,
+  finishedCount: nonnegativeInteger,
+  sessions: boundedArray(jobSessionSchema, 200),
+  indexing: jobIndexingSchema,
+  liveAvailable: Schema.Boolean,
+  generatedAt: nonnegativeInteger,
+})
+export type JobBoard = Schema.Schema.Type<typeof jobBoardSchema>
 
-export const jobKillSchema = z
-  .object({
-    jobId: z.string().min(1).max(128),
-    outcome: z.enum(['requested', 'already-finished']),
-  })
-  .strict()
-export type JobKill = z.infer<typeof jobKillSchema>
+export const jobOutputSchema = struct({
+  jobId: boundedString(1, 128),
+  available: Schema.Boolean,
+  reason: Schema.NullOr(boundedText(300)),
+  chunks: boundedArray(
+    struct({
+      at: nonnegativeInteger,
+      channel: Schema.NullOr(boundedText(32)),
+      text: boundedText(20_000),
+    }),
+    200,
+  ),
+  next: nonnegativeInteger,
+  lossy: Schema.Boolean,
+  spilled: boundedArray(boundedText(1000), 8),
+})
+export type JobOutput = Schema.Schema.Type<typeof jobOutputSchema>
 
-export const jobWaitInputSchema = z
-  .object({
-    jobIds: z.array(z.string().min(1).max(128)).max(20).optional().describe('Job ids to wait for; omit to wait for everything running when the call starts.'),
-    until: z
-      .enum(['settled', 'any-settled'])
-      .optional()
-      .describe('settled (default): every target finished. any-settled: stop when the first target finishes.'),
-    timeoutMs: z.number().int().min(1_000).max(3_600_000).optional().describe('Maximum wait in milliseconds; defaults to 300000 (5 minutes).'),
-  })
-  .strict()
-export type JobWaitInput = z.infer<typeof jobWaitInputSchema>
+export const jobKillSchema = struct({
+  jobId: boundedString(1, 128),
+  outcome: Schema.Literals(['requested', 'already-finished']),
+})
+export type JobKill = Schema.Schema.Type<typeof jobKillSchema>
 
-export const jobWaitSchema = z
-  .object({
-    startedAt: z.number().int().nonnegative(),
-    waitedMs: z.number().int().nonnegative(),
-    timeoutMs: z.number().int().nonnegative(),
-    until: z.enum(['settled', 'any-settled']),
-    timedOut: z.boolean(),
-    jobs: z
-      .array(
-        z
-          .object({
-            jobId: z.string().min(1).max(128),
-            status: jobStatusSchema.nullable(),
-            settled: z.boolean(),
-            label: z.string().max(2000).nullable(),
-            category: jobCategorySchema.nullable(),
-          })
-          .strict(),
-      )
-      .max(20),
-    running: z.array(z.string().min(1).max(128)).max(20),
-  })
-  .strict()
-export type JobWait = z.infer<typeof jobWaitSchema>
+export const jobWaitInputSchema = struct({
+  jobIds: Schema.optional(
+    boundedArray(boundedString(1, 128), 20).annotate({ description: 'Job ids to wait for; omit to wait for everything running when the call starts.' }),
+  ),
+  until: Schema.optional(
+    Schema.Literals(['settled', 'any-settled']).annotate({
+      description: 'settled (default): every target finished. any-settled: stop when the first target finishes.',
+    }),
+  ),
+  timeoutMs: Schema.optional(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1_000), Schema.isLessThanOrEqualTo(3_600_000)).annotate({
+      description: 'Maximum wait in milliseconds; defaults to 300000 (5 minutes).',
+    }),
+  ),
+})
+export type JobWaitInput = Schema.Schema.Type<typeof jobWaitInputSchema>
+
+export const jobWaitSchema = struct({
+  startedAt: nonnegativeInteger,
+  waitedMs: nonnegativeInteger,
+  timeoutMs: nonnegativeInteger,
+  until: Schema.Literals(['settled', 'any-settled']),
+  timedOut: Schema.Boolean,
+  jobs: boundedArray(
+    struct({
+      jobId: boundedString(1, 128),
+      status: Schema.NullOr(jobStatusSchema),
+      settled: Schema.Boolean,
+      label: Schema.NullOr(boundedText(2000)),
+      category: Schema.NullOr(jobCategorySchema),
+    }),
+    20,
+  ),
+  running: boundedArray(boundedString(1, 128), 20),
+})
+export type JobWait = Schema.Schema.Type<typeof jobWaitSchema>
 
 /** One job as the session log recorded it; live state is layered on top at read time. */
-export const historyJobSchema = z
-  .object({
-    id: z.string().min(1).max(128),
-    kind: z.string().min(1).max(64),
-    label: z.string().max(2000),
-    owner: z.string().min(1).max(256).nullable(),
-    startedAt: z.number().int().nonnegative(),
-    settled: z.boolean(),
-    status: z.enum(['completed', 'killed', 'failed']).nullable(),
-    cause: z.string().max(32).nullable(),
-    detail: z.string().max(500).nullable(),
-    finishedAt: z.number().int().nonnegative().nullable(),
-  })
-  .strict()
-export type HistoryJob = z.infer<typeof historyJobSchema>
+export const historyJobSchema = struct({
+  id: boundedString(1, 128),
+  kind: boundedString(1, 64),
+  label: boundedText(2000),
+  owner: Schema.NullOr(boundedString(1, 256)),
+  startedAt: nonnegativeInteger,
+  settled: Schema.Boolean,
+  status: Schema.NullOr(Schema.Literals(['completed', 'killed', 'failed'])),
+  cause: Schema.NullOr(boundedText(32)),
+  detail: Schema.NullOr(boundedText(500)),
+  finishedAt: Schema.NullOr(nonnegativeInteger),
+})
+export type HistoryJob = Schema.Schema.Type<typeof historyJobSchema>
 
-export const jobStateSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    offsets: z.record(z.string(), z.number().int().nonnegative()),
-    jobs: z.record(z.string(), historyJobSchema),
-    sessions: z.record(z.string(), jobSessionSchema),
-    startedAt: z.number().int().nonnegative(),
-  })
-  .strict()
-export type JobState = z.infer<typeof jobStateSchema>
+export const jobStateSchema = struct({
+  schemaVersion: Schema.Literal(1),
+  offsets: Schema.Record(Schema.String, nonnegativeInteger),
+  jobs: Schema.Record(Schema.String, historyJobSchema),
+  sessions: Schema.Record(Schema.String, jobSessionSchema),
+  startedAt: nonnegativeInteger,
+})
+export type JobState = Schema.Schema.Type<typeof jobStateSchema>

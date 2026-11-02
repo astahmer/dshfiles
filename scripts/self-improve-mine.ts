@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { ScriptJson } from './json.ts'
 import { SessionLogs, type SessionLogRef } from './self-improve-log.ts'
 
 /**
@@ -128,89 +129,124 @@ export interface SessionFacts {
 }
 
 /** Validates a cached extraction; a corrupt cache must fail loudly, not skew a report. */
-const sessionFactsSchema: z.ZodType<SessionFacts> = z.object({
-  sessionId: z.string(),
-  project: z.string(),
-  path: z.string(),
-  title: z.string(),
-  cwd: z.string(),
-  provider: z.string(),
-  model: z.string(),
-  createdAt: z.number(),
-  lastEventAt: z.number(),
-  durationMs: z.number(),
-  turns: z.number(),
-  steps: z.number(),
-  compactions: z.number(),
-  peerMessages: z.number(),
-  turnEnds: z.record(z.string(), z.number()),
-  repeatedCalls: z.array(
-    z.object({
-      name: z.string(),
-      argsKey: z.string(),
-      family: z.string(),
-      count: z.number(),
-      firstSeq: z.number(),
-      firstTime: z.number(),
-      callId: z.string(),
-      excerpt: z.string(),
+const sessionFactsSchema = Schema.Struct({
+  sessionId: Schema.String,
+  project: Schema.String,
+  path: Schema.String,
+  title: Schema.String,
+  cwd: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  createdAt: Schema.Number,
+  lastEventAt: Schema.Number,
+  durationMs: Schema.Number,
+  turns: Schema.Number,
+  steps: Schema.Number,
+  compactions: Schema.Number,
+  peerMessages: Schema.Number,
+  turnEnds: Schema.Record(Schema.String, Schema.Number),
+  repeatedCalls: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      argsKey: Schema.String,
+      family: Schema.String,
+      count: Schema.Number,
+      firstSeq: Schema.Number,
+      firstTime: Schema.Number,
+      callId: Schema.String,
+      excerpt: Schema.String,
     }),
   ),
-  toolStats: z.record(z.string(), z.object({ name: z.string(), count: z.number(), slowCount: z.number(), totalMs: z.number(), worstMs: z.number() })),
-  toolErrors: z.array(
-    z.object({ name: z.string(), signature: z.string(), count: z.number(), seq: z.number(), time: z.number(), callId: z.string(), excerpt: z.string() }),
+  toolStats: Schema.Record(
+    Schema.String,
+    Schema.Struct({ name: Schema.String, count: Schema.Number, slowCount: Schema.Number, totalMs: Schema.Number, worstMs: Schema.Number }),
   ),
-  failedJobs: z.array(z.object({ kind: z.string(), label: z.string(), detail: z.string() })),
-  retries: z.array(z.object({ provider: z.string(), code: z.string(), message: z.string(), count: z.number() })),
-  prompts: z.array(
-    z.object({ seq: z.number(), time: z.number(), kind: z.enum(['initial', 'peer', 'followup']), excerpt: z.string(), themes: z.array(z.string()) }),
+  toolErrors: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      signature: Schema.String,
+      count: Schema.Number,
+      seq: Schema.Number,
+      time: Schema.Number,
+      callId: Schema.String,
+      excerpt: Schema.String,
+    }),
   ),
-  jjFailures: z.array(z.object({ subcommand: z.string(), count: z.number(), seq: z.number(), excerpt: z.string(), error: z.string() })),
-  goals: z.array(z.string()),
-  skillLoads: z.record(z.string(), z.number()),
-  fileEdits: z.record(z.string(), z.number()),
-  revisions: z.array(z.string()),
-  tokens: z.object({ input: z.number(), cacheRead: z.number(), output: z.number() }),
-  toolCallCount: z.number(),
-  toolErrorCount: z.number(),
-  corrections: z.number(),
+  failedJobs: Schema.Array(Schema.Struct({ kind: Schema.String, label: Schema.String, detail: Schema.String })),
+  retries: Schema.Array(Schema.Struct({ provider: Schema.String, code: Schema.String, message: Schema.String, count: Schema.Number })),
+  prompts: Schema.Array(
+    Schema.Struct({
+      seq: Schema.Number,
+      time: Schema.Number,
+      kind: Schema.Literals(['initial', 'peer', 'followup']),
+      excerpt: Schema.String,
+      themes: Schema.Array(Schema.String),
+    }),
+  ),
+  jjFailures: Schema.Array(
+    Schema.Struct({ subcommand: Schema.String, count: Schema.Number, seq: Schema.Number, excerpt: Schema.String, error: Schema.String }),
+  ),
+  goals: Schema.Array(Schema.String),
+  skillLoads: Schema.Record(Schema.String, Schema.Number),
+  fileEdits: Schema.Record(Schema.String, Schema.Number),
+  revisions: Schema.Array(Schema.String),
+  tokens: Schema.Struct({ input: Schema.Number, cacheRead: Schema.Number, output: Schema.Number }),
+  toolCallCount: Schema.Number,
+  toolErrorCount: Schema.Number,
+  corrections: Schema.Number,
 })
 
-const textPartSchema = z.object({ type: z.string(), text: z.string().optional() })
-const contentSchema = z.array(textPartSchema)
-const messageSchema = z
-  .object({ role: z.string().optional(), content: contentSchema.optional(), isError: z.boolean().optional(), toolCallId: z.string().optional() })
-  .passthrough()
-const usageSchema = z.object({
-  inputTokens: z.number().optional(),
-  outputTokens: z.number().optional(),
-  cacheReadTokens: z.number().optional(),
+const textPartSchema = Schema.Struct({ type: Schema.String, text: Schema.optionalKey(Schema.String) })
+const contentSchema = Schema.Array(textPartSchema)
+const messageSchema = Schema.Struct({
+  role: Schema.optionalKey(Schema.String),
+  content: Schema.optionalKey(contentSchema),
+  isError: Schema.optionalKey(Schema.Boolean),
+  toolCallId: Schema.optionalKey(Schema.String),
 })
-const failureSchema = z.object({ message: z.string().optional(), code: z.string().optional() })
+const usageSchema = Schema.Struct({
+  inputTokens: Schema.optionalKey(Schema.Number),
+  outputTokens: Schema.optionalKey(Schema.Number),
+  cacheReadTokens: Schema.optionalKey(Schema.Number),
+})
+const failureSchema = Schema.Struct({ message: Schema.optionalKey(Schema.String), code: Schema.optionalKey(Schema.String) })
 
-const sessionRecordSchema = z.object({ id: z.string(), createdAt: z.number().optional(), cwd: z.string().optional() })
-const titleSchema = z.object({ title: z.string() })
-const toolCallSchema = z.object({ callId: z.string(), name: z.string(), arguments: z.string().optional() })
-const toolResultSchema = z.object({ message: messageSchema })
-const turnEndSchema = z.object({ reason: z.object({ kind: z.string() }).optional() })
-const attemptSchema = z.object({
-  stream: z
-    .array(z.object({ chunk: z.object({ type: z.string(), reason: z.object({ kind: z.string(), failure: failureSchema.optional() }).optional() }).optional() }))
-    .optional(),
+const sessionRecordSchema = Schema.Struct({ id: Schema.String, createdAt: Schema.optionalKey(Schema.Number), cwd: Schema.optionalKey(Schema.String) })
+const titleSchema = Schema.Struct({ title: Schema.String })
+const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optionalKey(Schema.String) })
+const toolResultSchema = Schema.Struct({ message: messageSchema })
+const turnEndSchema = Schema.Struct({ reason: Schema.optionalKey(Schema.Struct({ kind: Schema.String })) })
+const attemptSchema = Schema.Struct({
+  stream: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        chunk: Schema.optionalKey(
+          Schema.Struct({
+            type: Schema.String,
+            reason: Schema.optionalKey(Schema.Struct({ kind: Schema.String, failure: Schema.optionalKey(failureSchema) })),
+          }),
+        ),
+      }),
+    ),
+  ),
 })
-const retrySchema = z.object({ provider: z.string(), failure: failureSchema.optional() })
-const jobSettledSchema = z.object({ kind: z.string(), label: z.string().optional(), status: z.string(), detail: z.string().optional() })
-const goalSchema = z.object({ operation: z.string(), goal: z.object({ objective: z.string() }) })
-const inboxSchema = z.object({ inserted: z.array(messageSchema).optional() })
-const assistantSchema = z.object({
-  usage: usageSchema.optional(),
-  message: z
-    .object({ source: z.object({ provider: z.string().optional(), model: z.string().optional() }).optional() })
-    .passthrough()
-    .optional(),
+const retrySchema = Schema.Struct({ provider: Schema.String, failure: Schema.optionalKey(failureSchema) })
+const jobSettledSchema = Schema.Struct({
+  kind: Schema.String,
+  label: Schema.optionalKey(Schema.String),
+  status: Schema.String,
+  detail: Schema.optionalKey(Schema.String),
 })
-const editArgsSchema = z.object({ file_path: z.string().optional(), command: z.string().optional() })
-const skillArgsSchema = z.object({ name: z.string() })
+const goalSchema = Schema.Struct({ operation: Schema.String, goal: Schema.Struct({ objective: Schema.String }) })
+const inboxSchema = Schema.Struct({ inserted: Schema.optionalKey(Schema.Array(messageSchema)) })
+const assistantSchema = Schema.Struct({
+  usage: Schema.optionalKey(usageSchema),
+  message: Schema.optionalKey(
+    Schema.Struct({ source: Schema.optionalKey(Schema.Struct({ provider: Schema.optionalKey(Schema.String), model: Schema.optionalKey(Schema.String) })) }),
+  ),
+})
+const editArgsSchema = Schema.Struct({ file_path: Schema.optionalKey(Schema.String), command: Schema.optionalKey(Schema.String) })
+const skillArgsSchema = Schema.Struct({ name: Schema.String })
 
 const collapse = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
@@ -246,9 +282,15 @@ const digest = (value: string): string => createHash('sha1').update(value).diges
 
 const commandFamily = (command: string): string => collapse(command).replace(/\|.*$/, '').split(/\s+/).slice(0, 3).join(' ').replace(/\d+/g, '<n>').slice(0, 60)
 
-const toolArgumentsSchema = z
-  .object({ command: z.string().optional(), pattern: z.string().optional(), query: z.string().optional(), file_path: z.string().optional() })
-  .passthrough()
+const toolArgumentsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    command: Schema.optionalKey(Schema.String),
+    pattern: Schema.optionalKey(Schema.String),
+    query: Schema.optionalKey(Schema.String),
+    file_path: Schema.optionalKey(Schema.String),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+)
 
 export interface CallKeys {
   readonly argsKey: string
@@ -328,7 +370,7 @@ const SEARCH_TOOLS: ReadonlySet<string> = new Set([
   'activity_timeline_search',
 ])
 
-const partsText = (message: z.infer<typeof messageSchema>): string => (message.content ?? []).map(part => part.text ?? '').join('\n')
+const partsText = (message: Schema.Schema.Type<typeof messageSchema>): string => (message.content ?? []).map(part => part.text ?? '').join('\n')
 
 interface MutableCallGroup {
   readonly name: string
@@ -401,7 +443,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
     if (at > lastEventAt) lastEventAt = at
     switch (record.type) {
       case 'session': {
-        const parsed = sessionRecordSchema.safeParse(record)
+        const parsed = ScriptJson.decodeUnknownSafe(sessionRecordSchema, record)
         if (!parsed.success) break
         sessionId = parsed.data.id
         createdAt = parsed.data.createdAt ?? 0
@@ -409,7 +451,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'session/title': {
-        const parsed = titleSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(titleSchema, record.data)
         if (parsed.success) title = parsed.data.title
         break
       }
@@ -420,7 +462,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         turns += 1
         break
       case 'turn/end': {
-        const parsed = turnEndSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(turnEndSchema, record.data)
         const kind = parsed.success ? (parsed.data.reason?.kind ?? 'unknown') : 'unknown'
         if (ABNORMAL_TURN_ENDINGS.has(kind)) turnEnds[kind] = (turnEnds[kind] ?? 0) + 1
         break
@@ -429,7 +471,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         compactions += 1
         break
       case 'tool/call': {
-        const parsed = toolCallSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(toolCallSchema, record.data)
         if (!parsed.success) break
         sawAgentWork = true
         toolCallCount += 1
@@ -455,9 +497,9 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
           const oldest = pendingCalls.keys().next().value
           if (oldest !== undefined) pendingCalls.delete(oldest)
         }
-        const args = editArgsSchema.safeParse(SessionLogs.decodeJsonSafe(editArgsSchema, parsed.data.arguments ?? '{}') ?? {})
+        const args = ScriptJson.decodeUnknownSafe(editArgsSchema, SessionLogs.decodeJsonSafe(editArgsSchema, parsed.data.arguments ?? '{}') ?? {})
         if (parsed.data.name === 'skill') {
-          const named = skillArgsSchema.safeParse(SessionLogs.decodeJsonSafe(skillArgsSchema, parsed.data.arguments ?? '{}') ?? {})
+          const named = ScriptJson.decodeUnknownSafe(skillArgsSchema, SessionLogs.decodeJsonSafe(skillArgsSchema, parsed.data.arguments ?? '{}') ?? {})
           if (named.success) skillLoads[named.data.name] = (skillLoads[named.data.name] ?? 0) + 1
         }
         if (args.success && args.data.file_path !== undefined) fileEdits[args.data.file_path] = (fileEdits[args.data.file_path] ?? 0) + 1
@@ -475,7 +517,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'tool/result': {
-        const parsed = toolResultSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(toolResultSchema, record.data)
         if (!parsed.success) break
         const callId = parsed.data.message.toolCallId ?? ''
         const call = pendingCalls.get(callId)
@@ -521,14 +563,14 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'job/settled': {
-        const parsed = jobSettledSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(jobSettledSchema, record.data)
         if (!parsed.success || parsed.data.status === 'completed') break
         if (failedJobs.length >= 20) break
         failedJobs.push({ kind: parsed.data.kind, label: excerptOf(parsed.data.label ?? ''), detail: excerptOf(parsed.data.detail ?? parsed.data.status) })
         break
       }
       case 'llm/retry': {
-        const parsed = retrySchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(retrySchema, record.data)
         if (!parsed.success) break
         const key = `${parsed.data.provider}\u0000${parsed.data.failure?.code ?? 'UNKNOWN'}`
         const existing = retryGroups.get(key)
@@ -545,7 +587,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'assistant/attempt': {
-        const parsed = attemptSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(attemptSchema, record.data)
         if (!parsed.success) break
         for (const entry of parsed.data.stream ?? []) {
           const failure = entry.chunk?.type === 'finish' ? entry.chunk.reason?.failure : undefined
@@ -561,7 +603,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'assistant/message': {
-        const parsed = assistantSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(assistantSchema, record.data)
         if (!parsed.success) break
         sawAgentWork = true
         const source = parsed.data.message?.source
@@ -575,12 +617,18 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'goal/change': {
-        const parsed = goalSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(goalSchema, record.data)
         if (parsed.success && parsed.data.operation === 'create') goals.push(excerptOf(parsed.data.goal.objective))
         break
       }
       case 'user/message': {
-        const parsed = z.object({ content: contentSchema, source: z.object({ kind: z.string() }).passthrough().optional() }).safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(
+          Schema.Struct({
+            content: contentSchema,
+            source: Schema.optionalKey(Schema.StructWithRest(Schema.Struct({ kind: Schema.String }), [Schema.Record(Schema.String, Schema.Unknown)])),
+          }),
+          record.data,
+        )
         if (!parsed.success) break
         const text = partsText({ content: parsed.data.content })
         if (!isHumanPrompt(text, parsed.data.source?.kind)) break
@@ -588,7 +636,7 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
         break
       }
       case 'agent/inbox/spliced': {
-        const parsed = inboxSchema.safeParse(record.data)
+        const parsed = ScriptJson.decodeUnknownSafe(inboxSchema, record.data)
         if (!parsed.success) break
         for (const message of parsed.data.inserted ?? []) {
           peerMessages += 1

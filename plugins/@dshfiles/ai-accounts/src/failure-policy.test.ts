@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_RECOVERY_POLICY, NO_PROGRESS, decideRecovery, recoveryPolicySchema, type KindPolicy, type RecoveryProgress } from './failure-policy.js'
+import * as Schema from 'effect/Schema'
 
 const climb = (input: {
   readonly policy: KindPolicy
@@ -85,14 +86,17 @@ describe('decideRecovery', () => {
 
 describe('recoveryPolicySchema', () => {
   it('fills defaults for settings written before failure recovery existed', () => {
-    expect(recoveryPolicySchema.parse(undefined)).toEqual(DEFAULT_RECOVERY_POLICY)
-    expect(recoveryPolicySchema.parse({ transport: { retries: 4 }, rateLimit: 'garbage' })).toEqual({
+    expect(Schema.decodeUnknownSync(recoveryPolicySchema)(undefined)).toEqual(DEFAULT_RECOVERY_POLICY)
+    expect(Schema.decodeUnknownSync(recoveryPolicySchema)({ transport: { retries: 4 }, rateLimit: 'garbage' })).toEqual({
       ...DEFAULT_RECOVERY_POLICY,
       transport: { ...DEFAULT_RECOVERY_POLICY.transport, retries: 4 },
     })
   })
 
   it('replaces out-of-range values with the default for that field only', () => {
-    expect(recoveryPolicySchema.parse({ transport: { retries: 99, then: 'dsh' } }).transport).toEqual({ ...DEFAULT_RECOVERY_POLICY.transport, then: 'dsh' })
+    expect(Schema.decodeUnknownSync(recoveryPolicySchema)({ transport: { retries: 99, then: 'dsh' } }).transport).toEqual({
+      ...DEFAULT_RECOVERY_POLICY.transport,
+      then: 'dsh',
+    })
   })
 })

@@ -1,13 +1,15 @@
 import { randomUUID, createHash } from 'node:crypto'
+import * as Schema from 'effect/Schema'
+import * as SchemaIssue from 'effect/SchemaIssue'
 import { access, readFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
-import { z } from 'zod'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { decodeJson, jsonObjectSchema, jsonValueSchema } from '../json.js'
 import type { JsonObject, JsonValue } from '../json.js'
+import { withUnknownProperties } from '../schema.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { InspectProvider, InspectSlotOptions, ServiceSummary, EventSummary, SlotSummary, ToolSummary } from './types.js'
 
@@ -15,61 +17,61 @@ const PROTOCOL_VERSION = 1
 const MAX_MESSAGE_BYTES = 64 * 1024
 const DEFAULT_TIMEOUT_MS = 10_000
 
-const absolutePathSchema = z.string().refine(isAbsolute)
-
-const bridgeEndpointSchema = z
-  .object({
-    version: z.literal(PROTOCOL_VERSION),
-    packageId: z.string(),
+const absolutePathSchema = Schema.String.check(Schema.makeFilter(isAbsolute))
+const bridgeEndpointSchema = Schema.StructWithRest(
+  Schema.Struct({
+    version: Schema.Literal(PROTOCOL_VERSION),
+    packageId: Schema.String,
     root: absolutePathSchema,
-    pid: z.int(),
+    pid: Schema.Int,
     socketPath: absolutePathSchema,
-  })
-  .catchall(jsonValueSchema)
+  }),
+  [Schema.Record(Schema.String, Schema.Json)],
+)
 
-const bridgeCredentialsSchema = z.object({
-  version: z.literal(PROTOCOL_VERSION),
-  packageId: z.string(),
-  root: z.string(),
-  pid: z.int(),
-  socketPath: z.string(),
-  token: z.string().min(1),
+const bridgeCredentialsSchema = Schema.Struct({
+  version: Schema.Literal(PROTOCOL_VERSION),
+  packageId: Schema.String,
+  root: Schema.String,
+  pid: Schema.Int,
+  socketPath: Schema.String,
+  token: Schema.String.check(Schema.isMinLength(1)),
 })
 
-const bridgeResponseHeaderSchema = z.object({
-  version: z.literal(PROTOCOL_VERSION),
-  requestId: z.string(),
-  target: z.string(),
-  ok: z.boolean(),
+const bridgeResponseHeaderSchema = Schema.Struct({
+  version: Schema.Literal(PROTOCOL_VERSION),
+  requestId: Schema.String,
+  target: Schema.String,
+  ok: Schema.Boolean,
 })
 
-const bridgeErrorResponseSchema = z.object({
-  error: z.object({
-    code: z.enum(['DSHX3201', 'DSHX3202', 'DSHX3203', 'DSHX3204', 'DSHX3205']),
-    message: z.string(),
+const bridgeErrorResponseSchema = Schema.Struct({
+  error: Schema.Struct({
+    code: Schema.Literals(['DSHX3201', 'DSHX3202', 'DSHX3203', 'DSHX3204', 'DSHX3205']),
+    message: Schema.String,
   }),
 })
 
-const optionalStringSchema = z.string().exactOptional()
-const itemMetadataSchema = jsonObjectSchema.exactOptional()
-const itemNameSchema = z.string().trim().min(1)
+const optionalStringSchema = Schema.optionalKey(Schema.String)
+const itemMetadataSchema = Schema.optionalKey(jsonObjectSchema)
+const itemNameSchema = Schema.Trim.check(Schema.isMinLength(1))
 
-const slotItemsSchema = z.array(
-  z.looseObject({
+const slotItemsSchema = Schema.Array(
+  withUnknownProperties({
     name: itemNameSchema,
-    type: z.enum(['slot', 'factory']).exactOptional(),
+    type: Schema.optionalKey(Schema.Literals(['slot', 'factory'])),
     provider: optionalStringSchema,
     kind: optionalStringSchema,
     scope: optionalStringSchema,
     metadata: itemMetadataSchema,
   }),
 )
-const serviceItemsSchema = z.array(
-  z.looseObject({ name: itemNameSchema, provider: optionalStringSchema, scope: optionalStringSchema, metadata: itemMetadataSchema }),
+const serviceItemsSchema = Schema.Array(
+  withUnknownProperties({ name: itemNameSchema, provider: optionalStringSchema, scope: optionalStringSchema, metadata: itemMetadataSchema }),
 )
-const eventItemsSchema = z.array(z.looseObject({ name: itemNameSchema, provider: optionalStringSchema, metadata: itemMetadataSchema }))
+const eventItemsSchema = Schema.Array(withUnknownProperties({ name: itemNameSchema, provider: optionalStringSchema, metadata: itemMetadataSchema }))
 
-type BridgeCredentials = z.infer<typeof bridgeCredentialsSchema>
+type BridgeCredentials = Schema.Schema.Type<typeof bridgeCredentialsSchema>
 
 const bridgeRetryHint = 'Restart the Composition and retry the Inspect command.'
 
@@ -82,22 +84,23 @@ const decodeBridgeResponse = <Item>({
   readonly value: unknown
   readonly requestId: string
   readonly target: string
-  readonly itemsSchema: z.ZodType<readonly Item[]>
+  readonly itemsSchema: Schema.ConstraintDecoder<readonly Item[]>
 }): readonly Item[] => {
-  const header = bridgeResponseHeaderSchema.safeParse(value)
-  if (!header.success || header.data.requestId !== requestId || header.data.target !== target) {
+  const header = Schema.decodeUnknownResult(bridgeResponseHeaderSchema)(value)
+  if (header._tag === 'Failure' || header.success.requestId !== requestId || header.success.target !== target) {
     throw fail('DSHX3203', 'Host Inspect bridge response has an invalid protocol header.', bridgeRetryHint)
   }
-  if (!header.data.ok) {
-    const failure = bridgeErrorResponseSchema.safeParse(value)
-    if (!failure.success) throw fail('DSHX3203', 'Host Inspect bridge returned an invalid error response.', bridgeRetryHint)
-    throw fail(failure.data.error.code, failure.data.error.message, 'Inspect the running Composition and retry the command.')
+  if (!header.success.ok) {
+    const failure = Schema.decodeUnknownResult(bridgeErrorResponseSchema)(value)
+    if (failure._tag === 'Failure') throw fail('DSHX3203', 'Host Inspect bridge returned an invalid error response.', bridgeRetryHint)
+    throw fail(failure.success.error.code, failure.success.error.message, 'Inspect the running Composition and retry the command.')
   }
-  const items = z.object({ items: itemsSchema }).safeParse(value)
-  if (!items.success) {
-    throw fail('DSHX3203', `Host Inspect bridge returned an invalid ${target} item list: ${z.prettifyError(items.error)}`, bridgeRetryHint)
+  const items = Schema.decodeUnknownResult(Schema.Struct({ items: itemsSchema }))(value)
+  if (items._tag === 'Failure') {
+    const formatIssue = SchemaIssue.makeFormatterDefault()
+    throw fail('DSHX3203', `Host Inspect bridge returned an invalid ${target} item list: ${formatIssue(items.failure.issue)}`, bridgeRetryHint)
   }
-  return items.data.items
+  return items.success.items
 }
 
 export interface DshInspectBridgeProviderOptions {
@@ -192,8 +195,8 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  const parsed = bridgeEndpointSchema.safeParse(value)
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(bridgeEndpointSchema)(value)
+  if (parsed._tag === 'Failure') {
     return {
       state: 'invalid',
       diagnostics: [
@@ -207,7 +210,7 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  const endpoint = parsed.data
+  const endpoint = parsed.success
   if (
     endpoint.packageId !== project.packageId ||
     resolve(endpoint.root) !== resolve(project.root) ||
@@ -299,11 +302,11 @@ async function readMetadata(path: string, project: ResolvedDshxConfig, expectedS
       'Restart the current DSH Composition so DSHX can recreate its endpoint metadata.',
     )
   }
-  const parsed = bridgeCredentialsSchema.safeParse(value)
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(bridgeCredentialsSchema)(value)
+  if (parsed._tag === 'Failure') {
     throw fail('DSHX3203', 'Host Inspect bridge metadata is invalid.', 'Restart the current DSH Composition so DSHX can recreate its endpoint metadata.')
   }
-  const credentials = parsed.data
+  const credentials = parsed.success
   if (
     !isAbsolute(credentials.root) ||
     !isAbsolute(credentials.socketPath) ||
@@ -360,7 +363,7 @@ const request = async <Item>({
   readonly target: 'services' | 'events' | 'slots'
   readonly options: DshInspectBridgeProviderOptions
   readonly input: { readonly root: string } | undefined
-  readonly itemsSchema: z.ZodType<readonly Item[]>
+  readonly itemsSchema: Schema.ConstraintDecoder<readonly Item[]>
 }): Promise<readonly Item[]> => {
   const env = { ...process.env, ...options.env }
   const paths = endpointPaths(project.packageId, env)

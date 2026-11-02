@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Schema } from 'effect'
 import { test } from 'vitest'
 import { AGENT_HANDLE_PATTERN, agentSchema, Agents, MAX_MESSAGE_CHARS, type Agent, type AgentDraft } from './agent.js'
 
@@ -89,7 +90,7 @@ test('a creating draft derives its handle from the name', () => {
 test('a row stored before memory scopes and routines existed still loads', () => {
   // Exactly the shape Phase 2 wrote; the storage domain parses every stored row at open, so a missing key must default.
   const legacy = Agents.builtIn(5)
-  const parsed = agentSchema.parse({
+  const parsed = Schema.decodeUnknownSync(agentSchema)({
     handle: legacy.handle,
     name: legacy.name,
     glyph: legacy.glyph,

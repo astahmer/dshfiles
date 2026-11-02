@@ -5,16 +5,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { CoinsIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef } from 'react'
-import type { z } from 'zod'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
 import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema } from './cost-estimate.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { fetchedAgo } from './pricing-status.js'
 import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
 
 /** What the composer's projection hook hands over before `sessionCostViewSchema` decodes it. */
-type ProjectionSnapshot = z.input<typeof sessionCostViewSchema>
+type ProjectionSnapshot = typeof sessionCostViewSchema.Encoded
 
 type ProjectionHook = (key: string) => ProjectionSnapshot | undefined
 
@@ -50,8 +50,8 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
   const displayRef = useRef<SessionCostDisplay | null>(null)
   const raw = props.useProjection(SESSION_COST_PROJECTION_KEY)
   const view = useMemo(() => {
-    const parsed = sessionCostViewSchema.safeParse(raw)
-    return parsed.success ? parsed.data : null
+    const parsed = AiAccountsSchema.decodeResult(sessionCostViewSchema, raw)
+    return parsed._tag === 'Success' ? parsed.success : null
   }, [raw])
   const routes = useMemo(() => {
     const unique = new Map((view?.groups ?? []).map(group => [CostEstimateModel.routeKey(group), { provider: group.provider, model: group.model }]))

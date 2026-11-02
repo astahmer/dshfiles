@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { z } from 'zod'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { UsageCard } from './api.js'
 import { readCodexResetCredits, type CodexResetCredits } from './codex-reset-credits.js'
 import { CodexHomeModel } from './codex-home.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { providerFetch } from './provider-request.js'
 
 type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
@@ -24,41 +27,67 @@ export type UsageWindow = UsageCard['windows'][number]
 
 const READ_TIMEOUT_MS = 5_000
 
-const codexWindowSchema = z.object({
-  used_percent: z.number().finite(),
-  limit_window_seconds: z.number().positive().optional(),
-  reset_after_seconds: z.number().finite().nonnegative().optional(),
-  reset_at: z.number().finite().optional(),
-  resets_at: z.number().finite().optional(),
+const finiteNumber = Schema.Number.check(Schema.isFinite())
+
+/** The UTC pattern the previous datetime string rule accepted, so the converted schema accepts the same values. */
+const utcDateTimePattern =
+  /^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$/u
+
+const dateTimeString = Schema.String.check(
+  Schema.makeFilter(value => (utcDateTimePattern.test(value) ? true : 'Invalid datetime'), {
+    toJsonSchema: () => ({ format: 'date-time', pattern: utcDateTimePattern.source }),
+  }),
+)
+
+const codexWindowSchema = Schema.Struct({
+  used_percent: finiteNumber,
+  limit_window_seconds: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))),
+  reset_after_seconds: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))),
+  reset_at: Schema.optional(finiteNumber),
+  resets_at: Schema.optional(finiteNumber),
 })
 
-const codexRateLimitSchema = z.object({
-  primary_window: codexWindowSchema.nullish().catch(undefined),
-  secondary_window: codexWindowSchema.nullish().catch(undefined),
+/** Nullish, as the previous contract read it: absent stays absent, `null` stays `null`, and a malformed window reads as `undefined`. */
+const codexWindowNullish = Schema.optional(Schema.NullOr(codexWindowSchema)).pipe(Schema.catchDecoding(() => Effect.succeed(Option.none())))
+
+const codexRateLimitSchema = Schema.Struct({
+  primary_window: codexWindowNullish,
+  secondary_window: codexWindowNullish,
 })
 
-const codexUsageSchema = z.object({
-  plan_type: z.string().optional(),
-  rate_limit: codexRateLimitSchema.nullish(),
+const codexRateLimitNullish = Schema.optional(Schema.NullOr(codexRateLimitSchema)).pipe(Schema.catchDecoding(() => Effect.succeed(Option.none())))
+
+const additionalRateLimitSchema = Schema.Struct({
+  limit_name: Schema.optional(Schema.NullOr(Schema.String)),
+  metered_feature: Schema.optional(Schema.NullOr(Schema.String)),
+  rate_limit: codexRateLimitNullish,
+})
+
+/** A malformed entry in the list reads as `null`, the way the contract's per-entry `catch(null)` did. */
+const additionalRateLimitOrNull = Schema.NullOr(additionalRateLimitSchema).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(null))))
+
+const additionalRateLimitsNullish = Schema.optional(Schema.NullOr(Schema.Array(additionalRateLimitOrNull))).pipe(
+  Schema.catchDecoding(() => Effect.succeed(Option.none())),
+)
+
+const codexUsageSchema = Schema.Struct({
+  plan_type: Schema.optional(Schema.String),
+  rate_limit: codexRateLimitNullish,
   /** Extra metered limits; Luna Reserve is one of them when the request asks for it. */
-  additional_rate_limits: z
-    .array(
-      z
-        .object({
-          limit_name: z.string().nullish(),
-          metered_feature: z.string().nullish(),
-          rate_limit: codexRateLimitSchema.nullish(),
-        })
-        .nullable()
-        .catch(null),
-    )
-    .nullish()
-    .catch(undefined),
+  additional_rate_limits: additionalRateLimitsNullish,
 })
 
 // Display parsing tolerates an unknown window; fresh authentication evidence does not silently repair malformed data.
-const codexAuthenticatedSchema = codexUsageSchema.extend({
-  rate_limit: z.object({ primary_window: codexWindowSchema.nullish(), secondary_window: codexWindowSchema.nullish() }).nullish(),
+const codexAuthenticatedSchema = Schema.Struct({
+  ...codexUsageSchema.fields,
+  rate_limit: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        primary_window: Schema.optional(Schema.NullOr(codexWindowSchema)),
+        secondary_window: Schema.optional(Schema.NullOr(codexWindowSchema)),
+      }),
+    ),
+  ),
 })
 
 /** Asks the usage endpoint to include the Luna Reserve meter, as the official client does. */
@@ -66,13 +95,15 @@ const LUNA_RESERVE_HEADER = 'x-openai-codex-luna-reserve'
 
 const isReserveLimit = (name: string | null | undefined): boolean => name !== undefined && name !== null && /luna|reserve/i.test(name)
 
-const codexAuthSchema = z.object({
-  tokens: z.object({
-    access_token: z.string().min(1),
-    account_id: z.string().optional(),
-    id_token: z.string().optional(),
+const codexAuthSchema = Schema.Struct({
+  tokens: Schema.Struct({
+    access_token: Schema.String.check(Schema.isMinLength(1)),
+    account_id: Schema.optional(Schema.String),
+    id_token: Schema.optional(Schema.String),
   }),
 })
+
+const codexAuthClaimsSchema = Schema.Struct({ chatgpt_account_id: Schema.optional(Schema.String) })
 
 /**
  * The window's span decides its label, not its position: a free plan reports
@@ -86,7 +117,7 @@ const codexWindowLabel = (seconds: number | undefined, position: 'primary' | 'se
   return 'Monthly limit'
 }
 
-const codexResetAt = (window: z.infer<typeof codexWindowSchema>, now: number): number | null => {
+const codexResetAt = (window: typeof codexWindowSchema.Type, now: number): number | null => {
   const absolute = window.reset_at ?? window.resets_at
   // Codex reports seconds on some responses and milliseconds on others.
   if (absolute !== undefined && absolute > 0) return absolute > 1e12 ? absolute : absolute * 1000
@@ -97,15 +128,15 @@ const codexResetAt = (window: z.infer<typeof codexWindowSchema>, now: number): n
 /** Read one Codex account's live quota using the credential in its own home. */
 export const readCodexUsage = async (codexHome: string, signal?: AbortSignal, onAuthenticated?: () => void): Promise<UsageCard> => {
   if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
-  let auth: z.infer<typeof codexAuthSchema>
+  let auth: typeof codexAuthSchema.Type
   try {
-    auth = codexAuthSchema.parse(JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
+    auth = AiAccountsSchema.decode(codexAuthSchema, JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
   } catch {
     return ProviderUsageModel.emptyUsage('unauthenticated')
   }
   const claims = auth.tokens.id_token === undefined ? undefined : CodexHomeModel.decodeJwtPayload(auth.tokens.id_token)
-  const authClaims = z.object({ chatgpt_account_id: z.string().optional() }).safeParse(claims?.['https://api.openai.com/auth'])
-  const accountId = auth.tokens.account_id ?? (authClaims.success ? authClaims.data.chatgpt_account_id : undefined)
+  const authClaims = AiAccountsSchema.decodeResult(codexAuthClaimsSchema, claims?.['https://api.openai.com/auth'])
+  const accountId = auth.tokens.account_id ?? (authClaims._tag === 'Success' ? authClaims.success.chatgpt_account_id : undefined)
   if (accountId === undefined) return ProviderUsageModel.emptyUsage('error', 'The Codex account identifier was not found in its sign-in data.')
 
   try {
@@ -130,13 +161,13 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal, on
     if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Codex rejected this login; sign in again.')
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Codex returned ${String(response.status)} for usage.`)
     const raw: JsonValue = await response.json()
-    const parsed = codexAuthenticatedSchema.safeParse(raw)
+    const parsed = AiAccountsSchema.decodeResult(codexAuthenticatedSchema, raw)
     if (
-      parsed.success &&
-      (parsed.data.plan_type?.trim() ||
-        parsed.data.rate_limit === null ||
-        parsed.data.rate_limit?.primary_window !== undefined ||
-        parsed.data.rate_limit?.secondary_window !== undefined)
+      parsed._tag === 'Success' &&
+      (parsed.success.plan_type?.trim() ||
+        parsed.success.rate_limit === null ||
+        parsed.success.rate_limit?.primary_window !== undefined ||
+        parsed.success.rate_limit?.secondary_window !== undefined)
     ) {
       if (!signal?.aborted) onAuthenticated?.()
     }
@@ -146,18 +177,18 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal, on
   }
 }
 
-const opencodeWindowSchema = z.object({
-  status: z.enum(['ok', 'rate-limited']),
+const opencodeWindowSchema = Schema.Struct({
+  status: Schema.Literals(['ok', 'rate-limited']),
   /** Percent *used*, which the reference reader shows as `100 - percent` left. */
-  percent: z.number().finite().min(0).max(100),
-  resetsAt: z.string().datetime().optional(),
+  percent: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100)),
+  resetsAt: Schema.optional(dateTimeString),
 })
 
-const opencodeUsageSchema = z.object({
-  usage: z.object({
-    rolling: opencodeWindowSchema.nullish(),
-    weekly: opencodeWindowSchema.nullish(),
-    monthly: opencodeWindowSchema.nullish(),
+const opencodeUsageSchema = Schema.Struct({
+  usage: Schema.Struct({
+    rolling: Schema.optional(Schema.NullOr(opencodeWindowSchema)),
+    weekly: Schema.optional(Schema.NullOr(opencodeWindowSchema)),
+    monthly: Schema.optional(Schema.NullOr(opencodeWindowSchema)),
   }),
 })
 
@@ -185,8 +216,8 @@ export const readOpenCodeUsage = async (apiKey: string, signal?: AbortSignal, on
     if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'OpenCode rejected this key.')
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `OpenCode returned ${String(response.status)} for usage.`)
     const raw: JsonValue = await response.json()
-    const parsed = opencodeUsageSchema.safeParse(raw)
-    if (parsed.success && OPENCODE_WINDOWS.some(([key]) => parsed.data.usage[key] !== undefined) && !signal?.aborted) onAuthenticated?.()
+    const parsed = AiAccountsSchema.decodeResult(opencodeUsageSchema, raw)
+    if (parsed._tag === 'Success' && OPENCODE_WINDOWS.some(([key]) => parsed.success.usage[key] !== undefined) && !signal?.aborted) onAuthenticated?.()
     return ProviderUsageModel.parseOpenCodeUsage(raw)
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'OpenCode usage could not be read.')
@@ -211,11 +242,11 @@ export class ProviderUsageModel {
   static remainingFromUsed = (usedPercent: number): number => Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10))
 
   static parseCodexUsage = (raw: JsonValue, credits: CodexResetCredits, now: number): UsageCard => {
-    const parsed = codexUsageSchema.safeParse(raw)
-    if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'Codex returned an unsupported usage response.')
+    const parsed = AiAccountsSchema.decodeResult(codexUsageSchema, raw)
+    if (parsed._tag === 'Failure') return ProviderUsageModel.emptyUsage('error', 'Codex returned an unsupported usage response.')
     const windows: UsageWindow[] = []
     for (const position of ['primary', 'secondary'] as const) {
-      const window = parsed.data.rate_limit?.[`${position}_window`]
+      const window = parsed.success.rate_limit?.[`${position}_window`]
       if (window === undefined || window === null) continue
       windows.push({
         label: codexWindowLabel(window.limit_window_seconds, position),
@@ -224,7 +255,7 @@ export class ProviderUsageModel {
       })
     }
     // Reserve meters only ever add a window: the ordinary gauges above always come from `rate_limit`.
-    for (const limit of parsed.data.additional_rate_limits ?? []) {
+    for (const limit of parsed.success.additional_rate_limits ?? []) {
       if (limit === null || !(isReserveLimit(limit.limit_name) || isReserveLimit(limit.metered_feature))) continue
       const reserveWindows = [limit.rate_limit?.primary_window, limit.rate_limit?.secondary_window].flatMap(window =>
         window === undefined || window === null
@@ -240,7 +271,7 @@ export class ProviderUsageModel {
       status: 'ok',
       message: null,
       identity: null,
-      plan: parsed.data.plan_type ?? null,
+      plan: parsed.success.plan_type ?? null,
       windows,
       bankedResets: credits.available,
       bankedResetExpiries: credits.resets.map(reset => reset.expiresAt ?? null),
@@ -248,11 +279,11 @@ export class ProviderUsageModel {
   }
 
   static parseOpenCodeUsage = (raw: JsonValue): UsageCard => {
-    const parsed = opencodeUsageSchema.safeParse(raw)
-    if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'OpenCode returned an unsupported usage response.')
+    const parsed = AiAccountsSchema.decodeResult(opencodeUsageSchema, raw)
+    if (parsed._tag === 'Failure') return ProviderUsageModel.emptyUsage('error', 'OpenCode returned an unsupported usage response.')
     const windows: UsageWindow[] = []
     for (const [key, label] of OPENCODE_WINDOWS) {
-      const window = parsed.data.usage[key]
+      const window = parsed.success.usage[key]
       if (window === undefined || window === null) continue
       windows.push({
         label,

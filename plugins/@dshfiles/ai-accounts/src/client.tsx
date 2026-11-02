@@ -177,7 +177,7 @@ export default defineClientPlugin({
     )
     const ModelsPageAccountsView = (): JSX.Element => (
       <PluginQueryProvider>
-        <ModelsPageAccounts onAddAccount={() => openSetup()} />
+        <ModelsPageAccounts />
       </PluginQueryProvider>
     )
     // Dock entries share the bundle's query client, so every open composer reads one quote cache.

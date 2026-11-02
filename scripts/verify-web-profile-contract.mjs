@@ -1,33 +1,28 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const profileRoot = join(repositoryRoot, 'profiles/web')
 const pluginsRoot = join(repositoryRoot, 'plugins/@dshfiles')
-const profileManifestSchema = z
-  .object({
-    dependencies: z.record(z.string(), z.string()),
-    dsh: z.object({ profile: z.object({ bundles: z.array(z.string()) }) }),
-  })
-  .passthrough()
-const bundleManifestSchema = z
-  .object({
-    name: z.string(),
-    dependencies: z.record(z.string(), z.string()).default({}),
-    peerDependencies: z.record(z.string(), z.string()).default({}),
-    dsh: z
-      .object({
-        bundle: z.unknown().optional(),
-        client: z.object({ external: z.array(z.string()).default([]) }).optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough()
+const profileManifestSchema = Schema.Struct({
+  dependencies: Schema.Record(Schema.String, Schema.String),
+  dsh: Schema.Struct({ profile: Schema.Struct({ bundles: Schema.Array(Schema.String) }) }),
+})
+const bundleManifestSchema = Schema.Struct({
+  name: Schema.String,
+  dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  peerDependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  dsh: Schema.optionalKey(
+    Schema.Struct({
+      bundle: Schema.optionalKey(Schema.Unknown),
+      client: Schema.optionalKey(Schema.Struct({ external: Schema.optionalKey(Schema.Array(Schema.String)) })),
+    }),
+  ),
+})
 
-const readJson = async (path, schema) => schema.parse(JSON.parse(await readFile(path, 'utf8')))
+const readJson = async (path, schema) => Schema.decodeUnknownSync(schema)(JSON.parse(await readFile(path, 'utf8')))
 const isOwnedPackage = packageId => /^@dshfiles\/[^/]+$/.test(packageId)
 const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0]
 // Optional personal-project bundles require explicit selection, never activation by source synchronization.

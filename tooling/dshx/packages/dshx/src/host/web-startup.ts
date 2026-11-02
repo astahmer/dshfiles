@@ -1,10 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import type { WebStartupValues } from '@deepseek-ai/dsh-web-app/startup'
-import { z } from 'zod'
 
-const overridesSchema = z.object({
-  host: z.string().optional(),
-  port: z.number().int().min(0).max(65535).optional(),
+const overridesSchema = Schema.Struct({
+  host: Schema.optional(Schema.String),
+  port: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65535))),
 })
 
 /**
@@ -15,7 +15,7 @@ const overridesSchema = z.object({
  */
 export function readWebStartupOverrides(ctx: Context): Pick<WebStartupValues, 'host' | 'port'> {
   const raw: unknown = ctx.get('webStartup')
-  const overrides = overridesSchema.parse(raw ?? {})
+  const overrides = Schema.decodeUnknownSync(overridesSchema)(raw ?? {})
   const result: Pick<WebStartupValues, 'host' | 'port'> = {}
   if (overrides.host !== undefined) result.host = overrides.host
   if (overrides.port !== undefined) result.port = overrides.port

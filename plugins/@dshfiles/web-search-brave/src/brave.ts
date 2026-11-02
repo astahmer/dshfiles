@@ -1,27 +1,27 @@
 import { WebError, type WebSearchRequest, type WebSearchResult, type WebSearchSource } from '@deepseek-ai/dsh-web'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import { Result, Schema } from 'effect'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 
 const BRAVE_SEARCH_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search'
 const SEARCH_TIMEOUT_MS = 15_000
 const MAX_SNIPPET_CHARS = 1_200
 
-const braveResultSchema = z.object({
-  title: z.string().optional(),
-  url: z.string().min(1),
-  description: z.string().optional(),
-  age: z.string().optional(),
-  page_age: z.string().optional(),
+const braveResultSchema = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+  url: Schema.String.check(Schema.isMinLength(1)),
+  description: Schema.optionalKey(Schema.String),
+  age: Schema.optionalKey(Schema.String),
+  page_age: Schema.optionalKey(Schema.String),
 })
 
-const braveResponseSchema = z.object({
-  web: z.object({
-    results: z.array(braveResultSchema).optional(),
+const braveResponseSchema = Schema.Struct({
+  web: Schema.Struct({
+    results: Schema.optionalKey(Schema.Array(braveResultSchema)),
   }),
 })
 
-type BraveResponse = z.infer<typeof braveResponseSchema>
+type BraveResponse = typeof braveResponseSchema.Type
 
 interface MutableSource {
   url: string
@@ -64,9 +64,9 @@ export class BraveSearchModel {
     } catch (cause) {
       throw new WebError('Brave search returned invalid JSON.', 'WEB_PROVIDER_ERROR', { cause })
     }
-    const parsed = braveResponseSchema.safeParse(payload)
-    if (!parsed.success) throw new WebError('Brave search returned an unexpected response shape.', 'WEB_PROVIDER_ERROR')
-    return parsed.data
+    const parsed = Schema.decodeUnknownResult(braveResponseSchema)(payload)
+    if (Result.isFailure(parsed)) throw new WebError('Brave search returned an unexpected response shape.', 'WEB_PROVIDER_ERROR')
+    return parsed.success
   }
 
   /** Map a parsed Brave payload onto citeable sources; an unexpected shape fails loudly instead of returning nothing. */

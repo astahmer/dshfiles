@@ -1,44 +1,38 @@
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
-const githubReleaseSchema = z.object({
-  tag_name: z.string().min(1).max(255),
-  name: z.string().max(255).nullable(),
-  published_at: z.string().max(40).nullable(),
-  draft: z.boolean(),
-  body: z.string().max(50_000).nullable(),
+const githubReleaseSchema = Schema.Struct({
+  tag_name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  name: Schema.NullOr(Schema.String.check(Schema.isMaxLength(255))),
+  published_at: Schema.NullOr(Schema.String.check(Schema.isMaxLength(40))),
+  draft: Schema.Boolean,
+  body: Schema.NullOr(Schema.String.check(Schema.isMaxLength(50_000))),
 })
 
-const releaseHighlightSchema = z
-  .object({
-    section: z.string().min(1).max(80),
-    text: z.string().min(1).max(300),
-  })
-  .strict()
+const releaseHighlightSchema = Schema.Struct({
+  section: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(300)),
+})
 
-const releaseInfoSchema = z
-  .object({
-    version: z.string().min(1).max(100),
-    title: z.string().min(1).max(255),
-    url: z.string().url().max(2_048),
-    publishedAt: z.string().max(40).nullable(),
-    highlights: z.array(releaseHighlightSchema).max(12),
-  })
-  .strict()
+const releaseInfoSchema = Schema.Struct({
+  version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  url: Schema.String.check(Schema.isMaxLength(2_048), Schema.isPattern(/^https:\/\/github\.com\//u)),
+  publishedAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(40))),
+  highlights: Schema.Array(releaseHighlightSchema).check(Schema.isMaxLength(12)),
+})
 
-export const dshReleaseStatusSchema = z
-  .object({
-    currentVersion: z.string().max(100).nullable(),
-    latestVersion: z.string().max(100).nullable(),
-    latestUrl: z.string().url().max(2_048).nullable(),
-    available: z.boolean(),
-    comparisonKnown: z.boolean(),
-    releases: z.array(releaseInfoSchema).max(100),
-  })
-  .strict()
+export const dshReleaseStatusSchema = Schema.Struct({
+  currentVersion: Schema.NullOr(Schema.String.check(Schema.isMaxLength(100))),
+  latestVersion: Schema.NullOr(Schema.String.check(Schema.isMaxLength(100))),
+  latestUrl: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048), Schema.isPattern(/^https:\/\/github\.com\//u))),
+  available: Schema.Boolean,
+  comparisonKnown: Schema.Boolean,
+  releases: Schema.Array(releaseInfoSchema).check(Schema.isMaxLength(100)),
+})
 
-export type ReleaseInfo = z.infer<typeof releaseInfoSchema>
-export type DshReleaseStatus = z.infer<typeof dshReleaseStatusSchema>
+export type ReleaseInfo = typeof releaseInfoSchema.Type
+export type DshReleaseStatus = typeof dshReleaseStatusSchema.Type
 
 const RELEASES_URL = 'https://api.github.com/repos/deepseek-ai/deepseek-harness/releases?per_page=100'
 const RELEASE_PAGE_URL = 'https://github.com/deepseek-ai/deepseek-harness/releases/tag/'
@@ -91,7 +85,7 @@ const summarizeReleaseNotes = (body: string | null): ReleaseInfo['highlights'] =
   return highlights
 }
 
-const versionedRelease = (release: z.infer<typeof githubReleaseSchema>): ReleaseInfo | undefined => {
+const versionedRelease = (release: typeof githubReleaseSchema.Type): ReleaseInfo | undefined => {
   const version = releaseVersion(release.tag_name)
   if (version === undefined || release.draft) return undefined
   return {
@@ -104,8 +98,8 @@ const versionedRelease = (release: z.infer<typeof githubReleaseSchema>): Release
 }
 
 export const releaseStatusFromGitHub = (input: { readonly currentVersion: string | null; readonly response: unknown }): DshReleaseStatus => {
-  const payload = z.array(githubReleaseSchema).max(100).parse(input.response)
-  const releases = payload.flatMap(release => {
+  const payload = Schema.decodeUnknownSync(Schema.Array(githubReleaseSchema).check(Schema.isMaxLength(100)))(input.response)
+  const releases = payload.flatMap((release): ReleaseInfo[] => {
     const parsed = versionedRelease(release)
     return parsed === undefined ? [] : [parsed]
   })

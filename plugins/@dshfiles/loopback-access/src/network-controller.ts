@@ -6,35 +6,32 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { bindUrlHost, isLoopbackHost } from '@deepseek-ai/dsh-host-webserver'
 import { readWebStartupOverrides } from '@dshfiles/dshx/host'
 import { PluginApiError } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import type { LoopbackAccess } from './access.js'
-import { networkSaveSchema, type NetworkForm, type NetworkSnapshot } from './network-api.js'
-import {
-  NETWORK_SETTINGS_NAMESPACE,
-  NetworkPreferencesModel,
-  preferencesSchema,
-  type NetworkPreferences,
-  type NetworkStartupValues,
-} from './network-preferences.js'
+import { networkSaveSchema, type NetworkAddress, type NetworkForm, type NetworkSnapshot } from './network-api.js'
+import { NETWORK_SETTINGS_NAMESPACE, NetworkPreferencesModel, type NetworkPreferences, type NetworkStartupValues } from './network-preferences.js'
+import { LoopbackSchema } from './schema.js'
 
-const rawObject = z.record(z.string(), z.unknown())
-const expression = z.object({ __jsExpr: z.string() }).strict()
+const rawObject = Schema.Record(Schema.String, Schema.Unknown)
+// A strict object still rejects unknown keys: the decoder below keeps `onExcessProperty: 'error'`, as zod did.
+const expression = Schema.Struct({ __jsExpr: Schema.String })
 
 /** Only our explicit native startup delegation is managed; never reinterpret custom profile code. */
-const isManagedNetworkConfiguration = (value: z.infer<typeof rawObject>): boolean => {
+const isManagedNetworkConfiguration = (value: typeof rawObject.Type): boolean => {
   if (Object.hasOwn(value, '__jsExpr')) return false
-  const host = expression.safeParse(value.host)
-  const port = expression.safeParse(value.port)
+  const host = Schema.decodeUnknownOption(expression, { onExcessProperty: 'error' })(value.host)
+  const port = Schema.decodeUnknownOption(expression, { onExcessProperty: 'error' })(value.port)
   return (
-    host.success &&
-    port.success &&
-    host.data.__jsExpr.startsWith('ctx.webStartup.host ?? ctx.dshfilesNetworkStartup.host ??') &&
-    port.data.__jsExpr.startsWith('ctx.webStartup.port ?? ctx.dshfilesNetworkStartup.port ??')
+    Option.isSome(host) &&
+    Option.isSome(port) &&
+    host.value.__jsExpr.startsWith('ctx.webStartup.host ?? ctx.dshfilesNetworkStartup.host ??') &&
+    port.value.__jsExpr.startsWith('ctx.webStartup.port ?? ctx.dshfilesNetworkStartup.port ??')
   )
 }
 
 const localNetworkAddresses = (): NetworkSnapshot['addresses'] => {
-  const result: NetworkSnapshot['addresses'] = []
+  const result: NetworkAddress[] = []
   const seen = new Set<string>()
   for (const [interfaceName, entries] of Object.entries(networkInterfaces())) {
     for (const entry of entries ?? []) {
@@ -88,14 +85,14 @@ export class NetworkController {
     const native = this.#ctx.webServer
     const port = native.port
     if (port === undefined) throw new Error('The native Web listener has not initialized.')
-    const preferences = preferencesSchema.parse(descriptor.value)
+    const preferences = NetworkPreferencesModel.decode(descriptor.value)
     const saved = preferencesToForm(preferences, native.host, port)
     const applied = preferencesToForm(this.#boot.preferences, native.host, port)
     const current = this.#access.status()
     const row = this.#ctx.configEditor.entries().find(entry => entry.options.id === 'webserver' && entry.options.name === '@deepseek-ai/dsh-host-webserver')
-    const raw = rawObject.safeParse(row?.options.config)
-    const managed = row !== undefined && raw.success && isManagedNetworkConfiguration(raw.data)
-    const unsupported = row === undefined || !raw.success || Object.hasOwn(raw.data, '__jsExpr')
+    const raw = Schema.decodeUnknownOption(rawObject)(row?.options.config)
+    const managed = row !== undefined && Option.isSome(raw) && isManagedNetworkConfiguration(raw.value)
+    const unsupported = row === undefined || Option.isNone(raw) || Object.hasOwn(raw.value, '__jsExpr')
     const integration = managed ? 'managed' : unsupported ? 'unsupported' : 'needs-setup'
     const overrides = readWebStartupOverrides(this.#ctx)
     return {
@@ -118,8 +115,8 @@ export class NetworkController {
     }
   }
 
-  save(input: z.infer<typeof networkSaveSchema>, signal: AbortSignal): Promise<NetworkSnapshot> {
-    const parsed = networkSaveSchema.parse(input)
+  save(input: typeof networkSaveSchema.Type, signal: AbortSignal): Promise<NetworkSnapshot> {
+    const parsed = LoopbackSchema.decodeStrict(networkSaveSchema, input)
     const change = this.#pending.then(async () => {
       signal.throwIfAborted()
       const before = this.snapshot()

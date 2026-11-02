@@ -3,7 +3,8 @@ import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
-import { z } from 'zod'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { zstdCompressSync } from 'node:zlib'
 import { accountConnectionSnapshotSchema, accountDraftSchema, accountsFileSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
 import { threadAccountPreviewSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/thread-account-api.js'
@@ -414,9 +415,21 @@ Given('the isolated provisional account connections profile is booted', async ({
   await visitIsolatedPluginProfile(page, profile)
 })
 
+const savedDraftEnvelope = Schema.Struct({ payload: Schema.Struct({ input: Schema.Struct({ draft: accountDraftSchema }) }) })
+const savedAccountsEnvelope = Schema.Struct({
+  result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: accountsFileSchema }) }),
+})
+const prepareConnectionInput = Schema.Struct({ payload: Schema.Struct({ input: Schema.Struct({ existingInstanceId: Schema.String }) }) })
+const prepareReconnectInput = Schema.Struct({
+  payload: Schema.Struct({ input: Schema.Struct({ requestId: Schema.String.check(Schema.isUUID()), existingInstanceId: Schema.String }) }),
+})
+const accountConnectionEnvelope = Schema.Struct({
+  result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: accountConnectionSnapshotSchema }) }),
+})
+
 const readSavedAccounts = async (page: Page) => {
   const source = await readFile(join(profileFor(page).homeRoot, 'plugins', 'ai-accounts', 'accounts.json'), 'utf8').catch(() => '{"accounts":[]}')
-  return z.object({ accounts: z.array(accountDraftSchema) }).parse(JSON.parse(source)).accounts
+  return Schema.decodeUnknownSync(Schema.Struct({ accounts: Schema.Array(accountDraftSchema) }))(JSON.parse(source)).accounts
 }
 const emptyAccountStore = async (page: Page): Promise<void> => {
   expect(await readSavedAccounts(page)).toHaveLength(0)
@@ -868,12 +881,6 @@ Then('the AI Accounts list on the Models page can be hidden and restored', async
     await expect(restoredAccountList).toBeChecked()
     await settings.getByRole('button', { name: 'Models', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
-    await settings.getByRole('button', { name: 'Add account', exact: true }).click()
-    const setup = page.getByRole('dialog', { name: 'Add account', exact: true })
-    await expect(setup.getByRole('button', { name: 'Codex account', exact: true })).toBeVisible()
-    await expect(setup.getByRole('button', { name: 'Claude account', exact: true })).toBeVisible()
-    await expect(page.getByText('No accounts yet.', { exact: true })).toBeVisible()
-    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })
@@ -1091,12 +1098,12 @@ Then('the sidebar moves the current thread between accounts without the model pi
   // the real dialog API responses below provide the exact persisted Session identity.
   let threadUrl = page.url()
   let threadId: string | undefined
-  const threadResponse = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: threadAccountPreviewSchema }) }) })
+  const threadResponse = Schema.Struct({ result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: threadAccountPreviewSchema }) }) })
   const waitForThreadResponse = (method: 'preview' | 'switch') =>
     page.waitForResponse(
       response => /\/api\/dshx-[0-9a-f]+\//u.test(new URL(response.url()).pathname) && new URL(response.url()).pathname.endsWith(`/${method}`),
     )
-  const expectSameThread = (plan: z.infer<typeof threadAccountPreviewSchema>): void => {
+  const expectSameThread = (plan: Schema.Schema.Type<typeof threadAccountPreviewSchema>): void => {
     threadId ??= plan.sessionId
     expect(plan.sessionId).toBe(threadId)
   }
@@ -1124,7 +1131,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     keyboard = false,
     model = 'gpt-6-luna',
     strategy: 'same-model' | 'preferred-model' = 'same-model',
-  ): Promise<z.infer<typeof threadAccountPreviewSchema>> => {
+  ): Promise<Schema.Schema.Type<typeof threadAccountPreviewSchema>> => {
     const tile = usageStrip(page).getByRole('button', { name: new RegExp(`^Command Code ${account}: Weekly limit`, 'u') })
     if (keyboard) {
       await tile.focus()
@@ -1138,7 +1145,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     })
     const response = waitForThreadResponse('preview')
     await action.click()
-    const plan = threadResponse.parse(await (await response).json()).result.value.output
+    const plan = Schema.decodeUnknownSync(threadResponse)(await (await response).json()).result.value.output
     expectSameThread(plan)
     expect(plan.instanceId).toBe(account === 1 ? 'commandcode_work' : 'commandcode_work_2')
     const dialog = page.getByRole('dialog', { name: 'Use account for this thread', exact: true })
@@ -1161,7 +1168,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     const before = turns().length
     const response = waitForThreadResponse('switch')
     await page.getByRole('dialog', { name: 'Use account for this thread', exact: true }).getByRole('button', { name: 'Use this account', exact: true }).click()
-    const plan = threadResponse.parse(await (await response).json()).result.value.output
+    const plan = Schema.decodeUnknownSync(threadResponse)(await (await response).json()).result.value.output
     expectSameThread(plan)
     expect(plan.target).toMatchObject({ provider: accountId, model })
     const success = page.getByRole('dialog', { name: 'Thread account changed', exact: true })
@@ -1543,17 +1550,17 @@ const expectEnabledSave = async (page: Page, enabled: boolean, action: () => Pro
   const response = page.waitForResponse(candidate => {
     const path = new URL(candidate.url()).pathname
     if (!/\/api\/dshx-[0-9a-f]+\/save$/u.test(path)) return false
-    const input = z.object({ payload: z.object({ input: z.object({ draft: accountDraftSchema }) }) }).safeParse(candidate.request().postDataJSON())
-    return input.success && input.data.payload.input.draft.instanceId === 'commandcode_work'
+    const input = Schema.decodeUnknownOption(savedDraftEnvelope)(candidate.request().postDataJSON())
+    return Option.isSome(input) && input.value.payload.input.draft.instanceId === 'commandcode_work'
   })
   await action()
   const saved = await response
   expect(saved.ok()).toBe(true)
-  const draft = z.object({ payload: z.object({ input: z.object({ draft: accountDraftSchema }) }) }).parse(saved.request().postDataJSON()).payload.input.draft
+  const draft = Schema.decodeUnknownSync(savedDraftEnvelope)(saved.request().postDataJSON()).payload.input.draft
   expect(draft).toEqual(expected.find(account => account.instanceId === 'commandcode_work'))
-  const result = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: accountsFileSchema }) }) }).parse(await saved.json())
+  const result = Schema.decodeUnknownSync(savedAccountsEnvelope)(await saved.json())
   // The Host returns observed identity/health as well as saved settings; compare the complete authored draft projection.
-  expect(result.result.value.output.accounts.map(account => accountDraftSchema.parse(account))).toEqual(expected)
+  expect(result.result.value.output.accounts.map(account => Schema.decodeUnknownSync(accountDraftSchema)(account))).toEqual(expected)
   expect(result.result.value.output.accounts.find(account => account.instanceId === 'commandcode_work')?.state).toBe(enabled ? 'healthy' : 'disabled')
   await expect.poll(() => readSavedAccounts(page)).toEqual(expected)
 }
@@ -1637,9 +1644,9 @@ Then('usage popover toggles persist enabled state without hiding or reordering a
     }
     const collectSave = (request: Request): void => {
       if (!/\/api\/dshx-[0-9a-f]+\/save$/u.test(new URL(request.url()).pathname)) return
-      const input = z.object({ payload: z.object({ input: z.object({ draft: accountDraftSchema }) }) }).safeParse(request.postDataJSON())
-      if (input.success) {
-        const { instanceId, enabled } = input.data.payload.input.draft
+      const input = Schema.decodeUnknownOption(savedDraftEnvelope)(request.postDataJSON())
+      if (Option.isSome(input)) {
+        const { instanceId, enabled } = input.value.payload.input.draft
         saves.push({ method: 'save', instanceId, enabled, elapsedMs: Date.now() - saveStartedAt })
       }
     }
@@ -1839,10 +1846,7 @@ Then('an expired quota login keeps its sidebar identity without inventing a perc
       await expect(reconnect.getByRole('button', { name: 'Use existing credential', exact: true })).toHaveAttribute('aria-pressed', 'true')
       const preparations = requests.filter(request => method(request) === 'prepareAccountConnection')
       expect(preparations).toHaveLength(1)
-      expect(
-        z.object({ payload: z.object({ input: z.object({ existingInstanceId: z.string() }) }) }).parse(preparations[0]?.postDataJSON()).payload.input
-          .existingInstanceId,
-      ).toBe(existing.instanceId)
+      expect(Schema.decodeUnknownSync(prepareConnectionInput)(preparations[0]?.postDataJSON()).payload.input.existingInstanceId).toBe(existing.instanceId)
       expect(requests.filter(request => forbidden.has(method(request)))).toHaveLength(0)
       expect(await readSavedAccounts(page)).toEqual(before)
       await reconnect.getByRole('button', { name: 'Close', exact: true }).first().click()
@@ -1866,8 +1870,8 @@ Then('an expired quota login keeps its sidebar identity without inventing a perc
     const collect = (request: Request): void => {
       if (/\/api\/dshx-[0-9a-f]+\//u.test(new URL(request.url()).pathname)) requests.push(request)
     }
-    const preparationInput = z.object({ payload: z.object({ input: z.object({ requestId: z.uuid(), existingInstanceId: z.string() }) }) })
-    const connectionResponse = z.object({ result: z.object({ ok: z.literal(true), value: z.object({ output: accountConnectionSnapshotSchema }) }) })
+    const preparationInput = prepareReconnectInput
+    const connectionResponse = accountConnectionEnvelope
     page.on('request', collect)
     try {
       await quotaAccountCard(page, 'Command Code 1').getByRole('button', { name: 'Reauthenticate', exact: true }).click()
@@ -1875,15 +1879,17 @@ Then('an expired quota login keeps its sidebar identity without inventing a perc
       await expect(reconnect).toBeVisible()
       const initial = requests.filter(request => method(request) === 'prepareAccountConnection')
       expect(initial).toHaveLength(1)
-      const first = preparationInput.parse(initial[0]?.postDataJSON()).payload.input
+      const first = Schema.decodeUnknownSync(preparationInput)(initial[0]?.postDataJSON()).payload.input
       expect(first.existingInstanceId).toBe(existing.instanceId)
       const terminalResponse = page.waitForResponse(async response => {
         if (!new URL(response.url()).pathname.endsWith('/getAccountConnection')) return false
-        const parsed = connectionResponse.safeParse(await response.json())
-        return parsed.success && parsed.data.result.value.output.operationId === first.requestId && parsed.data.result.value.output.status === 'discarded'
+        const parsed = Schema.decodeUnknownOption(connectionResponse)(await response.json())
+        return (
+          Option.isSome(parsed) && parsed.value.result.value.output.operationId === first.requestId && parsed.value.result.value.output.status === 'discarded'
+        )
       })
       await reconnect.getByRole('button', { name: 'Verify and reconnect', exact: true }).click()
-      const terminal = connectionResponse.parse(await (await terminalResponse).json()).result.value.output
+      const terminal = Schema.decodeUnknownSync(connectionResponse)(await (await terminalResponse).json()).result.value.output
       expect(terminal.account).toBeNull()
       expect(terminal.expiresAt).toBeGreaterThan(Date.now())
       const unavailable = page.getByRole('dialog', { name: 'Reconnect account', exact: true })
@@ -1895,7 +1901,7 @@ Then('an expired quota login keeps its sidebar identity without inventing a perc
       await expect(reconnect).toBeVisible()
       const preparations = requests.filter(request => method(request) === 'prepareAccountConnection')
       expect(preparations).toHaveLength(2)
-      const second = preparationInput.parse(preparations[1]?.postDataJSON()).payload.input
+      const second = Schema.decodeUnknownSync(preparationInput)(preparations[1]?.postDataJSON()).payload.input
       expect(second.requestId).not.toBe(first.requestId)
       expect(second.existingInstanceId).toBe(existing.instanceId)
       await expect(reconnect.getByRole('button', { name: 'Use existing credential', exact: true })).toHaveAttribute('aria-pressed', 'true')

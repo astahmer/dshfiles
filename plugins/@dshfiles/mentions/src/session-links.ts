@@ -1,11 +1,11 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 
-const recallEventSchema = z.object({
-  type: z.literal('user/message'),
-  data: z.object({
-    source: z.object({
-      kind: z.literal('session-reference'),
-      references: z.array(z.object({ sessionId: z.string().min(1), label: z.string() })),
+const recallEventSchema = Schema.Struct({
+  type: Schema.Literal('user/message'),
+  data: Schema.Struct({
+    source: Schema.Struct({
+      kind: Schema.Literal('session-reference'),
+      references: Schema.Array(Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), label: Schema.String })),
     }),
   }),
 })
@@ -40,9 +40,9 @@ export class SessionLinks {
   static referencedSessions(events: readonly unknown[]): Map<string, string> {
     const byLabel = new Map<string, string>()
     for (const event of events) {
-      const parsed = recallEventSchema.safeParse(event)
-      if (!parsed.success) continue
-      for (const reference of parsed.data.data.source.references) byLabel.set(reference.label, reference.sessionId)
+      const parsed = Schema.decodeUnknownOption(recallEventSchema)(event)
+      if (Option.isNone(parsed)) continue
+      for (const reference of parsed.value.data.source.references) byLabel.set(reference.label, reference.sessionId)
     }
     return byLabel
   }

@@ -63,13 +63,16 @@ const LEGACY_NOT_WORKING_FILTER = 'not-working'
 export const NOT_WORKING_REPLACEMENT_FILTERS = ['not-running'] as const satisfies readonly ThreadStatusFilter[]
 
 /** Preserve the idle-thread intent of the retired `not-working` selector. */
-export const upgradeLegacyStatusFilters = (filters: readonly unknown[]): readonly unknown[] => {
-  const upgraded: unknown[] = []
+export const upgradeLegacyStatusFilters = (filters: readonly (ThreadStatusFilter | typeof LEGACY_NOT_WORKING_FILTER)[]): readonly ThreadStatusFilter[] => {
+  const upgraded = new Set<ThreadStatusFilter>()
   for (const filter of filters) {
-    const replacements = filter === LEGACY_NOT_WORKING_FILTER ? NOT_WORKING_REPLACEMENT_FILTERS : [filter]
-    for (const replacement of replacements) if (!upgraded.includes(replacement)) upgraded.push(replacement)
+    if (filter === LEGACY_NOT_WORKING_FILTER) {
+      for (const replacement of NOT_WORKING_REPLACEMENT_FILTERS) upgraded.add(replacement)
+      continue
+    }
+    upgraded.add(filter)
   }
-  return upgraded
+  return [...upgraded]
 }
 
 export const THREAD_SOURCE_FILTER_OPTIONS = ['all', 'main', 'subagents'] as const

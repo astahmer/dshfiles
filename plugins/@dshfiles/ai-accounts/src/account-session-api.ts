@@ -1,17 +1,16 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { defineApi } from '@dshfiles/dshx/api'
+import * as Schema from 'effect/Schema'
 import { accountRouteSlugSchema } from './account-draft.js'
+import { method } from './api-schema.js'
 
-const accountInput = z.object({ instanceId: accountRouteSlugSchema }).strict()
-export const accountSessionCapabilitySchema = z
-  .object({
-    instanceId: accountRouteSlugSchema,
-    available: z.boolean(),
-    reason: z.string().max(512).nullable(),
-    credentialScope: z.string().max(4096).nullable(),
-  })
-  .strict()
-export type AccountSessionCapability = z.infer<typeof accountSessionCapabilitySchema>
+const accountInput = Schema.Struct({ instanceId: accountRouteSlugSchema })
+export const accountSessionCapabilitySchema = Schema.Struct({
+  instanceId: accountRouteSlugSchema,
+  available: Schema.Boolean,
+  reason: Schema.NullOr(Schema.String.check(Schema.isMaxLength(512))),
+  credentialScope: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+})
+export type AccountSessionCapability = typeof accountSessionCapabilitySchema.Type
 
 /** Credential metadata only. The saved profile, enabled flag and model settings never change. */
 export const aiAccountsSessionApi = defineApi({
@@ -27,8 +26,8 @@ export const aiAccountsSessionApi = defineApi({
       tool: { name: 'ai_accounts_sign_out_capability', readOnly: true },
     }),
     signOut: method({
-      input: accountInput.extend({ confirm: z.literal(true) }).strict(),
-      output: z.object({ signedOut: z.literal(true) }).strict(),
+      input: Schema.Struct({ ...accountInput.fields, confirm: Schema.Literal(true) }),
+      output: Schema.Struct({ signedOut: Schema.Literal(true) }),
       description:
         'Sign out one account by removing only its supported, account-owned credential. Preserve its saved profile, enabled setting and model preferences. Call only when the user asked to sign out; explicit confirm: true is required. Active account connection or sign-in work is refused, never cancelled.',
       tool: { name: 'ai_accounts_sign_out', readOnly: false },

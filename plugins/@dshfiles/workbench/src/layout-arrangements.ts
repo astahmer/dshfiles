@@ -1,5 +1,5 @@
 import type { DockviewApi, SerializedDockview } from 'dockview-react'
-import { LAYOUT_SURFACES, nestedSurfacePathSchema, type LayoutStore, type LayoutSurface, type NestedLayoutStores } from './layout-store.js'
+import { LAYOUT_SURFACES, decodeNestedSurfacePath, type LayoutStore, type LayoutSurface, type NestedLayoutStores } from './layout-store.js'
 import { nestedPanelId } from './nested-surfaces.js'
 import type { WorkbenchRegionId } from './dock-regions.js'
 import type { SavedLayout } from './saved-layouts.js'
@@ -26,7 +26,7 @@ export const captureLayoutArrangement = <Surface extends ArrangementSurface>(
   const nested = ports.nestedStores.capture()
   for (const [region, api] of ports.regions.entries()) {
     if (region.startsWith('nested/')) {
-      const path = nestedSurfacePathSchema.parse(region)
+      const path = decodeNestedSurfacePath(region)
       nested[path] = api.toJSON()
     }
   }
@@ -57,7 +57,7 @@ export const restoreLayoutArrangement = <Surface extends ArrangementSurface>(
   const parentOf = new Map<WorkbenchRegionId, WorkbenchRegionId>()
   for (const [region] of live) {
     if (!region.startsWith('nested/')) continue
-    const panelId = nestedPanelId(nestedSurfacePathSchema.parse(region))
+    const panelId = nestedPanelId(decodeNestedSurfacePath(region))
     const parent = live.find(([, api]) => api.getPanel(panelId) !== undefined)?.[0]
     if (parent !== undefined) parentOf.set(region, parent)
   }
@@ -103,7 +103,7 @@ export const restoreLayoutArrangement = <Surface extends ArrangementSurface>(
   const nested = live.filter(([region]) => region.startsWith('nested/')).sort(([a], [b]) => depthOf(a) - depthOf(b))
   for (const [region, api] of nested) {
     if (parentRestored(region)) continue
-    const path = nestedSurfacePathSchema.parse(region)
+    const path = decodeNestedSurfacePath(region)
     const entry = layout.nested?.[path]
     if (entry !== undefined) restoreApi(region, api, entry)
   }

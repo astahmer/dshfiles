@@ -1,7 +1,8 @@
+import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parse } from 'yaml'
-import { z } from 'zod'
 
 /**
  * Workspace packages of a dshx repository and the cycles between them. Kept free of relative imports so the repository
@@ -9,24 +10,28 @@ import { z } from 'zod'
  * decode boundary.
  */
 
-type DecodeJson = <Schema extends z.ZodType>(schema: Schema, text: string) => z.output<Schema>
+type DecodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string) => S['Type']
 
 const dependencyFields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'] as const
-const dependencyMapSchema = z.record(z.string(), z.string()).optional()
-const manifestSchema = z.looseObject({
-  name: z.string().optional(),
+const looseObject = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
+const dependencyMapSchema = Schema.optional(Schema.Record(Schema.String, Schema.String))
+const manifestSchema = looseObject({
+  name: Schema.optional(Schema.String),
   dependencies: dependencyMapSchema,
   devDependencies: dependencyMapSchema,
   peerDependencies: dependencyMapSchema,
   optionalDependencies: dependencyMapSchema,
 })
-const workspaceFileSchema = z.looseObject({ packages: z.array(z.string()).default([]) })
+const workspaceFileSchema = looseObject({
+  packages: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+})
 
 export interface WorkspacePackage {
   readonly name: string
   /** Absolute path of the package folder. */
   readonly directory: string
-  readonly manifest: z.output<typeof manifestSchema>
+  readonly manifest: (typeof manifestSchema)['Type']
 }
 
 export class RepositoryWorkspace {
@@ -43,7 +48,9 @@ export class RepositoryWorkspace {
   /** The `pnpm-workspace.yaml` packages, or the root package alone in a single-package repository. */
   static packages(input: { readonly root: string; readonly decodeJson: DecodeJson }): readonly WorkspacePackage[] {
     const workspacePath = join(input.root, 'pnpm-workspace.yaml')
-    const patterns = existsSync(workspacePath) ? workspaceFileSchema.parse(parse(readFileSync(workspacePath, 'utf8')) ?? {}).packages : ['.']
+    const patterns = existsSync(workspacePath)
+      ? Schema.decodeUnknownSync(workspaceFileSchema)(parse(readFileSync(workspacePath, 'utf8')) ?? {}).packages
+      : ['.']
     const excluded = new Set(
       globSync(
         patterns.filter(pattern => pattern.startsWith('!')).map(pattern => pattern.slice(1)),

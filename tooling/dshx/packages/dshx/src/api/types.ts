@@ -9,8 +9,18 @@ declare const apiHostInputBrand: unique symbol
 declare const apiHostOutputBrand: unique symbol
 declare const apiClientOutputBrand: unique symbol
 declare const apiClientEventsBrand: unique symbol
+declare const apiEventPayloadBrand: unique symbol
 
-export type ApiSchema<Input = unknown, Output = Input> = StandardSchemaV1<Input, Output>
+export type ApiSchema<Input = unknown, Output = Input> =
+  | StandardSchemaV1<Input, Output>
+  | {
+      readonly Encoded: Input
+      readonly Type: Output
+      readonly DecodingServices: never
+      readonly EncodingServices: unknown
+    }
+export type ApiSchemaInput<S> = S extends StandardSchemaV1<infer Input, any> ? Input : S extends { readonly Encoded: infer Input } ? Input : never
+export type ApiSchemaOutput<S> = S extends StandardSchemaV1<any, infer Output> ? Output : S extends { readonly Type: infer Output } ? Output : never
 
 /** Opt-in exposure of one API method to the agent as a native tool. */
 export interface ApiToolExposure<Output = unknown> {
@@ -59,7 +69,8 @@ export type AnyApiMethodDefinition = ApiMethodDefinition<any, any, any, any>
  * is sent and again in the browser before a listener sees it, so it must accept its own output.
  */
 export interface ApiEventDefinition<HostPayload = unknown, ClientPayload = HostPayload> {
-  readonly schema: ApiSchema<HostPayload, ClientPayload>
+  readonly schema: ApiSchema
+  readonly [apiEventPayloadBrand]?: readonly [HostPayload, ClientPayload]
   /** What the event announces, written for another plugin author. */
   readonly description?: string
 }

@@ -1,88 +1,98 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
 export const REVISION_PAGE_SIZE = 10
 // One revision can be the working copy of every thread workspace; the Host's bounded jj output still caps the row.
 const MAX_REVISION_WORKSPACES = 1024
 
-export const revisionSchema = z.object({
-  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
-  changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
-  shortestChangeId: z.string().min(1).max(32),
+export const revisionSchema = Schema.Struct({
+  commitId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/)),
+  changeId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{20,64}$/)),
+  shortestChangeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
   // A squash merge can carry every folded commit message; the Host's bounded jj output is what caps it.
-  description: z.string().max(1_000_000),
-  author: z.string().max(320),
-  authorTime: z.string().max(64),
+  description: Schema.String.check(Schema.isMaxLength(1_000_000)),
+  author: Schema.String.check(Schema.isMaxLength(320)),
+  authorTime: Schema.String.check(Schema.isMaxLength(64)),
   // Older Hosts omit it; day headings fall back to the author time.
-  committerTime: z.string().max(64).optional(),
-  parents: z.array(z.string().regex(/^[a-f0-9]{40,64}$/)).max(16),
-  bookmarks: z.array(z.string().max(256)).max(64),
-  localBookmarks: z.array(z.string().max(256)).max(64),
-  remoteBookmarksText: z.string().max(32_768).default(''),
-  tags: z.array(z.string().max(256)).max(64),
-  workspaces: z.array(z.string().max(128)).max(MAX_REVISION_WORKSPACES),
-  workingCopy: z.boolean(),
-  mine: z.boolean(),
-  immutable: z.boolean(),
-  divergent: z.boolean(),
-  empty: z.boolean(),
-  conflict: z.boolean(),
-  evolved: z.boolean(),
+  committerTime: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(64))),
+  parents: Schema.Array(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/))).check(Schema.isMaxLength(16)),
+  bookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(64)),
+  localBookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(64)),
+  remoteBookmarksText: SchemaHelpers.withDecodedDefault(Schema.String.check(Schema.isMaxLength(32_768)), () => ''),
+  tags: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(64)),
+  workspaces: Schema.Array(Schema.String.check(Schema.isMaxLength(128))).check(Schema.isMaxLength(MAX_REVISION_WORKSPACES)),
+  workingCopy: Schema.Boolean,
+  mine: Schema.Boolean,
+  immutable: Schema.Boolean,
+  divergent: Schema.Boolean,
+  empty: Schema.Boolean,
+  conflict: Schema.Boolean,
+  evolved: Schema.Boolean,
   // Older Hosts omit it; jj only needs the offset to tell divergent copies apart.
-  changeOffset: z.number().int().min(0).max(65_535).default(0),
+  changeOffset: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)),
+    () => 0,
+  ),
 })
 
-const repoPathSchema = z.string().min(1).max(2048)
-const repoIdSchema = z.string().uuid()
-const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
+const repoPathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))
+const repoIdSchema = Schema.String.check(Schema.isUUID())
+const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/))
 /**
  * A revision the caller names, as a full commit id, a unique hex prefix or a
  * change id — what `jj log` prints and what a chat reference carries. Read-only
  * tools resolve it against the repository; mutations still take full ids so a
  * typo can never pick the wrong revision to rewrite.
  */
-const revisionRefSchema = z.string().regex(/^(?:[a-f0-9]{4,64}|[k-z]{4,32})$/)
-const remoteNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
-const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/)
-export const workspaceNameSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+const revisionRefSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{4,64}|[k-z]{4,32})$/))
+const remoteNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/))
+const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
+export const workspaceNameSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
-const pathListSchema = z.array(z.string().min(1).max(1024)).min(1).max(100)
+const pathListSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024))).check(Schema.isMinLength(1), Schema.isMaxLength(100))
 
-const mutationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
-  z.object({ kind: z.literal('split'), commitId: commitIdSchema, paths: pathListSchema, message: z.string().min(1).max(4000) }),
-  z.object({
-    kind: z.literal('squash'),
+const mutationSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('describe'), commitId: commitIdSchema, message: Schema.String.check(Schema.isMaxLength(4000)) }),
+  Schema.Struct({
+    kind: Schema.Literal('split'),
+    commitId: commitIdSchema,
+    paths: pathListSchema,
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4000)),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('squash'),
     sourceId: commitIdSchema,
     destinationId: commitIdSchema,
-    message: z.string().min(1).max(4000).optional(),
-    paths: pathListSchema.optional(),
+    message: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4000))),
+    paths: Schema.optionalKey(pathListSchema),
   }),
-  z.object({ kind: z.literal('rebase'), sourceId: commitIdSchema, destinationId: commitIdSchema }),
-  z.object({ kind: z.literal('bookmark-move'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
-  z.object({ kind: z.literal('bookmark-set'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
-  z.object({ kind: z.literal('bookmark-delete'), bookmark: bookmarkNameSchema }),
-  z.object({ kind: z.literal('fetch'), remote: remoteNameSchema }),
-  z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
-  z.object({ kind: z.literal('workspace-add'), parentPath: z.string().min(1).max(2048), name: workspaceNameSchema, commitId: commitIdSchema }),
-  z.object({ kind: z.literal('workspace-forget'), name: workspaceNameSchema }),
-  z.object({ kind: z.literal('workspace-edit'), name: workspaceNameSchema, commitId: commitIdSchema }),
-  z.object({ kind: z.literal('edit'), commitId: commitIdSchema }),
-  z.object({ kind: z.literal('new'), commitId: commitIdSchema }),
-  z.object({ kind: z.literal('commit'), commitId: commitIdSchema, message: z.string().min(1).max(4000) }),
-  z.object({ kind: z.literal('duplicate'), commitId: commitIdSchema }),
-  z.object({ kind: z.literal('abandon'), commitIds: z.array(commitIdSchema).min(1).max(50) }),
-  z.object({ kind: z.literal('revert'), commitId: commitIdSchema, destinationId: commitIdSchema }),
-  z.object({ kind: z.literal('restore'), commitId: commitIdSchema, paths: pathListSchema }),
+  Schema.Struct({ kind: Schema.Literal('rebase'), sourceId: commitIdSchema, destinationId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('bookmark-move'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('bookmark-set'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('bookmark-delete'), bookmark: bookmarkNameSchema }),
+  Schema.Struct({ kind: Schema.Literal('fetch'), remote: remoteNameSchema }),
+  Schema.Struct({ kind: Schema.Literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
+  Schema.Struct({
+    kind: Schema.Literal('workspace-add'),
+    parentPath: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+    name: workspaceNameSchema,
+    commitId: commitIdSchema,
+  }),
+  Schema.Struct({ kind: Schema.Literal('workspace-forget'), name: workspaceNameSchema }),
+  Schema.Struct({ kind: Schema.Literal('workspace-edit'), name: workspaceNameSchema, commitId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('edit'), commitId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('new'), commitId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('commit'), commitId: commitIdSchema, message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4000)) }),
+  Schema.Struct({ kind: Schema.Literal('duplicate'), commitId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('abandon'), commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(50)) }),
+  Schema.Struct({ kind: Schema.Literal('revert'), commitId: commitIdSchema, destinationId: commitIdSchema }),
+  Schema.Struct({ kind: Schema.Literal('restore'), commitId: commitIdSchema, paths: pathListSchema }),
 ])
 
-export const previewSchema = z.object({
-  id: z.string().uuid(),
-  kind: z.enum([
+export const previewSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isUUID()),
+  kind: Schema.Literals([
     'describe',
     'split',
     'squash',
@@ -103,107 +113,107 @@ export const previewSchema = z.object({
     'revert',
     'restore',
   ]),
-  title: z.string().max(200),
-  summary: z.string().max(1000),
-  detail: z.string().max(8000),
-  expiresAt: z.number().int(),
+  title: Schema.String.check(Schema.isMaxLength(200)),
+  summary: Schema.String.check(Schema.isMaxLength(1000)),
+  detail: Schema.String.check(Schema.isMaxLength(8000)),
+  expiresAt: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
 })
 
-export const fileStatusSchema = z.enum(['M', 'A', 'D', 'R', 'C'])
+export const fileStatusSchema = Schema.Literals(['M', 'A', 'D', 'R', 'C'])
 
-const fileStatSchema = z.object({
-  path: z.string().max(2048),
+const fileStatSchema = Schema.Struct({
+  path: Schema.String.check(Schema.isMaxLength(2048)),
   status: fileStatusSchema,
-  additions: z.number().int().min(0),
-  deletions: z.number().int().min(0),
+  additions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   /** Set by changed-file reads; an older Host omits it. */
-  conflict: z.boolean().optional(),
+  conflict: Schema.optionalKey(Schema.Boolean),
 })
 
-const fileChangeSchema = fileStatSchema.extend({
-  contentDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable(),
+const fileChangeSchema = Schema.Struct({
+  ...fileStatSchema.fields,
+  contentDigest: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))),
 })
 
-const stateSchema = z.object({
-  root: z.string().max(2048),
-  revisions: z.array(revisionSchema).max(500),
-  graphHasMore: z.boolean().default(false),
-  status: z.string().max(80_000),
-  changedPaths: z.array(z.string().max(2048)).max(1000),
-  remoteNames: z.array(z.string().max(128)).max(64),
-  lastPushAt: z.string().max(64).nullable(),
-  lastPushDescription: z.string().max(500).nullable(),
-  lastPushHistoryTruncated: z.boolean(),
-  evolutionHistoryTruncated: z.boolean(),
+const stateSchema = Schema.Struct({
+  root: Schema.String.check(Schema.isMaxLength(2048)),
+  revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(500)),
+  graphHasMore: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => false),
+  status: Schema.String.check(Schema.isMaxLength(80_000)),
+  changedPaths: Schema.Array(Schema.String.check(Schema.isMaxLength(2048))).check(Schema.isMaxLength(1000)),
+  remoteNames: Schema.Array(Schema.String.check(Schema.isMaxLength(128))).check(Schema.isMaxLength(64)),
+  lastPushAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))),
+  lastPushDescription: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  lastPushHistoryTruncated: Schema.Boolean,
+  evolutionHistoryTruncated: Schema.Boolean,
 })
 
-const detailsSchema = z.object({
-  files: z.array(fileChangeSchema).max(1000),
-  additions: z.number().int().min(0),
-  deletions: z.number().int().min(0),
-  patch: z.string().max(1_200_000),
-  truncated: z.boolean(),
-  evolution: z.string().max(120_000),
+const detailsSchema = Schema.Struct({
+  files: Schema.Array(fileChangeSchema).check(Schema.isMaxLength(1000)),
+  additions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  patch: Schema.String.check(Schema.isMaxLength(1_200_000)),
+  truncated: Schema.Boolean,
+  evolution: Schema.String.check(Schema.isMaxLength(120_000)),
 })
 
 // dshx replaces any thrown handler error with a generic message, so reads report their real failure in the output.
-const readFailureSchema = z.object({ failure: z.object({ message: z.string().max(500) }) })
+const readFailureSchema = Schema.Struct({ failure: Schema.Struct({ message: Schema.String.check(Schema.isMaxLength(500)) }) })
 
-const graphSliceSchema = z.object({
-  operationId: z.string().regex(/^[a-f0-9]{128}$/),
-  revisions: z.array(revisionSchema).max(500),
-  truncated: z.boolean(),
+const graphSliceSchema = Schema.Struct({
+  operationId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{128}$/)),
+  revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(500)),
+  truncated: Schema.Boolean,
 })
 
-const graphNavigationSchema = z.object({
-  operationId: z.string().regex(/^[a-f0-9]{128}$/),
-  landmarks: z
-    .array(
-      z.object({
-        kind: z.enum(['current', 'main-origin', 'main', 'default']),
-        label: z.string(),
-        status: z.enum(['resolved', 'missing', 'ambiguous']),
-        revisions: z.array(revisionSchema).max(500),
-      }),
-    )
-    .max(4),
+const graphNavigationSchema = Schema.Struct({
+  operationId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{128}$/)),
+  landmarks: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(['current', 'main-origin', 'main', 'default']),
+      label: Schema.String,
+      status: Schema.Literals(['resolved', 'missing', 'ambiguous']),
+      revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(500)),
+    }),
+  ).check(Schema.isMaxLength(4)),
 })
 
-const revisionRelationshipSchema = graphSliceSchema.extend({
+const revisionRelationshipSchema = Schema.Struct({
+  ...graphSliceSchema.fields,
   commitId: commitIdSchema,
   targetCommitId: commitIdSchema,
-  relation: z.enum(['same', 'ancestor', 'descendant', 'diverged', 'no-common-ancestor']),
-  selectedOnlyCount: z.number().int().nonnegative(),
-  targetOnlyCount: z.number().int().nonnegative(),
-  commonAncestorIds: z.array(commitIdSchema).max(500),
-  commonAncestorsTruncated: z.boolean(),
-  connectionIds: z.array(commitIdSchema).max(500),
-  differenceIds: z.array(commitIdSchema).max(500),
+  relation: Schema.Literals(['same', 'ancestor', 'descendant', 'diverged', 'no-common-ancestor']),
+  selectedOnlyCount: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  targetOnlyCount: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  commonAncestorIds: Schema.Array(commitIdSchema).check(Schema.isMaxLength(500)),
+  commonAncestorsTruncated: Schema.Boolean,
+  connectionIds: Schema.Array(commitIdSchema).check(Schema.isMaxLength(500)),
+  differenceIds: Schema.Array(commitIdSchema).check(Schema.isMaxLength(500)),
 })
 
-export const graphPageOutputSchema = z.object({ revisions: z.array(revisionSchema).max(REVISION_PAGE_SIZE), hasMore: z.boolean() })
+export const graphPageOutputSchema = Schema.Struct({
+  revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(REVISION_PAGE_SIZE)),
+  hasMore: Schema.Boolean,
+})
 
-const referenceGraphSchema = z.object({
-  label: z.string().min(1).max(255),
-  commitId: commitIdSchema.nullable(),
-  changeId: z.string().min(1).max(64).nullable(),
+const referenceGraphSchema = Schema.Struct({
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  commitId: Schema.NullOr(commitIdSchema),
+  changeId: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))),
   /** Older Hosts omit it; use the identifier as the chat label until title metadata is available. */
-  description: z.string().max(255).optional(),
-  graph: z.string().max(20_000),
+  description: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(255))),
+  graph: Schema.String.check(Schema.isMaxLength(20_000)),
   /** Older Hosts send only the text graph; the preview falls back to it. */
-  listedCommitIds: z.array(commitIdSchema).max(20).optional(),
-  revisions: z.array(revisionSchema).max(400).optional(),
-  defaultCommitId: commitIdSchema.nullable().optional(),
+  listedCommitIds: Schema.optionalKey(Schema.Array(commitIdSchema).check(Schema.isMaxLength(20))),
+  revisions: Schema.optionalKey(Schema.Array(revisionSchema).check(Schema.isMaxLength(400))),
+  defaultCommitId: Schema.optionalKey(Schema.NullOr(commitIdSchema)),
 })
 
-export type GraphSlice = z.infer<typeof graphSliceSchema>
-export type ReferenceGraph = z.infer<typeof referenceGraphSchema>
-export type GraphLandmark = z.infer<typeof graphNavigationSchema>['landmarks'][number]
-export type GraphNavigation = z.infer<typeof graphNavigationSchema>
-export type RevisionRelationship = z.infer<typeof revisionRelationshipSchema>
+export type GraphSlice = Schema.Schema.Type<typeof graphSliceSchema>
+export type ReferenceGraph = Schema.Schema.Type<typeof referenceGraphSchema>
+export type GraphLandmark = Schema.Schema.Type<typeof graphNavigationSchema>['landmarks'][number]
+export type GraphNavigation = Schema.Schema.Type<typeof graphNavigationSchema>
+export type RevisionRelationship = Schema.Schema.Type<typeof revisionRelationshipSchema>
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -221,8 +231,8 @@ export const jujutsuApi = defineApi({
   owner: '@dshfiles/jujutsu',
   methods: {
     openRepository: method({
-      input: z.object({ path: repoPathSchema }),
-      output: z.object({ repoId: repoIdSchema, root: z.string().max(2048), initialized: z.boolean() }),
+      input: Schema.Struct({ path: repoPathSchema }),
+      output: Schema.Struct({ repoId: repoIdSchema, root: Schema.String.check(Schema.isMaxLength(2048)), initialized: Schema.Boolean }),
       description:
         'Open a repository for Jujutsu. Automatically initialize colocated JJ metadata for an existing Git checkout; preserve Git history and files. Does not create Git repositories, fetch or push. Call only when the user asked to open or enable Jujutsu for that folder.',
       tool: {
@@ -232,30 +242,34 @@ export const jujutsuApi = defineApi({
       },
     }),
     registerRepository: method({
-      input: z.object({ path: repoPathSchema }),
-      output: z.object({ repoId: repoIdSchema, root: z.string().max(2048) }),
+      input: Schema.Struct({ path: repoPathSchema }),
+      output: Schema.Struct({ repoId: repoIdSchema, root: Schema.String.check(Schema.isMaxLength(2048)) }),
       description: 'Resolve a folder to its jj repository and return the repoId every other jujutsu tool takes. Read-only.',
       tool: { name: 'jj_register_repository', readOnly: true, render: output => `${output.repoId} · ${output.root}` },
     }),
     registerRepositories: method({
-      input: z.object({ paths: z.array(repoPathSchema).min(1).max(31) }),
-      output: z.object({
-        repositories: z
-          .array(
-            z.object({
-              path: repoPathSchema,
-              repoId: repoIdSchema.nullable(),
-              root: z.string().max(2048).nullable(),
-            }),
-          )
-          .max(31),
+      input: Schema.Struct({ paths: Schema.Array(repoPathSchema).check(Schema.isMinLength(1), Schema.isMaxLength(31)) }),
+      output: Schema.Struct({
+        repositories: Schema.Array(
+          Schema.Struct({
+            path: repoPathSchema,
+            repoId: Schema.NullOr(repoIdSchema),
+            root: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2048))),
+          }),
+        ).check(Schema.isMaxLength(31)),
       }),
       description:
         'Resolve up to 31 folders to their jj repositories in one call, reporting a null row per non-repository path instead of failing the batch. Read-only.',
     }),
     load: method({
-      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(REVISION_PAGE_SIZE).default(REVISION_PAGE_SIZE) }),
-      output: z.union([stateSchema, readFailureSchema]),
+      input: Schema.Struct({
+        repoId: repoIdSchema,
+        limit: SchemaHelpers.withDecodedDefault(
+          Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(REVISION_PAGE_SIZE)),
+          () => REVISION_PAGE_SIZE,
+        ),
+      }),
+      output: Schema.Union([stateSchema, readFailureSchema]),
       description: 'Repository status and the first page of the revision graph: root, revisions, changed paths, remotes and the last push. Read-only.',
       tool: {
         name: 'jj_load',
@@ -267,12 +281,12 @@ export const jujutsuApi = defineApi({
       },
     }),
     graphPage: method({
-      input: z.object({
+      input: Schema.Struct({
         repoId: repoIdSchema,
-        query: z.string().max(256).default(''),
-        excludeCommitIds: z.array(commitIdSchema).max(10_000),
+        query: SchemaHelpers.withDecodedDefault(Schema.String.check(Schema.isMaxLength(256)), () => ''),
+        excludeCommitIds: Schema.Array(commitIdSchema).check(Schema.isMaxLength(10_000)),
       }),
-      output: z.union([graphPageOutputSchema, readFailureSchema]),
+      output: Schema.Union([graphPageOutputSchema, readFailureSchema]),
       description: 'Load the next revision graph page, or search all visible revisions with a query. Read-only.',
       tool: {
         name: 'jj_graph_page',
@@ -282,8 +296,12 @@ export const jujutsuApi = defineApi({
       },
     }),
     workspaces: method({
-      input: z.object({ repoId: repoIdSchema }),
-      output: z.object({ workspaces: z.array(z.object({ name: workspaceNameSchema, path: z.string().min(1).max(2048) })).max(64) }),
+      input: Schema.Struct({ repoId: repoIdSchema }),
+      output: Schema.Struct({
+        workspaces: Schema.Array(
+          Schema.Struct({ name: workspaceNameSchema, path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)) }),
+        ).check(Schema.isMaxLength(64)),
+      }),
       description: 'Every Jujutsu workspace of this repository with its folder, including workspaces no DSH project is registered for. Read-only.',
       tool: {
         name: 'jj_workspaces',
@@ -292,26 +310,26 @@ export const jujutsuApi = defineApi({
       },
     }),
     graphNavigation: method({
-      input: z.object({ repoId: repoIdSchema }),
-      output: z.union([graphNavigationSchema, readFailureSchema]),
+      input: Schema.Struct({ repoId: repoIdSchema }),
+      output: Schema.Union([graphNavigationSchema, readFailureSchema]),
       description: 'Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.',
       tool: { name: 'jj_graph_navigation', readOnly: true, render: compactJson },
     }),
     revisionRelationship: method({
-      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema, targetCommitId: commitIdSchema }),
-      output: z.union([revisionRelationshipSchema, readFailureSchema]),
+      input: Schema.Struct({ repoId: repoIdSchema, commitId: commitIdSchema, targetCommitId: commitIdSchema }),
+      output: Schema.Union([revisionRelationshipSchema, readFailureSchema]),
       description: 'Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. Read-only.',
       tool: { name: 'jj_revision_relationship', readOnly: true, render: compactJson },
     }),
     graphSlice: method({
-      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema, mode: z.enum(['history', 'exclusive']) }),
-      output: z.union([graphSliceSchema, readFailureSchema]),
+      input: Schema.Struct({ repoId: repoIdSchema, commitId: commitIdSchema, mode: Schema.Literals(['history', 'exclusive']) }),
+      output: Schema.Union([graphSliceSchema, readFailureSchema]),
       description: 'One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Read-only.',
       tool: { name: 'jj_graph_slice', readOnly: true, render: compactJson },
     }),
     referenceGraph: method({
-      input: z.object({ repoId: repoIdSchema, reference: z.string().min(1).max(255) }),
-      output: z.union([referenceGraphSchema, readFailureSchema]),
+      input: Schema.Struct({ repoId: repoIdSchema, reference: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)) }),
+      output: Schema.Union([referenceGraphSchema, readFailureSchema]),
       description:
         'A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.',
       tool: {
@@ -321,8 +339,8 @@ export const jujutsuApi = defineApi({
       },
     }),
     details: method({
-      input: z.object({ repoId: repoIdSchema, commitId: revisionRefSchema }),
-      output: z.union([detailsSchema, readFailureSchema]),
+      input: Schema.Struct({ repoId: repoIdSchema, commitId: revisionRefSchema }),
+      output: Schema.Union([detailsSchema, readFailureSchema]),
       description: 'One revision: its description, files, patch and evolution log. Read-only.',
       tool: {
         name: 'jj_details',
@@ -334,10 +352,15 @@ export const jujutsuApi = defineApi({
       },
     }),
     revisionFiles: method({
-      input: z.object({ repoId: repoIdSchema, commitIds: z.array(commitIdSchema).min(1).max(40) }),
-      output: z.object({
-        revisions: z.array(z.object({ commitId: commitIdSchema, files: z.array(fileStatSchema).max(2000) })).max(40),
-        truncated: z.boolean(),
+      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(40)) }),
+      output: Schema.Struct({
+        revisions: Schema.Array(
+          Schema.Struct({
+            commitId: commitIdSchema,
+            files: Schema.Array(fileStatSchema).check(Schema.isMaxLength(2000)),
+          }),
+        ).check(Schema.isMaxLength(40)),
+        truncated: Schema.Boolean,
       }),
       description: 'Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them. Read-only.',
       tool: {
@@ -356,8 +379,12 @@ export const jujutsuApi = defineApi({
       },
     }),
     editTimes: method({
-      input: z.object({ repoId: repoIdSchema, commitIds: z.array(commitIdSchema).min(1).max(100) }),
-      output: z.object({ revisions: z.array(z.object({ commitId: commitIdSchema, editedAt: z.string().max(64).nullable() })).max(100) }),
+      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
+      output: Schema.Struct({
+        revisions: Schema.Array(Schema.Struct({ commitId: commitIdSchema, editedAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))) })).check(
+          Schema.isMaxLength(100),
+        ),
+      }),
       description:
         "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",
       tool: {
@@ -367,13 +394,13 @@ export const jujutsuApi = defineApi({
       },
     }),
     workingDiff: method({
-      input: z.object({ repoId: repoIdSchema }),
-      output: z.object({ patch: z.string().max(1_200_000), truncated: z.boolean() }),
+      input: Schema.Struct({ repoId: repoIdSchema }),
+      output: Schema.Struct({ patch: Schema.String.check(Schema.isMaxLength(1_200_000)), truncated: Schema.Boolean }),
       description: 'The working-copy patch, for reading uncommitted changes without shelling out. Read-only.',
       tool: { name: 'jj_working_diff', readOnly: true, render: output => patchText(output.patch) },
     }),
     prepare: method({
-      input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
+      input: Schema.Struct({ repoId: repoIdSchema, action: mutationSchema }),
       output: previewSchema,
       description:
         'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.',
@@ -383,8 +410,12 @@ export const jujutsuApi = defineApi({
       },
     }),
     confirm: method({
-      input: z.object({ repoId: repoIdSchema, previewId: z.string().uuid() }),
-      output: z.object({ message: z.string().max(1000), output: z.string().max(12_000), workspacePath: z.string().max(2048).nullable() }),
+      input: Schema.Struct({ repoId: repoIdSchema, previewId: Schema.String.check(Schema.isUUID()) }),
+      output: Schema.Struct({
+        message: Schema.String.check(Schema.isMaxLength(1000)),
+        output: Schema.String.check(Schema.isMaxLength(12_000)),
+        workspacePath: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2048))),
+      }),
       description:
         'Apply one prepared jujutsu action by its previewId and return the command message and output. Call only when the user asked, after jj_prepare_action showed them the plan.',
       tool: {
@@ -395,10 +426,10 @@ export const jujutsuApi = defineApi({
   },
 })
 
-export type Revision = z.infer<typeof revisionSchema>
-export type Mutation = z.infer<typeof mutationSchema>
-export type JujutsuState = z.infer<typeof stateSchema>
-export type RevisionDetails = z.infer<typeof detailsSchema>
-export type ReadFailure = z.infer<typeof readFailureSchema>
-export type FileStat = z.infer<typeof fileStatSchema>
-export type FileStatus = z.infer<typeof fileStatusSchema>
+export type Revision = Schema.Schema.Type<typeof revisionSchema>
+export type Mutation = Schema.Schema.Type<typeof mutationSchema>
+export type JujutsuState = Schema.Schema.Type<typeof stateSchema>
+export type RevisionDetails = Schema.Schema.Type<typeof detailsSchema>
+export type ReadFailure = Schema.Schema.Type<typeof readFailureSchema>
+export type FileStat = Schema.Schema.Type<typeof fileStatSchema>
+export type FileStatus = Schema.Schema.Type<typeof fileStatusSchema>

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Option, Schema } from 'effect'
 
 import { backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
@@ -43,8 +44,8 @@ describe('backlog reference links', () => {
     const requests: { readonly id: number; readonly anchorId: number }[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const parsed = backlogReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) requests.push(parsed.data)
+      const request = Option.getOrNull(Schema.decodeUnknownOption(backlogReferencePreviewRequestSchema)(event.detail))
+      if (request !== null) requests.push(request)
     }
     window.addEventListener(backlogReferencePreviewEvent, onRequest)
     const stop = installBacklogReferenceLinks()

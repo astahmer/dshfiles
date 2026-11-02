@@ -109,6 +109,10 @@
     "./effect": {
       "types": "./dist/effect/index.d.ts",
       "default": "./dist/effect/index.js"
+    },
+    "./effect/services": {
+      "types": "./dist/effect/services.d.ts",
+      "default": "./dist/effect/services.js"
     }
   },
   "scripts": {
@@ -134,8 +138,7 @@
     "vite": "catalog:",
     "write-file-atomic": "catalog:",
     "ws": "catalog:",
-    "yaml": "catalog:",
-    "zod": "catalog:"
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -170,6 +173,8 @@
     "@deepseek-ai/dsh-user-approval": "catalog:",
     "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/credential-port": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/semver": "catalog:",
@@ -203,17 +208,29 @@
     "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-settings": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-system-prompt": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "effect": ">=4.0.4 <5",
+    "@dshfiles/credential-port": ">=0.1.0 <0.2.0",
+    "effect": ">=4.1.0 <5",
     "playwright": ">=1.56.0 <2",
     "react": ">=18 <20",
     "react-dom": ">=18 <20"
   },
   "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-storage-domain": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-subprocess": {
+      "optional": true
+    },
+    "@dshfiles/credential-port": {
+      "optional": true
+    },
     "@deepseek-ai/dsh-api-session-controller": {
       "optional": true
     },

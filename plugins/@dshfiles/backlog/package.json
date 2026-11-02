@@ -47,7 +47,7 @@
     "@dshfiles/usage": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

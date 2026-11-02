@@ -1,11 +1,8 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, statSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
-import { promisify } from 'node:util'
-import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
+import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -15,15 +12,24 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
-import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import {
+  isApiOwnerMissing,
+  PluginApiError,
+  type ApiCaller,
+  type ApiHandler,
+  type ApiHandlerContext,
+  type ApiHostInput,
+  type ApiHostOutput,
+} from '@dshfiles/dshx/api'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { createHostApiClient, defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { traceJjExecutor } from './jj-span.js'
+import { JjFilesystem } from './jj-filesystem.js'
 import { workspaceScriptsApi } from '@dshfiles/memory/workspace-scripts-api'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
-import { z } from 'zod'
 import {
   jjIntegrationApi,
   type CleanupKindView,
@@ -41,7 +47,7 @@ import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { AutoCleanupModel, createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { AutoFetchModel, createAutoFetchScheduler, type FetchOutcome } from './auto-fetch.js'
-import { SETTLED_THREADS_NAMESPACE, SettleCleanupModel, settledStatusSchema } from './settle-cleanup.js'
+import { SETTLED_THREADS_NAMESPACE, SettleCleanupModel, parseSettledStatus } from './settle-cleanup.js'
 import { JsonText } from './json-text.js'
 import { workspaceSyncActivity } from './workspace-sync-outcome.js'
 import { ThreadStatusWarmup } from './thread-status-warmup.js'
@@ -102,7 +108,6 @@ const MAX_STDERR = 64 * 1024
 const JJ_TIMEOUT_MS = 120_000
 /** A cleanup deletes node_modules trees, which can take minutes on a slow disk. */
 const CLEANUP_TIMEOUT_MS = 5 * 60_000
-const execFileAsync = promisify(execFile)
 const SWEEP_INTERVAL_MS = 10 * 60_000
 /** Installs and plugin rebuilds after a large rebase take minutes. */
 const SYNC_TIMEOUT_MS = 30 * 60_000
@@ -135,7 +140,34 @@ const readIntegrationProgress = (path: string): IntegrationProgress | null => {
 }
 
 let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
-let hostContext: Context | undefined
+const makeJjHostServices = (context: Context) => ({
+  context,
+  filesystem: JjFilesystem,
+  get workspaceRegistry() {
+    return context.get('workspaceRegistry')
+  },
+  get sessionController() {
+    return context.get('sessionController')
+  },
+  get workingDirectory() {
+    return context.get('workingDirectory')
+  },
+  get sessionPersistence() {
+    return context.sessionPersistence
+  },
+  get sessionQuery() {
+    return context.sessionQuery
+  },
+  get agents() {
+    return context.agents
+  },
+  get subprocess() {
+    return context.subprocess
+  },
+})
+type JjHostServices = ReturnType<typeof makeJjHostServices>
+class JjIntegrationHostServices extends EffectContext.Service<JjIntegrationHostServices, JjHostServices>()('@dshfiles/jj-integration/HostServices') {}
+let hostServices: JjHostServices | undefined
 let threads: Threads | undefined
 const isolatedSessionWorkspaces = new Map<string, { readonly name: string; readonly path: string }>()
 let workspaceSync: WorkspaceSyncView | null = null
@@ -158,9 +190,9 @@ const threadsDirectory = (repoRoot: string): string => {
   return join(expanded, basename(repoRoot))
 }
 
-const requireContext = (): Context => {
-  if (hostContext === undefined) throw new Error('jj-integration is not active.')
-  return hostContext
+const requireHostServices = (): JjHostServices => {
+  if (hostServices === undefined) throw new Error('jj-integration is not active.')
+  return hostServices
 }
 
 const requireThreads = (): Threads => {
@@ -169,7 +201,7 @@ const requireThreads = (): Threads => {
 }
 
 const registryOf = () => {
-  const registry = requireContext().get('workspaceRegistry')
+  const registry = requireHostServices().workspaceRegistry
   if (registry === undefined) throw new Error('The DSH workspace registry is unavailable.')
   return registry
 }
@@ -203,7 +235,7 @@ const emitActivity = (input: {
   const path = input.path === null || input.path.length === 0 ? null : input.path
   // Reporting must never take the host down: emit runs listeners synchronously, often from a timer here.
   try {
-    hostContext?.emit('dshfiles/activity/event', {
+    hostServices?.context.emit('dshfiles/activity/event', {
       kind: 'workspace',
       value: {
         id: `workspace:${input.type}:${path ?? 'repository'}:${String(at)}`,
@@ -219,7 +251,7 @@ const emitActivity = (input: {
       },
     })
   } catch (error) {
-    hostContext?.logger.warn('jj-integration: activity event dropped: %s', error instanceof Error ? error.message : String(error))
+    hostServices?.context.logger.warn('jj-integration: activity event dropped: %s', error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -268,7 +300,7 @@ const SESSION_ACTIVITY_GUARD_BUDGET_MS = 15_000
 const SESSION_ACTIVITY_GUARD_ATTEMPTS = 3
 const SESSION_ACTIVITY_GUARD_CEILING_MS = 60_000
 const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
-  const controller = requireContext().get('sessionController')
+  const controller = requireHostServices().sessionController
   if (controller === undefined) return Promise.resolve(undefined)
   return controller
     .list({ projections: SESSION_ACTIVITY_PROJECTIONS }, signal)
@@ -288,8 +320,8 @@ const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, T
 }
 
 const readWorkspaceSessionActivity = (sessionIds: readonly string[], signal: AbortSignal): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
-  const context = requireContext()
-  const controller = context.get('sessionController')
+  const context = requireHostServices()
+  const controller = context.sessionController
   if (controller === undefined) return Promise.resolve(undefined)
   return readScopedWorkspaceSessionActivity({
     sessionIds,
@@ -330,8 +362,6 @@ const sessionActivity = createSessionActivityCache({
   guardCeilingMs: SESSION_ACTIVITY_GUARD_CEILING_MS,
 })
 
-type ThreadIntegrationView = NonNullable<ThreadView['integrations']>[number]
-
 /** A fork's boundary never moves, so one observation per forked Session serves every Turn tail of its conversation. */
 const MAX_FORK_CUT_ENTRIES = 256
 const forkCuts = new Map<string, number>()
@@ -346,9 +376,9 @@ const sessionForkedAt = async (sessionId: string | undefined): Promise<number | 
   const known = forkCuts.get(sessionId)
   if (known !== undefined) return known
   try {
-    const snapshot = await requireContext().sessionPersistence.stat(SessionId(sessionId))
+    const snapshot = await requireHostServices().sessionPersistence.stat(SessionId(sessionId))
     if (snapshot?.header.isSeeded !== true) return undefined
-    const observation = await requireContext().sessionQuery.observeSession(SessionId(sessionId), { projectionMode: 'none' })
+    const observation = await requireHostServices().sessionQuery.observeSession(SessionId(sessionId), { projectionMode: 'none' })
     try {
       const cut = observation.events[observation.inheritedEventCount - 1]?.time
       if (cut === undefined) return undefined
@@ -404,9 +434,7 @@ const threadView = (
   const withQueue: ThreadView = integrationQueuedAt === undefined ? withQueueEvents : { ...withQueueEvents, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
   const integrations = IntegrationAttribution.forSession({ records: status.integrations ?? [], sessionId: viewerSessionId, forkCutAt }).map(record => {
-    const visibleRecord: ThreadIntegrationView = { at: record.at }
-    if (record.tipChangeId !== undefined) visibleRecord.tipChangeId = record.tipChangeId
-    return visibleRecord
+    return record.tipChangeId === undefined ? { at: record.at } : { at: record.at, tipChangeId: record.tipChangeId }
   })
   const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt, integrations }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp
@@ -446,7 +474,8 @@ const cachedBestEffortLocation = async (threads: Threads, path: string): Promise
   locateBestEffort(() => cachedLocation(threads, path))
 
 /** Registered workspaces whose folders still exist, so one missing entry cannot cost a process per scan. */
-const presentWorkspaces = (workspaces: readonly Workspace[]): readonly Workspace[] => workspaces.filter(workspace => existsSync(workspace.path))
+const presentWorkspaces = (workspaces: readonly Workspace[]): readonly Workspace[] =>
+  workspaces.filter(workspace => requireHostServices().filesystem.existsSync(workspace.path))
 
 /** Reads them a bounded number at a time: one `jj` process each, and the scan runs while the user is working. */
 const LOCATE_CONCURRENCY = 8
@@ -584,8 +613,8 @@ const landingMessage = (outcome: LandResult): string | undefined => {
 }
 
 const askAgent = async (path: string, sessionId: string | undefined, text: string): Promise<boolean> => {
-  const context = requireContext()
-  const controller = context.get('sessionController')
+  const context = requireHostServices()
+  const controller = context.sessionController
   if (controller === undefined) return false
   const workspace = await registryOf().resolveByPath(path)
   const archived = new Set<string>(registryOf().archivedSessionIds)
@@ -597,19 +626,19 @@ const askAgent = async (path: string, sessionId: string | undefined, text: strin
   return true
 }
 
-const checkoutSyncOutputSchema = z.object({
-  ok: z.boolean(),
-  data: z
-    .object({
-      status: z.enum(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed']),
-      rebuilt: z.object({ plugins: z.array(z.string()) }),
-      plugins: z.array(z.object({ name: z.string(), host: z.boolean(), client: z.boolean() })),
-      restart: z.object({ needed: z.boolean() }),
-      conflicts: z.array(z.string()),
-      hint: z.string().nullable(),
-    })
-    .optional(),
-  error: z.object({ message: z.string(), hint: z.string() }).optional(),
+const checkoutSyncOutputSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  data: Schema.optional(
+    Schema.Struct({
+      status: Schema.Literals(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed']),
+      rebuilt: Schema.Struct({ plugins: Schema.Array(Schema.String) }),
+      plugins: Schema.Array(Schema.Struct({ name: Schema.String, host: Schema.Boolean, client: Schema.Boolean })),
+      restart: Schema.Struct({ needed: Schema.Boolean }),
+      conflicts: Schema.Array(Schema.String),
+      hint: Schema.NullOr(Schema.String),
+    }),
+  ),
+  error: Schema.optional(Schema.Struct({ message: Schema.String, hint: Schema.String })),
 })
 
 interface WorkspaceSyncInput {
@@ -659,7 +688,7 @@ const runUntracedWorkspaceSync = async (input: WorkspaceSyncInput): Promise<Work
   } catch {
     return failed('dshx is not installed beside jj-integration; run `pnpm --dir plugins install --frozen-lockfile` in the repository.')
   }
-  const handle = requireContext().subprocess.spawn({
+  const handle = requireHostServices().subprocess.spawn({
     argv: [...argv],
     cwd: input.repoRoot,
     stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_OUTPUT }, stderr: { maxBytes: MAX_STDERR } },
@@ -668,7 +697,7 @@ const runUntracedWorkspaceSync = async (input: WorkspaceSyncInput): Promise<Work
   })
   await handle.done
   const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
-  const output = JsonText.decode(checkoutSyncOutputSchema, stdout)
+  const output = JsonText.decodeEffect(checkoutSyncOutputSchema, stdout)
   if (output === undefined) return failed(`dshx checkout sync printed no result: ${(handle.collected.stderr?.readFrom(0)?.text ?? '').trim().slice(-400)}`)
   if (!output.success) return failed('dshx checkout sync printed a result this plugin cannot read; rebuild dshx.')
   const data = output.data.data
@@ -677,10 +706,10 @@ const runUntracedWorkspaceSync = async (input: WorkspaceSyncInput): Promise<Work
   return {
     ...workspaceSyncView(input, output.data.ok ? 'done' : 'failed', data.hint),
     status: data.status,
-    pluginsRebuilt: data.rebuilt.plugins,
+    pluginsRebuilt: [...data.rebuilt.plugins],
     hotPlugins: data.plugins.filter(plugin => plugin.client && !plugin.host).map(plugin => plugin.name),
     restartNeeded: data.restart.needed,
-    conflicts: data.conflicts,
+    conflicts: [...data.conflicts],
   }
 }
 
@@ -725,7 +754,7 @@ const queueWorkspaceSync = (input: {
     })
     .catch(error => {
       workspaceSyncQueued = false
-      hostContext?.logger.warn('jj-integration: queued checkout sync failed: %o', error)
+      hostServices?.context.logger.warn('jj-integration: queued checkout sync failed: %o', error)
     })
 }
 
@@ -754,7 +783,7 @@ const landThread = async (input: {
   const bookmark = input.bookmark ?? readSettings().bookmark
   const correlationId = randomUUID()
   const activeThreads = requireThreads()
-  const location = await activeThreads.locate(input.path)
+  const location = await activeThreads.locate(input.path, input.signal)
   const validate = async (): Promise<void> => {
     if (location.threadName === undefined) return
     const workspace = await registryOf().resolveByPath(location.workspaceRoot)
@@ -798,8 +827,8 @@ const landThread = async (input: {
     files: outcome.status === 'conflicted' ? [...outcome.files] : [],
     bookmark,
     agentAsked: false,
+    ...(outcome.status === 'landed' && { head: outcome.head }),
   }
-  if (outcome.status === 'landed') result.head = outcome.head
   const message = landingMessage(result)
   const agentAsked =
     message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
@@ -858,7 +887,7 @@ const wakeDeferredIntegrations = (delayMs: number): void => {
   if (deferredIntegrationWake !== undefined) clearTimeout(deferredIntegrationWake)
   deferredIntegrationWake = setTimeout(() => {
     deferredIntegrationWake = undefined
-    void deferredIntegrations.drain().catch(error => hostContext?.logger.warn('jj-integration: queued integration failed: %o', error))
+    void deferredIntegrations.drain().catch(error => hostServices?.context.logger.warn('jj-integration: queued integration failed: %o', error))
   }, delayMs)
   deferredIntegrationWake.unref()
 }
@@ -963,7 +992,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
     input.apply ? sessionActivity.guard() : sessionActivity.display(),
     kinds.includes('secondary')
       ? Promise.resolve()
-          .then(() => requireContext().sessionQuery.listSessions())
+          .then(() => requireHostServices().sessionQuery.listSessions())
           .catch(() => undefined)
       : Promise.resolve([]),
   ])
@@ -984,8 +1013,8 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const repoRoots: string[] = []
   const workspaces: PlannedWorkspace[] = []
   const workspaceIds = new Map<string, string | null>()
-  const skipped: CleanupResult['skipped'] = []
-  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  const skipped: Array<CleanupResult['skipped'][number]> = []
+  const emptyRevisions: Array<CleanupResult['emptyRevisions'][number]> = []
   const untracked: PlannedUntracked[] = []
   for (const repository of repositories) {
     repoRoots.push(repository.repoRoot)
@@ -1023,7 +1052,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
     }
     if (kinds.includes('secondary')) {
       const secondary = await active.secondaryWorkspaces(repository.repoRoot).catch((error: unknown) => {
-        hostContext?.logger.warn(
+        hostServices?.context.logger.warn(
           'jj-integration: could not list secondary workspaces in %s: %s',
           repository.repoRoot,
           error instanceof Error ? error.message : String(error),
@@ -1038,7 +1067,9 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
           ...new Set([
             ...(registered?.sessionIds ?? []),
             ...(sessionRecords ?? [])
-              .filter(record => WorkspaceSessionPath.includes({ sessionCwd: record.header.cwd, workspacePath: workspace.path }))
+              .filter(record =>
+                WorkspaceSessionPath.includes({ filesystem: requireHostServices().filesystem, sessionCwd: record.header.cwd, workspacePath: workspace.path }),
+              )
               .map(record => record.header.id),
           ]),
         ]
@@ -1082,7 +1113,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
     }
     if (input.apply) continue
     const found = await active.danglingEmptyRevisions({ repoRoot: repository.repoRoot, abandon: false }).catch((error: unknown) => {
-      hostContext?.logger.warn(
+      hostServices?.context.logger.warn(
         'jj-integration: could not clear empty revisions in %s: %s',
         repository.repoRoot,
         error instanceof Error ? error.message : String(error),
@@ -1118,9 +1149,9 @@ const applyCleanup = async (input: {
   const scan = input.scan
   const report = input.report
   const active = requireThreads()
-  const workspaces: CleanupResult['workspaces'] = []
-  const untracked: CleanupResult['untracked'] = []
-  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  const workspaces: Array<CleanupResult['workspaces'][number]> = []
+  const untracked: Array<CleanupResult['untracked'][number]> = []
+  const emptyRevisions: Array<CleanupResult['emptyRevisions'][number]> = []
   report.beginPhase('removing')
   const plannedByRepository = new Map<string, PlannedWorkspace[]>()
   for (const planned of scan.workspaces) {
@@ -1184,7 +1215,7 @@ const applyCleanup = async (input: {
   report.beginPhase('abandoning')
   for (const repoRoot of scan.repoRoots) {
     const found = await active.danglingEmptyRevisions({ repoRoot, abandon: true }).catch((error: unknown) => {
-      hostContext?.logger.warn('jj-integration: could not clear empty revisions in %s: %s', repoRoot, errorText(error))
+      hostServices?.context.logger.warn('jj-integration: could not clear empty revisions in %s: %s', repoRoot, errorText(error))
       return []
     })
     emptyRevisions.push(...found)
@@ -1222,7 +1253,7 @@ const cleanupRunner = createCleanupJobRunner({
 /** A finished run already reported itself as `workspace.cleaned`; only the runs that removed nothing by design or failed say so here. */
 /** A registered workspace whose folder changed recently counts as activity for the repository it belongs to. */
 const directoryModifiedAt = (path: string): number => {
-  const stats = statSync(path, { throwIfNoEntry: false })
+  const stats = requireHostServices().filesystem.statSync(path, { throwIfNoEntry: false })
   if (stats === undefined) return 0
   return Math.max(stats.mtimeMs, stats.ctimeMs)
 }
@@ -1261,15 +1292,19 @@ const jjRepositoryRoots = async (): Promise<readonly string[]> => {
 
 const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   if (outcome.status === 'busy') {
-    hostContext?.logger.debug('jj-integration: automatic cleanup skipped while %s runs', outcome.jobId)
+    hostServices?.context.logger.debug('jj-integration: automatic cleanup skipped while %s runs', outcome.jobId)
     return
   }
   if (outcome.status === 'idle') {
-    hostContext?.logger.debug('jj-integration: no repository changed in the last %s h; automatic cleanup idles', outcome.activeWithinHours)
+    hostServices?.context.logger.debug('jj-integration: no repository changed in the last %s h; automatic cleanup idles', outcome.activeWithinHours)
     return
   }
   if (outcome.status === 'done') {
-    hostContext?.logger.debug('jj-integration: automatic cleanup ran in %s repository(ies), skipped %s inactive one(s)', outcome.runs.length, outcome.inactive)
+    hostServices?.context.logger.debug(
+      'jj-integration: automatic cleanup ran in %s repository(ies), skipped %s inactive one(s)',
+      outcome.runs.length,
+      outcome.inactive,
+    )
     return
   }
   if (outcome.status !== 'failed') return
@@ -1347,7 +1382,11 @@ const sweepFinishedThreads = async (): Promise<void> => {
       )
         continue
       await discardThread({ path: thread.path, force: false }).catch(error => {
-        hostContext?.logger.warn('jj-integration: could not remove finished thread %s: %s', thread.name, error instanceof Error ? error.message : String(error))
+        hostServices?.context.logger.warn(
+          'jj-integration: could not remove finished thread %s: %s',
+          thread.name,
+          error instanceof Error ? error.message : String(error),
+        )
       })
     }
   }
@@ -1358,24 +1397,37 @@ const sweepFinishedThreads = async (): Promise<void> => {
  * script (written once by memory, per project) deletes its node_modules, which setup reinstalls if it is reopened.
  */
 const cleanKeptThread = async (path: string): Promise<void> => {
-  if (hostContext === undefined || !existsSync(join(path, 'node_modules'))) return
-  const memory = createHostApiClient(hostContext, workspaceScriptsApi, '@dshfiles/jj-integration')
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot Host services across async cleanup; teardown may clear the shared reference while it finishes.
+  const services = hostServices
+  if (services === undefined || !services.filesystem.existsSync(join(path, 'node_modules'))) return
+  const memory = createHostApiClient(services.context, workspaceScriptsApi, '@dshfiles/jj-integration')
   const scripts = await memory.scripts({ cwd: path }).catch((error: unknown) => {
-    if (!(error instanceof Error && isApiOwnerMissing(error))) hostContext?.logger.warn('jj-integration: no cleanup script for %s: %s', path, String(error))
+    if (!(error instanceof Error && isApiOwnerMissing(error))) services.context.logger.warn('jj-integration: no cleanup script for %s: %s', path, String(error))
     return null
   })
   if (scripts === null) return
-  await execFileAsync(scripts.cleanup, [path], { timeout: CLEANUP_TIMEOUT_MS }).catch((error: unknown) => {
-    hostContext?.logger.warn('jj-integration: cleanup of archived thread %s failed: %s', path, error instanceof Error ? error.message : String(error))
-  })
+  try {
+    const executable = await services.subprocess.resolveExecutable(scripts.cleanup)
+    const handle = services.subprocess.spawn({
+      argv: [executable, path],
+      cwd: process.cwd(),
+      stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
+      graceMs: 1_500,
+      signal: AbortSignal.timeout(CLEANUP_TIMEOUT_MS),
+    })
+    const outcome = await handle.done
+    if (outcome.exitCode !== 0) throw new Error(`cleanup exited with code ${String(outcome.exitCode)}`)
+  } catch (error) {
+    services.context.logger.warn('jj-integration: cleanup of archived thread %s failed: %s', path, error instanceof Error ? error.message : String(error))
+  }
 }
 
 /** A deleted thread folder must not fail the next turn of a Session pinned to it: check the workspace out again first. */
 const restoreMissingThreadWorkspace = async (path: string, sessionId: string): Promise<void> => {
-  if (existsSync(join(path, '.jj'))) return
+  if (requireHostServices().filesystem.existsSync(join(path, '.jj'))) return
   const activeThreads = requireThreads()
   for (const workspace of registryOf().list()) {
-    if (!existsSync(workspace.path) || threadsDirectory(workspace.path) !== dirname(path)) continue
+    if (!requireHostServices().filesystem.existsSync(workspace.path) || threadsDirectory(workspace.path) !== dirname(path)) continue
     const location = await cachedBestEffortLocation(activeThreads, workspace.path)
     if (location === undefined || location.repoRoot !== location.workspaceRoot) continue
     await activeThreads.restore(location.repoRoot, path)
@@ -1499,7 +1551,47 @@ const vcsProvider = VcsProviders.contract('@dshfiles/jj-integration').host({
   restore: async ({ input, signal }) => ({ previous: await requireThreads().restoreFiles(input.path, input.snapshot, signal) }),
 })
 
-const api = jjIntegrationApi.host({
+const effectPlugin = DshxEffect.plugin({
+  layer: context => Layer.succeed(JjIntegrationHostServices, makeJjHostServices(context)),
+  setup: context =>
+    Effect.gen(function* () {
+      const services = yield* JjIntegrationHostServices
+      yield* setupHost(context, services)
+    }),
+})
+
+class JjIntegrationOperationFailure extends Schema.TaggedError<JjIntegrationOperationFailure>()('JjIntegrationOperationFailure', {
+  operation: Schema.String,
+  message: Schema.String,
+}) {}
+
+const effectify = <Input, Output>(name: string, handler: ApiHandler<Input, Output>) =>
+  Effect.fn(`jj-integration ${name}`)((context: ApiHandlerContext<Input>) =>
+    Effect.tryPromise({
+      try: signal => Promise.resolve(handler({ ...context, signal })),
+      catch: error =>
+        error instanceof PluginApiError
+          ? error
+          : new JjIntegrationOperationFailure({
+              operation: name,
+              message: error instanceof Error ? error.message : String(error),
+            }),
+    }),
+  )
+
+type JjApiMethods = typeof jjIntegrationApi.methods
+type JjPromiseApiHandlers = {
+  readonly [Key in keyof JjApiMethods]: ApiHandler<ApiHostInput<JjApiMethods[Key]>, ApiHostOutput<JjApiMethods[Key]>>
+}
+
+type IntegrationSummary = {
+  readonly at: number
+  tipChangeId?: string
+  baseChangeId?: string
+  sessionId?: string
+}
+
+const promiseApiHandlers: JjPromiseApiHandlers = {
   ownWorkspaceFor: async ({ input }) => {
     const registry = registryOf()
     const source = registry.get(WorkspaceId(input.workspaceId))
@@ -1547,7 +1639,7 @@ const api = jjIntegrationApi.host({
     const jjWorkspaceIds: string[] = []
     for (const workspaceId of new Set(input.workspaceIds)) {
       const workspace = registry.get(WorkspaceId(workspaceId))
-      if (workspace === undefined || !existsSync(workspace.path)) continue
+      if (workspace === undefined || !requireHostServices().filesystem.existsSync(workspace.path)) continue
       const location = await active.locate(workspace.path).catch(() => undefined)
       if (location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location)) jjWorkspaceIds.push(workspaceId)
     }
@@ -1558,7 +1650,7 @@ const api = jjIntegrationApi.host({
     const registered = await registeredProjects({
       workspaces: workspaces.map(workspace => ({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })),
       classify: async path => {
-        if (!existsSync(path)) return 'missing'
+        if (!requireHostServices().filesystem.existsSync(path)) return 'missing'
         const location = await cachedBestEffortLocation(requireThreads(), path)
         return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location) ? 'workspace' : 'project'
       },
@@ -1568,7 +1660,7 @@ const api = jjIntegrationApi.host({
   noFolder: async () => {
     const registry = registryOf()
     const directory = join(homedir(), '.dsh', 'no-folder')
-    await mkdir(directory, { recursive: true })
+    await requireHostServices().filesystem.mkdir(directory, { recursive: true })
     const existing = await registry.resolveByPath(directory)
     return { workspaceId: (existing ?? (await registry.create(directory, 'No folder'))).id }
   },
@@ -1582,7 +1674,7 @@ const api = jjIntegrationApi.host({
     return { thread: found?.thread ?? null }
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
-  land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark }),
+  land: ({ input, signal }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark, signal }),
   queueLand: ({ input }) => queueIntegration({ path: input.path, sessionId: input.sessionId }),
   cancelQueuedLand: ({ input }) => cancelQueuedIntegration(input.path),
   integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
@@ -1595,7 +1687,18 @@ const api = jjIntegrationApi.host({
       .list()
       .find(workspace => resolve(threadsDirectory(workspace.path)) === threadDirectory)
     if (project === undefined) throw new PluginApiError('The owning project for this removed thread workspace is not registered.', { code: 'not-a-thread' })
-    return requireThreads().reviewHistory({ repoRoot: project.path, name })
+    const history = await requireThreads().reviewHistory({ repoRoot: project.path, name })
+    return {
+      repoRoot: history.repoRoot,
+      name: history.name,
+      integrations: history.integrations.map(record => {
+        const integration: IntegrationSummary = { at: record.at }
+        if (record.tipChangeId !== undefined) integration.tipChangeId = record.tipChangeId
+        if (record.baseChangeId !== undefined) integration.baseChangeId = record.baseChangeId
+        if (record.sessionId !== undefined) integration.sessionId = record.sessionId
+        return integration
+      }),
+    }
   },
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
@@ -1605,14 +1708,15 @@ const api = jjIntegrationApi.host({
     })
     return { bookmark: readSettings().bookmark, thread: found?.thread ?? null }
   },
-  landThread: async ({ input, caller }) => {
-    const location = await requireThreads().locate(threadPath(input, caller))
+  landThread: async ({ input, caller, signal }) => {
+    const location = await requireThreads().locate(threadPath(input, caller), signal)
     if (location.threadName === undefined) return { summary: 'This Session does not run in a thread workspace; nothing to rebase.', result: null }
     const result = await landThread({
       path: location.workspaceRoot,
       sessionId: caller.kind === 'agent' ? caller.sessionId : undefined,
       fromAgent: caller.kind === 'agent',
       bookmark: input.bookmark,
+      signal,
     })
     return { summary: landingMessage(result) ?? JSON.stringify(result), result }
   },
@@ -1631,6 +1735,33 @@ const api = jjIntegrationApi.host({
     return { job }
   },
   cleanupJobs: () => ({ jobs: [...cleanupRunner.trail()] }),
+}
+
+const api = effectPlugin.hostApi(jjIntegrationApi, {
+  ownWorkspaceFor: effectify('own workspace for', promiseApiHandlers.ownWorkspaceFor),
+  provision: effectify('provision workspace', promiseApiHandlers.provision),
+  isolate: effectify('isolate session', promiseApiHandlers.isolate),
+  destination: effectify('read destination', promiseApiHandlers.destination),
+  classifyWorkspaces: effectify('classify workspaces', promiseApiHandlers.classifyWorkspaces),
+  projects: effectify('list projects', promiseApiHandlers.projects),
+  noFolder: effectify('read no-folder hint', promiseApiHandlers.noFolder),
+  repositories: effectify('list repositories', promiseApiHandlers.repositories),
+  refreshRepositories: effectify('refresh repositories', promiseApiHandlers.refreshRepositories),
+  threadAt: effectify('read thread at path', promiseApiHandlers.threadAt),
+  revisionGraph: effectify('read revision graph', promiseApiHandlers.revisionGraph),
+  land: effectify('land revisions', promiseApiHandlers.land),
+  queueLand: effectify('queue land', promiseApiHandlers.queueLand),
+  cancelQueuedLand: effectify('cancel queued land', promiseApiHandlers.cancelQueuedLand),
+  integrationProgress: effectify('read integration progress', promiseApiHandlers.integrationProgress),
+  reviewHistory: effectify('read review history', promiseApiHandlers.reviewHistory),
+  threadStatus: effectify('read thread status', promiseApiHandlers.threadStatus),
+  landThread: effectify('land thread', promiseApiHandlers.landThread),
+  workspaceSync: effectify('read workspace sync', promiseApiHandlers.workspaceSync),
+  discard: effectify('discard thread', promiseApiHandlers.discard),
+  discardMany: effectify('discard threads', promiseApiHandlers.discardMany),
+  cleanupWorkspaces: effectify('cleanup workspaces', promiseApiHandlers.cleanupWorkspaces),
+  startCleanup: effectify('start cleanup', promiseApiHandlers.startCleanup),
+  cleanupJobs: effectify('list cleanup jobs', promiseApiHandlers.cleanupJobs),
 })
 
 const rebaseCommand = defineCommand({
@@ -1638,13 +1769,15 @@ const rebaseCommand = defineCommand({
   description: 'Rebase this thread workspace onto the configured bookmark.',
   handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
     if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: 'Usage: /rebase' }
-    if (hostContext === undefined) return { kind: 'error', text: 'jj-integration is not active.' }
-    const controller = hostContext.get('sessionController')
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot Host services across the Session API await; teardown may clear the shared reference while it finishes.
+    const services = hostServices
+    if (services === undefined) return { kind: 'error', text: 'jj-integration is not active.' }
+    const controller = services.sessionController
     if (controller === undefined) return { kind: 'error', text: 'The Session controller is unavailable.' }
     const sessions = await controller.list({ projections: [] }, invocation.signal)
     const path = sessions.items.find(session => session.sessionId === invocation.agent.id)?.cwd
     if (path === undefined || path.length === 0) return { kind: 'error', text: 'This Session has no working directory; there is nothing to rebase.' }
-    const location = await requireThreads().locate(path)
+    const location = await requireThreads().locate(path, invocation.signal)
     if (location.threadName === undefined) {
       return { kind: 'error', text: 'This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.' }
     }
@@ -1679,9 +1812,29 @@ const ownedSettings = jjIntegrationSettings.host({
   },
 })
 
-const setupHost = (context: Context): Effect<void> => {
-  hostContext = context
-  threads = createThreads({ executor: createExecutor(context), bookmark: () => readSettings().bookmark, threadsDirectory })
+const setupHostLifecycle = (context: Context, services: JjHostServices): AsyncIterable<() => Promise<void>> => {
+  threads = createThreads({
+    filesystem: services.filesystem,
+    executor: createExecutor(context),
+    bookmark: () => readSettings().bookmark,
+    threadsDirectory,
+    gitWorktree: async (repoRoot, args) =>
+      withSpan('git worktree', { kind: 'client', attributes: { 'process.executable.name': 'git', 'process.command.verb': 'worktree' } }, async span => {
+        const executable = await services.subprocess.resolveExecutable('git')
+        const handle = services.subprocess.spawn({
+          argv: [executable, '-C', repoRoot, 'worktree', ...args],
+          cwd: repoRoot,
+          stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
+          graceMs: 1_500,
+        })
+        const outcome = await handle.done
+        span.setAttributes({ 'process.exit.code': outcome.exitCode ?? 'unknown' })
+        if (outcome.exitCode !== 0) {
+          span.setStatus('error', `exit ${String(outcome.exitCode)}`)
+          throw new Error(`git worktree exited with code ${String(outcome.exitCode)}`)
+        }
+      }),
+  })
   const projectChecks = createHostApiClient(context, projectChecksApi, '@dshfiles/jj-integration')
   const handleVerifiedTurn = async (verifiedTurn: ProjectChecksVerifiedTurn): Promise<void> => {
     if (verifiedTurn.signal.aborted) return
@@ -1912,7 +2065,7 @@ const setupHost = (context: Context): Effect<void> => {
     async (_assembly, promptContext, next) => {
       const agent = promptContext.agent
       if (agent === undefined) return next()
-      const directories = new Set([context.get('workingDirectory')?.get(agent.session), agent.session.header.cwd])
+      const directories = new Set([services.workingDirectory?.get(agent.session), agent.session.header.cwd])
       for (const directory of directories) {
         if (directory === undefined || directory === null) continue
         await restoreMissingThreadWorkspace(directory, agent.session.id).catch(error =>
@@ -1962,7 +2115,7 @@ const setupHost = (context: Context): Effect<void> => {
   })
   const readSettledIds = (): readonly string[] | undefined => {
     try {
-      return settledStatusSchema.parse(context.settings.describe().find(entry => entry.ns === SETTLED_THREADS_NAMESPACE)?.value).settledSessionIds
+      return parseSettledStatus(context.settings.describe().find(entry => entry.ns === SETTLED_THREADS_NAMESPACE)?.value).settledSessionIds
     } catch {
       return undefined
     }
@@ -1998,8 +2151,8 @@ const setupHost = (context: Context): Effect<void> => {
         clearInterval(timer)
         clearInterval(deferredFallback)
         if (deferredIntegrationWake !== undefined) clearTimeout(deferredIntegrationWake)
-        if (hostContext === context) {
-          hostContext = undefined
+        if (hostServices === services) {
+          hostServices = undefined
           threads = undefined
           deferredIntegrations.clear()
           locationCache.clear()
@@ -2010,11 +2163,27 @@ const setupHost = (context: Context): Effect<void> => {
   }
 }
 
+const setupHost = Effect.fn('jj-integration setup')((context: Context, services: JjHostServices) =>
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      hostServices = services
+      return setupHostLifecycle(context, services)
+    }),
+    lifecycle =>
+      Effect.tryPromise({
+        try: async () => {
+          for await (const dispose of lifecycle) await dispose()
+        },
+        catch: error => error,
+      }).pipe(Effect.orDie),
+  ).pipe(Effect.asVoid),
+)
+
 export default defineHost({
   name: 'jj-integration',
   inject: ['subprocess', 'sessionController'],
   commands: [rebaseCommand],
   settings: [ownedSettings],
   apis: [api, vcsProvider],
-  setup: setupHost,
+  setup: effectPlugin.setup,
 })

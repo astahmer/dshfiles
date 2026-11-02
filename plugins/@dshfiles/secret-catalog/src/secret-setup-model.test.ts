@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from 'effect/StandardSchema'
 import { describe, expect, it } from 'vitest'
 import type { SecretMetadata } from './secret-metadata.js'
 import type { SecretSetupDraft } from './secret-setup-model.js'
@@ -14,6 +15,11 @@ const row = (input: { readonly alias: string; readonly environment: string; read
   service: '',
   description: '',
 })
+
+const acceptsDraft = async (value: unknown): Promise<boolean> => {
+  const result: StandardSchemaV1.Result<unknown> = await SecretSetupModel.draftSchema['~standard'].validate(value)
+  return result.issues === undefined
+}
 
 const validDraft: SecretSetupDraft = {
   alias: 'SYNTHETIC_TOKEN',
@@ -32,11 +38,11 @@ describe('Secret Catalog setup draft', () => {
     })
   })
 
-  it('validates alias, environment, and a non-empty bounded value through the shared schemas', () => {
-    expect(SecretSetupModel.draftSchema.safeParse({ ...validDraft, alias: '1BAD' }).success).toBe(false)
-    expect(SecretSetupModel.draftSchema.safeParse({ ...validDraft, environment: 'bad env' }).success).toBe(false)
-    expect(SecretSetupModel.draftSchema.safeParse({ ...validDraft, value: '' }).success).toBe(false)
-    expect(SecretSetupModel.draftSchema.safeParse({ ...validDraft, value: 'x'.repeat(SecretSetupModel.valueLimit + 1) }).success).toBe(false)
+  it('validates alias, environment, and a non-empty bounded value through the shared schemas', async () => {
+    expect(await acceptsDraft({ ...validDraft, alias: '1BAD' })).toBe(false)
+    expect(await acceptsDraft({ ...validDraft, environment: 'bad env' })).toBe(false)
+    expect(await acceptsDraft({ ...validDraft, value: '' })).toBe(false)
+    expect(await acceptsDraft({ ...validDraft, value: 'x'.repeat(SecretSetupModel.valueLimit + 1) })).toBe(false)
   })
 
   it('requires a folder for project and local scope, but not global', () => {

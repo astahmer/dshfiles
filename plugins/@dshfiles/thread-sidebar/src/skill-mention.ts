@@ -1,13 +1,10 @@
 import type { SkillEntry } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ClientSessionContext, InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
 import type { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
+import { SchemaHelpers } from './schema-helpers.js'
 
-const skillNameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)
+const skillNameSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u))
 type SkillSessionId = ClientSessionContext['sessionId']
 
 // The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:`, `@mcp:` and `@b:`/`@backlog:`.
@@ -45,7 +42,7 @@ const skillMentionCandidates = (input: {
   }))
 
 const skillMentionPick = (candidate: Pick<InputTriggerCandidate, 'name'>): { readonly text: string } | undefined => {
-  const parsedName = skillNameSchema.safeParse(candidate.name)
+  const parsedName = SchemaHelpers.decodeUnknownSafe(skillNameSchema, candidate.name)
   if (!parsedName.success) return undefined
   return { text: `/${parsedName.data} ` }
 }
