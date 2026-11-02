@@ -1,51 +1,53 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
-const marketplaceLocaleSchema = z.enum(['en', 'zh'])
-const marketplaceBadgeSchema = z.enum(['official', 'community'])
-const marketplaceCompatibilitySchema = z.enum(['compatible', 'incompatible', 'unknown'])
-const marketplaceSortSchema = z.enum(['latest', 'stars'])
+const marketplaceLocaleSchema = Schema.Literals(['en', 'zh'])
+const marketplaceBadgeSchema = Schema.Literals(['official', 'community'])
+const marketplaceCompatibilitySchema = Schema.Literals(['compatible', 'incompatible', 'unknown'])
+const marketplaceSortSchema = Schema.Literals(['latest', 'stars'])
 
-const marketplaceCategorySchema = z.object({
-  slug: z.string().min(1).max(80),
-  name: z.string().min(1).max(100),
+const absoluteUrl = Schema.makeFilter((value: string) => (URL.canParse(value) ? undefined : 'Expected an absolute URL.'))
+
+const marketplaceCategorySchema = Schema.Struct({
+  slug: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
 })
 
-const marketplaceCardSchema = z.object({
-  slug: z.string().min(1).max(160),
-  name: z.string().min(1).max(160),
-  packageName: z.string().min(1).max(240),
-  description: z.string().max(600),
-  version: z.string().min(1).max(100),
-  compatibilityRange: z.string().min(1).max(160),
+const marketplaceCardSchema = Schema.Struct({
+  slug: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)),
+  packageName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(240)),
+  description: Schema.String.check(Schema.isMaxLength(600)),
+  version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  compatibilityRange: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(160)),
   compatibility: marketplaceCompatibilitySchema,
-  category: z.string().min(1).max(80),
+  category: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   badge: marketplaceBadgeSchema,
-  glyph: z.string().min(1).max(4),
-  iconUrl: z.string().url().nullable(),
-  author: z.string().min(1).max(120).nullable(),
-  avatarUrl: z.string().url().nullable(),
-  stars: z.number().int().nonnegative().nullable(),
-  updated: z.string().max(40).nullable(),
-  installed: z.boolean(),
+  glyph: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  iconUrl: Schema.NullOr(Schema.String.check(absoluteUrl)),
+  author: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120))),
+  avatarUrl: Schema.NullOr(Schema.String.check(absoluteUrl)),
+  stars: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  updated: Schema.NullOr(Schema.String.check(Schema.isMaxLength(40))),
+  installed: Schema.Boolean,
 })
 
-const marketplaceListInputSchema = z.object({
+const marketplaceListInputSchema = Schema.Struct({
   locale: marketplaceLocaleSchema,
-  category: z.string().min(1).max(80).optional(),
-  cursor: z.string().min(1).max(1000).optional(),
-  query: z.string().trim().min(1).max(64).optional(),
-  sort: marketplaceSortSchema.optional(),
+  category: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
+  cursor: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1000))),
+  query: Schema.optionalKey(Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64))),
+  sort: Schema.optionalKey(marketplaceSortSchema),
 })
 
-const marketplaceListOutputSchema = z.object({
-  categories: z.array(marketplaceCategorySchema).max(100),
-  items: z.array(marketplaceCardSchema).max(24),
-  nextCursor: z.string().max(1000).nullable(),
-  total: z.number().int().nonnegative().nullable(),
+const marketplaceListOutputSchema = Schema.Struct({
+  categories: Schema.Array(marketplaceCategorySchema).check(Schema.isMaxLength(100)),
+  items: Schema.Array(marketplaceCardSchema).check(Schema.isMaxLength(24)),
+  nextCursor: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
+  total: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
 })
 
-const installFailureCodeSchema = z.enum([
+const installFailureCodeSchema = Schema.Literals([
   'busy',
   'catalog-unavailable',
   'target-unavailable',
@@ -58,30 +60,30 @@ const installFailureCodeSchema = z.enum([
   'timeout',
 ])
 
-const installSuccessSchema = z.object({
-  status: z.enum(['installed', 'already-installed']),
-  packageName: z.string().min(1).max(240),
-  version: z.string().min(1).max(100),
-  restartRequired: z.literal(true),
+const installSuccessSchema = Schema.Struct({
+  status: Schema.Literals(['installed', 'already-installed']),
+  packageName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(240)),
+  version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  restartRequired: Schema.Literal(true),
 })
 
-const installFailureSchema = z.object({
-  status: z.literal('failed'),
+const installFailureSchema = Schema.Struct({
+  status: Schema.Literal('failed'),
   code: installFailureCodeSchema,
-  retryable: z.boolean(),
+  retryable: Schema.Boolean,
 })
 
-const marketplaceInstallOutputSchema = z.union([installSuccessSchema, installFailureSchema])
+const marketplaceInstallOutputSchema = Schema.Union([installSuccessSchema, installFailureSchema])
 
-export type MarketplaceLocale = z.infer<typeof marketplaceLocaleSchema>
-export type MarketplaceBadge = z.infer<typeof marketplaceBadgeSchema>
-export type MarketplaceSort = z.infer<typeof marketplaceSortSchema>
-export type MarketplaceCategory = z.infer<typeof marketplaceCategorySchema>
-export type MarketplaceCard = z.infer<typeof marketplaceCardSchema>
-export type MarketplaceListInput = z.infer<typeof marketplaceListInputSchema>
-export type MarketplaceListOutput = z.infer<typeof marketplaceListOutputSchema>
-export type MarketplaceInstallOutput = z.infer<typeof marketplaceInstallOutputSchema>
-export type InstallFailureCode = z.infer<typeof installFailureCodeSchema>
+export type MarketplaceLocale = typeof marketplaceLocaleSchema.Type
+export type MarketplaceBadge = typeof marketplaceBadgeSchema.Type
+export type MarketplaceSort = typeof marketplaceSortSchema.Type
+export type MarketplaceCategory = typeof marketplaceCategorySchema.Type
+export type MarketplaceCard = typeof marketplaceCardSchema.Type
+export type MarketplaceListInput = typeof marketplaceListInputSchema.Type
+export type MarketplaceListOutput = typeof marketplaceListOutputSchema.Type
+export type MarketplaceInstallOutput = typeof marketplaceInstallOutputSchema.Type
+export type InstallFailureCode = typeof installFailureCodeSchema.Type
 
 export const pluginMarketplaceApi = defineApi({
   id: 'plugin-marketplace',
@@ -92,11 +94,8 @@ export const pluginMarketplaceApi = defineApi({
       output: marketplaceListOutputSchema,
     }),
     install: method({
-      input: z.object({
-        slug: z
-          .string()
-          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-          .max(160),
+      input: Schema.Struct({
+        slug: Schema.String.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), Schema.isMaxLength(160)),
       }),
       output: marketplaceInstallOutputSchema,
     }),

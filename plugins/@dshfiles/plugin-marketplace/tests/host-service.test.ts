@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   hubListResponseSchema,
@@ -119,12 +120,12 @@ async function serviceFixture(options: {
 
 describe('Framework Hub response validation', () => {
   it('accepts the previous list response shape and defaults categories to an empty list', () => {
-    expect(hubListResponseSchema.parse({ items: [], nextCursor: null }).categories).toEqual([])
+    expect(Schema.decodeUnknownSync(hubListResponseSchema)({ items: [], nextCursor: null }).categories).toEqual([])
   })
 
   it('rejects more than one marketplace page', () => {
     expect(() =>
-      hubListResponseSchema.parse({
+      Schema.decodeUnknownSync(hubListResponseSchema)({
         items: Array.from({ length: 25 }, () => card()),
         nextCursor: null,
       }),

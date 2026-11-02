@@ -6,11 +6,11 @@ import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { execa } from 'execa'
+import * as Schema from 'effect/Schema'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { MarketplaceHostService } from '../src/host-service.js'
 
-const profileManifestSchema = z.object({ dsh: z.object({ profile: z.object({ bundles: z.array(z.string()) }) }) })
+const profileManifestSchema = Schema.Struct({ dsh: Schema.Struct({ profile: Schema.Struct({ bundles: Schema.Array(Schema.String) }) }) })
 
 const workspace = resolve(import.meta.dirname, '../../..')
 const packageDirectory = resolve(import.meta.dirname, '..')
