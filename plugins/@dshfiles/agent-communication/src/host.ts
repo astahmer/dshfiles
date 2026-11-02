@@ -12,7 +12,7 @@ import {
   type CommunicationPrincipal,
 } from '@dshfiles/dshx/communication'
 import type { Context } from '@deepseek-ai/cordis'
-import { Effect, Layer, Schedule, Schema } from 'effect'
+import { Cause, Effect, Layer, Schema } from 'effect'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
@@ -21,6 +21,7 @@ import { CommunicationDelegation, type DelegationSender } from './delegation-gua
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
 import { RecipientDirectoryModel } from './recipient-directory.js'
+import { recurringTask } from './recurring-task.js'
 import { SessionHistoryModel } from './session-history.js'
 import { UnreadNudgeRules } from './unread-nudge.js'
 
@@ -813,9 +814,6 @@ const setupHostIterator = (context: Context) => {
   }
 }
 
-const recurring = (run: () => Promise<void>, intervalMs: number) =>
-  Effect.repeat(Effect.tryPromise({ try: run, catch: () => undefined }), Schedule.spaced(`${intervalMs} millis`))
-
 const setupHost = Effect.fn('agent communication setup')(function* (context: Context) {
   const setup = yield* Effect.acquireRelease(
     Effect.tryPromise({
@@ -833,8 +831,18 @@ const setupHost = Effect.fn('agent communication setup')(function* (context: Con
         await setup.close()
       }),
   )
-  yield* Effect.forkScoped(recurring(refreshUnreadCounts, UnreadNudgeRules.refreshIntervalMs))
-  if (setup.ownsBridge) yield* Effect.forkScoped(recurring(() => Promise.resolve(setup.runMaintenance()), workspaceTopicCleanupIntervalMs))
+  const reportFailure = (task: string) => (cause: Cause.Cause<unknown>) => context.logger.warn('agent-communication: %s failed: %s', task, Cause.pretty(cause))
+  yield* Effect.forkScoped(
+    recurringTask({ run: refreshUnreadCounts, intervalMs: UnreadNudgeRules.refreshIntervalMs, onFailure: reportFailure('unread count refresh') }),
+  )
+  if (setup.ownsBridge)
+    yield* Effect.forkScoped(
+      recurringTask({
+        run: () => Promise.resolve(setup.runMaintenance()),
+        intervalMs: workspaceTopicCleanupIntervalMs,
+        onFailure: reportFailure('workspace topic maintenance'),
+      }),
+    )
 })
 
 const effectPlugin = DshxEffect.plugin({ layer: Layer.empty, setup: context => setupHost(context) })
