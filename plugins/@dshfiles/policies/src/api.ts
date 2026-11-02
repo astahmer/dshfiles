@@ -1,16 +1,6 @@
-import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
-import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
-import * as Schema from 'effect/Schema'
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { Schema } from 'effect'
 import { Policies } from './policies.js'
-import { strictStandardSchema } from './schema.js'
-
-const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
-  options: Omit<ApiMethodOptions<Input, Output>, 'input' | 'output' | 'tool'> & {
-    readonly input: Input
-    readonly output: Output
-    readonly tool?: ApiToolExposure<Output['Type']>
-  },
-) => defineMethod({ ...options, input: strictStandardSchema(options.input), output: strictStandardSchema(options.output) })
 
 export const policiesApi = defineApi({
   id: 'policies',
