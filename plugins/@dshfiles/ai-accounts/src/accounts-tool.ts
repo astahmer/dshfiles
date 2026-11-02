@@ -2,6 +2,7 @@ import { HostContext, Tool } from '@dshfiles/dshx/effect'
 import { Effect, Schema } from 'effect'
 import { accountRuntime } from './account-runtime.js'
 import { AccountsHostApiModel } from './accounts-host-api.js'
+import { AccountStorePromiseService } from './account-store-promise.js'
 
 const accountReport = Schema.Struct({
   route: Schema.String,
@@ -58,7 +59,8 @@ export const aiAccountsTool = Tool.make({
   render: renderReport,
   execute: Effect.fn('ai accounts tool report')(function* () {
     const host = yield* HostContext
-    const snapshot = yield* Effect.promise(() => AccountsHostApiModel.accountsFile(host.ctx))
+    const store = yield* AccountStorePromiseService
+    const snapshot = yield* Effect.promise(() => AccountsHostApiModel.accountsFile(host.ctx, store))
     return {
       distribution: snapshot.distribution,
       cooldownMs: snapshot.cooldownMs,

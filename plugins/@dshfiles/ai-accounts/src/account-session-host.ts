@@ -3,7 +3,8 @@ import { AccountSignInActive } from './errors.js'
 import { accountRuntime } from './account-runtime.js'
 import { AccountLocks } from './account-locks.js'
 import { Effect } from 'effect'
-import { accountStoreService } from './account-store.js'
+import type { AccountStoreFile } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import { Api } from '@dshfiles/dshx/effect'
 import { aiAccountsSessionApi } from './account-session-api.js'
 import { effectHandler, lockedHandler } from './host-effect.js'
@@ -14,8 +15,7 @@ import type { AccountDraft } from './api.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 
 /** A reconnect cannot start writing a saved account's credential home while sign-out owns it. */
-export const accountSessionRelatedIds = (account: AccountDraft): readonly string[] => {
-  const file = accountStoreService.readAccountFileSync()
+export const accountSessionRelatedIds = (file: AccountStoreFile, account: AccountDraft): readonly string[] => {
   const homes = (candidate: AccountDraft): readonly string[] => {
     if (candidate.kind === 'codex') {
       try {
@@ -45,7 +45,7 @@ export const accountSessionRelatedIds = (account: AccountDraft): readonly string
 }
 
 const services = new WeakMap<Context, AccountSessionService>()
-const busy = (ctx: Context, account: AccountDraft): boolean => {
+const busy = (ctx: Context, file: AccountStoreFile, account: AccountDraft): boolean => {
   const runtime = accountRuntime(ctx)
   const active = (state: string | undefined): boolean => state === 'starting' || state === 'waiting'
   if (active(runtime?.accountLogin?.state(account.instanceId).status) || active(runtime?.copilotLogin?.state(account.instanceId).status)) return true
@@ -55,7 +55,7 @@ const busy = (ctx: Context, account: AccountDraft): boolean => {
       ?.candidates()
       .some(
         candidate =>
-          accountSessionRelatedIds(candidate).includes(account.instanceId) ||
+          accountSessionRelatedIds(file, candidate).includes(account.instanceId) ||
           (account.apiKeyEnv !== '' && candidate.apiKeyEnv === account.apiKeyEnv) ||
           [account.homePath, account.shadowHomePath].some(
             home => home !== '' && [candidate.homePath, candidate.shadowHomePath].some(selected => AccountHomePolicy.containsConfiguredHome(home, selected)),
@@ -63,11 +63,11 @@ const busy = (ctx: Context, account: AccountDraft): boolean => {
       ) ?? false
   )
 }
-const serviceFor = (ctx: Context): AccountSessionService => {
+const serviceFor = (ctx: Context, store: AccountStorePromise): AccountSessionService => {
   const existing = services.get(ctx.root)
   if (existing !== undefined) return existing
   const service = createAccountSessionService({
-    readAccounts: () => accountStoreService.readAccountFile(),
+    readAccounts: () => store.readAccountFile(),
     credentials: ctx.get('credentials'),
     copilot: {
       writable: async id =>
@@ -78,7 +78,7 @@ const serviceFor = (ctx: Context): AccountSessionService => {
         await login.signOut(id)
       },
     },
-    isBusy: account => busy(ctx, account),
+    isBusy: account => busy(ctx, store.current(), account),
     onSignedOut: async account => {
       // Credentials are read per request; do not remove, disable or rewrite the account's route/profile.
       if (account.kind === 'claude') claudeAccountService.invalidateUsage(ClaudeAccountModel.resolveClaudeConfigDir(account.homePath))
@@ -91,7 +91,7 @@ const serviceFor = (ctx: Context): AccountSessionService => {
   })
   return service
 }
-const readCapability = effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input }) => serviceFor(ctx).capability(input.instanceId))
+const readCapability = effectHandler(aiAccountsSessionApi, 'capability', ({ ctx, input, store }) => serviceFor(ctx, store).capability(input.instanceId))
 
 export const accountSessionHostApi = Api.bind(aiAccountsSessionApi, {
   capability: Effect.fn('ai accounts capability')(function* (input, call) {
@@ -109,13 +109,13 @@ export const accountSessionHostApi = Api.bind(aiAccountsSessionApi, {
     aiAccountsSessionApi,
     'signOut',
     ({ input }) => [input.instanceId],
-    async ({ ctx, input }) => {
+    async ({ ctx, input, store }) => {
       // Join any cancelled Codex subprocess that is still exiting. Never cancel a live attempt ourselves.
-      const file = await accountStoreService.readAccountFile()
+      const file = await store.readAccountFile()
       const account = file.accounts.find(candidate => candidate.instanceId === input.instanceId)
-      if (account !== undefined && busy(ctx, account)) throw new AccountSignInActive({ instanceId: input.instanceId })
+      if (account !== undefined && busy(ctx, file, account)) throw new AccountSignInActive({ instanceId: input.instanceId })
       await accountRuntime(ctx)?.accountLogin?.settledAccount(input.instanceId)
-      return serviceFor(ctx).signOut(input)
+      return serviceFor(ctx, store).signOut(input)
     },
   ),
 })

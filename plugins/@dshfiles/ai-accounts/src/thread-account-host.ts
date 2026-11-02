@@ -8,7 +8,7 @@ import type { ApiCaller } from '@dshfiles/dshx/api'
 
 import { Api } from '@dshfiles/dshx/effect'
 import { threadModelApi } from '@dshfiles/session-controller/thread-model-api'
-import { accountStoreService } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import { accountRuntime } from './account-runtime.js'
 import { servingAccountSessionForCaller } from './serving-account-host.js'
 import { threadAccountApi, type ThreadAccountPreview } from './thread-account-api.js'
@@ -19,6 +19,7 @@ const threadModels = (ctx: Context) => createHostApiClient(ctx, threadModelApi, 
 
 const previewThreadAccount = async (
   ctx: Context,
+  store: AccountStorePromise,
   input: { readonly sessionId?: string | undefined; readonly instanceId: string },
   caller: ApiCaller,
 ): Promise<ThreadAccountPreview> => {
@@ -30,7 +31,7 @@ const previewThreadAccount = async (
         throw new OwnerApiMissing({ owner: '@dshfiles/session-controller', apiId: threadModelApi.id, method: 'snapshot' })
       throw error
     })
-  const file = await accountStoreService.readAccountFile()
+  const file = await store.readAccountFile()
   const account = file.accounts.find(account => account.instanceId === input.instanceId)
   if (account === undefined || !account.enabled || account.kind === 'cursor')
     throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'cannot-run-models' })
@@ -85,9 +86,9 @@ const previewThreadAccount = async (
 }
 
 export const threadAccountHostApi = Api.bind(threadAccountApi, {
-  preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller }) => previewThreadAccount(ctx, input, caller)),
-  switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller }) => {
-    const preview = await previewThreadAccount(ctx, input, caller)
+  preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller, store }) => previewThreadAccount(ctx, store, input, caller)),
+  switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller, store }) => {
+    const preview = await previewThreadAccount(ctx, store, input, caller)
     if (preview.expectedRevision !== input.expectedRevision || !ThreadAccountModel.same(preview.target, input.target))
       throw new ThreadSelectionChanged({ sessionId: preview.sessionId })
     await threadModels(ctx).select({

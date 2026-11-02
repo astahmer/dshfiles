@@ -13,7 +13,7 @@ import {
   type AccountProfile,
   type PrepareAccountConnectionInput,
 } from './api.js'
-import type { accountStoreService } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import type { CredentialValueResolver } from './credentials.js'
 
 interface Operation {
@@ -49,7 +49,7 @@ export interface SetupVerificationInput {
 
 /** One bounded, ephemeral owner per Host. Nothing here is a saved account until commitConnection. */
 export const createAccountSetupService = (input: {
-  readonly store: Pick<typeof accountStoreService, 'readAccountFile' | 'createSetupAccount' | 'commitConnection' | 'connectionMetadata'>
+  readonly store: Pick<AccountStorePromise, 'readAccountFile' | 'createSetupAccount' | 'commitConnection' | 'connectionMetadata'>
   readonly verify: (input: SetupVerificationInput) => Promise<unknown>
   readonly observeExisting?: (draft: AccountDraft) => Promise<AccountProfile | undefined>
   readonly resolveCredential: CredentialValueResolver

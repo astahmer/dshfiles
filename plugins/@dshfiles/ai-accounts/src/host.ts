@@ -31,7 +31,8 @@ import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
 import { AccountHomePolicy } from './account-home-policy.js'
-import { accountStoreService, type AccountStoreFile } from './account-store.js'
+import { AccountProfilesModel, AccountStore, type AccountStoreFile } from './account-store.js'
+import { AccountStorePromiseService, type AccountStorePromise } from './account-store-promise.js'
 import { createAccountSetupService } from './account-setup-service.js'
 import { verifyAccountConnection } from './account-connection-verification.js'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -116,7 +117,12 @@ interface AccountsHostActivation {
  * The imperative account Host still being split into services: everything it starts registers its release in
  * `onRelease`, which the plugin Scope runs in reverse order when the plugin unloads.
  */
-const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnapshot, onRelease: (release: () => void) => void): AccountsHostActivation => {
+const startAccountsHost = (
+  ctx: Context,
+  readSettings: () => AccountSettingsSnapshot,
+  store: AccountStorePromise,
+  onRelease: (release: () => void) => void,
+): AccountsHostActivation => {
   const resolveCredential = resolveKeyFromContext(ctx)
   const runtime = activateAccountRuntime(ctx)
   const servingAccount = createServingAccountService(ctx)
@@ -127,12 +133,12 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   })
   const copilotCredentialReader = createCopilotCredentialsService(ctx.get('credentials')).read
   runtime.accountSetup = createAccountSetupService({
-    store: accountStoreService,
+    store,
     resolveCredential,
     observeExisting: async draft => {
-      const file = await accountStoreService.readAccountFile()
+      const file = await store.readAccountFile()
       return (
-        await accountStoreService.buildAccountsFile(
+        await AccountProfilesModel.buildAccountsFile(
           { ...file, accounts: [draft] },
           [],
           resolveCredential,
@@ -172,7 +178,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
     },
     cleanupCandidate: async draft => {
       await runtime.accountLogin?.settledAccount(draft.instanceId)
-      const file = await accountStoreService.readAccountFile()
+      const file = await store.readAccountFile()
       if (
         file.accounts.some(
           account =>
@@ -197,7 +203,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
       await runtime.refreshRoutes?.()
     },
   })
-  installAccountLogin(ctx)
+  installAccountLogin(ctx, store)
   const usageHistory = createUsageHistoryService(ctx)
   const fastModeUsageHistory = createFastModeUsageHistoryService(ctx, {
     readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
@@ -205,7 +211,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   runtime.fastModeUsageHistory = fastModeUsageHistory
   runtime.scheduler = usageHistory.createScheduler(
     async () => {
-      const file = await AccountsHostApiModel.accountsFile(ctx)
+      const file = await AccountsHostApiModel.accountsFile(ctx, store)
       return { accounts: file.accounts, shadowRoot: file.shadowRoot }
     },
     { resolveCredential },
@@ -221,10 +227,10 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   runtime.usageCache = createUsageCache({
     ttlMs: 30_000,
     timeoutMs: 30_000,
-    read: signal => AccountsHostApiModel.readAccountsUsage(ctx, signal),
+    read: signal => AccountsHostApiModel.readAccountsUsage(ctx, store, signal),
   })
   ctx.on('credentials/reference-updated', ref => {
-    if (accountStoreService.readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
+    if (store.current().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
   })
   const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
   runtime.pricing = pricing
@@ -248,7 +254,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   })
   const quotaContinuations = createQuotaContinuationService({
     context: ctx,
-    readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, accountId),
+    readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, store, accountId),
   })
   runtime.quotaContinuations = quotaContinuations
   const stopQuotaContinuations = quotaContinuations.start()
@@ -257,11 +263,8 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
     if (runtime.quotaContinuations === quotaContinuations) delete runtime.quotaContinuations
     void quotaContinuations.close().catch(() => ctx.logger.warn('ai-accounts: quota recovery storage could not close cleanly'))
   })
-  // Cordis activates this plugin synchronously, so the cache must hold the file
-  // before the first read: an unprimed cache answers emptyFile(), which
-  // registers no routes at all and hides the whole page.
-  accountStoreService.primeAccountFile()
-  const initialFile = accountStoreService.readAccountFileSync()
+  // The store layer read the file before activation, so routes exist by the time the plugin is active.
+  const initialFile = store.current()
   let config = configFromAccountsFile(initialFile)
   let routes = ProviderRoutes.buildRoutes(config).routes
   let profiles = new Map<string, ResolvedPiAiProviderProfile>()
@@ -291,7 +294,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   const copilotLogin = createCopilotLoginService({
     credentials: ctx.credentials,
     isCopilotAccount: instanceId =>
-      accountStoreService.readAccountFileSync().accounts.some(account => account.instanceId === instanceId && account.kind === 'github-copilot') ||
+      store.current().accounts.some(account => account.instanceId === instanceId && account.kind === 'github-copilot') ||
       runtime.accountSetup?.candidate(instanceId)?.kind === 'github-copilot',
     isPendingAccount: instanceId => runtime.accountSetup?.candidate(instanceId) !== undefined,
     onChange: () => runtime.usageCache?.invalidate(),
@@ -665,7 +668,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   )
 
   runtime.modelCatalogForEditing = async instanceId => {
-    const editingProfiles = buildProfiles(routes, await accountStoreService.readAccountFile(), true)
+    const editingProfiles = buildProfiles(routes, await store.readAccountFile(), true)
     const catalogAdapter = new EffortPinnedAdapter(
       {
         profiles: () => editingProfiles,
@@ -785,7 +788,7 @@ const startAccountsHost = (ctx: Context, readSettings: () => AccountSettingsSnap
   applyRouteSnapshot(initialFile)
   let refreshQueue: Promise<void> = Promise.resolve()
   const refreshRoutes = (): Promise<void> => {
-    const next = refreshQueue.then(async () => applyRouteSnapshot(await accountStoreService.readAccountFile()))
+    const next = refreshQueue.then(async () => applyRouteSnapshot(await store.readAccountFile()))
     refreshQueue = next.catch(() => {
       ctx.logger.warn('ai-accounts: provider route refresh failed')
     })
@@ -1074,6 +1077,7 @@ const AccountsHostLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const host = yield* HostContext
     const accountSettings = yield* AccountSettings
+    const store = yield* AccountStorePromiseService
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
     const live = { settings: yield* accountSettings.current }
     yield* DshxPlugin.worker(
@@ -1090,6 +1094,7 @@ const AccountsHostLive = Layer.effectDiscard(
           started: startAccountsHost(
             host.ctx,
             () => live.settings,
+            store,
             release => releases.push(release),
           ),
           releases,
@@ -1108,7 +1113,13 @@ export default DshxPlugin.make({
   name: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
   settings: [aiAccountsSettings],
-  layer: AccountsHostLive.pipe(Layer.provideMerge(Layer.mergeAll(AccountsPlatformLive, AccountLocks.layer, AccountSettings.layer))),
+  layer: AccountsHostLive.pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(AccountLocks.layer, AccountSettings.layer, AccountStorePromiseService.layer.pipe(Layer.provideMerge(AccountStore.layer))).pipe(
+        Layer.provideMerge(AccountsPlatformLive),
+      ),
+    ),
+  ),
   apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi, accountSessionHostApi, threadAccountHostApi],
   tools: [aiAccountsTool],
 })

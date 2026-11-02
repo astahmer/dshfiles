@@ -30,6 +30,12 @@ const draft = (instanceId: string, kind: string, extra: Record<string, unknown> 
 })
 
 let home = ''
+
+const openStore = async () => {
+  const { AccountHomePolicy } = await import('./account-home-policy.js')
+  const { openAccountStore } = await import('./fixtures/account-store.js')
+  return openAccountStore(AccountHomePolicy.filePath())
+}
 const previousHome = process.env.DSH_HOME
 
 beforeEach(async () => {
@@ -62,11 +68,10 @@ afterEach(async () => {
 
 describe('host boot against the account store', () => {
   it('routes every kind that serves models and leaves Cursor to its runtime driver', async () => {
-    const { accountStoreService } = await import('./account-store.js')
+    const accountStoreService = await openStore()
     const { configFromAccountsFile } = await import('./account-config.js')
     const { ProviderRoutes } = await import('./provider-routes.js')
-    accountStoreService.primeAccountFile()
-    const file = accountStoreService.readAccountFileSync()
+    const file = accountStoreService.current()
     expect(file.accounts.find(account => account.instanceId === 'codex')?.reasoningDefaults['gpt-6-luna']).toBe('low')
     const { routes, rejected } = ProviderRoutes.buildRoutes(configFromAccountsFile(file))
     expect(rejected).toEqual([])
@@ -75,7 +80,7 @@ describe('host boot against the account store', () => {
   })
 
   it('persists account reasoning defaults and paused curation across ordinary saves', async () => {
-    const { accountStoreService } = await import('./account-store.js')
+    const accountStoreService = await openStore()
     const before = await accountStoreService.readAccountFile()
     const account = before.accounts.find(candidate => candidate.instanceId === 'commandcode_a')
     if (account === undefined) throw new Error('Expected the keyed test account')
@@ -105,7 +110,7 @@ describe('host boot against the account store', () => {
   })
 
   it('renames an account in place instead of leaving the old slug behind', async () => {
-    const { accountStoreService } = await import('./account-store.js')
+    const accountStoreService = await openStore()
     const before = await accountStoreService.readAccountFile()
     const original = before.accounts.find(account => account.instanceId === 'commandcode_a')
     expect(original).toBeDefined()

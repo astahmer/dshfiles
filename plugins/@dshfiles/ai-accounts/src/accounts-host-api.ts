@@ -28,7 +28,8 @@ import {
   type QuotaRecoveryModelSelection,
 } from './api.js'
 import { AccountHomePolicy } from './account-home-policy.js'
-import { accountStoreService } from './account-store.js'
+import { AccountProfilesModel } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
@@ -72,9 +73,9 @@ const selectionForContinuation = (selection: QuotaRecoveryModelSelection | undef
   return { provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort }
 }
 
-const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
-  accountStoreService.buildAccountsFile(
-    await accountStoreService.readAccountFile(),
+const accountsFile = async (ctx: Context, store: AccountStorePromise): Promise<AccountsFile> =>
+  AccountProfilesModel.buildAccountsFile(
+    await store.readAccountFile(),
     accountRuntime(ctx)?.accounts?.pool.describe() ?? [],
     resolveKeyFromContext(ctx),
     async instanceId => (await createCopilotCredentialsService(ctx.get('credentials')).read(instanceId)) !== undefined,
@@ -107,10 +108,10 @@ const copilotLoginFor = (ctx: Context) => {
 }
 
 const quoteRoutesWith = (settings: PricingSettings) =>
-  effectHandler(aiAccountsApi, 'quoteRoutes', async ({ input, ctx }) => {
+  effectHandler(aiAccountsApi, 'quoteRoutes', async ({ input, ctx, store }) => {
     const pricing = pricingFor(ctx)
     if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
-    const file = await accountStoreService.readAccountFile()
+    const file = await store.readAccountFile()
     const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
     const cache = pricing.current()
     return {
@@ -127,10 +128,10 @@ const quoteRoutesWith = (settings: PricingSettings) =>
   })
 
 export const accountsHostApi = Api.bind(aiAccountsApi, {
-  read: effectHandler(aiAccountsApi, 'read', async ({ ctx }) => {
+  read: effectHandler(aiAccountsApi, 'read', async ({ ctx, store }) => {
     // A changed file means changed routes, so rebuild before answering.
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+    await refreshRoutes(ctx, store)
+    return accountsFile(ctx, store)
   }),
   filePath: effectHandler(aiAccountsApi, 'filePath', () => AccountHomePolicy.filePath()),
   secretCatalogKeys: effectHandler(aiAccountsApi, 'secretCatalogKeys', async ({ input, ctx }) => {
@@ -146,8 +147,8 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     aiAccountsApi,
     'importSecretCatalogKey',
     ({ input }) => [input.instanceId],
-    async ({ input, ctx }) => {
-      const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
+    async ({ input, ctx, store }) => {
+      const account = (await store.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
       if (account === undefined || account.kind === 'codex') throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'not-keyed' })
       if (!isKeyEnvName(account.apiKeyEnv)) throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'invalid-key-env' })
       const bridge = secretCatalogBridgeFor(ctx)
@@ -177,14 +178,14 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   configureAccountConnection: lockedHandler(
     aiAccountsApi,
     'configureAccountConnection',
-    ({ input, ctx }) => {
+    ({ input, ctx, store }) => {
       const { operationId, ...configuration } = input
       const account = setupFor(ctx).get(operationId).account
       return account === null
         ? []
         : [
-            ...accountSessionRelatedIds(account),
-            ...accountSessionRelatedIds({
+            ...accountSessionRelatedIds(store.current(), account),
+            ...accountSessionRelatedIds(store.current(), {
               ...account,
               homePath: configuration.homePath ?? account.homePath,
               shadowHomePath: configuration.shadowHomePath ?? account.shadowHomePath,
@@ -222,9 +223,9 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   completeAccountConnection: lockedHandler(
     aiAccountsApi,
     'completeAccountConnection',
-    ({ input, ctx }) => {
+    ({ input, ctx, store }) => {
       const account = setupFor(ctx).get(input.operationId).account
-      return account === null ? [] : accountSessionRelatedIds(account)
+      return account === null ? [] : accountSessionRelatedIds(store.current(), account)
     },
     ({ input, ctx }) => setupFor(ctx).complete(input.operationId),
   ),
@@ -235,55 +236,60 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   save: lockedHandler(
     aiAccountsApi,
     'save',
-    ({ input }) => [...accountSessionRelatedIds(input.draft), ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId])],
-    async ({ input, ctx }) => {
-      await accountStoreService.upsertAccount(input.draft, input.previousInstanceId, true)
+    ({ input, store }) => [
+      ...accountSessionRelatedIds(store.current(), input.draft),
+      ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId]),
+    ],
+    async ({ input, ctx, store }) => {
+      await store.upsertAccount(input.draft, input.previousInstanceId, true)
       accountRuntime(ctx)?.usageCache?.invalidate()
-      await refreshRoutes(ctx)
-      return accountsFile(ctx)
+      await refreshRoutes(ctx, store)
+      return accountsFile(ctx, store)
     },
   ),
   remove: lockedHandler(
     aiAccountsApi,
     'remove',
     ({ input }) => [input.instanceId],
-    async ({ input, ctx }) => {
-      await accountStoreService.removeAccount(input.instanceId)
+    async ({ input, ctx, store }) => {
+      await store.removeAccount(input.instanceId)
       accountRuntime(ctx)?.usageCache?.invalidate()
-      await refreshRoutes(ctx)
-      return accountsFile(ctx)
+      await refreshRoutes(ctx, store)
+      return accountsFile(ctx, store)
     },
   ),
   removeCustomModel: lockedHandler(
     aiAccountsApi,
     'removeCustomModel',
     ({ input }) => [input.instanceId],
-    async ({ input, ctx }) => {
-      const account = (await accountStoreService.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
+    async ({ input, ctx, store }) => {
+      const account = (await store.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
       if (account === undefined) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
       const patch = ModelCurationModel.removeAdditionalModel({ account, modelId: input.modelId })
       if (patch === null) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
-      await accountStoreService.upsertAccount({ ...account, ...patch }, undefined, true)
-      await refreshRoutes(ctx)
+      await store.upsertAccount({ ...account, ...patch }, undefined, true)
+      await refreshRoutes(ctx, store)
       return { removed: true, instanceId: input.instanceId, modelId: input.modelId }
     },
   ),
-  moveAccount: effectHandler(aiAccountsApi, 'moveAccount', async ({ input, ctx }) => {
-    await accountStoreService.moveAccount(input.instanceId, input.direction)
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+  moveAccount: effectHandler(aiAccountsApi, 'moveAccount', async ({ input, ctx, store }) => {
+    await store.moveAccount(input.instanceId, input.direction)
+    await refreshRoutes(ctx, store)
+    return accountsFile(ctx, store)
   }),
-  reorderAccount: effectHandler(aiAccountsApi, 'reorderAccount', async ({ input, ctx }) => {
-    await accountStoreService.reorderAccount(input)
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+  reorderAccount: effectHandler(aiAccountsApi, 'reorderAccount', async ({ input, ctx, store }) => {
+    await store.reorderAccount(input)
+    await refreshRoutes(ctx, store)
+    return accountsFile(ctx, store)
   }),
-  setDistribution: effectHandler(aiAccountsApi, 'setDistribution', async ({ input, ctx }) => {
-    await accountStoreService.setDistribution(input.distribution)
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+  setDistribution: effectHandler(aiAccountsApi, 'setDistribution', async ({ input, ctx, store }) => {
+    await store.setDistribution(input.distribution)
+    await refreshRoutes(ctx, store)
+    return accountsFile(ctx, store)
   }),
-  identity: effectHandler(aiAccountsApi, 'identity', async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId)),
+  identity: effectHandler(aiAccountsApi, 'identity', async ({ input, store }) =>
+    AccountProfilesModel.readAccountIdentity(await store.readAccountFile(), input.instanceId),
+  ),
   beginCopilotLogin: lockedHandler(
     aiAccountsApi,
     'beginCopilotLogin',
@@ -319,8 +325,8 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
       return { signedOut: true } satisfies { readonly signedOut: true }
     },
   ),
-  catalog: effectHandler(aiAccountsApi, 'catalog', async ({ input, ctx }) => {
-    await refreshRoutes(ctx)
+  catalog: effectHandler(aiAccountsApi, 'catalog', async ({ input, ctx, store }) => {
+    await refreshRoutes(ctx, store)
     const llm = ctx.get('llm')
     if (llm === undefined) return { instanceId: input.instanceId, models: [] }
     let warning: string | undefined
@@ -348,8 +354,12 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
   }),
   nativeProviders: effectHandler(aiAccountsApi, 'nativeProviders', async ({ ctx }) => readNativeProviders(ctx)),
   setNativeProviderEnabled: effectHandler(aiAccountsApi, 'setNativeProviderEnabled', async ({ input, ctx }) => setNativeProviderEnabled(ctx, input)),
-  usage: effectHandler(aiAccountsApi, 'usage', async ({ ctx }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx)),
-  refreshUsage: effectHandler(aiAccountsApi, 'refreshUsage', async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx)),
+  usage: effectHandler(aiAccountsApi, 'usage', async ({ ctx, store }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx, store)),
+  refreshUsage: effectHandler(
+    aiAccountsApi,
+    'refreshUsage',
+    async ({ ctx, store }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx, store),
+  ),
   history: effectHandler(aiAccountsApi, 'history', async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
@@ -382,7 +392,9 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     }
     return settings
   }),
-  collectUsage: effectHandler(aiAccountsApi, 'collectUsage', async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 })),
+  collectUsage: effectHandler(aiAccountsApi, 'collectUsage', async ({ ctx }) => ({
+    recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0,
+  })),
   pricingStatus: effectHandler(aiAccountsApi, 'pricingStatus', async ({ ctx }) => pricingFor(ctx).status()),
   refreshPricing: effectHandler(aiAccountsApi, 'refreshPricing', async ({ ctx }) => pricingFor(ctx).refresh()),
   quoteRoutes: Effect.fn('ai accounts quote routes')(function* (input, call) {
@@ -412,8 +424,8 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
 /** Provider reads are independent; bound them so a profile with 64 accounts is not a 64-request burst. */
 const ACCOUNT_USAGE_READ_CONCURRENCY = 4
 
-const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
-  const file = await accountsFile(ctx)
+const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accountId: string): Promise<number | null> => {
+  const file = await accountsFile(ctx, store)
   const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
   return knownQuotaResetAt(
@@ -434,10 +446,10 @@ const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number
  * on an interval, so a provider that is slow or down costs its own card rather
  * than the panel.
  */
-const readAccountsUsage = async (ctx: Context, signal?: AbortSignal): Promise<AccountsUsage> => {
+const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signal?: AbortSignal): Promise<AccountsUsage> => {
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
-  const file = await accountsFile(ctx)
+  const file = await accountsFile(ctx, store)
   const resolveCredential = resolveKeyFromContext(ctx)
   const readCopilotCredential = createCopilotCredentialsService(ctx.get('credentials')).read
   const cards = await mapRolling({
@@ -463,7 +475,7 @@ const readAccountsUsage = async (ctx: Context, signal?: AbortSignal): Promise<Ac
  * enabled flag actually changed are re-registered, because the adapter registry
  * rejects a duplicate route for one already taken.
  */
-const refreshRoutes = async (ctx: Context): Promise<void> => {
+const refreshRoutes = async (ctx: Context, store: AccountStorePromise): Promise<void> => {
   const runtime = accountRuntime(ctx)
   if (runtime === undefined) return
   if (runtime.refreshRoutes !== undefined) {
@@ -472,7 +484,7 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
   }
   const activeAccounts = runtime.accounts
   if (activeAccounts === undefined) return
-  const file = await accountStoreService.readAccountFile()
+  const file = await store.readAccountFile()
   const config = configFromAccountsFile(file)
   activeAccounts.config = config
   activeAccounts.pool.setDistribution(file.distribution)

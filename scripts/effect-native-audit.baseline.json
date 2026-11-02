@@ -89,7 +89,7 @@
     "moduleState": 6,
     "timers": 11,
     "childProcess": 5,
-    "nodeFs": 20,
+    "nodeFs": 18,
     "globalFetch": 0,
     "testMocks": 82,
     "runOutsideEdges": 0,

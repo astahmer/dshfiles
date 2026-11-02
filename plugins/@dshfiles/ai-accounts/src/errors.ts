@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { AccountOrderModel } from './account-order-model.js'
 
 /** Another credential or profile operation holds one of these accounts; the new one is refused, not queued. */
 export class AccountOperationBusy extends Schema.TaggedError<AccountOperationBusy>()(
@@ -167,6 +168,53 @@ export class ThreadSelectionChanged extends Schema.TaggedError<ThreadSelectionCh
   }
 }
 
+const conflictMessages = {
+  'identity-saved': () => 'This account identity is already saved.',
+  removed: () => 'This saved account was removed.',
+  'connection-changed': () => 'The saved account connection settings changed. Start again.',
+  'connection-inactive': () => 'This account connection is no longer active.',
+  'name-taken': (instanceId: string) => `An account named '${instanceId}' already exists.`,
+  'not-saved': () => 'Connect a new account before saving its settings; this saved account no longer exists.',
+  missing: (instanceId: string) => `Account '${instanceId}' is no longer available.`,
+} as const
+
+/** The accounts file no longer matches what the edit was based on. */
+export class AccountConflict extends Schema.TaggedError<AccountConflict>()(
+  'AccountConflict',
+  {
+    instanceId: Schema.String,
+    reason: Schema.Literals(['identity-saved', 'removed', 'connection-changed', 'connection-inactive', 'name-taken', 'not-saved', 'missing']),
+    cause: Schema.optional(Schema.Defect()),
+  },
+  { dshxWireCode: 'account-conflict' },
+) {
+  override get message(): string {
+    return conflictMessages[this.reason](this.instanceId)
+  }
+}
+
+/** A priority move named a missing account, crossed provider groups, or was based on a stale order. */
+export class AccountOrderRejected extends Schema.TaggedError<AccountOrderRejected>()(
+  'AccountOrderRejected',
+  { reason: Schema.Literals(['missing', 'cross-provider', 'stale']), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'account-order-rejected' },
+) {
+  override get message(): string {
+    return AccountOrderModel.rejectionMessage(this.reason)
+  }
+}
+
+/** The accounts file could not be written; the previous file stays in place. */
+export class AccountStoreWriteFailed extends Schema.TaggedError<AccountStoreWriteFailed>()(
+  'AccountStoreWriteFailed',
+  { path: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'account-store-write-failed' },
+) {
+  override get message(): string {
+    return 'The accounts file could not be saved. Check that the DSH home is writable, then retry.'
+  }
+}
+
 /** Every failure the account APIs expose to their callers. */
 export const AccountsWireError = Schema.Union([
   AccountOperationBusy,
@@ -181,4 +229,7 @@ export const AccountsWireError = Schema.Union([
   HostServiceUnavailable,
   OwnerApiMissing,
   ThreadSelectionChanged,
+  AccountConflict,
+  AccountOrderRejected,
+  AccountStoreWriteFailed,
 ])

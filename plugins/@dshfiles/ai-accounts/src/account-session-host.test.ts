@@ -7,20 +7,24 @@ import { AccountSettings } from './account-settings-service.js'
 import { accountSessionHostApi } from './account-session-host.js'
 import { accountLoginHostApi } from './account-login-host.js'
 import { accountsHostApi } from './accounts-host-api.js'
-import { accountStoreService } from './account-store.js'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { AccountStorePromiseService, type AccountStorePromise } from './account-store-promise.js'
+import { openAccountStore } from './fixtures/account-store.js'
 
 const hosts: TestHost[] = []
 afterEach(async () => {
   for (const host of hosts.splice(0)) await host.dispose()
   vi.restoreAllMocks()
 })
-const mount = async (locks: AccountLocks['Service']) => {
+const mount = async (locks: AccountLocks['Service'], store: AccountStorePromise) => {
   const host = await createTestHost()
   hosts.push(host)
   await host.mount(
     DshxPlugin.make({
       name: 'session-boundary-test',
-      layer: Layer.mergeAll(Layer.succeed(AccountLocks, locks), AccountSettings.layer),
+      layer: Layer.mergeAll(Layer.succeed(AccountLocks, locks), AccountSettings.layer, Layer.succeed(AccountStorePromiseService, store)),
       apis: [accountSessionHostApi, accountLoginHostApi, accountsHostApi],
     }),
     {
@@ -29,14 +33,16 @@ const mount = async (locks: AccountLocks['Service']) => {
   )
   return host
 }
+const scratchStore = () => openAccountStore(join(mkdtempSync(join(tmpdir(), 'ai-accounts-session-')), 'accounts.json'))
 const call = async (host: TestHost, apiId: string, method: string, input: unknown) => {
   const response = await host.connection.requestApi({ packageId: '@dshfiles/ai-accounts', apiId, method, version: 1, input })
   return response.text()
 }
 describe('native Host session contract and mutation guards', () => {
   it('registers the new capability and rejects an unconfirmed write before any account or credential access', async () => {
-    const host = await mount(await Effect.runPromise(AccountLocks.make))
-    const read = vi.spyOn(accountStoreService, 'readAccountFile')
+    const store = await scratchStore()
+    const host = await mount(await Effect.runPromise(AccountLocks.make), store)
+    const read = vi.spyOn(store, 'readAccountFile')
     const text = await call(host, 'ai-accounts-session', 'signOut', { instanceId: 'synthetic' })
     expect(text).not.toContain('"signedOut":true')
     expect(text).toContain('error')
@@ -44,11 +50,12 @@ describe('native Host session contract and mutation guards', () => {
   })
   it('shares the real async lock with sign-out, Codex/Copilot sign-in, saved key imports and saved profile removal', async () => {
     const locks = await Effect.runPromise(AccountLocks.make)
-    const host = await mount(locks)
+    const store = await scratchStore()
+    const host = await mount(locks, store)
     const gate = Effect.runSync(Deferred.make<void>())
     const owned = Effect.runFork(locks.withAccounts(['synthetic'], Deferred.await(gate)))
     await Effect.runPromise(Effect.yieldNow)
-    const read = vi.spyOn(accountStoreService, 'readAccountFile')
+    const read = vi.spyOn(store, 'readAccountFile')
     try {
       const capability = await call(host, 'ai-accounts-session', 'capability', { instanceId: 'synthetic' })
       expect(capability).toContain('"available":false')

@@ -2,17 +2,37 @@ import type { AccountKind, AccountReorder } from './api.js'
 
 type OrderedAccount = { readonly instanceId: string; readonly kind: AccountKind }
 
+export type AccountOrderRejection = 'missing' | 'cross-provider' | 'stale'
+
+const rejectionMessages = {
+  missing: 'An account is no longer available. Refresh and try again.',
+  'cross-provider': 'Account priority can only change within the same provider group.',
+  stale: 'Account priority changed elsewhere. Refresh and try your move again.',
+} as const satisfies Record<AccountOrderRejection, string>
+
 /** Account priority is the store order, never the list of tiles a surface happens to show. */
 export class AccountOrderModel {
-  static reorder = <Account extends OrderedAccount>(accounts: readonly Account[], input: AccountReorder): Account[] => {
+  /** Why `reorder` would refuse this move, or undefined when it applies. */
+  static rejection = (accounts: readonly OrderedAccount[], input: AccountReorder): AccountOrderRejection | undefined => {
     const current = accounts.find(account => account.instanceId === input.instanceId)
     const target = accounts.find(account => account.instanceId === input.targetInstanceId)
-    if (current === undefined || target === undefined) throw new Error('An account is no longer available. Refresh and try again.')
-    if (current.kind !== target.kind) throw new Error('Account priority can only change within the same provider group.')
+    if (current === undefined || target === undefined) return 'missing'
+    if (current.kind !== target.kind) return 'cross-provider'
+    const group = accounts.filter(account => account.kind === current.kind).map(account => account.instanceId)
+    if (input.expectedOrder !== undefined && (group.length !== input.expectedOrder.length || group.some((id, index) => id !== input.expectedOrder?.[index])))
+      return 'stale'
+    return undefined
+  }
+
+  static readonly rejectionMessage = (rejection: AccountOrderRejection): string => rejectionMessages[rejection]
+
+  static reorder = <Account extends OrderedAccount>(accounts: readonly Account[], input: AccountReorder): Account[] => {
+    const rejection = AccountOrderModel.rejection(accounts, input)
+    if (rejection !== undefined) throw new Error(rejectionMessages[rejection])
+    const current = accounts.find(account => account.instanceId === input.instanceId)
+    const target = accounts.find(account => account.instanceId === input.targetInstanceId)
+    if (current === undefined || target === undefined) return [...accounts]
     const group = accounts.filter(account => account.kind === current.kind)
-    if (input.expectedOrder !== undefined && JSON.stringify(group.map(account => account.instanceId)) !== JSON.stringify(input.expectedOrder)) {
-      throw new Error('Account priority changed elsewhere. Refresh and try your move again.')
-    }
     if (current === target) return [...accounts]
     const remaining = group.filter(account => account !== current)
     const targetIndex = remaining.indexOf(target) + (input.placement === 'after' ? 1 : 0)
