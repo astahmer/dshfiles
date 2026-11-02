@@ -21,7 +21,6 @@
     "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 1,
     "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1,
     "plugins/@dshfiles/references/src/references.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/host.ts": 1,
     "plugins/@dshfiles/tweet-context/src/tweet-context.ts": 1
   },
   "effect-migration(no-host-global-timer)": {
@@ -51,10 +50,7 @@
     "plugins/@dshfiles/optmem-core/src/engine.ts": 6,
     "plugins/@dshfiles/preview/src/browser-pool.ts": 2,
     "plugins/@dshfiles/preview/src/host.ts": 1,
-    "plugins/@dshfiles/session-search/src/worker-client.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/host.ts": 2,
-    "plugins/@dshfiles/thread-sidebar/src/restart.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/thread-actions.ts": 2
+    "plugins/@dshfiles/session-search/src/worker-client.ts": 1
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/agents/src/host.ts": 1,
@@ -77,11 +73,7 @@
     "plugins/@dshfiles/preview/src/host.ts": 2,
     "plugins/@dshfiles/queue-reorder/src/host.ts": 1,
     "plugins/@dshfiles/references/src/host.ts": 3,
-    "plugins/@dshfiles/resource-packs/src/host.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/attention-host.ts": 1,
-    "plugins/@dshfiles/thread-sidebar/src/host.ts": 5,
-    "plugins/@dshfiles/thread-sidebar/src/settings.ts": 5,
-    "plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts": 1
+    "plugins/@dshfiles/resource-packs/src/host.ts": 1
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
@@ -94,7 +86,6 @@
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
-    "plugins/@dshfiles/thread-sidebar/src/host.ts": 3,
     "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
     "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,
     "tooling/dshx/packages/dshx/src/platform/client.ts": 1
