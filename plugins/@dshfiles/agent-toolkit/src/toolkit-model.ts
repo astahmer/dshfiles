@@ -21,13 +21,14 @@ const optionalText = Schema.optional(Schema.String).pipe(Schema.catchDecoding(()
 const optionalFlag = Schema.optional(Schema.Boolean).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined))))
 
 const toolSourceSchema = Schema.Literals(['api', 'mcp', 'plugin', 'tool'])
+const DEFAULT_TOOL_SOURCE: typeof toolSourceSchema.Type = 'tool'
 
 const toolSchema = Schema.Struct({
   name: Schema.String,
   description: textWithDefault(''),
   source: toolSourceSchema.pipe(
-    Schema.catchDecoding(() => Effect.succeed(Option.some('tool' as const))),
-    Schema.withDecodingDefaultKey(Effect.succeed('tool' as const)),
+    Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_TOOL_SOURCE))),
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_TOOL_SOURCE)),
   ),
   owner: optionalText,
   readOnly: optionalFlag,
