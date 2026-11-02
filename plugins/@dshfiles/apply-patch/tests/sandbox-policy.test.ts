@@ -136,7 +136,8 @@ describe('apply_patch real Host sandbox policy', () => {
     setSandboxMode(f.agent.session, 'danger-full-access')
     const file = join(f.workspace, 'note.txt')
     await writeFile(file, 'before')
-    expect(await f.patch(file, f.agent, 'missing')).toMatchObject({ isError: true })
+    const refused = await f.patch(file, f.agent, 'missing')
+    expect(refused).toMatchObject({ isError: true, error: { message: expect.stringMatching(/^cannot patch ".*note\.txt": edit 1/u) } })
     expect(await readFile(file, 'utf8')).toBe('before')
   })
 
@@ -165,7 +166,7 @@ describe('apply_patch real Host sandbox policy', () => {
       agent: f.agent,
       signal: new AbortController().signal,
     })
-    expect(result).toMatchObject({ isError: true })
+    expect(result).toMatchObject({ isError: true, error: { message: expect.stringContaining('sandboxPolicy') } })
     expect(await readFile(file, 'utf8')).toBe('before')
   })
 
