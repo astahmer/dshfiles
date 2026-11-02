@@ -167,8 +167,7 @@
     "plugins/@dshfiles/traces/src/alerts/alerts-host.ts": 1,
     "plugins/@dshfiles/traces/src/host.ts": 3,
     "plugins/@dshfiles/web-search-brave/src/host.ts": 1,
-    "plugins/@dshfiles/worktree-memory/src/host.ts": 1,
-    "tooling/dshx/packages/dshx/src/effect/index.ts": 1
+    "plugins/@dshfiles/worktree-memory/src/host.ts": 1
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,

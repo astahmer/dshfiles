@@ -73,10 +73,8 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
       const services = yield* Layer.buildWithScope(Layer.provideMerge(layer, base), scope)
       return Context.add(services, Scope.Scope, scope)
     }).pipe(Effect.withSpan('plugin activate', { attributes: { 'dshx.plugin.package': packageId } }), Effect.provide(tracerLayer))
-    // oxlint-disable-next-line effect-antislop/no-domain-effect-run -- DshxPlugin.make is the Cordis activation edge.
     const built = await Effect.runPromiseExit(build)
     if (Exit.isFailure(built)) {
-      // oxlint-disable-next-line effect-antislop/no-domain-effect-run -- the edge closes the Scope its failed build opened.
       await Effect.runPromise(Scope.close(scope, built))
       ctx.logger('dshx:plugin').error(`${definition.name} failed to activate:\n${causeReport(built.cause)}`)
       const error = new PluginActivationError({ plugin: definition.name, cause: built.cause })
@@ -97,7 +95,6 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
     }
     return async () => {
       slot.stop()
-      // oxlint-disable-next-line effect-antislop/no-domain-effect-run -- the one Cordis disposer closes the plugin Scope.
       await Effect.runPromise(Scope.close(scope, Exit.void))
     }
   }

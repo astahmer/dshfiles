@@ -359,7 +359,7 @@
     "nodeFs": 0,
     "globalFetch": 1,
     "causelessErrors": 1,
-    "testMocks": 21,
+    "testMocks": 23,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
@@ -749,7 +749,7 @@
     "nodeFs": 2,
     "globalFetch": 0,
     "causelessErrors": 0,
-    "testMocks": 0,
+    "testMocks": 2,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },

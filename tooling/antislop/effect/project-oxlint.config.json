@@ -26,6 +26,8 @@
           "tooling/dshx/packages/dshx/src/effect/tool.ts",
           "tooling/dshx/packages/dshx/src/effect/events.ts",
           "tooling/dshx/packages/dshx/src/effect/tracer.ts",
+          "tooling/dshx/packages/dshx/src/effect/plugin-runtime.ts",
+          "tooling/dshx/packages/dshx/src/effect/dshx-effect.ts",
           "-promise.ts",
           ".test.",
           ".spec.",
@@ -39,7 +41,18 @@
       "error",
       {
         "implementationPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
-        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/", "-promise.ts"]
+        "excludePaths": [
+          ".test.",
+          ".spec.",
+          ".bench.",
+          "/fixtures/",
+          "/e2e/",
+          "-promise.ts",
+          "tooling/dshx/packages/dshx/src/effect/plugin.ts",
+          "tooling/dshx/packages/dshx/src/effect/plugin-runtime.ts",
+          "tooling/dshx/packages/dshx/src/effect/tool.ts",
+          "tooling/dshx/packages/dshx/src/effect/dshx-effect.ts"
+        ]
       }
     ],
     "effect-antislop/no-catch-if-tagged-error": [

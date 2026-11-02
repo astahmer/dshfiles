@@ -1,4 +1,4 @@
-/* oxlint-disable antislop/no-export-bag, effect-antislop/no-domain-effect-run -- the deprecated DshxEffect namespace is a Cordis edge kept for existing callers; delete it when they reach 0. */
+/* oxlint-disable antislop/no-export-bag -- the deprecated DshxEffect namespace is a Cordis edge kept for existing callers; delete it when they reach 0. */
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { Cause, Context, Effect, Exit, Layer, type ManagedRuntime, Option, Queue, Schema, Scope, Stream } from 'effect'
 import { ApiProtocolModel } from '../api/common.js'
