@@ -1,11 +1,11 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { MAX_FILES } from './api.js'
 
 /** How many review scopes the Host keeps marks for; the rest are evicted oldest-first. */
 export const MAX_REVIEWED_KEYS = 20
 
-const reviewedMarksSchema = z.record(z.string(), z.array(z.string().max(2048)).max(MAX_FILES))
-export type ReviewedMarks = z.infer<typeof reviewedMarksSchema>
+const reviewedMarksSchema = Schema.Record(Schema.String, Schema.Array(Schema.String.check(Schema.isMaxLength(2048))).check(Schema.isMaxLength(MAX_FILES)))
+export type ReviewedMarks = typeof reviewedMarksSchema.Type
 
 /**
  * Reviewed marks are keyed by workspace, base and working-copy revision, so a

@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+import { Schema } from 'effect'
 
 /**
  * One `jj diff --git` for a whole thread can be large, and the RPC is one JSON
@@ -8,92 +8,83 @@ import { z } from 'zod'
 export const MAX_PATCH_CHARS = 1_200_000
 export const MAX_FILES = 4_000
 
-export const scopeKeySchema = z.enum(['docs', 'code', 'tests', 'config', 'deps', 'generated', 'other'])
-export type ScopeKey = z.infer<typeof scopeKeySchema>
+export const scopeKeys = ['docs', 'code', 'tests', 'config', 'deps', 'generated', 'other'] as const
+export const scopeKeySchema = Schema.Literals(scopeKeys)
+export type ScopeKey = typeof scopeKeySchema.Type
 
-export const reviewScopeSchema = z
-  .object({
-    key: scopeKeySchema,
-    category: z.string().min(1).max(32),
-    label: z.string().min(1).max(120),
-    summary: z.string().min(1).max(400),
-    filePaths: z.array(z.string().min(1).max(2048)).max(MAX_FILES),
-    additions: z.number().int().min(0),
-    deletions: z.number().int().min(0),
-  })
-  .strict()
-export type ReviewScope = z.infer<typeof reviewScopeSchema>
+export const reviewScopeSchema = Schema.Struct({
+  key: scopeKeySchema,
+  category: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  summary: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(400)),
+  filePaths: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))).check(Schema.isMaxLength(MAX_FILES)),
+  additions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  deletions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+export type ReviewScope = typeof reviewScopeSchema.Type
 
-export const reviewFileSchema = z
-  .object({
-    path: z.string().min(1).max(2048),
-    status: z.string().max(32),
-    additions: z.number().int().min(0),
-    deletions: z.number().int().min(0),
-  })
-  .strict()
-export type ReviewFile = z.infer<typeof reviewFileSchema>
+export const reviewFileSchema = Schema.Struct({
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  status: Schema.String.check(Schema.isMaxLength(32)),
+  additions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  deletions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+export type ReviewFile = typeof reviewFileSchema.Type
 
-export const reviewFailureReasonSchema = z.enum(['workspace-missing', 'not-a-repository', 'no-base', 'jj-missing', 'jj-failed'])
-export type ReviewFailureReason = z.infer<typeof reviewFailureReasonSchema>
+export const reviewFailureReasonSchema = Schema.Literals(['workspace-missing', 'not-a-repository', 'no-base', 'jj-missing', 'jj-failed'])
+export type ReviewFailureReason = typeof reviewFailureReasonSchema.Type
 
-export const reviewResultSchema = z.discriminatedUnion('status', [
-  z
-    .object({
-      status: z.literal('ok'),
-      path: z.string().min(1).max(2048),
-      base: z.string().min(1).max(256),
-      head: z.string().min(1).max(256),
-      range: z.string().min(1).max(512),
-      patch: z.string().max(MAX_PATCH_CHARS),
-      truncated: z.boolean(),
-      fileCount: z.number().int().min(0),
-      additions: z.number().int().min(0),
-      deletions: z.number().int().min(0),
-      files: z.array(reviewFileSchema).max(MAX_FILES),
-      scopes: z.array(reviewScopeSchema).max(16),
-    })
-    .strict(),
-  z
-    .object({
-      status: z.literal('failed'),
-      path: z.string().max(2048),
-      reason: reviewFailureReasonSchema,
-      message: z.string().min(1).max(600),
-    })
-    .strict(),
+export const reviewResultSchema = Schema.Union([
+  Schema.Struct({
+    status: Schema.Literal('ok'),
+    path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+    base: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    head: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    range: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+    patch: Schema.String.check(Schema.isMaxLength(MAX_PATCH_CHARS)),
+    truncated: Schema.Boolean,
+    fileCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    additions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    deletions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    files: Schema.Array(reviewFileSchema).check(Schema.isMaxLength(MAX_FILES)),
+    scopes: Schema.Array(reviewScopeSchema).check(Schema.isMaxLength(16)),
+  }),
+  Schema.Struct({
+    status: Schema.Literal('failed'),
+    path: Schema.String.check(Schema.isMaxLength(2048)),
+    reason: reviewFailureReasonSchema,
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(600)),
+  }),
 ])
-export type ReviewResult = z.infer<typeof reviewResultSchema>
+export type ReviewResult = typeof reviewResultSchema.Type
 
-export const summaryFailureReasonSchema = z.enum(['no-route', 'llm-unavailable', 'llm-failed', 'unparsed', 'review-failed', 'no-changes'])
-export type SummaryFailureReason = z.infer<typeof summaryFailureReasonSchema>
+export const summaryFailureReasonSchema = Schema.Literals(['no-route', 'llm-unavailable', 'llm-failed', 'unparsed', 'review-failed', 'no-changes'])
+export type SummaryFailureReason = typeof summaryFailureReasonSchema.Type
 
 /** One model call over the whole diff; a partial answer is still a success. */
-export const summarizeResultSchema = z.discriminatedUnion('status', [
-  z
-    .object({
-      status: z.literal('ok'),
-      route: z.object({ provider: z.string().min(1).max(120), model: z.string().min(1).max(200) }).strict(),
-      summaries: z.record(scopeKeySchema, z.string().min(1).max(600)),
-    })
-    .strict(),
-  z
-    .object({
-      status: z.literal('failed'),
-      reason: summaryFailureReasonSchema,
-      message: z.string().min(1).max(600),
-    })
-    .strict(),
+export const summarizeResultSchema = Schema.Union([
+  Schema.Struct({
+    status: Schema.Literal('ok'),
+    route: Schema.Struct({ provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)), model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)) }),
+    summaries: Schema.Record(Schema.String, Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(600))).check(
+      Schema.makeFilter(record => (Object.keys(record).every(key => scopeKeys.some(scopeKey => scopeKey === key)) ? true : 'Unknown review scope key.')),
+    ),
+  }),
+  Schema.Struct({
+    status: Schema.Literal('failed'),
+    reason: summaryFailureReasonSchema,
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(600)),
+  }),
 ])
-export type SummarizeResult = z.infer<typeof summarizeResultSchema>
+export type SummarizeResult = typeof summarizeResultSchema.Type
 
-export const summarizeInputSchema = z.object({
-  path: z.string().min(1).max(2048),
-  base: z.string().min(1).max(256).optional(),
+export const summarizeInputSchema = Schema.Struct({
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  base: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
   /** The thread whose model route should summarize; ignored when provider/model are given. */
-  sessionId: z.string().min(1).max(128).optional(),
-  provider: z.string().min(1).max(120).optional(),
-  model: z.string().min(1).max(200).optional(),
+  sessionId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+  provider: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120))),
+  model: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
 })
 
 export const pullsReviewApi = defineApi({
@@ -102,14 +93,12 @@ export const pullsReviewApi = defineApi({
   version: 1,
   methods: {
     review: method({
-      input: z
-        .object({
-          path: z.string().min(1).max(2048),
-          base: z.string().min(1).max(256).optional(),
-          fromChangeId: z.string().min(1).max(128).optional(),
-          toChangeId: z.string().min(1).max(128).optional(),
-        })
-        .strict(),
+      input: Schema.Struct({
+        path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+        base: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+        fromChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+        toChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
+      }),
       output: reviewResultSchema,
       description: "Read a workspace's changes since a base bookmark, or an exact saved change-ID range, and group the changed files into review scopes.",
     }),

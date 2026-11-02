@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { Option, Schema } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { reviewResultSchema } from '../src/api.js'
 import type { JjRun } from '../src/jj.js'
@@ -52,8 +53,7 @@ describe('jj diff output', () => {
   it.skipIf(!available)('reviews a real workspace through the argv the Host builds', async () => {
     const result = await ReviewWorkspaceModel.review({ run: createRealRunner(), path: workspace })
     expect(result).toMatchObject({ status: 'ok', base: 'main', range: 'main..@', fileCount: 2, additions: 2, deletions: 1, truncated: false })
-    const parsed = reviewResultSchema.safeParse(result)
-    expect(parsed.success ? undefined : parsed.error.issues).toBeUndefined()
+    expect(Option.isSome(Schema.decodeUnknownOption(reviewResultSchema)(result))).toBe(true)
     expect(result.status === 'ok' ? result.scopes.map(scope => scope.key).sort() : []).toEqual(['code', 'tests'])
     expect(result.status === 'ok' ? result.head : '').toMatch(/^[a-f0-9]{8,}$/)
   })

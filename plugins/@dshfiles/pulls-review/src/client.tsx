@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Changes, defineClientPlugin, hostStorage } from '@dshfiles/dshx/client'
 import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
@@ -24,12 +25,13 @@ export default defineClientPlugin({
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
     const workspacePicker = createWorkspacePickerPorts(ctx.remote)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
-    const reviewed = hostStorage(api).store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
+    const reviewedSchema = zodSchemaFromEffect(ReviewedMarksModel.schema)
+    const reviewed = hostStorage(api).store({ key: 'reviewed', scope: 'global', schema: reviewedSchema, initial: {} })
     void reviewed.ready
       .then(() => {
         const legacyText = globalThis.localStorage?.getItem(ReviewedMarksModel.legacyBrowserKey) ?? 'null'
         globalThis.localStorage?.removeItem(ReviewedMarksModel.legacyBrowserKey)
-        const legacy = ReviewedMarksModel.schema.safeParse(JSON.parse(legacyText))
+        const legacy = reviewedSchema.safeParse(JSON.parse(legacyText))
         if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
       })
       .catch((error: unknown) => console.warn('pulls.review: reviewed marks stay unsaved until the Host storage answers.', error))
