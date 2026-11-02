@@ -1,21 +1,77 @@
 import { isDeepStrictEqual } from 'node:util'
 import { networkInterfaces } from 'node:os'
-import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-config-editor'
-import type {} from '@deepseek-ai/dsh-settings'
 import { bindUrlHost, isLoopbackHost } from '@deepseek-ai/dsh-host-webserver'
-import { readWebStartupOverrides } from '@dshfiles/dshx/host'
-import { PluginApiError } from '@dshfiles/dshx/api'
-import * as Option from 'effect/Option'
-import * as Schema from 'effect/Schema'
-import type { LoopbackAccess } from './access.js'
-import { networkSaveSchema, type NetworkAddress, type NetworkForm, type NetworkSnapshot } from './network-api.js'
-import { NETWORK_SETTINGS_NAMESPACE, NetworkPreferencesModel, type NetworkPreferences, type NetworkStartupValues } from './network-preferences.js'
-import { LoopbackSchema } from './schema.js'
+import { Context, Effect, Layer, Option, Schema, Semaphore } from 'effect'
+import { LoopbackAdjunct, NetworkHost, type NetworkSettingsReplaceFailed } from './host-edge-promise.js'
+import type { networkSaveSchema, NetworkAddress, NetworkForm, NetworkSnapshot } from './network-api.js'
+import { NetworkPreferencesModel, type NetworkPreferences } from './network-preferences.js'
+
+export class NetworkSettingsUnavailable extends Schema.TaggedError<NetworkSettingsUnavailable>()(
+  'NetworkSettingsUnavailable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'network-settings-unavailable' },
+) {
+  override get message(): string {
+    return 'Network startup preferences are unavailable. Restart DSH to load the updated plugin.'
+  }
+}
+
+export class WebListenerUninitialized extends Schema.TaggedError<WebListenerUninitialized>()(
+  'WebListenerUninitialized',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'web-listener-uninitialized' },
+) {
+  override get message(): string {
+    return 'The native Web listener has not initialized. Reload the page once DSH finishes starting.'
+  }
+}
+
+export class NetworkSettingsReadOnly extends Schema.TaggedError<NetworkSettingsReadOnly>()(
+  'NetworkSettingsReadOnly',
+  { reason: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'network-settings-read-only' },
+) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+export class NetworkSettingsConflict extends Schema.TaggedError<NetworkSettingsConflict>()(
+  'NetworkSettingsConflict',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'network-settings-conflict' },
+) {
+  override get message(): string {
+    return 'Network settings changed elsewhere. Reload the page before saving again.'
+  }
+}
+
+export class NetworkAddressUnavailable extends Schema.TaggedError<NetworkAddressUnavailable>()(
+  'NetworkAddressUnavailable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'network-address-unavailable' },
+) {
+  override get message(): string {
+    return 'The selected LAN address is no longer available. Choose a current interface address.'
+  }
+}
+
+export class NetworkSettingsSaveFailed extends Schema.TaggedError<NetworkSettingsSaveFailed>()(
+  'NetworkSettingsSaveFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'network-settings-save-failed' },
+) {
+  override get message(): string {
+    return 'Network settings could not be saved. Check that the profile settings file is writable, then retry.'
+  }
+}
+
+export type NetworkReadFailure = NetworkSettingsUnavailable | WebListenerUninitialized
+export type NetworkSaveFailure = NetworkReadFailure | NetworkSettingsReadOnly | NetworkSettingsConflict | NetworkAddressUnavailable | NetworkSettingsSaveFailed
 
 const rawObject = Schema.Record(Schema.String, Schema.Unknown)
-// A strict object still rejects unknown keys: the decoder below keeps `onExcessProperty: 'error'`, as zod did.
 const expression = Schema.Struct({ __jsExpr: Schema.String })
+const settingsConflictCause = Schema.Struct({ code: Schema.Literal('SETTINGS_CONFLICT') })
 
 /** Only our explicit native startup delegation is managed; never reinterpret custom profile code. */
 const isManagedNetworkConfiguration = (value: typeof rawObject.Type): boolean => {
@@ -61,86 +117,76 @@ const intendedBinding = (form: NetworkForm) => ({
   port: form.port,
 })
 
-export class NetworkController {
-  readonly #ctx: Context
-  readonly #access: LoopbackAccess
-  readonly #boot: NetworkStartupValues
-  #pending: Promise<NetworkSnapshot | undefined> = Promise.resolve(undefined)
+const saveFailure = (error: NetworkSettingsReplaceFailed) =>
+  Option.isSome(Schema.decodeUnknownOption(settingsConflictCause)(error.cause))
+    ? new NetworkSettingsConflict({ cause: error })
+    : new NetworkSettingsSaveFailed({ cause: error })
 
-  constructor(ctx: Context, access: LoopbackAccess, boot: NetworkStartupValues) {
-    this.#ctx = ctx
-    this.#access = access
-    this.#boot = boot
+/** The Network access section: what the running listener is, what the user saved for the next startup, and saving it. */
+export class NetworkAccess extends Context.Service<
+  NetworkAccess,
+  {
+    readonly snapshot: Effect.Effect<NetworkSnapshot, NetworkReadFailure>
+    readonly save: (input: typeof networkSaveSchema.Type) => Effect.Effect<NetworkSnapshot, NetworkSaveFailure>
   }
+>()('@dshfiles/loopback-access/NetworkAccess') {
+  static readonly layer = Layer.effect(
+    NetworkAccess,
+    Effect.gen(function* () {
+      const network = yield* NetworkHost
+      const adjunct = yield* LoopbackAdjunct
+      const saving = yield* Semaphore.make(1)
 
-  #descriptor() {
-    const descriptor = this.#ctx.settings.describe({ redactSecrets: true }).find(item => item.ns === NETWORK_SETTINGS_NAMESPACE)
-    if (descriptor === undefined)
-      throw new PluginApiError('Network startup preferences are unavailable. Restart DSH to load the updated plugin.', { code: 'network-settings-unavailable' })
-    return descriptor
-  }
+      const snapshot = Effect.gen(function* () {
+        const descriptor = yield* Effect.flatMap(
+          network.descriptor,
+          Option.match({ onNone: () => Effect.fail(new NetworkSettingsUnavailable({})), onSome: Effect.succeed }),
+        )
+        const listener = yield* network.listener
+        const port = listener.port
+        if (port === undefined) return yield* new WebListenerUninitialized({})
+        const saved = preferencesToForm(NetworkPreferencesModel.decode(descriptor.value), listener.host, port)
+        const applied = preferencesToForm(network.boot.preferences, listener.host, port)
+        const current = yield* adjunct.status
+        const config = yield* network.webserverConfig
+        const raw = Option.flatMap(config, Schema.decodeUnknownOption(rawObject))
+        const managed = Option.isSome(config) && Option.isSome(raw) && isManagedNetworkConfiguration(raw.value)
+        const unsupported = Option.isNone(config) || Option.isNone(raw) || Object.hasOwn(raw.value, '__jsExpr')
+        const overrides = yield* network.cliOverrides
+        const result: NetworkSnapshot = {
+          revision: descriptor.revision,
+          writable: (yield* network.settingsWritable) && managed,
+          saved,
+          active: {
+            host: listener.host,
+            port,
+            localhostEnabled: isLoopbackHost(listener.host) || current.state === 'forwarding',
+            urls: [...new Set([current.upstreamOrigin, current.localhostOrigin].filter((origin): origin is string => origin !== null))],
+          },
+          addresses: localNetworkAddresses(),
+          cliOverrides: { host: overrides.host ?? null, port: overrides.port ?? null },
+          pendingRestart: !isDeepStrictEqual(intendedBinding(saved), intendedBinding(applied)),
+          integration: managed ? 'managed' : unsupported ? 'unsupported' : 'needs-setup',
+          unavailableReason: managed
+            ? null
+            : 'This profile overrides the native network configuration. Install the Network access startup wiring and restart DSH before editing it here.',
+        }
+        return result
+      }).pipe(Effect.withSpan('network access snapshot'))
 
-  snapshot(): NetworkSnapshot {
-    const descriptor = this.#descriptor()
-    const native = this.#ctx.webServer
-    const port = native.port
-    if (port === undefined) throw new Error('The native Web listener has not initialized.')
-    const preferences = NetworkPreferencesModel.decode(descriptor.value)
-    const saved = preferencesToForm(preferences, native.host, port)
-    const applied = preferencesToForm(this.#boot.preferences, native.host, port)
-    const current = this.#access.status()
-    const row = this.#ctx.configEditor.entries().find(entry => entry.options.id === 'webserver' && entry.options.name === '@deepseek-ai/dsh-host-webserver')
-    const raw = Schema.decodeUnknownOption(rawObject)(row?.options.config)
-    const managed = row !== undefined && Option.isSome(raw) && isManagedNetworkConfiguration(raw.value)
-    const unsupported = row === undefined || Option.isNone(raw) || Object.hasOwn(raw.value, '__jsExpr')
-    const integration = managed ? 'managed' : unsupported ? 'unsupported' : 'needs-setup'
-    const overrides = readWebStartupOverrides(this.#ctx)
-    return {
-      revision: descriptor.revision,
-      writable: this.#ctx.settings.writable && managed,
-      saved,
-      active: {
-        host: native.host,
-        port,
-        localhostEnabled: isLoopbackHost(native.host) || current.state === 'forwarding',
-        urls: [...new Set([current.upstreamOrigin, current.localhostOrigin].filter((origin): origin is string => origin !== null))],
-      },
-      addresses: localNetworkAddresses(),
-      cliOverrides: { host: overrides.host ?? null, port: overrides.port ?? null },
-      pendingRestart: !isDeepStrictEqual(intendedBinding(saved), intendedBinding(applied)),
-      integration,
-      unavailableReason: managed
-        ? null
-        : 'This profile overrides the native network configuration. Install the Network access startup wiring and restart DSH before editing it here.',
-    }
-  }
+      const save = Effect.fn('network access save')(function* (input: typeof networkSaveSchema.Type) {
+        const before = yield* snapshot
+        if (!before.writable) return yield* new NetworkSettingsReadOnly({ reason: before.unavailableReason ?? 'Network settings are read-only on this Host.' })
+        if (before.revision !== input.expectedRevision) return yield* new NetworkSettingsConflict({})
+        if (input.lanEnabled && !before.addresses.some(item => item.address === input.bindAddress)) return yield* new NetworkAddressUnavailable({})
+        const preferences = NetworkPreferencesModel.normalize({ lanEnabled: input.lanEnabled, bindAddress: input.bindAddress, port: input.port })
+        // Every owned field is volatile: only desired preferences change. The upstream startup provider and native
+        // listener retain their boot values. Replace the owned section so a legacy localhost flag is not persisted again.
+        yield* network.replace(preferences, input.expectedRevision).pipe(Effect.mapError(saveFailure))
+        return yield* snapshot
+      }, saving.withPermits(1))
 
-  save(input: typeof networkSaveSchema.Type, signal: AbortSignal): Promise<NetworkSnapshot> {
-    const parsed = LoopbackSchema.decodeStrict(networkSaveSchema, input)
-    const change = this.#pending.then(async () => {
-      signal.throwIfAborted()
-      const before = this.snapshot()
-      if (!before.writable)
-        throw new PluginApiError(before.unavailableReason ?? 'Network settings are read-only on this Host.', { code: 'network-settings-read-only' })
-      if (before.revision !== parsed.expectedRevision)
-        throw new PluginApiError('Network settings changed elsewhere. Reload the page before saving again.', { code: 'network-settings-conflict' })
-      if (parsed.lanEnabled && !before.addresses.some(item => item.address === parsed.bindAddress))
-        throw new PluginApiError('The selected LAN address is no longer available. Choose a current interface address.', {
-          code: 'network-address-unavailable',
-        })
-      const preferences = NetworkPreferencesModel.normalize({
-        lanEnabled: parsed.lanEnabled,
-        bindAddress: parsed.bindAddress,
-        port: parsed.port,
-      })
-      signal.throwIfAborted()
-      // Every owned field is volatile: only desired preferences change. The
-      // upstream startup provider and native listener retain their boot values.
-      // Replace the owned section so a legacy localhost flag is not persisted again.
-      await this.#ctx.settings.replace(NETWORK_SETTINGS_NAMESPACE, preferences, parsed.expectedRevision)
-      return this.snapshot()
-    })
-    this.#pending = change.catch(() => undefined)
-    return change
-  }
+      return NetworkAccess.of({ snapshot, save })
+    }),
+  )
 }
