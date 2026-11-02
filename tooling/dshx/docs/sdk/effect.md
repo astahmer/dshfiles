@@ -136,6 +136,11 @@ yield * HostEvents.answer('request-messages/status', () => Effect.succeed(status
 Captures the current services and returns `(...args) => Promise`, for a callback API that must stay Promise (a
 polyfill, a native hook). Capture it once in a layer or `main`, not per call.
 
+`DshxPlugin.callbackWithSignal(fn)` is the same for a caller that can abort: the returned function is
+`({ signal }, ...args) => Promise`, an abort interrupts the fiber, and the interrupted call rejects with
+`signal.reason`, as an aborted Promise API does. context-compaction passes the engine's summary signal this way, so
+the model lookup stops with the compaction.
+
 `callback`, `HostEvents.on`, `HostEvents.intercept`, `HostEvents.answer` and `Tool.register` capture their context without the current span, so each later run
 starts its own trace instead of hanging under `plugin activate`. A plugin edge that captures context itself (an
 SDK adapter calling `Effect.runPromiseWith`) uses `DshxPlugin.detachedContext()` for the same reason.

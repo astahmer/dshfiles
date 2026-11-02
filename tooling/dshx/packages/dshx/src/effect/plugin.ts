@@ -136,3 +136,26 @@ export const callback = <Args extends ReadonlyArray<unknown>, A, E, R>(
     const run = Effect.runPromiseWith(services)
     return (...args: Args) => run(body(...args))
   })
+
+/** The first argument of a `callbackWithSignal` function: the Promise caller's abort. */
+export interface CallbackOptions {
+  readonly signal: AbortSignal | undefined
+}
+
+/**
+ * `callback` for a Promise caller that can abort: the returned function takes `{ signal }` before the body's
+ * arguments, and an abort interrupts the fiber. An interrupted call rejects with `signal.reason`, as an aborted Promise
+ * API does; any other failure rejects as `callback` does.
+ */
+export const callbackWithSignal = <Args extends ReadonlyArray<unknown>, A, E, R>(
+  body: (...args: Args) => Effect.Effect<A, E, R>,
+): Effect.Effect<(options: CallbackOptions, ...args: Args) => Promise<A>, never, R> =>
+  Effect.map(detachedContext<R>(), services => {
+    const run = Effect.runPromiseExitWith(services)
+    return async (options: CallbackOptions, ...args: Args) => {
+      const exit = await run(body(...args), options.signal === undefined ? undefined : { signal: options.signal })
+      if (Exit.isSuccess(exit)) return exit.value
+      if (options.signal?.aborted === true && Cause.hasInterruptsOnly(exit.cause)) throw options.signal.reason
+      throw Cause.squash(exit.cause)
+    }
+  })

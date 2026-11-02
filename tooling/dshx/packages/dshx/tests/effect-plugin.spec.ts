@@ -397,6 +397,43 @@ describe('DshxPlugin.callback', () => {
     }).pipe(Effect.provide(tracerLayer)),
   )
 
+  it.effect('callbackWithSignal interrupts the fiber when the caller aborts and rejects with the abort reason', () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      const interrupted = yield* Deferred.make<void>()
+      const lookup = yield* DshxPlugin.callbackWithSignal((name: string) =>
+        Effect.gen(function* () {
+          const journal = yield* Journal
+          if (name === 'slow') {
+            yield* Deferred.succeed(started, undefined)
+            return yield* Effect.never.pipe(Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)))
+          }
+          return `${journal.prefix} ${name}`
+        }),
+      )
+      expect(yield* Effect.promise(() => lookup({ signal: undefined }, 'Ada'))).toBe('Hi Ada')
+      const controller = new AbortController()
+      const reason = new Error('caller went away')
+      const pending = lookup({ signal: controller.signal }, 'slow').then(
+        () => 'resolved',
+        (error: unknown) => (error === reason ? 'aborted with reason' : 'other'),
+      )
+      yield* Deferred.await(started)
+      controller.abort(reason)
+      yield* Deferred.await(interrupted)
+      expect(yield* Effect.promise(() => pending)).toBe('aborted with reason')
+      const failing = yield* DshxPlugin.callbackWithSignal(() => Effect.fail(new JournalLocked({ reason: 'y' })))
+      expect(
+        yield* Effect.promise(() =>
+          failing({ signal: new AbortController().signal }).then(
+            () => 'resolved',
+            (error: unknown) => (error instanceof JournalLocked ? error.reason : 'other'),
+          ),
+        ),
+      ).toBe('y')
+    }).pipe(Effect.provide(Layer.succeed(Journal, Journal.of({ entries: Ref.makeUnsafe<ReadonlyArray<string>>([]), prefix: 'Hi' })))),
+  )
+
   it('is a Cause-preserving PluginActivationError', () => {
     const error = new DshxPlugin.PluginActivationError({ plugin: 'p', cause: Cause.fail('boot') })
     expect(error.message).toBe('p failed to activate. See the Host log for its cause.')

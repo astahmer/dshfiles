@@ -101,10 +101,10 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const host = yield* HostContext
-      const summarize = yield* DshxPlugin.callback(summarizeBounded)
+      const summarize = yield* DshxPlugin.callbackWithSignal(summarizeBounded)
       // A failed provider request reaches the engine as the provider's own error, as the stock engine throws it.
       const engine = engineWith(request =>
-        summarize(request).catch((error: unknown) => {
+        summarize({ signal: request.signal }, request).catch((error: unknown) => {
           throw error instanceof SummaryRequestFailed ? error.cause : error
         }),
       )
