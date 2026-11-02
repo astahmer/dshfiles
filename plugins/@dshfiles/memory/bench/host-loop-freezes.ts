@@ -475,9 +475,16 @@ const main = async () => {
   assertSafeRunDir(options.runDir)
   await mkdir(options.runDir, { recursive: true })
 
-  const corpus = await scanCorpus(options.corpus)
+  const scanned = await scanCorpus(options.corpus)
   const headers = new Map()
-  for (const entry of corpus) headers.set(entry.id, await readHeaderLine(entry.log))
+  for (const entry of scanned) {
+    const header = await readHeaderLine(entry.log).catch(error => {
+      console.warn(`skipping ${entry.id}: ${error instanceof Error ? error.message : String(error)}`)
+      return undefined
+    })
+    if (header !== undefined) headers.set(entry.id, header)
+  }
+  const corpus = scanned.filter(entry => headers.has(entry.id))
 
   const liveIndexRevisions = indexRevisions(options.index)
   const behind = new Set(corpus.filter(entry => liveIndexRevisions.get(entry.id) !== entry.revision).map(entry => entry.id))
