@@ -1,35 +1,31 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { PluginApiError } from '@dshfiles/dshx/api'
+import { PluginApiError, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
+import { Schema } from 'effect'
 import { execFile } from 'node:child_process'
 import { mkdir, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
-import { z } from 'zod'
 
-const nameSchema = z
-  .string()
-  .regex(/^[a-z0-9][a-z0-9._-]{0,47}$/u, 'Use 1–48 lowercase letters, digits, dots, dashes or underscores, starting with a letter or digit.')
+const nameSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,47}$/u))
 
-const referenceSchema = z
-  .object({
-    name: nameSchema,
-    kind: z.enum(['directory', 'git']),
-    /** The directory or the git URL the user gave. */
-    source: z.string().min(1).max(2048),
-    /** Branch or tag a git reference was cloned at; null for the remote's default branch or a directory. */
-    ref: z.string().min(1).max(256).nullable(),
-    /** Where the agent reads it: the directory itself, or the clone under `$DSH_HOME/references`. */
-    path: z.string().min(1),
-    description: z.string().max(500).nullable(),
-    createdAt: z.number().int().nonnegative(),
-  })
-  .strict()
+const referenceSchema = Schema.Struct({
+  name: nameSchema,
+  kind: Schema.Literals(['directory', 'git']),
+  /** The directory or the git URL the user gave. */
+  source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
+  /** Branch or tag a git reference was cloned at; null for the remote's default branch or a directory. */
+  ref: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+  /** Where the agent reads it: the directory itself, or the clone under `$DSH_HOME/references`. */
+  path: Schema.String.check(Schema.isMinLength(1)),
+  description: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
 
-const attachmentSchema = z.object({ sessionId: z.string().min(1).max(256), names: z.array(nameSchema).max(32) }).strict()
+const attachmentSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)), names: Schema.Array(nameSchema).check(Schema.isMaxLength(32)) })
 
-export type Reference = z.infer<typeof referenceSchema>
-type Attachment = z.infer<typeof attachmentSchema>
+export type Reference = typeof referenceSchema.Type
+type Attachment = typeof attachmentSchema.Type
 
 const gitClone = (input: { readonly source: string; readonly ref: string | null; readonly path: string }): Promise<void> => {
   const args = ['clone', '--depth', '1', ...(input.ref === null ? [] : ['--branch', input.ref]), '--', input.source, input.path]
@@ -65,8 +61,8 @@ export class References {
     version: 1,
     layout: 'per-record',
     tables: {
-      references: { valueSchema: referenceSchema, __key: 'references' },
-      attachments: { valueSchema: attachmentSchema, __key: 'attachments' },
+      references: { valueSchema: zodSchemaFromEffect(referenceSchema), __key: 'references' },
+      attachments: { valueSchema: zodSchemaFromEffect(attachmentSchema), __key: 'attachments' },
     },
   })
 
