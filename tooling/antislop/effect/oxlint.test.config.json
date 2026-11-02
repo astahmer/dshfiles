@@ -1,4 +1,8 @@
 {
+  "plugins": [],
+  "categories": {
+    "correctness": "off"
+  },
   "jsPlugins": [
     {
       "name": "effect-antislop",
@@ -17,12 +21,29 @@
         "excludePaths": []
       }
     ],
+    "effect-antislop/no-silent-error-swallow": [
+      "error",
+      {
+        "implementationPaths": ["/tests/oxlint/implementation/"],
+        "excludePaths": []
+      }
+    ],
     "effect-migration/no-effect-api-promise-lift": "error",
     "effect-migration/no-try-catch-around-effect": "error",
     "effect-migration/require-curried-tagged-error": "error",
     "effect-migration/no-raw-error-in-effect": "error",
     "effect-migration/no-unscoped-plugin-timer": "error",
     "effect-migration/no-run-promise-in-host-handler": "error",
-    "effect-migration/no-cordis-get-outside-root-layer": "error"
+    "effect-migration/no-cordis-get-outside-root-layer": "error",
+    "effect-migration/no-cause-dropping-catch": "error",
+    "effect-migration/no-empty-plugin-layer": "error",
+    "effect-migration/no-gen-inside-fn": "error",
+    "effect-migration/no-repeat-over-uncaught-effect": "error",
+    "effect-migration/no-host-module-state": "error",
+    "effect-migration/no-host-global-timer": "error",
+    "effect-migration/no-host-child-process": "error",
+    "effect-migration/no-void-then": "error",
+    "effect-migration/effect-span-name-format": "error",
+    "effect-migration/no-effect-unstable-import": "error"
   }
 }

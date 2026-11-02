@@ -1,4 +1,8 @@
 {
+  "plugins": [],
+  "categories": {
+    "correctness": "off"
+  },
   "jsPlugins": [
     {
       "name": "effect-antislop",
@@ -9,12 +13,74 @@
       "specifier": "./repo-rules/index.mjs"
     }
   ],
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "plugins/@dshfiles/*/src/native/**", "plugins/@dshfiles/session-controller/typert/**"],
   "rules": {
     "effect-antislop/no-domain-effect-run": [
       "error",
       {
-        "domainPaths": ["/tooling/dshx/packages/dshx/src/effect/"],
-        "excludePaths": ["/tooling/dshx/packages/dshx/src/effect/index.ts", "/tooling/dshx/packages/dshx/src/effect/tracer.ts"]
+        "domainPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [
+          "tooling/dshx/packages/dshx/src/effect/index.ts",
+          "tooling/dshx/packages/dshx/src/effect/plugin.ts",
+          "tooling/dshx/packages/dshx/src/effect/api.ts",
+          "tooling/dshx/packages/dshx/src/effect/tool.ts",
+          "tooling/dshx/packages/dshx/src/effect/events.ts",
+          "tooling/dshx/packages/dshx/src/effect/tracer.ts",
+          ".test.",
+          ".spec.",
+          ".bench.",
+          "/fixtures/",
+          "/e2e/"
+        ]
+      }
+    ],
+    "effect-antislop/no-effect-context-reprovide": [
+      "error",
+      {
+        "implementationPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-catch-if-tagged-error": [
+      "error",
+      {
+        "implementationPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-silent-error-swallow": [
+      "error",
+      {
+        "implementationPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-service-flat-map-facade": [
+      "error",
+      {
+        "implementationPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-fallible-database-promise": [
+      "error",
+      {
+        "databasePaths": ["sqlite", "database", "-db.", "/db/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-untyped-readable-stream-error": [
+      "error",
+      {
+        "streamPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
+      }
+    ],
+    "effect-antislop/no-sequential-effect-yield-in-loop": [
+      "error",
+      {
+        "domainPaths": ["plugins/@dshfiles/*/src/", "tooling/dshx/packages/dshx/src/"],
+        "excludePaths": [".test.", ".spec.", ".bench.", "/fixtures/", "/e2e/"]
       }
     ],
     "effect-migration/no-effect-api-promise-lift": "error",
@@ -23,6 +89,16 @@
     "effect-migration/no-raw-error-in-effect": "error",
     "effect-migration/no-unscoped-plugin-timer": "error",
     "effect-migration/no-run-promise-in-host-handler": "error",
-    "effect-migration/no-cordis-get-outside-root-layer": "error"
+    "effect-migration/no-cordis-get-outside-root-layer": "error",
+    "effect-migration/no-cause-dropping-catch": "error",
+    "effect-migration/no-empty-plugin-layer": "error",
+    "effect-migration/no-gen-inside-fn": "error",
+    "effect-migration/no-repeat-over-uncaught-effect": "error",
+    "effect-migration/no-host-module-state": "error",
+    "effect-migration/no-host-global-timer": "error",
+    "effect-migration/no-host-child-process": "error",
+    "effect-migration/no-void-then": "error",
+    "effect-migration/effect-span-name-format": "error",
+    "effect-migration/no-effect-unstable-import": "error"
   }
 }
