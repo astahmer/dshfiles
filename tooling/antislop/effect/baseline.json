@@ -30,7 +30,6 @@
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2
   },
   "effect-migration(no-void-then)": {

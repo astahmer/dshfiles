@@ -20,9 +20,17 @@
         "fill textbox \"Capture\" \"Inspect @Image 1\"",
         "expect textbox \"Capture\""
       ],
-      "surfaces": ["client", "host", "storage", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["inbox", "triaged"],
+      "states": [
+        "inbox",
+        "triaged"
+      ],
       "failureModes": [
         "An unknown prefix stays in the title and the item becomes a task.",
         "A storage write failure is logged and the in-memory item stays readable."
@@ -83,29 +91,44 @@
         "expect textbox \"TypeSafe API key reference\"",
         "expect button \"Save Jev settings\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "configuration": [
         {
           "key": "dshfiles-backlog.jevEnabled",
           "defaultValue": "false",
           "constraints": "Boolean; Jev calls are disabled unless enabled.",
-          "coveredBy": ["backlog.jev-settings-panel"]
+          "coveredBy": [
+            "backlog.jev-settings-panel"
+          ]
         },
         {
           "key": "dshfiles-backlog.autoTriage",
           "defaultValue": "false",
           "constraints": "Boolean; background triage for new items is opt-in.",
-          "coveredBy": ["backlog.jev-settings-panel"]
+          "coveredBy": [
+            "backlog.jev-settings-panel"
+          ]
         },
         {
           "key": "dshfiles-backlog.jevSecret",
           "defaultValue": "",
           "constraints": "Secret Catalog reference only; value resolves on the Host.",
-          "coveredBy": ["backlog.jev-settings-panel"]
+          "coveredBy": [
+            "backlog.jev-settings-panel"
+          ]
         }
       ],
-      "states": ["settings-view", "secret-reference-only"],
-      "failureModes": ["Settings remain read-only while the namespace is unavailable.", "The UI stores a Secret Catalog reference, never a credential value."],
+      "states": [
+        "settings-view",
+        "secret-reference-only"
+      ],
+      "failureModes": [
+        "Settings remain read-only while the namespace is unavailable.",
+        "The UI stores a Secret Catalog reference, never a credential value."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -146,10 +169,20 @@
         "press ArrowUp",
         "expect article \"Item b:2\""
       ],
-      "surfaces": ["client", "host"],
+      "surfaces": [
+        "client",
+        "host"
+      ],
       "configuration": [],
-      "states": ["fresh", "stale", "dormant", "archived"],
-      "failureModes": ["Dormant and archived items stay in search and backlinks; only the default feed hides them."],
+      "states": [
+        "fresh",
+        "stale",
+        "dormant",
+        "archived"
+      ],
+      "failureModes": [
+        "Dormant and archived items stay in search and backlinks; only the default feed hides them."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -205,9 +238,16 @@
       "id": "inline-title-edit",
       "title": "Rename an item in place",
       "summary": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["reading", "editing", "saved", "cancelled"],
+      "states": [
+        "reading",
+        "editing",
+        "saved",
+        "cancelled"
+      ],
       "failureModes": [
         "An unchanged, blank or escape-cancelled draft closes the editor without a Host write.",
         "A double click on a link, chip or button inside the row keeps that control's own action instead of starting a rename."
@@ -253,10 +293,22 @@
         "expect button \"Open in browser\"",
         "expect button \"Copy URL\""
       ],
-      "surfaces": ["client", "host", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["inbox", "todo", "doing", "done", "dropped"],
-      "failureModes": ["An unknown item id answers not-found without writing."],
+      "states": [
+        "inbox",
+        "todo",
+        "doing",
+        "done",
+        "dropped"
+      ],
+      "failureModes": [
+        "An unknown item id answers not-found without writing."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -303,10 +355,18 @@
         "click button \"Configure board columns\"",
         "expect button \"Configure board columns\""
       ],
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["default-order", "custom-order", "hidden-column"],
-      "failureModes": ["At least one board column remains visible; hiding columns does not change item status or remove items."],
+      "states": [
+        "default-order",
+        "custom-order",
+        "hidden-column"
+      ],
+      "failureModes": [
+        "At least one board column remains visible; hiding columns does not change item status or remove items."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -344,15 +404,22 @@
         "expect text \"2 selected\"",
         "expect button \"Start thread\"",
         "rightclick row \"Item b:2\"",
-        "click menuitem \"Start thread (2)…\"",
+        "click menuitem \"Start thread (2)\u2026\"",
         "expect dialog \"Start thread\"",
-        "expect text \"· 2 items*\"",
+        "expect text \"\u00b7 2 items*\"",
         "click button \"Cancel\"",
         "expect text \"First selection item\""
       ],
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["unselected", "range-selected", "additive-selection", "batch-updated"],
+      "states": [
+        "unselected",
+        "range-selected",
+        "additive-selection",
+        "batch-updated"
+      ],
       "failureModes": [
         "A range uses the current visible item order and falls back to the target if its anchor is no longer visible.",
         "A menu opened on one row of a selection starts one thread for every selected item, not just the row it was opened on."
@@ -450,16 +517,21 @@
         "click checkbox \"Select b:1\"",
         "click checkbox \"Select b:2\"",
         "rightclick row \"Item b:2\"",
-        "expect menuitem \"Start thread (2)…\"",
+        "expect menuitem \"Start thread (2)\u2026\"",
         "expect menuitem \"Copy item IDs (2)\"",
         "expect menuitem \"Copy item links (2)\"",
         "expect menuitem \"Status (2)\"",
         "expect menuitem \"Pin items (2)\"",
-        "expect menuitem \"Delete permanently (2)…\""
+        "expect menuitem \"Delete permanently (2)\u2026\""
       ],
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["single", "selection"],
+      "states": [
+        "single",
+        "selection"
+      ],
       "failureModes": [
         "A menu opened on one row of a selection acts only on that row, or names no count, so the user cannot tell how many items an action changes.",
         "Bulk deletion runs without a confirmation that names how many items it removes."
@@ -489,9 +561,19 @@
       "id": "auto-triage",
       "title": "Triage new items automatically",
       "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
-      "surfaces": ["client", "host", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["off", "proposed", "applied", "dismissed"],
+      "states": [
+        "off",
+        "proposed",
+        "applied",
+        "dismissed"
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -576,9 +658,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
-          "testName": "records a jev classify span with status and token counts, never the key or text"
+          "span": "backlog triage pass",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "records one bounded backlog triage pass span with the item id"
         },
         {
           "kind": "automatic",
@@ -606,9 +688,20 @@
       "id": "backfill-triage",
       "title": "Backfill triage on items captured before it was set up",
       "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging inbox/todo tasks triage already looked at.",
-      "surfaces": ["client", "host", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
+      "states": [
+        "untriaged",
+        "applied",
+        "suggested",
+        "unchanged",
+        "remaining",
+        "not-configured"
+      ],
       "reach": [
         "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
@@ -674,9 +767,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
-          "testName": "records a jev classify span with status and token counts, never the key or text"
+          "span": "backlog triage pass",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "records one bounded backlog triage pass span with the item id"
         },
         {
           "kind": "automatic",
@@ -688,9 +781,19 @@
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
       "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
-      "surfaces": ["host", "settings", "integration"],
+      "surfaces": [
+        "host",
+        "settings",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["linked", "started", "stalled", "suggested", "finished"],
+      "states": [
+        "linked",
+        "started",
+        "stalled",
+        "suggested",
+        "finished"
+      ],
       "failureModes": [
         "A repository without jj or a main bookmark is skipped.",
         "An unchanged main costs one read-only jj call and is not rescanned.",
@@ -832,18 +935,26 @@
         {
           "kind": "custom",
           "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/backlog/src/jj-runner.test.ts",
-          "testName": "records a jj log span with flag names only and the exit code"
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; …)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
-      "surfaces": ["client", "integration"],
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["listed", "inserted", "sent", "rendered"],
+      "states": [
+        "listed",
+        "inserted",
+        "sent",
+        "rendered"
+      ],
       "failureModes": [
         "A failing search returns no backlog rows; the other @ groups are unaffected.",
         "An invalid chip reference blocks the send instead of sending broken text."
@@ -900,7 +1011,7 @@
         "press Enter",
         "expect button \"Backlog item b:1\"",
         "click button \"Backlog item b:1\"",
-        "expect text \"Backlog · b:1\"",
+        "expect text \"Backlog \u00b7 b:1\"",
         "expect text \"Ship the backlog reference preview\"",
         "expect img \"red.png\"",
         "click button \"Open red.png\"",
@@ -914,9 +1025,20 @@
         "press Enter",
         "expect button \"Backlog item b:1\""
       ],
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["idle", "loading", "linked", "sent", "gallery-open", "navigating", "missing", "opened"],
+      "states": [
+        "idle",
+        "loading",
+        "linked",
+        "sent",
+        "gallery-open",
+        "navigating",
+        "missing",
+        "opened"
+      ],
       "failureModes": [
         "A deleted item says it no longer exists inline without failing the conversation.",
         "A token that cannot name an item in the Host's id shape stays plain text."
@@ -970,10 +1092,21 @@
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
       "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
-      "surfaces": ["client", "host", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["browsing", "searching", "saved"],
-      "failureModes": ["A settings write that the Host refuses drops the optimistic saved view."],
+      "states": [
+        "browsing",
+        "searching",
+        "saved"
+      ],
+      "failureModes": [
+        "A settings write that the Host refuses drops the optimistic saved view."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -1032,11 +1165,27 @@
       "id": "attention-inbox",
       "title": "Attention Inbox across items and threads",
       "summary": "One row per open backlog item combines attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. Thread acknowledgement never resolves item attention or suggestions; answering a thread's question does settle its own request for input; done/dropped historical thread items stay excluded, and snoozed items return later.",
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["unread", "acknowledged", "resolved", "snoozed"],
-      "failureModes": ["Without thread-sidebar's attention API the Inbox shows backlog items only."],
-      "reach": ["click button \"Backlog: Items\"", "click button \"Inbox\"", "expect text \"Needs you\""],
+      "states": [
+        "unread",
+        "acknowledged",
+        "resolved",
+        "snoozed"
+      ],
+      "failureModes": [
+        "Without thread-sidebar's attention API the Inbox shows backlog items only."
+      ],
+      "reach": [
+        "click button \"Backlog: Items\"",
+        "click button \"Inbox\"",
+        "expect text \"Needs you\""
+      ],
       "externalDependencies": [
         {
           "id": "@dshfiles/thread-sidebar",
@@ -1098,10 +1247,19 @@
       "id": "shared-activity",
       "title": "Backlog work in the Activity timeline",
       "summary": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
-      "surfaces": ["host", "settings", "integration"],
+      "surfaces": [
+        "host",
+        "settings",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["published", "off"],
-      "failureModes": ["Without the timeline plugin the events have no listener and nothing changes."],
+      "states": [
+        "published",
+        "off"
+      ],
+      "failureModes": [
+        "Without the timeline plugin the events have no listener and nothing changes."
+      ],
       "externalDependencies": [
         {
           "id": "@dshfiles/activity-timeline",
@@ -1169,9 +1327,21 @@
         "expect button \"Image 1 of 2\"",
         "expect img \"red.png\""
       ],
-      "surfaces": ["client", "host", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "configuration": [],
-      "states": ["empty", "gallery", "images", "properties", "saved", "sending", "typing"],
+      "states": [
+        "empty",
+        "gallery",
+        "images",
+        "properties",
+        "saved",
+        "sending",
+        "typing"
+      ],
       "failureModes": [
         "A file that is not a supported image, or one still larger than 8 MB after shrinking, is refused with the reason and the rest of the draft stays.",
         "Voice input is disabled with a title when the browser has no speech recognizer.",
@@ -1241,48 +1411,85 @@
         "press Meta+Enter",
         "expect text \"sample\""
       ],
-      "surfaces": ["client", "host", "storage"],
-      "states": ["reading", "editing", "mentioning", "attached", "saved", "routing"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
+      "states": [
+        "reading",
+        "editing",
+        "mentioning",
+        "attached",
+        "saved",
+        "routing"
+      ],
       "configuration": [
         {
           "key": "smartThreadRouting",
           "defaultValue": "true",
           "constraints": "Boolean; classify plain replies before saving.",
-          "choices": ["true", "false"],
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         },
         {
           "key": "threadStartNotifications",
           "defaultValue": "in-app",
           "constraints": "One of off, in-app, system, or both.",
-          "choices": ["off", "in-app", "system", "both"],
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "choices": [
+            "off",
+            "in-app",
+            "system",
+            "both"
+          ],
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         },
         {
           "key": "replyThreadThreshold",
           "defaultValue": "0.7",
           "constraints": "Number from 0 to 1 in steps of 0.05.",
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         },
         {
           "key": "smartReplyAnswers",
           "defaultValue": "true",
           "constraints": "Boolean; generate a short AI answer for text-only replies classified as discussion.",
-          "choices": ["true", "false"],
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         },
         {
           "key": "replyAgent",
           "defaultValue": "",
           "constraints": "Optional enabled agent handle; falls back to the linked-item agent and then @dsh.",
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         },
         {
           "key": "replyAgentOrder",
           "defaultValue": "preferred",
           "constraints": "One of preferred or last-used.",
-          "choices": ["preferred", "last-used"],
-          "coveredBy": ["backlog.smart-reply-routing"]
+          "choices": [
+            "preferred",
+            "last-used"
+          ],
+          "coveredBy": [
+            "backlog.smart-reply-routing"
+          ]
         }
       ],
       "failureModes": [
@@ -1359,9 +1566,19 @@
         "click option \"No project\"",
         "expect text \"2 projects\""
       ],
-      "surfaces": ["client", "host", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "configuration": [],
-      "states": ["all-projects", "one-project", "multiple-projects", "no-project", "remembered"],
+      "states": [
+        "all-projects",
+        "one-project",
+        "multiple-projects",
+        "no-project",
+        "remembered"
+      ],
       "failureModes": [
         "With no project candidates the combobox lists No project only; capture still adds the item without one.",
         "Clearing the header scope leaves the capture chip on the project it last used while reuseCaptureProject is on."
@@ -1408,9 +1625,17 @@
       "id": "capture-project-target",
       "title": "File a thread capture under its project",
       "summary": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way; without jj-integration the path stays as given.",
-      "surfaces": ["host", "storage", "integration"],
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["project-workspace", "thread-workspace", "unregistered-folder"],
+      "states": [
+        "project-workspace",
+        "thread-workspace",
+        "unregistered-folder"
+      ],
       "failureModes": [
         "Without jj-integration loaded, or for a folder no registered workspace claims, the item keeps the captured path.",
         "A jj-integration call that fails for another reason is logged and leaves the project as captured."
@@ -1472,12 +1697,12 @@
         "expect text \"Start a thread from b:1\"",
         "click button \"Feed\"",
         "rightclick article \"Item b:1\"",
-        "expect menuitem \"Start thread…\"",
+        "expect menuitem \"Start thread\u2026\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
         "expect menuitem \"Copy item ID\"",
         "expect menuitem \"Copy item link\"",
-        "click menuitem \"Start thread…\"",
+        "click menuitem \"Start thread\u2026\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",
@@ -1495,9 +1720,20 @@
         "hover button \"Start thread\"",
         "expect tooltip \"Start a thread for this item\""
       ],
-      "surfaces": ["client", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "settings",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["item-without-project", "item-project-registered", "item-project-unregistered", "send-at-once", "stays-in-backlog", "opened-on-request"],
+      "states": [
+        "item-without-project",
+        "item-project-registered",
+        "item-project-unregistered",
+        "send-at-once",
+        "stays-in-backlog",
+        "opened-on-request"
+      ],
       "failureModes": [
         "A thread the Host refuses is reported in a toast and no item link is written.",
         "A model switch that the Host rejects keeps the thread on the Host default model and the toast still offers it.",
@@ -1608,9 +1844,23 @@
         "click button \"Set up missing secrets\"",
         "expect textbox \"Secret value\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["disabled", "missing-key", "offered", "editing-masked", "cancelled", "bound", "binding-failed", "catalog-unavailable"],
+      "states": [
+        "disabled",
+        "missing-key",
+        "offered",
+        "editing-masked",
+        "cancelled",
+        "bound",
+        "binding-failed",
+        "catalog-unavailable"
+      ],
       "failureModes": [
         "A malformed or unresolved key reference offers setup without returning the key or resolver error to chat.",
         "Cancelling leaves the setting unchanged; a failed binding retains only the stored reference for retry.",
@@ -1638,8 +1888,8 @@
         {
           "kind": "unit-test",
           "id": "backlog.jev-secret-setup-status",
-          "file": "plugins/@dshfiles/backlog/src/jev-setup-status.test.ts",
-          "testName": "suggests setup when the key is missing or its reference cannot resolve"
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "reports that Jev needs its key when it is on without one"
         }
       ],
       "telemetry": [
@@ -1664,9 +1914,19 @@
         "rightclick article \"Item b:1\"",
         "expect menuitem \"Retrieve tweet content\""
       ],
-      "surfaces": ["client", "host", "storage", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["unmatched", "retrieving", "imported", "retryable-failure"],
+      "states": [
+        "unmatched",
+        "retrieving",
+        "imported",
+        "retryable-failure"
+      ],
       "failureModes": [
         "Only an HTTPS X or Twitter status URL already linked to the item is accepted; private, deleted, or unavailable posts stay unchanged and can be retried from the row menu.",
         "A fetch failure or unavailable Tweet Context plugin leaves the original description and attachments intact.",
@@ -1706,12 +1966,18 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "backlog tweet import",
-          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "file": "plugins/@dshfiles/backlog/src/tweet-import.test.ts",
           "testName": "records one bounded span for the import work unit"
         }
       ]

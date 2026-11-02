@@ -1,8 +1,19 @@
+import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Llm } from '@dshfiles/dshx/effect/llm'
+import { Jev } from '@dshfiles/jev'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect } from 'effect'
+import { Clock, Effect, Layer } from 'effect'
 
+import { AiActivity } from './ai-activity.js'
+import { backlogSettingsTestLayer } from './backlog-settings.js'
 import type { BacklogItem } from './item.js'
+import { backlogSettings, type BacklogSettings } from './settings.js'
+import { BacklogStore } from './store.js'
+import { backlogStoreLayer } from './test-support.js'
 import { BacklogTriage, type TriageServices } from './triage.js'
+import { Triage } from './triage-service.js'
 
 const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): BacklogItem => ({
   id,
@@ -22,6 +33,16 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
   events: [],
   ...fields,
 })
+
+/** The triage service over a real store, with only Jev, the model and the Secret Catalog replaced at their edges. */
+const triageLayer = (settings: Partial<BacklogSettings>) =>
+  Triage.layer.pipe(
+    Layer.provideMerge(backlogStoreLayer({ settings })),
+    Layer.provideMerge(AiActivity.layer),
+    Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
+    Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as unknown as Llm['Service']))),
+    Layer.provideMerge(Layer.succeed(SecretReferenceResolver, SecretReferenceResolver.of({ resolve: () => Effect.succeedNone, resolveWithLabel: () => Effect.succeedNone }))),
+  )
 
 const jevAnswering =
   (answers: { readonly actionable: number; readonly duplicate?: number }): TriageServices['jev'] =>
@@ -190,5 +211,40 @@ describe('thread resolution', () => {
       })
       expect(failing).toBeNull()
     }),
+  )
+})
+
+describe('backlog triage host span', () => {
+  it.effect('records one bounded backlog triage pass span with the item id', () =>
+    Effect.gen(function* () {
+      const recorder = yield* Effect.acquireRelease(
+        Effect.sync(() => recordSpans()),
+        spans => Effect.sync(() => spans.stop()),
+      )
+      const store = yield* BacklogStore
+      const triage = yield* Triage
+      const created = yield* store.capture({ text: 'Fix the paste handler', actor: { kind: 'user' } })
+
+      yield* triage.pass({ id: created.item.id, setup: { settings: backlogSettings.schema({}), services: {} } })
+
+      const span = recorder.span('backlog triage pass')
+      expect(span.attributes['dshx.backlog.item_id']).toBe(created.item.id)
+    }).pipe(Effect.provide(triageLayer({ jevEnabled: false })), Effect.scoped, Effect.provide(DshxEffect.tracerLayer)),
+  )
+})
+
+describe('Backlog Jev setup status', () => {
+  it.effect('reports that Jev needs its key when it is on without one', () =>
+    Effect.gen(function* () {
+      const triage = yield* Triage
+      expect(yield* triage.jevNeedsSetup).toBe(true)
+      expect(yield* Effect.flip(triage.setup)).toMatchObject({ reason: 'jev-key-missing' })
+    }).pipe(Effect.provide(triageLayer({ jevEnabled: true, jevSecret: '' })), Effect.scoped),
+  )
+
+  it.effect('reports no setup need when Jev is off', () =>
+    Effect.gen(function* () {
+      expect(yield* (yield* Triage).jevNeedsSetup).toBe(false)
+    }).pipe(Effect.provide(triageLayer({ jevEnabled: false })), Effect.scoped),
   )
 })
