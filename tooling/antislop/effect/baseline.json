@@ -21,7 +21,6 @@
     "plugins/@dshfiles/usage/src/host.ts": 3
   },
   "effect-migration(no-cause-dropping-catch)": {
-    "plugins/@dshfiles/agent-communication/src/host.ts": 1,
     "plugins/@dshfiles/agent-questions/src/host.ts": 1,
     "plugins/@dshfiles/agent-questions/src/keyed-effect-lock.ts": 1,
     "plugins/@dshfiles/agent-questions/src/markdown-target.ts": 1,
@@ -59,7 +58,7 @@
     "plugins/@dshfiles/agent-questions/src/service.ts": 1,
     "plugins/@dshfiles/agent-questions/src/tool-flow.ts": 1,
     "plugins/@dshfiles/annotations/src/host.ts": 15,
-    "plugins/@dshfiles/background-jobs/src/host.ts": 5,
+    "plugins/@dshfiles/background-jobs/src/host.ts": 4,
     "plugins/@dshfiles/editor/src/host.ts": 1,
     "plugins/@dshfiles/mcp-endpoint/src/host.ts": 4,
     "plugins/@dshfiles/mcp-endpoint/src/mcp-route.ts": 1,
@@ -175,9 +174,6 @@
     "plugins/@dshfiles/worktree-memory/src/host.ts": 1,
     "tooling/dshx/packages/dshx/src/effect/index.ts": 1
   },
-  "effect-migration(no-repeat-over-uncaught-effect)": {
-    "plugins/@dshfiles/agent-communication/src/host.ts": 1
-  },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
     "plugins/@dshfiles/ai-accounts/src/host.ts": 3,
@@ -187,7 +183,6 @@
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
     "plugins/@dshfiles/project-checks/src/host.ts": 1,
-    "plugins/@dshfiles/session-controller/src/native/list.ts": 1,
     "plugins/@dshfiles/session-undo/src/host.ts": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
