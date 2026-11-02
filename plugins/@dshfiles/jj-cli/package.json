@@ -1,0 +1,40 @@
+{
+  "name": "@dshfiles/jj-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Effect service that runs the Jujutsu CLI for Host plugins: one resolved executable, bounded output, timeouts, `jj <verb>` spans and an operation-head cache for view reads.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --run build && vitest run && node --test tests/runtime-distribution.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

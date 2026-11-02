@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "jj-cli-run",
+      "title": "One Effect service that runs the Jujutsu CLI",
+      "summary": "Resolve jj once, run it with --color=never --no-pager, bounded stdout and stderr, a timeout and kill-on-interrupt; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["succeeded", "exited-non-zero", "timed-out", "truncated", "interrupted"],
+      "failureModes": [
+        "jj missing from PATH or resolved to a relative path fails with JjSpawnFailed and is retried on the next run instead of being cached.",
+        "A run over its timeout or interrupted by its caller has its process group killed.",
+        "A non-zero exit through exec carries flag-value-redacted arguments and credential-redacted stderr."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj CLI through the Effect ChildProcessSpawner with stdin ignored, bounded output, a timeout and process-group kill on interrupt.",
+          "deterministicFake": "Real temporary jj repositories created per test; no jj mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-cli.exec-redaction",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "fails exec with JjCommandFailed carrying redacted args and stderr"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-cli.timeout-kills",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "stops a run that exceeds its timeout and kills the process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-cli.interrupt-kills",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "kills the process when the caller is interrupted"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
+        }
+      ]
+    },
+    {
+      "id": "jj-cli-view-reads",
+      "title": "Operation-head cache for jj view reads",
+      "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["hit", "miss", "shared", "uncached"],
+      "failureModes": [
+        "A failed or non-zero read is not cached.",
+        "One caller's interruption leaves a shared read running for the other waiters; the last waiter's interruption stops it."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj CLI through the Effect ChildProcessSpawner with stdin ignored, bounded output, a timeout and process-group kill on interrupt.",
+          "deterministicFake": "Real temporary jj repositories created per test; no jj mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-cli.view-read-cache",
+          "file": "plugins/@dshfiles/jj-cli/src/jj-view-reads.test.ts",
+          "testName": "answers a repeated view read without spawning jj until an operation lands"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-cli.shared-read-interrupt",
+          "file": "plugins/@dshfiles/jj-cli/src/jj-view-reads.test.ts",
+          "testName": "keeps a shared read running for the other waiter when one caller is interrupted"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj-view-reads.test.ts",
+          "testName": "answers a repeated view read without spawning jj until an operation lands"
+        }
+      ]
+    }
+  ]
+}
