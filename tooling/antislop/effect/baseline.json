@@ -17,10 +17,8 @@
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1,
-    "plugins/@dshfiles/git-worktrees/src/git-worktrees.ts": 1,
     "plugins/@dshfiles/multi-host/src/connectors/ssh.ts": 1,
     "plugins/@dshfiles/multi-host/src/local-project-files.ts": 1,
-    "plugins/@dshfiles/references/src/references.ts": 1,
     "plugins/@dshfiles/tweet-context/src/tweet-context.ts": 1
   },
   "effect-migration(no-host-global-timer)": {
@@ -36,7 +34,6 @@
     "plugins/@dshfiles/ai-accounts/src/request-retry-wait.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/usage-recorder.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
-    "plugins/@dshfiles/fff-search/src/host.ts": 1,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/auto-cleanup.ts": 1,
     "plugins/@dshfiles/jj-integration/src/auto-fetch.ts": 1,
@@ -53,7 +50,6 @@
     "plugins/@dshfiles/session-search/src/worker-client.ts": 1
   },
   "effect-migration(no-host-module-state)": {
-    "plugins/@dshfiles/agents/src/host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/account-runtime.ts": 2,
     "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
@@ -62,7 +58,6 @@
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/settings.ts": 1,
     "plugins/@dshfiles/backlog/src/host.ts": 2,
-    "plugins/@dshfiles/git-worktrees/src/host.ts": 2,
     "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/host.ts": 7,
     "plugins/@dshfiles/memory/src/host.ts": 6,
@@ -71,8 +66,6 @@
     "plugins/@dshfiles/multi-host/src/thread-store.ts": 1,
     "plugins/@dshfiles/plugin-marketplace/src/host.ts": 1,
     "plugins/@dshfiles/preview/src/host.ts": 2,
-    "plugins/@dshfiles/queue-reorder/src/host.ts": 1,
-    "plugins/@dshfiles/references/src/host.ts": 3,
     "plugins/@dshfiles/resource-packs/src/host.ts": 1
   },
   "effect-migration(no-void-then)": {
@@ -80,7 +73,6 @@
     "plugins/@dshfiles/ai-accounts/src/host.ts": 3,
     "plugins/@dshfiles/backlog/src/backlog-panel.tsx": 2,
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
-    "plugins/@dshfiles/fff-search/src/host.ts": 1,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
