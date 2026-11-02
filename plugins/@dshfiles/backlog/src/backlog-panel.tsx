@@ -518,12 +518,12 @@ export const BacklogPanel = (props: {
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : []],
     queryFn: async ({ signal }) => {
-      const statuses = showsResults && stored.statuses.length > 0 ? stored.statuses : undefined
+      const statusFilter = showsResults && stored.statuses.length > 0 ? { statuses: stored.statuses } : {}
       const input: Parameters<typeof api.list>[0] = {
         query: debounced,
         kinds,
         ...scoped,
-        statuses,
+        ...statusFilter,
         freshness: 'all',
         limit: showsResults ? 200 : 2_000,
       }
