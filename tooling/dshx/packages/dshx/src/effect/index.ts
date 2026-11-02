@@ -66,7 +66,7 @@ const registerEffectHost = <const Methods extends Record<string, AnyApiMethodDef
     Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers).map(([name, handler]) => [
       name,
       async (context: ApiHandlerContext<never>) =>
-        settle(await run(Effect.withSpan(handler(context), `dshx-effect ${contract.id}.${name}`), context.signal, context.ctx), {
+        settle(await run(handler(context), context.signal, context.ctx), {
           ctx: context.ctx,
           apiId: contract.id,
           method: name,
@@ -100,7 +100,7 @@ const setup =
   <Config, E>(program: (ctx: Context, config: Config) => Effect.Effect<void, E, Scope.Scope>) =>
   async (ctx: Context, config: Config): Promise<() => Promise<void>> => {
     const scope = Effect.runSync(Scope.make())
-    const started = await Effect.runPromiseExit(provideDshxTracer(Effect.withSpan(Scope.provide(scope)(program(ctx, config)), 'dshx-effect setup')))
+    const started = await Effect.runPromiseExit(provideDshxTracer(Scope.provide(scope)(program(ctx, config))))
     if (Exit.isFailure(started)) {
       await Effect.runPromise(Scope.close(scope, started))
       throw Cause.squash(started.cause)
