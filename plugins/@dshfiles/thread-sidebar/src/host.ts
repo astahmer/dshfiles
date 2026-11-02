@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-user-questions'
-import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
@@ -50,21 +50,16 @@ const settledGate = Layer.effectDiscard(
   Effect.gen(function* () {
     const { ctx } = yield* HostContext
     const settings = yield* SidebarSettings
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        ctx.on('agent/pre-step', async (payload, next) => {
-          const settled = underSettledSession({
-            header: payload.agent.session.header,
-            settledSessionIds: settings.settledSessionIdsNow(),
-            // Live agents carry the durable headers of a chain the walk can still read; a settled parent
-            // that is not live answers from the child's own recorded parentSession instead.
-            parentHeader: sessionId => ctx.agents.list().find(candidate => String(candidate.id) === sessionId)?.session.header,
-          })
-          return settled ? { kind: 'reject' as const } : next()
-        }),
-      ),
-      dispose => Effect.sync(dispose),
-    )
+    yield* HostEvents.interceptAsync('agent/pre-step', ({ args: [payload], next }) => {
+      const settled = underSettledSession({
+        header: payload.agent.session.header,
+        settledSessionIds: settings.settledSessionIdsNow(),
+        // Live agents carry the durable headers of a chain the walk can still read; a settled parent
+        // that is not live answers from the child's own recorded parentSession instead.
+        parentHeader: sessionId => ctx.agents.list().find(candidate => String(candidate.id) === sessionId)?.session.header,
+      })
+      return settled ? Effect.succeed({ kind: 'reject' as const }) : next
+    })
   }),
 )
 

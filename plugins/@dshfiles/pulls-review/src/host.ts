@@ -1,6 +1,7 @@
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-subprocess'
-import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { SessionId } from '@dshfiles/dshx/ids'
 import { Jj } from '@dshfiles/jj-cli'
@@ -17,26 +18,17 @@ const decodeSessionId = Schema.decodeUnknownOption(SessionId)
 
 /** `/pulls`: the thread workspace's review report, printed in the thread. */
 const pullsCommand = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const commands = yield* hostService('commands')
-    const report = yield* DshxPlugin.callback((cwd: string | undefined): Effect.Effect<CommandResult, never, ReviewWorkspace> =>
-      cwd === undefined || cwd.length === 0
-        ? Effect.succeed({ kind: 'error', text: 'This thread has no workspace folder to review.' })
-        : ReviewWorkspace.use(workspace => workspace.review({ path: cwd })).pipe(
-            Effect.map((result): CommandResult => ({ kind: result.status === 'failed' ? 'error' : 'success', text: reviewReportText(result) })),
-            Effect.catchTag('PullsReviewOperationError', error => Effect.succeed<CommandResult>({ kind: 'error', text: error.message })),
-          ),
-    )
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        commands.register({
-          name: 'pulls',
-          description: "Review this thread's changes, grouped like a pull request",
-          handler: invocation => report(invocation.agent.session.header.cwd),
-        }),
-      ),
-      unregister => Effect.sync(unregister),
-    )
+  HostCommands.register({
+    name: 'pulls',
+    description: "Review this thread's changes, grouped like a pull request",
+    handler: invocation => {
+      const cwd = invocation.agent.session.header.cwd
+      if (cwd === undefined || cwd.length === 0) return Effect.succeed<CommandResult>({ kind: 'error', text: 'This thread has no workspace folder to review.' })
+      return ReviewWorkspace.use(workspace => workspace.review({ path: cwd })).pipe(
+        Effect.map((result): CommandResult => ({ kind: result.status === 'failed' ? 'error' : 'success', text: reviewReportText(result) })),
+        Effect.catchTag('PullsReviewOperationError', error => Effect.succeed<CommandResult>({ kind: 'error', text: error.message })),
+      )
+    },
   }),
 )
 

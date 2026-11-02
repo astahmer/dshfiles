@@ -3,8 +3,9 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
-import { createHostApiClient, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { HostContext } from '@dshfiles/dshx/effect'
+import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
+import { createHostApiClient, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
@@ -189,39 +190,35 @@ const commandText = (error: { readonly message: string }): CommandResult => ({ k
 /** `/settle` and `/archive`: the calling thread's own lifecycle verbs, registered for the plugin's lifetime. */
 export const threadCommandsLayer = Layer.effectDiscard(
   Effect.gen(function* () {
-    const commands = yield* hostService('commands')
     const actions = yield* ThreadActions
-    const settle = yield* DshxPlugin.callback((invocation: CommandInvocation) =>
-      invocation.rawInput.trim().length > 0
-        ? Effect.succeed<CommandResult>({ kind: 'error', text: 'Usage: /settle' })
-        : actions.settle({ input: {}, caller: { kind: 'agent', sessionId: invocation.agent.id } }).pipe(
-            Effect.map((result): CommandResult => ({ kind: 'success', text: `Settled thread ${result.sessionId}.` })),
-            Effect.catch(error => Effect.succeed(commandText(error))),
-          ),
-    )
-    const archive = yield* DshxPlugin.callback((invocation: CommandInvocation) =>
-      invocation.rawInput.trim().length > 0
-        ? Effect.succeed<CommandResult>({ kind: 'error', text: 'Usage: /archive' })
-        : actions.archive({ input: {}, caller: { kind: 'agent', sessionId: invocation.agent.id } }).pipe(
-            Effect.map((result): CommandResult =>
-              result.status === 'refused-active'
-                ? {
-                    kind: 'error',
-                    text: `Cannot archive thread ${result.sessionId} while it has running work (${result.activity.join(', ') || 'activity unknown'}). Stop it first, then run /archive again.`,
-                  }
-                : { kind: 'success', text: `Archived thread ${result.sessionId}.` },
+    yield* HostCommands.register({
+      name: 'settle',
+      description: 'Settle this thread so it will not run another model step until unsettled.',
+      handler: invocation =>
+        invocation.rawInput.trim().length > 0
+          ? Effect.succeed<CommandResult>({ kind: 'error', text: 'Usage: /settle' })
+          : actions.settle({ input: {}, caller: { kind: 'agent', sessionId: invocation.agent.id } }).pipe(
+              Effect.map((result): CommandResult => ({ kind: 'success', text: `Settled thread ${result.sessionId}.` })),
+              Effect.catch(error => Effect.succeed(commandText(error))),
             ),
-            Effect.catch(error => Effect.succeed(commandText(error))),
-          ),
-    )
-    for (const command of [
-      { name: 'settle', description: 'Settle this thread so it will not run another model step until unsettled.', handler: settle },
-      { name: 'archive', description: 'Archive this thread without stopping any running work.', handler: archive },
-    ]) {
-      yield* Effect.acquireRelease(
-        Effect.sync(() => commands.register(command)),
-        unregister => Effect.sync(unregister),
-      )
-    }
+    })
+    yield* HostCommands.register({
+      name: 'archive',
+      description: 'Archive this thread without stopping any running work.',
+      handler: invocation =>
+        invocation.rawInput.trim().length > 0
+          ? Effect.succeed<CommandResult>({ kind: 'error', text: 'Usage: /archive' })
+          : actions.archive({ input: {}, caller: { kind: 'agent', sessionId: invocation.agent.id } }).pipe(
+              Effect.map((result): CommandResult =>
+                result.status === 'refused-active'
+                  ? {
+                      kind: 'error',
+                      text: `Cannot archive thread ${result.sessionId} while it has running work (${result.activity.join(', ') || 'activity unknown'}). Stop it first, then run /archive again.`,
+                    }
+                  : { kind: 'success', text: `Archived thread ${result.sessionId}.` },
+              ),
+              Effect.catch(error => Effect.succeed(commandText(error))),
+            ),
+    })
   }),
 )

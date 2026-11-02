@@ -98,6 +98,47 @@ export const intercept = <K extends EventName, R>(
     yield* register({ host, name, listener: listener as Events[K] })
   })
 
+/** One asynchronous `waterfall` dispatch as an interceptor sees it: `next` awaits the rest of the chain. */
+export interface AsyncInterception<K extends EventName> {
+  readonly args: LeadingArguments<EventArguments<K>>
+  /** Run the rest of the chain once and await it; later runs await the same result. */
+  readonly next: Effect.Effect<Awaited<EventResult<K>>>
+}
+
+/**
+ * `intercept` for a waterfall whose result is a Promise (`agent/pre-step`, `system-prompt/assemble`): the handler
+ * may suspend, and its value resolves the emitter's Promise. A failing handler is logged and the chain continues
+ * with `next`; a rejection of the rest of the chain itself reaches the emitter.
+ */
+export const interceptAsync = <K extends EventName, R>(
+  name: K,
+  handler: (interception: AsyncInterception<K>) => Effect.Effect<Awaited<EventResult<K>>, never, R>,
+): Effect.Effect<void, never, Scope.Scope | HostContext | R> =>
+  Effect.gen(function* () {
+    const host = yield* HostContext
+    const runPromise = Effect.runPromiseExitWith(yield* detachedContext<R>())
+    const listener = (...dispatched: EventArguments<K>): Promise<Awaited<EventResult<K>>> => {
+      // SAFETY: a waterfall dispatch always passes the innermost continuation as its last argument.
+      const continuation = dispatched.at(-1) as () => EventResult<K>
+      // SAFETY: the arguments before the continuation are exactly LeadingArguments of the event's parameters.
+      const args = dispatched.slice(0, -1) as LeadingArguments<EventArguments<K>>
+      let chain: Promise<Awaited<EventResult<K>>> | undefined
+      const callNext = () => {
+        chain ??= new Promise<Awaited<EventResult<K>>>(resolve => resolve(continuation()))
+        return chain
+      }
+      return runPromise(handler({ args, next: Effect.promise(callNext) })).then(exit => {
+        if (Exit.isSuccess(exit)) return exit.value
+        return callNext().then(value => {
+          logFailure({ host, name, cause: exit.cause })
+          return value
+        })
+      })
+    }
+    // SAFETY: Cordis types a listener as Events[K]; this one takes exactly its parameters and resolves its result.
+    yield* register({ host, name, listener: listener as Events[K] })
+  })
+
 /**
  * Answer a Cordis `bail` event (a status probe, a lookup) for as long as the current Scope lives: the handler's
  * value is returned to the emitter, and `undefined` lets the next listener answer. Bail dispatch is synchronous, so

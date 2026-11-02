@@ -30,6 +30,8 @@ const astGrepBoundaries = [
   'tooling/dshx/packages/dshx/src/effect/services.ts',
   'tooling/dshx/packages/dshx/src/effect/child-process-spawner.ts',
   'tooling/dshx/packages/dshx/src/effect/keyed-mutex.ts',
+  'tooling/dshx/packages/dshx/src/effect/host-commands.ts',
+  'tooling/dshx/packages/dshx/src/effect/host-prompt.ts',
   'tooling/dshx/packages/dshx/src/effect/settings.ts',
   'plugins/@dshfiles/usage/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',

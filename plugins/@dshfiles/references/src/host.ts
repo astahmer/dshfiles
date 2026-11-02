@@ -1,9 +1,11 @@
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineApi, method, type ApiCaller } from '@dshfiles/dshx/api'
-import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
+import { HostPrompt } from '@dshfiles/dshx/effect/host-prompt'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
-import { defineCommand, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import type { CommandInvocation, CommandResult } from '@dshfiles/dshx/host'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { Effect, Layer, Option, Schema } from 'effect'
@@ -129,42 +131,26 @@ const runCommand = Effect.fn('references command')(function* (invocation: Comman
   return failure(USAGE)
 })
 
-/** `/reference` stays a Promise command handler; it runs in the plugin's services and answers every failure as text. */
+/** `/reference` answers every failure as text. */
 const referenceCommand = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const commands = yield* hostService('commands')
-    const handler = yield* DshxPlugin.callback((invocation: CommandInvocation) =>
-      runCommand(invocation).pipe(Effect.catch(error => Effect.succeed<CommandResult>({ kind: 'error', text: error.message }))),
-    )
-    const command = defineCommand({
-      name: 'reference',
-      description: 'List, attach, detach or save named outside directories and git repositories for this thread.',
-      input: { hint: 'attach <name> · detach <name> · save <name> <directory-or-git-url> [ref]' },
-      handler,
-    })
-    yield* Effect.acquireRelease(
-      Effect.sync(() => commands.register(command)),
-      dispose => Effect.sync(dispose),
-    )
+  HostCommands.register({
+    name: 'reference',
+    description: 'List, attach, detach or save named outside directories and git repositories for this thread.',
+    input: { hint: 'attach <name> · detach <name> · save <name> <directory-or-git-url> [ref]' },
+    handler: invocation => runCommand(invocation).pipe(Effect.catch(error => Effect.succeed<CommandResult>({ kind: 'error', text: error.message }))),
   }),
 )
 
-/** The attached references' paths and origins in every model request of the Session; the assembly is synchronous. */
+/** The attached references' paths and origins in every model request of the Session. */
 const attachedContext = Layer.effectDiscard(
   Effect.gen(function* () {
-    const systemPrompt = yield* hostService('systemPrompt')
     const references = yield* References
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        systemPrompt.context({
-          name: 'dshfiles-references:attached',
-          order: 200,
-          interpolate: false,
-          text: assembly => (assembly.agent === undefined ? '' : References.promptText(references.attachedNow(String(assembly.agent.id)))),
-        }),
-      ),
-      dispose => Effect.sync(dispose),
-    )
+    yield* HostPrompt.context({
+      name: 'dshfiles-references:attached',
+      order: 200,
+      interpolate: false,
+      text: assembly => Effect.sync(() => (assembly.agent === undefined ? '' : References.promptText(references.attachedNow(String(assembly.agent.id))))),
+    })
   }),
 )
 

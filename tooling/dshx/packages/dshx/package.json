@@ -157,6 +157,14 @@
     "./effect/keyed-mutex": {
       "types": "./dist/effect/keyed-mutex.d.ts",
       "default": "./dist/effect/keyed-mutex.js"
+    },
+    "./effect/host-commands": {
+      "types": "./dist/effect/host-commands.d.ts",
+      "default": "./dist/effect/host-commands.js"
+    },
+    "./effect/host-prompt": {
+      "types": "./dist/effect/host-prompt.d.ts",
+      "default": "./dist/effect/host-prompt.js"
     }
   },
   "scripts": {

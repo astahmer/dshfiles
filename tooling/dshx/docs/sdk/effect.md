@@ -126,9 +126,41 @@ Cordis `waterfall` and `bail` events return a value to the emitter synchronously
 - `answer` answers a bail event such as `request-messages/status`: the handler's value goes back to the emitter and
   `undefined` lets the next listener answer. A failing handler is logged and answers `undefined`.
 
+- `interceptAsync` is `intercept` for a waterfall whose result is a Promise (`agent/pre-step`,
+  `system-prompt/assemble`): the handler may suspend, `next` awaits the rest of the chain, and the handler's value
+  resolves the emitter's Promise.
+
 ```ts
-yield * HostEvents.intercept('llm/stream', ({ args: [options], next }) => Effect.andThen(Queue.offer(requests, options), next))
-yield * HostEvents.answer('request-messages/status', () => Effect.succeed(status))
+const hooks = Layer.effectDiscard(
+  Effect.gen(function* () {
+    yield* HostEvents.intercept('llm/stream', ({ args: [options], next }) => Effect.andThen(Queue.offer(requests, options), next))
+    yield* HostEvents.interceptAsync('agent/pre-step', ({ args: [payload], next }) => (isSettled(payload) ? Effect.succeed({ kind: 'reject' }) : next))
+    yield* HostEvents.answer('request-messages/status', () => Effect.succeed(status))
+  }),
+)
+```
+
+### `HostCommands.register(command)`, `HostPrompt.section(section)` and `HostPrompt.context(context)`
+
+From `@dshfiles/dshx/effect/host-commands` and `@dshfiles/dshx/effect/host-prompt`; the plugin declares
+`@deepseek-ai/dsh-commands` / `@deepseek-ai/dsh-system-prompt` and injects `commands` / `systemPrompt`. Each registers
+for the current Scope, so put it in a `Layer.effectDiscard` and the plugin's unload removes it.
+
+- `HostCommands.register` takes the native `CommandDefinition` with an Effect handler
+  `(invocation) => Effect<CommandResult, never, R>` that runs in the plugin's services. The invocation's abort
+  interrupts it; a defect is logged under `dshx:commands` and answered as `/<name> failed. See Host diagnostics.`.
+  Answer user errors as `{ kind: 'error', text }`.
+- `HostPrompt.section` / `HostPrompt.context` take the native `PromptSection` / `PromptContext`; `text` is a string or
+  `(assembly) => Effect<string, never, R>`. Assembly is synchronous, so that Effect must not suspend; a failing text
+  is logged under `dshx:prompt` and contributes nothing.
+
+```ts
+const referenceCommand = Layer.effectDiscard(
+  HostCommands.register({ name: 'reference', description: 'Attach references to this thread.', handler: invocation => runCommand(invocation) }),
+)
+const attachedContext = Layer.effectDiscard(
+  HostPrompt.context({ name: 'dshfiles-references:attached', order: 200, interpolate: false, text: assembly => attachedText(assembly) }),
+)
 ```
 
 ### `DshxPlugin.callback(fn)`
@@ -141,9 +173,10 @@ polyfill, a native hook). Capture it once in a layer or `main`, not per call.
 `signal.reason`, as an aborted Promise API does. context-compaction passes the engine's summary signal this way, so
 the model lookup stops with the compaction.
 
-`callback`, `HostEvents.on`, `HostEvents.intercept`, `HostEvents.answer` and `Tool.register` capture their context without the current span, so each later run
-starts its own trace instead of hanging under `plugin activate`. A plugin edge that captures context itself (an
-SDK adapter calling `Effect.runPromiseWith`) uses `DshxPlugin.detachedContext()` for the same reason.
+`callback`, every `HostEvents` listener, `HostCommands.register`, `HostPrompt` texts and `Tool.register` capture their
+context without the current span, so each later run starts its own trace instead of hanging under `plugin activate`. A
+plugin edge that captures context itself (an SDK adapter calling `Effect.runPromiseWith`) uses
+`DshxPlugin.detachedContext()` for the same reason.
 
 ### `DshxPlugin.worker(effect)`
 
