@@ -10,16 +10,17 @@ import '@deepseek-ai/dsh-agent'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import '@deepseek-ai/dsh-working-directory'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
-import type { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { stat } from 'node:fs/promises'
 import { Worker } from 'node:worker_threads'
-import { FffSearch } from './fff-search.js'
+import { FffSearch, FffSearchError } from './fff-search.js'
 
 /** Matches the stock grep's cooperative timeout; a request still pending then is failed, not left hanging. */
 const REQUEST_TIMEOUT_MS = 30_000
 
-type WorkerRequest = z.input<typeof FffSearch.workerRequest>
-type WorkerReply = z.infer<typeof FffSearch.workerReply>
+type WorkerRequest = typeof FffSearch.workerRequest.Encoded
+type WorkerReply = typeof FffSearch.workerReply.Type
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
 
 export default defineHost({
@@ -41,15 +42,16 @@ export default defineHost({
     const ensureWorker = (): Worker => {
       if (worker !== undefined) return worker
       const spawned = new Worker(new URL('./fff-worker.js', import.meta.url), { workerData: { stateRoot: dshHomePath('plugins', 'fff-search') } })
-      // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerReply.safeParse` runs on the next line.
+      // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerReply` decoding runs on the next line.
       spawned.on('message', (raw: unknown) => {
-        const reply = FffSearch.workerReply.safeParse(raw)
-        if (!reply.success) return
-        const request = pending.get(reply.data.id)
+        const decoded = Schema.decodeUnknownOption(FffSearch.workerReply)(raw)
+        if (Option.isNone(decoded)) return
+        const reply = decoded.value
+        const request = pending.get(reply.id)
         if (request === undefined) return
-        pending.delete(reply.data.id)
+        pending.delete(reply.id)
         clearTimeout(request.timer)
-        request.settle(reply.data)
+        request.settle(reply)
       })
       spawned.on('error', error => ctx.logger.warn(`fff-search: worker failed: ${error.message}`))
       // A crashed worker takes its indexes with it; the next search spawns a fresh one.
@@ -67,7 +69,7 @@ export default defineHost({
         const id = nextId++
         const timer = setTimeout(() => {
           pending.delete(id)
-          reject(new Error(`fff-search ${request.kind} did not answer within ${REQUEST_TIMEOUT_MS / 1000} s`))
+          reject(new FffSearchError({ message: `fff-search ${request.kind} did not answer within ${REQUEST_TIMEOUT_MS / 1000} s` }))
         }, REQUEST_TIMEOUT_MS)
         pending.set(id, { settle, reject, timer })
         ensureWorker().postMessage({ ...request, id })
@@ -124,9 +126,18 @@ export default defineHost({
         if (exec.agent === undefined) throw new Error('fff-search grep runs only on behalf of an Agent')
         const workingDirectory = await ctx.workingDirectory.ensure(exec.agent, exec.signal)
         const scope = await resolveScope({ workingDirectory, path: args.path })
-        const reply = await ask({ kind: 'grep', scope, pattern: args.pattern, include: args.include, workingDirectory })
-        if (!reply.ok) throw new Error(reply.error)
-        return FffSearch.grepOutcome.parse(reply.value)
+        const reply = await ask(
+          args.include === undefined
+            ? { kind: 'grep', scope, pattern: args.pattern, workingDirectory }
+            : { kind: 'grep', scope, pattern: args.pattern, include: args.include, workingDirectory },
+        )
+        if (!reply.ok) throw new FffSearchError({ message: reply.error })
+        const outcome = Schema.decodeUnknownSync(FffSearch.grepOutcome)(reply.value)
+        return {
+          matches: outcome.matches.map(match => ({ path: match.path, lineNumber: match.lineNumber, line: match.line })),
+          total: outcome.total,
+          totalIsLowerBound: outcome.totalIsLowerBound,
+        }
       },
     })
 
@@ -154,8 +165,9 @@ export default defineHost({
         const workingDirectory = await ctx.workingDirectory.ensure(exec.agent, exec.signal)
         const scope = await resolveScope({ workingDirectory, path: args.path })
         const reply = await ask({ kind: 'glob', scope, pattern: args.pattern, workingDirectory })
-        if (!reply.ok) throw new Error(reply.error)
-        return FffSearch.globOutcome.parse(reply.value)
+        if (!reply.ok) throw new FffSearchError({ message: reply.error })
+        const outcome = Schema.decodeUnknownSync(FffSearch.globOutcome)(reply.value)
+        return { paths: [...outcome.paths], total: outcome.total }
       },
     })
 

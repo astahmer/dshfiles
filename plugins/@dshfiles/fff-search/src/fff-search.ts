@@ -1,14 +1,19 @@
 import type { FileFinder, GrepCursor } from '@ff-labs/fff-node'
 import { homedir } from 'node:os'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { z } from 'zod'
+import * as Schema from 'effect/Schema'
 
 type GrepMatch = { path: string; lineNumber: number; line: string }
-type GrepOutcome = z.infer<typeof FffSearch.grepOutcome>
-type GlobOutcome = z.infer<typeof FffSearch.globOutcome>
+type GrepOutcome = typeof FffSearch.grepOutcome.Type
+type GlobOutcome = typeof FffSearch.globOutcome.Type
 
 /** Where a search runs: the index root and, inside it, an optional directory or file the caller narrowed to. */
-type SearchScope = z.infer<typeof FffSearch.searchScope>
+type SearchScope = typeof FffSearch.searchScope.Type
+
+/** A search the caller can fix: missing path, a root that swallows the workspace, or a pattern fff cannot compile. */
+export class FffSearchError extends Schema.TaggedError<FffSearchError>()('FffSearchError', {
+  message: Schema.String,
+}) {}
 
 /**
  * The model-facing `grep`/`glob` contract mapped onto fff queries. fff reads query tokens shaped like paths or globs
@@ -23,29 +28,29 @@ export class FffSearch {
   /** Pages counted past the shown matches, so a broad pattern reports a useful total without scanning forever. */
   static readonly maxCountedPages = 8
 
-  static readonly searchScope = z.object({ root: z.string(), directory: z.string().optional(), file: z.string().optional() })
-  static readonly grepOutcome = z.object({
-    matches: z.array(z.object({ path: z.string(), lineNumber: z.number(), line: z.string() })),
-    total: z.number(),
-    totalIsLowerBound: z.boolean(),
+  static readonly searchScope = Schema.Struct({ root: Schema.String, directory: Schema.optionalKey(Schema.String), file: Schema.optionalKey(Schema.String) })
+  static readonly grepOutcome = Schema.Struct({
+    matches: Schema.Array(Schema.Struct({ path: Schema.String, lineNumber: Schema.Number, line: Schema.String })),
+    total: Schema.Number,
+    totalIsLowerBound: Schema.Boolean,
   })
-  static readonly globOutcome = z.object({ paths: z.array(z.string()), total: z.number() })
+  static readonly globOutcome = Schema.Struct({ paths: Schema.Array(Schema.String), total: Schema.Number })
   /** Host → worker. `warm` builds a root's index ahead of the first search. */
-  static readonly workerRequest = z.discriminatedUnion('kind', [
-    z.object({ id: z.number(), kind: z.literal('warm'), root: z.string() }),
-    z.object({
-      id: z.number(),
-      kind: z.literal('grep'),
+  static readonly workerRequest = Schema.Union([
+    Schema.Struct({ id: Schema.Number, kind: Schema.Literal('warm'), root: Schema.String }),
+    Schema.Struct({
+      id: Schema.Number,
+      kind: Schema.Literal('grep'),
       scope: FffSearch.searchScope,
-      pattern: z.string(),
-      include: z.string().optional(),
-      workingDirectory: z.string(),
+      pattern: Schema.String,
+      include: Schema.optionalKey(Schema.String),
+      workingDirectory: Schema.String,
     }),
-    z.object({ id: z.number(), kind: z.literal('glob'), scope: FffSearch.searchScope, pattern: z.string(), workingDirectory: z.string() }),
+    Schema.Struct({ id: Schema.Number, kind: Schema.Literal('glob'), scope: FffSearch.searchScope, pattern: Schema.String, workingDirectory: Schema.String }),
   ])
-  static readonly workerReply = z.union([
-    z.object({ id: z.number(), ok: z.literal(true), value: z.unknown() }),
-    z.object({ id: z.number(), ok: z.literal(false), error: z.string() }),
+  static readonly workerReply = Schema.Union([
+    Schema.Struct({ id: Schema.Number, ok: Schema.Literal(true), value: Schema.Unknown }),
+    Schema.Struct({ id: Schema.Number, ok: Schema.Literal(false), error: Schema.String }),
   ])
 
   /** Resolve the tool's optional `path` to the absolute target the Host stats, expanding `~` as the model means it. */
@@ -61,31 +66,33 @@ export class FffSearch {
    * contains the Agent's workspace is refused: one search at `~/dev` would index every checkout under it.
    */
   static scope(options: { workingDirectory: string; path: string | undefined; target: string; stats: { isFile: boolean } | undefined }): SearchScope {
-    if (options.path === undefined) return { root: options.workingDirectory, directory: undefined, file: undefined }
-    if (options.stats === undefined) throw new Error(`path does not exist: ${options.path}`)
+    if (options.path === undefined) return { root: options.workingDirectory }
+    if (options.stats === undefined) throw new FffSearchError({ message: `path does not exist: ${options.path}` })
     const inside = relative(options.workingDirectory, options.target)
     const outsideRoot = inside.startsWith('..') || isAbsolute(inside)
     const parent = resolve(options.target, '..')
     const scope: SearchScope = outsideRoot
       ? options.stats.isFile
-        ? { root: parent, directory: undefined, file: relative(parent, options.target).split(sep).join('/') }
-        : { root: options.target, directory: undefined, file: undefined }
+        ? { root: parent, file: relative(parent, options.target).split(sep).join('/') }
+        : { root: options.target }
       : FffSearch.#inside({ workingDirectory: options.workingDirectory, inside: inside.split(sep).join('/'), isFile: options.stats.isFile })
     FffSearch.#refuseWorkspaceAncestor({ root: scope.root, workingDirectory: options.workingDirectory, path: options.path })
     return scope
   }
 
   static #inside(options: { workingDirectory: string; inside: string; isFile: boolean }): SearchScope {
-    if (options.inside === '') return { root: options.workingDirectory, directory: undefined, file: undefined }
-    if (!options.isFile) return { root: options.workingDirectory, directory: options.inside, file: undefined }
+    if (options.inside === '') return { root: options.workingDirectory }
+    if (!options.isFile) return { root: options.workingDirectory, directory: options.inside }
     const slash = options.inside.lastIndexOf('/')
-    return { root: options.workingDirectory, directory: slash === -1 ? undefined : options.inside.slice(0, slash), file: options.inside }
+    return slash === -1 ? { root: options.workingDirectory, file: options.inside } : { root: options.workingDirectory, directory: options.inside.slice(0, slash), file: options.inside }
   }
 
   static #refuseWorkspaceAncestor(options: { root: string; workingDirectory: string; path: string }): void {
     const inside = relative(options.root, options.workingDirectory)
     if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return
-    throw new Error(`path ${options.path} is outside the workspace and contains it; search from ${options.workingDirectory} or a path inside it`)
+    throw new FffSearchError({
+      message: `path ${options.path} is outside the workspace and contains it; search from ${options.workingDirectory} or a path inside it`,
+    })
   }
 
   static grep(options: { finder: FileFinder; scope: SearchScope; pattern: string; include: string | undefined; workingDirectory: string }): GrepOutcome {
@@ -103,8 +110,10 @@ export class FffSearch {
       pages += 1
       // fff defaults to smart case; ripgrep, whose contract this tool keeps, is case-sensitive.
       const page = options.finder.grep(query, { mode, smartCase: false, pageSize: FffSearch.maxGrepMatches, cursor })
-      if (!page.ok) throw new Error(`grep failed: ${page.error}`)
-      if (page.value.regexFallbackError !== undefined) throw new Error(`grep pattern is not a valid regular expression: ${page.value.regexFallbackError}`)
+      if (!page.ok) throw new FffSearchError({ message: `grep failed: ${page.error}` })
+      if (page.value.regexFallbackError !== undefined) {
+        throw new FffSearchError({ message: `grep pattern is not a valid regular expression: ${page.value.regexFallbackError}` })
+      }
       for (const item of page.value.items) {
         if (options.scope.file !== undefined && item.relativePath !== options.scope.file) continue
         total += 1
@@ -124,7 +133,7 @@ export class FffSearch {
     const anchored =
       options.scope.directory === undefined ? options.pattern : `${options.scope.directory}/${options.pattern.includes('/') ? '' : '**/'}${options.pattern}`
     const result = options.finder.glob(anchored, { pageSize: FffSearch.maxGlobPaths })
-    if (!result.ok) throw new Error(`glob failed: ${result.error}`)
+    if (!result.ok) throw new FffSearchError({ message: `glob failed: ${result.error}` })
     const items = options.scope.file === undefined ? result.value.items : result.value.items.filter(item => item.relativePath === options.scope.file)
     return {
       paths: items.map(item => FffSearch.#fromRoot(options.scope.root, item.relativePath, options.workingDirectory)),
