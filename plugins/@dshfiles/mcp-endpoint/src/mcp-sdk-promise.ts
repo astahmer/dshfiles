@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { Context, Effect, Layer, Schema, Tracer } from 'effect'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { describeTool, failureResult, mcpTools, type McpProjects, type McpSessions } from './mcp-tools.js'
 
 /** The MCP SDK failed to connect or serve one request after it was admitted. */
@@ -33,8 +34,7 @@ export class McpServers extends Context.Service<
   static readonly layer = Layer.effect(
     McpServers,
     Effect.gen(function* () {
-      // Each tool call is its own unit of work: it must not inherit the plugin activation span as its parent.
-      const runTool = Effect.runPromiseWith(Context.omit(Tracer.ParentSpan)(yield* Effect.context<McpSessions | McpProjects>()))
+      const runTool = Effect.runPromiseWith(yield* DshxPlugin.detachedContext<McpSessions | McpProjects>())
       const createServer = (version: string) => {
         const server = new Server({ name: 'dsh', version }, { capabilities: { tools: {} } })
         server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpTools.map(describeTool) }))
