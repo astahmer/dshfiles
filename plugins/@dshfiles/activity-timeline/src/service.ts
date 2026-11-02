@@ -3,6 +3,7 @@ import type { Stats } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { Schema } from 'effect'
 import {
   activityIngestSchema,
   activityStateSchema,
@@ -67,7 +68,7 @@ const parseCursor = (cursor: string): { readonly at: number; readonly id: string
 }
 
 const normalize = (input: ActivityIngest): ActivityEvent => {
-  const parsed = activityIngestSchema.parse(input)
+  const parsed = Schema.decodeUnknownSync(activityIngestSchema, { onExcessProperty: 'error' })(input)
   return {
     id: parsed.id,
     at: parsed.at,
@@ -305,7 +306,7 @@ export class ActivityTimelineService {
     }
     let state: ActivityState
     try {
-      state = activityStateSchema.parse(JSON.parse(text))
+      state = Schema.decodeUnknownSync(activityStateSchema, { onExcessProperty: 'error' })(JSON.parse(text))
     } catch {
       throw new ActivityError('state-invalid', 'Activity state is invalid; it was left untouched.')
     }
@@ -314,7 +315,7 @@ export class ActivityTimelineService {
   }
 
   async #writeState(state: ActivityState): Promise<void> {
-    const parsed = activityStateSchema.parse(state)
+    const parsed = Schema.decodeUnknownSync(activityStateSchema, { onExcessProperty: 'error' })(state)
     const directory = dirname(this.#statePath)
     await mkdir(directory, { recursive: true, mode: 0o700 })
     const temporaryPath = `${this.#statePath}.tmp-${randomUUID()}`

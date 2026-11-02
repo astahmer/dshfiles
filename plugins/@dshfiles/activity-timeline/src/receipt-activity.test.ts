@@ -1,3 +1,4 @@
+import { Option, Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { verificationReceiptActivity } from './adapters.js'
 import { createActivityTimelineService } from './service.js'
@@ -27,10 +28,13 @@ const value = {
 
 const temporaryRoots: string[] = []
 
+const accepts = (candidate: unknown): boolean =>
+  Option.isSome(Schema.decodeUnknownOption(verificationReceiptEventSchema, { onExcessProperty: 'error' })(candidate))
+
 describe('verification receipt activity contract', () => {
   it('accepts only the current version and exact bounded fields', () => {
     const event = { kind: 'verification-receipt', version: 1, value }
-    expect(verificationReceiptEventSchema.safeParse(event).success).toBe(true)
+    expect(accepts(event)).toBe(true)
     const projected = verificationReceiptActivity(value)
     if (projected.metadata === undefined) throw new Error('verification projection must include bounded metadata')
     expect(Object.keys(projected.metadata).sort()).toEqual([
@@ -51,19 +55,17 @@ describe('verification receipt activity contract', () => {
       'status',
       'verificationTurn',
     ])
-    expect(verificationReceiptEventSchema.safeParse({ ...event, version: 2 }).success).toBe(false)
-    expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, argv: ['/secret'] } }).success).toBe(false)
+    expect(accepts({ ...event, version: 2 })).toBe(false)
+    expect(accepts({ ...event, value: { ...value, argv: ['/secret'] } })).toBe(false)
     expect(
-      verificationReceiptEventSchema.safeParse({
+      accepts({
         ...event,
         value: { ...value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: 'm1-perso', workspace: '/peer/check' } },
-      }).success,
+      }),
     ).toBe(true)
-    expect(
-      verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: 'm1-perso' } } }).success,
-    ).toBe(false)
-    expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\nlabel' } }).success).toBe(false)
-    expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\u0085label' } }).success).toBe(false)
+    expect(accepts({ ...event, value: { ...value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: 'm1-perso' } } })).toBe(false)
+    expect(accepts({ ...event, value: { ...value, label: 'bad\nlabel' } })).toBe(false)
+    expect(accepts({ ...event, value: { ...value, label: 'bad\u0085label' } })).toBe(false)
   })
 
   it('maps failure and cancellation truthfully and deduplicates receipt replay', async () => {

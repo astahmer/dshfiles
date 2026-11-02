@@ -1,8 +1,7 @@
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineHost } from '@dshfiles/dshx/host'
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 import {
   backlogActivity,
   communicationActivity,
@@ -66,29 +65,30 @@ const { hostApi, ...effectPlugin } = DshxEffect.plugin({
         return undefined
       })
       context.on('dshfiles/activity/source-ready', payload => {
-        if (!projectChecksReadySchema.safeParse(payload).success) return undefined
+        if (Option.isNone(Schema.decodeUnknownOption(projectChecksReadySchema, { onExcessProperty: 'error' })(payload))) return undefined
         context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
         return undefined
       })
       context.on('dshfiles/activity/event', payload => {
-        const parsed = activityEventPayloadSchema.safeParse(payload)
-        if (!parsed.success) return undefined
-        if (parsed.data.kind === 'verification-receipt') {
-          const receipt = parsed.data.value
+        const parsed = Schema.decodeUnknownOption(activityEventPayloadSchema, { onExcessProperty: 'error' })(payload)
+        if (Option.isNone(parsed)) return undefined
+        const event = parsed.value
+        if (event.kind === 'verification-receipt') {
+          const receipt = event.value
           recordActivity(() => verificationReceiptActivity(receipt))
           return undefined
         }
-        if (parsed.data.kind === 'communication-activity')
-          recordActivity(() => communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
-        if (parsed.data.kind === 'communication-message') recordActivity(() => communicationMessageSafe(parsed.data.value))
-        if (parsed.data.kind === 'integration') recordActivity(() => integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
-        if (parsed.data.kind === 'backlog') {
-          const backlogEntry = parsed.data.value
+        if (event.kind === 'communication-activity')
+          recordActivity(() => communicationActivity(event.value as Parameters<typeof communicationActivity>[0]))
+        if (event.kind === 'communication-message') recordActivity(() => communicationMessageSafe(event.value))
+        if (event.kind === 'integration') recordActivity(() => integrationActivity(event.value as Parameters<typeof integrationActivity>[0]))
+        if (event.kind === 'backlog') {
+          const backlogEntry = event.value
           recordActivity(() => backlogActivity(backlogEntry))
           return undefined
         }
-        if (parsed.data.kind === 'workspace') {
-          const workspaceEntry = parsed.data.value
+        if (event.kind === 'workspace') {
+          const workspaceEntry = event.value
           recordActivity(() => workspaceActivity(workspaceEntry))
         }
         return undefined
@@ -107,49 +107,46 @@ const api = hostApi(activityTimelineApi, {
 
 const BACKFILL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
-const workspaceActivityValueSchema = z.object({
-  id: z.string().min(1).max(256),
-  at: z.number().int().nonnegative(),
-  type: z.string().min(1).max(80),
+const workspaceActivityValueSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  type: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   level: activityLevelSchema,
-  summary: z.string().min(1).max(500),
-  detail: z.string().max(2000).nullable(),
-  sessionId: z.string().max(256).nullable(),
-  correlationId: z.string().max(128).nullable(),
-  workspaceId: z.string().max(256).nullable(),
-  workspaceName: z.string().max(200).nullable(),
+  summary: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)),
+  detail: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2000))),
+  sessionId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  correlationId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  workspaceId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  workspaceName: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
 })
 
-const activityEventPayloadSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.enum(['communication-activity', 'communication-message', 'integration']),
-      value: z.unknown(),
-    })
-    .strict(),
-  z.object({ kind: z.literal('workspace'), value: workspaceActivityValueSchema }).strict(),
-  z.object({ kind: z.literal('backlog'), value: backlogActivitySchema }).strict(),
+const activityEventPayloadSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literals(['communication-activity', 'communication-message', 'integration']),
+    value: Schema.Unknown,
+  }),
+  Schema.Struct({ kind: Schema.Literal('workspace'), value: workspaceActivityValueSchema }),
+  Schema.Struct({ kind: Schema.Literal('backlog'), value: backlogActivitySchema }),
   verificationReceiptEventSchema,
 ])
 
-const projectChecksReadySchema = z.object({ source: z.literal('project-checks-receipts'), version: z.literal(1) }).strict()
+const projectChecksReadySchema = Schema.Struct({ source: Schema.Literal('project-checks-receipts'), version: Schema.Literal(1) })
 
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 2000)
 
 const communicationMessageSafe = (value: unknown): ActivityIngest => {
-  const parsed = z
-    .object({
-      at: z.number().int().nonnegative(),
-      messageId: z.string().min(1).max(256),
-      senderId: z.string().min(1).max(256),
-      recipientCount: z.number().int().nonnegative(),
-      intent: z.enum(['notice', 'request']),
-      topic: z.string().max(128).nullable(),
-      correlationId: z.string().max(128).optional(),
-      sessionId: z.string().max(256).nullable().optional(),
-    })
-    .strict()
-    .parse(value)
+  const parsed = Schema.decodeUnknownSync(
+    Schema.Struct({
+      at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+      messageId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+      senderId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+      recipientCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+      intent: Schema.Literals(['notice', 'request']),
+      topic: Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+      correlationId: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+      sessionId: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(256)))),
+    }),
+  )(value)
   return communicationMessage(parsed)
 }
 
