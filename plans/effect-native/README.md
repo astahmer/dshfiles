@@ -5,7 +5,7 @@ schemas; this one migrates the Host runtime itself. Evidence for every claim bel
 (seven independent reviews with file:line citations, plus the [rubric](reviews/rubric.md) they used and an
 [Effect 4.1 cookbook](reviews/cookbook.md) drawn from `~/.references/{effect-4.1.0,opencode,t3code}`).
 
-**Resume here:** Claude credits exhausted 2026-11-02 23:10; work resumed on `opencode-go`/`deepseek-v4.1-flash` and all lanes were stopped. Line tip: `kuvuqnsv` holds Phases 0–3, waves A, B, C1–C3, C4 part, D1, D2, E 5a–5d, F steps 1–3a + 6, G1, G2, fix1, dshx2. Paused with WIP in `eff-w-*`: E multi-host (5e–5f), F2 ai-accounts (usage history, pricing, routes, steps 7–9), C4 backlog/marketplace/preview. Remaining: E + F2 + C4 finish, wave 5 schema cleanup, Phase 6 gates (scratch-DSH journeys, one-span-per-call traces, perf table).
+**Resume here:** Line tip holds every wave except the Phase 5 Schema cleanup (lane `eff-w-schema` running). `pnpm run lint` passes; `pnpm run check:green` fails only on F11/F12 (parallel-load flakes: boot-check parallelism and the jj background-work suite). Every package passes alone. Remaining: Phase 5, then the Phase 6 gates that need a live run (scratch-DSH journeys, one-span-per-call traces, perf table).
 
 ## Progress
 
@@ -276,6 +276,8 @@ edge, and restore exact-message assertions.
 | F9  | session-search index still on `DatabaseSync`; moving it onto sqlite-store needs a copy-based proof on the 3.1 GB live index                                                                                                                                                                                           | follow-up lane |
 | F10 | memory host-loop-freezes bench has no before/after numbers (the before run measured the stock engine indexing a 2 GB backlog)                                                                                                                                                                                         | Phase 6 perf   |
 | F11 | Full-repo `turbo run test` at `tqlxnmvy` (1099+ plugin tests): only `jj-integration/src/host-background-work.integration.test.ts` failed, and it passes 6/6 alone (28 s) — real-timer assertions flake under parallel load, not a regression. Re-run it alone before blaming a change                                 | Phase 6        |
+| F12 | `check:plugin-boot` runs many plugin suites at once; policies, apply-patch, session-search, jujutsu and jj-integration failed there yet pass 6/6, 20/20, 24/24, 309/309 and 391/391 alone. Lower its concurrency instead of chasing them                                                                              | Phase 6        |
+| F12 | `check:plugin-boot` runs many plugin suites at once; policies, apply-patch, session-search, jujutsu and jj-integration failed there yet pass 6/6, 20/20, 24/24, 309/309, 391/391 alone. Lower its concurrency (or raise its timeouts) instead of chasing them                                                         | Phase 6        |
 
 ## What this does not do
 
