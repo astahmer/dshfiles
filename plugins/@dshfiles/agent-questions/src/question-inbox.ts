@@ -1,5 +1,5 @@
 import type { PendingUserQuestion } from '@deepseek-ai/dsh-user-questions'
-import type { ParentQuestionInboxEntry } from './service.js'
+import type { ParentQuestionInboxEntry } from './parent-questions.js'
 import type { QuestionWaitRecord } from './question-wait-projection.js'
 
 const nativeRecommendedLabelPattern = /\(Recommended\)\s*$/i

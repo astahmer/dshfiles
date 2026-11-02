@@ -1,5 +1,5 @@
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
-import type { ParentQuestionInboxEntry } from './service.js'
+import type { ParentQuestionInboxEntry } from './parent-questions.js'
 import type { QuestionWaitRecord } from './question-wait-projection.js'
 import { projectNativeQuestion, projectParentQuestion } from './question-inbox.js'
 import { describe, expect, it } from 'vitest'
