@@ -26,6 +26,26 @@ const fakeRun = (): DirectRun => async (_ctx, cwd, args) => {
 }
 
 describe('composer context host', () => {
+  it('keeps a shared read alive when the caller that started it aborts', async () => {
+    let finishRead = () => {}
+    const reads = ComposerContextHost.reads(
+      (_ctx, _cwd, _args, signal) =>
+        new Promise((resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('read aborted')))
+          finishRead = () => resolve({ stdout: 'shared\n', truncated: false })
+        }),
+    )
+    const firstCaller = new AbortController()
+    const secondCaller = new AbortController()
+    const ctx = Object.create(null)
+    const firstRead = reads(ctx, '/repo', ['log', '-r', '@'], firstCaller.signal, { outputLimit: 1_000 })
+    const secondRead = reads(ctx, '/repo', ['log', '-r', '@'], secondCaller.signal, { outputLimit: 1_000 })
+    firstCaller.abort()
+    finishRead()
+    assert.deepEqual(await secondRead, { stdout: 'shared\n', truncated: false })
+    await firstRead.catch(() => undefined)
+  })
+
   it('decodes remote bookmarks from their plain template lines', async () => {
     const result = await ComposerContextHost.read(
       { input: { cwd: process.cwd(), base: { kind: 'bookmark', name: 'main' } }, ctx: {} as never, signal: undefined },

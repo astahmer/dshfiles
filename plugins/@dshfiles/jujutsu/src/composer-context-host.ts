@@ -114,14 +114,15 @@ const operationHeads = (root: string): string | null => {
 const composerReads = (directRun: RunJj): RunJj => {
   const readResults = new Map<string, { readonly value: Awaited<ReturnType<RunJj>>; readonly at: number }>()
   const readsInFlight = new Map<string, Promise<Awaited<ReturnType<RunJj>>>>()
-  return (ctx, cwd, args, signal, options) => {
+  return (ctx, cwd, args, _signal, options) => {
     const heads = args[0] === '--ignore-working-copy' ? operationHeads(cwd) : null
     const key = `${cwd}\u0000${heads ?? ''}\u0000${args.join('\u0000')}\u0000${String(options.outputLimit)}`
     const cached = readResults.get(key)
     if (cached !== undefined && (heads !== null || Date.now() - cached.at < COMPOSER_READ_TTL_MS)) return Promise.resolve(cached.value)
     const inFlight = readsInFlight.get(key)
     if (inFlight !== undefined) return inFlight
-    const read = directRun(ctx, cwd, args, signal, options).then(value => {
+    // Shared by every caller of the same read, so no single caller's signal may abort it.
+    const read = directRun(ctx, cwd, args, undefined, options).then(value => {
       readResults.set(key, { value, at: Date.now() })
       if (readResults.size > 256) readResults.delete(readResults.keys().next().value ?? key)
       return value
