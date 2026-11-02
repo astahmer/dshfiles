@@ -1,7 +1,6 @@
 import { createAdaptorServer } from '@hono/node-server'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { withUnknownProperties } from '../schema.js'
 import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
@@ -32,6 +31,9 @@ const TITLE_INSTRUCTION = 'Create a concise title for an AI coding-assistant ses
 const RUNTIME_CONTEXT_PREFIXES = ['Current runtime context.', 'Time sampled while preparing turn ']
 
 const isRuntimeContextMessage = (text: string): boolean => RUNTIME_CONTEXT_PREFIXES.some(prefix => text.startsWith(prefix))
+
+const withUnknownProperties = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
 
 const streamDelaySchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(250))
 
