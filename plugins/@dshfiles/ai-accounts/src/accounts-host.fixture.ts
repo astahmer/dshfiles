@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, realpathSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -27,7 +27,8 @@ import * as Schema from 'effect/Schema'
  *
  * Account paths are fixed when the store module loads, so this module claims `DSH_HOME` before importing the Host.
  */
-const home = mkdtempSync(join(tmpdir(), 'ai-accounts-host-'))
+// Real path: Codex login refuses a home with a symlinked ancestor such as macOS `/var`.
+const home = realpathSync(mkdtempSync(join(tmpdir(), 'ai-accounts-host-')))
 process.env.DSH_HOME = home
 
 const MODEL = 'gpt-6-luna'
@@ -46,6 +47,17 @@ interface FixtureAccount {
   readonly id: string
   readonly enabled?: boolean
 }
+
+/** A generated private Codex account whose home this Host owns, as connection setup creates one. */
+const managedCodexHome = (instanceId: string): string => join(home, 'plugins', 'ai-accounts', 'homes', instanceId)
+
+const codexDraft = (instanceId: string) => ({
+  ...draft({ id: instanceId }, ''),
+  kind: 'codex',
+  apiKeyEnv: '',
+  homePath: managedCodexHome(instanceId),
+  shadowHomePath: managedCodexHome(instanceId),
+})
 
 interface SelectionRequest {
   readonly sessionId: string
@@ -138,6 +150,8 @@ interface AccountsHost {
 
 interface StartInput {
   readonly accounts: readonly FixtureAccount[]
+  /** Generated private Codex accounts (`codex_work_<32 hex>`) saved after the keyed ones. */
+  readonly codexAccounts?: readonly string[]
   readonly distribution: 'sticky' | 'priority' | 'round-robin' | 'balanced'
   /** One reply per chat request, in order; requests past the end answer with text. */
   readonly replies?: readonly ChatReply[]
@@ -196,7 +210,7 @@ const start = async (input: StartInput): Promise<AccountsHost> => {
       distribution: input.distribution,
       cooldownMs: 300_000,
       shadowRoot: '~/.codex-dshx-test',
-      accounts: input.accounts.map(account => draft(account, baseUrl)),
+      accounts: [...input.accounts.map(account => draft(account, baseUrl)), ...(input.codexAccounts ?? []).map(codexDraft)],
     }),
   )
 
@@ -283,6 +297,7 @@ export class AccountsHostFixture {
   static readonly model = MODEL
   static readonly start = start
   static readonly callApi = callApi
+  static readonly managedCodexHome = managedCodexHome
   static readonly eventTypes = (agent: Agent): readonly string[] => agent.session.snapshotEvents().map(event => event.type)
   static readonly eventsOfType = (agent: Agent, type: SessionEvent['type']): readonly SessionEvent[] =>
     agent.session.snapshotEvents().filter(event => event.type === type)
