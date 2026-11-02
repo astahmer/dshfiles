@@ -29,7 +29,7 @@ import { Effect } from 'effect'
 import * as Schema from 'effect/Schema'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, SearchMatch, SessionHeaderRow } from './protocol.js'
-import { SearchWorkerClient } from './worker-client.js'
+import { SearchWorkerPort } from './worker-port-promise.js'
 
 /** Bounds how stale a listing may get when another process writes the same Session logs. */
 const LISTING_TTL_MS = 60_000
@@ -38,7 +38,7 @@ const LISTING_TTL_MS = 60_000
 const positiveCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
 const nonNegativeCount = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 const engineConfigSchema = Schema.Struct({
-  client: Schema.instanceOf(SearchWorkerClient),
+  client: Schema.instanceOf(SearchWorkerPort),
   defaultLimit: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(20))),
   maxLimit: positiveCount.pipe(Schema.withDecodingDefault(Effect.succeed(100))),
   readWindowMax: nonNegativeCount.pipe(Schema.withDecodingDefault(Effect.succeed(50))),
@@ -81,7 +81,7 @@ const unsupportedFilters = (label: string): never => {
 }
 
 export class SessionSearchEngine extends SessionQueryEngine {
-  readonly _client: SearchWorkerClient
+  readonly _client: SearchWorkerPort
   readonly _defaultLimit: number
   readonly _maxLimit: number
 

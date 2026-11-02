@@ -1,11 +1,8 @@
-import * as Schema from 'effect/Schema'
+import { Schema } from 'effect'
+import { Rpc, RpcGroup } from 'effect/rpc'
 
-/** A JSON value as it crosses the worker boundary. */
+/** A JSON value as a session log stores it. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
-
-const jsonValueSchema: Schema.ConstraintDecoder<JsonValue> = Schema.suspend(() =>
-  Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null, Schema.Array(jsonValueSchema), Schema.Record(Schema.String, jsonValueSchema)]),
-)
 
 /**
  * The host↔worker contract. The host never touches the index file; it forwards requests and session events over this
@@ -97,40 +94,6 @@ const searchMatchSchema = Schema.Struct({
 })
 export type SearchMatch = typeof searchMatchSchema.Type
 
-export const workerRequestSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('search-sessions'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), request: sessionSearchRequestSchema }),
-  Schema.Struct({
-    kind: Schema.Literal('search-events'),
-    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
-    request: sessionEventSearchRequestSchema,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal('ingest'),
-    id: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
-    root: Schema.String.check(Schema.isMinLength(1)),
-  }),
-  Schema.Struct({ kind: Schema.Literal('health'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
-  Schema.Struct({ kind: Schema.Literal('nudge'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
-  Schema.Struct({ kind: Schema.Literal('close'), id: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),
-])
-export type WorkerRequest = typeof workerRequestSchema.Type
-
-/** The same union without the correlation id, which the client assigns per request. */
-export type WorkerRequestInput =
-  | { readonly kind: 'search-sessions'; readonly request: SessionSearchRequest }
-  | { readonly kind: 'search-events'; readonly request: SessionEventSearchRequest }
-  | { readonly kind: 'ingest'; readonly root: string }
-  | { readonly kind: 'health' }
-  | { readonly kind: 'nudge' }
-  | { readonly kind: 'close' }
-
-export const workerReplySchema = Schema.Union([
-  Schema.Struct({ id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), ok: Schema.Literal(true), value: jsonValueSchema }),
-  Schema.Struct({ id: Schema.Number.check(Schema.isFinite(), Schema.isInt()), ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal('progress'), health: indexHealthSchema }),
-])
-export type WorkerReply = typeof workerReplySchema.Type
-
 export const searchSessionsResultSchema = Schema.Struct({ matches: Schema.Array(searchMatchSchema), hasMore: Schema.Boolean })
 export type SearchSessionsResult = typeof searchSessionsResultSchema.Type
 
@@ -141,3 +104,30 @@ export const searchEventsResultSchema = Schema.Struct({
   hasMore: Schema.Boolean,
 })
 export type SearchEventsResult = typeof searchEventsResultSchema.Type
+
+/** The index refused or failed one request; `code` is the stable identifier the Host logs and callers branch on. */
+export class SearchWorkerFailed extends Schema.TaggedError<SearchWorkerFailed>()('SearchWorkerFailed', {
+  code: Schema.String,
+  reason: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+/** The worker's whole RPC surface; the worker side serves it with `RpcServer`, the Host calls it with `RpcClient`. */
+export class SearchWorkerRpcs extends RpcGroup.make(
+  Rpc.make('SearchSessions', { payload: sessionSearchRequestSchema, success: searchSessionsResultSchema, error: SearchWorkerFailed }),
+  Rpc.make('SearchEvents', { payload: sessionEventSearchRequestSchema, success: searchEventsResultSchema, error: SearchWorkerFailed }),
+  Rpc.make('StartIngest', { payload: { root: Schema.String.check(Schema.isMinLength(1)) }, success: indexHealthSchema, error: SearchWorkerFailed }),
+  Rpc.make('Health', { success: indexHealthSchema, error: SearchWorkerFailed }),
+  Rpc.make('Nudge', { success: indexHealthSchema, error: SearchWorkerFailed }),
+) {}
+
+/** What the Host hands the worker at spawn. */
+export const workerConfigSchema = Schema.Struct({
+  indexPath: Schema.String.check(Schema.isMinLength(1)),
+  // Each window is decoded, parsed and committed in one synchronous step that searches wait behind.
+  windowBytes: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
+})

@@ -17,7 +17,7 @@ import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { FrameLog } from '../src/frame-log.js'
 import { SessionSearchEngine } from '../src/engine.js'
-import { SearchWorkerClient } from '../src/worker-client.js'
+import { openSearchWorker } from '../src/worker-port-promise.js'
 
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite')
 
@@ -179,7 +179,7 @@ describe.skipIf(process.env.OWNED_BENCH !== '1')('owned search backend bench', (
     async () => {
       const root = join(runDir, 'sessions')
       const subset = await prepareSubset({ target: root, known: stockIndexedSessions() })
-      const client = new SearchWorkerClient({ indexPath: join(runDir, 'index.sqlite') })
+      const client = openSearchWorker({ indexPath: join(runDir, 'index.sqlite') })
       const context = new Context()
       context.provide('sessions', { list: () => [], get: () => undefined })
       context.provide('sessionPersistence', {
@@ -188,7 +188,7 @@ describe.skipIf(process.env.OWNED_BENCH !== '1')('owned search backend bench', (
           throw new Error('the owned backend must not read logs through the persistence service')
         },
       })
-      const fiber = await context.plugin(SessionSearchEngine, { client })
+      const fiber = await context.plugin(SessionSearchEngine, { client: client.port })
       const probe = await startProbe(join(runDir, 'probe.sock'))
       const hostGaps: number[] = []
       let previousTick = process.hrtime.bigint()

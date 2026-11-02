@@ -4,36 +4,31 @@
  * disabled by this bundle's own patch (and by the seed profile): while it stays enabled it registers first, wins the
  * service, and silently leaves content search on the read path that freezes the Host.
  */
-import type { Context } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
-import { Clock, Context as EffectContext, Duration, Effect, Layer, Queue, Schema } from 'effect'
+import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
+import { Effect, Layer, Option, Schema, Stream } from 'effect'
+
 import { sessionSearchApi } from './api.js'
-import { SessionSearchEngine } from './engine.js'
-import { withoutUndefined } from './optional-fields.js'
+import { SessionQueryOwnership } from './engine-registration-promise.js'
 import type { IndexHealth } from './protocol.js'
-import { SearchWorkerClient, type SearchWorkerError } from './worker-client.js'
+import { SearchWorker } from './worker-client.js'
 
 /** A Loader row may omit either index setting, so both keys stay optional. */
-const rowConfig = Schema.Struct({
-  indexPath: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))),
-  windowBytes: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
-})
+const rowConfig = Schema.UndefinedOr(
+  Schema.Struct({
+    indexPath: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))),
+    windowBytes: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
+  }),
+)
 
 /** A row with no `config` key arrives as `undefined`; the defaults fill it instead of failing activation. */
-export const Config = Schema.toStandardSchemaV1(Schema.UndefinedOr(rowConfig))
+export const Config = Schema.toStandardSchemaV1(rowConfig)
 
-const persistenceConfigSchema = Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) })
-
-/** The JSONL backend's configured root, else the default `$DSH_HOME/sessions`. */
-const sessionsRoot = (ctx: Context): string => {
-  const parsed = Schema.decodeUnknownResult(persistenceConfigSchema)(ctx.get('sessionPersistence'))
-  return parsed._tag === 'Success' ? parsed.success.config.root : dshHomePath('sessions')
-}
+const persistenceConfig = Schema.decodeUnknownOption(Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) }))
 
 /** A committed Session event wakes the ingest loop, coalesced so a busy turn does not wake it per event. */
-const NUDGE_DEBOUNCE_MS = 500
+const NUDGE_DEBOUNCE = '500 millis'
 
 const IDLE_HEALTH: IndexHealth = {
   sessions: 0,
@@ -49,114 +44,54 @@ const IDLE_HEALTH: IndexHealth = {
   lastError: null,
 }
 
-/** The engine that currently backs `sessionQuery`, or nothing — a recomposition can replace or drop this plugin's row. */
-const engineOf = (ctx: Context | undefined): SessionSearchEngine | undefined => {
-  const service = ctx?.get('sessionQuery')
-  return service instanceof SessionSearchEngine ? service : undefined
-}
-
-interface SessionSearchRuntime {
-  readonly client: SearchWorkerClient
-  readonly nudges: Queue.Queue<void>
-  readonly engine: () => SessionSearchEngine | undefined
-  readonly sessionsRoot: string
-}
-
-class SessionSearch extends EffectContext.Service<SessionSearch, SessionSearchRuntime>()('dshfiles/session-search/Runtime') {}
-
-const makeLayer = (ctx: Context, rawConfig: unknown): Layer.Layer<SessionSearch, never, never> => {
-  const config = Schema.decodeUnknownSync(Schema.UndefinedOr(rowConfig))(rawConfig) ?? {}
-  const indexPath = config.indexPath ?? dshHomePath('plugins', 'session-search', 'index.sqlite')
-  return Layer.effect(
-    SessionSearch,
-    Effect.gen(function* () {
-      const nudges = yield* Queue.dropping<void>(1)
-      const client = yield* Effect.acquireRelease(
-        Effect.sync(
-          () =>
-            new SearchWorkerClient(
-              withoutUndefined({
-                indexPath,
-                windowBytes: config.windowBytes,
-                onError: (error: SearchWorkerError) => ctx.logger.warn(`session-search: ${error.code}: ${error.message}`),
-              }),
-            ),
-        ),
-        active => Effect.promise(() => active.close()),
-      )
-      return { client, nudges, engine: () => engineOf(ctx), sessionsRoot: sessionsRoot(ctx) }
-    }),
+const layer = (config: typeof rowConfig.Type) =>
+  SessionQueryOwnership.layer.pipe(
+    Layer.provideMerge(
+      SearchWorker.layer({
+        indexPath: config?.indexPath ?? dshHomePath('plugins', 'session-search', 'index.sqlite'),
+        windowBytes: config?.windowBytes,
+      }),
+    ),
+    Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
   )
-}
 
-const nudgeLoop = (ctx: Context, active: SessionSearchRuntime) => {
-  let lastNudgeAt = 0
-  return Effect.forever(
-    Effect.gen(function* () {
-      yield* Queue.take(active.nudges)
-      const now = yield* Clock.currentTimeMillis
-      const delay = Math.max(0, NUDGE_DEBOUNCE_MS - (now - lastNudgeAt))
-      if (delay > 0) yield* Effect.sleep(Duration.millis(delay))
-      yield* Queue.takeAll(active.nudges)
-      lastNudgeAt = yield* Clock.currentTimeMillis
-      yield* Effect.tryPromise({ try: () => active.client.nudge(), catch: error => error }).pipe(
-        Effect.catch(error => Effect.sync(() => ctx.logger.warn(`session-search: ingest nudge failed: ${String(error)}`))),
-      )
-    }),
+const main = Effect.gen(function* () {
+  const ownership = yield* SessionQueryOwnership
+  const worker = yield* SearchWorker
+  const host = yield* HostContext
+  if (ownership.started && !(yield* ownership.owned))
+    yield* Effect.logError(
+      'session-search: another plugin owns the sessionQuery service, so content search stays on it and the owned index is not built; disable the stock @deepseek-ai/dsh-session-query-sqlite row in the profile and restart the DSH host process',
+    )
+  if (yield* ownership.owned) {
+    // The JSONL backend's configured root, else the default `$DSH_HOME/sessions`.
+    const root = Option.match(persistenceConfig(host.ctx.get('sessionPersistence')), {
+      onNone: () => dshHomePath('sessions'),
+      onSome: persistence => persistence.config.root,
+    })
+    yield* worker.startIngest(root).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest could not start', cause)))
+  }
+  yield* HostEvents.stream('session/event').pipe(
+    Stream.debounce(NUDGE_DEBOUNCE),
+    Stream.runForEach(() => worker.nudge.pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest nudge failed', cause)))),
   )
-}
-
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: makeLayer,
-  setup: (ctx: Context) =>
-    Effect.gen(function* () {
-      const active = yield* SessionSearch
-      const engine = yield* Effect.acquireRelease(
-        Effect.tryPromise({ try: () => ctx.plugin(SessionSearchEngine, { client: active.client }), catch: error => error }),
-        current => Effect.sync(() => current.dispose()),
-      ).pipe(
-        Effect.catch(error =>
-          Effect.sync(() => {
-            ctx.logger.error(`session-search: the owned search backend did not start: ${error instanceof Error ? error.message : String(error)}`)
-          }).pipe(Effect.as(undefined)),
-        ),
-      )
-      if (engine !== undefined) {
-        const owner = active.engine()
-        if (owner === undefined) {
-          ctx.logger.error(
-            'session-search: another plugin owns the sessionQuery service, so content search stays on it and the owned index is not built; disable the stock @deepseek-ai/dsh-session-query-sqlite row in the profile',
-          )
-        } else if (owner._client === active.client) {
-          yield* Effect.forkScoped(
-            Effect.tryPromise({ try: () => active.client.startIngest(active.sessionsRoot), catch: error => error }).pipe(
-              Effect.catch(error => Effect.sync(() => ctx.logger.warn(`session-search: ingest could not start: ${String(error)}`))),
-            ),
-          )
-        }
-      }
-      yield* Effect.sync(() => ctx.on('session/event', () => Queue.offerUnsafe(active.nudges, undefined)))
-      yield* Effect.forkScoped(nudgeLoop(ctx, active))
-    }),
 })
 
-export default defineHost({
-  ...effectPlugin,
+export default DshxPlugin.make({
   name: '@dshfiles/session-search',
-  Config,
+  Config: rowConfig,
   inject: ['sessions', 'sessionPersistence'],
+  layer,
+  main,
   apis: [
-    hostApi(sessionSearchApi, {
-      health: Effect.fn('session search health')(() =>
+    Api.bind(sessionSearchApi, {
+      health: () =>
         Effect.gen(function* () {
-          const active = yield* SessionSearch
-          const engine = active.engine()
           // Another plugin owning the service is the failure this index cannot see from inside: say it, and build nothing.
-          if (engine === undefined) return { ...IDLE_HEALTH, ownsService: false }
-          const health = yield* Effect.tryPromise({ try: () => engine._client.health(), catch: error => error })
+          if (!(yield* (yield* SessionQueryOwnership).owned)) return { ...IDLE_HEALTH, ownsService: false }
+          const health = yield* (yield* SearchWorker).health
           return { ...health, ownsService: true }
-        }),
-      ),
+        }).pipe(Effect.withSpan('session search health')),
     }),
   ],
 })
