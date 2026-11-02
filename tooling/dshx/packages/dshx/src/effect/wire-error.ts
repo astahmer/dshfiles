@@ -1,5 +1,6 @@
 import { Cause, Option, Schema, SchemaAST } from 'effect'
 import { ApiProtocolModel, PluginApiError } from '../api/common.js'
+import { causeReport } from './cause-report.js'
 
 declare module 'effect/Schema' {
   namespace Annotations {
@@ -48,7 +49,7 @@ const exposedFailure = (error: unknown): PluginApiError | undefined => {
   return new PluginApiError(message, { code, details: encodedDetails(error.constructor, error), cause: error })
 }
 
-const internal = (cause: Cause.Cause<unknown>): WireFailure => ({ kind: 'internal', report: Cause.pretty(cause) })
+const internal = (cause: Cause.Cause<unknown>): WireFailure => ({ kind: 'internal', report: causeReport(cause) })
 
 /**
  * Map a failed run to what its caller may see. Interruption alone is an abort; a failure whose Schema class carries

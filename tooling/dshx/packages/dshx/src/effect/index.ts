@@ -18,6 +18,13 @@ import type {
   ApiHostRegistration,
 } from '../api/types.js'
 
+export * as DshxPlugin from './plugin.js'
+export * as Api from './api.js'
+export * as Tool from './tool.js'
+export * as HostEvents from './events.js'
+export { HostContext, HostServiceMissing, hostService } from './host-context.js'
+export type { WireFailure } from './wire-error.js'
+
 /** A failed dshx API call, with the same fields as the thrown `ApiError` so it can be matched by `_tag` and `kind`. */
 export { ApiCallError } from './client.js'
 export type { EffectApiClient } from './client.js'
