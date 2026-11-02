@@ -375,4 +375,31 @@ describe('native client lifecycle reconciliation', () => {
     expect(reconciler.state('one')).toBe('start-failed')
     await reconciler.dispose()
   })
+
+  it('applies the newest plan when an older plan resolves its targets later', async () => {
+    const active = new Map<string, string>()
+    const reconciler = new ClientReconciler(async target => {
+      active.set(target.id, target.fingerprint)
+      return () => {
+        active.delete(target.id)
+      }
+    })
+    let releaseOlder = () => {}
+    const olderTargetsResolved = new Promise<void>(resolve => {
+      releaseOlder = resolve
+    })
+    const olderReconcile = reconciler.reconcile(async () => {
+      await olderTargetsResolved
+      return { targets: [{ id: 'one', enabled: true, ready: true, fingerprint: 'older' }], restart: new Set() }
+    })
+    const newerReconcile = reconciler.reconcile(async () => ({
+      targets: [{ id: 'one', enabled: true, ready: true, fingerprint: 'newer' }],
+      restart: new Set(),
+    }))
+    await Promise.resolve()
+    releaseOlder()
+    await Promise.all([olderReconcile, newerReconcile])
+    expect(active.get('one')).toBe('newer')
+    await reconciler.dispose()
+  })
 })

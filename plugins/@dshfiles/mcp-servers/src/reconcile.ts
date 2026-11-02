@@ -6,6 +6,11 @@ export interface ClientTarget {
   readonly fingerprint: string
 }
 
+export interface ReconcilePlan<Target extends ClientTarget> {
+  readonly targets: readonly Target[]
+  readonly restart: ReadonlySet<string>
+}
+
 export type ClientLifecycle = 'inactive' | 'starting' | 'loaded' | 'start-failed' | 'manually-disconnected'
 
 /** Serializes native client start/stop transitions and replaces edited clients. */
@@ -17,24 +22,21 @@ export class ClientReconciler<Target extends ClientTarget = ClientTarget> {
   constructor(private readonly start: (target: Target) => Promise<() => void | Promise<void>>) {}
 
   update(targets: readonly Target[]): Promise<void> {
-    const run = this.pending.then(() => this.apply(targets))
-    this.pending = run.catch(() => undefined)
-    return run
+    return this.enqueue(() => this.apply(targets))
+  }
+
+  /** Resolve the targets inside the serialized section, so an older plan can never be applied after a newer one. */
+  reconcile(plan: () => Promise<ReconcilePlan<Target>>): Promise<void> {
+    return this.enqueue(async () => {
+      const next = await plan()
+      if (next.restart.size === 0) return this.apply(next.targets)
+      for (const id of next.restart) await this.restartNow(id, next.targets)
+    })
   }
 
   /** Dispose and recreate one native client through its owning Cordis fiber. */
   restart(id: string, targets: readonly Target[]): Promise<void> {
-    const run = this.pending.then(async () => {
-      const current = this.active.get(id)
-      if (current !== undefined) {
-        this.active.delete(id)
-        await current.dispose()
-      }
-      this.lifecycle.delete(id)
-      await this.apply(targets)
-    })
-    this.pending = run.catch(() => undefined)
-    return run
+    return this.enqueue(() => this.restartNow(id, targets))
   }
 
   state(id: string): ClientLifecycle {
@@ -43,6 +45,22 @@ export class ClientReconciler<Target extends ClientTarget = ClientTarget> {
 
   async dispose(): Promise<void> {
     await this.update([])
+  }
+
+  private enqueue(task: () => Promise<void>): Promise<void> {
+    const run = this.pending.then(task)
+    this.pending = run.catch(() => undefined)
+    return run
+  }
+
+  private async restartNow(id: string, targets: readonly Target[]): Promise<void> {
+    const current = this.active.get(id)
+    if (current !== undefined) {
+      this.active.delete(id)
+      await current.dispose()
+    }
+    this.lifecycle.delete(id)
+    await this.apply(targets)
   }
 
   private async apply(targets: readonly Target[]): Promise<void> {

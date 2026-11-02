@@ -419,24 +419,22 @@ class ManagerRuntime {
     for (const id of this.manuallyDisconnected) {
       if (!currentIds.has(id)) this.manuallyDisconnected.delete(id)
     }
-    const targets = await desiredTargets(this.ctx, servers, this.manuallyDisconnected)
-    const restart = new Set(restartIds)
-    for (const target of targets) {
-      if (
-        target.enabled &&
-        target.ready &&
-        target.suspended !== true &&
-        target.localCommand !== undefined &&
-        this.localProcesses.get(target.id)?.status === 'exited'
-      ) {
-        restart.add(target.id)
+    await this.reconciler.reconcile(async () => {
+      const targets = await desiredTargets(this.ctx, servers, this.manuallyDisconnected)
+      const restart = new Set(restartIds)
+      for (const target of targets) {
+        if (
+          target.enabled &&
+          target.ready &&
+          target.suspended !== true &&
+          target.localCommand !== undefined &&
+          this.localProcesses.get(target.id)?.status === 'exited'
+        ) {
+          restart.add(target.id)
+        }
       }
-    }
-    if (restart.size === 0) {
-      await this.reconciler.update(targets)
-      return
-    }
-    for (const id of restart) await this.reconciler.restart(id, targets)
+      return { targets, restart }
+    })
   }
 
   async setConnection(id: string, connected: boolean, servers: readonly StoredServer[]): Promise<void> {
