@@ -4,11 +4,11 @@ This directory holds repository-wide operational guidance. Product and API docum
 
 | Document                                                     | Purpose                                                                                                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `dshx check repo`.                                       |
+| [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `dshx check repo`.                                        |
 | [Fork maintenance](fork-maintenance.md)                      | Upstream sync, selective plugin PRs, ownership policy, sanitized publication history, and the separate deployment boundary.                             |
 | [Personal configuration](personal-configuration.md)          | Machine-local launcher choices, private paths and deployment settings.                                                                                  |
 | [25 October upstream sync](upstream-sync-20261025.md)        | Isolated candidate, deliberate conflict resolutions, verification evidence and deployment caveats.                                                      |
-| [26 October upstream sync](upstream-sync-20261026.md)        | Historical receipt: six accepted upstream PRs, rollback reference, conflict resolutions and verification.                                              |
+| [26 October upstream sync](upstream-sync-20261026.md)        | Historical receipt: six accepted upstream PRs, rollback reference, conflict resolutions and verification.                                               |
 | [Recovering a broken DSH](recovery.md)                       | Start the last known good DSH, find what broke, refresh the snapshot, and upgrade DSH through the gate.                                                 |
 | [`profile-installs.md`](profile-installs.md)                 | Local profile installs, pnpm behavior, peer dependencies, and composition.                                                                              |
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                                                          |
@@ -25,6 +25,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Native forks](native-forks.md)                              | Vendored native DSH packages, their pinned upstream and delta, and the drift/upgrade diff script.                                                       |
 | [Secret references](secret-references.md)                    | How a plugin stores `secret:ALIAS` instead of a value, resolves it on the Host, and offers the vault in a field.                                        |
 | [Performance](performance.md)                                | What made the live GUI slow, what fixed it, before/after numbers, and what is still open.                                                               |
+| [Startup request audit](startup-request-audit.md)            | Which requests a fresh start plus one refresh issues, what each group costs, and which were redundant or slow.                                          |
 | [Repository checks](repository-checks.md)                    | Which check to run, `node --run` versus `pnpm run`, the e2e scope rule, and the Turbo cache/`--force` policy.                                           |
 | [Plugin reload](plugin-reload.md)                            | What a rebuilt bundle updates over HMR, what needs a Host restart, and how a failed reload behaves in the page.                                         |
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                                            |
