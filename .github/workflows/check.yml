@@ -79,6 +79,9 @@ jobs:
         with:
           jj: 'true'
           ffmpeg: 'true'
+          # @dshfiles/preview's suite launches the real headless shell and every bundle boots in a real Host.
+          browsers: 'true'
+          systemd-scope: 'true'
       - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 3
 
   dshx:
@@ -121,10 +124,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2]
-    env:
-      # A boot check asserts one scratch Host mounts; the journeys that flake under parallel load are the smoke job.
-      # Three at a time measured ~2.7x faster on ten cores, so two is conservative on four.
-      CHECK_BROWSER_CONCURRENCY: '2'
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -133,6 +132,9 @@ jobs:
           browsers: 'true'
           systemd-scope: 'true'
       # Every bundle's own boot lands in exactly one shard, and the composed web-profile boot in shard 0 only.
+      # Boots stay serial inside a shard: two at once on a 4 vCPU runner left expected Client entries `pending` past
+      # their settle window (workbench, agent-preset) although both pass alone and on a 10-core workstation. The
+      # parallelism is the three shards, not concurrency inside one.
       - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 3 boot
 
   e2e-smoke:
