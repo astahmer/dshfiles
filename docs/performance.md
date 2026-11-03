@@ -523,6 +523,80 @@ The integrated live probe used the existing Host (PID 61372), the same `dshfiles
 
 The live browser showed one unrelated `[deepseek-account] account read failed {field: profile}` console error and one request failure in the network-idle run; no page or HTTP errors occurred, and a follow-up showed no failed or HTTP requests. The GUI also showed an unrelated restart notice for `@dshfiles/memory`; no Host restart occurred. The approved 60-second Host CPU profile failed at `Profiler.stop` with `Warning: Detected unsettled top-level await` (exit 13), produced no artifact, and left inspector port 9229 closed with Host PID 61372 still serving. No second profile was attempted while system load remained above 10 cores.
 
+## Effect-native migration, Phase 6.2 (2026-11-03; controlled scratch before/after)
+
+Both sides were measured the same way, on the same machine, in the same session: **BEFORE** is jj bookmark `main`
+(`kpmmvlzx`, the pre-Effect baseline) checked out into its own workspace (`jj workspace add ../eff-w-perf-main -r main
+--name eff-w-perf-main`, `pnpm install --frozen-lockfile`, full `turbo run build`); **AFTER** is this branch's workspace,
+built the same way. Every number comes from a scratch `DSH_HOME` (`/tmp/dshx-boot-profile-*`) and a scratch `dshx dev`
+instance. The live Host on port 3080 was never touched, restarted, or measured.
+
+| Probe                                                             | BEFORE (`main`)                                  | AFTER (branch)                                       | Delta                           |
+| ----------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- | ------------------------------- |
+| Cold scratch Host boot, spawn → authenticated RPC (14 pairs)      | median **5,357 ms** (IQR 4,739–7,029; 3.4–9.0 s) | median **5,929 ms** (IQR 5,547–6,974; 3.8–11.7 s)    | **+11 %**, spread overlaps      |
+| Same boot, 42 pooled runs per side                                | median 4,677 ms (IQR 4,083–5,685)                | median 5,341 ms (IQR 4,709–6,075)                    | +14 %                           |
+| Boot including scratch-profile prep, end to end                   | median 7,032 ms                                  | median 7,213 ms                                      | **+3 %**                        |
+| Host event-loop lag, idle                                         | p99 16–242 ms (median 24), max 43–257 ms         | p99 18–65 ms (median 34), max 42–90 and one 1,154 ms | noise-level; one AFTER outlier  |
+| Host event-loop lag, 4 concurrent `session/list` streams          | p99 46–894 ms (median 116), max 198–894 ms       | p99 24–241 ms (median 39), max 26–346 ms             | AFTER steadier across 5 rounds  |
+| Host event-loop lag, 8 concurrent `session/list` streams          | p99 30–606 ms (median 57), max 36–606 ms         | p99 46–710 ms (median 96), max 50–710 ms             | no clear change across 6 rounds |
+| `dist/index.js` total, all owned Host bundles                     | 17,084,560 B = **16.29 MiB** (82 bundles)        | 18,303,870 B = **17.46 MiB** (83 bundles)            | **+7.1 %** (+1.16 MiB)          |
+| Same total, gzipped                                               | 4.29 MiB                                         | 4.65 MiB                                             | +8.4 %                          |
+| Tracer overhead, 300k `flatMap` steps (`bench/effect-tracer.mjs`) | +46–51 ns/step, span + recording on              | +43–48 ns/step, span + recording on                  | ≈ −3 ns/step                    |
+| Thread switch, first click onto a thread with history             | median 476 ms, p90 710 ms, 18/18 over 250 ms     | median 506 ms, p90 637 ms, 18/18 over 250 ms         | ≈ +30 ms, same over-budget set  |
+| Thread switch, second click onto a short thread                   | median 196 ms, p90 242 ms, 1/10 over 250 ms      | median 200 ms, p90 220 ms, 1/10 over 250 ms          | ≈ +4 ms, same over-budget set   |
+
+**Five largest owned Host bundles** (`dist/index.js`, bytes on disk):
+
+| Rank | BEFORE (`main`)          | AFTER (branch)             |
+| ---- | ------------------------ | -------------------------- |
+| 1    | `secret-catalog` 788,646 | `secret-catalog` 1,033,943 |
+| 2    | `pulls-review` 760,231   | `ai-accounts` 810,451      |
+| 3    | `ai-accounts` 739,594    | `memory` 533,934           |
+| 4    | `memory` 454,976         | `jj-integration` 497,220   |
+| 5    | `multi-host` 445,358     | `multi-host` 485,335       |
+
+`effect` itself stays external: every bundle imports it as a bare `"effect"` specifier and no `effect/internal/*` code is
+inlined. The growth is our own code plus newly imported runtime packages — 32 bundles now import `@effect/platform-node`
+or `@effect/sql-sqlite-node` (0 on `main`), and `@dshfiles/jj-cli` is a new bundle. `pulls-review` shrank 760,231 →
+232,534 B because its removed facade code went away.
+
+**Method and commands.** Boot: a probe that calls `prepareComposedBootProfile` + `LocalBundleModel.listLocalBootBundles`
+from the workspace's own `tooling/dshx/packages/dshx/dist`, spawns `dsh --profile dshx-boot --port <free> --no-open`
+with `ScratchProfileRuntime.hostEnvironment`, and stops the clock at the first authenticated
+`POST /api/credentials/describe` — not at "the log printed a URL". Runs were interleaved (alternating order per pair, 14
+pairs, plus 42 unpaired runs) while recording `sysctl vm.loadavg`. Lag: the skill's `host-lag.mjs` 4 ms RPC sampled every
+100 ms while 0/4/8 concurrent `session/list` streams held the Host busy (`node /tmp/lag-under-load.mjs <url> 20`). Switch:
+the skill's `switch-probe.mjs` with `MATCH='^perf thread'` in a headless Chromium, ten clicks per side, interleaved.
+Bundles: byte size of every `plugins/@dshfiles/*/dist/index.js`. Tracer: `node
+tooling/dshx/packages/dshx/bench/effect-tracer.mjs`, min of 30 interleaved rounds, run three times interleaved against
+both builds.
+
+**Machine/load caveat.** This machine (10 logical CPUs) sat at load 3.5–24 throughout, drifting within a single paired
+run, and the concrete evidence page hit its own memory pressure. Boot medians moved 3.4–9.0 s on `main` alone, so the
++11 %/+14 % boot delta is inside the spread: per-pair deltas ranged −2,952 to +2,577 ms while the median pair cost
++723 ms. Treat the boot row as "roughly half a second more on a noisy machine", not as a resolved percentage. The lag
+rows are worse: p99 moved by more than 10× between rounds on the _same_ build (BEFORE x4 ranged 46–894 ms), so only the
+idle p50 (3–5 ms both sides) and the absence of a systematic AFTER-only stall are meaningful there — the point is that no
+build-specific stall appears, not that one side is faster. The switch rows come from the same noisy window, and the
+AFTER side recorded one 1,154 ms idle outlier that no BEFORE run matched and that no build-side cause explains.
+
+**Verdict against the budget (≤ +10 % boot, no new >250 ms interaction).** Boot: **not a clean pass, not a proven
+regression** — spawn → authenticated RPC is +11 % on paired medians (+14 % pooled), while the end-to-end scratch boot
+including profile preparation, which is what a user waits for, is +3 %. Because the paired spread overlaps and load
+moved during every run, this is reported as unproven either way rather than claimed as a pass. Interactions: **pass** —
+no new over-250 ms interaction appears; the same 19 of 28 clicks exceeded 250 ms on both sides, and the over-budget path
+is the pre-existing first-click-on-a-thread-with-history cost (`session/page`, the per-switch catalogs and the snapshot
+fan-out), not a new one. Bundle size is **+7.1 %**, inside the boot budget's spirit but a real growth that the external
+`effect` decision does not absorb. Tracer overhead is unchanged within noise (≈45 ns/step with recording on, both sides).
+
+Reproduce: `node .agents/skills/live-performance-audit/scripts/boot-probe.mjs <workspace>` (cold boot, one JSON line per
+run: `prepareMs`, `spawnToFirstOutputMs`, `spawnToUrlMs`, `spawnToReadyMs`),
+`node .agents/skills/live-performance-audit/scripts/lag-under-load.mjs <launchUrl> 20`,
+`MATCH='^perf thread' LAUNCH_URL=<launchUrl> node .agents/skills/live-performance-audit/scripts/switch-probe.mjs 3`, and
+`node tooling/dshx/packages/dshx/bench/effect-tracer.mjs`. The two new probes live beside `switch-probe.mjs`; the BEFORE
+workspace has no `bench/effect-tracer.mjs`, so that one file was copied there temporarily and removed after the run.
+Launch URLs are secrets and are not recorded here.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
