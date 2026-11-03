@@ -118,6 +118,9 @@ export class PreviewDevServers extends Context.Service<
             process.platform === 'linux' ? ['-ltnpH'] : ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-u', String(process.getuid?.() ?? 0), '-F', 'pn'],
           )
           const sockets = process.platform === 'linux' ? DevServers.parseSsListeners(socketsText) : DevServers.parseLsofListeners(socketsText)
+          // No listening socket means no row to attribute: skip the process table, the cwd probes and the Session
+          // fold. Every poll of an idle thread used to pay all three to return `servers: []`.
+          if (sockets.length === 0) return { supported: true, servers: [] }
           const rows = DevServers.parsePs(yield* probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']))
           const known = yield* sessions
           const cwds = yield* readCwds([...new Set(sockets.map(socket => socket.pid))])

@@ -54,4 +54,39 @@ describe('PreviewDevServers', () => {
       expect(probe.supported).toBe(process.platform === 'darwin' || process.platform === 'linux')
     }).pipe(Effect.provide(probeLayer(fakeExec([])))),
   )
+
+  it.effect('skips the process table, cwd probes and Session fold when nothing is listening', () => {
+    const calls: string[] = []
+    const exec: ProbeExec = async (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`)
+      if (command === 'lsof' && args.includes('cwd')) throw new Error('the cwd probe must not run for an empty socket list')
+      if (command === 'ps') throw new Error('the process table must not run for an empty socket list')
+      return ''
+    }
+    let listed = 0
+    const quietContext = {
+      get: (name: string) =>
+        name === 'sessionController'
+          ? {
+              list: async () => {
+                listed += 1
+                return { items: [] }
+              },
+            }
+          : undefined,
+      inject: () => undefined,
+    }
+    const layer = PreviewDevServers.makeLayer({ exec }).pipe(
+      Layer.provide(HostContext.layer({ ctx: quietContext as never, packageId: '@dshfiles/preview' })),
+      Layer.provide(nodeFileSystemLayer),
+    )
+    return Effect.gen(function* () {
+      const servers = yield* PreviewDevServers
+      const probe = yield* servers.read(true)
+      expect(probe).toEqual({ supported: true, servers: [] })
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toMatch(/^lsof /)
+      expect(listed).toBe(0)
+    }).pipe(Effect.provide(layer))
+  })
 })
