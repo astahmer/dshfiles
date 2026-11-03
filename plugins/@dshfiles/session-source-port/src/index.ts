@@ -18,12 +18,12 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import * as SessionPayload from './payload.js'
+import * as SessionPayload from './payload.ts'
 
-export { SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.js'
-export { fromEffect } from './session-source-promise.js'
-export * as SessionPayload from './payload.js'
-export { SessionPayloadError } from './payload.js'
+export { SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.ts'
+export { fromEffect } from './session-source-promise.ts'
+export * as SessionPayload from './payload.ts'
+export { SessionPayloadError } from './payload.ts'
 
 /**
  * One place where Sessions live other than this Host — a DSH runtime reached through a tunnel, or anything else that can
