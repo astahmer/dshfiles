@@ -19,6 +19,7 @@
     "tooling/antislop/tests/oxlint/**",
     "tooling/antislop/effect/repo-rules/fixtures/**",
     "plugins/@dshfiles/multi-host/tests/fixtures/**",
+    "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
     "tooling/dshx/packages/dshx/bench/**",
     "tooling/antislop/effect/tests/oxlint/**",
   ],
@@ -80,7 +81,7 @@
     "plugins/@dshfiles/backlog": {
       // devDependency copy of the jj-integration peer the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration"],
+      "ignoreDependencies": ["@dshfiles/usage", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration"],
     },
     "plugins/@dshfiles/chat": {
       // dshx.config.ts bundles util-crypto into the client by name, so no module import references it.
@@ -97,14 +98,24 @@
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
+    "plugins/@dshfiles/traces": {
+      // @effect/sql-sqlite-node is the runtime half of the bundled @dshfiles/sqlite-store.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@effect/sql-sqlite-node"],
+    },
+    "plugins/@dshfiles/project-checks": {
+      // @effect/sql-sqlite-node is the runtime half of the bundled @dshfiles/sqlite-store.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@effect/sql-sqlite-node"],
+    },
     "plugins/@dshfiles/memory": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+      "ignoreDependencies": ["@effect/sql-sqlite-node", "@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/usage": {
       // Scripts run by hand.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "scripts/*.mjs"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+      "ignoreDependencies": ["@effect/sql-sqlite-node", "@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/activity-timeline": {
       // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
@@ -130,7 +141,7 @@
     "plugins/@dshfiles/preview": {
       // devDependency copy of a peerDependency the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
+      "ignoreDependencies": ["@dshfiles/dshx", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
     "plugins/@dshfiles/shared-runtime": {
       "entry": ["dshx.config.ts", "src/client.ts!"],
