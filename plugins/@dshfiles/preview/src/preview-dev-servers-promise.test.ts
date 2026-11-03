@@ -9,12 +9,19 @@ const outputs = {
   ps: ['  500     1 Thu Oct 29 21:00:00 2026 node dsh web', '  700     1 Thu Oct 29 21:05:00 2026 python3 -m http.server 8123'].join('\n'),
 }
 
+/** Linux lists listening sockets with `ss`, macOS with `lsof`; the fake answers whichever this platform asks for. */
+const socketTool = process.platform === 'linux' ? 'ss' : 'lsof'
+const socketOutput =
+  socketTool === 'ss'
+    ? 'LISTEN 0 511 127.0.0.1:3080 0.0.0.0:* users:(("node",pid=500,fd=20))\nLISTEN 0 511 127.0.0.1:8123 0.0.0.0:* users:(("python3",pid=700,fd=3))\n'
+    : 'p500\nf20\nn127.0.0.1:3080\np700\nf3\nn127.0.0.1:8123\n'
+
 const fakeExec =
   (calls: string[]): ProbeExec =>
   async (command, args) => {
     calls.push(`${command} ${args.join(' ')}`)
     if (command === 'lsof' && args.includes('cwd')) return 'p700\nfcwd\nn/repo-threads/b\n'
-    if (command === 'lsof') return 'p500\nf20\nn127.0.0.1:3080\np700\nf3\nn127.0.0.1:8123\n'
+    if (command === socketTool) return socketOutput
     return command === 'ps' ? outputs.ps : ''
   }
 
@@ -43,7 +50,7 @@ describe('PreviewDevServers', () => {
         { pid: 700, ports: [8123], sessionIds: ['session-b'] },
       ])
       expect(calls).toHaveLength(3)
-      expect(recorder.named('preview port-probe').map(span => span.attributes['process.executable.name'])).toEqual(expect.arrayContaining(['lsof', 'ps']))
+      expect(recorder.named('preview port-probe').map(span => span.attributes['process.executable.name'])).toEqual(expect.arrayContaining([socketTool, 'ps']))
     }).pipe(Effect.provide(probeLayer(fakeExec(calls))), Effect.provide(DshxEffect.tracerLayer), Effect.ensuring(Effect.sync(() => recorder.stop())))
   })
 
@@ -85,7 +92,7 @@ describe('PreviewDevServers', () => {
       const probe = yield* servers.read(true)
       expect(probe).toEqual({ supported: true, servers: [] })
       expect(calls).toHaveLength(1)
-      expect(calls[0]).toMatch(/^lsof /)
+      expect(calls[0]).toMatch(new RegExp(`^${socketTool} `))
       expect(listed).toBe(0)
     }).pipe(Effect.provide(layer))
   })
