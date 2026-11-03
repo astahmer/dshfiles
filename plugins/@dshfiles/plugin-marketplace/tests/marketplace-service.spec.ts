@@ -104,9 +104,7 @@ const marketplaceLayer = (input: {
         Effect.map(MarketplaceFiles, files =>
           MarketplaceFiles.of({ ...files, dshCli: Effect.succeed({ cliPath: '/installation/dsh/lib/bin.js', version: '0.1.5' }) }),
         ),
-      ).pipe(
-        Layer.provide(MarketplaceFiles.makeLayer({ harnessHome: input.home }).pipe(Layer.provide(nodeFileSystemLayer), Layer.provide(nodePathLayer))),
-      ),
+      ).pipe(Layer.provide(MarketplaceFiles.makeLayer({ harnessHome: input.home }).pipe(Layer.provide(nodeFileSystemLayer), Layer.provide(nodePathLayer)))),
     ),
     Layer.provideMerge(Layer.succeed(MarketplaceProcesses, MarketplaceProcesses.of({ runCli: () => input.runCli?.() ?? Effect.succeed(cliResult()) }))),
     Layer.provide(marketplaceSettingsTestLayer({ hubBaseUrl: input.hubBaseUrl ?? 'https://hub.example.test' })),
@@ -116,8 +114,7 @@ const marketplaceLayer = (input: {
 
 type CliResult = CliRunResult
 
-const serviceIn = <R>(layer: Layer.Layer<MarketplaceService, never, R>) =>
-  Effect.map(Layer.build(layer), context => Context.get(context, MarketplaceService))
+const serviceIn = <R>(layer: Layer.Layer<MarketplaceService, never, R>) => Effect.map(Layer.build(layer), context => Context.get(context, MarketplaceService))
 
 describe('Framework Hub response validation', () => {
   it.effect('accepts the previous list response shape and rejects more than one page', () =>
@@ -138,7 +135,9 @@ describe('MarketplaceService.list', () => {
       const scratch = yield* scratchHome()
       yield* writeManifest(scratch.profileDir, ['@fixture/community-tool'])
       const github = hub([() => jsonResponse({ items: [card()], categories: [{ slug: 'tools', name: '工具' }], nextCursor: 'next-page' })])
-      const service = yield* serviceIn(marketplaceLayer({ ...scratch, bundles: () => ['@fixture/community-tool'], fetcher: github.fetcher })).pipe(Effect.scoped)
+      const service = yield* serviceIn(marketplaceLayer({ ...scratch, bundles: () => ['@fixture/community-tool'], fetcher: github.fetcher })).pipe(
+        Effect.scoped,
+      )
 
       const result = yield* service.list({ locale: 'zh', category: 'tools', cursor: 'cursor-one' })
 
@@ -213,7 +212,14 @@ describe('MarketplaceService.install', () => {
       const scratch = yield* scratchHome()
       yield* writeManifest(scratch.profileDir, (input.bundles ?? (() => ['@fixture/installed']))())
       const github = hub(input.hubAnswers)
-      const service = yield* serviceIn(marketplaceLayer({ ...scratch, bundles: input.bundles ?? (() => ['@fixture/installed']), fetcher: github.fetcher, ...(input.runCli !== undefined && { runCli: input.runCli }) })).pipe(Effect.scoped)
+      const service = yield* serviceIn(
+        marketplaceLayer({
+          ...scratch,
+          bundles: input.bundles ?? (() => ['@fixture/installed']),
+          fetcher: github.fetcher,
+          ...(input.runCli !== undefined && { runCli: input.runCli }),
+        }),
+      ).pipe(Effect.scoped)
       return { service, github, scratch }
     })
 
@@ -228,9 +234,7 @@ describe('MarketplaceService.install', () => {
   it.effect('validates the exact active target before reporting an installed bundle', () =>
     Effect.gen(function* () {
       const { service } = yield* installing({
-        hubAnswers: [
-          () => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], package_name: '@fixture/other' }] })),
-        ],
+        hubAnswers: [() => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], package_name: '@fixture/other' }] }))],
         bundles: () => ['@fixture/community-tool'],
       })
       expect(yield* service.install('community-tool')).toMatchObject({ status: 'failed', code: 'target-unavailable' })
@@ -247,10 +251,11 @@ describe('MarketplaceService.install', () => {
           ...scratch,
           bundles: () => ['@fixture/installed'],
           fetcher: github.fetcher,
-          runCli: () => Effect.promise(async () => {
-            await writeManifestFile(scratch.profileDir, ['@fixture/installed', '@fixture/community-tool'])
-            return cliResult()
-          }),
+          runCli: () =>
+            Effect.promise(async () => {
+              await writeManifestFile(scratch.profileDir, ['@fixture/installed', '@fixture/community-tool'])
+              return cliResult()
+            }),
         }),
       ).pipe(Effect.scoped)
       expect(yield* service.install('community-tool')).toMatchObject({ status: 'installed', version: '1.2.3', restartRequired: true })
@@ -259,10 +264,14 @@ describe('MarketplaceService.install', () => {
 
   it.effect('rejects inactive, mismatched, mutable and unverifiable targets', () =>
     Effect.gen(function* () {
-      const inactive = yield* installing({ hubAnswers: [() => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], status: 'disabled' }] }))] })
+      const inactive = yield* installing({
+        hubAnswers: [() => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], status: 'disabled' }] }))],
+      })
       expect(yield* inactive.service.install('community-tool')).toMatchObject({ code: 'target-unavailable' })
 
-      const mutable = yield* installing({ hubAnswers: [() => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], spec: '@fixture/community-tool@latest' }] }))] })
+      const mutable = yield* installing({
+        hubAnswers: [() => jsonResponse(detail({ installTargets: [{ ...detail().installTargets[0], spec: '@fixture/community-tool@latest' }] }))],
+      })
       expect(yield* mutable.service.install('community-tool')).toMatchObject({ code: 'target-unavailable' })
 
       const unactivated = yield* installing({ hubAnswers: [() => jsonResponse(detail())] })

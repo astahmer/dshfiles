@@ -46,9 +46,7 @@ describe('multi-host record schemas', () => {
 
   test('accepts tokenized HTTP launch URLs only on loopback', () => {
     expect(decodeStrict(runtimeLocatorSchema, localRuntime.locator).success).toBe(true)
-    expect(
-      decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://remote.example/?token=token_value-123456' }).success,
-    ).toBe(false)
+    expect(decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://remote.example/?token=token_value-123456' }).success).toBe(false)
     expect(decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'http://127.0.0.1:3199/?token=short' }).success).toBe(false)
     expect(
       decodeStrict(runtimeLocatorSchema, {
@@ -56,21 +54,15 @@ describe('multi-host record schemas', () => {
         launchUrl: 'http://127.0.0.1:3199/?token=token_value-123456&next=https://outside.invalid',
       }).success,
     ).toBe(false)
-    expect(
-      decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'https://127.0.0.1:3199/?token=token_value-123456' }).success,
-    ).toBe(false)
+    expect(decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl: 'https://127.0.0.1:3199/?token=token_value-123456' }).success).toBe(false)
   })
 
   test('rejects shell-shaped SSH targets and remote paths; the legacy unit field is optional', () => {
     expect(decodeStrict(runtimeLocatorSchema, { kind: 'ssh', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
     expect(decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: 'deploy@machine.example' }).success).toBe(true)
     expect(decodeStrict(hostConnectorSchema, { kind: 'ssh', sshTarget: 'deploy@machine; touch /tmp/pwned' }).success).toBe(false)
-    expect(
-      decodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime@blue.service', remoteHome: '/home/deploy/.dsh/blue' }).success,
-    ).toBe(true)
-    expect(decodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: "dsh'; id #", remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(
-      false,
-    )
+    expect(decodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime@blue.service', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
+    expect(decodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: "dsh'; id #", remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(false)
     expect(decodeStrict(runtimeLocatorSchema, { kind: 'ssh', unit: 'dsh-runtime', remoteHome: '/home/deploy/../root' }).success).toBe(false)
   })
 

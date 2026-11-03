@@ -325,9 +325,7 @@ const nativeValueSchema = Schema.Union([
     ).check(Schema.isMaxLength(10_000)),
   }).pipe(SchemaFields.passthrough),
   Schema.Struct({
-    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(SchemaFields.passthrough)).check(
-      Schema.isMaxLength(10_000),
-    ),
+    items: Schema.Array(Schema.Struct({ sessionId: sessionIdSchema, snippet: Schema.String }).pipe(SchemaFields.passthrough)).check(Schema.isMaxLength(10_000)),
     hasMore: Schema.Boolean,
   }).pipe(SchemaFields.passthrough),
   Schema.Struct({ sessionId: sessionIdSchema, agentPreset: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough),

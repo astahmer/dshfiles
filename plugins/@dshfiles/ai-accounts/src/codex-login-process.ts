@@ -46,49 +46,51 @@ export type CodexLoginSpawnProcess = (
 }
 
 /** The real `node:child_process` adapter over the fixed argv; a test exercises it through an injected `spawn`. */
-export const spawnOfficialCodexLogin = (spawn: CodexLoginSpawnProcess): CodexLoginSpawn => options => {
-  const child = spawn(options.executable, options.args, {
-    cwd: options.home,
-    env: options.env,
-    shell: false,
-    // The official npm launcher can own a native child. Cancel the entire owned group on Unix.
-    detached: process.platform !== 'win32',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
-  const finished = new Promise<number | null>((resolve, reject) => {
-    let failure: Error | undefined
-    child.on('error', error => {
-      // Never include spawn errors: they can contain env, paths or command output.
-      failure = 'code' in error && error.code === 'ENOENT' ? new CodexLoginUnsupported() : new Error('Official Codex CLI could not start or stop')
+export const spawnOfficialCodexLogin =
+  (spawn: CodexLoginSpawnProcess): CodexLoginSpawn =>
+  options => {
+    const child = spawn(options.executable, options.args, {
+      cwd: options.home,
+      env: options.env,
+      shell: false,
+      // The official npm launcher can own a native child. Cancel the entire owned group on Unix.
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     })
-    // An error event alone does not prove a running process stopped. Never clean its home before close.
-    child.once('close', code => {
-      if (failure === undefined) resolve(code)
-      else reject(failure)
+    const finished = new Promise<number | null>((resolve, reject) => {
+      let failure: Error | undefined
+      child.on('error', error => {
+        // Never include spawn errors: they can contain env, paths or command output.
+        failure = 'code' in error && error.code === 'ENOENT' ? new CodexLoginUnsupported() : new Error('Official Codex CLI could not start or stop')
+      })
+      // An error event alone does not prove a running process stopped. Never clean its home before close.
+      child.once('close', code => {
+        if (failure === undefined) resolve(code)
+        else reject(failure)
+      })
     })
-  })
-  return {
-    finished,
-    onOutput: receive => {
-      child.stdout.setEncoding('utf8')
-      child.stderr.setEncoding('utf8')
-      child.stdout.on('data', (text: string) => receive(text))
-      child.stderr.on('data', (text: string) => receive(text))
-    },
-    kill: signal => {
-      if (process.platform === 'win32' || child.pid === undefined) {
-        child.kill(signal)
-        return
-      }
-      try {
-        process.kill(-child.pid, signal)
-      } catch (error) {
-        if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) child.kill(signal)
-      }
-    },
+    return {
+      finished,
+      onOutput: receive => {
+        child.stdout.setEncoding('utf8')
+        child.stderr.setEncoding('utf8')
+        child.stdout.on('data', (text: string) => receive(text))
+        child.stderr.on('data', (text: string) => receive(text))
+      },
+      kill: signal => {
+        if (process.platform === 'win32' || child.pid === undefined) {
+          child.kill(signal)
+          return
+        }
+        try {
+          process.kill(-child.pid, signal)
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) child.kill(signal)
+        }
+      },
+    }
   }
-}
 
 const spawnOfficial: CodexLoginSpawn = spawnOfficialCodexLogin(spawn as CodexLoginSpawnProcess)
 

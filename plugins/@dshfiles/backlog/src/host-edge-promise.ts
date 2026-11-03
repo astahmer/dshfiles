@@ -59,9 +59,7 @@ export class HostSessions extends Context.Service<
     readonly selectModel: (request: Omit<SessionSelectModelRequest, 'sessionId'> & { readonly sessionId: string }) => Effect.Effect<void, SessionsUnavailable>
     readonly rename: (request: Omit<SessionRenameRequest, 'sessionId'> & { readonly sessionId: string }) => Effect.Effect<void, SessionsUnavailable>
     /** Queue one message into the thread; `requestId` is Host-minted and unique per prompt. */
-    readonly prompt: (
-      request: Omit<SessionPromptRequest, 'sessionId'> & { readonly sessionId: string },
-    ) => Effect.Effect<void, SessionsUnavailable>
+    readonly prompt: (request: Omit<SessionPromptRequest, 'sessionId'> & { readonly sessionId: string }) => Effect.Effect<void, SessionsUnavailable>
   }
 >()('@dshfiles/backlog/HostSessions') {
   static readonly layer = Layer.effect(
@@ -196,7 +194,13 @@ export class HostSpeech extends Context.Service<
             return { available: true, ready, provider: provider.name, language, reason: ready ? null : 'Open Plugins → Voice input to prepare the recognizer.' }
           }),
           Effect.catch(error =>
-            Effect.succeed<SpeechStatus>({ available: true, ready: false, provider: null, language: null, reason: reasonOf(error.cause, 'Speech readiness is unavailable.') }),
+            Effect.succeed<SpeechStatus>({
+              available: true,
+              ready: false,
+              provider: null,
+              language: null,
+              reason: reasonOf(error.cause, 'Speech readiness is unavailable.'),
+            }),
           ),
         )
       }).pipe(Effect.withSpan('backlog speech status'))

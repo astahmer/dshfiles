@@ -25,8 +25,14 @@ describe('backlog reply routing', () => {
 
   it.effect('keeps low confidence as a reply and uses keywords when Jev fails', () =>
     Effect.gen(function* () {
-      expect(yield* ReplyRouting.classify({ text: 'Could you explain this?', jev: () => Effect.succeed(0.42) })).toMatchObject({ route: 'reply', source: 'jev' })
-      expect(yield* ReplyRouting.classify({ text: 'Please fix this', jev: () => Effect.fail('offline') })).toMatchObject({ route: 'thread', source: 'keywords' })
+      expect(yield* ReplyRouting.classify({ text: 'Could you explain this?', jev: () => Effect.succeed(0.42) })).toMatchObject({
+        route: 'reply',
+        source: 'jev',
+      })
+      expect(yield* ReplyRouting.classify({ text: 'Please fix this', jev: () => Effect.fail('offline') })).toMatchObject({
+        route: 'thread',
+        source: 'keywords',
+      })
     }),
   )
 

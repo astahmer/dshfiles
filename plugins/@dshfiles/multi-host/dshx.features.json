@@ -5,30 +5,16 @@
       "id": "runtime-directory",
       "title": "Register and identify local DSH runtimes",
       "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
           "key": "profile",
           "defaultValue": "inferred",
           "constraints": "Optional trimmed identifier of 1 to 64 characters; if supplied it must match the profile name discovered from the environment/argv.",
-          "coveredBy": [
-            "multi-host.identity-profile"
-          ]
+          "coveredBy": ["multi-host.identity-profile"]
         }
       ],
-      "states": [
-        "unregistered",
-        "registered",
-        "online",
-        "stale",
-        "incompatible"
-      ],
+      "states": ["unregistered", "registered", "online", "stale", "incompatible"],
       "failureModes": [
         "Profile mismatch or runtime identity change rejects registration.",
         "Corrupt or unsupported directory data is left intact and writes are refused."
@@ -66,11 +52,7 @@
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
       "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
-      "surfaces": [
-        "client",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": [
         "empty",
@@ -177,19 +159,9 @@
       "id": "ssh-runtime-connection",
       "title": "Connect to an SSH-managed runtime",
       "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "disconnected",
-        "connecting",
-        "authenticated",
-        "stale",
-        "refused"
-      ],
+      "states": ["disconnected", "connecting", "authenticated", "stale", "refused"],
       "failureModes": [
         "Host-key or identity mismatch rejects attachment.",
         "A missing or stale launch file reports runtime-not-running instead of connecting."
@@ -230,11 +202,7 @@
       "id": "session-routing",
       "title": "Use the native composer for remote threads",
       "summary": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime, and follow/reply in the native chat.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": [
         "auto-selecting",
@@ -263,12 +231,7 @@
           "deterministicFake": "Use an injected in-memory gateway transport with synthetic token and runtime identities; no real DSH profile credentials."
         }
       ],
-      "reach": [
-        "seed multi-host-hosts",
-        "click button \"New session\"",
-        "click button \"Run on Local\"",
-        "expect text \"Auto\""
-      ],
+      "reach": ["seed multi-host-hosts", "click button \"New session\"", "click button \"Run on Local\"", "expect text \"Auto\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -321,22 +284,10 @@
       "id": "isolated-runtime-views",
       "title": "Open the host's own DSH UI",
       "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "leased",
-        "opened",
-        "expired",
-        "released"
-      ],
-      "failureModes": [
-        "A dropped tunnel retires the lease; the next open reconnects.",
-        "Lease release never mutates the remote runtime."
-      ],
+      "states": ["leased", "opened", "expired", "released"],
+      "failureModes": ["A dropped tunnel retires the lease; the next open reconnects.", "Lease release never mutates the remote runtime."],
       "externalDependencies": [],
       "verification": [
         {
@@ -368,17 +319,9 @@
       "id": "remote-thread-references",
       "title": "Mention remote threads safely",
       "summary": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "surfaces": ["host", "integration"],
       "configuration": [],
-      "states": [
-        "local-reference",
-        "remote-reference",
-        "remote-snapshot-added",
-        "remote-snapshot-unavailable"
-      ],
+      "states": ["local-reference", "remote-reference", "remote-snapshot-added", "remote-snapshot-unavailable"],
       "failureModes": [
         "An unrecorded or unauthorized remote Session never receives a remote read.",
         "An unavailable or empty remote snapshot leaves the canonical reference untouched for the native resolver to handle."
@@ -421,27 +364,15 @@
       "id": "remote-inventory",
       "title": "Every thread on every host",
       "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "empty",
-        "listed",
-        "host-started",
-        "host-offline"
-      ],
+      "states": ["empty", "listed", "host-started", "host-offline"],
       "failureModes": [
         "A failed status keeps that host's started-here rows instead of dropping them.",
         "A blank host session (never received a message) stays out of the list."
       ],
       "externalDependencies": [],
-      "reach": [
-        "click button \"All remote threads, including ones started on a host\"",
-        "expect heading \"Remote threads\""
-      ],
+      "reach": ["click button \"All remote threads, including ones started on a host\"", "expect heading \"Remote threads\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -472,19 +403,9 @@
       "id": "remote-host-fallback",
       "title": "Open a mirrored thread on its host",
       "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's DSH home for native questions, approvals, terminals, and JJ tools. The remote DSH does not consume a Session deep link, so the user locates the thread there.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "local-thread-hidden",
-        "remote-owner-resolved",
-        "host-opened",
-        "owner-unavailable",
-        "popup-blocked"
-      ],
+      "states": ["local-thread-hidden", "remote-owner-resolved", "host-opened", "owner-unavailable", "popup-blocked"],
       "failureModes": [
         "A missing local multi-host API is reported without making an unowned runtime call.",
         "A blocked popup or unavailable runtime leaves the local thread and its data unchanged."

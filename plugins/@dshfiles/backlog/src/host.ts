@@ -66,7 +66,9 @@ const backlogHandlers = Api.handlers(backlogApi, {
       const store = yield* BacklogStore
       const actor = actorOf(call.caller)
       const project =
-        input.project === undefined && actor.kind === 'agent' && actor.cwd !== undefined ? yield* CaptureProjects.use(projects => projects.of(actor.cwd ?? '')) : input.project
+        input.project === undefined && actor.kind === 'agent' && actor.cwd !== undefined
+          ? yield* CaptureProjects.use(projects => projects.of(actor.cwd ?? ''))
+          : input.project
       const detail = yield* store.capture({ ...input, actor, ...(project !== undefined && { project }) })
       yield* Triage.use(triage => triage.schedule(detail.item.id))
       yield* TweetImport.use(tweets => tweets.schedule(detail.item.id))

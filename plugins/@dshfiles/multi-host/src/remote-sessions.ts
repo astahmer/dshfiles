@@ -126,7 +126,9 @@ export class RemoteSessions extends Context.Service<
       /** Concurrent lookups of one Session share a single discovery. */
       const runtimeFor = (sessionId: string) => Effect.flatMap(FiberMap.run(discoveries, sessionId, lookup(sessionId), { onlyIfMissing: true }), Fiber.join)
       const requireRuntime = (sessionId: string) =>
-        Effect.flatMap(runtimeFor(sessionId), runtime => (runtime === undefined ? Effect.fail(new SessionOwnerMissing({ sessionId })) : Effect.succeed(runtime)))
+        Effect.flatMap(runtimeFor(sessionId), runtime =>
+          runtime === undefined ? Effect.fail(new SessionOwnerMissing({ sessionId })) : Effect.succeed(runtime),
+        )
 
       const forward = <Value>(input: {
         readonly sessionId: string
@@ -136,9 +138,13 @@ export class RemoteSessions extends Context.Service<
         readonly decode: (value: unknown) => Effect.Effect<Value, unknown>
       }) =>
         Effect.flatMap(requireRuntime(input.sessionId), runtime =>
-          pool.use(runtime.id, gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: input.method, args: { request: input.request } }), input.decode), {
-            mutation: input.mutation,
-          }),
+          pool.use(
+            runtime.id,
+            gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: input.method, args: { request: input.request } }), input.decode),
+            {
+              mutation: input.mutation,
+            },
+          ),
         )
 
       const list = Effect.fn('multi-host remote sessions list')(function* (request: SessionListRequest) {
@@ -233,9 +239,10 @@ export class RemoteSessions extends Context.Service<
         owns: (sessionId: SessionId) => Effect.map(runtimeFor(sessionId), runtime => runtime !== undefined),
         runtimeIdForSession,
         follow: (request: SessionFollowRequest): Stream.Stream<SessionFollowFrame, unknown> =>
-          Stream.flatMap(
-            Stream.fromEffect(requireRuntime(ownedSessionOf(request.address))),
-            runtime => Stream.unwrap(pool.use(runtime.id, gateway => Effect.succeed(gateway.stream({ endpoint: 'session/follow', args: { request } })), { mutation: false })),
+          Stream.flatMap(Stream.fromEffect(requireRuntime(ownedSessionOf(request.address))), runtime =>
+            Stream.unwrap(
+              pool.use(runtime.id, gateway => Effect.succeed(gateway.stream({ endpoint: 'session/follow', args: { request } })), { mutation: false }),
+            ),
           ).pipe(Stream.mapEffect(SessionPayload.followFrame)),
         page: (request: SessionPageRequest): Effect.Effect<SessionPage, unknown> =>
           forward({ sessionId: ownedSessionOf(request.address), method: 'page', request, mutation: false, decode: SessionPayload.page }),

@@ -10,17 +10,13 @@ const recordSchema = Schema.Struct({ type: Schema.Literal('event'), event: event
 const textBlockSchema = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }).pipe(
   SchemaFields.passthrough,
 )
-const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(
-  SchemaFields.passthrough,
-)
+const messageSchema = Schema.Struct({ content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))) }).pipe(SchemaFields.passthrough)
 const userMessageSchema = Schema.Struct({
   content: Schema.optional(Schema.Array(textBlockSchema).check(Schema.isMaxLength(512))),
   source: Schema.optional(Schema.Struct({ kind: Schema.String }).pipe(SchemaFields.passthrough)),
 }).pipe(SchemaFields.passthrough)
 const assistantSchema = Schema.Struct({ message: messageSchema }).pipe(SchemaFields.passthrough)
-const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(
-  SchemaFields.passthrough,
-)
+const toolCallSchema = Schema.Struct({ callId: Schema.String, name: Schema.String, arguments: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough)
 const toolArgumentsSchema = Schema.Struct({
   command: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),

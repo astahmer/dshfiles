@@ -40,7 +40,9 @@ const triageLayer = (settings: Partial<BacklogSettings>) =>
     Layer.provideMerge(AiActivity.layer),
     Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
     Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as never))),
-    Layer.provideMerge(Layer.succeed(SecretReferenceResolver, SecretReferenceResolver.of({ resolve: () => Effect.succeedNone, resolveWithLabel: () => Effect.succeedNone }))),
+    Layer.provideMerge(
+      Layer.succeed(SecretReferenceResolver, SecretReferenceResolver.of({ resolve: () => Effect.succeedNone, resolveWithLabel: () => Effect.succeedNone })),
+    ),
   )
 
 const jevAnswering =
@@ -114,7 +116,9 @@ describe('triage', () => {
   it.effect('takes the model answer, dropping invalid fields and duplicates it was not shown', () =>
     Effect.gen(function* () {
       const complete: TriageServices['complete'] = () =>
-        Effect.succeed('Sure: {"kind": "bug", "status": "sideways", "title": "Composer drops chips on paste", "tags": ["composer"], "duplicateOf": 99, "confidence": 0.92, "reason": "Something is broken."}')
+        Effect.succeed(
+          'Sure: {"kind": "bug", "status": "sideways", "title": "Composer drops chips on paste", "tags": ["composer"], "duplicateOf": 99, "confidence": 0.92, "reason": "Something is broken."}',
+        )
       const proposal = yield* BacklogTriage.run({ item: item(1, 'composer drops chips on paste'), others: [], services: { complete }, now: 5 })
       expect(proposal).toEqual({
         kind: 'bug',
@@ -131,7 +135,8 @@ describe('triage', () => {
   it.effect('uses the configured model without making a redundant Jev request or changing status', () =>
     Effect.gen(function* () {
       let jevCalls = 0
-      const complete: TriageServices['complete'] = () => Effect.succeed('{"kind": "idea", "status": "doing", "confidence": 0.95, "reason": "A possible feature."}')
+      const complete: TriageServices['complete'] = () =>
+        Effect.succeed('{"kind": "idea", "status": "doing", "confidence": 0.95, "reason": "A possible feature."}')
       const jev: TriageServices['jev'] = () =>
         Effect.sync(() => {
           jevCalls += 1

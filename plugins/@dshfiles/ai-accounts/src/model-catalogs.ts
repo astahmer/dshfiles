@@ -46,9 +46,7 @@ export class ModelCatalogs extends Context.Service<
     const settle = (instanceId: string, token: number) =>
       Ref.get(generation).pipe(
         Effect.flatMap(current =>
-          HashMap.get(current, instanceId) === Option.some(token)
-            ? Ref.update(running, entries => HashMap.remove(entries, instanceId))
-            : Effect.void,
+          HashMap.get(current, instanceId) === Option.some(token) ? Ref.update(running, entries => HashMap.remove(entries, instanceId)) : Effect.void,
         ),
         Effect.andThen(
           Ref.get(generation).pipe(
@@ -83,7 +81,10 @@ export class ModelCatalogs extends Context.Service<
       forget: instanceId => Ref.update(discovered, current => HashMap.remove(current, instanceId)),
       retain: matches =>
         Ref.update(discovered, current =>
-          [...current].reduce((kept, [instanceId, catalog]) => (matches({ instanceId, route: catalog.route }) ? kept : HashMap.remove(kept, instanceId)), current),
+          [...current].reduce(
+            (kept, [instanceId, catalog]) => (matches({ instanceId, route: catalog.route }) ? kept : HashMap.remove(kept, instanceId)),
+            current,
+          ),
         ),
       start,
       isRefreshing: instanceId =>

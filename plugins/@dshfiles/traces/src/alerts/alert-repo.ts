@@ -51,11 +51,7 @@ export class AlertDb extends Context.Service<AlertDb, SqlClient.SqlClient>()('@d
     SqliteStore.layerAs(AlertDb, { filename, migrations: { '1_rules': createAndSeed }, legacyUserVersion: 1, pragmas: { synchronous: 'full' } })
 }
 
-export class AlertRuleNotFound extends Schema.TaggedError<AlertRuleNotFound>()(
-  'AlertRuleNotFound',
-  { id: Schema.String },
-  { dshxWireCode: 'not-found' },
-) {
+export class AlertRuleNotFound extends Schema.TaggedError<AlertRuleNotFound>()('AlertRuleNotFound', { id: Schema.String }, { dshxWireCode: 'not-found' }) {
   override get message(): string {
     return `No alert rule ${this.id}.`
   }

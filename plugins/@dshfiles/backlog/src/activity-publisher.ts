@@ -48,7 +48,8 @@ export const backlogActivityPayload = (item: BacklogItem, event: BacklogEvent): 
   const attentionPhrase = attention === 'none' ? 'cleared the request on' : attention === 'needs-input' ? 'asked for your input on' : `marked ${attention}`
   const phrase = type === 'backlog.attention' ? attentionPhrase : type.slice('backlog.'.length)
   const who = event.actor === 'user' ? 'You' : event.actor === 'system' ? 'Automatic' : `Agent ${(sessionId ?? '').replace(/^session-/, '').slice(0, 6)}`
-  const level = type === 'backlog.attention' && attention !== 'none' ? 'attention' : type === 'backlog.moved' || type === 'backlog.created' ? 'notable' : 'routine'
+  const level =
+    type === 'backlog.attention' && attention !== 'none' ? 'attention' : type === 'backlog.moved' || type === 'backlog.created' ? 'notable' : 'routine'
   return {
     kind: 'backlog',
     value: {

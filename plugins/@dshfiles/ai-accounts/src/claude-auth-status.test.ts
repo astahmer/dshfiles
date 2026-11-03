@@ -6,10 +6,16 @@ import { ClaudeAccountModel } from './claude-account.js'
 import { createClaudeAuthStatusRunner, verifyClaudeAuthStatus, type ClaudeAuthStatusExec, type ClaudeAuthStatusRunner } from './claude-auth-status.js'
 
 /** The official CLI, a neutral directory and its cleanup are the only things outside this module. */
-const claudeCli = (answer: (callback: (error: Error | null, stdout: string) => void) => void = callback => callback(null, '{"loggedIn":true,"authMethod":"claude.ai"}')) => {
+const claudeCli = (
+  answer: (callback: (error: Error | null, stdout: string) => void) => void = callback => callback(null, '{"loggedIn":true,"authMethod":"claude.ai"}'),
+) => {
   const exec = vi.fn<ClaudeAuthStatusExec>((_input, callback) => answer(callback))
   const removeDirectory = vi.fn()
-  return { exec, removeDirectory, run: createClaudeAuthStatusRunner({ exec, makeNeutralDirectory: () => '/synthetic/tmp/dsh-claude-status-fake', removeDirectory }) }
+  return {
+    exec,
+    removeDirectory,
+    run: createClaudeAuthStatusRunner({ exec, makeNeutralDirectory: () => '/synthetic/tmp/dsh-claude-status-fake', removeDirectory }),
+  }
 }
 /** The CLI's own default login directory: the module compares against the real home, not a mock. */
 const DEFAULT_CLAUDE_CONFIG_DIR = join(homedir(), '.claude')
@@ -150,14 +156,14 @@ describe('official Claude CLI authenticated configuration (not remote validation
   it('bounds a runner ignoring cancellation and clears all timers', async () => {
     vi.useFakeTimers()
     try {
-    let childSignal: AbortSignal | undefined
-    const run: ClaudeAuthStatusRunner = async input => {
-      childSignal = input.signal
-      return new Promise(() => {})
-    }
-    const pending = expect(verifyClaudeAuthStatus({ ...base(), run })).rejects.toThrow('did not confirm')
-    await vi.advanceTimersByTimeAsync(5_000)
-    await pending
+      let childSignal: AbortSignal | undefined
+      const run: ClaudeAuthStatusRunner = async input => {
+        childSignal = input.signal
+        return new Promise(() => {})
+      }
+      const pending = expect(verifyClaudeAuthStatus({ ...base(), run })).rejects.toThrow('did not confirm')
+      await vi.advanceTimersByTimeAsync(5_000)
+      await pending
       expect(childSignal?.aborted).toBe(true)
       expect(vi.getTimerCount()).toBe(0)
     } finally {

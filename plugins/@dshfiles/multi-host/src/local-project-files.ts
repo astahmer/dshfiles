@@ -113,7 +113,10 @@ const candidateOf = (input: { readonly root: string; readonly relativePath: stri
   })
 
 /** Untracked files of a local Git project, plus its ignored ones when asked, that could be copied to a remote clone. */
-const list = Effect.fn('local project files scan', { kind: 'internal' })(function* (input: { readonly path: string; readonly includeIgnored?: boolean | undefined }) {
+const list = Effect.fn('local project files scan', { kind: 'internal' })(function* (input: {
+  readonly path: string
+  readonly includeIgnored?: boolean | undefined
+}) {
   const root = yield* repositoryRoot(input.path)
   const untracked = yield* runBounded({
     executable: 'git',
@@ -136,11 +139,9 @@ const list = Effect.fn('local project files scan', { kind: 'internal' })(functio
   const paths = [...new Set([...pathListOf(untracked), ...ignored])]
     .filter(value => safeRelativePath(value) && pathIsCopyable(value))
     .sort((left, right) => left.localeCompare(right))
-  const found = yield* Effect.forEach(
-    paths.slice(0, maxListedFiles),
-    relativePath => candidateOf({ root, relativePath, ignored: ignored.has(relativePath) }),
-    { concurrency: 8 },
-  )
+  const found = yield* Effect.forEach(paths.slice(0, maxListedFiles), relativePath => candidateOf({ root, relativePath, ignored: ignored.has(relativePath) }), {
+    concurrency: 8,
+  })
   const candidates = found.flatMap(file => Option.toArray(file))
   yield* Effect.annotateCurrentSpan('dshfiles.multi_host.local_file_count', candidates.length)
   return { root, files: candidates, truncated: paths.length > maxListedFiles }

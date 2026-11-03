@@ -65,7 +65,9 @@ export class ReplyGenerator extends Context.Service<
         const item = existing.value.item
         const preferred = current.replyAgent === '' ? null : yield* enabledAgent(current.replyAgent)
         const linkedThreads = new Set(item.links.filter(link => link.type === 'thread').map(link => link.target))
-        const recentThreads = item.events.toReversed().flatMap(event => (event.threadId !== undefined && linkedThreads.has(event.threadId) ? [event.threadId] : []))
+        const recentThreads = item.events
+          .toReversed()
+          .flatMap(event => (event.threadId !== undefined && linkedThreads.has(event.threadId) ? [event.threadId] : []))
         const recent = yield* Effect.findFirst(recentThreads, sessionId => Effect.map(threadAgent(sessionId), Option.isSome))
         const lastUsed = Option.isNone(recent) ? null : Option.getOrNull(yield* threadAgent(recent.value))
         const agent = ReplyAgentSelection.choose({ order: current.replyAgentOrder, preferred, lastUsed })

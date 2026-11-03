@@ -40,7 +40,11 @@ export class ReplyRouting {
     return keywordDecision(text)
   }
 
-  static classify(input: { readonly text: string; readonly jev?: JevAsk | undefined; readonly threshold?: number | undefined }): Effect.Effect<ReplyRouteResult> {
+  static classify(input: {
+    readonly text: string
+    readonly jev?: JevAsk | undefined
+    readonly threshold?: number | undefined
+  }): Effect.Effect<ReplyRouteResult> {
     if (input.jev === undefined) return Effect.succeed(keywordDecision(input.text))
     return input.jev({ question: threadWorthyQuestion, text: input.text }).pipe(
       Effect.map((confidence): ReplyRouteResult => ({ route: confidence >= (input.threshold ?? 0.72) ? 'thread' : 'reply', confidence, source: 'jev' })),

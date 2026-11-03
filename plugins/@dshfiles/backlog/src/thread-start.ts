@@ -189,9 +189,16 @@ export class ThreadStart extends Context.Service<
         const title = StartThreadForm.title(details)
         const route =
           agent?.route ??
-          (input.provider === undefined || input.model === undefined ? null : { provider: input.provider, model: input.model, reasoningEffort: input.reasoningEffort })
+          (input.provider === undefined || input.model === undefined
+            ? null
+            : { provider: input.provider, model: input.model, reasoningEffort: input.reasoningEffort })
         if (route !== null) {
-          const selection = { sessionId, provider: route.provider, model: route.model, ...(route.reasoningEffort !== undefined && { reasoningEffort: route.reasoningEffort }) }
+          const selection = {
+            sessionId,
+            provider: route.provider,
+            model: route.model,
+            ...(route.reasoningEffort !== undefined && { reasoningEffort: route.reasoningEffort }),
+          }
           yield* sessions
             .selectModel(selection)
             .pipe(Effect.catch(error => Effect.logWarning('backlog: the started thread kept the Host default model', error)))
@@ -208,9 +215,9 @@ export class ThreadStart extends Context.Service<
             const uploaded = yield* uploads.upload({ sessionId, name: attachment.name, bytes: attachment.bytes })
             content.push({ type: 'file', receiptId: uploaded.receiptId })
           }
-          yield* sessions.prompt({ requestId: requestId(), sessionId, mode: 'queue', content }).pipe(
-            Effect.mapError(cause => new ThreadContextNotDelivered({ sessionId, cause })),
-          )
+          yield* sessions
+            .prompt({ requestId: requestId(), sessionId, mode: 'queue', content })
+            .pipe(Effect.mapError(cause => new ThreadContextNotDelivered({ sessionId, cause })))
         })
         if (agent !== null)
           yield* agents
@@ -223,7 +230,11 @@ export class ThreadStart extends Context.Service<
         for (const detail of items) {
           const result = yield* store
             .link({ id: detail.item.id, link: { type: 'thread', target: sessionId, provenance }, actor })
-            .pipe(Effect.catch((error: BacklogWriteFailed) => Effect.as(Effect.logWarning('backlog: an item was not linked to its thread', error), { ok: false } as const)))
+            .pipe(
+              Effect.catch((error: BacklogWriteFailed) =>
+                Effect.as(Effect.logWarning('backlog: an item was not linked to its thread', error), { ok: false } as const),
+              ),
+            )
           if (result.ok) linked.push(detail.item.id)
         }
         return { sessionId, linked, missing }

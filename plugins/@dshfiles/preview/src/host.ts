@@ -36,11 +36,14 @@ const previewHandlers = Api.handlers(previewApi, {
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      const opened = yield* (pages.open({ sessionId, url: input.url, reveal: input.reveal ?? false }))
+      const opened = yield* pages.open({ sessionId, url: input.url, reveal: input.reveal ?? false })
       yield* Api.publish({
         contract: previewApi,
         event: 'pagesChanged',
-        payload: { sessionId, reveal: opened.revealRequestedAt === null ? null : { pageId: opened.pageId, url: opened.url, requestedAt: opened.revealRequestedAt } },
+        payload: {
+          sessionId,
+          reveal: opened.revealRequestedAt === null ? null : { pageId: opened.pageId, url: opened.url, requestedAt: opened.revealRequestedAt },
+        },
       }).pipe(Effect.catch(() => Effect.logDebug('preview: the page-change event was not published')))
       return opened
     }),
@@ -48,8 +51,10 @@ const previewHandlers = Api.handlers(previewApi, {
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      const result = yield* (pages.navigate({ sessionId, pageId: input.pageId, url: input.url, action: input.action }))
-      yield* Api.publish({ contract: previewApi, event: 'pagesChanged', payload: { sessionId, reveal: null } }).pipe(Effect.catch(() => Effect.logDebug('preview: the page-change event was not published')))
+      const result = yield* pages.navigate({ sessionId, pageId: input.pageId, url: input.url, action: input.action })
+      yield* Api.publish({ contract: previewApi, event: 'pagesChanged', payload: { sessionId, reveal: null } }).pipe(
+        Effect.catch(() => Effect.logDebug('preview: the page-change event was not published')),
+      )
       return result
     }),
   reveal: (input, call) =>
@@ -57,7 +62,7 @@ const previewHandlers = Api.handlers(previewApi, {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
       const revealRequestedAt = yield* pages.revealRequest({ sessionId, pageId: input.pageId })
-      const page = (yield* (pages.list(sessionId))).find(entry => entry.pageId === input.pageId)
+      const page = (yield* pages.list(sessionId)).find(entry => entry.pageId === input.pageId)
       if (page !== undefined && revealRequestedAt !== null)
         yield* Api.publish({
           contract: previewApi,
@@ -70,39 +75,52 @@ const previewHandlers = Api.handlers(previewApi, {
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      return yield* (pages.snapshot({ sessionId, pageId: input.pageId, maxChars: input.maxChars ?? DEFAULT_SNAPSHOT_CHARS }))
+      return yield* pages.snapshot({ sessionId, pageId: input.pageId, maxChars: input.maxChars ?? DEFAULT_SNAPSHOT_CHARS })
     }),
   click: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      return yield* pages.click({ sessionId, pageId: input.pageId, target: { ref: input.ref, selector: input.selector }, doubleClick: input.doubleClick ?? false })
+      return yield* pages.click({
+        sessionId,
+        pageId: input.pageId,
+        target: { ref: input.ref, selector: input.selector },
+        doubleClick: input.doubleClick ?? false,
+      })
     }),
   type: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      return yield* pages.type({ sessionId, pageId: input.pageId, target: { ref: input.ref, selector: input.selector }, text: input.text, submit: input.submit ?? false })
+      return yield* pages.type({
+        sessionId,
+        pageId: input.pageId,
+        target: { ref: input.ref, selector: input.selector },
+        text: input.text,
+        submit: input.submit ?? false,
+      })
     }),
   evaluate: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      return yield* (pages.evaluate({ sessionId, pageId: input.pageId, expression: input.expression }))
+      return yield* pages.evaluate({ sessionId, pageId: input.pageId, expression: input.expression })
     }),
   close: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      const result = yield* (pages.close({ sessionId, pageId: input.pageId }))
-      yield* Api.publish({ contract: previewApi, event: 'pagesChanged', payload: { sessionId, reveal: null } }).pipe(Effect.catch(() => Effect.logDebug('preview: the page-change event was not published')))
+      const result = yield* pages.close({ sessionId, pageId: input.pageId })
+      yield* Api.publish({ contract: previewApi, event: 'pagesChanged', payload: { sessionId, reveal: null } }).pipe(
+        Effect.catch(() => Effect.logDebug('preview: the page-change event was not published')),
+      )
       return result
     }),
   list: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
       const pages = yield* PreviewPages
-      return { pages: yield* (pages.list(sessionId)) }
+      return { pages: yield* pages.list(sessionId) }
     }),
   devServers: (input, call) =>
     Effect.gen(function* () {
@@ -115,7 +133,9 @@ const previewHandlers = Api.handlers(previewApi, {
       const sessionId = yield* ownThread(call, input.sessionId)
       const servers = yield* PreviewDevServers
       const { servers: listed } = yield* servers.read(true)
-      const server = listed.find(candidate => candidate.pid === input.pid && candidate.startedAt === input.startedAt && candidate.sessionIds.includes(sessionId))
+      const server = listed.find(
+        candidate => candidate.pid === input.pid && candidate.startedAt === input.startedAt && candidate.sessionIds.includes(sessionId),
+      )
       if (server === undefined) return { outcome: 'missing' as const }
       yield* servers.invalidate
       if (server.jobId !== null) {
@@ -145,14 +165,14 @@ export default DshxPlugin.make({
           if (call.caller.kind !== 'plugin') return yield* new PreviewInactive({ reason: 'plugin-only' })
           const pages = yield* PreviewPages
           const shot = yield* pages.renderHtml({
-              document: input.document,
-              width: input.width ?? RenderHtmlLimits.defaultWidth,
-              height: input.height ?? RenderHtmlLimits.defaultHeight,
-              fullPage: input.fullPage ?? false,
-              colorScheme: input.colorScheme ?? 'light',
-              maxImageBytes: MAX_RENDER_IMAGE_BYTES,
-              maxFullPageHeight: RenderHtmlLimits.maxFullPageHeight,
-            })
+            document: input.document,
+            width: input.width ?? RenderHtmlLimits.defaultWidth,
+            height: input.height ?? RenderHtmlLimits.defaultHeight,
+            fullPage: input.fullPage ?? false,
+            colorScheme: input.colorScheme ?? 'light',
+            maxImageBytes: MAX_RENDER_IMAGE_BYTES,
+            maxFullPageHeight: RenderHtmlLimits.maxFullPageHeight,
+          })
           return { image: Buffer.from(shot.image).toString('base64'), mediaType: 'image/jpeg' as const, width: shot.width, height: shot.height }
         }),
     }),

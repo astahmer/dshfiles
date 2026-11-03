@@ -5,14 +5,7 @@ import { Context, Effect, FiberMap, Layer } from 'effect'
 import { AiActivity } from './ai-activity.js'
 import type { BacklogDetailResult } from './api.js'
 import { BacklogTweetContext } from './backlog-tweet-context.js'
-import {
-  TweetContextFailed,
-  TweetContextUnavailable,
-  TweetDescriptionFull,
-  TweetImageInvalid,
-  TweetUrlNotInItem,
-  type BacklogWriteFailed,
-} from './errors.js'
+import { TweetContextFailed, TweetContextUnavailable, TweetDescriptionFull, TweetImageInvalid, TweetUrlNotInItem, type BacklogWriteFailed } from './errors.js'
 import { BacklogItems, type BacklogFileInput } from './item.js'
 import { HostAttachments } from './host-edge-promise.js'
 import { BacklogStore, type BacklogActor } from './store.js'
@@ -23,7 +16,11 @@ type TweetImportError = BacklogWriteFailed | TweetUrlNotInItem | TweetContextUna
 export class TweetImport extends Context.Service<
   TweetImport,
   {
-    readonly import: (input: { readonly id: number; readonly url: string; readonly actor: BacklogActor }) => Effect.Effect<BacklogDetailResult, TweetImportError>
+    readonly import: (input: {
+      readonly id: number
+      readonly url: string
+      readonly actor: BacklogActor
+    }) => Effect.Effect<BacklogDetailResult, TweetImportError>
     /** Import the first post an item names in the background; a second request for the same post joins the first. */
     readonly schedule: (id: number) => Effect.Effect<void>
   }
@@ -95,7 +92,9 @@ export class TweetImport extends Context.Service<
         yield* FiberMap.run(
           running,
           `${String(id)}:${url}`,
-          activity.track(importContext({ id, url, actor: { kind: 'system' } })).pipe(Effect.catch(error => Effect.logDebug('backlog: tweet import skipped', error))),
+          activity
+            .track(importContext({ id, url, actor: { kind: 'system' } }))
+            .pipe(Effect.catch(error => Effect.logDebug('backlog: tweet import skipped', error))),
           { onlyIfMissing: true, startImmediately: true },
         )
       })

@@ -83,14 +83,17 @@ const fixture = (): Fixture => {
       streamed = frames
     },
     released: () => releases,
-    layer: Layer.succeed(Connectors, Connectors.of({
-      connect: () =>
-        Effect.gen(function* () {
-          const connection = gateway()
-          yield* Effect.addFinalizer(() => Effect.sync(() => (releases += 1)))
-          return connection
-        }),
-    })),
+    layer: Layer.succeed(
+      Connectors,
+      Connectors.of({
+        connect: () =>
+          Effect.gen(function* () {
+            const connection = gateway()
+            yield* Effect.addFinalizer(() => Effect.sync(() => (releases += 1)))
+            return connection
+          }),
+      }),
+    ),
   }
 }
 
@@ -126,7 +129,13 @@ const layerWith = (test: Fixture, sessions: readonly { readonly sessionId: strin
       createdAt: '2026-10-05T00:00:00.000Z',
     })
     for (const thread of sessions)
-      yield* threads.record({ runtimeId: thread.runtimeId, sessionId: thread.sessionId, cwd: thread.cwd ?? '/remote/repo', title: '', createdAt: '2026-10-05T00:00:00.000Z' })
+      yield* threads.record({
+        runtimeId: thread.runtimeId,
+        sessionId: thread.sessionId,
+        cwd: thread.cwd ?? '/remote/repo',
+        title: '',
+        createdAt: '2026-10-05T00:00:00.000Z',
+      })
   })
 
 const services = (test: Fixture, sessions: readonly { readonly sessionId: string; readonly runtimeId: string; readonly cwd?: string }[] = []) =>
@@ -158,7 +167,9 @@ describe('RemoteSessions', () => {
     return Effect.gen(function* () {
       const sessions = yield* RemoteSessions
       yield* sessions.source.list({})
-      const frames = yield* Stream.runCollect(sessions.source.follow?.({ address: { kind: 'session', sessionId: 'session-remote' as SessionId } }) ?? Stream.empty)
+      const frames = yield* Stream.runCollect(
+        sessions.source.follow?.({ address: { kind: 'session', sessionId: 'session-remote' as SessionId } }) ?? Stream.empty,
+      )
       expect([...frames]).toHaveLength(1)
     }).pipe(Effect.provide(services(test)))
   })
@@ -194,9 +205,7 @@ describe('RemoteSessions', () => {
     return Effect.gen(function* () {
       const sessions = yield* RemoteSessions
       const rows = yield* sessions.source.list({})
-      expect(rows).toEqual(
-        expect.arrayContaining([expect.objectContaining({ sessionId: 'session-created', cwd: '/remote/new', blank: true, running: false })]),
-      )
+      expect(rows).toEqual(expect.arrayContaining([expect.objectContaining({ sessionId: 'session-created', cwd: '/remote/new', blank: true, running: false })]))
     }).pipe(Effect.provide(services(test, [{ sessionId: 'session-created', runtimeId, cwd: '/remote/new' }])))
   })
 
@@ -217,8 +226,10 @@ describe('RemoteSessions', () => {
     return Effect.gen(function* () {
       const sessions = yield* RemoteSessions
       yield* sessions.source.list({})
-      const selected = yield* sessions.source.selectModel?.({ sessionId: 'session-remote' as SessionId, provider: 'deepseek', model: 'chat', reasoningEffort: 'high' }) ??
-        Effect.succeed(undefined)
+      const selected = yield* (
+        sessions.source.selectModel?.({ sessionId: 'session-remote' as SessionId, provider: 'deepseek', model: 'chat', reasoningEffort: 'high' }) ??
+          Effect.succeed(undefined)
+      )
       expect(selected).toEqual({ selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } })
       expect(test.calls.at(-1)).toEqual({
         method: 'selectModel',

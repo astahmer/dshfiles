@@ -50,7 +50,9 @@ const prepare = Effect.fn('backlog start context prepare')(function* (input: {
   const appendText = Effect.fnUntraced(function* (value: string) {
     textCharacters += value.length
     if (textCharacters > MAX_CONTEXT_TEXT_CHARACTERS) {
-      return yield* new StartContextInvalid({ reason: `Backlog context exceeds ${String(MAX_CONTEXT_TEXT_CHARACTERS)} characters; split the items into separate threads.` })
+      return yield* new StartContextInvalid({
+        reason: `Backlog context exceeds ${String(MAX_CONTEXT_TEXT_CHARACTERS)} characters; split the items into separate threads.`,
+      })
     }
     text.push(value)
   })
@@ -59,11 +61,15 @@ const prepare = Effect.fn('backlog start context prepare')(function* (input: {
     for (const attachment of entries) {
       attachmentCount += 1
       if (attachmentCount > MAX_CONTEXT_ATTACHMENTS) {
-        return yield* new StartContextInvalid({ reason: `Backlog context exceeds ${String(MAX_CONTEXT_ATTACHMENTS)} attachments; split the items into separate threads.` })
+        return yield* new StartContextInvalid({
+          reason: `Backlog context exceeds ${String(MAX_CONTEXT_ATTACHMENTS)} attachments; split the items into separate threads.`,
+        })
       }
       attachmentBytes += attachment.bytes
       if (attachmentBytes > MAX_CONTEXT_ATTACHMENT_BYTES) {
-        return yield* new StartContextInvalid({ reason: `Backlog attachments exceed ${String(MAX_CONTEXT_ATTACHMENT_BYTES)} bytes; split the items into separate threads.` })
+        return yield* new StartContextInvalid({
+          reason: `Backlog attachments exceed ${String(MAX_CONTEXT_ATTACHMENT_BYTES)} bytes; split the items into separate threads.`,
+        })
       }
       const result = yield* input.readFile({ id, attachmentId: attachment.id })
       if (!result.ok) return yield* new StartContextInvalid({ reason: `Could not read ${source} attachment “${attachment.name}”.` })

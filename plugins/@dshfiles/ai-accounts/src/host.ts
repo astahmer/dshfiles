@@ -718,7 +718,9 @@ const startAccountsHost = (input: {
     if (route === undefined || !route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) return
     const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
     const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
-    const modelIds = await catalogState.refresh(instanceId, async signal => (await llm.discoverModels(settingsNs, discoveryRequest, signal)).map(model => model.id))
+    const modelIds = await catalogState.refresh(instanceId, async signal =>
+      (await llm.discoverModels(settingsNs, discoveryRequest, signal)).map(model => model.id),
+    )
     // A route that changed while the fetch ran cannot claim the models it found.
     if (modelIds === undefined || !sameKeyedRoute(routes.get(instanceId), route)) return
     catalogState.record({ instanceId, route, modelIds })

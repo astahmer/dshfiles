@@ -22,8 +22,12 @@ export class PreviewPages extends Context.Service<
     readonly click: (input: Parameters<PreviewBrowsers['click']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['click']>>, PreviewRefused>
     readonly type: (input: Parameters<PreviewBrowsers['type']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['type']>>, PreviewRefused>
     readonly evaluate: (input: Parameters<PreviewBrowsers['evaluate']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['evaluate']>>, PreviewRefused>
-    readonly screenshot: (input: Parameters<PreviewBrowsers['screenshot']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['screenshot']>>, PreviewRefused>
-    readonly renderHtml: (input: Parameters<PreviewBrowsers['renderHtml']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['renderHtml']>>, PreviewRefused>
+    readonly screenshot: (
+      input: Parameters<PreviewBrowsers['screenshot']>[0],
+    ) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['screenshot']>>, PreviewRefused>
+    readonly renderHtml: (
+      input: Parameters<PreviewBrowsers['renderHtml']>[0],
+    ) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['renderHtml']>>, PreviewRefused>
     readonly close: (input: Parameters<PreviewBrowsers['close']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['close']>>, PreviewRefused>
     readonly list: (sessionId: string) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['list']>>, PreviewRefused>
     readonly closeThread: (sessionId: string) => Effect.Effect<number>

@@ -20,8 +20,7 @@ const fakeExec =
 
 /** The Host context a probe reads: one Session whose checkout holds the python server's cwd. */
 const testContext = {
-  get: (name: string) =>
-    name === 'sessionController' ? { list: async () => ({ items: [{ sessionId: 'session-b', cwd: '/repo-threads/b' }] }) } : undefined,
+  get: (name: string) => (name === 'sessionController' ? { list: async () => ({ items: [{ sessionId: 'session-b', cwd: '/repo-threads/b' }] }) } : undefined),
   inject: () => undefined,
 }
 

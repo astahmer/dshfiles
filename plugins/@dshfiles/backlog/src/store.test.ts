@@ -110,12 +110,8 @@ describe('store', () => {
       const fromProject = yield* store.capture({ text: 'ship the board', actor: agent })
 
       expect(fromWorkspace.item.project).toBe('/work/dshfiles')
-      expect((yield* store.projects)).toEqual([expect.objectContaining({ project: '/work/dshfiles', counts: expect.objectContaining({ inbox: 2 }) })])
-      expect(
-        (yield* store.list({ project: '/work/dshfiles-threads/thread-1b7a8c' })).items
-          .map(item => item.id)
-          .sort(),
-      ).toEqual([1, 2])
+      expect(yield* store.projects).toEqual([expect.objectContaining({ project: '/work/dshfiles', counts: expect.objectContaining({ inbox: 2 }) })])
+      expect((yield* store.list({ project: '/work/dshfiles-threads/thread-1b7a8c' })).items.map(item => item.id).sort()).toEqual([1, 2])
       expect((yield* store.list({ project: '/work/dshfiles' })).total).toBe(2)
       expect(fromProject.item.project).toBe('/work/dshfiles')
     }).pipe(Effect.scoped),
@@ -219,12 +215,12 @@ describe('store', () => {
       yield* store.capture({ text: 'child step, part of b:1', actor: user })
       yield* store.link({ id: 2, link: { type: 'branch', target: 'feat/backlog' }, actor: user })
 
-      const parent = (yield* store.get(1))
+      const parent = yield* store.get(1)
       expect(parent.ok && parent.value.backlinks.map(item => item.id)).toEqual([2])
       expect((yield* store.referencing({ type: 'branch', target: 'feat/backlog' })).map(item => item.id)).toEqual([2])
 
       yield* store.link({ id: 2, link: { type: 'item', target: '1' }, remove: true, actor: user })
-      const unlinked = (yield* store.get(1))
+      const unlinked = yield* store.get(1)
       expect(unlinked.ok && unlinked.value.backlinks).toEqual([])
     }).pipe(Effect.scoped),
   )
@@ -236,7 +232,7 @@ describe('store', () => {
       yield* store.capture({ text: 'one', actor: user })
       yield* store.capture({ text: 'two', actor: user })
 
-      const many = (yield* store.getMany([2, 99, 1, 2]))
+      const many = yield* store.getMany([2, 99, 1, 2])
       expect(many.items.map(detail => detail.item.id)).toEqual([2, 1])
       expect(many.missing).toEqual([99])
     }).pipe(Effect.scoped),
@@ -313,8 +309,8 @@ describe('triage proposals', () => {
 
       yield* store.applyProposal({ id: 2, actor: user })
 
-      const duplicate = (yield* store.get(2))
-      const canonical = (yield* store.get(1))
+      const duplicate = yield* store.get(2)
+      const canonical = yield* store.get(1)
       expect(duplicate.ok && duplicate.value.item.status).toBe('done')
       expect(canonical.ok && canonical.value.item.status).toBe('done')
       expect(canonical.ok && canonical.value.item.events.at(-1)?.detail).toBe('inbox → done (duplicate b:2 resolved)')
@@ -332,7 +328,7 @@ describe('triage proposals', () => {
 
       yield* store.update({ id: 2, status: 'done', actor: agent })
 
-      const canonical = (yield* store.get(1))
+      const canonical = yield* store.get(1)
       expect(canonical.ok && canonical.value.item.status).toBe('done')
     }).pipe(Effect.scoped),
   )
@@ -350,7 +346,7 @@ describe('triage proposals', () => {
 
       yield* store.applyProposal({ id: 2, actor: user })
 
-      const canonical = (yield* store.get(1))
+      const canonical = yield* store.get(1)
       expect(canonical.ok && canonical.value.item.status).toBe('doing')
     }).pipe(Effect.scoped),
   )
@@ -404,7 +400,12 @@ describe('lifecycle signals', () => {
       })
 
       yield* store.update({ id: 1, attention: 'blocked', actor: agent })
-      const closed = yield* store.applySignal({ id: 1, status: 'done', link: { type: 'revision', target: 'kvyxrlmkptyv' }, reason: 'closed by jj:kvyxrlmkptyv' })
+      const closed = yield* store.applySignal({
+        id: 1,
+        status: 'done',
+        link: { type: 'revision', target: 'kvyxrlmkptyv' },
+        reason: 'closed by jj:kvyxrlmkptyv',
+      })
       expect(closed.ok && closed.value.item.status).toBe('done')
       expect(closed.ok && closed.value.item.attention).toBe('none')
 
@@ -739,7 +740,7 @@ describe('attention and inbox', () => {
       const deleted = yield* store.delete({ id: created.item.id })
 
       expect(deleted).toEqual({ ok: true, value: undefined })
-      expect((yield* store.get(created.item.id))).toEqual({ ok: false, reason: 'not-found' })
+      expect(yield* store.get(created.item.id)).toEqual({ ok: false, reason: 'not-found' })
       expect(rows.files.size).toBe(0)
       expect(rows.items.size).toBe(0)
       expect(yield* store.delete({ id: created.item.id })).toEqual({ ok: false, reason: 'not-found' })
@@ -836,7 +837,7 @@ describe('attention and inbox', () => {
       yield* TestClock.setTime(1_000)
 
       const reopened = yield* openStore(rows)
-      const detail = (yield* reopened.get(1))
+      const detail = yield* reopened.get(1)
       expect(detail.ok).toBe(true)
       if (!detail.ok) return
       const reply = detail.value.item.events.find(event => event.kind === 'commented')

@@ -73,18 +73,14 @@ describe('local project copy', () => {
     },
   )
 
-  test(
-    'refuses credentials, files outside the project and paths outside a Git project',
-    { timeout: 30_000 },
-    async () => {
-      const root = await makeGitProject()
-      const found = await scan({ path: root, includeIgnored: true })
-      await expect(archive({ root: found.root, paths: ['ignored-settings.json'] })).rejects.toThrow()
-      await expect(archive({ root: found.root, paths: ['local-secret.env'], includeIgnored: true })).rejects.toThrow()
-      const notGit = await mkdtemp(join(tmpdir(), 'multi-host-not-git-'))
-      temporaryPaths.push(notGit)
-      await expect(scan({ path: notGit })).rejects.toThrow()
-      await expect(archive({ root: notGit, paths: ['../outside'] })).rejects.toThrow()
-    },
-  )
+  test('refuses credentials, files outside the project and paths outside a Git project', { timeout: 30_000 }, async () => {
+    const root = await makeGitProject()
+    const found = await scan({ path: root, includeIgnored: true })
+    await expect(archive({ root: found.root, paths: ['ignored-settings.json'] })).rejects.toThrow()
+    await expect(archive({ root: found.root, paths: ['local-secret.env'], includeIgnored: true })).rejects.toThrow()
+    const notGit = await mkdtemp(join(tmpdir(), 'multi-host-not-git-'))
+    temporaryPaths.push(notGit)
+    await expect(scan({ path: notGit })).rejects.toThrow()
+    await expect(archive({ root: notGit, paths: ['../outside'] })).rejects.toThrow()
+  })
 })

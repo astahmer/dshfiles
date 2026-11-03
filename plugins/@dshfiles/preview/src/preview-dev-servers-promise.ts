@@ -31,8 +31,10 @@ export class PreviewProbeFailed extends Schema.TaggedError<PreviewProbeFailed>()
 export type ProbeExec = (command: string, args: readonly string[]) => Promise<string>
 
 /** Runs one read-only probe command through the DSH subprocess service, bounded and timed out. */
-export const contextProbeExec = (ctx: HostContext['Service']['ctx']): ProbeExec => (command, args) =>
-  runProbe({ ctx, command, args }).pipe(Effect.runPromise)
+export const contextProbeExec =
+  (ctx: HostContext['Service']['ctx']): ProbeExec =>
+  (command, args) =>
+    runProbe({ ctx, command, args }).pipe(Effect.runPromise)
 
 const runProbe = (input: { readonly ctx: HostContext['Service']['ctx']; readonly command: string; readonly args: readonly string[] }) =>
   Effect.gen(function* () {
@@ -62,110 +64,118 @@ export class PreviewDevServers extends Context.Service<
 >()('@dshfiles/preview/PreviewDevServers') {
   static readonly makeLayer = (options: { readonly exec?: ProbeExec } = {}) =>
     Layer.effect(
-    PreviewDevServers,
-    Effect.gen(function* () {
-      const host = yield* HostContext
-      const fs = yield* FileSystem.FileSystem
-      const cached = yield* Ref.make<{ readonly at: number; readonly result: Effect.Effect<DevServerProbeResult, PreviewProbeFailed> } | undefined>(undefined)
-      const liveJobs = yield* Ref.make<readonly LiveJob[]>([])
+      PreviewDevServers,
+      Effect.gen(function* () {
+        const host = yield* HostContext
+        const fs = yield* FileSystem.FileSystem
+        const cached = yield* Ref.make<{ readonly at: number; readonly result: Effect.Effect<DevServerProbeResult, PreviewProbeFailed> } | undefined>(undefined)
+        const liveJobs = yield* Ref.make<readonly LiveJob[]>([])
 
-      const exec = options.exec ?? contextProbeExec(host.ctx)
-      const probeExec = (command: string, args: readonly string[]) =>
-        Effect.tryPromise({
-          try: () => exec(command, args),
-          catch: cause => new PreviewProbeFailed({ command, cause }),
-        }).pipe(Effect.withSpan('preview port-probe', { kind: 'client', attributes: { 'process.executable.name': command } }))
+        const exec = options.exec ?? contextProbeExec(host.ctx)
+        const probeExec = (command: string, args: readonly string[]) =>
+          Effect.tryPromise({
+            try: () => exec(command, args),
+            catch: cause => new PreviewProbeFailed({ command, cause }),
+          }).pipe(Effect.withSpan('preview port-probe', { kind: 'client', attributes: { 'process.executable.name': command } }))
 
-      const sessions = Effect.gen(function* () {
-        const controller = host.ctx.get('sessionController')
-        if (controller === undefined) return []
-        const listed = yield* Effect.promise(() => controller.list({}, AbortSignal.timeout(SESSIONS_TIMEOUT_MS)).catch(() => undefined))
-        return (listed?.items ?? []).map((summary): KnownSession => ({ sessionId: summary.sessionId, cwd: summary.cwd ?? null }))
-      })
+        const sessions = Effect.gen(function* () {
+          const controller = host.ctx.get('sessionController')
+          if (controller === undefined) return []
+          const listed = yield* Effect.promise(() => controller.list({}, AbortSignal.timeout(SESSIONS_TIMEOUT_MS)).catch(() => undefined))
+          return (listed?.items ?? []).map((summary): KnownSession => ({ sessionId: summary.sessionId, cwd: summary.cwd ?? null }))
+        })
 
-      const readCwds = (pids: readonly number[]) =>
-        Effect.gen(function* () {
-          const cwds = new Map<number, string>()
-          const probed = pids.slice(0, MAX_CWD_PROBES)
-          if (probed.length === 0) return cwds
-          if (process.platform === 'linux') {
-            yield* Effect.forEach(
-              probed,
-              pid =>
-                fs.readLink(`/proc/${String(pid)}/cwd`).pipe(
-                  Effect.tap(cwd => Effect.sync(() => cwds.set(pid, cwd))),
-                  Effect.ignore,
-                ),
-              { concurrency: 'unbounded', discard: true },
-            )
+        const readCwds = (pids: readonly number[]) =>
+          Effect.gen(function* () {
+            const cwds = new Map<number, string>()
+            const probed = pids.slice(0, MAX_CWD_PROBES)
+            if (probed.length === 0) return cwds
+            if (process.platform === 'linux') {
+              yield* Effect.forEach(
+                probed,
+                pid =>
+                  fs.readLink(`/proc/${String(pid)}/cwd`).pipe(
+                    Effect.tap(cwd => Effect.sync(() => cwds.set(pid, cwd))),
+                    Effect.ignore,
+                  ),
+                { concurrency: 'unbounded', discard: true },
+              )
+              return cwds
+            }
+            const output = yield* probeExec('lsof', ['-a', '-d', 'cwd', '-F', 'pn', '-p', probed.join(',')])
+            let current: number | undefined
+            for (const line of output.split('\n')) {
+              if (line.startsWith('p')) current = Number(line.slice(1))
+              else if (line.startsWith('n') && current !== undefined) cwds.set(current, line.slice(1))
+            }
             return cwds
-          }
-          const output = yield* probeExec('lsof', ['-a', '-d', 'cwd', '-F', 'pn', '-p', probed.join(',')])
-          let current: number | undefined
-          for (const line of output.split('\n')) {
-            if (line.startsWith('p')) current = Number(line.slice(1))
-            else if (line.startsWith('n') && current !== undefined) cwds.set(current, line.slice(1))
-          }
-          return cwds
-        })
+          })
 
-      const probe = Effect.gen(function* () {
-        if (process.platform !== 'darwin' && process.platform !== 'linux') return { supported: false, servers: [] }
-        const socketsText = yield* probeExec(process.platform === 'linux' ? 'ss' : 'lsof', process.platform === 'linux' ? ['-ltnpH'] : ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-u', String(process.getuid?.() ?? 0), '-F', 'pn'])
-        const sockets = process.platform === 'linux' ? DevServers.parseSsListeners(socketsText) : DevServers.parseLsofListeners(socketsText)
-        const rows = DevServers.parsePs(yield* probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']))
-        const known = yield* sessions
-        const cwds = yield* readCwds([...new Set(sockets.map(socket => socket.pid))])
-        const jobs = yield* Ref.get(liveJobs)
-        return { supported: true, servers: DevServers.attribute({ sockets, rows, cwds, hostPid: process.pid, home: process.env.HOME ?? '', sessions: known, jobs }) }
-      })
-
-      const read = (fresh: boolean) =>
-        Effect.gen(function* () {
-          const now = Date.now()
-          const current = yield* Ref.get(cached)
-          if (!fresh && current !== undefined && now - current.at < PROBE_TTL_MS) return yield* current.result
-          const shared = yield* Deferred.make<DevServerProbeResult, PreviewProbeFailed>()
-          const result = Deferred.await(shared)
-          yield* Ref.set(cached, { at: now, result })
-          return yield* Effect.scoped(
-            probe.pipe(
-              Effect.onExit(exit => Deferred.done(shared, exit)),
-              Effect.ignore,
-              Effect.forkScoped,
-              Effect.andThen(result),
-            ),
+        const probe = Effect.gen(function* () {
+          if (process.platform !== 'darwin' && process.platform !== 'linux') return { supported: false, servers: [] }
+          const socketsText = yield* probeExec(
+            process.platform === 'linux' ? 'ss' : 'lsof',
+            process.platform === 'linux' ? ['-ltnpH'] : ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-u', String(process.getuid?.() ?? 0), '-F', 'pn'],
           )
+          const sockets = process.platform === 'linux' ? DevServers.parseSsListeners(socketsText) : DevServers.parseLsofListeners(socketsText)
+          const rows = DevServers.parsePs(yield* probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']))
+          const known = yield* sessions
+          const cwds = yield* readCwds([...new Set(sockets.map(socket => socket.pid))])
+          const jobs = yield* Ref.get(liveJobs)
+          return {
+            supported: true,
+            servers: DevServers.attribute({ sockets, rows, cwds, hostPid: process.pid, home: process.env.HOME ?? '', sessions: known, jobs }),
+          }
         })
 
-      /** Live jobs the Host reports, so a probe attributes a dev server to the job that started it. */
-      host.ctx.inject(['jobs'], scoped => {
-        const registry = scoped.get('jobs')
-        if (registry === undefined) return
-        scoped.effect(() => {
-          const unsubscribe = registry.events.subscribe({ owners: 'all' }, event => {
-            if (event.type === 'output') return
-            Effect.runSync(
-              Ref.update(liveJobs, current =>
-                event.type === 'removed'
-                  ? current.filter(job => job.id !== event.job.id)
-                  : [
-                      ...current.filter(job => job.id !== event.job.id),
-                      { id: event.job.id, label: event.job.label, owner: event.job.owner ?? null, startedAt: event.job.startedAt },
-                    ],
+        const read = (fresh: boolean) =>
+          Effect.gen(function* () {
+            const now = Date.now()
+            const current = yield* Ref.get(cached)
+            if (!fresh && current !== undefined && now - current.at < PROBE_TTL_MS) return yield* current.result
+            const shared = yield* Deferred.make<DevServerProbeResult, PreviewProbeFailed>()
+            const result = Deferred.await(shared)
+            yield* Ref.set(cached, { at: now, result })
+            return yield* Effect.scoped(
+              probe.pipe(
+                Effect.onExit(exit => Deferred.done(shared, exit)),
+                Effect.ignore,
+                Effect.forkScoped,
+                Effect.andThen(result),
               ),
             )
           })
-          return () => unsubscribe()
-        }, 'preview: live job tracking')
-      })
 
-      return PreviewDevServers.of({
-        read,
-        invalidate: Ref.set(cached, undefined),
-        readProcessTable: probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']).pipe(Effect.map(DevServers.parsePs)),
-      })
-    }),
+        /** Live jobs the Host reports, so a probe attributes a dev server to the job that started it. */
+        host.ctx.inject(['jobs'], scoped => {
+          const registry = scoped.get('jobs')
+          if (registry === undefined) return
+          scoped.effect(() => {
+            const unsubscribe = registry.events.subscribe({ owners: 'all' }, event => {
+              if (event.type === 'output') return
+              Effect.runSync(
+                Ref.update(liveJobs, current =>
+                  event.type === 'removed'
+                    ? current.filter(job => job.id !== event.job.id)
+                    : [
+                        ...current.filter(job => job.id !== event.job.id),
+                        { id: event.job.id, label: event.job.label, owner: event.job.owner ?? null, startedAt: event.job.startedAt },
+                      ],
+                ),
+              )
+            })
+            return () => unsubscribe()
+          }, 'preview: live job tracking')
+        })
+
+        return PreviewDevServers.of({
+          read,
+          invalidate: Ref.set(cached, undefined),
+          readProcessTable: probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']).pipe(
+            Effect.map(DevServers.parsePs),
+          ),
+        })
+      }),
     )
 
   static readonly layer = PreviewDevServers.makeLayer()

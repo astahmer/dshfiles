@@ -176,7 +176,11 @@ const isTransportCode = (code: string): boolean =>
   ['gateway-unreachable', 'authentication-expired', 'stream-unreachable', 'stream-closed', 'api-unreachable', 'gateway-request-failed'].includes(code)
 
 /** A runtime record with its live connection state. */
-const runtimeSummary = (input: { readonly record: RuntimeRecord; readonly connected: boolean; readonly lastError: { readonly code: string; readonly message: string; readonly at: string } | undefined }) => ({
+const runtimeSummary = (input: {
+  readonly record: RuntimeRecord
+  readonly connected: boolean
+  readonly lastError: { readonly code: string; readonly message: string; readonly at: string } | undefined
+}) => ({
   id: input.record.id,
   hostId: input.record.hostId,
   name: input.record.name,
@@ -244,7 +248,12 @@ const withRuntime = <A, E>(
           ),
         { mutation: options.mutation },
       )
-      .pipe(Effect.catchIf(error => error === marker, () => (last.value === undefined ? Effect.fail(marker) : Effect.succeed(last.value))))
+      .pipe(
+        Effect.catchIf(
+          error => error === marker,
+          () => (last.value === undefined ? Effect.fail(marker) : Effect.succeed(last.value)),
+        ),
+      )
   })
 
 /** Probe one SSH target and DSH home and pin its identity; shared by the add-host test and the save. */
@@ -303,7 +312,10 @@ const qualifyRuntime = Effect.fn('multi-host runtime qualify')(function* (input:
 })
 
 /** Reserve this runtime's stable loopback origin port; the first one no other registration holds wins. */
-const allocateOriginPort = Effect.fnUntraced(function* (runtimeId: string, directory: { readonly retiredPorts: readonly number[]; readonly runtimes: readonly RuntimeRecord[] }) {
+const allocateOriginPort = Effect.fnUntraced(function* (
+  runtimeId: string,
+  directory: { readonly retiredPorts: readonly number[]; readonly runtimes: readonly RuntimeRecord[] },
+) {
   const unavailable = new Set<number>()
   for (const port of directory.retiredPorts) unavailable.add(port)
   for (const runtime of directory.runtimes) if (runtime.originPort !== undefined) unavailable.add(runtime.originPort)
@@ -355,11 +367,12 @@ const runtimeSummaryOf = (record: RuntimeRecord, pool: RuntimePool['Service']) =
 
 const isTagged = (error: Error): error is Error & { readonly _tag: string } => '_tag' in error && typeof error._tag === 'string'
 
-const isTaggedFailure = (error: unknown): error is TaggedFailure & { readonly message: string } =>
-  error instanceof Error && isTagged(error)
+const isTaggedFailure = (error: unknown): error is TaggedFailure & { readonly message: string } => error instanceof Error && isTagged(error)
 
 /** What creating or starting a remote thread reports: the Session id survives a failure that already created it. */
-type SessionStartOutcome = { readonly ok: true; readonly sessionId: string } | { readonly ok: false; readonly code: string; readonly message: string; readonly sessionId?: string }
+type SessionStartOutcome =
+  | { readonly ok: true; readonly sessionId: string }
+  | { readonly ok: false; readonly code: string; readonly message: string; readonly sessionId?: string }
 
 const threadRefused = (input: { readonly code: string; readonly message: string; readonly sessionId?: string }): SessionStartOutcome => ({
   ok: false,
@@ -445,7 +458,8 @@ const handlers = Api.handlers(multiHostApi, {
       const remoteHome = yield* remoteHomeOf({ facts, requested: input.remoteHome })
       const before = yield* RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome })
       if (input.action === 'stop') {
-        if (!before.running || before.pid === undefined) return { ok: true as const, action: 'stop' as const, detail: 'no running remote runtime', status: before }
+        if (!before.running || before.pid === undefined)
+          return { ok: true as const, action: 'stop' as const, detail: 'no running remote runtime', status: before }
         const stopped = yield* RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteRuntime.stopCommand({ pid: before.pid }), timeoutMs: 30_000 })
         const status = yield* RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome })
         return { ok: true as const, action: 'stop' as const, detail: stopped.stdout.trim() || stopped.stderr.trim() || 'stop requested', status }
@@ -509,7 +523,14 @@ const handlers = Api.handlers(multiHostApi, {
     return yield* Effect.gen(function* () {
       const connector = yield* decodeConnector({ kind: 'ssh', sshTarget: input.sshTarget })
       const locator = yield* decodeLocator({ kind: 'ssh', remoteHome: input.remoteHome })
-      const host: HostRecord = { schemaVersion: 2, id: sshHostId(input.sshTarget), name: input.name, connector, hidden: false, createdAt: new Date().toISOString() }
+      const host: HostRecord = {
+        schemaVersion: 2,
+        id: sshHostId(input.sshTarget),
+        name: input.name,
+        connector,
+        hidden: false,
+        createdAt: new Date().toISOString(),
+      }
       return yield* qualifyRuntime({ host, locator, name: input.name }).pipe(
         Effect.map(({ identity, steps }) => ({ ok: true as const, steps, identity })),
         Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
@@ -604,9 +625,7 @@ const handlers = Api.handlers(multiHostApi, {
     const startedAt = yield* Clock.currentTimeMillis
     return yield* withRuntime(input.runtimeId, gateway => gateway.api('identity', undefined), { mutation: false }).pipe(
       Effect.map(() => ({ ok: true as const, ms: 0 })),
-      Effect.flatMap(result =>
-        Effect.map(Clock.currentTimeMillis, now => ({ ok: result.ok, ms: Math.max(0, Math.round(now - startedAt)) })),
-      ),
+      Effect.flatMap(result => Effect.map(Clock.currentTimeMillis, now => ({ ok: result.ok, ms: Math.max(0, Math.round(now - startedAt)) }))),
       Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
     )
   }),
@@ -671,15 +690,15 @@ const handlers = Api.handlers(multiHostApi, {
       if (host === undefined || host.connector.kind !== 'ssh')
         return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
       const sshTarget = host.connector.sshTarget
-      const listing = yield* withRuntime(
-        input.runtimeId,
-        gateway => Effect.flatMap(gateway.api('listDirectory', {}), decodeDirectoryListing),
-        { mutation: false },
-      )
+      const listing = yield* withRuntime(input.runtimeId, gateway => Effect.flatMap(gateway.api('listDirectory', {}), decodeDirectoryListing), {
+        mutation: false,
+      })
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
       const wantsFiles = input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0
       const archive = wantsFiles
-        ? yield* LocalProjectFiles.archive({ root: input.copyFromPath ?? '', paths: input.copyPaths ?? [], includeIgnored: input.includeIgnored }).pipe(Effect.option)
+        ? yield* LocalProjectFiles.archive({ root: input.copyFromPath ?? '', paths: input.copyPaths ?? [], includeIgnored: input.includeIgnored }).pipe(
+            Effect.option,
+          )
         : Option.some(Buffer.alloc(0))
       if (Option.isNone(archive)) return { ok: false as const, ...failed(new LocalProjectFailed({ code: 'local-process-failed' })) }
       const cloned = yield* RemoteExec.run({
@@ -704,11 +723,16 @@ const handlers = Api.handlers(multiHostApi, {
           : undefined
       const created = yield* withRuntime(
         input.runtimeId,
-        gateway => Effect.flatMap(gateway.run({ namespace: 'workspace', method: 'create', args: { request: { path: destinationPath } } }), decodeWorkspaceCreated),
+        gateway =>
+          Effect.flatMap(gateway.run({ namespace: 'workspace', method: 'create', args: { request: { path: destinationPath } } }), decodeWorkspaceCreated),
         { mutation: true },
       ).pipe(Effect.option)
       if (Option.isNone(created))
-        return { ok: false as const, code: 'project-registration-failed', message: 'Repository cloned, but project registration failed. Use Add folder to register it.' }
+        return {
+          ok: false as const,
+          code: 'project-registration-failed',
+          message: 'Repository cloned, but project registration failed. Use Add folder to register it.',
+        }
       const copiedFileCount = wantsFiles && copyWarning === undefined ? new Set(input.copyPaths ?? []).size : 0
       return {
         ok: true as const,
@@ -789,7 +813,14 @@ const handlers = Api.handlers(multiHostApi, {
             yield* gateway.run({
               namespace: 'session',
               method: 'selectModel',
-              args: { request: { sessionId, provider: model.provider, model: model.model, ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }) } },
+              args: {
+                request: {
+                  sessionId,
+                  provider: model.provider,
+                  model: model.model,
+                  ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }),
+                },
+              },
             })
           }
           yield* threads.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
@@ -805,9 +836,13 @@ const handlers = Api.handlers(multiHostApi, {
     ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
   }),
   runtimeModels: Effect.fn('multi-host runtime models')(function* (input) {
-    return yield* withRuntime(input.runtimeId, gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: 'modelCatalog', args: {} }), decodeModelCatalog), {
-      mutation: false,
-    }).pipe(
+    return yield* withRuntime(
+      input.runtimeId,
+      gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: 'modelCatalog', args: {} }), decodeModelCatalog),
+      {
+        mutation: false,
+      },
+    ).pipe(
       Effect.map(catalog => ({
         ok: true as const,
         default: catalog.default ?? null,
@@ -1092,76 +1127,82 @@ const remoteSnapshot = (input: { readonly sessionId: string; readonly maxMessage
 const referenceMiddleware = Effect.gen(function* () {
   const host = yield* HostContext
   const threads = yield* RemoteThreads
-  const run = yield* DshxPlugin.callback((input: {
-    readonly messages: readonly { readonly source: { readonly kind: string }; readonly content: readonly ContentBlock[] }[]
-    readonly agentId: string
-    readonly signal: AbortSignal
-  }) =>
-    Effect.gen(function* () {
-      const recordedThreads = (yield* threads.list).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId }))
-      if (recordedThreads.length === 0) return undefined
-      const remoteSessionIds = new Set(recordedThreads.filter(thread => thread.sessionId !== input.agentId).map(thread => thread.sessionId))
-      const replaced = new Map<
-        object,
-        { readonly content: readonly ContentBlock[]; readonly references: readonly { readonly sessionId: string; readonly label: string; readonly runtimeId: string }[] }
-      >()
-      const references = new Map<string, { readonly sessionId: string; readonly label: string; readonly runtimeId: string }>()
-      for (const message of input.messages) {
-        if (message.source.kind !== 'user') continue
-        const content: ContentBlock[] = []
-        let changed = false
-        for (const block of message.content) {
-          if (block.type !== 'text') {
-            content.push(block)
-            continue
+  const run = yield* DshxPlugin.callback(
+    (input: {
+      readonly messages: readonly { readonly source: { readonly kind: string }; readonly content: readonly ContentBlock[] }[]
+      readonly agentId: string
+      readonly signal: AbortSignal
+    }) =>
+      Effect.gen(function* () {
+        const recordedThreads = (yield* threads.list).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId }))
+        if (recordedThreads.length === 0) return undefined
+        const remoteSessionIds = new Set(recordedThreads.filter(thread => thread.sessionId !== input.agentId).map(thread => thread.sessionId))
+        const replaced = new Map<
+          object,
+          {
+            readonly content: readonly ContentBlock[]
+            readonly references: readonly { readonly sessionId: string; readonly label: string; readonly runtimeId: string }[]
           }
-          const redacted = RemoteReferenceContext.redactRemoteReferenceMentions(block.text, remoteSessionIds)
-          if (redacted === undefined) {
-            content.push(block)
-            continue
-          }
-          const targets = redacted.references.flatMap(reference => {
-            const recorded = recordedThreads.find(thread => thread.sessionId === reference.sessionId)
-            return recorded === undefined ? [] : [{ sessionId: reference.sessionId, label: reference.label ?? reference.sessionId, runtimeId: recorded.runtimeId }]
-          })
-          if (targets.length === 0) {
-            content.push(block)
-            continue
-          }
-          changed = true
-          content.push({ ...block, text: redacted.text })
-          for (const target of targets) references.set(target.sessionId, target)
-        }
-        if (changed) replaced.set(message, { content, references: [...references.values()] })
-      }
-      if (references.size === 0 || references.size > 3) return undefined
-      // Each reference reads its own runtime, so the three at most run together rather than one after another.
-      const contexts = yield* Effect.forEach(
-        [...references.values()],
-        reference =>
-          Effect.gen(function* () {
-            const snapshot = yield* remoteSnapshot({ sessionId: reference.sessionId, maxMessages: RemoteReferenceContext.limits.maxMessages })
-            if (snapshot === undefined) return undefined
-            const conversation = RemoteReferenceContext.remoteReferenceConversation(snapshot)
-            if (conversation.length === 0) return undefined
-            return createUserMessage({
-              source: {
-                kind: 'multi-host-remote-reference',
-                form: 'recall',
-                references: [{ sessionId: reference.sessionId, label: reference.label, capturedThroughSeq: snapshotCursor(snapshot) }],
-              },
-              content: [
-                {
-                  type: 'text',
-                  text: RemoteReferenceContext.remoteReferenceContextText({ sessionId: reference.sessionId, label: reference.label, conversation }),
-                },
-              ],
+        >()
+        const references = new Map<string, { readonly sessionId: string; readonly label: string; readonly runtimeId: string }>()
+        for (const message of input.messages) {
+          if (message.source.kind !== 'user') continue
+          const content: ContentBlock[] = []
+          let changed = false
+          for (const block of message.content) {
+            if (block.type !== 'text') {
+              content.push(block)
+              continue
+            }
+            const redacted = RemoteReferenceContext.redactRemoteReferenceMentions(block.text, remoteSessionIds)
+            if (redacted === undefined) {
+              content.push(block)
+              continue
+            }
+            const targets = redacted.references.flatMap(reference => {
+              const recorded = recordedThreads.find(thread => thread.sessionId === reference.sessionId)
+              return recorded === undefined
+                ? []
+                : [{ sessionId: reference.sessionId, label: reference.label ?? reference.sessionId, runtimeId: recorded.runtimeId }]
             })
-          }),
-        { concurrency: 3 },
-      )
-      return { replaced, contexts: contexts.flatMap(context => (context === undefined ? [] : [context])) }
-    }),
+            if (targets.length === 0) {
+              content.push(block)
+              continue
+            }
+            changed = true
+            content.push({ ...block, text: redacted.text })
+            for (const target of targets) references.set(target.sessionId, target)
+          }
+          if (changed) replaced.set(message, { content, references: [...references.values()] })
+        }
+        if (references.size === 0 || references.size > 3) return undefined
+        // Each reference reads its own runtime, so the three at most run together rather than one after another.
+        const contexts = yield* Effect.forEach(
+          [...references.values()],
+          reference =>
+            Effect.gen(function* () {
+              const snapshot = yield* remoteSnapshot({ sessionId: reference.sessionId, maxMessages: RemoteReferenceContext.limits.maxMessages })
+              if (snapshot === undefined) return undefined
+              const conversation = RemoteReferenceContext.remoteReferenceConversation(snapshot)
+              if (conversation.length === 0) return undefined
+              return createUserMessage({
+                source: {
+                  kind: 'multi-host-remote-reference',
+                  form: 'recall',
+                  references: [{ sessionId: reference.sessionId, label: reference.label, capturedThroughSeq: snapshotCursor(snapshot) }],
+                },
+                content: [
+                  {
+                    type: 'text',
+                    text: RemoteReferenceContext.remoteReferenceContextText({ sessionId: reference.sessionId, label: reference.label, conversation }),
+                  },
+                ],
+              })
+            }),
+          { concurrency: 3 },
+        )
+        return { replaced, contexts: contexts.flatMap(context => (context === undefined ? [] : [context])) }
+      }),
   )
   const installed = host.ctx.on('agent/pre-step', async (payload, next) => {
     return run({ messages: payload.messages, agentId: payload.agent.id, signal: payload.signal }).then(async outcome => {
@@ -1214,23 +1255,14 @@ const referenceMiddlewareLayer = Layer.effectDiscard(referenceMiddleware)
 
 /** The domain services every consumer shares: registries, identity and the launch file. */
 const domainLayer = (input: { readonly configuredProfile: string | undefined }) =>
-  Layer.mergeAll(
-    HostDirectory.layer,
-    RemoteThreads.layer,
-    RuntimeIdentity.layer({ configuredProfile: input.configuredProfile }),
-    LaunchFile.layer,
-  ).pipe(Layer.provideMerge(MultiHostPaths.layer))
+  Layer.mergeAll(HostDirectory.layer, RemoteThreads.layer, RuntimeIdentity.layer({ configuredProfile: input.configuredProfile }), LaunchFile.layer).pipe(
+    Layer.provideMerge(MultiHostPaths.layer),
+  )
 
 /** The pooled runtimes and the services above them; `RemoteSessionsLive` registers the Session source built from them. */
 const runtimeLayer = Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, ViewLeases.layer, RemoteSessions.layer).pipe(
   Layer.provideMerge(RuntimePool.layer),
-  Layer.provideMerge(
-    Connectors.layer.pipe(
-      Layer.provide(FetchHttpClient.layer),
-      Layer.provideMerge(Ssh.layer),
-      Layer.provide(DshChildProcessSpawner.layer),
-    ),
-  ),
+  Layer.provideMerge(Connectors.layer.pipe(Layer.provide(FetchHttpClient.layer), Layer.provideMerge(Ssh.layer), Layer.provide(DshChildProcessSpawner.layer))),
 )
 
 const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>

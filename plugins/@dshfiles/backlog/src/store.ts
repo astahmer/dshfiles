@@ -69,7 +69,6 @@ export interface BacklogUpdate {
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
 
-
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 2_000
 
@@ -149,8 +148,6 @@ const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = n
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
 const byActivity = (left: BacklogItem, right: BacklogItem): number =>
   Number(right.pinned) - Number(left.pinned) || right.lastActivityAt - left.lastActivityAt || right.id - left.id
-
-
 
 const notFound = { ok: false, reason: 'not-found' } as const
 
@@ -339,7 +336,12 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>) => {
 }
 
 /** The fields an accepted proposal sets; `system` (automatic triage) leaves the fields the user set by hand alone. */
-const proposalChange = (input: { readonly item: BacklogItem; readonly chosen: BacklogProposal; readonly actor: BacklogActor; readonly exists: (id: number) => boolean }) => {
+const proposalChange = (input: {
+  readonly item: BacklogItem
+  readonly chosen: BacklogProposal
+  readonly actor: BacklogActor
+  readonly exists: (id: number) => boolean
+}) => {
   const { item, chosen, actor } = input
   const locked = actor.kind === 'system' ? new Set(item.humanFields) : new Set<BacklogHumanField>()
   const change: BacklogChange = { proposal: null }
@@ -409,12 +411,7 @@ export class BacklogStore extends Context.Service<
     readonly removeFile: (input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }) => Detailed
     readonly delete: (input: { readonly id: number }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed>
     readonly update: (input: BacklogUpdate & { readonly actor: BacklogActor }) => Detailed
-    readonly link: (input: {
-      readonly id: number
-      readonly link: BacklogLink
-      readonly remove?: boolean | undefined
-      readonly actor: BacklogActor
-    }) => Detailed
+    readonly link: (input: { readonly id: number; readonly link: BacklogLink; readonly remove?: boolean | undefined; readonly actor: BacklogActor }) => Detailed
     readonly comment: (input: {
       readonly id: number
       readonly text: string
@@ -622,7 +619,11 @@ export class BacklogStore extends Context.Service<
         return yield* detailOf(item)
       }, serialized)
 
-      const attachFile = Effect.fn('backlog store attach file')(function* (input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }) {
+      const attachFile = Effect.fn('backlog store attach file')(function* (input: {
+        readonly id: number
+        readonly file: BacklogFileInput
+        readonly actor: BacklogActor
+      }) {
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
             if (item.attachments.length >= BacklogItems.maxAttachments) return yield* unchanged(item)
@@ -646,7 +647,11 @@ export class BacklogStore extends Context.Service<
           Effect.gen(function* () {
             const imported = item.tweetContextUrls ?? []
             if (imported.includes(input.url) || imported.length >= 20) return yield* unchanged(item)
-            const additions = yield* storeFiles(input.id, input.files.slice(0, BacklogItems.maxAttachments - item.attachments.length), yield* Clock.currentTimeMillis)
+            const additions = yield* storeFiles(
+              input.id,
+              input.files.slice(0, BacklogItems.maxAttachments - item.attachments.length),
+              yield* Clock.currentTimeMillis,
+            )
             const separator = item.body === '' || input.bodySection === '' ? '' : '\n\n'
             const bodyRoom = Math.max(0, BacklogItems.maxBodyChars - item.body.length - separator.length)
             const bodyAddition = input.bodySection.slice(0, bodyRoom)
@@ -668,7 +673,11 @@ export class BacklogStore extends Context.Service<
         return found({ dataUrl: `data:${stored.value.attachment.mediaType};base64,${stored.value.data}` })
       })
 
-      const removeFile = Effect.fn('backlog store remove file')(function* (input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }) {
+      const removeFile = Effect.fn('backlog store remove file')(function* (input: {
+        readonly id: number
+        readonly attachmentId: string
+        readonly actor: BacklogActor
+      }) {
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
             const attachment = item.attachments.find(candidate => candidate.id === input.attachmentId)
@@ -786,7 +795,12 @@ export class BacklogStore extends Context.Service<
             }
             const events = item.events.map((event, index) =>
               index === commentIndex
-                ? { ...event, commentId: input.commentId, detail: input.text.slice(0, BacklogItems.maxBodyChars), ...(attachments !== undefined && { attachments }) }
+                ? {
+                    ...event,
+                    commentId: input.commentId,
+                    detail: input.text.slice(0, BacklogItems.maxBodyChars),
+                    ...(attachments !== undefined && { attachments }),
+                  }
                 : event,
             )
             return found(yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'edited a reply' }, {}))
@@ -794,7 +808,11 @@ export class BacklogStore extends Context.Service<
         )
       })
 
-      const deleteComment = Effect.fn('backlog store delete comment')(function* (input: { readonly id: number; readonly commentId: string; readonly actor: BacklogActor }) {
+      const deleteComment = Effect.fn('backlog store delete comment')(function* (input: {
+        readonly id: number
+        readonly commentId: string
+        readonly actor: BacklogActor
+      }) {
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
             if (input.actor.kind !== 'user') return notFound
@@ -892,7 +910,12 @@ export class BacklogStore extends Context.Service<
             if (input.attention === 'blocked') {
               if (attention !== 'none' || item.status === 'done' || item.status === 'dropped') return yield* unchanged(item)
               return found(
-                yield* touch(item, system, { kind: 'edited', detail: `attention: blocked (${reason})`, threadId }, { attention: 'blocked', acknowledgedAt: null }),
+                yield* touch(
+                  item,
+                  system,
+                  { kind: 'edited', detail: `attention: blocked (${reason})`, threadId },
+                  { attention: 'blocked', acknowledgedAt: null },
+                ),
               )
             }
             const last = item.events.at(-1)
@@ -936,7 +959,10 @@ export class BacklogStore extends Context.Service<
         return yield* withItem(input.id, item =>
           item.proposal === undefined || item.proposal === null
             ? unchanged(item)
-            : Effect.map(touch(item, input.actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal)}` }, { proposal: null }), found),
+            : Effect.map(
+                touch(item, input.actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal)}` }, { proposal: null }),
+                found,
+              ),
         )
       })
 

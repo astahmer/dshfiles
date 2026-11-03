@@ -208,11 +208,7 @@ export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
   }
 }
 
-export class TraceNotFound extends Schema.TaggedError<TraceNotFound>()(
-  'TraceNotFound',
-  { traceId: Schema.String },
-  { dshxWireCode: 'not-found' },
-) {
+export class TraceNotFound extends Schema.TaggedError<TraceNotFound>()('TraceNotFound', { traceId: Schema.String }, { dshxWireCode: 'not-found' }) {
   override get message(): string {
     return `No stored trace ${this.traceId}.`
   }

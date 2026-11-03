@@ -83,8 +83,7 @@ export class MarketplaceService extends Context.Service<
 
       const list = Effect.fn('marketplace list')(function* (input: CatalogListInput) {
         const baseUrl = baseUrlOf()
-        if (baseUrl.length === 0)
-          return yield* new MarketplaceFailed({ operation: 'list', reason: 'profile' })
+        if (baseUrl.length === 0) return yield* new MarketplaceFailed({ operation: 'list', reason: 'profile' })
         const profile = yield* files.currentProfile(baseUrl).pipe(Effect.mapError(profileOf))
         const hubBaseUrl = (yield* settings.get).hubBaseUrl
         const page = yield* catalog
@@ -129,39 +128,33 @@ export class MarketplaceService extends Context.Service<
       })
 
       const runInstall = Effect.fnUntraced(function* (slug: string) {
-        const profile = yield* files.currentProfile(baseUrlOf()).pipe(
-          Effect.catch(error =>
-            Effect.as(Effect.logWarning('marketplace: the current Profile could not be read', error), undefined),
-          ),
-        )
+        const profile = yield* files
+          .currentProfile(baseUrlOf())
+          .pipe(Effect.catch(error => Effect.as(Effect.logWarning('marketplace: the current Profile could not be read', error), undefined)))
         if (profile === undefined) return installFailure('profile-unavailable', false)
         const hubBaseUrl = (yield* settings.get).hubBaseUrl
-        const detail = yield* catalog.detail({ hubBaseUrl, slug }).pipe(
-          Effect.catch(error =>
-            Effect.as(Effect.logWarning(`marketplace: the install target for ${slug} could not be resolved`, error), undefined),
-          ),
-        )
+        const detail = yield* catalog
+          .detail({ hubBaseUrl, slug })
+          .pipe(Effect.catch(error => Effect.as(Effect.logWarning(`marketplace: the install target for ${slug} could not be resolved`, error), undefined)))
         if (detail === undefined) return installFailure('catalog-unavailable', true)
-        const target = yield* catalog.primaryTarget(detail).pipe(
-          Effect.catch(error =>
-            Effect.as(Effect.logWarning(`marketplace: ${slug} has no exact install target`, error), null),
-          ),
-        )
+        const target = yield* catalog
+          .primaryTarget(detail)
+          .pipe(Effect.catch(error => Effect.as(Effect.logWarning(`marketplace: ${slug} has no exact install target`, error), null)))
         if (target === null) return installFailure('target-unavailable', false)
         if (profile.bundles.includes(target.package_name)) {
           return { status: 'already-installed', packageName: target.package_name, version: target.version, restartRequired: true } as const
         }
         const cli = yield* files.dshCli.pipe(
-          Effect.catch(error =>
-            Effect.as(Effect.logWarning('marketplace: the DSH CLI entry could not be resolved', error), undefined),
-          ),
+          Effect.catch(error => Effect.as(Effect.logWarning('marketplace: the DSH CLI entry could not be resolved', error), undefined)),
         )
         if (cli === undefined) return installFailure('profile-unavailable', false)
-        const result = yield* processes.runCli({ cliPath: cli.cliPath, args: ['plugin', '--profile', profile.name, 'add', target.spec], cwd: profile.dir }).pipe(
-          Effect.catchTag('DshCliUnavailable', error =>
-            Effect.as(Effect.logWarning(`marketplace: the DSH CLI for ${slug} could not be started`, error), undefined),
-          ),
-        )
+        const result = yield* processes
+          .runCli({ cliPath: cli.cliPath, args: ['plugin', '--profile', profile.name, 'add', target.spec], cwd: profile.dir })
+          .pipe(
+            Effect.catchTag('DshCliUnavailable', error =>
+              Effect.as(Effect.logWarning(`marketplace: the DSH CLI for ${slug} could not be started`, error), undefined),
+            ),
+          )
         if (result === undefined) return installFailure('install-failed', true)
         if (result.timedOut) return installFailure('timeout', true)
         if (result.cancelled) return installFailure('cancelled', true)
@@ -171,11 +164,9 @@ export class MarketplaceService extends Context.Service<
           )
           return installFailure('install-failed', true)
         }
-        const activated = yield* files.bundlesOf(profile.dir).pipe(
-          Effect.catch(error =>
-            Effect.as(Effect.logWarning(`marketplace: the Profile activation for ${slug} could not be verified`, error), undefined),
-          ),
-        )
+        const activated = yield* files
+          .bundlesOf(profile.dir)
+          .pipe(Effect.catch(error => Effect.as(Effect.logWarning(`marketplace: the Profile activation for ${slug} could not be verified`, error), undefined)))
         if (activated === undefined) return installFailure('activation-missing', true)
         if (!activated.includes(target.package_name)) {
           yield* Effect.logWarning(`marketplace: the DSH CLI exited successfully but ${target.package_name} was not activated`)

@@ -52,10 +52,9 @@ export class CaptureProjects extends Context.Service<CaptureProjects, { readonly
           projectOf: workspaceId =>
             jj.destination({ workspaceId }).pipe(
               Effect.map(destination =>
-                Option.map(
-                  Option.fromUndefinedOr(registered.find(candidate => candidate.id === destination.projectWorkspaceId)),
-                  project => ({ path: project.path }),
-                ),
+                Option.map(Option.fromUndefinedOr(registered.find(candidate => candidate.id === destination.projectWorkspaceId)), project => ({
+                  path: project.path,
+                })),
               ),
               Effect.catch(error =>
                 error.kind === 'unavailable'

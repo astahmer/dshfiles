@@ -27,7 +27,10 @@ export class DshCliUnavailable extends Schema.TaggedError<DshCliUnavailable>()(
 const collectText = (stream: Stream.Stream<Uint8Array, unknown>): Effect.Effect<string> =>
   stream.pipe(
     Stream.decodeText(),
-    Stream.runFold(() => '', (text, chunk) => text + chunk),
+    Stream.runFold(
+      () => '',
+      (text, chunk) => text + chunk,
+    ),
     Effect.map(text => (text.length <= MAX_CLI_OUTPUT_CHARACTERS ? text : text.slice(0, MAX_CLI_OUTPUT_CHARACTERS))),
     Effect.orElseSucceed(() => ''),
   )
@@ -78,9 +81,7 @@ export class MarketplaceProcesses extends Context.Service<
         runCli: input =>
           runCli(input).pipe(
             Effect.timeoutOption(INSTALL_TIMEOUT),
-            Effect.map(outcome =>
-              outcome._tag === 'Some' ? outcome.value : { exitCode: null, stdout: '', stderr: '', timedOut: true, cancelled: false },
-            ),
+            Effect.map(outcome => (outcome._tag === 'Some' ? outcome.value : { exitCode: null, stdout: '', stderr: '', timedOut: true, cancelled: false })),
           ),
       })
     }),

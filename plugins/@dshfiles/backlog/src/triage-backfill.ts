@@ -29,7 +29,10 @@ const retained = (jobs: ReadonlyMap<string, Snapshot>): ReadonlyMap<string, Snap
   const entries = [...jobs]
   const surplus = entries.length - RETAINED_JOBS
   if (surplus <= 0) return jobs
-  const finished = entries.filter(([, job]) => job.state === 'completed' || job.state === 'failed').slice(0, surplus).map(([id]) => id)
+  const finished = entries
+    .filter(([, job]) => job.state === 'completed' || job.state === 'failed')
+    .slice(0, surplus)
+    .map(([id]) => id)
   return new Map(entries.filter(([id]) => !finished.includes(id)))
 }
 
@@ -40,7 +43,10 @@ const retained = (jobs: ReadonlyMap<string, Snapshot>): ReadonlyMap<string, Snap
 export class TriageBackfill extends Context.Service<
   TriageBackfill,
   {
-    readonly start: (request: { readonly retriage?: boolean | undefined; readonly limit?: number | undefined }) => Effect.Effect<Snapshot, BackfillAlreadyRunning>
+    readonly start: (request: {
+      readonly retriage?: boolean | undefined
+      readonly limit?: number | undefined
+    }) => Effect.Effect<Snapshot, BackfillAlreadyRunning>
     readonly status: (jobId: string) => Effect.Effect<Snapshot | null>
   }
 >()('@dshfiles/backlog/TriageBackfill') {

@@ -68,7 +68,9 @@ describe('native mutation outcome recovery', () => {
         method: 'create',
         args: { request: { cwd: '/tmp/multi-host-outcome-fixture' } },
       }
-      const result = await opened.call(NativeRpc.call(gateway, createRequest).pipe(Effect.catch(error => Effect.succeed(NativeRpc.failureResult({ request: createRequest, error })))))
+      const result = await opened.call(
+        NativeRpc.call(gateway, createRequest).pipe(Effect.catch(error => Effect.succeed(NativeRpc.failureResult({ request: createRequest, error })))),
+      )
       expect(result).toEqual({
         ok: false,
         code: 'unknown-mutation-outcome',

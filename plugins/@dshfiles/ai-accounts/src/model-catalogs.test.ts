@@ -2,7 +2,15 @@ import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Exit, Fiber, Option } from 'effect'
 import { ModelCatalogs } from './model-catalogs.js'
 
-const route = { instanceId: 'go_a', kind: 'opencode-go', enabled: true, apiBaseUrl: 'https://go.test', apiKeyEnv: 'GO_KEY', authSource: 'cli', displayName: 'Go' } as const
+const route = {
+  instanceId: 'go_a',
+  kind: 'opencode-go',
+  enabled: true,
+  apiBaseUrl: 'https://go.test',
+  apiKeyEnv: 'GO_KEY',
+  authSource: 'cli',
+  displayName: 'Go',
+} as const
 
 describe('ModelCatalogs', () => {
   it.effect('records a discovered catalog per account and drops it again', () =>
