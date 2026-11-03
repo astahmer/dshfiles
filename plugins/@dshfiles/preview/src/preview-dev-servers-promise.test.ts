@@ -51,7 +51,8 @@ describe('PreviewDevServers', () => {
       expect(first.servers.map(server => ({ pid: server.pid, ports: server.ports.map(port => port.port), sessionIds: server.sessionIds }))).toEqual([
         { pid: 700, ports: [8123], sessionIds: ['session-b'] },
       ])
-      expect(calls).toHaveLength(3)
+      // Linux reads /proc/<pid>/cwd instead of a second lsof pass.
+      expect(calls).toHaveLength(process.platform === 'linux' ? 2 : 3)
       expect(recorder.named('preview port-probe').map(span => span.attributes['process.executable.name'])).toEqual(expect.arrayContaining([socketTool, 'ps']))
     }).pipe(Effect.provide(probeLayer(fakeExec(calls))), Effect.provide(DshxEffect.tracerLayer), Effect.ensuring(Effect.sync(() => recorder.stop())))
   })
