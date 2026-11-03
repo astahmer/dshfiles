@@ -76,6 +76,63 @@ const rows = (output: string): readonly string[] =>
 
 const isCommitId = Schema.is(commitIdSchema)
 
+/**
+ * Revisions that join two listed rows are never drawn: the preview only needs to know that a link passes through
+ * hidden history (it draws it dashed) and where it lands. Each hidden stretch therefore collapses to one stand-in, the
+ * real first hidden revision with its parents rewritten to the listed rows (or the parentless root) the stretch reaches.
+ * A hover preview used to carry 200+ full revisions (~140 KiB) for a dozen drawn rows.
+ */
+const collapseHidden = (input: { readonly revisions: readonly Revision[]; readonly listedCommitIds: readonly string[] }): Revision[] => {
+  const byId = new Map(input.revisions.map(revision => [revision.commitId, revision]))
+  const listed = new Set(input.listedCommitIds)
+  const kept = new Map<string, Revision>()
+  const bare = (revision: Revision, parents: readonly string[]): Revision => ({
+    ...revision,
+    description: '',
+    author: '',
+    bookmarks: [],
+    localBookmarks: [],
+    remoteBookmarksText: '',
+    tags: [],
+    workspaces: [],
+    parents: [...parents],
+  })
+  const reached = (start: string): string[] => {
+    const targets = new Set<string>()
+    const seen = new Set<string>()
+    const pending = [start]
+    while (pending.length > 0) {
+      const commitId = pending.pop()
+      if (commitId === undefined || seen.has(commitId)) continue
+      seen.add(commitId)
+      const revision = byId.get(commitId)
+      if (revision === undefined || listed.has(commitId)) {
+        targets.add(commitId)
+        continue
+      }
+      if (revision.parents.length === 0) {
+        kept.set(commitId, bare(revision, []))
+        targets.add(commitId)
+        continue
+      }
+      pending.push(...revision.parents)
+    }
+    targets.delete(start)
+    return [...targets]
+  }
+  for (const commitId of input.listedCommitIds) {
+    const revision = byId.get(commitId)
+    if (revision === undefined) continue
+    kept.set(commitId, revision)
+    for (const parentId of revision.parents) {
+      const parent = byId.get(parentId)
+      if (parent === undefined || listed.has(parentId) || kept.has(parentId)) continue
+      kept.set(parentId, bare(parent, parent.parents.length === 0 ? [] : reached(parentId)))
+    }
+  }
+  return [...kept.values()]
+}
+
 const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: JjRun; readonly reference: string }) {
   const reference = JSON.stringify(
     yield* Schema.decodeUnknownEffect(referenceSchema)(input.reference).pipe(Effect.mapError(cause => new InvalidJjOutput({ cause }))),
@@ -120,12 +177,24 @@ const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: J
   const revisions =
     listedCommitIds.length === 0
       ? []
-      : (yield* Effect.fromResult(
-          JujutsuOutputModel.parseJsonLines(
-            yield* read(['log', '--no-graph', '--limit', String(CONNECTION_LIMIT), '-r', `connected(${listedCommitIds.join(' | ')})`, '-T', REVISION_TEMPLATE]),
-            revisionSchema,
-          ),
-        )).map(revision => ({ ...revision, description: revision.description.split('\n')[0] ?? '' }))
+      : collapseHidden({
+          revisions: (yield* Effect.fromResult(
+            JujutsuOutputModel.parseJsonLines(
+              yield* read([
+                'log',
+                '--no-graph',
+                '--limit',
+                String(CONNECTION_LIMIT),
+                '-r',
+                `connected(${listedCommitIds.join(' | ')})`,
+                '-T',
+                REVISION_TEMPLATE,
+              ]),
+              revisionSchema,
+            ),
+          )).map(revision => ({ ...revision, description: revision.description.split('\n')[0] ?? '' })),
+          listedCommitIds,
+        })
   const graphAround: ReferenceGraph = {
     label: input.reference,
     commitId,
@@ -140,6 +209,7 @@ const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: J
 })
 
 export class ReferenceGraphModel {
+  static readonly collapseHidden = collapseHidden
   static readonly revset = revset
   static readonly template = template
   static readonly read = readReferenceGraph

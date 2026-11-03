@@ -16,14 +16,14 @@ the mapping used below is resolved by hand from each plugin's `defineApi` id.
 
 ## Headline
 
-| Reading | Value |
-| --- | --- |
-| Requests | 189 (all `_resourceType: fetch`; no bundle, static or websocket entries were in this capture) |
-| Decoded / transferred | 12,647 KiB / 3,190 KiB |
-| Window | 42.0 s |
-| Page markers | `DOMContentLoaded` 435 ms, `load` 2,246 ms |
-| Queueing | 119 of 189 requests waited > 50 ms for a connection; 116 s of blocked time in total; peak 38 in flight |
-| Failed | 7 requests, all `GET /api/changes.summary` → 404 |
+| Reading               | Value                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| Requests              | 189 (all `_resourceType: fetch`; no bundle, static or websocket entries were in this capture)          |
+| Decoded / transferred | 12,647 KiB / 3,190 KiB                                                                                 |
+| Window                | 42.0 s                                                                                                 |
+| Page markers          | `DOMContentLoaded` 435 ms, `load` 2,246 ms                                                             |
+| Queueing              | 119 of 189 requests waited > 50 ms for a connection; 116 s of blocked time in total; peak 38 in flight |
+| Failed                | 7 requests, all `GET /api/changes.summary` → 404                                                       |
 
 The page reached `load` in 2.2 s while 42 s of API traffic continued behind it. Most of that tail is real work
 (session history), but the budget question from `docs/performance.md` is per request: 11 requests took over
@@ -31,52 +31,52 @@ The page reached `load` in 2.2 s while 42 s of API traffic continued behind it. 
 
 ## Group owners
 
-| Owner | Requests | Decoded | What it is |
-| --- | ---: | ---: | --- |
-| native `session` | 36 | 9,834 KiB | history pages, Session list, attachments, model catalog |
-| `@dshfiles/jj-integration` | 28 | 1,265 KiB | `repositories`, `threadAt`, `projects`, `destination` |
-| `@dshfiles/jujutsu` | 10 | 631 KiB | `referenceGraph`, `openRepository`, `registerRepository`, `context` |
-| `@dshfiles/thread-sidebar` | 6 | 352 KiB | attention `state`, `pending`, `cleanupJobs`, `threadList` |
-| native `settings` / `pluginManager` / `credentials` | 10 | 245 KiB | profile describe, bundle list, credential probes |
-| `@dshfiles/ai-accounts` | 10 | 55 KiB | `quotaContinuations`, `usage`, `read`, `quoteRoutes` |
-| `@dshfiles/preview` | 18 | 2.6 KiB | `devServers` + `list`, once per mounted session header every 10 s |
-| everything else (14 owners) | 40 | 60 KiB | small single reads |
+| Owner                                               | Requests |   Decoded | What it is                                                          |
+| --------------------------------------------------- | -------: | --------: | ------------------------------------------------------------------- |
+| native `session`                                    |       36 | 9,834 KiB | history pages, Session list, attachments, model catalog             |
+| `@dshfiles/jj-integration`                          |       28 | 1,265 KiB | `repositories`, `threadAt`, `projects`, `destination`               |
+| `@dshfiles/jujutsu`                                 |       10 |   631 KiB | `referenceGraph`, `openRepository`, `registerRepository`, `context` |
+| `@dshfiles/thread-sidebar`                          |        6 |   352 KiB | attention `state`, `pending`, `cleanupJobs`, `threadList`           |
+| native `settings` / `pluginManager` / `credentials` |       10 |   245 KiB | profile describe, bundle list, credential probes                    |
+| `@dshfiles/ai-accounts`                             |       10 |    55 KiB | `quotaContinuations`, `usage`, `read`, `quoteRoutes`                |
+| `@dshfiles/preview`                                 |       18 |   2.6 KiB | `devServers` + `list`, once per mounted session header every 10 s   |
+| everything else (14 owners)                         |       40 |    60 KiB | small single reads                                                  |
 
 ## Patterns by decoded bytes
 
-| Requests | Decoded | Slowest | Slowest TTFB | Pattern | Owner |
-| ---: | ---: | ---: | ---: | --- | --- |
-| 4 | 6,047 KiB | 9,747 ms | 9,477 ms | `api/session/page` | native |
-| 1 | 3,225 KiB | 10,220 ms | 9,061 ms | `api/session/list` | native |
-| 3 | 999 KiB | 1,646 ms | 74 ms | `dshx-e1cc781b/repositories` | jj-integration |
-| 5 | 630 KiB | 1,299 ms | 319 ms | `dshx-6b371122/referenceGraph` | jujutsu |
-| 7 | 457 KiB | 1,513 ms | 1,441 ms | `api/session/attachment` | native |
-| 3 | 352 KiB | 852 ms | 13 ms | `dshx-2113d713/state` | thread-sidebar |
-| 18 | 257 KiB | 1,803 ms | 469 ms | `dshx-e1cc781b/threadAt` | jj-integration |
-| 24 | 105 KiB | 1,660 ms | 750 ms | `api/session/modelCatalog` | native |
-| 18 | 2.6 KiB | 3,102 ms | 3,099 ms | `dshx-16a2d652/devServers` + `/list` | preview |
-| 7 | 0.2 KiB | 369 ms | 79 ms | `api/changes.summary` | diff-viewed (native route) |
+| Requests |   Decoded |   Slowest | Slowest TTFB | Pattern                              | Owner                      |
+| -------: | --------: | --------: | -----------: | ------------------------------------ | -------------------------- |
+|        4 | 6,047 KiB |  9,747 ms |     9,477 ms | `api/session/page`                   | native                     |
+|        1 | 3,225 KiB | 10,220 ms |     9,061 ms | `api/session/list`                   | native                     |
+|        3 |   999 KiB |  1,646 ms |        74 ms | `dshx-e1cc781b/repositories`         | jj-integration             |
+|        5 |   630 KiB |  1,299 ms |       319 ms | `dshx-6b371122/referenceGraph`       | jujutsu                    |
+|        7 |   457 KiB |  1,513 ms |     1,441 ms | `api/session/attachment`             | native                     |
+|        3 |   352 KiB |    852 ms |        13 ms | `dshx-2113d713/state`                | thread-sidebar             |
+|       18 |   257 KiB |  1,803 ms |       469 ms | `dshx-e1cc781b/threadAt`             | jj-integration             |
+|       24 |   105 KiB |  1,660 ms |       750 ms | `api/session/modelCatalog`           | native                     |
+|       18 |   2.6 KiB |  3,102 ms |     3,099 ms | `dshx-16a2d652/devServers` + `/list` | preview                    |
+|        7 |   0.2 KiB |    369 ms |        79 ms | `api/changes.summary`                | diff-viewed (native route) |
 
 ## 20 slowest
 
-| start | wall | TTFB | status | decoded | pattern |
-| ---: | ---: | ---: | ---: | ---: | --- |
-| 599 ms | 10,603 ms | 10,120 ms | 200 | 1.0 KiB | `ai-accounts/quotaContinuations` |
-| 1,002 ms | 10,220 ms | 9,061 ms | 200 | 3,225 KiB | `session/list` |
-| 22,237 ms | 9,747 ms | 9,477 ms | 200 | 3,620 KiB | `session/page` |
-| 31,186 ms | 9,220 ms | 9,036 ms | 200 | 380 KiB | `session/page` |
-| 22,931 ms | 8,866 ms | 7,880 ms | 200 | 1,470 KiB | `session/page` |
-| 22,475 ms | 8,613 ms | 8,405 ms | 200 | 577 KiB | `session/page` |
-| 26,208 ms | 4,877 ms | 2,248 ms | 200 | 1.0 KiB | `ai-accounts/quotaContinuations` |
-| 12,966 ms | 3,102 ms | 3,099 ms | 200 | 0.2 KiB | `preview/devServers` |
-| 13,003 ms | 3,065 ms | 3,060 ms | 200 | 0.2 KiB | `preview/devServers` |
-| 13,008 ms | 3,061 ms | 2,359 ms | 200 | 0.2 KiB | `preview/devServers` |
-| 28,143 ms | 2,945 ms | 2 ms | 200 | 0.5 KiB | `session-undo/history` |
-| 26,078 ms | 2,756 ms | 1 ms | 200 | 0.1 KiB | `preview/list` |
-| 26,077–26,072 ms | 2,753–2,755 ms | 1–2,743 ms | 200 | 0.2 KiB | `preview/devServers` ×3, `preview/list` ×2 |
-| 28,687 ms | 2,404 ms | 2 ms | 200 | 1.5 KiB | `session-undo/history` |
-| 29,277 ms | 1,814 ms | 2 ms | 200 | 0.4 KiB | `session-undo/history` |
-| 30,000 ms | 1,803 ms | 469 ms | 200 | 0.7 KiB | `jj-integration/threadAt` |
+|            start |           wall |       TTFB | status |   decoded | pattern                                    |
+| ---------------: | -------------: | ---------: | -----: | --------: | ------------------------------------------ |
+|           599 ms |      10,603 ms |  10,120 ms |    200 |   1.0 KiB | `ai-accounts/quotaContinuations`           |
+|         1,002 ms |      10,220 ms |   9,061 ms |    200 | 3,225 KiB | `session/list`                             |
+|        22,237 ms |       9,747 ms |   9,477 ms |    200 | 3,620 KiB | `session/page`                             |
+|        31,186 ms |       9,220 ms |   9,036 ms |    200 |   380 KiB | `session/page`                             |
+|        22,931 ms |       8,866 ms |   7,880 ms |    200 | 1,470 KiB | `session/page`                             |
+|        22,475 ms |       8,613 ms |   8,405 ms |    200 |   577 KiB | `session/page`                             |
+|        26,208 ms |       4,877 ms |   2,248 ms |    200 |   1.0 KiB | `ai-accounts/quotaContinuations`           |
+|        12,966 ms |       3,102 ms |   3,099 ms |    200 |   0.2 KiB | `preview/devServers`                       |
+|        13,003 ms |       3,065 ms |   3,060 ms |    200 |   0.2 KiB | `preview/devServers`                       |
+|        13,008 ms |       3,061 ms |   2,359 ms |    200 |   0.2 KiB | `preview/devServers`                       |
+|        28,143 ms |       2,945 ms |       2 ms |    200 |   0.5 KiB | `session-undo/history`                     |
+|        26,078 ms |       2,756 ms |       1 ms |    200 |   0.1 KiB | `preview/list`                             |
+| 26,077–26,072 ms | 2,753–2,755 ms | 1–2,743 ms |    200 |   0.2 KiB | `preview/devServers` ×3, `preview/list` ×2 |
+|        28,687 ms |       2,404 ms |       2 ms |    200 |   1.5 KiB | `session-undo/history`                     |
+|        29,277 ms |       1,814 ms |       2 ms |    200 |   0.4 KiB | `session-undo/history`                     |
+|        30,000 ms |       1,803 ms |     469 ms |    200 |   0.7 KiB | `jj-integration/threadAt`                  |
 
 Two things separate TTFB (~server) from wall (~browser queue) here: `quotaContinuations` at 10.6 s is 10.1 s of
 Host time, while `preview/list` at 2.7 s is 1 ms of Host time and 2.75 s of queueing behind the six-connection
@@ -84,17 +84,17 @@ limit. The second is a symptom of firing 38 requests at once, not of a slow endp
 
 ## Repeats (identical method + path), gap to the previous copy
 
-| Requests | Closest gap | Gaps ≤ 1 s | Pattern |
-| ---: | ---: | ---: | --- |
-| 24 | 0 ms | 22 | `session/modelCatalog` |
-| 18 | 0 ms | 12 | `jj-integration/threadAt` |
-| 9 + 9 | 1 ms | 6 + 6 | `preview/devServers` + `preview/list` |
-| 7 | 0 ms | 5 | `credentials/describe` |
-| 7 | 0 ms | 5 | `session/attachment` |
-| 7 | 1 ms | 4 | `changes.summary` (all 404) |
-| 6 | 2 ms | 5 | `multi-host/sessionRuntime` |
-| 6 | 4 ms | 4 | `session-undo/history` |
-| 5 | 254 ms | 3 | `jujutsu/referenceGraph` |
+| Requests | Closest gap | Gaps ≤ 1 s | Pattern                               |
+| -------: | ----------: | ---------: | ------------------------------------- |
+|       24 |        0 ms |         22 | `session/modelCatalog`                |
+|       18 |        0 ms |         12 | `jj-integration/threadAt`             |
+|    9 + 9 |        1 ms |      6 + 6 | `preview/devServers` + `preview/list` |
+|        7 |        0 ms |          5 | `credentials/describe`                |
+|        7 |        0 ms |          5 | `session/attachment`                  |
+|        7 |        1 ms |          4 | `changes.summary` (all 404)           |
+|        6 |        2 ms |          5 | `multi-host/sessionRuntime`           |
+|        6 |        4 ms |          4 | `session-undo/history`                |
+|        5 |      254 ms |          3 | `jujutsu/referenceGraph`              |
 
 ## Waterfall against the page markers
 
@@ -116,12 +116,12 @@ No websocket and no event-stream entry exists in this capture: the connection's 
 is not represented as an HTTP entry, so it cannot be audited from this artifact. The long-lived list is therefore
 just the slow polls above. Cadences observed:
 
-| Endpoint | Cadence in the window | Caller |
-| --- | --- | --- |
+| Endpoint                       | Cadence in the window                  | Caller                               |
+| ------------------------------ | -------------------------------------- | ------------------------------------ |
 | `preview/devServers` + `/list` | every 10 s, per mounted session header | `@dshfiles/preview` `DevServersChip` |
-| `jj-integration/repositories` | 60 s, or 5 s while `refreshing` | `@dshfiles/jj-integration` panel |
-| `thread-sidebar/state` | 30 s (2 s minimum gap) | attention store |
-| `session-undo/history` | 15 s per mounted composer | `@dshfiles/session-undo` |
+| `jj-integration/repositories`  | 60 s, or 5 s while `refreshing`        | `@dshfiles/jj-integration` panel     |
+| `thread-sidebar/state`         | 30 s (2 s minimum gap)                 | attention store                      |
+| `session-undo/history`         | 15 s per mounted composer              | `@dshfiles/session-undo`             |
 
 ## Ranked by wasted work
 
@@ -143,6 +143,10 @@ just the slow polls above. Cadences observed:
 4. **`jujutsu/referenceGraph` 5 × 125–131 KiB.** Two full revisions arrays (208–217 rows) per visible project,
    for a chip title and a hover popover. N+1 by reference: each visible jj reference resolves its own graph, and a
    miss in the preferred project re-probes cwd and then every registered repository.
+   **Payload fixed:** the Host now collapses each hidden stretch between listed rows to one stand-in revision, so on
+   this repository an answer went from 233–240 revisions / 121–146 KiB to 9–15 revisions / 6–10 KiB with an identical
+   preview layout (`ReferenceGraphModel.collapseHidden`, checked against the full graph on four real references). The
+   per-reference fan-out is still open.
 5. **`changes.summary` 7 × 404.** `@dshfiles/diff-viewed` asks `api/changes.summary` (a native route this Host
    does not serve) once per rendered turn action, and gets 404 every time. Small bytes, but it is a failed request
    per turn on every page load.
