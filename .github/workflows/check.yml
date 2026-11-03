@@ -15,7 +15,7 @@
 #   dshx      pnpm run check:dshx
 #   repo      check:cycles, check:native-forks, test:scripts, verify:web-profile-contract, check:repo,
 #             check:effect-native, knip, check:screenshots
-#   boot      3 shards of pnpm run check:plugin-boot (`scripts/ci/plugin-shard.mjs boot`)
+#   boot      4 shards of pnpm run check:plugin-boot (`scripts/ci/plugin-shard.mjs boot`)
 #   e2e-smoke pnpm run check:e2e:smoke
 name: Required checks
 
@@ -118,7 +118,7 @@ jobs:
       - run: pnpm run check:screenshots
 
   boot:
-    name: boot (${{ matrix.shard }}/3)
+    name: boot (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
@@ -136,7 +136,7 @@ jobs:
       # Boots stay serial inside a shard: two at once on a 4 vCPU runner left expected Client entries `pending` past
       # their settle window (workbench, agent-preset) although both pass alone and on a 10-core workstation. The
       # parallelism is the three shards, not concurrency inside one.
-      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 3 boot
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 4 boot
 
   e2e-smoke:
     name: e2e-smoke (${{ matrix.shard }}/2)

@@ -22,7 +22,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -37,24 +37,6 @@ const run = (command, args, options = {}) =>
     child.once('close', code => resolveRun(code ?? 1))
   })
 
-/**
- * Test bytes under a package, used as a deterministic cost proxy: the suites, not the sources, are what a shard pays
- * for (real Hosts, subprocesses, browser shells). A package without tests weighs only its smallest unit.
- */
-const directorySize = async directory => {
-  let total = 0
-  const walk = async path => {
-    const entries = await readdir(path, { withFileTypes: true })
-    for (const entry of entries) {
-      const child = resolve(path, entry.name)
-      if (entry.isDirectory()) await walk(child)
-      else if (entry.isFile() && /\.(test|spec)\.tsx?$/.test(entry.name)) total += (await stat(child)).size
-    }
-  }
-  await walk(directory)
-  return total
-}
-
 const listPluginPackages = async () => {
   const entries = await readdir(pluginsRoot, { withFileTypes: true })
   const packages = []
@@ -64,9 +46,7 @@ const listPluginPackages = async () => {
     if (!existsSync(manifestPath)) continue
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     if (typeof manifest.name !== 'string') continue
-    const sourceRoot = resolve(pluginsRoot, entry.name, 'src')
     packages.push({
-      weight: existsSync(sourceRoot) ? await directorySize(sourceRoot) : 1,
       name: manifest.name,
       directory: `plugins/@dshfiles/${entry.name}`,
       isBundle: manifest.dsh !== undefined,
@@ -74,21 +54,6 @@ const listPluginPackages = async () => {
     })
   }
   return packages.sort((left, right) => left.name.localeCompare(right.name))
-}
-
-/**
- * Longest-processing-time assignment: heaviest package first, each onto the lightest shard so far. Round-robin by name
- * left shards 60 % apart in wall clock because a few packages dominate; this keeps the slices deterministic (name and
- * source size only) while evening the work.
- */
-const balance = (items, count) => {
-  const shards = Array.from({ length: count }, () => ({ weight: 0, items: [] }))
-  for (const item of [...items].sort((left, right) => right.weight - left.weight || left.name.localeCompare(right.name))) {
-    const lightest = shards.reduce((best, shard) => (shard.weight < best.weight ? shard : best), shards[0])
-    lightest.items.push(item)
-    lightest.weight += item.weight
-  }
-  return shards
 }
 
 const parseShard = argv => {
@@ -103,10 +68,7 @@ const parseShard = argv => {
 
 const { index, count, mode } = parseShard(process.argv.slice(2))
 const packages = await listPluginPackages()
-const sliceOf = items => balance(items, count)[index].items.sort((left, right) => left.name.localeCompare(right.name))
-
-/** Boot cost tracks bundle count rather than test bytes, and its measured shards were already within noise. */
-const roundRobinSliceOf = items => items.filter((_, position) => position % count === index)
+const sliceOf = items => items.filter((_, position) => position % count === index)
 
 if (mode === 'test' || mode === 'unit') {
   const slice = sliceOf(packages)
@@ -131,7 +93,7 @@ if (mode === 'test' || mode === 'unit') {
 
 if (mode === 'boot') {
   const bundles = packages.filter(item => item.isBundle)
-  const slice = roundRobinSliceOf(bundles)
+  const slice = sliceOf(bundles)
   // The composed boot loads every bundle in one profile, so it belongs to exactly one shard: the first that owns any
   // bundle. A shard with bundles after that one runs only its own per-plugin boots.
   const owners = slice.map(item => item.name.replace('@dshfiles/', ''))
