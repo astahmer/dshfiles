@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import * as Schema from 'effect/Schema'
 import { workbenchRegions, type NestedSurfacePath, type WorkbenchRegionId, type WorkbenchRegionRegistry, type WorkbenchRegionSurface } from './dock-regions.js'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { nestedLayoutStores, decodeNestedSurfacePath, nestedSurfacePathSchema, type LayoutStore, type NestedLayouts } from './layout-store.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
 import { trimmedString } from './schema.js'
@@ -19,7 +19,7 @@ export interface NestedSurfaceDescriptor {
 }
 
 /** Stable container identities, retained even when their containing surface is unmounted. */
-export const nestedSurfaceDefinitions = createEffectStoredValue({
+export const nestedSurfaceDefinitions = createStoredValue({
   key: 'dshfiles.workbench.nested-surfaces.v1',
   schema: Schema.Array(descriptorSchema),
   fallback: [],

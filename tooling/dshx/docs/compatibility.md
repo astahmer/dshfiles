@@ -15,15 +15,15 @@ stays generic so a future generation can be added beside it.
 `packages/dshx/src/compat/index.ts` validates the registry, analyzes plugin
 ranges, selects the adapter, and reports capabilities.
 
-| Field | Value |
-|---|---|
-| DSH range | `>=0.2.0-rc.1 <0.3.0-0` |
-| Verified versions | `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.2` |
-| Node range | `^22.19.0 \|\| >=24.0.0` |
-| Settings service | `configForms` from `@deepseek-ai/dsh-client-ui-settings` |
-| Conversation contracts | `@deepseek-ai/dsh-client-ui-conversation` |
-| Custom durable event vocabulary | not available |
-| Conversation component contributions | not available |
+| Field                                | Value                                                    |
+| ------------------------------------ | -------------------------------------------------------- |
+| DSH range                            | `>=0.2.0-rc.1 <0.3.0-0`                                  |
+| Verified versions                    | `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.2`                 |
+| Node range                           | `^22.19.0 \|\| >=24.0.0`                                 |
+| Settings service                     | `configForms` from `@deepseek-ai/dsh-client-ui-settings` |
+| Conversation contracts               | `@deepseek-ai/dsh-client-ui-conversation`                |
+| Custom durable event vocabulary      | not available                                            |
+| Conversation component contributions | not available                                            |
 
 ## Supported authoring API policy
 
@@ -92,12 +92,12 @@ not contain the installed DSH, or when the devDependency floats.
 
 ## Status semantics
 
-| Status | Meaning |
-|---|---|
-| `verified` | The installed DSH is one of the verified versions above. |
-| `compatible` | An unverified stable version inside the range; runs with a warning. |
-| `experimental` | An unverified prerelease inside the range; runs with an explicit warning. |
-| `unsupported` | Outside every range. Rejected unless `compatibility.allowUnsupported` is set for temporary diagnosis. |
+| Status         | Meaning                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
+| `verified`     | The installed DSH is one of the verified versions above.                                              |
+| `compatible`   | An unverified stable version inside the range; runs with a warning.                                   |
+| `experimental` | An unverified prerelease inside the range; runs with an explicit warning.                             |
+| `unsupported`  | Outside every range. Rejected unless `compatibility.allowUnsupported` is set for temporary diagnosis. |
 
 Semver membership never implies a real boot. `dshx check --json` reports the
 static assessment; `dshx check --runtime --json` adds the resolved Profile,

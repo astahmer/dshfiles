@@ -1,5 +1,4 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import type { PersistedTabs } from './tabs-machine.js'
 
@@ -23,7 +22,7 @@ const atMostStoredSets = Schema.makeFilter<typeof tabSets.Type>(sets => (Object.
 /** One document for every scope (global and each project) so switching the persistence setting loses nothing. */
 export const storedTabs = createStoredValue({
   key: 'dshfiles.main-tabs.v1',
-  schema: zodSchemaFromEffect(Schema.Struct({ lastProjectKey: Schema.NullOr(idSchema), sets: tabSets.check(atMostStoredSets) })),
+  schema: Schema.Struct({ lastProjectKey: Schema.NullOr(idSchema), sets: tabSets.check(atMostStoredSets) }),
   fallback: null,
 })
 

@@ -316,8 +316,6 @@ These are understood and deliberately open, not forgotten:
   session-query engine indexing a large backlog rather than in memory's own code.
 - `@dshfiles/optmem-core` still owns a `createMemoryEngine` that no Host imports; it is dead from the Host side, which is
   why it was not ported.
-- `plugin-ui`'s `createStoredValue` requires `safeParse`, so four `createEffectStoredValue` copies and most
-  `zodSchemaFromEffect` bridges remain until it accepts a Standard Schema.
 
 ## Reference plugins
 

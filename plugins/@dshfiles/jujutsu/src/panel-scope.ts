@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { type Dispatch, type SetStateAction, useEffect, useState, useSyncExternalStore } from 'react'
 import { SchemaHelpers } from './schema-helpers.js'
-import { createEffectStoredValue } from './stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 /**
  * One Jujutsu panel, several contexts. The main view shows a single panel per key, so a tab that asks for another
@@ -56,7 +56,7 @@ export type PanelScopeState = Schema.Schema.Type<typeof panelScopeStateSchema>[s
 export type PanelScopeView = NonNullable<PanelScopeState['view']>
 
 const NO_PANEL_SCOPES: Record<string, PanelScopeState> = {}
-const storedPanelScopes = createEffectStoredValue({ key: PANEL_SCOPE_STATE_KEY, schema: panelScopeStateSchema, fallback: NO_PANEL_SCOPES })
+const storedPanelScopes = createStoredValue({ key: PANEL_SCOPE_STATE_KEY, schema: panelScopeStateSchema, fallback: NO_PANEL_SCOPES })
 
 /** Panel state that belongs to one scope rather than the browser: filters, selection and expanded rows. */
 const scopeMemory = new Map<string, Map<string, unknown>>()

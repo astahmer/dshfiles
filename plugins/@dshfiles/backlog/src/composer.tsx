@@ -1,4 +1,3 @@
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import {
@@ -62,7 +61,7 @@ type ReferenceMode = 'item' | 'thread'
 
 const captureProject = createStoredValue({
   key: 'dshfiles.backlog.capture-project.v1',
-  schema: zodSchemaFromEffect(Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))),
+  schema: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars))),
   fallback: null,
 })
 

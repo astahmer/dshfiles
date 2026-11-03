@@ -1,10 +1,10 @@
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
 import * as Schema from 'effect/Schema'
 import type { StoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 /** Browser presentation state, separate from the obsolete per-profile surface choice. */
-export const rightPaneVisibility = createEffectStoredValue({
+export const rightPaneVisibility = createStoredValue({
   key: 'dshfiles.workbench.right-pane-visible.v1',
   schema: Schema.NullOr(Schema.Boolean),
   fallback: null,

@@ -21,7 +21,7 @@ import type { TracesAlertsTranslate } from '../alerts/alerts-locale.js'
 import { logsViewSchema, storedLogsView } from '../log-list.js'
 import { storedTracesView, tracesViewSchema } from '../view-state.js'
 import { BUILTIN_BOARDS } from './board-definitions.js'
-import { createStoredValue } from '../stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { boardCopyOf, storedBoardId } from './boards-view.js'
 
 const MAX_SAVED_VIEWS = 30

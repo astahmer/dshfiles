@@ -6,7 +6,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -37,7 +36,7 @@ const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 // Open requests arrive while no editor surface is mounted, so the settings are mirrored where the event handler reads them.
 const placement = createStoredValue({
   key: 'dshfiles-editor:placement',
-  schema: zodSchemaFromEffect(Schema.Literals(['workbench', 'right-panel'])),
+  schema: Schema.Literals(['workbench', 'right-panel']),
   fallback: 'workbench',
 })
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.

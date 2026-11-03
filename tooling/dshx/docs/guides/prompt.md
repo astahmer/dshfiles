@@ -7,29 +7,25 @@
 ## Define contributions
 
 ```ts
-import {
-  defineHost,
-  definePromptContext,
-  definePromptSection,
-} from "@dshfiles/dshx/host";
+import { defineHost, definePromptContext, definePromptSection } from '@dshfiles/dshx/host'
 
-let requestCount = 0;
+let requestCount = 0
 
 const guidance = definePromptSection({
-  name: "my-plugin:guidance",
+  name: 'my-plugin:guidance',
   order: 150,
-  text: "Use my_plugin_status before reporting runtime health.",
-});
+  text: 'Use my_plugin_status before reporting runtime health.',
+})
 
 const runtime = definePromptContext({
-  name: "my-plugin:runtime",
+  name: 'my-plugin:runtime',
   order: 0,
   text: () => `The plugin has handled ${requestCount} requests.`,
-});
+})
 
 export default defineHost({
   prompts: [guidance, runtime],
-});
+})
 ```
 
 ```ts
@@ -63,11 +59,11 @@ Use direct official registration in `setup(ctx)` when a contribution must be cre
 
 ```ts
 export default defineHost({
-  inject: ["systemPrompt"],
+  inject: ['systemPrompt'],
   setup(ctx) {
-    ctx.systemPrompt.section(scopedSection);
+    ctx.systemPrompt.section(scopedSection)
   },
-});
+})
 ```
 
 The official registry owns the disposer and restores shadowed contributions when that scope is disposed.

@@ -1,4 +1,4 @@
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import * as Option from 'effect/Option'
@@ -259,7 +259,7 @@ const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreference
 const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
 
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
-export const storedPreferences = createEffectStoredValue({
+export const storedPreferences = createStoredValue({
   key: PREFERENCES_STORAGE_KEY,
   schema: storedPreferencesSchema,
   fallback: null,

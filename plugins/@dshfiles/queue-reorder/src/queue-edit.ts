@@ -1,4 +1,3 @@
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -122,8 +121,7 @@ const editRecordSchema = Schema.Struct({
   error: Schema.optional(Schema.String),
 })
 
-/** `createStoredValue` types its key schema as `ZodType`; the Effect schema is the source of truth across that boundary. */
-export const queueEditRecordsSchema = zodSchemaFromEffect(Schema.Record(Schema.String, editRecordSchema))
+export const queueEditRecordsSchema = Schema.Record(Schema.String, editRecordSchema)
 
 export type QueueEditRecord = typeof editRecordSchema.Type
 

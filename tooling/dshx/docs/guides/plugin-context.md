@@ -9,11 +9,11 @@ reload and HMR withdraw it.
 
 Where to get it:
 
-| Where | How |
-| --- | --- |
-| `defineClientPlugin({ setup(api) })` | `api` is the context (plus `uses` capabilities) |
-| `defineClient({ setup(ctx, decorate, metadata) })` | `metadata.plugin` |
-| A component registered through dshx | `usePlugin()` |
+| Where                                              | How                                             |
+| -------------------------------------------------- | ----------------------------------------------- |
+| `defineClientPlugin({ setup(api) })`               | `api` is the context (plus `uses` capabilities) |
+| `defineClient({ setup(ctx, decorate, metadata) })` | `metadata.plugin`                               |
+| A component registered through dshx                | `usePlugin()`                                   |
 
 ## Definition options
 
@@ -56,17 +56,17 @@ export default defineClientPlugin({
 
 ### Typed registries dshx renders natively
 
-| Registry | Native place |
-| --- | --- |
-| `Panel` | main view + sidebar navigation row |
-| `ComposerAction` | composer tool row (`placement: 'left' \| 'right'`) |
-| `ComposerPill` | a pill above each session's composer (`conversation.input.dock`) with an optional row menu |
-| `HeaderAction` | session header actions |
-| `SessionRowAccessory` | leading content of each sidebar thread row |
-| `Overlay` | frame-wide floating layer (`shell.overlay`) |
-| `SettingsSection` | a Settings section with search `entries`; `placement: 'plugins'` makes it a tab inside Settings › Plugins, `'general'` a row in General |
-| `PluginDetailBadge` | a tag beside a Settings › Plugins detail title |
-| `PluginDetailSection` | a section under a Settings › Plugins detail page |
+| Registry              | Native place                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `Panel`               | main view + sidebar navigation row                                                                                                      |
+| `ComposerAction`      | composer tool row (`placement: 'left' \| 'right'`)                                                                                      |
+| `ComposerPill`        | a pill above each session's composer (`conversation.input.dock`) with an optional row menu                                              |
+| `HeaderAction`        | session header actions                                                                                                                  |
+| `SessionRowAccessory` | leading content of each sidebar thread row                                                                                              |
+| `Overlay`             | frame-wide floating layer (`shell.overlay`)                                                                                             |
+| `SettingsSection`     | a Settings section with search `entries`; `placement: 'plugins'` makes it a tab inside Settings › Plugins, `'general'` a row in General |
+| `PluginDetailBadge`   | a tag beside a Settings › Plugins detail title                                                                                          |
+| `PluginDetailSection` | a section under a Settings › Plugins detail page                                                                                        |
 
 `ComposerPill.usePill({ sessionId })` runs as a React hook in each composer and returns `{ label, icon?, menu? }`
 or undefined to hide the pill there; a click opens `menu` rows (`{ id, title, disabled?, danger?, run }`) in the
@@ -84,12 +84,12 @@ api.add(ComposerPill, {
 
 ### Registries owned plugins render
 
-| Registry | Owner |
-| --- | --- |
-| `Command` | `@dshfiles/command-palette` lists it; `@dshfiles/shortcuts` binds its keys and lists `editable` ones in Keyboard shortcuts; `@dshfiles/input-trigger` adds its `slash` entry |
-| `MenuItem` | `@dshfiles/workbench` lists rows with `menu: 'workbench.new-view'` as Actions in its New tab chooser; a row runs and the chooser closes |
-| `FileViewer` | `@dshfiles/editor` offers a matching viewer as a toggle beside Save and renders it over the text with `{ sessionId, path, text }` (unsaved edits included); the editor's own Markdown preview is one |
-| `LinkHandler` | Markdown renderers: the chat fork's assistant messages and plugin-ui `Markdown` open `[label](scheme:target)` and `<scheme:target>` links through it |
+| Registry      | Owner                                                                                                                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Command`     | `@dshfiles/command-palette` lists it; `@dshfiles/shortcuts` binds its keys and lists `editable` ones in Keyboard shortcuts; `@dshfiles/input-trigger` adds its `slash` entry                         |
+| `MenuItem`    | `@dshfiles/workbench` lists rows with `menu: 'workbench.new-view'` as Actions in its New tab chooser; a row runs and the chooser closes                                                              |
+| `FileViewer`  | `@dshfiles/editor` offers a matching viewer as a toggle beside Save and renders it over the text with `{ sessionId, path, text }` (unsaved edits included); the editor's own Markdown preview is one |
+| `LinkHandler` | Markdown renderers: the chat fork's assistant messages and plugin-ui `Markdown` open `[label](scheme:target)` and `<scheme:target>` links through it                                                 |
 
 ### Custom link schemes: `LinkHandler`
 
@@ -134,18 +134,18 @@ binds only Mod (+ Shift) chords. `CommandChords` converts `Mod+Shift+K` to and f
 Import the token from the owner's dshx module (the owner as a workspace dependency) and follow it with `api.use` or
 `useContract`; it is `pending` while the owner is absent.
 
-| Contract | Module | What |
-| --- | --- | --- |
-| `CommandPalette` | `@dshfiles/command-palette/palette-contract` | `open(mode)`, `close()`, `setRecentLimit(n)`, live `state` |
-| `MainTabs` | `@dshfiles/main-tabs/tabs-contract` | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)`, `pin(tabId, pinned)`, `reopenClosed()` |
+| Contract         | Module                                       | What                                                                                                                                                               |
+| ---------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CommandPalette` | `@dshfiles/command-palette/palette-contract` | `open(mode)`, `close()`, `setRecentLimit(n)`, live `state`                                                                                                         |
+| `MainTabs`       | `@dshfiles/main-tabs/tabs-contract`          | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)`, `pin(tabId, pinned)`, `reopenClosed()` |
 
 App contracts are declared by dshx itself, so a consumer needs no dependency on whichever plugin provides them:
 
-| Contract | Provider | What |
-| --- | --- | --- |
-| `Files` | `@dshfiles/editor` | for the session on screen: `watch(listener, { signal? })` follows the workspace file list (`no-session`, then `indexing`/`ready` replies), `open({ path, line?, cwd? })` opens a file in the editor, `openIn({ path, application?, reveal? })` hands an absolute Host path to another app or the file manager (desktop Hosts) |
-| `Changes` | `@dshfiles/pulls-review` | `review({ workspacePath, sessionId? })` opens the review page on a workspace's changes |
-| `Browser` | `@dshfiles/chat` | live `available` and `open(url)` for an http(s) URL in the embedded browser pane beside the session on screen |
+| Contract  | Provider                 | What                                                                                                                                                                                                                                                                                                                          |
+| --------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Files`   | `@dshfiles/editor`       | for the session on screen: `watch(listener, { signal? })` follows the workspace file list (`no-session`, then `indexing`/`ready` replies), `open({ path, line?, cwd? })` opens a file in the editor, `openIn({ path, application?, reveal? })` hands an absolute Host path to another app or the file manager (desktop Hosts) |
+| `Changes` | `@dshfiles/pulls-review` | `review({ workspacePath, sessionId? })` opens the review page on a workspace's changes                                                                                                                                                                                                                                        |
+| `Browser` | `@dshfiles/chat`         | live `available` and `open(url)` for an http(s) URL in the embedded browser pane beside the session on screen                                                                                                                                                                                                                 |
 
 ```ts
 const files = api.use(Files).get()
@@ -224,15 +224,15 @@ is no longer current.
 
 ## App services
 
-| Service | What |
-| --- | --- |
-| `api.dialogs` | `confirm`, `alert`, `prompt`, `select` in the app's dialogs (`Dialogs` contract); plain browser dialogs while no provider runs |
-| `api.toast.show(input)` | a toast through the `Toasts` contract; logged while no provider runs |
-| `api.commands.run(id)` | run a contributed `Command`, else a Host command; false when none can run; `api.commands.keys` is the live map of each command's effective keys |
-| `api.layout` | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()`; `side` is the right region of the session on screen (its native right pane, or the Workbench dock): live `expanded`, `open()`, `hide()`, `toggle()`, each false without a side region or a session on screen |
-| `api.system` | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab, `openLink(href)` through a `LinkHandler` and else as `openExternal`; each resolves or returns false when the browser cannot |
-| `api.notifications` | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported` |
-| `api.environment` | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service |
+| Service                 | What                                                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.dialogs`           | `confirm`, `alert`, `prompt`, `select` in the app's dialogs (`Dialogs` contract); plain browser dialogs while no provider runs                                                                                                                                                     |
+| `api.toast.show(input)` | a toast through the `Toasts` contract; logged while no provider runs                                                                                                                                                                                                               |
+| `api.commands.run(id)`  | run a contributed `Command`, else a Host command; false when none can run; `api.commands.keys` is the live map of each command's effective keys                                                                                                                                    |
+| `api.layout`            | `panel` (selected main panel), `openPanel(id)`, `toggleSidebar()`; `side` is the right region of the session on screen (its native right pane, or the Workbench dock): live `expanded`, `open()`, `hide()`, `toggle()`, each false without a side region or a session on screen    |
+| `api.system`            | `copy(text)` through the Host clipboard, `save({ name, content, type? })` as a download, `openExternal(url)` for http(s) and mailto URLs in a new tab, `openLink(href)` through a `LinkHandler` and else as `openExternal`; each resolves or returns false when the browser cannot |
+| `api.notifications`     | `notify({ title, body?, tag?, onClick? })` shows an OS notification and returns false without permission or Notification API (it never prompts); `permission()` and `requestPermission()` (call it from a click) report `default`, `granted`, `denied` or `unsupported`            |
+| `api.environment`       | `locale` (`{ id, direction }`) and `appearance` (`{ colorScheme, fonts? }`) as live values to `track` or `useSubscribable`; the page language and the system color scheme while the Host has no locale or theme service                                                            |
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.
 
@@ -249,13 +249,13 @@ composer.attach({ attachment: { kind: 'quote', text: selection } })
 await composer.setModel({ selection: { provider: 'deepseek', model: 'deepseek-chat', variant: 'high' } })
 ```
 
-| Member | What |
-| --- | --- |
-| `current`, `focused` | live session id of the composer on screen, and whether it holds keyboard focus |
-| `text()`, `setText({ text })`, `insert({ text })` | the draft with chips in clipboard form; replace it; insert at the caret |
-| `attach({ attachment })` | a chip: `{ kind: 'file', path }`; `{ kind: 'quote' \| 'note', text, label? }` sent as a block quote or inside `<note>`; `{ kind: 'comment', path, line, endLine?, text }`, a comment on file lines sent with the next message inside `<comment path lines>` |
-| `setModel({ selection })` | `provider`, `model` and `variant` (reasoning effort) for the next message |
-| `focus()` | give the composer keyboard focus |
+| Member                                            | What                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current`, `focused`                              | live session id of the composer on screen, and whether it holds keyboard focus                                                                                                                                                                              |
+| `text()`, `setText({ text })`, `insert({ text })` | the draft with chips in clipboard form; replace it; insert at the caret                                                                                                                                                                                     |
+| `attach({ attachment })`                          | a chip: `{ kind: 'file', path }`; `{ kind: 'quote' \| 'note', text, label? }` sent as a block quote or inside `<note>`; `{ kind: 'comment', path, line, endLine?, text }`, a comment on file lines sent with the next message inside `<comment path lines>` |
+| `setModel({ selection })`                         | `provider`, `model` and `variant` (reasoning effort) for the next message                                                                                                                                                                                   |
+| `focus()`                                         | give the composer keyboard focus                                                                                                                                                                                                                            |
 
 ### Session screen
 
@@ -268,13 +268,13 @@ const stop = screen.files.index.subscribe(() => render(screen.files.index.get())
 const hits = await screen.files.search({ query: 'retry' })
 ```
 
-| Member | What |
-| --- | --- |
-| `current` | the session the main view shows; undefined while a panel takes it |
-| `mounted` | the session side panels follow: the last one shown |
-| `files.index` | `{ status: 'no-session' }`, or `indexing`/`ready` with workspace-relative `files` and `truncated`; walked and watched only while subscribed |
-| `files.list({ path })` | one tree level (`''` is the root) as `{ name, path, type }`, undefined when the Host refuses |
-| `files.search({ query })` | the Host's file search as `@` mentions rank it |
+| Member                    | What                                                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current`                 | the session the main view shows; undefined while a panel takes it                                                                           |
+| `mounted`                 | the session side panels follow: the last one shown                                                                                          |
+| `files.index`             | `{ status: 'no-session' }`, or `indexing`/`ready` with workspace-relative `files` and `truncated`; walked and watched only while subscribed |
+| `files.list({ path })`    | one tree level (`''` is the root) as `{ name, path, type }`, undefined when the Host refuses                                                |
+| `files.search({ query })` | the Host's file search as `@` mentions rank it                                                                                              |
 
 Line comments ride the composer: `Composer.attach({ attachment: { kind: 'comment', … } })` puts a chip in the draft, so the
 user sees and can remove it before it goes with the next message.

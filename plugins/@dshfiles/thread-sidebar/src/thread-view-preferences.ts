@@ -1,4 +1,4 @@
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import * as Option from 'effect/Option'
@@ -75,13 +75,13 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   showFilterControl: true,
 }
 
-export const doneViewFilterMigration = createEffectStoredValue({
+export const doneViewFilterMigration = createStoredValue({
   key: 'dshfiles.thread-sidebar.done-view-filters.v1',
   schema: Schema.Boolean,
   fallback: false,
 })
 
-export const shippedViewFiltersMigration = createEffectStoredValue({
+export const shippedViewFiltersMigration = createStoredValue({
   key: 'dshfiles.thread-sidebar.shipped-view-filters.v2',
   schema: Schema.Boolean,
   fallback: false,
@@ -429,7 +429,7 @@ const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadV
 }
 
 /** The browser copy this plugin wrote before the saved views became Host settings; read once to migrate. */
-export const threadViewPreferences = createEffectStoredValue({
+export const threadViewPreferences = createStoredValue({
   key: 'dshfiles.thread-sidebar.view.v1',
   schema: storedThreadViewSettingsSchema,
   fallback: DEFAULT_THREAD_VIEW_SETTINGS,

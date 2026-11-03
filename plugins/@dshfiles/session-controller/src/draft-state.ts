@@ -4,15 +4,10 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import type { SessionCreateHandle, SessionDraft, SessionDrafts } from './draft-client.ts'
 
-/**
- * `createStoredValue` types its schema parameter as `ZodType`; the Effect schema stays the source of truth and
- * `zodSchemaFromEffect` carries it across that native boundary. Stored JSON holds plain strings, so the branded ids are
- * recovered once when a stored record enters this module.
- */
+/** Stored JSON holds plain strings, so the branded ids are recovered once when a stored record enters this module. */
 const metadataEffectSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isStartingWith('session-')),
   workspaceId: Schema.optional(Schema.String),
@@ -21,7 +16,7 @@ const metadataEffectSchema = Schema.Struct({
   model: Schema.optional(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) })),
   preview: Schema.String.check(Schema.isMaxLength(80)),
 })
-const draftsSchema = zodSchemaFromEffect(Schema.Array(metadataEffectSchema))
+const draftsSchema = Schema.Array(metadataEffectSchema)
 function sameModel(left: { provider: string; model: string; reasoningEffort?: string | undefined }, right: ModelSelection | undefined): boolean {
   return right !== undefined && left.provider === right.provider && left.model === right.model && left.reasoningEffort === right.reasoningEffort
 }

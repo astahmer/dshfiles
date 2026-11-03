@@ -8,47 +8,42 @@
 
 ```ts
 interface ClientDefinition {
-  readonly name?: string;
-  readonly inject?: readonly string[];
-  readonly locales?: readonly LocaleDefinition[];
-  readonly conversations?: readonly ConversationContribution[];
-  readonly slots?: readonly SlotContribution[];
-  readonly setup?: (ctx: Context) => void | Promise<void>;
+  readonly name?: string
+  readonly inject?: readonly string[]
+  readonly locales?: readonly LocaleDefinition[]
+  readonly conversations?: readonly ConversationContribution[]
+  readonly slots?: readonly SlotContribution[]
+  readonly setup?: (ctx: Context) => void | Promise<void>
 }
 ```
 
 There are no Client `api`, `apis`, or `settings` fields. Calling `useApi`, `useApiQuery`, `useApiEvent`, or `useSettings` from retained Client code declares the corresponding capability.
 
 ```tsx
-import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
-import {
-  defineClient,
-  defineLocale,
-  defineSlot,
-  type PropsLocaleOf,
-} from "@dshfiles/dshx/client";
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { defineClient, defineLocale, defineSlot, type PropsLocaleOf } from '@dshfiles/dshx/client'
 
-const copy = defineLocale("my-plugin.status", {
-  zh: { ready: "插件已就绪" },
-  en: { ready: "Plugin ready" },
-});
+const copy = defineLocale('my-plugin.status', {
+  zh: { ready: '插件已就绪' },
+  en: { ready: 'Plugin ready' },
+})
 
 function Status({ t }: PropsLocaleOf<typeof copy>) {
-  return <p>{t("ready")}</p>;
+  return <p>{t('ready')}</p>
 }
 
-const statusSlot = defineSlot("sidebar.footer.action", {
-  id: "my-plugin.status",
+const statusSlot = defineSlot('sidebar.footer.action', {
+  id: 'my-plugin.status',
   order: 0,
   locale: copy,
   component: Status,
-});
+})
 
 export default defineClient({
-  name: "my-plugin",
+  name: 'my-plugin',
   locales: [copy],
   slots: [statusSlot],
-});
+})
 ```
 
 ## `defineLocale(namespace, dictionaries)`
@@ -56,22 +51,22 @@ export default defineClient({
 `defineLocale()` creates one opaque, plugin-owned Locale contribution and preserves its namespace and key union without requiring declaration merging:
 
 ```ts
-const copy = defineLocale("my-plugin.status", {
-  zh: { ready: "插件已就绪" },
-  en: { ready: "Plugin ready" },
-});
+const copy = defineLocale('my-plugin.status', {
+  zh: { ready: '插件已就绪' },
+  en: { ready: 'Plugin ready' },
+})
 
-type CopyKey = LocaleKeyOf<typeof copy>; // "ready"
-type CopyProps = PropsLocaleOf<typeof copy>; // { t(key): string }
+type CopyKey = LocaleKeyOf<typeof copy> // "ready"
+type CopyProps = PropsLocaleOf<typeof copy> // { t(key): string }
 ```
 
 `en` is required and complete: its keys are the namespace's key union. Every other locale id (`zh`, or a language-pack id such as `fr` or `pt-BR`) is optional and may be partial; it may not add a key `en` lacks. Values are strings only. A violation is a type error for literal dictionaries and `DSHX2402` at runtime. At registration dshx fills each locale's missing keys with the English text, so the native provider always receives complete `zh` and `en` dictionaries; other locales register through its single-locale form and appear once a language pack adds them with `ctx.locale.addLanguage()`.
 
 ```ts
-const copy = defineLocale("my-plugin.status", {
-  en: { ready: "Plugin ready", retry: "Retry" },
-  zh: { ready: "插件已就绪" }, // retry shows "Retry"
-});
+const copy = defineLocale('my-plugin.status', {
+  en: { ready: 'Plugin ready', retry: 'Retry' },
+  zh: { ready: '插件已就绪' }, // retry shows "Retry"
+})
 ```
 
 ### Plurals
@@ -79,20 +74,18 @@ const copy = defineLocale("my-plugin.status", {
 A key with `_one` and `_other` variants (and optionally `_zero`) is a plural key. `plural(t, key, count, params?)` picks `key_zero` when `count` is 0 and that variant exists, then the `Intl.PluralRules` category of the active locale (read from `<html lang>`, which the native provider keeps in sync), then `key_other`. `{count}` and the other params interpolate through the native `t`. `PluralKeyOf<typeof copy>` is the union of plural base keys.
 
 ```tsx
-import { defineLocale, plural, type PropsLocaleOf } from "@dshfiles/dshx/client";
+import { defineLocale, plural, type PropsLocaleOf } from '@dshfiles/dshx/client'
 
-const copy = defineLocale("my-plugin.files", {
+const copy = defineLocale('my-plugin.files', {
   en: {
-    files_zero: "No files",
-    files_one: "{count} file in {folder}",
-    files_other: "{count} files in {folder}",
+    files_zero: 'No files',
+    files_one: '{count} file in {folder}',
+    files_other: '{count} files in {folder}',
   },
-  zh: { files_zero: "没有文件", files_other: "{folder} 中有 {count} 个文件" },
-});
+  zh: { files_zero: '没有文件', files_other: '{folder} 中有 {count} 个文件' },
+})
 
-const Files = ({ t, count }: PropsLocaleOf<typeof copy> & { count: number }) => (
-  <p>{plural(t, "files", count, { folder: "src" })}</p>
-);
+const Files = ({ t, count }: PropsLocaleOf<typeof copy> & { count: number }) => <p>{plural(t, 'files', count, { folder: 'src' })}</p>
 ```
 
 Chinese plural rules select only `other`, so `zh` needs the `_other` variant, plus `_zero` when `en` defines one (otherwise the English zero text shows). Pass the definition to `defineClient({ locales: [...] })` to register and dispose its dictionaries, and to `defineSlot(..., { locale: copy })` to infer the component's typed `t()` prop. Locale definitions register before Conversations, Slots, and `setup(ctx)`.
@@ -191,9 +184,9 @@ Slot and Conversation components are wrapped with the current Client Fiber's API
 The Client entry exports:
 
 ```ts
-useApi(contract);
-useApiQuery(contract, method, options);
-useSettings(contract);
+useApi(contract)
+useApiQuery(contract, method, options)
+useSettings(contract)
 ```
 
 Call Hooks only from React components. Calling one outside a DSHX Slot/Conversation renderer throws because no current Client runtime context exists. See [Typed API](./api.md) and [Settings](./settings.md).

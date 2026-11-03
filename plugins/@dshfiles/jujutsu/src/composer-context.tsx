@@ -30,7 +30,7 @@ import { installChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
-import { createEffectStoredValue } from './stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 export interface ComposerJujutsuServices {
   readonly sessions: ISessions
@@ -61,7 +61,7 @@ const ABOVE_STYLE: CSSProperties = {
 }
 
 const noStoredBases: Readonly<Record<string, string>> = {}
-const storedBases = createEffectStoredValue({
+const storedBases = createStoredValue({
   key: 'dshfiles.jujutsu.composer-base.v1',
   schema: Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(512))),
   fallback: noStoredBases,

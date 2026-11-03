@@ -9,15 +9,15 @@
 ## Configuration
 
 ```ts
-import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "@dshfiles/dshx";
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   host: {
-    entry: "src/host.ts",
+    entry: 'src/host.ts',
   },
   client: {
-    entry: "src/client.tsx",
+    entry: 'src/client.tsx',
     vite: {
       plugins: [tailwindcss()],
     },
@@ -27,34 +27,34 @@ export default defineConfig({
     declarations: true,
     minify: false, // true minifies the production Client chunk; `dshx dev` never minifies
   },
-});
+})
 ```
 
 ```ts
 interface DshxConfig {
-  readonly name?: string;
+  readonly name?: string
   readonly host?:
     | false
     | {
-        readonly entry?: string;
-        readonly vite?: { readonly plugins?: readonly PluginOption[] };
-      };
+        readonly entry?: string
+        readonly vite?: { readonly plugins?: readonly PluginOption[] }
+      }
   readonly client?:
     | false
     | {
-        readonly entry?: string;
-        readonly vite?: { readonly plugins?: readonly PluginOption[] };
-      };
-  readonly profile?: string;
+        readonly entry?: string
+        readonly vite?: { readonly plugins?: readonly PluginOption[] }
+      }
+  readonly profile?: string
   readonly dev?: {
-    readonly hostRestart?: "manual" | "auto";
-    readonly hostHmr?: { readonly hostContractVersion: string };
-  };
+    readonly hostRestart?: 'manual' | 'auto'
+    readonly hostHmr?: { readonly hostContractVersion: string }
+  }
   readonly build?: {
-    readonly sourcemap?: boolean;
-    readonly declarations?: boolean;
-  };
-  readonly compatibility?: { readonly allowUnsupported?: boolean };
+    readonly sourcemap?: boolean
+    readonly declarations?: boolean
+  }
+  readonly compatibility?: { readonly allowUnsupported?: boolean }
 }
 ```
 
@@ -132,11 +132,11 @@ export default defineConfig({ client: { shared: '@scope/shared-runtime' } })
 
 A Client build fails with `DSHX1209` when its final chunk keeps code from a package the page already loads:
 
-| Provided by                  | Packages                                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Provided by                  | Packages                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | DSH, for every Client        | the adapter's platform modules and preloaded externals (`react`, `react-dom`, `@deepseek-ai/cordis`, `@deepseek-ai/dsh-client-ui-slots`, …) |
-| The Host, before this Client | `@deepseek-ai/*` entries of `dsh.client.inject` and `dsh.client.external`                                                                  |
-| The shared runtime           | every module the `client.shared` supplier provides                                                                                         |
+| The Host, before this Client | `@deepseek-ai/*` entries of `dsh.client.inject` and `dsh.client.external`                                                                   |
+| The shared runtime           | every module the `client.shared` supplier provides                                                                                          |
 
 Externals match exact specifiers, so a subpath (`react/jsx-dev-runtime`) or a dependency's deep import reaches the bundle silently, and the copy then runs beside the loaded one with its own module state. The guard matches the package that owns each retained file instead, and the error names the package, why it is provided and the import chain from the Client entry. The list comes from the adapter, the package manifest and the supplier's `shared-runtime.json`; there is no second list to maintain.
 
@@ -149,9 +149,9 @@ Tailwind is optional and remains a generated-project dev dependency. Configure t
 ```css
 @layer theme, utilities;
 
-@import "tailwindcss/theme.css" layer(theme) prefix(dshx);
+@import 'tailwindcss/theme.css' layer(theme) prefix(dshx);
 
-@import "tailwindcss/utilities.css" layer(utilities) source("./") prefix(dshx);
+@import 'tailwindcss/utilities.css' layer(utilities) source('./') prefix(dshx);
 ```
 
 Omitting `tailwindcss/preflight.css` avoids resetting DSH's shared page DOM. Use the `dshx:` utility prefix and complete static class names, for example `className="dshx:flex dshx:gap-2"`; do not assemble class fragments dynamically.

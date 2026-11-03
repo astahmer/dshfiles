@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 type StorageSource = () => Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
 
@@ -9,7 +9,7 @@ export class SidebarPreviewMigration {
   static readonly storageKey = 'dshfiles.workbench.sidebar-preview-docked.v1'
 
   static create(storage?: StorageSource) {
-    const completed = createEffectStoredValue({ key: this.storageKey, schema: Schema.Boolean, fallback: false, ...(storage !== undefined && { storage }) })
+    const completed = createStoredValue({ key: this.storageKey, schema: Schema.Boolean, fallback: false, ...(storage !== undefined && { storage }) })
     return {
       reset(): void {
         completed.remove()

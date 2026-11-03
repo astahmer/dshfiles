@@ -1,4 +1,4 @@
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import type { AttentionFinishReason, ThreadAttentionMigrationEntry } from './attention-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
@@ -22,13 +22,13 @@ export interface ThreadNotificationCategoryPreferences {
 
 export type ThreadNotificationCategories = Readonly<Record<ThreadNotificationCategory, ThreadNotificationCategoryPreferences>>
 
-export const storedNotificationSoundsMuted = createEffectStoredValue({
+export const storedNotificationSoundsMuted = createStoredValue({
   key: 'dshfiles.thread-sidebar.notification-sounds-muted.v1',
   schema: Schema.Boolean,
   fallback: false,
 })
 
-export const storedNotificationsMuted = createEffectStoredValue({
+export const storedNotificationsMuted = createStoredValue({
   key: 'dshfiles.thread-sidebar.notifications-muted.v1',
   schema: Schema.Boolean,
   fallback: false,
@@ -115,7 +115,7 @@ const categoryForFinishReason = (reason: AttentionFinishReason): ThreadFinishNot
 const deliveredNotificationIdsSchema = Schema.mutable(Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024)))).check(
   Schema.isMaxLength(5000),
 )
-const deliveredNotificationIds = createEffectStoredValue({
+const deliveredNotificationIds = createStoredValue({
   key: 'dshfiles.thread-sidebar.notification-deliveries.v1',
   schema: deliveredNotificationIdsSchema,
   fallback: Schema.decodeUnknownSync(deliveredNotificationIdsSchema)([]),
@@ -202,7 +202,7 @@ export type LegacyNotificationPreferences = Schema.Schema.Type<typeof legacyNoti
 
 const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
 
-export const legacyNotificationPreferences = createEffectStoredValue({
+export const legacyNotificationPreferences = createStoredValue({
   key: LEGACY_NOTIFICATION_STORAGE_KEY,
   schema: legacyNotificationPreferencesSchema,
   fallback: null,

@@ -1,4 +1,4 @@
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 
 /**
@@ -15,7 +15,7 @@ const collapsedGroupsSchema = Schema.Array(Schema.String.check(Schema.isMinLengt
 
 const noCollapsedGroups: readonly string[] = []
 
-export const storedCollapsedGroups = createEffectStoredValue({
+export const storedCollapsedGroups = createStoredValue({
   key: COLLAPSED_GROUPS_STORAGE_KEY,
   schema: collapsedGroupsSchema,
   fallback: noCollapsedGroups,

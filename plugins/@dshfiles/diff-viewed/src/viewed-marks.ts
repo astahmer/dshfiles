@@ -1,5 +1,4 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { MAX_VIEWED_MARKS, viewedFileFromKey, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
@@ -39,7 +38,7 @@ export const createViewedMarks = (options: { readonly storage: () => Pick<Storag
   // `createStoredValue` still types its schema as a zod schema; the Effect schema stays the source of truth.
   const stored = createStoredValue({
     key: VIEWED_MARKS_STORAGE_KEY,
-    schema: zodSchemaFromEffect(Schema.Array(Schema.String)),
+    schema: Schema.Array(Schema.String),
     fallback: [],
     storage: options.storage,
   })

@@ -9,16 +9,16 @@
 ## `defineSettings(definition)`
 
 ```ts
-import Schema from "@deepseek-ai/schemastery";
-import { defineSettings } from "@dshfiles/dshx/settings";
+import Schema from '@deepseek-ai/schemastery'
+import { defineSettings } from '@dshfiles/dshx/settings'
 
 export const runtimeSettings = defineSettings({
-  namespace: "my-plugin",
+  namespace: 'my-plugin',
   schema: Schema.object({
     showActivity: Schema.boolean().default(true),
   }),
-  applies: "live",
-});
+  applies: 'live',
+})
 ```
 
 `namespace` must match `/^[a-z][a-z0-9-]*$/`. `schema` must be an official Schemastery object schema; its object value becomes the Host value type. `applies` is `'live' | 'restart'` and defaults to `'live'`. The contract preserves the namespace, schema identity, and inferred types and is safe to share between Host and Client source.
@@ -28,12 +28,12 @@ export const runtimeSettings = defineSettings({
 Register the contract directly for the normal case:
 
 ```ts
-import { defineHost } from "@dshfiles/dshx/host";
-import { runtimeSettings } from "./settings.js";
+import { defineHost } from '@dshfiles/dshx/host'
+import { runtimeSettings } from './settings.js'
 
 export default defineHost({
   settings: [runtimeSettings],
-});
+})
 ```
 
 Use `.host()` only for Host-private behavior:
@@ -42,17 +42,17 @@ Use `.host()` only for Host-private behavior:
 const ownedSettings = runtimeSettings.host({
   base: { showActivity: true },
   validate(value) {
-    if (typeof value.showActivity !== "boolean") throw new Error("invalid");
+    if (typeof value.showActivity !== 'boolean') throw new Error('invalid')
   },
   setup(scope, ctx) {
-    return scope.watch((next) => {
-      void next;
-      void ctx;
-    });
+    return scope.watch(next => {
+      void next
+      void ctx
+    })
   },
-});
+})
 
-export default defineHost({ settings: [ownedSettings] });
+export default defineHost({ settings: [ownedSettings] })
 ```
 
 `base`, `validate`, and `setup` stay out of the shared contract and Client bundle. `setup` is synchronous and may return a disposer; DSHX passes it to `ctx.effect()`. The official Settings provider owns schema validation, defaults/base/user layering, revision fences, watches, update/replace behavior, persistence, recovery, duplicate namespaces, and disposal.
@@ -63,24 +63,20 @@ Without a decoder, Client and Host values have the same type. A decoder can infe
 
 ```ts
 const credentials = defineSettings({
-  namespace: "my-plugin-credentials",
+  namespace: 'my-plugin-credentials',
   schema: Schema.object({
     enabled: Schema.boolean().default(true),
-    token: Schema.string().role("secret"),
+    token: Schema.string().role('secret'),
   }),
   client: {
     decode(value): { enabled: boolean } {
-      if (
-        typeof value !== "object" ||
-        value === null ||
-        !("enabled" in value)
-      ) {
-        throw new Error("invalid redacted settings");
+      if (typeof value !== 'object' || value === null || !('enabled' in value)) {
+        throw new Error('invalid redacted settings')
       }
-      return { enabled: Boolean(value.enabled) };
+      return { enabled: Boolean(value.enabled) }
     },
   },
-});
+})
 ```
 
 Decoder failure must throw. Returning `undefined` is rejected and is never a failure sentinel.
@@ -90,48 +86,37 @@ Secret contracts require a decoder. Secret traversal is fail-closed: only plain 
 ## `useSettings(contract)`
 
 ```tsx
-import { useSettings } from "@dshfiles/dshx/client";
-import { runtimeSettings } from "./settings.js";
+import { useSettings } from '@dshfiles/dshx/client'
+import { runtimeSettings } from './settings.js'
 
 function ActivityToggle() {
-  const settings = useSettings(runtimeSettings);
-  const visible = settings.value?.showActivity ?? true;
+  const settings = useSettings(runtimeSettings)
+  const visible = settings.value?.showActivity ?? true
 
   return (
-    <button
-      type="button"
-      disabled={!settings.writable || settings.mutation.pending}
-      onClick={() => void settings.set("showActivity", !visible)}
-    >
-      {settings.mutation.pending
-        ? "Saving…"
-        : visible
-          ? "Hide activity"
-          : "Show activity"}
+    <button type="button" disabled={!settings.writable || settings.mutation.pending} onClick={() => void settings.set('showActivity', !visible)}>
+      {settings.mutation.pending ? 'Saving…' : visible ? 'Hide activity' : 'Show activity'}
     </button>
-  );
+  )
 }
 ```
 
 ```ts
 interface SettingsState<HostValue, ClientValue> {
-  readonly status: "loading" | "ready" | "unavailable";
-  readonly value: ClientValue | undefined;
-  readonly revision: number | undefined;
-  readonly writable: boolean;
-  readonly mode: "host" | "memory";
-  readonly applies: "live" | "restart";
+  readonly status: 'loading' | 'ready' | 'unavailable'
+  readonly value: ClientValue | undefined
+  readonly revision: number | undefined
+  readonly writable: boolean
+  readonly mode: 'host' | 'memory'
+  readonly applies: 'live' | 'restart'
   readonly secrets: readonly {
-    readonly path: readonly string[];
-    readonly set: boolean;
-  }[];
-  readonly error: SettingsReadError | null;
-  readonly mutation: { readonly pending: boolean };
-  set<K extends keyof HostValue & string>(
-    key: K,
-    value: HostValue[K],
-  ): Promise<void>;
-  unset<K extends keyof HostValue & string>(key: K): Promise<void>;
+    readonly path: readonly string[]
+    readonly set: boolean
+  }[]
+  readonly error: SettingsReadError | null
+  readonly mutation: { readonly pending: boolean }
+  set<K extends keyof HostValue & string>(key: K, value: HostValue[K]): Promise<void>
+  unset<K extends keyof HostValue & string>(key: K): Promise<void>
 }
 ```
 

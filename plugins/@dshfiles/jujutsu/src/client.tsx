@@ -60,7 +60,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
-import { createEffectStoredValue } from './stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -149,8 +149,8 @@ const DISCLOSURE_TRIGGER =
 
 const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
 
-const storedRepoHistory = createEffectStoredValue({ key: REPO_HISTORY_KEY, schema: Schema.Array(Schema.String), fallback: [] })
-const storedRepoPath = createEffectStoredValue({ key: SELECTED_REPO_KEY, schema: Schema.String, fallback: '' })
+const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: Schema.Array(Schema.String), fallback: [] })
+const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: Schema.String, fallback: '' })
 
 const REPOSITORY_ID_LIMIT = 32
 const EMPTY_REVISIONS: readonly Revision[] = []
@@ -182,14 +182,14 @@ const reviewStoreStorage = (): Pick<Storage, 'getItem' | 'setItem' | 'removeItem
   }
 }
 
-const storedReviewProgress = createEffectStoredValue({
+const storedReviewProgress = createStoredValue({
   key: REVIEW_PROGRESS_KEY,
   schema: reviewStoreSchema,
   fallback: emptyReviewStore,
   storage: reviewStoreStorage,
 })
 
-const storedReviewMigration = createEffectStoredValue({ key: REVIEW_PROGRESS_MIGRATED_KEY, schema: Schema.Literal(1), fallback: 0 })
+const storedReviewMigration = createStoredValue({ key: REVIEW_PROGRESS_MIGRATED_KEY, schema: Schema.Literal(1), fallback: 0 })
 
 const writeLocalReviewStore = (store: ReviewStore): boolean => {
   const saved = storedReviewProgress.set(store)
