@@ -31,8 +31,10 @@ const testContext = {
   inject: () => undefined,
 }
 
+const readCwdLink = (path: string) => Effect.succeed(path === '/proc/700/cwd' ? '/repo-threads/b' : '/')
+
 const probeLayer = (exec: ProbeExec) =>
-  PreviewDevServers.makeLayer({ exec }).pipe(
+  PreviewDevServers.makeLayer({ exec, readCwdLink }).pipe(
     Layer.provide(HostContext.layer({ ctx: testContext as never, packageId: '@dshfiles/preview' })),
     Layer.provide(nodeFileSystemLayer),
   )

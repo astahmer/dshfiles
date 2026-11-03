@@ -62,7 +62,7 @@ export class PreviewDevServers extends Context.Service<
     readonly readProcessTable: Effect.Effect<ReturnType<typeof DevServers.parsePs>, PreviewProbeFailed>
   }
 >()('@dshfiles/preview/PreviewDevServers') {
-  static readonly makeLayer = (options: { readonly exec?: ProbeExec } = {}) =>
+  static readonly makeLayer = (options: { readonly exec?: ProbeExec; readonly readCwdLink?: (path: string) => Effect.Effect<string, unknown> } = {}) =>
     Layer.effect(
       PreviewDevServers,
       Effect.gen(function* () {
@@ -72,6 +72,8 @@ export class PreviewDevServers extends Context.Service<
         const liveJobs = yield* Ref.make<readonly LiveJob[]>([])
 
         const exec = options.exec ?? contextProbeExec(host.ctx)
+        // Linux resolves a pid's working directory through /proc; the seam keeps that path testable on any platform.
+        const readCwdLink = options.readCwdLink ?? ((path: string) => fs.readLink(path))
         const probeExec = (command: string, args: readonly string[]) =>
           Effect.tryPromise({
             try: () => exec(command, args),
@@ -94,7 +96,7 @@ export class PreviewDevServers extends Context.Service<
               yield* Effect.forEach(
                 probed,
                 pid =>
-                  fs.readLink(`/proc/${String(pid)}/cwd`).pipe(
+                  readCwdLink(`/proc/${String(pid)}/cwd`).pipe(
                     Effect.tap(cwd => Effect.sync(() => cwds.set(pid, cwd))),
                     Effect.ignore,
                   ),
