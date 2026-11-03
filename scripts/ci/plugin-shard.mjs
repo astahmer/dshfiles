@@ -7,7 +7,8 @@
  * runner. This script slices the same Turbo work across parallel runners without changing what is asserted — it only
  * answers "which packages does this shard own", so the local `pnpm check` and the CI job run the same commands.
  *
- *   node scripts/ci/plugin-shard.mjs <index> <count>            # plugins test slice  (units matrix)
+ *   node scripts/ci/plugin-shard.mjs <index> <count>            # build+typecheck+test slice (local parity)
+ *   node scripts/ci/plugin-shard.mjs <index> <count> unit       # build+test slice    (units matrix)
  *   node scripts/ci/plugin-shard.mjs <index> <count> boot       # plugin boot slice   (boot matrix)
  *   node scripts/ci/plugin-shard.mjs <index> <count> smoke      # smoke journeys      (e2e-smoke matrix)
  *
@@ -69,7 +70,7 @@ const { index, count, mode } = parseShard(process.argv.slice(2))
 const packages = await listPluginPackages()
 const sliceOf = items => items.filter((_, position) => position % count === index)
 
-if (mode === 'test') {
+if (mode === 'test' || mode === 'unit') {
   const slice = sliceOf(packages)
   if (slice.length === 0) {
     console.log(`plugin shard ${String(index)}/${String(count)}: no package (nothing to test)`)
@@ -81,7 +82,10 @@ if (mode === 'test') {
   // runs once here and is replayed from the local cache by the test invocation — splitting typecheck into its own CI
   // job would instead pay the ~260s plugin build twice.
   const filters = slice.map(item => `--filter=${item.name}`)
-  const built = await run('pnpm', ['exec', 'node', 'scripts/turbo.mjs', 'run', 'build', 'typecheck', ...filters])
+  // `unit` leaves typecheck to the CI `types` job, which runs the whole plugin typecheck once instead of paying it in
+  // every shard; `test` (the local shape) keeps all three so a single command still proves what `pnpm check` proves.
+  const tasks = mode === 'unit' ? ['build'] : ['build', 'typecheck']
+  const built = await run('pnpm', ['exec', 'node', 'scripts/turbo.mjs', 'run', ...tasks, ...filters])
   if (built !== 0) process.exit(built)
   // `--testTimeout=30000` is a vitest argument, so it may only be appended to the test task, never to build/typecheck.
   process.exit(await run('pnpm', ['exec', 'node', 'scripts/turbo.mjs', 'run', 'test', ...filters, '--', '--testTimeout=30000']))

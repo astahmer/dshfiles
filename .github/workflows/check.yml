@@ -11,7 +11,7 @@
 # Job → local command (`pnpm check` is unchanged and still runs all of them in one process):
 #   lint      pnpm run lint + pnpm run fmt:check
 #   types     pnpm run typecheck:scripts, dshx typecheck (the packages' typecheck runs in the units shards)
-#   units     3 shards of the plugins build+typecheck+test (`scripts/ci/plugin-shard.mjs`, same Turbo tasks)
+#   units     4 shards of the plugins build+test (`scripts/ci/plugin-shard.mjs unit`); typecheck runs once in `types`
 #   dshx      pnpm run check:dshx
 #   repo      check:cycles, check:native-forks, test:scripts, verify:web-profile-contract, check:repo,
 #             check:effect-native, knip, check:screenshots
@@ -61,18 +61,19 @@ jobs:
       # The workspace contract is a manifest rule, so it rides with the compiler pass that reads the same manifests.
       - run: pnpm run typecheck:scripts
       - run: pnpm --dir plugins run contract
-      # The owned bundles' `typecheck` task dependsOn `build`, so it runs beside their build and tests in the units
-      # shards instead of paying a second full plugin build here.
+      # The whole plugin typecheck runs here, once, instead of in every units shard; the units shards then only build
+      # and test their slice, which is what makes four of them cheaper than three of all three tasks.
+      - run: pnpm --dir plugins run typecheck
       - run: pnpm --dir tooling/dshx run typecheck
 
   units:
-    name: units (${{ matrix.shard }}/3)
+    name: units (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -82,7 +83,7 @@ jobs:
           # @dshfiles/preview's suite launches the real headless shell and every bundle boots in a real Host.
           browsers: 'true'
           systemd-scope: 'true'
-      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 3
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 4 unit
 
   dshx:
     name: dshx
