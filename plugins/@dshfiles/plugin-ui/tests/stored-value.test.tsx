@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
+import { Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createStoredValue } from '../src/hooks/stored-value.js'
 
@@ -28,6 +29,20 @@ describe('createStoredValue', () => {
     expect(createStoredValue({ key: KEY, schema: countSchema, fallback: null }).get()).toBeNull()
     localStorage.setItem(KEY, JSON.stringify({ count: 'many' }))
     expect(createStoredValue({ key: KEY, schema: countSchema, fallback: { count: 0 } }).get()).toEqual({ count: 0 })
+  })
+
+  it('decodes and validates through an Effect schema', () => {
+    const effectCount = Schema.Struct({ count: Schema.Int })
+    localStorage.setItem(KEY, JSON.stringify({ count: 3 }))
+    const stored = createStoredValue({ key: KEY, schema: effectCount, fallback: null })
+    const value: { readonly count: number } | null = stored.get()
+    expect(value).toEqual({ count: 3 })
+    expect(stored.set({ count: 1.5 })).toBe(false)
+    expect(stored.set({ count: 4 })).toBe(true)
+    expect(localStorage.getItem(KEY)).toBe(JSON.stringify({ count: 4 }))
+    localStorage.setItem(KEY, JSON.stringify({ count: 'many' }))
+    stored.reload()
+    expect(stored.get()).toBeNull()
   })
 
   it('accepts a legacy bare string when the schema takes strings', () => {
