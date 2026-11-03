@@ -253,13 +253,13 @@ edge, and restore exact-message assertions.
 
 ### Phase 6 — Gates and stabilization
 
-| #   | Gate                                                                                                                                                        |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 6.1 | `effect-native-audit` all zero (or explicitly waived edge files); lint ratchet at zero                                                                      |
-| 6.2 | Every e2e feature green in scratch DSH; `pnpm lint typecheck fmt check:cycles`; `native-fork-diff` clean                                                    |
-| 6.3 | Traces: one server span per call, no orphans, no SQL spans, no traces→traces loop                                                                           |
-| 6.4 | Perf (`live-performance-audit`): Host boot, event-loop lag, Host bundle size, tracer bench; before/after table in `docs/performance.md`; budget ≤ +10% boot |
-| 6.5 | `complete-plan`: Standards → `tooling/dshx/docs/sdk/effect.md`; delete this plan and `effect-refactor`                                                      |
+| #   | Gate                                                                                                                                                                                                                                                                                   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 6.1 | Every e2e feature green — **in CI**: `check:green` runs the smoke set locally, the full catalogue is `pnpm run check:e2e --all` (30–50 min). Locally run only the owners a change touches (`pnpm run check:e2e <owner>`): the full sweep starves the machine and belongs on the runner |
+| 6.2 | Every e2e feature green in scratch DSH; `pnpm lint typecheck fmt check:cycles`; `native-fork-diff` clean                                                                                                                                                                               |
+| 6.3 | Traces: one server span per call, no orphans, no SQL spans, no traces→traces loop                                                                                                                                                                                                      |
+| 6.4 | Perf (`live-performance-audit`): Host boot, event-loop lag, Host bundle size, tracer bench; before/after table in `docs/performance.md`; budget ≤ +10% boot                                                                                                                            |
+| 6.5 | `complete-plan`: Standards → `tooling/dshx/docs/sdk/effect.md`; delete this plan and `effect-refactor`                                                                                                                                                                                 |
 
 ## Foundation follow-ups (from lane reports)
 
