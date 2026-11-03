@@ -209,8 +209,16 @@ const reply = (seq: number, text: string): SessionEvent =>
 const ask = (seq: number, text: string): SessionEvent =>
   ({ type: 'user/message', seq, time: seq, data: { content: [{ type: 'text', text }], source: { kind: 'user' } } }) as never
 
+/**
+ * Let the digester's forked fiber finish: yields alone spin the scheduler without letting real I/O (log reads, SQLite
+ * writes) complete, which made these assertions fail on a loaded CI runner. A short real tick every few rounds gives
+ * the event loop a chance, bounded so the test stays fast.
+ */
 const settle = Effect.gen(function* () {
-  for (let round = 0; round < 50; round++) yield* Effect.yieldNow
+  for (let round = 0; round < 300; round++) {
+    yield* Effect.yieldNow
+    if (round % 10 === 9) yield* Effect.promise(() => new Promise<void>(resolve => setTimeout(resolve, 1)))
+  }
 })
 
 describe('memory services', () => {
