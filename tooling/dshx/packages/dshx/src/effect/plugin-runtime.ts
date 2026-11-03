@@ -1,5 +1,6 @@
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { type Context, Effect, type Exit } from 'effect'
+import { cordisLogger } from './host-context.js'
 
 /** How the edge runs one effect inside an active plugin: its built services, the call's signal as interruption. */
 export interface PluginRuntime<R> {
@@ -13,7 +14,7 @@ export const runtimeOf = <R>(input: { readonly services: Context.Context<R>; rea
   const runWith = Effect.runPromiseExitWith(input.services)
   return {
     run: (effect, options) => runWith(effect, options?.signal === undefined ? undefined : { signal: options.signal }),
-    log: entry => input.ctx.logger(`dshx:${entry.topic}`)[entry.level](entry.message),
+    log: entry => cordisLogger(input.ctx, `dshx:${entry.topic}`)[entry.level](entry.message),
   }
 }
 

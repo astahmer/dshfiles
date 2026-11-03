@@ -32,7 +32,19 @@ export const sinkLogger = (sink: LogSink) =>
 export const hostLoggerLayer = Logger.layer([
   Effect.gen(function* () {
     const host = yield* HostContext
-    const logger = host.ctx.logger(host.packageId)
+    const service: unknown = host.ctx.logger
+    // A bare Cordis context (a fixture, a probe) may carry no logging service; fall back to the console instead of
+    // failing the activation of every plugin that logs through Effect.
+    if (typeof service !== 'function') {
+      return sinkLogger({
+        debug: () => undefined,
+        info: () => undefined,
+        warn: line => console.warn(line),
+        error: line => console.error(line),
+      })
+    }
+    // SAFETY: the guard above proves the service is callable, which is exactly Cordis's LoggerService shape.
+    const logger = service.call(host.ctx, host.packageId) as ReturnType<typeof host.ctx.logger>
     return sinkLogger({
       debug: line => logger.debug(line),
       info: line => logger.info(line),

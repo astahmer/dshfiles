@@ -3,6 +3,7 @@ export * as HostCommands from './host-commands.js'
 import type { CommandDefinition, CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { Cause, Effect, type Scope } from 'effect'
 import { causeReport } from './cause-report.js'
+import { safeCordisLogger } from '../host/safe-logger.js'
 import { HostContext, hostService, type HostServiceMissing } from './host-context.js'
 import { callbackWithSignal } from './plugin.js'
 
@@ -27,7 +28,7 @@ export const register = <R>(command: Command<R>): Effect.Effect<void, HostServic
       handler(invocation).pipe(
         Effect.catchCause(cause => {
           if (Cause.hasInterruptsOnly(cause)) return Effect.failCause(cause)
-          host.ctx.logger('dshx:commands').error(`/${command.name} failed:\n${causeReport(cause)}`)
+          safeCordisLogger(host.ctx, 'dshx:commands').error(`/${command.name} failed:\n${causeReport(cause)}`)
           return Effect.succeed(failed)
         }),
       ),

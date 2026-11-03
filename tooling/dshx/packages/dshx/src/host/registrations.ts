@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { safeCordisLogger } from './safe-logger.js'
 import type { PresetDefinition } from '@deepseek-ai/dsh-agent-preset-registry'
 import type { LlmAdapter, LlmConfigurableProvider, LlmDiscoveredModel, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
 import type { SkillRegistration } from '@deepseek-ai/dsh-skill'
@@ -64,7 +65,9 @@ const install = (ctx: Context, packageId: string, definition: HostRegistrations)
         for (const server of servers) ctx.plugin(client, server)
       },
       (cause: unknown) =>
-        ctx.logger('dshx:registrations').warn(`${packageId}: MCP servers were not started: ${cause instanceof Error ? cause.message : String(cause)}`),
+        safeCordisLogger(ctx, 'dshx:registrations').warn(
+          `${packageId}: MCP servers were not started: ${cause instanceof Error ? cause.message : String(cause)}`,
+        ),
     )
   }
 }

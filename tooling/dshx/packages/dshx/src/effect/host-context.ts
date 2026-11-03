@@ -14,6 +14,13 @@ export class HostServiceMissing extends Schema.TaggedError<HostServiceMissing>()
  * The Cordis plugin context of one plugin activation. Only dshx edge layers read it; domain services depend on the
  * typed services built from it, never on `ctx` itself.
  */
+/** A Cordis logger by name; a bare context (a fixture, a probe) without the logging service degrades to the console. */
+export const cordisLogger = (ctx: CordisContext, name: string) => {
+  const service: unknown = ctx.logger
+  if (typeof service === 'function') return service.call(ctx, name) as ReturnType<CordisContext['logger']>
+  return { debug: () => undefined, info: () => undefined, warn: (line: string) => console.warn(line), error: (line: string) => console.error(line) }
+}
+
 export class HostContext extends Context.Service<
   HostContext,
   {

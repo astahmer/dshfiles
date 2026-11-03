@@ -1,7 +1,7 @@
 /* oxlint-disable antislop/no-export-bag -- events.ts is the HostEvents namespace of @dshfiles/dshx/effect (export * as HostEvents); its exports are the namespace members. */
 import type { Events } from '@deepseek-ai/cordis'
 import { Cause, Effect, Exit, FiberSet, Queue, type Scope, Stream } from 'effect'
-import { HostContext } from './host-context.js'
+import { HostContext, cordisLogger } from './host-context.js'
 import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
 
@@ -26,7 +26,7 @@ const register = <K extends EventName>(input: { readonly host: HostContext['Serv
 
 const logFailure = (input: { readonly host: HostContext['Service']; readonly name: string; readonly cause: Cause.Cause<unknown> }) => {
   if (Cause.hasInterruptsOnly(input.cause)) return
-  input.host.ctx.logger('dshx:events').error(`Handler of ${input.name} failed:\n${causeReport(input.cause)}`)
+  cordisLogger(input.host.ctx, 'dshx:events').error(`Handler of ${input.name} failed:\n${causeReport(input.cause)}`)
 }
 
 /**

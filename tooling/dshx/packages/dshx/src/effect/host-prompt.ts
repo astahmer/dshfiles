@@ -3,6 +3,7 @@ export * as HostPrompt from './host-prompt.js'
 import type { AssembleContext, PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import { Effect, Exit, type Scope } from 'effect'
 import { causeReport } from './cause-report.js'
+import { safeCordisLogger } from '../host/safe-logger.js'
 import { detachedContext } from './detached.js'
 import { HostContext, hostService, type HostServiceMissing } from './host-context.js'
 
@@ -27,7 +28,7 @@ const textProvider = Effect.fnUntraced(function* <R>(input: { readonly name: str
   return (assembly: AssembleContext): string => {
     const exit = runSync(text(assembly))
     if (Exit.isSuccess(exit)) return exit.value
-    host.ctx.logger('dshx:prompt').error(`Prompt text ${input.name} failed:\n${causeReport(exit.cause)}`)
+    safeCordisLogger(host.ctx, 'dshx:prompt').error(`Prompt text ${input.name} failed:\n${causeReport(exit.cause)}`)
     return ''
   }
 })

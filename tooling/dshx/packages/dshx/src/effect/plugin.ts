@@ -5,7 +5,7 @@ import type { HostDefinition } from '../host/types.js'
 import { SdkSetupRuntime } from '../sdk/setup.js'
 import type { SettingsContribution } from '../settings/types.js'
 import type { ApiBinding } from './api.js'
-import { HostContext } from './host-context.js'
+import { HostContext, cordisLogger } from './host-context.js'
 import { type ActivationSlot, makeActivationSlot, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
 import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
@@ -83,7 +83,7 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
     const built = await Effect.runPromiseExit(build)
     if (Exit.isFailure(built)) {
       await Effect.runPromise(Scope.close(scope, built))
-      ctx.logger('dshx:plugin').error(`${definition.name} failed to activate:\n${causeReport(built.cause)}`)
+      cordisLogger(ctx, 'dshx:plugin').error(`${definition.name} failed to activate:\n${causeReport(built.cause)}`)
       const error = new PluginActivationError({ plugin: definition.name, cause: built.cause })
       slot.fail(error)
       throw error
