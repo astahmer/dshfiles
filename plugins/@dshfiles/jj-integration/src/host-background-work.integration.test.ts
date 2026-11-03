@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { JjIntegrationTestHost, type JjIntegrationTestHarness } from './host-test-harness.js'
 
 /**
- * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jj-int b/c):
+ * Characterization that pins the Host half's behaviour through the Effect-native edge (formerly recorded in the migration plan, jj-int b/c):
  * the Host wiring of deferred integrations (a Session event retries 1.5 s after the thread went quiet, a 30 s
  * fallback catches unannounced idleness, waiting errors keep the entry, other errors settle it) and the checkout sync
  * queue (one sync at a time, later lands of a repository coalesced into one sync of the newest revision).

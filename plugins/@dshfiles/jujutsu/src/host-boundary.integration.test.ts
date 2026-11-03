@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { jujutsuApi } from './api.js'
 
 /**
- * Characterization of the jujutsu Host half (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jujutsu a–d,
+ * Characterization of the jujutsu Host half through its Effect edge (formerly recorded in the migration plan, jujutsu a–d,
  * f), mounted in a dshx test Host with real `jj` processes: each failure reaches the caller under its own wire code
  * with these exact messages. Repository identity is guarded, jj's stderr never reaches a caller, a cancellation reads
  * as aborted, a preview is one-use and bound to its repository state, and every read endpoint answers a failure as a

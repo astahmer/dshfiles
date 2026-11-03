@@ -32,8 +32,6 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                    |
 | [opencode v2 parity](opencode-parity.md)                             | Browser plugin context gaps against opencode v2 (composer, session screen, panel/tab model, registries); A14 unblocks the workbench and chat-focus migrations.                           |
 | [t3code parity](t3code-parity.md)                                    | Gaps against t3code nightly: forge/PR plugin (C1, C2, B4), scheduled tasks and webhooks (B5), rewind any turn (B3), multi-model fan-out (A6), Host-owned settle (C3).                    |
-| [Effect refactor](effect-refactor/README.md)                         | Move dshx and owned Host halves to Effect in waves: tracing bridge, tool-schema snapshot gate, pilot secret-catalog and jj-integration, then optional browser-side state.                |
-| [Effect-native](effect-native/README.md)                             | Replace the facade migration with Effect-native Hosts: dshx edge v2, shared sqlite/jj libraries, exemplar plugin, audited waves.                                                         |
 
 ## Testing, research and housekeeping
 

@@ -7,7 +7,7 @@ import { ThreadWorkspaceModel } from './thread-workspace-model.js'
 import { ThreadWorkspacesTestSupport, type JjExecutor } from './thread-workspaces-test-support.js'
 
 /**
- * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jj-int a/e):
+ * Characterization that pins the Host half's behaviour through the Effect-native edge (formerly recorded in the migration plan, jj-int a/e):
  * one repository's mutations run strictly in order while different repositories land in parallel, and a shared view
  * read keeps running for its other callers when one of them is interrupted.
  */

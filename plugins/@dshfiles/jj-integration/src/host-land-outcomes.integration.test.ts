@@ -8,7 +8,7 @@ import { JjIntegrationTestHost, type ActivityEvent, type JjIntegrationTestHarnes
 const jj = JjIntegrationTestHost.jj
 
 /**
- * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jj-int h):
+ * Characterization that pins the Host half's behaviour through the Effect-native edge (formerly recorded in the migration plan, jj-int h):
  * every land outcome, reached through the manual `land` API and through Project Checks' verified-turn event, with
  * the activity events it emits and the exact text it asks the thread's agent to act on.
  */

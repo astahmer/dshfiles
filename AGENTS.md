@@ -391,16 +391,15 @@ and round-trip. Every credential-using feature stores `secret:ALIAS` (or
 
 ### Effect in Host code
 
-Host halves are Effect 4.1 programs. Follow the Standards table in
-[plans/effect-native](plans/effect-native/README.md) until it moves to
-`tooling/dshx/docs/sdk/effect.md`.
+Host halves are Effect 4.1 programs. Follow the Standards table and the
+[Effect guide](tooling/dshx/docs/sdk/effect.md).
 
 - Verify APIs against `~/.references/effect-4.1.0`; `~/.references/effect` is an
   older 4.0 release candidate. Module paths are `effect`, `effect/process`,
   `effect/http`, `effect/sql`; there is no `effect/unstable/*`.
 - Patterns come from `~/.references/opencode/packages/core/src` and
   `~/.references/t3code/apps/server/src`, summarized with citations in
-  [the cookbook](plans/effect-native/reviews/cookbook.md).
+  [the cookbook](tooling/dshx/docs/sdk/effect-cookbook.md).
 - Never wrap an unchanged Promise implementation in `Effect.tryPromise` and call
   it migrated; `pnpm check:effect-native` tracks the remaining facades.
 

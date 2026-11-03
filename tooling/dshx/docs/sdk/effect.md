@@ -280,6 +280,45 @@ describe('Notes', () => {
 `create-dshx --template effect-host` scaffolds this shape: `DshxPlugin.make`, one service, one annotated error and an
 `it.layer` test, with `effect` and `@effect/vitest` pinned to `4.1.0`.
 
+## Verifying a Host migration
+
+Migration is behaviour-preserving, so the checks compare behaviour instead of reading code. Run the narrow ones while
+iterating and the whole gate before landing.
+
+| Check                                                                                           | Proves                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run check:effect-native`                                                                  | the per-package debt scorecard did not grow: no `Layer.empty`, `tryPromise` facade, module `let`/`WeakMap`, timer, `node:fs`/`node:child_process`/`fetch`, causeless `TaggedError` or Host-test mock creeps back in    |
+| `pnpm run lint`                                                                                 | oxlint + ast-grep ratchets plus `check:effect-antislop` and the zod-import gate; the Effect rules flag cause-dropping catches, `Effect.fn(…)(() => Effect.gen…)`, global timers, span-name format                      |
+| `pnpm --dir tooling/dshx run features:check`                                                    | each feature still names the test that asserts its span and its behaviour                                                                                                                                              |
+| `pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/host-tool-schema-snapshot.spec.ts` | no published tool schema changed; a deliberate change means regenerating the fixture and saying so                                                                                                                     |
+| `node scripts/check-api-spans.mjs`                                                              | live shape in a scratch DSH: exactly one `<api>/<method>` server span per call, the handler's `Effect.fn` under it, no orphans, no SQL spans, and a `traces/stats` control call stores nothing (no traces→traces loop) |
+| `pnpm run check`                                                                                | the local gate: scripts typecheck, cycles, native-fork diff, script tests, profile contract, dshx, screenshots, plugins, repo, effect-native audit, knip                                                               |
+| `pnpm run check:e2e <owner>`                                                                    | the journeys whose owner you touched. The full catalogue (`pnpm run check:e2e --all`, 30–50 min) belongs to CI                                                                                                         |
+
+CI runs the same building blocks as parallel jobs behind one `gate` job, so the required-check name survives reshards:
+lint, types, three `units` shards of plugin build+typecheck+test, `dshx`, repo checks, three `boot` shards and
+`e2e-smoke`. Wire codes stay compatible by annotating each failure kind (`dshxWireCode`); the tool-schema snapshot is
+the contract for tool parameters.
+
+Measured cost of the migration, method and spread: [`docs/performance.md`](../../../../docs/performance.md).
+
+## Known follow-ups
+
+These are understood and deliberately open, not forgotten:
+
+- `@dshfiles/fff-search`'s real-Host suite executes `grep`/`glob`, which spawns the native index worker inside the
+  vitest child; on the CI Linux runner that child exits mid-run, so the mount is skipped on CI while the unit file and
+  the plugin boot gate still run there. Reproduce on a Linux runner and check whether executing an fff tool in a real
+  Linux Host also kills the process.
+- The session-search index still opens its own `DatabaseSync`; moving it onto `@dshfiles/sqlite-store` needs a
+  copy-based proof on the multi-gigabyte live index.
+- memory's `bench/host-loop-freezes.ts` has no clean before/after: the "before" run spends its time in the stock
+  session-query engine indexing a large backlog rather than in memory's own code.
+- `@dshfiles/optmem-core` still owns a `createMemoryEngine` that no Host imports; it is dead from the Host side, which is
+  why it was not ported.
+- `plugin-ui`'s `createStoredValue` requires `safeParse`, so four `createEffectStoredValue` copies and most
+  `zodSchemaFromEffect` bridges remain until it accepts a Standard Schema.
+
 ## Reference plugins
 
 Copy these two Host halves before writing a new one; each file is one pattern.

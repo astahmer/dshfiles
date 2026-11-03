@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { JjIntegrationTestHost, type JjIntegrationTestHarness, type WireInput, type WireOutcome } from './host-test-harness.js'
 
 /**
- * Characterization for the Effect-native rewrite (plans/effect-native/reviews/vcs-multihost.md §4 step 0, jj-int g):
+ * Characterization that pins the Host half's behaviour through the Effect-native edge (formerly recorded in the migration plan, jj-int g):
  * the exact wire `code` (and message) every jj-integration API failure path answers today, through the real
  * Connection route a browser posts to and through the agent tools. The rewrite must keep this table unchanged.
  */
