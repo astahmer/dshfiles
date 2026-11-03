@@ -253,13 +253,49 @@ edge, and restore exact-message assertions.
 
 ### Phase 6 — Gates and stabilization
 
-| #   | Gate                                                                                                                                                                                                                                                                                   |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 6.1 | Every e2e feature green — **in CI**: `check:green` runs the smoke set locally, the full catalogue is `pnpm run check:e2e --all` (30–50 min). Locally run only the owners a change touches (`pnpm run check:e2e <owner>`): the full sweep starves the machine and belongs on the runner |
-| 6.2 | Every e2e feature green in scratch DSH; `pnpm lint typecheck fmt check:cycles`; `native-fork-diff` clean                                                                                                                                                                               |
-| 6.3 | Traces: one server span per call, no orphans, no SQL spans, no traces→traces loop                                                                                                                                                                                                      |
-| 6.4 | Perf (`live-performance-audit`): Host boot, event-loop lag, Host bundle size, tracer bench; before/after table in `docs/performance.md`; budget ≤ +10% boot                                                                                                                            |
-| 6.5 | `complete-plan`: Standards → `tooling/dshx/docs/sdk/effect.md`; delete this plan and `effect-refactor`                                                                                                                                                                                 |
+| #   | Gate                                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 6.1 | `effect-native-audit` all zero (or explicitly waived edge files); lint ratchet at zero. The full e2e catalogue runs in **CI**: `check:green` covers the smoke set locally, `pnpm run check:e2e --all` is a 30–50 min runner job, and a local run should name the owners a change touches (`pnpm run check:e2e <owner>`) because the full sweep starves the machine |
+| 6.2 | `pnpm lint typecheck fmt check:cycles`; `native-fork-diff` clean; every e2e feature green in CI                                                                                                                                                                                                                                                                    |
+| 6.3 | (done) Traces: one server span per call, no orphans, no SQL spans, no traces→traces loop — `node scripts/check-api-spans.mjs`                                                                                                                                                                                                                                      |
+| 6.4 | Perf (`live-performance-audit`): Host boot, event-loop lag, Host bundle size, tracer bench; before/after table in `docs/performance.md`; budget ≤ +10% boot                                                                                                                                                                                                        |
+| 6.5 | `complete-plan`: Standards → `tooling/dshx/docs/sdk/effect.md`; delete this plan and `effect-refactor`                                                                                                                                                                                                                                                             |
+
+#### 6.3 evidence — live span shapes (scratch DSH, 2026-11-03)
+
+`node scripts/check-api-spans.mjs` boots a scratch DSH (`--plugin @dshfiles/activity-timeline --plugin @dshfiles/traces`,
+its own temp `DSH_HOME`, free port, headless Chromium; the live :3080 instance and `~/.dsh` are never touched), drives
+three distinct read-only API calls over the authenticated launch URL, waits for the OTLP batch, then reads
+`<scratch home>/plugins/traces/traces.db`:
+
+```text
+call                        dispatch  kind  handler                              parent     ok
+activity-timeline/stats     1         server activity timeline stats (1)          child      yes
+  chain activity-timeline/stats > activity timeline stats > activity store read
+activity-timeline/attention 1         server activity timeline attention (1)      child      yes
+  chain activity-timeline/attention > activity timeline attention > activity store read
+activity-timeline/page      1         server activity timeline page (1)           child      yes
+  chain activity-timeline/page > activity timeline page > activity store read
+
+checked traces       970dabd94876cd9ec9b74f47c287e775, 2431675c776b13f500e95252bdebbf62, 3d1f43b02b103590a2803a2b385bf652
+stored spans         9
+orphans in checked   0
+orphans anywhere     0
+traces API spans     0 (control call stored: 0)
+SQL spans            0
+
+check-api-spans: OK
+```
+
+Per call the store holds exactly one `<api>/<method>` server span (`kind = 2`), the handler's `Effect.fn` span directly
+under it, and the handler's own `activity store read` under that — no `dshx-effect <api>.<method>` wrapper span, which is
+what the pre-plan baseline recorded as 3 spans per call. A control call to `traces/stats` (the API that owns the store)
+leaves no row at all, so the traces→traces loop is closed on both sides: `Api.bind` handlers run `withTracerEnabled(false)`
+and ingest drops any `dshx.api.id` of `traces`/`traces-alerts`/`traces-boards`. No orphan: every stored span's
+`parent_span_id` resolves inside its trace (the `alert engine evaluate` root the panel polls also has none missing).
+
+Reproduce: `node scripts/check-api-spans.mjs` (add `--skip-build` to reuse `dist/`, `--keep` to inspect the scratch
+store, `--timeout <ms>` to raise the boot timeout). Exit 1 prints the offending trace ids and rows first.
 
 ## Foundation follow-ups (from lane reports)
 
