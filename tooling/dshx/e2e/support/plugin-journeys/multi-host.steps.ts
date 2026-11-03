@@ -16,7 +16,9 @@ import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion, v
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
-import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
+import { RuntimeLaunchFile } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
+
+const { launchFilePaths, parseRuntimeLaunch } = RuntimeLaunchFile
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
 import { startFakeCommandCode } from '../fake-command-code.js'
 
