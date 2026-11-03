@@ -7,8 +7,8 @@ import { ExternalLinkIcon, GlobeIcon, SquareIcon } from '@dshfiles/plugin-ui/ico
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
+import { DevServerPoll } from './dev-server-poll.js'
 
-const POLL_MS = 10_000
 const revealed = new Set<string>()
 
 const portLabel = (servers: readonly DevServerView[], pages: readonly PreviewPageView[]): string => {
@@ -24,7 +24,8 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [armed, setArmed] = useState<number | null>(null)
-  const key = useMemo(() => ['dshfiles-preview', props.sessionId] as const, [props.sessionId])
+  const key = useMemo(() => DevServerPoll.serversKey(props.sessionId), [props.sessionId])
+  const pagesKey = useMemo(() => DevServerPoll.pagesKey(props.sessionId), [props.sessionId])
   const canOpen = browser.status === 'active' && browser.value.available.get()
   const openInTab = (url: string): void => {
     if (browser.status === 'active') browser.value.open(url)
@@ -32,7 +33,7 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
 
   const events = useApiEvent(previewApi, 'pagesChanged', payload => {
     if (payload.sessionId !== props.sessionId) return
-    void queryClient.invalidateQueries({ queryKey: key })
+    void queryClient.invalidateQueries({ queryKey: pagesKey })
     const reveal = payload.reveal
     if (reveal === null) return
     const id = `${props.sessionId}:${reveal.pageId}:${String(reveal.requestedAt)}`
@@ -41,19 +42,24 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
     openInTab(reveal.url)
   })
   useEffect(() => {
-    if (events === 'live') void queryClient.invalidateQueries({ queryKey: key })
-  }, [events, queryClient, key])
+    if (events === 'live') {
+      void queryClient.invalidateQueries({ queryKey: key })
+      void queryClient.invalidateQueries({ queryKey: pagesKey })
+    }
+  }, [events, queryClient, key, pagesKey])
 
-  const state = useQuery({
+  // A port a thread starts is not pushed, so this one polls. Pages are: `pagesChanged` invalidates them below,
+  // and polling them as well doubled every round of an otherwise event-driven read.
+  const serversQuery = useQuery({
     queryKey: key,
-    queryFn: async ({ signal }) => {
-      const [servers, pages] = await Promise.all([
-        api.devServers({ sessionId: props.sessionId }, { signal }),
-        api.list({ sessionId: props.sessionId }, { signal }),
-      ])
-      return { servers: servers.servers, pages: pages.pages }
-    },
-    refetchInterval: query => (query.state.error !== null && isApiOwnerMissing(query.state.error) ? false : POLL_MS),
+    queryFn: ({ signal }) => api.devServers({ sessionId: props.sessionId }, { signal }),
+    refetchInterval: query => DevServerPoll.serversIntervalMs({ ownerMissing: query.state.error !== null && isApiOwnerMissing(query.state.error) }),
+    retry: false,
+  })
+  const pagesQuery = useQuery({
+    queryKey: pagesKey,
+    queryFn: ({ signal }) => api.list({ sessionId: props.sessionId }, { signal }),
+    refetchInterval: DevServerPoll.pagesIntervalMs,
     retry: false,
   })
 
@@ -65,8 +71,8 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
     },
   })
 
-  const servers = state.data?.servers ?? []
-  const pages = state.data?.pages ?? []
+  const servers = serversQuery.data?.servers ?? []
+  const pages = pagesQuery.data?.pages ?? []
   if (servers.length === 0 && pages.length === 0) return null
 
   return (
