@@ -8,9 +8,15 @@
 # plugins build 260s, plugins typecheck 113s, plugins tests 655s, boot 521s, e2e smoke 256s. Each job below runs one
 # pole on its own 4 vCPU / 16 GB runner, so the gate costs the slowest pole instead of their sum.
 #
+# Measured after the split (whole run, created → gate green): 465-490s on a warm turbo cache, 786s on a cold one. The
+# spread comes from the e2e-smoke shards (300-770s): journeys are far more variable than unit suites, and one shard
+# that owns a shared jj/multi-host journey can double. Shard counts were measured, not guessed: units 4 × build+test
+# beat 3 × build+typecheck+test, balancing the unit shards by test bytes measured no better than round-robin (487s vs
+# 465s) so round-robin stayed, and boot went from 3 to 4 shards after it became the pole at 469s.
+#
 # Job → local command (`pnpm check` is unchanged and still runs all of them in one process):
 #   lint      pnpm run lint + pnpm run fmt:check
-#   types     pnpm run typecheck:scripts, dshx typecheck (the packages' typecheck runs in the units shards)
+#   types     pnpm run typecheck:scripts, plugin contract, the whole plugin typecheck, dshx typecheck
 #   units     4 shards of the plugins build+test (`scripts/ci/plugin-shard.mjs unit`); typecheck runs once in `types`
 #   dshx      pnpm run check:dshx
 #   repo      check:cycles, check:native-forks, test:scripts, verify:web-profile-contract, check:repo,
