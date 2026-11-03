@@ -432,7 +432,10 @@ instead of replaying the unchanged ones, and 210 forced browser runs across the
 2026-10-15..18 window measured 3.7h of wall time — so scope the run
 (`pnpm check:e2e <plugin>`) rather than forcing the whole suite while iterating.
 
-In CI, `check.yml` runs `pnpm check`, which includes `features:check`, the
-web-profile boot and the `@smoke` journeys. `plugin-e2e-coverage.yml` runs the
-inventory and catalog tests, the report and `bddgen` listing; it does not
-execute the full journeys yet (see [plans/plugin-e2e-coverage.md](../plans/plugin-e2e-coverage.md)).
+In CI, `check.yml` splits `pnpm check` across parallel jobs: the `boot` job runs
+`check:plugin-boot` in three shards (`scripts/ci/plugin-shard.mjs boot`, every
+bundle once and the composed web profile in shard 0), and `e2e-smoke` runs the
+`@smoke` journeys on its own runner. `features:check` rides in the `dshx` job.
+`plugin-e2e-coverage.yml` runs the inventory and catalog tests, the report and
+`bddgen` listing; it does not execute the full journeys yet (see
+[plans/plugin-e2e-coverage.md](../plans/plugin-e2e-coverage.md)).
