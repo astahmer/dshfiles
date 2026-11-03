@@ -138,9 +138,13 @@ jobs:
       - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 3 boot
 
   e2e-smoke:
-    name: e2e-smoke
+    name: e2e-smoke (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -149,7 +153,9 @@ jobs:
           ffmpeg: 'true'
           browsers: 'true'
           systemd-scope: 'true'
-      - run: pnpm run check:e2e:smoke
+      # Smoke journeys were the whole critical path after the split (446s, one serial owner at a time); two shards halve
+      # it and each still runs whole owners, so a journey never depends on another shard's order.
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 2 smoke
 
   gate:
     name: gate

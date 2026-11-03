@@ -9,6 +9,7 @@
  *
  *   node scripts/ci/plugin-shard.mjs <index> <count>            # plugins test slice  (units matrix)
  *   node scripts/ci/plugin-shard.mjs <index> <count> boot       # plugin boot slice   (boot matrix)
+ *   node scripts/ci/plugin-shard.mjs <index> <count> smoke      # smoke journeys      (e2e-smoke matrix)
  *
  * Packages are listed by directory name and assigned round-robin (`index % count`), so the slice is identical on every
  * run and on every machine: a shard index never means a different package because of timing or hash order. A boot shard
@@ -44,7 +45,12 @@ const listPluginPackages = async () => {
     if (!existsSync(manifestPath)) continue
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     if (typeof manifest.name !== 'string') continue
-    packages.push({ name: manifest.name, directory: `plugins/@dshfiles/${entry.name}`, isBundle: manifest.dsh !== undefined })
+    packages.push({
+      name: manifest.name,
+      directory: `plugins/@dshfiles/${entry.name}`,
+      isBundle: manifest.dsh !== undefined,
+      hasSmoke: typeof manifest.scripts?.['test:e2e:smoke'] === 'string',
+    })
   }
   return packages.sort((left, right) => left.name.localeCompare(right.name))
 }
@@ -92,5 +98,17 @@ if (mode === 'boot') {
   process.exit(await run('node', ['scripts/check-browser.mjs', 'boot', ...owners]))
 }
 
-console.error(`unknown shard mode "${mode}" (expected test or boot)`)
+if (mode === 'smoke') {
+  // Only owners that actually declare a smoke journey take part, and the round-robin covers every one of them.
+  const owners = packages.filter(item => item.hasSmoke).map(item => item.name.replace('@dshfiles/', ''))
+  const slice = sliceOf(owners)
+  if (slice.length === 0) {
+    console.log(`e2e smoke shard ${String(index)}/${String(count)}: no owner (nothing to run)`)
+    process.exit(0)
+  }
+  console.log(`e2e smoke shard ${String(index)}/${String(count)}: ${slice.join(', ')}`)
+  process.exit(await run('node', ['scripts/check-browser.mjs', 'smoke', ...slice]))
+}
+
+console.error(`unknown shard mode "${mode}" (expected test, boot or smoke)`)
 process.exit(2)
