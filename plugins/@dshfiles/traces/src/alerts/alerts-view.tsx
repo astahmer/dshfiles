@@ -1,4 +1,5 @@
 import { useApi, usePlugin } from '@dshfiles/dshx/client'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -155,7 +156,7 @@ const FiringList = (props: {
 }): JSX.Element => {
   const t = props.t
   const firing = props.rules.filter(rule => rule.state.status === 'firing')
-  if (firing.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{t('noFiring')}</p>
+  if (firing.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noFiring')}</EmptyState>
   return (
     <ul className="dshx:flex dshx:flex-col dshx:gap-2" aria-label={t('firingAlerts')}>
       {firing.map(rule => {
@@ -206,7 +207,7 @@ const RulesTable = (props: {
   readonly t: TracesAlertsTranslate
 }): JSX.Element => {
   const t = props.t
-  if (props.rules.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRules')}</p>
+  if (props.rules.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noRules')}</EmptyState>
   return (
     <Table aria-label={t('rules')}>
       <TableHeader>
@@ -284,7 +285,7 @@ const HistoryList = (props: {
   readonly t: TracesAlertsTranslate
 }): JSX.Element => {
   const t = props.t
-  if (props.history.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{t('noHistory')}</p>
+  if (props.history.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noHistory')}</EmptyState>
   return (
     <ol className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border" aria-label={t('history')}>
       {props.history.map(event => {
@@ -342,7 +343,14 @@ export const AlertsView = (props: {
   if (stateQuery.isError)
     return (
       <Alert variant={alertsOwnerMissing(stateQuery.error) ? 'default' : 'destructive'}>
-        <AlertDescription>{alertsOwnerMissing(stateQuery.error) ? t('alertsUnavailable') : errorMessage(stateQuery.error, t('loadFailed'))}</AlertDescription>
+        <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <span className="dshx:min-w-0 dshx:flex-1">
+            {alertsOwnerMissing(stateQuery.error) ? t('alertsUnavailable') : errorMessage(stateQuery.error, t('loadFailed'))}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => void stateQuery.refetch()}>
+            {t('retry')}
+          </Button>
+        </AlertDescription>
       </Alert>
     )
   const snapshot = stateQuery.data

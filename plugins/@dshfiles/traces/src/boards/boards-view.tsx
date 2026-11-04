@@ -1,4 +1,6 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
@@ -106,11 +108,18 @@ export const BoardsView = (props: {
       <p className="dshx:text-xs dshx:text-muted-foreground">{t(boardCopyOf(board.id).hint)}</p>
       {breakdown.isError ? (
         <Alert variant={alertsOwnerMissing(breakdown.error) ? 'default' : 'destructive'}>
-          <AlertDescription>{alertsOwnerMissing(breakdown.error) ? t('alertsUnavailable') : errorMessage(breakdown.error, t('loadFailed'))}</AlertDescription>
+          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <span className="dshx:min-w-0 dshx:flex-1">
+              {alertsOwnerMissing(breakdown.error) ? t('alertsUnavailable') : errorMessage(breakdown.error, t('loadFailed'))}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => void breakdown.refetch()}>
+              {t('retry')}
+            </Button>
+          </AlertDescription>
         </Alert>
       ) : null}
       {breakdown.data === undefined ? null : breakdown.data.rows.length === 0 ? (
-        <p className="dshx:text-sm dshx:text-muted-foreground">{t('boardEmpty')}</p>
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('boardEmpty')}</EmptyState>
       ) : (
         <Table aria-label={t(boardCopyOf(board.id).title)}>
           <TableHeader>

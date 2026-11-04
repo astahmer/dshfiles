@@ -1,4 +1,6 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
@@ -102,10 +104,17 @@ export const MetricsView = (props: { readonly client: TracesClient; readonly win
       />
       {listQuery.isError ? (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>
+          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(listQuery.error, t('loadFailed'))}</span>
+            <Button variant="outline" size="sm" onClick={() => void listQuery.refetch()}>
+              {t('retry')}
+            </Button>
+          </AlertDescription>
         </Alert>
       ) : null}
-      {metrics.length === 0 && listQuery.isSuccess ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noMetrics')}</p> : null}
+      {metrics.length === 0 && listQuery.isSuccess ? (
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noMetrics')}</EmptyState>
+      ) : null}
       {current === undefined ? null : seriesQuery.data === undefined ? null : <MetricChart series={seriesQuery.data} t={t} />}
       {metrics.length === 0 ? null : (
         <Table aria-label={t('tabMetrics')}>

@@ -1,4 +1,5 @@
 import type { ConvViewOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
@@ -215,7 +216,12 @@ export const SessionTracesView = (
               <>
                 {listQuery.isError ? (
                   <Alert variant="destructive">
-                    <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>
+                    <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                      <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(listQuery.error, t('loadFailed'))}</span>
+                      <Button variant="outline" size="sm" onClick={() => void listQuery.refetch()}>
+                        {t('retry')}
+                      </Button>
+                    </AlertDescription>
                   </Alert>
                 ) : null}
                 <TraceList
@@ -257,11 +263,16 @@ export const SessionTracesView = (
               <>
                 {logsQuery.isError ? (
                   <Alert variant="destructive">
-                    <AlertDescription>{errorMessage(logsQuery.error, t('loadFailed'))}</AlertDescription>
+                    <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                      <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(logsQuery.error, t('loadFailed'))}</span>
+                      <Button variant="outline" size="sm" onClick={() => void logsQuery.refetch()}>
+                        {t('retry')}
+                      </Button>
+                    </AlertDescription>
                   </Alert>
                 ) : null}
                 {logs.length === 0 && logsQuery.isSuccess ? (
-                  <p className="dshx:text-sm dshx:text-muted-foreground">{t('noSessionLogs')}</p>
+                  <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noSessionLogs')}</EmptyState>
                 ) : (
                   <ul className="dshx:flex dshx:flex-col" aria-label={t('tabLogs')}>
                     {logs.map(log => (

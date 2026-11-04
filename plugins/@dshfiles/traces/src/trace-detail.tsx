@@ -25,7 +25,7 @@ export const AttributeTable = (props: {
   const entries = Object.entries(props.values).sort(([left], [right]) => left.localeCompare(right))
   return (
     <section className="dshx:flex dshx:flex-col dshx:gap-1" aria-label={props.label}>
-      <h4 className="dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{props.label}</h4>
+      <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.label}</h4>
       {entries.length === 0 ? (
         <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('noAttributes')}</p>
       ) : (
@@ -146,7 +146,7 @@ const SpanDetailPanel = (props: {
       <AttributeTable label={props.t('attributes')} values={span.attributes} t={props.t} />
       {span.events.length === 0 ? null : (
         <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label={props.t('events')}>
-          <h4 className="dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{props.t('events')}</h4>
+          <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.t('events')}</h4>
           {span.events.map((event, index) => (
             <div key={`${event.name}-${String(index)}`} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded dshx:bg-muted/40 dshx:p-2">
               <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-xs">

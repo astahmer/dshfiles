@@ -180,7 +180,8 @@ Then('selecting a span shows its attributes and resource attributes', async ({ p
 })
 
 Then('the span detail panel stays visible while scrolling the trace view', async ({ page }: { page: Page }) => {
-  const main = page.locator('main.dshx-root')
+  // The page kit's `Page` owns the Traces scroll (`scroll`), so it is the container the detail sticks inside.
+  const main = page.locator('[data-slot="page"]').filter({ has: page.getByRole('heading', { name: 'Traces', exact: true, level: 1 }) })
   const detail = page.getByRole('complementary', { name: 'Span detail' })
   await page.getByRole('tree', { name: 'Span waterfall' }).evaluate(element => {
     element.style.minHeight = '1200px'

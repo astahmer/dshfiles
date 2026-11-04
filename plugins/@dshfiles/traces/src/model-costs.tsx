@@ -14,7 +14,7 @@ export const ModelCostTable = (props: { readonly models: readonly ModelUsage[]; 
   return (
     <section className="dshx:flex dshx:flex-col dshx:gap-1" aria-label={props.t('modelCosts')} data-testid="traces-model-costs">
       <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
-        <h3 className="dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{props.t('modelCosts')}</h3>
+        <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.t('modelCosts')}</h3>
         <span className="dshx:font-mono dshx:text-xs" data-stat="modelCostTotal">
           {TraceFormat.usd(total)}
         </span>

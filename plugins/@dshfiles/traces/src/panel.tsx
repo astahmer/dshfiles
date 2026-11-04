@@ -12,9 +12,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
@@ -54,6 +54,18 @@ const windowLabel = (minutes: number, t: TracesTranslate): string => {
   return t('window7d')
 }
 
+/** A failure with the one control that recovers from it (retry, or go back), so no error is a dead end. */
+export const RecoveryAlert = (props: { readonly message: string; readonly actionLabel: string; readonly onAction: () => void }): JSX.Element => (
+  <Alert variant="destructive">
+    <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+      <span className="dshx:min-w-0 dshx:flex-1">{props.message}</span>
+      <Button variant="outline" size="sm" onClick={props.onAction}>
+        {props.actionLabel}
+      </Button>
+    </AlertDescription>
+  </Alert>
+)
+
 export const TracesPanel = (props: {
   readonly sessions: ISessions
   readonly workspaces: IWorkspaces
@@ -67,6 +79,7 @@ export const TracesPanel = (props: {
   const queryClient = useQueryClient()
   const view = storedTracesView.useValue()
   const [traceId, setTraceId] = useState<string | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [logCorrelation, setLogCorrelation] = useState<LogCorrelation | null>(null)
   const showLogs = (correlation: LogCorrelation): void => {
     setLogCorrelation(correlation)
@@ -109,55 +122,62 @@ export const TracesPanel = (props: {
 
   return (
     <TooltipProvider>
-      <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-3">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-            <h1 className="dshx:text-lg dshx:font-semibold">{t('title')}</h1>
-            <p className="dshx:text-sm dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            {status === undefined ? null : <ReceiverBadge status={status} t={t} />}
-            {status === undefined ? null : (
+      <Page
+        scroll
+        heading={t('title')}
+        description={t('subtitle')}
+        meta={
+          status === undefined ? undefined : (
+            <>
+              <ReceiverBadge status={status} t={t} />
               <span className="dshx:text-xs dshx:text-muted-foreground" data-testid="traces-store-summary">
                 {status.store.traces} {t('traces')} · {status.store.spans} {t('spans')} · {status.store.logs} {t('logs')} {t('storedSummary')}
               </span>
-            )}
-            <SavedViewsMenu t={props.tAlerts} />
-            <Button variant="outline" size="sm" aria-label={t('refresh')} onClick={() => void queryClient.invalidateQueries({ queryKey: tracesKeys.all })}>
-              <RefreshCwIcon />
-              <span className="dshx:@max-pane-compact:sr-only">{t('refresh')}</span>
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" aria-label={t('clear')} disabled={storeEmpty || clearMutation.isPending}>
-                  <Trash2Icon />
-                  <span className="dshx:@max-pane-compact:sr-only">{t('clear')}</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t('clearTitle')}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {status === undefined
-                      ? ''
-                      : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')} · ${String(status.store.logs)} ${t('logs')}. `}
-                    {t('clearDescription')}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => clearMutation.mutate()}>{t('clearConfirm')}</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </header>
+            </>
+          )
+        }
+        actions={[
+          {
+            id: 'refresh',
+            label: t('refresh'),
+            icon: <RefreshCwIcon aria-hidden />,
+            onSelect: () => void queryClient.invalidateQueries({ queryKey: tracesKeys.all }),
+          },
+          {
+            id: 'clear',
+            label: t('clear'),
+            icon: <Trash2Icon aria-hidden />,
+            destructive: true,
+            placement: 'overflow',
+            disabled: storeEmpty,
+            pending: clearMutation.isPending,
+            onSelect: () => setConfirmClear(true),
+          },
+        ]}
+        className="dshx:min-h-0"
+        bodyClassName="dshx:min-h-0 dshx:flex-1"
+      >
+        <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('clearTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {status === undefined
+                  ? ''
+                  : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')} · ${String(status.store.logs)} ${t('logs')}. `}
+                {t('clearDescription')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => clearMutation.mutate()}>{t('clearConfirm')}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {status === undefined ? null : <ReceiverMessage status={status} t={t} />}
         {statusQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(statusQuery.error, t('loadFailed'))}</AlertDescription>
-          </Alert>
+          <RecoveryAlert message={errorMessage(statusQuery.error, t('loadFailed'))} actionLabel={t('retry')} onAction={() => void statusQuery.refetch()} />
         ) : null}
         {status !== undefined && (storeEmpty || exportBlocked(status) || status.diagnosis?.code === 'port-in-use') ? (
           <EmptyStoreGuide status={status} compact={!storeEmpty} t={t} />
@@ -183,20 +203,23 @@ export const TracesPanel = (props: {
                 {props.tAlerts('tabAlerts')} <FiringAlertsCount firing={firing} />
               </TabsTrigger>
             </TabsList>
-            {view.tab === 'traces' || view.tab === 'logs' || view.tab === 'alerts' ? null : (
-              <Select value={String(view.windowMinutes)} onValueChange={value => update({ windowMinutes: Number(value) })}>
-                <SelectTrigger size="sm" aria-label={t('window')} className="dshx:w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {WINDOW_OPTIONS.map(minutes => (
-                    <SelectItem key={minutes} value={String(minutes)}>
-                      {windowLabel(minutes, t)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <SavedViewsMenu t={props.tAlerts} />
+              {view.tab === 'traces' || view.tab === 'logs' || view.tab === 'alerts' ? null : (
+                <Select value={String(view.windowMinutes)} onValueChange={value => update({ windowMinutes: Number(value) })}>
+                  <SelectTrigger size="sm" aria-label={t('window')} className="dshx:w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WINDOW_OPTIONS.map(minutes => (
+                      <SelectItem key={minutes} value={String(minutes)}>
+                        {windowLabel(minutes, t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           <TabsContent value="traces" className="dshx:flex dshx:flex-col dshx:gap-3">
@@ -260,12 +283,22 @@ export const TracesPanel = (props: {
                   ) : null}
                 </div>
                 {listQuery.isError ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>
-                  </Alert>
+                  <RecoveryAlert message={errorMessage(listQuery.error, t('loadFailed'))} actionLabel={t('retry')} onAction={() => void listQuery.refetch()} />
                 ) : null}
                 {traces.length === 0 && listQuery.isSuccess ? (
-                  <p className="dshx:text-sm dshx:text-muted-foreground">{filtered ? t('noMatch') : t('noTraces')}</p>
+                  <EmptyState
+                    className="dshx:rounded-lg dshx:border dshx:border-border"
+                    {...(filtered
+                      ? {
+                          action: {
+                            label: t('clearFilters'),
+                            onSelect: () => update({ search: '', service: null, operation: null, status: 'all', minDurationMs: null }),
+                          },
+                        }
+                      : {})}
+                  >
+                    {filtered ? t('noMatch') : t('noTraces')}
+                  </EmptyState>
                 ) : (
                   <TraceList
                     traces={traces}
@@ -288,11 +321,7 @@ export const TracesPanel = (props: {
                     <ScrollTextIcon /> <span className="dshx:@max-pane-narrow:sr-only">{t('logsForTrace')}</span>
                   </Button>
                 </div>
-                {traceQuery.isError ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{t('traceNotFound')}</AlertDescription>
-                  </Alert>
-                ) : null}
+                {traceQuery.isError ? <RecoveryAlert message={t('traceNotFound')} actionLabel={t('back')} onAction={() => update({ traceId: null })} /> : null}
                 {traceQuery.data === undefined ? null : (
                   <TraceDetailView
                     key={traceQuery.data.traceId}
@@ -321,9 +350,7 @@ export const TracesPanel = (props: {
 
           <TabsContent value="map">
             {mapQuery.isError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{errorMessage(mapQuery.error, t('loadFailed'))}</AlertDescription>
-              </Alert>
+              <RecoveryAlert message={errorMessage(mapQuery.error, t('loadFailed'))} actionLabel={t('retry')} onAction={() => void mapQuery.refetch()} />
             ) : null}
             {mapQuery.data === undefined ? null : (
               <ServiceMapView map={mapQuery.data} onPickService={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
@@ -343,9 +370,7 @@ export const TracesPanel = (props: {
 
           <TabsContent value="errors">
             {errorsQuery.isError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{errorMessage(errorsQuery.error, t('loadFailed'))}</AlertDescription>
-              </Alert>
+              <RecoveryAlert message={errorMessage(errorsQuery.error, t('loadFailed'))} actionLabel={t('retry')} onAction={() => void errorsQuery.refetch()} />
             ) : null}
             {errorsQuery.data === undefined ? null : (
               <ErrorGroups groups={errorsQuery.data.groups} onOpenTrace={sampleTraceId => update({ traceId: sampleTraceId, tab: 'traces' })} t={t} />
@@ -379,7 +404,7 @@ export const TracesPanel = (props: {
             ) : null}
           </TabsContent>
         </Tabs>
-      </main>
+      </Page>
     </TooltipProvider>
   )
 }

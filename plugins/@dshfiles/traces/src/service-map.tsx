@@ -1,4 +1,5 @@
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import { ServiceMapLayout } from './service-map-layout.js'
@@ -23,7 +24,7 @@ export const ServiceMapView = (props: {
     props.map.nodes.map(node => node.service),
     props.map.edges,
   )
-  if (placed.nodes.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{props.t('noOperations')}</p>
+  if (placed.nodes.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{props.t('noOperations')}</EmptyState>
   const position = new Map(placed.nodes.map(node => [node.service, node]))
   const stats = new Map(props.map.nodes.map(node => [node.service, node]))
   const width = PADDING * 2 + placed.columns * NODE_WIDTH + Math.max(0, placed.columns - 1) * COLUMN_GAP

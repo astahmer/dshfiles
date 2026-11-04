@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -201,11 +202,16 @@ export const LogsView = (props: {
       </div>
       {logsQuery.isError ? (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage(logsQuery.error, t('loadFailed'))}</AlertDescription>
+          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(logsQuery.error, t('loadFailed'))}</span>
+            <Button variant="outline" size="sm" onClick={() => void logsQuery.refetch()}>
+              {t('retry')}
+            </Button>
+          </AlertDescription>
         </Alert>
       ) : null}
       {logs.length === 0 && logsQuery.isSuccess ? (
-        <p className="dshx:text-sm dshx:text-muted-foreground">{t('noLogs')}</p>
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noLogs')}</EmptyState>
       ) : (
         <ul className="dshx:flex dshx:flex-col" aria-label={t('tabLogs')}>
           {logs.map(log => (

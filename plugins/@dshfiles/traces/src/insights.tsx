@@ -1,4 +1,5 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { TraceFormat } from './format.js'
@@ -46,7 +47,7 @@ export const OperationsTable = (props: {
   readonly onPick: (service: string, operation: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
-  if (props.stats.operations.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{props.t('noOperations')}</p>
+  if (props.stats.operations.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{props.t('noOperations')}</EmptyState>
   return (
     <Table aria-label={props.t('tabOperations')}>
       <TableHeader>
@@ -96,7 +97,7 @@ export const ErrorGroups = (props: {
   readonly onOpenTrace: (traceId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
-  if (props.groups.length === 0) return <p className="dshx:text-sm dshx:text-muted-foreground">{props.t('noErrors')}</p>
+  if (props.groups.length === 0) return <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{props.t('noErrors')}</EmptyState>
   return (
     <ul className="dshx:flex dshx:flex-col dshx:gap-2" aria-label={props.t('tabErrors')}>
       {props.groups.map(group => (

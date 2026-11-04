@@ -1156,7 +1156,11 @@ const tracesReceiverEndpoint = async (input: {
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
     )
   }
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click({ timeout: timeoutMs })
+  // The view is offered as `Traces: Explorer` (native sidebar, Workbench) or `Traces` in a shortened navigation.
+  await page
+    .getByRole('button', { name: /^Traces(?::|$)/u })
+    .first()
+    .click({ timeout: timeoutMs })
   const badge = page.getByTestId('traces-receiver-state')
   await badge.waitFor({ state: 'visible', timeout: timeoutMs })
   await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
