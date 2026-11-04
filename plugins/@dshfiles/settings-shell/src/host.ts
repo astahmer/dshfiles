@@ -2,6 +2,7 @@ import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { Effect, FileSystem, Layer, Option } from 'effect'
 import { FetchHttpClient } from 'effect/http'
+import { BundleLabels } from './bundle-labels-cache.js'
 import { InstalledVersions } from './installed-versions.js'
 import { NativeSettings } from './native-settings-promise.js'
 import { ReleaseCheck } from './release-check.js'
@@ -31,7 +32,7 @@ const PortDriftWarning = Layer.effectDiscard(
   }),
 )
 
-const settingsShellLayer = Layer.mergeAll(SettingsTools.layer, ReleaseCheck.layer, PortDriftWarning).pipe(
+const settingsShellLayer = Layer.mergeAll(SettingsTools.layer, ReleaseCheck.layer, BundleLabels.layer, PortDriftWarning).pipe(
   Layer.provideMerge(Layer.mergeAll(InstalledVersions.layer, NativeSettings.layer)),
   Layer.provideMerge(Layer.merge(nodeFileSystemLayer, FetchHttpClient.layer)),
 )
@@ -53,6 +54,7 @@ export default DshxPlugin.make({
   apis: [
     Api.bind(settingsShellApi, {
       documentPath,
+      bundleLabels: () => BundleLabels.use(labels => labels.read),
       upstream: () =>
         InstalledVersions.use(versions =>
           Effect.succeed({

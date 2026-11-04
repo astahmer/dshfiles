@@ -44,6 +44,7 @@ import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
+import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseNotice } from './release-notice.js'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
@@ -284,27 +285,27 @@ export default defineClient({
     // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`). The workbench lists pages even
     // while Settings is closed, so resolve this one label snapshot when the provider becomes available.
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
-    ctx.inject(['remote.pluginManager'], scoped => {
-      const load = (): void => {
-        void scoped.remote.pluginManager.listBundles().then(result => {
-          if (!result.ok) return
-          const next = new Map<string, NamespaceLabel>()
-          for (const bundle of result.value) {
-            for (const row of bundle.rows) {
-              // A package name is no title; without manifest text the page falls back to the schema or the id.
-              const title = row.meta?.title ?? bundle.meta?.title
-              const description = row.meta?.description ?? bundle.meta?.description
-              const resolvedTitle = title === undefined ? '' : ctx.locale.resolveText(title)
-              next.set(row.rowId, {
-                title: resolvedTitle === bundle.name || resolvedTitle === row.moduleName ? '' : resolvedTitle,
-                description: description === undefined ? (bundle.description ?? '') : ctx.locale.resolveText(description),
-              })
-            }
-          }
-          labels.set(next)
+    const installLabels = (rows: readonly BundleLabel[]): void => {
+      const next = new Map<string, NamespaceLabel>()
+      for (const row of rows) {
+        // A package name is no title; without manifest text the page falls back to the schema or the id.
+        const resolvedTitle = row.title === undefined ? '' : ctx.locale.resolveText(row.title)
+        next.set(row.rowId, {
+          title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
+          description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
         })
       }
-      load()
+      labels.set(next)
+    }
+    const labelsApi = createApiClient(ctx, settingsShellApi, metadata?.packageId)
+    ctx.inject(['remote.pluginManager'], scoped => {
+      // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
+      // that method existed is asked the old way.
+      void labelsApi.safe.bundleLabels().then(async cached => {
+        if (cached.ok) return installLabels(cached.value)
+        const result = await scoped.remote.pluginManager.listBundles()
+        if (result.ok) installLabels(bundleLabelsOf(result.value))
+      })
     })
 
     const describe = ctx.configForms.describe()
