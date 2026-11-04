@@ -105,9 +105,16 @@ const withSharedStylesheet = (bundles: readonly LocalBootBundle[], available: re
   return [owner, ...bundles]
 }
 
-export const buildPlugin = async (projectRoot: string, packageId: string): Promise<void> => {
-  const child = spawnOwnedProcess('pnpm', ['run', 'build'], {
-    cwd: projectRoot,
+const runBuild = async (input: {
+  readonly command: string
+  readonly args: readonly string[]
+  readonly cwd: string
+  readonly label: string
+  readonly timeoutMs: number
+}): Promise<void> => {
+  const { label, timeoutMs } = input
+  const child = spawnOwnedProcess(input.command, [...input.args], {
+    cwd: input.cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
@@ -140,16 +147,32 @@ export const buildPlugin = async (projectRoot: string, packageId: string): Promi
         clearTimeout(timer)
         child.off('error', handleError)
         child.off('close', handleClose)
-        reject(new Error(`${packageId} build exceeded 180000ms.`))
-      }, 180_000)
+        reject(new Error(`${label} build exceeded ${String(timeoutMs)}ms.`))
+      }, timeoutMs)
       child.once('error', handleError)
       child.once('close', handleClose)
     })
-    if (status !== 0) throw new Error(`${packageId} build exited with code ${String(status)}:\n${ScratchProfileRuntime.redactHostOutput(output)}`)
+    if (status !== 0) throw new Error(`${label} build exited with code ${String(status)}:\n${ScratchProfileRuntime.redactHostOutput(output)}`)
   } finally {
     await stopOwnedProcess(child)
   }
 }
+
+export const buildPlugin = async (projectRoot: string, packageId: string): Promise<void> =>
+  runBuild({ command: 'pnpm', args: ['run', 'build'], cwd: projectRoot, label: packageId, timeoutMs: 180_000 })
+
+/**
+ * Build several bundles in one Turbo run, which builds each one's workspace dependencies first (a dshx module another
+ * bundle imports must exist before that bundle builds) and replays unchanged ones from the shared cache.
+ */
+export const buildPlugins = async (packageIds: readonly string[]): Promise<void> =>
+  runBuild({
+    command: 'pnpm',
+    args: ['exec', 'node', 'scripts/turbo.mjs', 'run', 'build', '--output-logs=errors-only', ...packageIds.map(packageId => `--filter=${packageId}`)],
+    cwd: DSHFILES_ROOT,
+    label: packageIds.length === 1 ? (packageIds[0] ?? 'plugin') : `${String(packageIds.length)} plugins`,
+    timeoutMs: 180_000 + 30_000 * packageIds.length,
+  })
 
 const portAddressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isFinite()) })
 

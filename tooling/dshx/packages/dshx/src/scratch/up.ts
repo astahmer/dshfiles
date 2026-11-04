@@ -2,7 +2,7 @@ import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises
 import { delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
-import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
+import { DSHFILES_ROOT, buildPlugins, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
 import { resolveDshExecutable } from '../project/dsh-executable.js'
@@ -124,10 +124,8 @@ export const scratchUp = async (
   const [firstBundle, ...otherBundles] = bundles
   if (firstBundle === undefined) throw new ScratchError('no-bundles', 'No owned plugin bundles were selected.', 'Pass --plugin @dshfiles/<name>.')
   if (!options.skipBuild) {
-    for (const bundle of bundles) {
-      options.onProgress(`building ${bundle.packageId}`)
-      await buildPlugin(bundle.projectRoot, bundle.packageId)
-    }
+    options.onProgress(`building ${bundles.map(bundle => bundle.packageId).join(', ')}`)
+    await buildPlugins(bundles.map(bundle => bundle.packageId))
   }
   options.onProgress('installing the scratch profile')
   const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles], {
