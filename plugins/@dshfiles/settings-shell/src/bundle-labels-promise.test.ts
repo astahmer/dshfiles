@@ -3,7 +3,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
-import { BundleLabels } from './bundle-labels-cache.js'
+import { BundleLabels } from './bundle-labels-promise.js'
 
 const bundle: BundleInfo = {
   name: '@dshfiles/thread-sidebar',
