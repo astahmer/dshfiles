@@ -107,8 +107,12 @@ export const makeClientReconciler = <Target extends ClientTarget>(
         lock.withPermit(
           Effect.gen(function* () {
             const next = yield* plan
-            if (next.restart.size === 0) return yield* apply(next.targets)
-            for (const id of next.restart) yield* restartNow(id, next.targets)
+            // Every restarted client stops before anything starts, then one apply starts them all.
+            for (const id of next.restart) {
+              yield* stop(id)
+              yield* Ref.update(lifecycle, map => withoutEntry(map, id))
+            }
+            yield* apply(next.targets)
           }),
         ),
       restart: (id, targets) => lock.withPermit(restartNow(id, targets)),

@@ -1,6 +1,6 @@
 import { credentialKey, type CredentialKey } from '@deepseek-ai/dsh-credentials'
 import type { Config as NativeMcpConfig } from '@deepseek-ai/dsh-mcp-client'
-import { Context, Effect, Layer, Option, Ref, Schema, type Scope } from 'effect'
+import { Context, Deferred, Effect, Layer, Option, Ref, Schema, type Scope } from 'effect'
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { preferencesSchema, type ManagerPreferences, type ManagerSnapshot, type RegistryEntry, type ServerDraft, type StoredServer } from './api.js'
@@ -45,6 +45,29 @@ const usesOAuth = (server: StoredServer): server is HttpServer => server.transpo
 
 const grantKey = (server: StoredServer): CredentialKey =>
   credentialKey(CREDENTIAL_SCOPE, `oauth-${createHash('sha256').update(server.id).digest('hex').slice(0, 24)}`)
+
+/** Credential lookups one reconciliation or snapshot runs at once. */
+const CREDENTIAL_CONCURRENCY = 8
+
+/** `mcp__<serverName>__<tool>` names counted per server name in one pass; a name counts for every prefix it carries. */
+const toolCountsByServerName = (tools: ReadonlyArray<string>): ReadonlyMap<string, number> => {
+  const counts = new Map<string, number>()
+  for (const name of tools) {
+    if (!name.startsWith('mcp__')) continue
+    for (let end = name.indexOf('__', 5); end !== -1; end = name.indexOf('__', end + 1)) {
+      const serverName = name.slice(5, end)
+      counts.set(serverName, (counts.get(serverName) ?? 0) + 1)
+    }
+  }
+  return counts
+}
+
+/** One pending reconciliation: the newest server list (undefined reads the row) and every restart asked for. */
+interface Generation {
+  readonly servers: ReadonlyArray<StoredServer> | undefined
+  readonly restart: ReadonlySet<string>
+  readonly done: Deferred.Deferred<void, ManagerConfigUnavailable>
+}
 
 const referenceBindings = (server: StoredServer): ReadonlyArray<readonly [string, string]> =>
   server.transport === 'stdio' ? Object.entries(server.envRefs) : [...Object.entries(server.headerRefs), ...Object.entries(server.startCommand?.envRefs ?? {})]
@@ -176,17 +199,54 @@ export class McpManager extends Context.Service<
             .pipe(Effect.catch(() => Effect.succeedNone))
         })
 
-        const resolveReferences = (refs: Readonly<Record<string, string>>) =>
-          Effect.forEach(Object.entries(refs), ([key, name]) =>
-            Effect.map(
-              host.resolveReference(name),
-              Option.map((value): readonly [string, string] => [key, value]),
-            ),
-          ).pipe(Effect.map(entries => Option.map(Option.all(entries), resolved => Object.fromEntries(resolved))))
+        /** Values of one reconciliation's references, each read once; the map lives only as long as that plan. */
+        type ResolvedValues = ReadonlyMap<string, Option.Option<string>>
 
-        const nativeTarget = Effect.fnUntraced(function* (server: StoredServer, suspended: boolean, toolCallTimeoutMs: number) {
+        const resolveAll = (references: Iterable<string>) =>
+          Effect.map(
+            Effect.forEach([...new Set(references)], name => Effect.map(host.resolveReference(name), value => [name, value] as const), {
+              concurrency: CREDENTIAL_CONCURRENCY,
+            }),
+            (entries): ResolvedValues => new Map(entries),
+          )
+
+        const resolveReferences = (refs: Readonly<Record<string, string>>, values: ResolvedValues) =>
+          Option.map(
+            Option.all(
+              Object.entries(refs).map(([key, name]) =>
+                Option.map(Option.flatten(Option.fromUndefinedOr(values.get(name))), (value): readonly [string, string] => [key, value]),
+              ),
+            ),
+            resolved => Object.fromEntries(resolved),
+          )
+
+        /** A disabled or manually disconnected server never starts, so it gets no credential or OAuth work. */
+        const inactiveTarget = (server: StoredServer, suspended: boolean, toolCallTimeoutMs: number): NativeTarget => ({
+          id: server.id,
+          enabled: server.enabled,
+          ready: false,
+          suspended,
+          fingerprint: JSON.stringify({ server }),
+          config:
+            server.transport === 'stdio'
+              ? {
+                  transport: 'stdio',
+                  serverName: server.serverName,
+                  command: server.command,
+                  args: [...server.args],
+                  cwd: server.cwd,
+                  env: {},
+                  toolCallTimeoutMs,
+                  failOnStartupError: false,
+                }
+              : { transport: 'streamable-http', serverName: server.serverName, url: server.url, headers: {}, toolCallTimeoutMs, failOnStartupError: false },
+          redactions: [],
+        })
+
+        const nativeTarget = Effect.fnUntraced(function* (server: StoredServer, suspended: boolean, toolCallTimeoutMs: number, values: ResolvedValues) {
+          if (!server.enabled || suspended) return inactiveTarget(server, suspended, toolCallTimeoutMs)
           if (server.transport === 'stdio') {
-            const env = yield* resolveReferences(server.envRefs)
+            const env = resolveReferences(server.envRefs, values)
             const resolved = Option.getOrElse(env, () => ({}))
             const stdio: NativeTarget = {
               id: server.id,
@@ -209,7 +269,7 @@ export class McpManager extends Context.Service<
             }
             return stdio
           }
-          const referenced = yield* resolveReferences(server.headerRefs)
+          const referenced = resolveReferences(server.headerRefs, values)
           const grant = usesOAuth(server) ? yield* liveGrant(server) : Option.none<OAuthGrant>()
           const oauthReady = !usesOAuth(server) || Option.isSome(grant)
           const headers =
@@ -221,7 +281,7 @@ export class McpManager extends Context.Service<
                     onSome: current => ({ ...referenced.value, Authorization: `Bearer ${current.accessToken}` }),
                   }),
                 )
-          const localEnv = server.startCommand === undefined ? Option.none<Record<string, string>>() : yield* resolveReferences(server.startCommand.envRefs)
+          const localEnv = server.startCommand === undefined ? Option.none<Record<string, string>>() : resolveReferences(server.startCommand.envRefs, values)
           const resolvedHeaders = Option.getOrElse(headers, () => ({}))
           const startCommand = server.startCommand
           const http: NativeTarget = {
@@ -270,15 +330,20 @@ export class McpManager extends Context.Service<
           return status
         })
 
-        const reconcile = Effect.fn('mcp servers reconcile')(function* (
-          input: { readonly servers?: ReadonlyArray<StoredServer>; readonly restart?: ReadonlyArray<string> } = {},
-        ) {
+        const runGeneration = Effect.fn('mcp servers reconcile')(function* (input: Generation) {
           const plan = Effect.gen(function* () {
             const current = input.servers ?? (yield* servers)
             const ids = new Set(current.map(server => server.id))
             const suspended = yield* Ref.updateAndGet(disconnected, previous => new Set([...previous].filter(id => ids.has(id))))
             const toolCallTimeoutMs = (yield* preferences).toolCallTimeoutSeconds * 1000
-            const targets = yield* Effect.forEach(current, server => nativeTarget(server, suspended.has(server.id), toolCallTimeoutMs))
+            const active = current.filter(server => server.enabled && !suspended.has(server.id))
+            const values = yield* resolveAll(active.flatMap(server => referenceBindings(server).map(([, reference]) => reference)))
+            yield* Effect.annotateCurrentSpan({
+              'dshx.mcp-servers.servers': current.length,
+              'dshx.mcp-servers.active': active.length,
+              'dshx.mcp-servers.references': values.size,
+            })
+            const targets = yield* Effect.forEach(current, server => nativeTarget(server, suspended.has(server.id), toolCallTimeoutMs, values))
             const locals = yield* Ref.get(localProcesses)
             const running = targets.filter(target => target.enabled && target.ready && target.suspended !== true && target.localCommand !== undefined)
             const exited = yield* Effect.forEach(running, target => {
@@ -286,37 +351,74 @@ export class McpManager extends Context.Service<
               if (local === undefined) return Effect.succeed([])
               return Effect.map(local.status, status => (status === 'exited' ? [target.id] : []))
             })
-            const restart = new Set([...(input.restart ?? []), ...exited.flat()])
+            const restart = new Set([...input.restart, ...exited.flat()])
             return { targets, restart }
           })
           yield* reconciler.reconcile(plan)
         })
 
+        // One reconciliation runs at a time and at most one waits behind it: a call made meanwhile joins the waiting
+        // generation (newest server list wins, restart ids are united) instead of queueing a stale full pass. The
+        // driver runs in the manager's own Scope, so an aborted caller never cancels work other callers wait for.
+        const managerScope = yield* Effect.scope
+        const generations = yield* Ref.make<{ readonly running: boolean; readonly next: Generation | undefined }>({ running: false, next: undefined })
+
+        const drive: Effect.Effect<void> = Effect.gen(function* () {
+          for (;;) {
+            const generation = yield* Ref.modify(generations, state =>
+              state.next === undefined
+                ? ([undefined, { running: false, next: undefined }] as const)
+                : ([state.next, { running: true, next: undefined }] as const),
+            )
+            if (generation === undefined) return
+            yield* Deferred.done(generation.done, yield* Effect.exit(runGeneration(generation)))
+          }
+        })
+
+        yield* Effect.addFinalizer(() =>
+          Effect.flatMap(Ref.get(generations), state => (state.next === undefined ? Effect.void : Effect.asVoid(Deferred.interrupt(state.next.done)))),
+        )
+
+        const reconcile = Effect.fn('mcp servers reconcile request')(function* (
+          input: { readonly servers?: ReadonlyArray<StoredServer>; readonly restart?: ReadonlyArray<string> } = {},
+        ) {
+          const fresh = yield* Deferred.make<void, ManagerConfigUnavailable>()
+          const [joined, start] = yield* Ref.modify(generations, state => {
+            const merged: Generation = {
+              servers: input.servers,
+              restart: new Set([...(state.next?.restart ?? []), ...(input.restart ?? [])]),
+              done: state.next?.done ?? fresh,
+            }
+            return [[merged, !state.running] as const, { running: true, next: merged }] as const
+          })
+          yield* Effect.annotateCurrentSpan('dshx.mcp-servers.coalesced', joined.done !== fresh)
+          if (start) yield* Effect.forkIn(drive, managerScope)
+          yield* Deferred.await(joined.done)
+        })
+
         const snapshotOf = Effect.fn('mcp servers snapshot')(function* (current: ReadonlyArray<StoredServer>) {
-          const tools = yield* host.toolNames
+          const toolCounts = toolCountsByServerName(yield* host.toolNames)
+          // Servers share references, so each one's metadata is read once per snapshot, not once per server.
+          const references = [...new Set(current.flatMap(server => referenceBindings(server).map(([, reference]) => reference)))]
+          const availability: ReadonlyMap<string, boolean> = new Map(
+            yield* Effect.forEach(
+              references,
+              reference => Effect.map(host.isConfigured(reference), (configured): readonly [string, boolean] => [reference, configured]),
+              { concurrency: CREDENTIAL_CONCURRENCY },
+            ),
+          )
           const rows = yield* Effect.forEach(
             current,
             server =>
               Effect.gen(function* () {
                 const signedIn = usesOAuth(server) ? Option.isSome(yield* host.readGrant(grantKey(server))) : false
-                const references = [...new Set(referenceBindings(server).map(([, reference]) => reference))]
-                const availability = new Map(
-                  yield* Effect.forEach(
-                    references,
-                    reference => Effect.map(host.isConfigured(reference), (configured): readonly [string, boolean] => [reference, configured]),
-                    {
-                      concurrency: 'unbounded',
-                    },
-                  ),
-                )
-                const prefix = `mcp__${server.serverName}__`
                 return McpServerStateModel.publicServerView({
                   server,
                   availability,
                   clientLifecycle: yield* reconciler.state(server.id),
                   localProcess: yield* localStatus(server),
                   signedIn,
-                  registeredToolCount: tools.reduce((count, name) => count + Number(name.startsWith(prefix)), 0),
+                  registeredToolCount: toolCounts.get(server.serverName) ?? 0,
                 })
               }),
             { concurrency: 'unbounded' },
