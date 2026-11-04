@@ -20,6 +20,7 @@
     "@dshfiles/capabilities-hub": "link:../../plugins/@dshfiles/capabilities-hub",
     "@dshfiles/chat": "link:../../plugins/@dshfiles/chat",
     "@dshfiles/command-palette": "link:../../plugins/@dshfiles/command-palette",
+    "@dshfiles/component-gallery": "link:../../plugins/@dshfiles/component-gallery",
     "@dshfiles/context-compaction": "link:../../plugins/@dshfiles/context-compaction",
     "@dshfiles/dialogs": "link:../../plugins/@dshfiles/dialogs",
     "@dshfiles/diff-viewed": "link:../../plugins/@dshfiles/diff-viewed",
@@ -169,7 +170,8 @@
         "@dshfiles/hmr-gate",
         "@dshfiles/capabilities-hub",
         "@dshfiles/plugin-guide",
-        "@dshfiles/web-fetch-readable"
+        "@dshfiles/web-fetch-readable",
+        "@dshfiles/component-gallery"
       ]
     }
   }

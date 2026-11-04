@@ -171,6 +171,45 @@
           "reason": "Client-only stylesheet rules; no Host work."
         }
       ]
+    },
+    {
+      "id": "shared-motion",
+      "title": "Animate components with one shared motion layer",
+      "summary": "Expose Motion's framework-free core with shared spring, duration, easing and enter presets, reduced-motion handling, FLIP lists, count-ups and rolling digits, so every animated plugin component moves the same way.",
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: library",
+      "configuration": [],
+      "states": ["animating", "settled", "reduced-motion"],
+      "failureModes": ["Under prefers-reduced-motion every animation ends at its final frame at once, and removed list items leave immediately."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.motion-reduced",
+          "file": "plugins/@dshfiles/plugin-ui/tests/motion.test.tsx",
+          "testName": "ends animations instantly under reduced motion"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.motion-presence-exit",
+          "file": "plugins/@dshfiles/plugin-ui/tests/motion.test.tsx",
+          "testName": "keeps a removed PresenceList item until its exit ends, hidden from assistive tech"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.motion-rolling-number",
+          "file": "plugins/@dshfiles/plugin-ui/tests/motion.test.tsx",
+          "testName": "exposes the plain value of a RollingNumber to screen readers"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the motion layer animates DOM in the browser and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }

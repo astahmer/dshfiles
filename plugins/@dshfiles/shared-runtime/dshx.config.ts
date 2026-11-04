@@ -63,6 +63,7 @@ export default defineConfig({
         'class-variance-authority',
         'clsx',
         'cmdk',
+        'motion',
         'react-remove-scroll',
         'tailwind-merge',
         'xstate',

@@ -1,0 +1,4 @@
+# Client-only: the row exists so the loader mounts the package and hands its Client contribution to the shell.
+- insert:
+    - id: dshfiles-component-gallery
+      name: '@dshfiles/component-gallery'

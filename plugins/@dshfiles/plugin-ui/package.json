@@ -29,6 +29,14 @@
       "types": "./src/lib/workspace-listed.ts",
       "default": "./src/lib/workspace-listed.ts"
     },
+    "./motion": {
+      "types": "./src/motion/index.ts",
+      "default": "./src/motion/index.ts"
+    },
+    "./motion/react": {
+      "types": "./src/motion/react.ts",
+      "default": "./src/motion/react.ts"
+    },
     "./icons": {
       "types": "./src/icons.ts",
       "default": "./src/icons.ts"
@@ -91,6 +99,7 @@
     "clsx": "catalog:",
     "cmdk": "catalog:",
     "lucide-react": "1.48.0",
+    "motion": "catalog:",
     "radix-ui": "1.7.0",
     "react-resizable-panels": "4.14.2",
     "shiki": "4.5.0",
