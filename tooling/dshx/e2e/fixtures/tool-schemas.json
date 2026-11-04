@@ -1,5 +1,5 @@
 {
-  "hostBundles": 57,
+  "hostBundles": 53,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -19,7 +19,6 @@
     "@dshfiles/editor",
     "@dshfiles/fff-search",
     "@dshfiles/git-worktrees",
-    "@dshfiles/home",
     "@dshfiles/html-render",
     "@dshfiles/jj-integration",
     "@dshfiles/jujutsu",
@@ -41,7 +40,6 @@
     "@dshfiles/secret-catalog",
     "@dshfiles/session-search",
     "@dshfiles/session-undo",
-    "@dshfiles/session-warming",
     "@dshfiles/settings-shell",
     "@dshfiles/shared-streams",
     "@dshfiles/test-runs",
@@ -57,7 +55,7 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 449,
+  "apiMethods": 445,
   "apiToolBindings": 308,
   "apiToolNameCount": 308,
   "apiToolSchemas": 307,
@@ -5046,8 +5044,7 @@
       "description": "Identity of this DSH runtime as other hosts see it. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -5055,8 +5052,7 @@
       "description": "List the machines (hosts) this DSH can run threads on and their DSH runtimes: connector, remote home, whether a connection is open, and the last error. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -5279,8 +5275,7 @@
       "description": "Read resource snapshots for registered hosts and the least-pressured eligible remote destination. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -5288,8 +5283,7 @@
       "description": "Read CPU load and memory capacity for this DSH machine. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -5434,8 +5428,7 @@
       "description": "SSH aliases from the local ssh config and known_hosts entries, as suggestions when adding a host. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -5599,8 +5592,7 @@
       "description": "Every thread this DSH started on remote runtimes, with its host, Session, title and state. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -6156,7 +6148,15 @@
       "description": "Remove one project registration: its directory and threads are kept, its threads simply lose the project grouping. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -6164,7 +6164,8 @@
       "description": "List registered projects (DSH Workspaces): id, title, path and thread count. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -6172,7 +6173,18 @@
       "description": "Register an existing directory as a project so threads can live in it. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -6180,7 +6192,19 @@
       "description": "Rename one project (its sidebar title); titles must be unique. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "title"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -6188,7 +6212,18 @@
       "description": "Move one project within the sidebar order: before another project, or to the end when beforeProjectId is omitted. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "beforeProjectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7264,7 +7299,15 @@
       "description": "Archive one thread: it leaves the sidebar and its project groups until restored, and later wake-ups for it are blocked. Defaults to the calling thread when sessionId is omitted. A thread with running work is refused with the work named; pass stopActivity: true only when the user also asked to stop it, which stops its turn, subagent descendants, background jobs and schedules first — the sidebar's stop-and-archive confirmation. Archiving the calling thread always needs stopActivity: true and ends this turn. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "stopActivity": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7288,7 +7331,21 @@
       "description": "Continue one thread in another project: fork its conversation into a new thread that runs in that project's own workspace (its isolated jj workspace when the project isolates new threads), then settle the original so it stays readable but runs no further step. Use it when a thread was started in the wrong folder or its work moved to another repository. Defaults to the calling thread: from inside a turn the new thread keeps this turn too, and this thread stops after the call. Another thread must be idle. text is queued as the new thread's first message. Get projectId from project_list. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7296,7 +7353,24 @@
       "description": "Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "agentPreset": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7349,7 +7423,15 @@
       "description": "Fork one thread into a new independent thread at its latest completed turn, or at an exact inclusive event sequence with atSeq. Defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "atSeq": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7357,7 +7439,18 @@
       "description": "List threads (DSH Sessions) with title, project, running and pinned/archived/settled state. A settled thread is listed and openable but runs no model step until thread_unsettle. Use it to resolve which thread the user means before another thread_* or move call. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "includeArchived": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7365,7 +7458,22 @@
       "description": "Reorder one thread within the project that already holds it, optionally before another thread of that project. It cannot move a thread to another project; thread_continue_in does that. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "beforeSessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "projectId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7373,7 +7481,15 @@
       "description": "Pin one thread ahead of the unpinned threads of its project. Refused while the thread is archived. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7381,7 +7497,25 @@
       "description": "Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "queue",
+              "steer"
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7450,7 +7584,15 @@
       "description": "Threads that reference one thread (DSH Session): its forked and subagent children, plus the threads whose messages pulled it in as referenced context. Reports degraded: true with lineage only when the Host cannot search session content. Defaults to the calling thread. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7458,7 +7600,18 @@
       "description": "Rename one thread (its sidebar title). Defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7466,7 +7619,25 @@
       "description": "Choose the provider, model and optional reasoning effort one thread uses for its next request. Defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "reasoningEffort": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7474,7 +7645,12 @@
       "description": "Settle one thread: it stays listed and openable, but no model step starts — not from a message, a subagent settlement, a reminder or a queued follow-up — until thread_unsettle. Refuse while its own turn runs; stop it first. Defaults to the calling thread when sessionId is omitted. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7482,7 +7658,15 @@
       "description": "Stop one thread's running work through the same cancel path as the sidebar's stop: its current turn ends and the thread stays available. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7490,7 +7674,15 @@
       "description": "Restore an archived thread to its recorded place in the sidebar. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7498,7 +7690,15 @@
       "description": "Remove one thread's pin. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7506,7 +7706,15 @@
       "description": "Unsettle a settled thread so it can run model steps again. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7514,7 +7722,64 @@
       "description": "Create a saved thread sidebar view. Call only when the user asked to create that view.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "project",
+              "date",
+              "status",
+              "none"
+            ]
+          },
+          "statusFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "working",
+                "not-running",
+                "attention",
+                "unread",
+                "approval-needed",
+                "input-needed",
+                "turn-finished",
+                "needs-resume",
+                "interrupted",
+                "inactive",
+                "muted",
+                "settled",
+                "archived"
+              ]
+            }
+          },
+          "sourceFilter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "main",
+              "subagents"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "groupBy",
+          "statusFilters",
+          "sourceFilter"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7522,7 +7787,22 @@
       "description": "Delete a saved thread sidebar view. Requires explicit confirm: true. Call only when the user asked to delete that view.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7530,7 +7810,15 @@
       "description": "Read one saved thread sidebar view by id. Missing views fail explicitly. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7538,7 +7826,23 @@
       "description": "Move a saved thread sidebar view one position earlier or later. Call only when the user asked to reorder that view.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "earlier",
+              "later"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "direction"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7546,7 +7850,18 @@
       "description": "Select an enabled saved thread sidebar view or change grouping/filter control visibility. Call only when the user asked for that selection or visibility change.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "showGroupControl": {
+            "type": "boolean"
+          },
+          "showFilterControl": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -7554,7 +7869,59 @@
       "description": "Change a saved thread sidebar view name, enabled state, grouping or filters. Call only when the user asked for that change.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "project",
+              "date",
+              "status",
+              "none"
+            ]
+          },
+          "statusFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "working",
+                "not-running",
+                "attention",
+                "unread",
+                "approval-needed",
+                "input-needed",
+                "turn-finished",
+                "needs-resume",
+                "interrupted",
+                "inactive",
+                "muted",
+                "settled",
+                "archived"
+              ]
+            }
+          },
+          "sourceFilter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "main",
+              "subagents"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7562,7 +7929,8 @@
       "description": "Read saved thread sidebar views, their order, active view and control visibility. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
