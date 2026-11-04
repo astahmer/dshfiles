@@ -139,6 +139,19 @@ const useWorkspaceToggle = (actor: WorkspaceToggleActor, sessionId: string | und
   return { ...events, pending, deferredIsolation, awaitingDestination, error, busy }
 }
 
+/** Whether the main view holds a Session that is no longer blank: a sent thread whose first turn has not rendered yet. */
+const useMainViewHoldsSentSession = (services: DestinationBarServices): boolean =>
+  useSyncExternalStore(
+    useCallback((listener: () => void) => services.sessions.list.subscribe(listener), [services]),
+    useCallback(() => {
+      const { ids, byId } = services.sessions.list.getSnapshot()
+      return ids.some(id => {
+        const session = byId[id]
+        return session !== undefined && !session.blank && (session.retainedBy.mainView ?? 0) > 0
+      })
+    }, [services]),
+  )
+
 /** The selected main-view Session and its workspace; only a blank Session can drive New-thread moves. */
 const useComposerWorkspace = (services: DestinationBarServices, selectedWorkspaceId: string | undefined) => {
   // Read each store through the service on every call, as the rest of this file does; a detached store loses its owner.
@@ -251,9 +264,10 @@ export const DestinationBar = (props: {
   const rootSelectionHandledFor = useRef<string | null>(null)
   const rootSelectionVisitId = composerWorkspace?.visitId ?? mountId
   // A thread that was just sent is no longer blank, yet its empty-thread screen (and this bar) stays mounted until its
-  // first turn renders. Redirecting then would open a fresh New thread in the project root on every visit to the
-  // running thread, each one a new tab; only a composer with no sent thread may be moved to the project root.
-  const showsSentThread = composerWorkspace !== null && composerWorkspace.sessionId === undefined
+  // first turn renders. `composerWorkspace` only describes a blank main-view Session, so it cannot tell that screen
+  // from an empty one: ask the Session list whether the main view holds any Session at all. Redirecting a sent thread
+  // would open a fresh New thread in the project root on every visit to it, each one a new tab.
+  const showsSentThread = useMainViewHoldsSentSession(services)
   useEffect(() => {
     if (rootSelectionHandledFor.current === rootSelectionVisitId || workspaceId === null || current === undefined || toggle.busy) return
     rootSelectionHandledFor.current = rootSelectionVisitId
