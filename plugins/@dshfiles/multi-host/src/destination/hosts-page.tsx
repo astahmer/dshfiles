@@ -28,6 +28,7 @@ import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog
 import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { versionMismatch } from './connection-diagnostics.js'
+import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -194,8 +195,7 @@ const HostRow = (props: {
         {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
         {outdatedVersion === undefined ? null : (
           <span data-testid={`host-version-mismatch-${host.id}`} className="dshx:text-xs dshx:text-warning">
-            Runs DSH {outdatedVersion}; this machine runs {props.localVersion}. Ask the agent to update it with multi_host_checkout_sync or
-            multi_host_provision.
+            Runs DSH {outdatedVersion}; this machine runs {props.localVersion}. Update its DSH core on that machine, then restart it.
           </span>
         )}
         {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
@@ -325,6 +325,8 @@ export const HostsPage = () => {
   const [form, setForm] = useState<HostDraft | null>(null)
   const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
+  const [fleetOpen, setFleetOpen] = useState(false)
+  const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
 
@@ -397,7 +399,11 @@ export const HostsPage = () => {
               {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
               {hosts.some(host => host.hidden) ? ` · ${hosts.filter(host => host.hidden).length} hidden` : ''}
             </Badge>
-            <Button size="sm" className="dshx:ml-auto" onClick={() => setForm(blankDraft)}>
+            <Button size="sm" variant="outline" className="dshx:ml-auto" disabled={hosts.length === 0} onClick={() => setFleetOpen(true)}>
+              <RefreshCwIcon className="dshx:size-4" />
+              Update hosts
+            </Button>
+            <Button size="sm" onClick={() => setForm(blankDraft)}>
               <PlusIcon className="dshx:size-4" />
               Add host
             </Button>
@@ -523,6 +529,14 @@ export const HostsPage = () => {
         />
       ) : null}
       <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+      <FleetUpdateDialog
+        api={api}
+        hosts={ordered}
+        open={fleetOpen}
+        updateRequest={updateRequest}
+        onUpdateAll={() => setUpdateRequest(current => current + 1)}
+        onOpenChange={setFleetOpen}
+      />
     </main>
   )
 }

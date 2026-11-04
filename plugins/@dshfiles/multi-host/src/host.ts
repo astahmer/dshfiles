@@ -43,6 +43,7 @@ import { NativeRpc } from './native-rpc.js'
 import { MultiHostPaths } from './paths.js'
 import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
 import { RemoteCheckout } from './remote-checkout.js'
+import { RemoteUpdate } from './remote-update.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
@@ -621,6 +622,17 @@ const handlers = Api.handlers(multiHostApi, {
       if (locator.kind !== host.connector.kind) return yield* new ConnectorKindMismatch()
       const runtime = yield* register({ host, locator, name: input.name.trim() })
       return { ok: true as const, runtime: yield* runtimeSummaryOf(runtime, pool) }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  hostUpdate: Effect.fn('multi-host host update')(function* (input) {
+    return yield* Effect.gen(function* () {
+      const directory = yield* HostDirectory
+      const host = yield* directory.findHost(input.hostId)
+      if (host === undefined) return yield* new HostNotFound({ hostId: input.hostId })
+      if (host.connector.kind !== 'ssh') return yield* new ConnectorKindMismatch()
+      const sshTarget = host.connector.sshTarget
+      const facts = yield* RemoteDoctor.readFacts({ sshTarget, profile: 'web', checkoutPath: undefined })
+      return yield* RemoteUpdate.run({ sshTarget, facts, nodePath: officialNodeOf({ facts }), bookmark: input.bookmark, apply: input.apply })
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   runtimeStatus: Effect.fn('multi-host runtime status')(function* (input) {

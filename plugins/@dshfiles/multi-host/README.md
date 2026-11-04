@@ -10,6 +10,10 @@ Manage hosts on a dedicated page:
 
 ![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
+Update every host's dshfiles checkout from the same page:
+
+![Update hosts lists each host's sync result, with Retry on a failed host](docs/screenshots/fleet-update.png)
+
 The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
 
 ## Using it
@@ -143,6 +147,10 @@ method with a `multi_host_*` tool:
 - `multi_host_checkout_sync` — fetch and rebase one checkout onto
   `<bookmark>@origin`, keeping that machine's edits; `apply: false` only reports
   the commands.
+- `multi_host_update` — the Hosts page's **Update hosts** for one host: fetch,
+  then the host's own `dshx checkout sync` rebases, installs and rebuilds what
+  changed and says whether DSH there needs a restart. `apply: false` is a dry
+  run. It never restarts the host, and only commits on `main@origin` reach it.
 
 Provisioning never installs a package manager or edits the machine's own setup:
 a missing fnm or a stale nixfiles is reported, not patched. It also never
@@ -173,22 +181,22 @@ title}` for threads started here, so the sidebar and view can list them.
 
 ## Compared with bb and t3code
 
-|                                   | bb (desktop build)                                      | t3code nightly                                             | multi-host                                                         |
-| --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| Transport                         | enrolled daemon, WebSocket to server                    | `ssh -L` to `t3 serve`                                     | `ssh -L` to `dsh web` (BatchMode, strict host keys)                |
-| Add host                          | enroll key + `curl \| sh` command, poll until connected | Settings → Connections, ssh config/known_hosts suggestions | chip → Add host…, same suggestions, Find + stepwise Test           |
-| Provision remote server           | install script                                          | automatic on SSH connect: release archive, lock, serve     | stepwise opt-in `multi_host_provision` (node → runtime), `doctor`  |
-| Persistent connection / reconnect | heartbeat 5 s, backoff 1–30 s                           | supervisor, backoff 2 s–5 min                              | pooled tunnel, lazy reconnect, ping on menu open, manual Reconnect |
-| Remote folders / branches         | `host.browse_directory`, `list_branch_options`          | env `filesystem.browse`, `vcs.listRefs`                    | host's multi-host listing, host's jj-integration                   |
-| Run and follow a thread           | RPC + event upload                                      | per-environment WebSocket                                  | create + prompt over the native API, transcript polled             |
-| Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                    |
-| Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                             |
-| Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                     |
-| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                               |
-| Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                          |
-| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                  |
-| Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | per host: `checkout_sync`, `provision`; no UI                      |
-| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | none: subagents run locally                                        |
+|                                   | bb (desktop build)                                      | t3code nightly                                             | multi-host                                                            |
+| --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
+| Transport                         | enrolled daemon, WebSocket to server                    | `ssh -L` to `t3 serve`                                     | `ssh -L` to `dsh web` (BatchMode, strict host keys)                   |
+| Add host                          | enroll key + `curl \| sh` command, poll until connected | Settings → Connections, ssh config/known_hosts suggestions | chip → Add host…, same suggestions, Find + stepwise Test              |
+| Provision remote server           | install script                                          | automatic on SSH connect: release archive, lock, serve     | stepwise opt-in `multi_host_provision` (node → runtime), `doctor`     |
+| Persistent connection / reconnect | heartbeat 5 s, backoff 1–30 s                           | supervisor, backoff 2 s–5 min                              | pooled tunnel, lazy reconnect, ping on menu open, manual Reconnect    |
+| Remote folders / branches         | `host.browse_directory`, `list_branch_options`          | env `filesystem.browse`, `vcs.listRefs`                    | host's multi-host listing, host's jj-integration                      |
+| Run and follow a thread           | RPC + event upload                                      | per-environment WebSocket                                  | create + prompt over the native API, transcript polled                |
+| Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                       |
+| Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                                |
+| Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
+| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
+| Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
+| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                     |
+| Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
+| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | none: subagents run locally                                           |
 
 ## Limits
 

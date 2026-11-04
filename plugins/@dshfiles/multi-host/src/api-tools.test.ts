@@ -90,6 +90,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_thread_stop',
       'multi_host_thread_transcript',
       'multi_host_threads',
+      'multi_host_update',
     ])
   })
 

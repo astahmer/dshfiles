@@ -412,6 +412,16 @@ const remoteNodeSchema = Schema.Struct({
   nix: Schema.Boolean,
 })
 
+const hostUpdateResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  applied: Schema.Boolean,
+  checkoutPath: Schema.String,
+  revision: Schema.optional(Schema.String),
+  rebuilt: Schema.Array(Schema.String),
+  restartNeeded: Schema.Boolean,
+  detail: Schema.String,
+})
+
 const remoteFactsSchema = Schema.Struct({
   uname: Schema.String,
   osVersion: Schema.optional(Schema.String),
@@ -960,6 +970,17 @@ const effectMultiHostApi = defineApi({
       description:
         'Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.',
       tool: { name: 'multi_host_checkout_sync', render: compactJson },
+    }),
+    hostUpdate: method({
+      input: Schema.Struct({
+        hostId: idSchema,
+        bookmark: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128)).pipe(Schema.withDecodingDefault(Effect.succeed('main'))),
+        apply: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+      }),
+      output: Schema.Union([hostUpdateResultSchema, failedSchema]),
+      description:
+        "Bring one SSH host's dshfiles checkout onto the bookmark from origin: fetch, then its own dshx checkout sync rebases, installs and rebuilds what changed, and reports whether that host needs a restart. It never restarts the host. Without apply it reports what would change. Call only when the user asked to update that host.",
+      tool: { name: 'multi_host_update', render: compactJson },
     }),
     runtimeCall: method({
       input: Schema.Struct({ runtimeId: idSchema, request: nativeRpcSchema }),

@@ -23,10 +23,10 @@
       "reach": [
         "click button \"New session\"",
         "click button \"Run on Local\"",
-        "click option \"Add host\u2026\"",
+        "click option \"Add host…\"",
         "expect dialog \"Add host\"",
         "click button \"SSH destination\"",
-        "expect text \"Enter a custom destination\u2026\""
+        "expect text \"Enter a custom destination…\""
       ],
       "verification": [
         {
@@ -146,6 +146,60 @@
           "span": "local project files archive",
           "file": "plugins/@dshfiles/multi-host/tests/local-project-files.test.ts",
           "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
+        },
+        {
+          "kind": "custom",
+          "span": "ssh command",
+          "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
+          "testName": "records an ssh command span that fails on a refused target before ssh starts"
+        }
+      ]
+    },
+    {
+      "id": "fleet-update",
+      "title": "Update every host from the Hosts page",
+      "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists what would change. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["checking", "up-to-date", "update-available", "updating", "updated", "restart-needed", "failed"],
+      "failureModes": [
+        "A host without a built checkout, jj or an official Node build is reported with the provisioning step it needs.",
+        "A conflicted or refused sync leaves the host checkout as dshx checkout sync left it and names the recovery on that host.",
+        "Only commits on main@origin reach a host; local commits that are not pushed stay here.",
+        "A failed row keeps its error and offers Retry; other hosts continue."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed multi-host-hosts",
+        "click button \"Multi-host: Hosts\"",
+        "expect heading \"Hosts\"",
+        "click button \"Update hosts\"",
+        "expect heading \"Update hosts\"",
+        "expect button \"Update all\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.host-update-sync-output",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-update.test.ts",
+          "testName": "reports rebuilt plugins and whether the host needs a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.host-update-blocked",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-update.test.ts",
+          "testName": "names what a machine lacks before it can update"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.fleet-update-browser",
+          "reason": "A real update needs an SSH host with a built dshfiles checkout, which the browser journeys do not provision; the sync and failure handling are unit-tested and the dialog is reachable through its reach path."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         },
         {
           "kind": "custom",
@@ -330,7 +384,7 @@
       "reach": [
         "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
-        "expect text \"Threads \u00b7 @f: files\""
+        "expect text \"Threads · @f: files\""
       ],
       "verification": [
         {
