@@ -200,7 +200,20 @@ const BasePicker = (props: { readonly repository: ComposerRepository; readonly b
 }
 
 /** "Uncommitted · 5 files, +116 −3 ▾" above the composer, with the changed files and a base picker. */
-export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null => {
+/** Whether this Session has not sent its first message: its run row already says where it will work. */
+const useBlankSession = (props: ComposerSlotProps): boolean => {
+  const sessions = props.jujutsu.sessions
+  const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
+  const read = useCallback(() => sessions.list.getSnapshot().byId[props.sessionId]?.blank === true, [sessions, props.sessionId])
+  return useSyncExternalStore(subscribe, read, read)
+}
+
+export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null =>
+  // A new thread's run row (rich-composer) carries project, workspace and starting bookmark; this bar only explains
+  // changes once the thread has some.
+  useBlankSession(props) ? null : <ComposerChangesBarContent {...props} />
+
+const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerBar')
   const [expanded, setExpanded] = useState(false)
   const [fullDiffPath, setFullDiffPath] = useState<string | null | undefined>(undefined)

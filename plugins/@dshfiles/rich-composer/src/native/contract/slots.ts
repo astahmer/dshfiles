@@ -459,6 +459,13 @@ export interface ComposerBarOwnerProps {
   placeholder?: string
   /** Optional content rendered above the composer surface. */
   accessory?: ReactNode
+  /**
+   * Hero only: the run row's leading segments (project, host, workspace, agent mode). The bar adds its own
+   * File access and Model + account seats so one row holds every choice made before the first message.
+   */
+  runRow?: ReactNode
+  /** Composer only: the run row collapsed to one summary chip, leading the meter line under the input. */
+  runSummary?: ReactNode
 }
 
 /** Package-private operations injected into the resident composer bar. */

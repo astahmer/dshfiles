@@ -40,7 +40,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   builtInGroup: 'Built-in', customGroup: 'Custom',
   sectionIntro: 'Choose the agent’s tools and how it works. Use Standard mode for everyday tasks, or Creator mode to add capabilities to DSH.',
 
-  seatHint: 'Choose the agent preset for your new task',
+  seatHint: 'Agent mode: which tools and instructions the agent starts this thread with. Standard mode fits everyday coding.',
   headerHint: 'The agent preset chosen when this task started',
   nav: 'Agent presets',
 
@@ -85,7 +85,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   builtInGroup: '内置', customGroup: '自定义',
   sectionIntro: '选择 Agent 的工具和工作方式。日常任务用「标准模式」，扩展 DSH 的能力用「创造模式」。',
 
-  seatHint: '选择新任务使用的 Agent 预设',
+  seatHint: '智能体模式：此会话开始时使用的工具和指令。日常编码选择标准模式。',
   headerHint: '本任务的 Agent 预设，在任务开始时确定',
   nav: 'Agent 预设',
 

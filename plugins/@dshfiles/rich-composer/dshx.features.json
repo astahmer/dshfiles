@@ -397,6 +397,54 @@
           "reason": "Client-only: the file is built in the browser and uploads through the composer's existing file path, which this feature does not change."
         }
       ]
+    },
+    {
+      "id": "composer-run-row",
+      "title": "Run row and meter line",
+      "summary": "A new thread shows one run row above its input: project · host · workspace · agent mode · file access · model and account. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting. Once the thread has started the row collapses to one summary chip that leads the meter line under the input (context % · cost and activity readings · N queued); model and file access stay changeable in the toolbar. At phone width the row is one sideways-scrolling line.",
+      "reach": [
+        "click button \"New session\"",
+        "expect group \"Run settings\"",
+        "expect button \"Choose workspace\"",
+        "expect button \"Run on Local\"",
+        "expect button \"Workspace: *\""
+      ],
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: run row above the new-thread input; summary chip on the meter line",
+      "configuration": [],
+      "states": ["new-thread", "started", "narrow"],
+      "failureModes": [
+        "An absent segment owner drops its segment; the rest of the row still renders.",
+        "A native seat that renders nothing on a blank thread (File access) leaves no empty gap."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.composer-run-row",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.run-row-hero",
+          "file": "plugins/@dshfiles/rich-composer/src/run-row.test.tsx",
+          "testName": "holds every pre-send choice in one row above the card on a new thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.run-row-summary",
+          "file": "plugins/@dshfiles/rich-composer/src/run-row.test.tsx",
+          "testName": "collapses to a summary chip on the meter line once the thread has started"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the run row places other owners’ controls and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }

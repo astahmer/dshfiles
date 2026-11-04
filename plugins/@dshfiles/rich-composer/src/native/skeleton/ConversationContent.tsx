@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { IconFolderOpenRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
@@ -117,15 +118,22 @@ export function ConversationContent(props: ConversationContentProps) {
     ? undefined
     : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
 
+  // The run row's leading segments (plans/ade-ux §4.5): project · host · workspace (the hero.workspace occupant, which
+  // leads with its host chip) · agent mode · plugin options. The bar appends File access and Model + account. Each
+  // owner keeps its own state; this row only places their slots, so a missing owner just drops its segment.
   const heroWorkspaceRow = (
-    <div className={css.heroWorkspaceRow}>
-      <WorkspaceChip
-        buttonRef={pickerAnchor}
-        label={chipTitle}
-        menuOpen={pickerOpen}
-        onClick={() => { setPickerOpen(open => !open) }}
-        t={t}
-      />
+    <>
+      <span className={css.runProject} data-run-segment="project">
+        <Tooltip label={t('runRow.project')} side="top" delayMs={400} disabled={pickerOpen}>
+          <WorkspaceChip
+            buttonRef={pickerAnchor}
+            label={chipTitle}
+            menuOpen={pickerOpen}
+            onClick={() => { setPickerOpen(open => !open) }}
+            t={t}
+          />
+        </Tooltip>
+      </span>
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
@@ -139,10 +147,24 @@ export function ConversationContent(props: ConversationContentProps) {
         },
         onClose: () => { setPickerOpen(false) },
       })}
-      {renderSlot('conversation.hero.agentPreset', {})}
+      <span className={css.runSegment} data-run-segment="agent-mode">{renderSlot('conversation.hero.agentPreset', {})}</span>
       {sessionId === undefined ? null : <div className={css.heroOptions}>{renderSlot('conversation.hero.options', {})}</div>}
-    </div>
+    </>
   )
+
+  // Once the thread has started, the run row collapses to one summary chip leading the meter line. Memoized on its
+  // text so streaming Session updates keep the memoized bar from re-rendering.
+  const summaryHost = remoteWorkspaceCwd === undefined ? t('runRow.summaryLocal') : t('runRow.summaryRemote')
+  const runSummary = useMemo(() => chipTitle === undefined ? undefined : (
+    <Tooltip label={t('runRow.summary', { project: chipTitle, host: summaryHost })} side="top" delayMs={400}>
+      <span className={css.runSummary} tabIndex={0} data-run-summary="">
+        <IconFolderOpenRegular size={13} aria-hidden />
+        <span className={css.runSummaryText}>{chipTitle}</span>
+        <span aria-hidden>·</span>
+        <span className={css.runSummaryText}>{summaryHost}</span>
+      </span>
+    </Tooltip>
+  ), [chipTitle, summaryHost, t])
 
   // The placeholder chip ("Choose workspace") and Workspace-trigger input travel
   // together for a cold start or an unowned blank Session. Confirmed remote
@@ -169,12 +191,12 @@ export function ConversationContent(props: ConversationContentProps) {
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
         : hero ? { placeholder: t('placeholder.hero') } : {}),
+    ...(hero ? { runRow: heroWorkspaceRow } : runSummary === undefined ? {} : { runSummary }),
   })
 
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
-      {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
     </div>

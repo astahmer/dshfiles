@@ -595,3 +595,51 @@ button.crumbEditable {
 .embeddedBody[data-content-phase='settling'] .composerSeat {
   visibility: hidden;
 }
+
+/* Run row segments placed by the conversation (see InputBar .runRow). The
+   project leads; the hero.workspace occupant's host chip (order -1) follows. */
+.runProject {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  order: -2;
+}
+
+.runSegment {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.runSegment:empty {
+  display: none;
+}
+
+/* The collapsed run row: one quiet chip leading the meter line. */
+.runSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  padding: 1px 8px;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  white-space: nowrap;
+  cursor: default;
+}
+
+.runSummary:hover,
+.runSummary:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.runSummaryText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

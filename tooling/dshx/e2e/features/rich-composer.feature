@@ -37,3 +37,9 @@ Feature: Rich composer references
     Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When 40 KiB of text is pasted into a thread composer
     Then the paste is a text file attachment that Paste as text turns back into text
+
+  @scenario:rich-composer.composer-run-row
+  Scenario: Start a thread from the run row without changing a chip
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/session-controller, @dshfiles/input-trigger, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When a new thread shows its run row
+    Then the run row holds project, host, workspace and model, and sending with the defaults collapses it to a summary chip

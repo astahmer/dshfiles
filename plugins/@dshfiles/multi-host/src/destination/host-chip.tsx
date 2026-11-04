@@ -1,6 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -92,14 +93,24 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" className={chipClassName} aria-label={`Run on ${label}`} title={state?.label}>
-            {destination.kind === 'local' ? <LaptopIcon className="dshx:size-3.5" /> : <ServerIcon className="dshx:size-3.5" />}
-            {label}
-            {state === undefined ? null : <StatusDot tone={state.tone} />}
-            <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-          </Button>
-        </PopoverTrigger>
+        <TooltipProvider delayDuration={400}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className={chipClassName} aria-label={`Run on ${label}`} data-run-segment="host">
+                  {destination.kind === 'local' ? <LaptopIcon className="dshx:size-3.5" /> : <ServerIcon className="dshx:size-3.5" />}
+                  {label}
+                  {state === undefined ? null : <StatusDot tone={state.tone} />}
+                  <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:max-w-72">
+              Host: the machine this thread runs on. Local is this computer; a remote host runs it over SSH.
+              {state === undefined ? null : ` ${state.label}.`}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
           <Command>
             <CommandList>

@@ -13,5 +13,5 @@
     { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
     { "upstream": "locale", "local": "locale" }
   ],
-  "delta": ["src/native/index.ts", "src/native/seat-store.ts"]
+  "delta": ["src/native/index.ts", "src/native/locales.ts", "src/native/seat-store.ts"]
 }

@@ -214,3 +214,36 @@ Then('the paste is a text file attachment that Paste as text turns back into tex
   })
   await finishJourneyAssertions(page)
 })
+
+const runRow = (page: Page) => page.getByRole('group', { name: 'Run settings', exact: true })
+
+When('a new thread shows its run row', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await expect(newThreadComposer(page)).toHaveAttribute('contenteditable', 'true', { timeout: 20_000 })
+  await expect(runRow(page)).toBeVisible()
+})
+
+Then(
+  'the run row holds project, host, workspace and model, and sending with the defaults collapses it to a summary chip',
+  async ({ page }: { page: Page }) => {
+    await recordAssertion(page, 'rich-composer-run-row-holds-every-pre-send-choice', async () => {
+      const row = runRow(page)
+      await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
+      await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
+      await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
+      await expect(row.locator('[data-run-segment="model"]')).toBeVisible()
+      // The input keeps no second model seat while the row holds it.
+      await expect(page.locator('[data-composer-card] [data-slot="conversation.input.model"]')).toHaveCount(0)
+    })
+    await recordAssertion(page, 'rich-composer-run-row-sends-with-defaults', async () => {
+      // Zero chip changes: type and send with the row's defaults.
+      await newThreadComposer(page).click()
+      await page.keyboard.type('run row default send')
+      await page.keyboard.press('Enter')
+      await expect(failedTurns(page)).toHaveCount(1, { timeout: 30_000 })
+      await expect(runRow(page)).toHaveCount(0)
+      await expect(page.locator('[data-run-summary]')).toBeVisible()
+    })
+    await finishJourneyAssertions(page)
+  },
+)

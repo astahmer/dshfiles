@@ -451,3 +451,78 @@
 .activity { display: flex; align-items: center; flex: none; }
 .activity:empty { display: none; }
 .activityExpanded { flex: 1; min-width: 0; }
+
+/* Run row (hero): every choice made before the first message on one line above
+   the card — project · host · workspace · agent mode · file access · model.
+   The frame is the size container, so the row can query its own width. */
+.runRowFrame {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  margin-bottom: 6px;
+  container-type: inline-size;
+}
+
+.runRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  min-width: 0;
+  /* Optical alignment: the project chip's folder glyph lines up with the
+     card's + button below. */
+  padding: 0 4px;
+}
+
+.runRow > * {
+  flex: none;
+}
+
+.runSegment {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.runSegment:empty {
+  display: none;
+}
+
+/* "Who answers" sits at the trailing edge, above the send button. */
+.runModel {
+  margin-left: auto;
+}
+
+/* Narrow panes and phones: one line that scrolls sideways instead of a
+   wrapping stack; the trailing fade says there is more. */
+@container (max-width: 560px) {
+  .runRow {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+    padding-right: 20px;
+  }
+
+  .runRow::-webkit-scrollbar {
+    display: none;
+  }
+
+  .runModel {
+    margin-left: 0;
+  }
+}
+
+/* Meter line: queued count after the context and cost readings. */
+.queued {
+  flex: none;
+  padding: 1px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-variant-numeric: tabular-nums;
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  white-space: nowrap;
+}

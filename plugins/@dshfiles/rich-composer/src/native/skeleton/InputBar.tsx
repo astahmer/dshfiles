@@ -52,7 +52,7 @@ export const InputBar = memo(function InputBar({
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut,
   useProjection, sessionId, variant, disabled: inert = false, blocked, insertReference,
   workspacePickerOpen = false, onRequestWorkspace,
-  placeholder, accessory,
+  placeholder, accessory, runRow, runSummary,
 }: InputBarProps) {
   const input = useInput(s => s)
   const notice = useNotices(s => s)
@@ -426,8 +426,31 @@ export const InputBar = memo(function InputBar({
         ? t('placeholder.steerQueue')
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
+  // Hero: one run row above the card holds every pre-send choice (§4.5 of plans/ade-ux). File access and the model
+  // seat move up from the toolbar there; once the thread has started they return to the toolbar, where they stay
+  // changeable, and the row collapses to the summary chip on the meter line.
+  const heroRunRow = variant === 'hero' && runRow !== undefined
+  const queued = input?.queue.length ?? 0
+
   return (
     <div className={clsx(css.root, variant === 'hero' && css.hero)}>
+      {heroRunRow && (
+        <div className={css.runRowFrame}>
+        <div className={css.runRow} role="group" aria-label={t('runRow.label')} data-run-row="">
+          {runRow}
+          {sessionId === undefined ? null : (
+            <span className={css.runSegment} data-run-segment="file-access">
+              {renderSlot('conversation.input.permission', { locked })}
+            </span>
+          )}
+          {sessionId === undefined ? null : (
+            <span className={clsx(css.runSegment, css.runModel)} data-run-segment="model">
+              {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+            </span>
+          )}
+        </div>
+        </div>
+      )}
       {toast !== null && (
         <Toast
           key={toast.seq}
@@ -524,7 +547,7 @@ export const InputBar = memo(function InputBar({
               onChange={onPickFiles}
             />
             <div className={css.modes}>
-              {sessionId === undefined ? null : renderSlot('conversation.input.permission', { locked })}
+              {sessionId === undefined || heroRunRow ? null : renderSlot('conversation.input.permission', { locked })}
               {sessionId === undefined ? null : renderSlot('conversation.input.plan', { locked })}
             </div>
             {input === undefined || sessionId === undefined
@@ -536,7 +559,7 @@ export const InputBar = memo(function InputBar({
               {input === undefined || sessionId === undefined
                 ? null
                 : renderSlot('conversation.input.right', {})}
-              {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+              {sessionId === undefined || heroRunRow ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             </div>
             {input === undefined || sessionId === undefined ? null : <div className={activity ? css.activityExpanded : css.activity}>
               {renderSlot('conversation.input.activity', { locked, onActiveChange: setActivity })}
@@ -580,11 +603,16 @@ export const InputBar = memo(function InputBar({
           </div>
         </div>
       </div>
-      <div className={css.dock} data-composer-dock>
+      {/* The meter line: run summary · context % · dock readings (cost, activity, plugin chips) · N queued. */}
+      <div className={css.dock} data-composer-dock data-meter-line="">
+        {variant === 'composer' && runSummary !== undefined ? runSummary : null}
+        {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
         {variant === 'composer' && input !== undefined && sessionId !== undefined
           ? renderSlot('conversation.composer.dock', {})
           : null}
-        {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
+        {variant === 'composer' && queued > 0 ? (
+          <span className={css.queued} data-meter="queued">{t('runRow.queued', { count: String(queued) })}</span>
+        ) : null}
       </div>
     </div>
   )
