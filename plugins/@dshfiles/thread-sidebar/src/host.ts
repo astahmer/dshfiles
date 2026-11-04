@@ -19,6 +19,8 @@ import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { MachineName } from './machine-name.js'
+import { threadSidebarNavigationApi } from './navigation-api.js'
+import { NavigationCounter } from './navigation-counter.js'
 import { OutsideReload } from './outside-reload-promise.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
@@ -87,7 +89,7 @@ const hostEdge = Layer.mergeAll(
   SidebarSettings.layer.pipe(Layer.provideMerge(Settings.layer(threadSidebarSettings))),
 ).pipe(Layer.provideMerge(platform))
 
-const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer).pipe(Layer.provideMerge(RecoveryStore.layer), Layer.provideMerge(StateFiles.layer))
+const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer).pipe(Layer.provideMerge(RecoveryStore.layer), Layer.provideMerge(StateFiles.layer))
 
 const restart = RestartDrain.layer.pipe(Layer.provideMerge(RestartControl.layerWith({ env: process.env, homeDirectory: homedir() })))
 
@@ -154,6 +156,11 @@ export default DshxPlugin.make({
         ),
       resume: input => Recoveries.use(recoveries => Effect.map(recoveries.resume(input.sessionId), accepted => ({ accepted }))),
       dismiss: input => Recoveries.use(recoveries => Effect.map(recoveries.dismiss(input.sessionId), dismissed => ({ dismissed }))),
+    }),
+    Api.bind(threadSidebarNavigationApi, {
+      record: input => NavigationCounter.use(counter => Effect.as(counter.record(input), { recorded: true })),
+      counts: () => NavigationCounter.use(counter => counter.counts),
+      reset: () => NavigationCounter.use(counter => counter.reset),
     }),
     Api.bind(threadSidebarMachineApi, {
       name: () => MachineName.use(machine => Effect.map(machine.name, name => ({ name }))),

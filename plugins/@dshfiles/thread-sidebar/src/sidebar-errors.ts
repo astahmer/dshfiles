@@ -14,7 +14,7 @@ export class AttentionStorageFailed extends Schema.TaggedError<AttentionStorageF
 /** One of the plugin's small state files under `<DSH home>/runtime` could not be read or replaced. */
 export class RuntimeStateFailed extends Schema.TaggedError<RuntimeStateFailed>()(
   'RuntimeStateFailed',
-  { file: Schema.Literals(['recoveries', 'inflight-turns']), operation: Schema.Literals(['read', 'write']), cause: Schema.optional(Schema.Defect()) },
+  { file: Schema.Literals(['recoveries', 'inflight-turns', 'navigation']), operation: Schema.Literals(['read', 'write']), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'runtime-state-failed' },
 ) {
   override get message(): string {
