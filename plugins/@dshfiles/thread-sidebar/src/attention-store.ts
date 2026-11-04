@@ -1,7 +1,7 @@
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { Clock, Context, Effect, Layer, Option, Schema, SynchronizedRef } from 'effect'
+import { Clock, Context, Effect, Layer, Option, PubSub, Schema, Stream, SynchronizedRef } from 'effect'
 import {
   MAX_ATTENTION_SESSIONS,
   threadAttentionViewSchema,
@@ -112,6 +112,8 @@ export class ThreadAttention extends Context.Service<
   ThreadAttention,
   {
     readonly snapshot: Effect.Effect<ThreadAttentionSnapshot>
+    /** Every committed change, after the mirror moved; read `snapshot` for the state. */
+    readonly changes: Stream.Stream<void>
     readonly recordFinish: (input: {
       readonly sessionId: string
       readonly seq: number
@@ -137,6 +139,7 @@ export class ThreadAttention extends Context.Service<
       const table = domain.table('sessions')
       const stored = yield* table.entries.pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'open', cause })))
       const now = yield* Clock.currentTimeMillis
+      const changed = yield* PubSub.sliding<void>(16)
       const state = yield* SynchronizedRef.make<AttentionState>({
         records: new Map(stored),
         revision: Math.max(now, ...stored.map(([, record]) => record.version)),
@@ -164,12 +167,13 @@ export class ThreadAttention extends Context.Service<
             const next = { records, revision }
             return [snapshotOf(next), next] as const
           }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation, cause }))),
-        )
+        ).pipe(Effect.tap(() => PubSub.publish(changed, undefined)))
 
       const unchanged: AttentionChange = { put: [], remove: [] }
 
       return ThreadAttention.of({
         snapshot: Effect.map(SynchronizedRef.get(state), snapshotOf),
+        changes: Stream.fromPubSub(changed),
         recordFinish: Effect.fn('thread attention record')(function* (input) {
           yield* apply('record', (records, takeVersion) => ({
             put: [

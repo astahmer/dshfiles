@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-user-questions'
 import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
@@ -14,6 +15,7 @@ import { ThreadAttention } from './attention-store.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
 import { ClientModules } from './client-modules-promise.js'
+import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { MachineName } from './machine-name.js'
@@ -102,7 +104,14 @@ const services = Layer.mergeAll(
   MachineName.layer,
 ).pipe(Layer.provideMerge(runtimeState))
 
-const workers = Layer.mergeAll(attentionRecorder, inflightTracker, bootRecovery, settledGate, modelRouteProjection)
+const workers = Layer.mergeAll(
+  attentionRecorder,
+  inflightTracker,
+  bootRecovery,
+  settledGate,
+  modelRouteProjection,
+  FinishedTurnAttention.layer.pipe(Layer.provide(HostApis.layer)),
+)
 
 const threadSidebarLayer = workers.pipe(Layer.provideMerge(services), Layer.provideMerge(hostEdge))
 

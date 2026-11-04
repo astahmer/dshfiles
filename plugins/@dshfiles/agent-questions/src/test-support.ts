@@ -55,6 +55,7 @@ const fakeAgentDirectory = (world: AgentWorld) =>
     AgentDirectory,
     AgentDirectory.of({
       isLive: agent => world.live.get(agent.id) === agent,
+      liveAgent: sessionId => world.live.get(sessionId),
       parentSessionId: childSessionId => world.parents.get(childSessionId),
       isDirectChild: (childSessionId, parentSessionId) =>
         world.live.has(childSessionId) && world.live.has(parentSessionId) && world.parents.get(childSessionId) === parentSessionId,
@@ -104,6 +105,7 @@ const writeWorkspaceFile = (input: { readonly workspace: string; readonly relati
 /** Real layers and stand-ins shared by the agent-questions tests. */
 export class AgentQuestionsTesting {
   static readonly jsonStorageHost = jsonStorageHost
+  static readonly fakeAgentDirectory = fakeAgentDirectory
   static readonly makeWorld = makeWorld
   static readonly questionServices = questionServices
   static readonly temporaryDirectory = temporaryDirectory

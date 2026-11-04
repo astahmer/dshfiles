@@ -25,6 +25,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/activity-timeline": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -60,7 +61,8 @@
     "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-user-questions": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/dsh-user-questions": ">=0.2.1-rc.2 <0.3.0-0",
+    "@dshfiles/activity-timeline": ">=0.1.0 <0.2.0-0"
   },
   "dsh": {
     "bundle": {

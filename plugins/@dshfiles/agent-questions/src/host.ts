@@ -1,8 +1,10 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Layer } from 'effect'
 import { AgentDirectory, NativeQuestions, QuestionFactsLive } from './agent-host-promise.js'
+import { ChildQuestionAttention } from './attention-provider.js'
 import { DeferredQuestionFiles } from './deferred-question-files.js'
 import { MarkdownDocuments } from './markdown-documents.js'
 import { ParentFeedback } from './parent-feedback.js'
@@ -22,8 +24,9 @@ const HostEdgeLive = Layer.mergeAll(
   QuestionStore.layer.pipe(Layer.provide(StorageDomain.layer)),
 )
 
-const AgentQuestionsLive = Layer.mergeAll(ParentQuestions.layer, ParentFeedback.layer, QuestionScan.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(WorkspaceFilesLive, HostEdgeLive)),
+const AgentQuestionsLive = ChildQuestionAttention.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(ParentQuestions.layer, ParentFeedback.layer, QuestionScan.layer)),
+  Layer.provideMerge(Layer.mergeAll(WorkspaceFilesLive, HostEdgeLive, HostApis.layer)),
 )
 
 export default DshxPlugin.make({

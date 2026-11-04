@@ -803,6 +803,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(cfc185dcf599a1b50b7c8f3bb0df144e)
+      '@dshfiles/activity-timeline':
+        specifier: workspace:*
+        version: link:../activity-timeline
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
@@ -6501,6 +6504,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/activity-timeline':
+        specifier: workspace:*
+        version: link:../activity-timeline
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts

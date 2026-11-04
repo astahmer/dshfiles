@@ -36,6 +36,8 @@ export class AgentDirectory extends Context.Service<
   AgentDirectory,
   {
     readonly isLive: (agent: LiveAgent) => boolean
+    /** The live Agent object of a Session, when it runs now; the user answers from the Inbox as that Agent's principal. */
+    readonly liveAgent: (sessionId: string) => LiveAgent | undefined
     readonly parentSessionId: (childSessionId: string) => string | undefined
     readonly isDirectChild: (childSessionId: string, parentSessionId: string) => boolean
     /** The workspace directory of a live Session, else the one its log recorded. */
@@ -67,6 +69,7 @@ export class AgentDirectory extends Context.Service<
         })
       return AgentDirectory.of({
         isLive: agent => agentOf(agent.id) === agent,
+        liveAgent: sessionId => agentOf(sessionId),
         parentSessionId: childSessionId =>
           Option.getOrUndefined(Option.flatMapNullishOr(sessionIdOf(childSessionId), id => context.sessions.get(id)?.header.parentSession)),
         isDirectChild: (childSessionId, parentSessionId) => {
