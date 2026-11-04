@@ -9,7 +9,7 @@
       "surfaces": ["host", "tool", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",
-      "currentSurface": "agent tools and Host watcher; no UI",
+      "currentSurface": "agent tools: pull_request_link, pull_request_watch, pull_request_list",
       "configuration": [],
       "states": ["linked", "watched", "rate-limited", "merged", "closed"],
       "failureModes": [
@@ -46,18 +46,12 @@
         {
           "kind": "not-applicable",
           "id": "pull-requests.no-browser-journey",
-          "reason": "This capability is intentionally Host-only and exposes every user action as an Agent tool; there is no browser UI to drive. The served API is exercised through a real test Host in tests/host.spec.ts."
+          "reason": "Linking and watching are Agent tools with no browser UI of their own; creating a pull request (github-pull-request-create) links its result through this path in the browser journey. The served API is exercised through a real test Host in tests/host.spec.ts."
         }
       ],
       "telemetry": [
-        {
-          "kind": "automatic",
-          "source": "api-dispatch"
-        },
-        {
-          "kind": "automatic",
-          "source": "agent-tool"
-        },
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
         {
           "kind": "custom",
           "span": "pull request gh repo",
@@ -76,10 +70,19 @@
       "id": "github-pull-request-create",
       "title": "Create a GitHub pull request from a thread",
       "summary": "Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create and links and watches the pull request on the thread.",
-      "surfaces": ["host", "tool", "integration"],
-      "surface": "infrastructure",
+      "surfaces": ["client", "host", "tool", "command", "integration"],
+      "surface": "command",
       "destination": "none",
-      "currentSurface": "host: agent tools pull_request_create_preview/pull_request_create",
+      "currentSurface": "palette: Create pull request from this thread (dialog)",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a pull request\"",
+        "press Enter",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"pull request\"",
+        "click option \"Create pull request from this thread*\"",
+        "expect dialog \"Create pull request\""
+      ],
       "configuration": [],
       "states": ["ready", "blocked", "created", "linked-existing", "failed"],
       "failureModes": [
@@ -107,6 +110,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pull-requests.create-from-thread",
+          "featureFile": "tooling/dshx/e2e/features/pull-requests.feature"
+        },
         {
           "kind": "unit-test",
           "id": "pull-requests.create-preview",
@@ -150,9 +158,16 @@
           "testName": "pushes the thread bookmark with jj, opens the PR with gh, and links and watches it on the thread"
         },
         {
-          "kind": "not-applicable",
-          "id": "pull-requests.create-no-browser-journey",
-          "reason": "This change adds the Host API and agent tools only; the served API, a real jj push and a stubbed gh are exercised through a real test Host in tests/create-host.spec.ts."
+          "kind": "unit-test",
+          "id": "pull-requests.create-dialog",
+          "file": "plugins/@dshfiles/pull-requests/tests/create-dialog.spec.tsx",
+          "testName": "previews the draft, lets the user edit it, and confirms the create with the previewed head commit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-dialog-blocked",
+          "file": "plugins/@dshfiles/pull-requests/tests/create-dialog.spec.tsx",
+          "testName": "shows every blocker with its recovery and keeps confirm disabled"
         }
       ],
       "telemetry": [

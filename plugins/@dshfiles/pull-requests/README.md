@@ -1,6 +1,8 @@
 # Pull requests
 
-Host-only GitHub integration that links a pull request to a DSH thread, watches it, and reports meaningful state changes through the thread sidebar. The plugin exposes these Agent tools:
+![Create a GitHub pull request from a thread](docs/screenshots/github-pull-request-create.png)
+
+GitHub integration that creates a pull request from a DSH thread, links it to the thread, watches it, and reports meaningful state changes through the thread sidebar. In the browser, the command palette's **Create pull request from this thread** opens a dialog: it previews the repository, bookmark, base and commits, shows a title and body drafted from the thread that you can edit, lists every blocker with its fix, and pushes and creates only when you confirm. The result links the pull request to the thread and starts watching it. The plugin exposes these Agent tools:
 
 - `pull_request_link` — link by GitHub.com PR URL, or by number and repository `cwd`.
 - `pull_request_unlink` — remove one link by URL or repository plus number.
@@ -48,4 +50,4 @@ pnpm exec turbo run build --filter=@dshfiles/pull-requests
 node plugins/@dshfiles/pull-requests/scripts/host-import-check.mjs
 ```
 
-`tests/create-host.spec.ts` creates a PR end to end against a real test Host, real jj and a temporary bare Git remote, with a shell-script `gh` on `PATH`, and checks the pushed branch, the `gh pr create` argv and the watched link. The Host API and durable storage path run against a real disposable test Host; schema and transition tests use fixed GitHub-shaped JSON and do not contact GitHub. A browser journey is intentionally not applicable because this plugin adds no client surface.
+`tests/create-host.spec.ts` creates a PR end to end against a real test Host, real jj and a temporary bare Git remote, with a shell-script `gh` on `PATH`, and checks the pushed branch, the `gh pr create` argv and the watched link. The Host API and durable storage path run against a real disposable test Host; schema and transition tests use fixed GitHub-shaped JSON and do not contact GitHub. The browser journey `tooling/dshx/e2e/features/pull-requests.feature` (`pnpm check:e2e pull-requests`) seeds a jj repository with a bare remote and a stub `gh` on the Host PATH, runs the palette command, confirms the dialog and checks the pushed branch and the created, polled pull request.

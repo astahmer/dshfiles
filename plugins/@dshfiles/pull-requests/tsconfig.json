@@ -5,7 +5,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["node", "@dshfiles/dshx/client/env"]
   },
-  "include": ["dshx.config.ts", "src/**/*.ts", "tests/**/*.ts"]
+  "include": ["dshx.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }
