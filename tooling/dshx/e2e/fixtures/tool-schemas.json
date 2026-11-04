@@ -1,8 +1,9 @@
 {
-  "hostBundles": 54,
+  "hostBundles": 55,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
+    "@dshfiles/agent-plan",
     "@dshfiles/agent-questions",
     "@dshfiles/agent-telemetry",
     "@dshfiles/agent-toolkit",
@@ -56,12 +57,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 470,
-  "apiToolBindings": 325,
-  "apiToolNameCount": 325,
-  "apiToolSchemas": 324,
+  "apiMethods": 471,
+  "apiToolBindings": 326,
+  "apiToolNameCount": 326,
+  "apiToolSchemas": 325,
   "definedTools": 22,
-  "tools": 346,
+  "tools": 347,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -3769,6 +3770,49 @@
         "required": [
           "repoId",
           "reference"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_reference_titles",
+      "description": "Titles for up to 100 chat references (revisions or bookmarks) in one call: each path is tried in order and the first repository that resolves a reference names its first-line description and root. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "revision",
+                    "bookmark"
+                  ]
+                }
+              },
+              "required": [
+                "value",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "paths",
+          "references"
         ],
         "additionalProperties": false
       }
