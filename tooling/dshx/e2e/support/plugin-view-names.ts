@@ -8,7 +8,6 @@ const reusableViewNames = new Map([
   ['Sidebar status', 'AI Accounts: Preview'],
   // Shared Workbench fixtures include native/unlabeled footer actions, so this aggregate has mixed owners.
   ['Sidebar actions', 'Thread Sidebar: Plugin controls'],
-  ['Settings', 'Settings Shell: Settings'],
   ['Backlog', 'Backlog: Items'],
   ['Editor', 'Editor: Files'],
   ['Jujutsu', 'Jujutsu: Revision graph'],
@@ -19,6 +18,29 @@ const reusableViewNames = new Map([
 ])
 
 export const reusableViewName = (fixtureName: string): string => reusableViewNames.get(fixtureName) ?? fixtureName
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+
+/** "Usage: Analytics" → "Analytics"; mirrors the workbench's tab-title fallback. */
+const withoutPluginPrefix = (label: string): string => {
+  const index = label.indexOf(': ')
+  return index > 0 && index < label.length - 2 ? label.slice(index + 2) : label
+}
+
+/**
+ * Every name a view's tab or pane may carry (plans/ade-ux Phase 3b): tab titles drop the "Plugin: View" prefix and use
+ * the rail section label when main-tabs supplies it, while compositions without it keep the navigation label minus its
+ * prefix. Matches the qualified name too, for pane registrations that keep their own title.
+ */
+export const viewNames = (fixtureName: string): readonly string[] => {
+  const qualified = reusableViewName(fixtureName)
+  const section = railLocations.get(qualified)?.section
+  return [...new Set([qualified, withoutPluginPrefix(qualified), ...(section === undefined ? [] : [section])])]
+}
+
+/** An exact-name pattern for a view, optionally inside an accessible name such as `Close <view>`. */
+export const viewNamePattern = (fixtureName: string, before = '', after = ''): RegExp =>
+  new RegExp(`^${escapeRegExp(before)}(?:${viewNames(fixtureName).map(escapeRegExp).join('|')})${escapeRegExp(after)}$`, 'u')
 
 /** Core-owned navigation metadata stays original outside Workbench; the owned Navigation seat qualifies it. */
 const globalPanelName = (fixtureName: string): string =>

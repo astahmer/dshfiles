@@ -6,11 +6,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { MainSurfaceSeat } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
+import { DestinationSections, KNOWN_SECTIONS } from '@dshfiles/thread-sidebar/destinations'
+import { PanelTitles } from '@dshfiles/workbench/registry'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -22,6 +24,7 @@ import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
 import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
+import { PanelTitlesModel } from './panel-titles.js'
 import { TabMenuItems } from './tab-menu-items.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
@@ -333,6 +336,12 @@ export default defineClient({
       }),
     )
 
+    // Free-docking tabs (the workbench) get the same page names as the strip: the destination section labels.
+    ctx.effect(() => {
+      const releases = KNOWN_SECTIONS.map(section => metadata?.plugin?.add(PanelTitles, { panelId: section.panelId, title: section.label }) ?? (() => {}))
+      return () => releases.forEach(release => release())
+    }, 'main-tabs: destination tab titles for the workbench')
+
     const subscribeMainSurface = (listener: () => void): (() => void) => mainSurface?.subscribe(listener) ?? (() => undefined)
     const mainSurfaceMode = () => mainSurface?.mode() ?? 'native'
     const subscribeActor = (listener: () => void): (() => void) => {
@@ -369,10 +378,14 @@ export default defineClient({
           // Re-render when panels register or the locale changes; the ledger reads below are cheap.
           const panelVersion = useSyncExternalStore(subscribePanels, panelsVersion)
           const registeredPanels = new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? []))
+          const contributedSections = useRegistry(DestinationSections)
+          const titles = useMemo(() => PanelTitlesModel.destinationTitles(contributedSections), [contributedSections])
+          // Tab titles name the page, not the plugin: a destination section's label, else the label without "Plugin: ".
           const panelLabels = new Map(
             ctx.slots.entriesOfSlot('sidebar.panellist').flatMap(entry => {
-              const label = resolveSlotLabel(entry.options.label)
-              return entry.options.id === undefined || label === undefined ? [] : [[entry.options.id, label] as const]
+              const id = entry.options.id
+              const title = id === undefined ? undefined : PanelTitlesModel.titleOf(id, resolveSlotLabel(entry.options.label), titles)
+              return id === undefined || title === undefined ? [] : [[id, title] as const]
             }),
           )
           const byId = props.useSessions(HostSnapshotsModel.selectStableSessionListState).byId
@@ -496,9 +509,11 @@ export default defineClient({
                   const panelId = entry.options.id
                   if (panelId === undefined) return []
                   const title = panelLabels.get(panelId) ?? panelTitleFallback(panelId)
+                  const former = [resolveSlotLabel(entry.options.label), ...(KNOWN_SECTIONS.find(section => section.panelId === panelId)?.formerLabels ?? [])]
                   return {
                     id: `panel:${panelId}`,
                     title,
+                    keywords: former.filter(label => label !== undefined && label !== title).join(' '),
                     icon: <PanelIcon glyph={entry.component} fallback={<PanelsTopLeftIcon aria-hidden size={22} strokeWidth={1.5} />} />,
                     shortcut: panelShortcut(catalog, title),
                     pick: () => pick({ kind: 'panel', panelId }),

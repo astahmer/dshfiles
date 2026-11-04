@@ -7,7 +7,7 @@ import { OPEN_THREAD_IN_MAIN_TAB_EVENT } from '../../../../../plugins/@dshfiles/
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 import { After, Given, Then, When } from '../bdd.js'
-import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
+import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
@@ -72,8 +72,8 @@ When('the Workbench is opened', async ({ page }: { page: Page }) => {
 })
 
 When('the Editor panel is closed and the page is reloaded', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: `Close ${reusableViewName('Editor')}`, exact: true }).click()
-  await expect(page.getByRole('region', { name: reusableViewName('Editor'), exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: viewNamePattern('Editor', 'Close ') }).click()
+  await expect(page.getByRole('region', { name: viewNamePattern('Editor') })).toHaveCount(0)
   await StartupDialogs.reloadPastProviderSetup(page)
   await openWorkbench(page)
 })
@@ -87,7 +87,7 @@ When('the saved Workbench layout is corrupted and the page is reloaded', async (
 When('the Editor tab is selected and the editor plugin is disabled', async ({ page }: { page: Page }) => {
   // Selecting the chooser card saved this layout, so disabling its owner must preserve the panel identity.
   await dockTab(mainDock(page), 'Editor').click()
-  await expect(mainSeat(page).getByRole('region', { name: reusableViewName('Editor'), exact: true })).toBeVisible()
+  await expect(mainSeat(page).getByRole('region', { name: viewNamePattern('Editor') })).toBeVisible()
   await setPluginEnabled(page, '@dshfiles/editor', false)
   await dockTab(mainDock(page), 'Editor').click()
 })
@@ -101,7 +101,7 @@ When('the right pane closes its Jujutsu panel', async ({ page }: { page: Page })
   await setRightPaneVisible(page, true)
   await addRegisteredPanel(page, paneRoot(page, 'right'), 'Jujutsu')
   await dockTab(dockRegion(page), 'Jujutsu')
-    .getByRole('button', { name: `Close ${reusableViewName('Jujutsu')}`, exact: true })
+    .getByRole('button', { name: viewNamePattern('Jujutsu', 'Close ') })
     .click()
   await expect(dockTab(dockRegion(page), 'Jujutsu')).toHaveCount(0)
 })
@@ -121,7 +121,7 @@ Then('the closed panel stays closed and can be added back', async ({ page }: { p
   })
   await addRegisteredPanel(page, mainPane(page), 'Editor')
   await recordAssertion(page, 'workbench-add-panel-restores-the-closed-panel', () =>
-    expect(mainSeat(page).getByRole('region', { name: reusableViewName('Editor'), exact: true })).toBeVisible(),
+    expect(mainSeat(page).getByRole('region', { name: viewNamePattern('Editor') })).toBeVisible(),
   )
   await paneAction(page, mainPane(page), 'Reset layout')
   await recordAssertion(page, 'workbench-reset-restores-the-default-layout', async () => {
@@ -140,7 +140,7 @@ Then('the Workbench falls back to its default layout', async ({ page }: { page: 
 
 Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-missing-plugin-keeps-a-placeholder', async () => {
-    await expect(page.getByRole('tab', { name: reusableViewName('Editor'), exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: viewNamePattern('Editor') })).toBeVisible()
     await expect(
       page.getByText('“dshfiles-editor.main” is not available. Its plugin may be disabled or removed; it comes back here once it registers again.', {
         exact: true,
@@ -152,7 +152,7 @@ Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: 
 
 Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-placeholder-recovers-on-registration', async () => {
-    await page.getByRole('tab', { name: reusableViewName('Editor'), exact: true }).click()
+    await page.getByRole('tab', { name: viewNamePattern('Editor') }).click()
     await expect(page.getByText('Open a session to browse and edit its files.', { exact: true })).toBeVisible()
     await expect(page.getByText(/is not available\. Its plugin may be disabled/)).toHaveCount(0)
   })
@@ -198,19 +198,19 @@ When('the global dock page is reloaded outside any thread', async ({ page }: { p
 Then('the global dock shows the Jujutsu panel', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-global-dock-opens-the-selected-panel', async () => {
     await expect(paneRoot(page, 'right').getByRole('button', { name: 'Pane options', exact: true })).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
   })
 })
 
 Then('the global dock still shows the Jujutsu panel outside a thread', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-global-dock-outlives-the-thread-view', async () => {
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
   })
 })
 
 Then('the global dock still shows the Jujutsu panel after a reload', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-global-dock-survives-a-reload', async () => {
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
     // The surface saves the layout it restored or applied, so the dock's own key holds the panel it shows.
     expect(await page.evaluate(key => localStorage.getItem(key) ?? '', DOCK_LAYOUT_KEY)).toContain('dshfiles-jujutsu.dock')
   })
@@ -222,8 +222,8 @@ When('the Jujutsu panel is moved to the main view from the dock', async ({ page 
 
 Then('the main view shows the Jujutsu page and the dock no longer shows it', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-global-dock-moves-a-panel-to-the-main-view', async () => {
-    await expect(mainSeat(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toHaveCount(0)
+    await expect(mainSeat(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
   })
 })
 
@@ -236,7 +236,7 @@ Then('the bottom panel is open below the columns', async ({ page }: { page: Page
     await expect(bottomRegion(page)).toBeVisible()
     await expect(dockTab(bottomRegion(page), 'New tab')).toBeVisible()
     await expect(chooserIn(bottomRegion(page))).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
   })
 })
 
@@ -246,13 +246,13 @@ When('the Jujutsu panel is moved to the bottom panel', async ({ page }: { page: 
 
 Then('the bottom panel shows the Jujutsu panel and the dock no longer does', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-panel-moves-into-the-bottom-panel', async () => {
-    await expect(bottomRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toHaveCount(0)
+    await expect(bottomRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
   })
 })
 
 When('the Jujutsu tab is dragged from the dock into the bottom panel', async ({ page }: { page: Page }) => {
-  await dragTabOnto(page, dockRegion(page).getByRole('tab', { name: reusableViewName('Jujutsu'), exact: true }), surfaceOf(bottomRegion(page)))
+  await dragTabOnto(page, dockRegion(page).getByRole('tab', { name: viewNamePattern('Jujutsu') }), surfaceOf(bottomRegion(page)))
 })
 
 Then('the bottom row starts with its own chooser tab', async ({ page }: { page: Page }) => {
@@ -264,8 +264,8 @@ Then('the bottom row starts with its own chooser tab', async ({ page }: { page: 
 
 Then('the bottom row took the dragged Jujutsu panel and the dock lost it', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-drag-moves-a-panel-into-the-bottom-row', async () => {
-    await expect(bottomRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toHaveCount(0)
+    await expect(bottomRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
     // Each region saves its own layout, so the target holds the panel and the source no longer does.
     const [bottomLayout, dockLayout] = await layoutKeys(page)
     expect(bottomLayout ?? '').toContain(JUJUTSU_PANEL_ID)
@@ -274,13 +274,13 @@ Then('the bottom row took the dragged Jujutsu panel and the dock lost it', async
 })
 
 When('the Jujutsu tab is dragged from the bottom panel back into the dock', async ({ page }: { page: Page }) => {
-  await dragTabOnto(page, bottomRegion(page).getByRole('tab', { name: reusableViewName('Jujutsu'), exact: true }), surfaceOf(dockRegion(page)))
+  await dragTabOnto(page, bottomRegion(page).getByRole('tab', { name: viewNamePattern('Jujutsu') }), surfaceOf(dockRegion(page)))
 })
 
 Then('the dock took the dragged Jujutsu panel back and the bottom row lost it', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-drag-moves-a-panel-back-into-the-dock', async () => {
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
-    await expect(bottomRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toHaveCount(0)
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
+    await expect(bottomRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
     const [bottomLayout, dockLayout] = await layoutKeys(page)
     expect(dockLayout ?? '').toContain(JUJUTSU_PANEL_ID)
     expect(bottomLayout ?? '').not.toContain(JUJUTSU_PANEL_ID)
@@ -317,8 +317,8 @@ When('the Jujutsu panel is moved back to the right column', async ({ page }: { p
 
 Then('the dock shows the Jujutsu panel and the bottom panel does not', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-named-layout-saves-the-arrangement', async () => {
-    await expect(dockRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toBeVisible()
-    await expect(bottomRegion(page).getByRole('region', { name: reusableViewName('Jujutsu'), exact: true })).toHaveCount(0)
+    await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
+    await expect(bottomRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
   })
 })
 
@@ -336,7 +336,7 @@ Then('the main Workbench keeps its own layout', async ({ page }: { page: Page })
 // no test injects a registry, fires a private event, or creates a synthetic Dockview transfer.
 const mainSeat = (page: Page) => page.locator('[data-slot="shell.main"]')
 const mainDock = (page: Page) => mainSeat(page).locator('.dv-dockview').first()
-const dockTab = (scope: Locator, title: string) => scope.getByRole('tab', { name: reusableViewName(title), exact: true })
+const dockTab = (scope: Locator, title: string) => scope.getByRole('tab', { name: viewNamePattern(title) })
 const dockBody = (scope: Locator, title: string) =>
   dockTab(scope, title).locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," dv-groupview ")][1]')
 const mainPane = (page: Page) => mainSeat(page).locator('[data-workbench-region="main"]').first()
@@ -442,7 +442,7 @@ When('the unified Workbench is ready', async ({ page }: { page: Page }) => {
 
 const addRegisteredPanel = async (_page: Page, pane: Locator, title: string): Promise<void> => {
   const chooser = await clickNewTab(pane)
-  await chooser.getByRole('button', { name: reusableViewName(title), exact: true }).click()
+  await chooser.getByRole('button', { name: viewNamePattern(title) }).click()
   await expect(chooser).toBeHidden()
 }
 
@@ -481,7 +481,7 @@ Then('both Backlog views restore and closing one leaves the other', async ({ pag
     await expect((await panelBodyForTab(right)).getByRole('textbox', { name: 'Capture', exact: true })).toHaveValue('Right draft')
     await main.click()
     await expect((await panelBodyForTab(main)).getByRole('textbox', { name: 'Capture', exact: true })).toHaveValue('Main draft')
-    await main.getByRole('button', { name: `Close ${reusableViewName('Backlog')}`, exact: true }).click()
+    await main.getByRole('button', { name: viewNamePattern('Backlog', 'Close ') }).click()
     await expect(main).toHaveCount(0)
     await expect(right).toBeVisible()
     await expect((await panelBodyForTab(right)).getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
@@ -1096,7 +1096,7 @@ Then('the registered main page and original General controls are docked in the S
 
 When('the Settings hub is closed from its Dockview tab', async ({ page }: { page: Page }) => {
   await dockTab(mainDock(page), 'Settings')
-    .getByRole('button', { name: `Close ${reusableViewName('Settings')}`, exact: true })
+    .getByRole('button', { name: viewNamePattern('Settings', 'Close ') })
     .click()
 })
 
@@ -1105,12 +1105,12 @@ Then('the Jujutsu panel remains and only the Settings hub is offered in the choo
     await expect(dockTab(mainDock(page), 'Jujutsu')).toBeVisible()
     await expect(dockTab(mainDock(page), 'Settings')).toHaveCount(0)
     const chooser = await clickNewTab(mainPane(page))
-    await expect(chooser.getByRole('button', { name: reusableViewName('Settings'), exact: true })).toHaveCount(1)
+    await expect(chooser.getByRole('button', { name: viewNamePattern('Settings') })).toHaveCount(1)
     await expect(chooser.getByRole('button', { name: /^Settings:/ })).toHaveCount(0)
     const search = chooser.getByRole('textbox', { name: 'Search views', exact: true })
     await search.fill('Settings')
     await expect(chooser.getByRole('button')).toHaveCount(1)
-    await expect(chooser.getByRole('button', { name: reusableViewName('Settings'), exact: true })).toBeVisible()
+    await expect(chooser.getByRole('button', { name: viewNamePattern('Settings') })).toBeVisible()
     await search.fill('General')
     await expect(chooser.getByRole('button', { name: /^Settings:/ })).toHaveCount(0)
     await expect(chooser.getByText('No matching views.', { exact: true })).toBeVisible()
@@ -1153,7 +1153,7 @@ When('the main workbench opens an empty dock and bottom row', async ({ page }: {
   // A previously adopted Jujutsu view must return through the centre's chooser before this drag journey.
   if ((await dockTab(dockRegion(page), 'Jujutsu').count()) > 0) {
     await dockTab(dockRegion(page), 'Jujutsu')
-      .getByRole('button', { name: `Close ${reusableViewName('Jujutsu')}`, exact: true })
+      .getByRole('button', { name: viewNamePattern('Jujutsu', 'Close ') })
       .click()
     await addRegisteredPanel(page, mainPane(page), 'Jujutsu')
   }
@@ -1278,7 +1278,7 @@ Then('a focused New tab chooser offers reusable views without changing the pinne
     const chooser = chooserIn(mainPane(page))
     await expect(await tabOfChooser(chooser)).toBeVisible()
     await expect(chooser.getByRole('textbox', { name: 'Search views', exact: true })).toBeFocused()
-    await expect(chooser.getByRole('button', { name: reusableViewName('Current conversation'), exact: true })).toHaveCount(0)
+    await expect(chooser.getByRole('button', { name: viewNamePattern('Current conversation') })).toHaveCount(0)
     await expect(chooser.getByRole('button', { name: threadPrompt('second'), exact: false })).toHaveCount(0)
     await expect(threadDockTab(page, 'second').getByLabel('Pinned', { exact: true })).toBeVisible()
     await expect(mainSeat(page).locator('[data-main-tabs-start]')).toHaveCount(0)
@@ -1355,9 +1355,9 @@ When('a Jujutsu preview is opened and closed from its Dockview tab', async ({ pa
   await expect(tab.locator('[data-preview="true"]')).toBeVisible()
   await tab.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Float panel', exact: true }).click()
-  const floating = page.locator('.dv-groupview-floating').filter({ has: page.getByRole('tab', { name: reusableViewName('Jujutsu'), exact: true }) })
+  const floating = page.locator('.dv-groupview-floating').filter({ has: page.getByRole('tab', { name: viewNamePattern('Jujutsu') }) })
   await expect(floating).toBeVisible()
-  await floating.getByRole('button', { name: `Close ${reusableViewName('Jujutsu')}`, exact: true }).click()
+  await floating.getByRole('button', { name: viewNamePattern('Jujutsu', 'Close ') }).click()
   await expect(floating).toHaveCount(0)
 })
 Then('the pinned thread remains open and its conversation can still receive a draft', async ({ page }: { page: Page }) => {
@@ -1486,7 +1486,7 @@ When('the main pane is split right beside Editor through Pane options', async ({
   await expect(mainDock(page).locator('.dv-groupview')).toHaveCount(2)
   const chooser = chooserIn(mainPane(page))
   await expect(chooser).toBeVisible()
-  await chooser.getByRole('button', { name: reusableViewName('Jujutsu'), exact: true }).click()
+  await chooser.getByRole('button', { name: viewNamePattern('Jujutsu') }).click()
   const editor = await dockTab(mainDock(page), 'Editor').getAttribute('data-tab-panel-id')
   const jujutsu = await dockTab(mainDock(page), 'Jujutsu').getAttribute('data-tab-panel-id')
   if (editor === null || jujutsu === null) throw new Error('Split panel identities are missing.')
@@ -1516,7 +1516,7 @@ Then('the two panels share one group with their original identities', async ({ p
 When('Jujutsu is split down through its group Pane options', async ({ page }: { page: Page }) => {
   await paneAction(page, dockBody(mainDock(page), 'Jujutsu'), 'Split down')
   await chooserIn(mainPane(page))
-    .getByRole('button', { name: reusableViewName('Jujutsu'), exact: true })
+    .getByRole('button', { name: viewNamePattern('Jujutsu') })
     .click()
 })
 const assertSplitPanelIdentities = async (page: Page): Promise<void> => {
@@ -1562,9 +1562,9 @@ Then('the reusable view picker offers plugins without per-thread trajectories', 
     const chooser = await clickNewTab(mainPane(page))
     await expect(dockTab(mainDock(page), 'New tab').filter({ visible: true }).last()).toBeVisible()
     await expect(chooser.getByRole('textbox', { name: 'Search views', exact: true })).toBeVisible()
-    await expect(chooser.getByRole('button', { name: reusableViewName('Current conversation'), exact: true })).toHaveCount(0)
+    await expect(chooser.getByRole('button', { name: viewNamePattern('Current conversation') })).toHaveCount(0)
     await expect(chooser.getByRole('button', { name: /Trajectory|Workbench first conversation|Workbench second conversation/ })).toHaveCount(0)
-    await expect(chooser.getByRole('button', { name: reusableViewName('Plugins'), exact: true })).toBeVisible()
+    await expect(chooser.getByRole('button', { name: viewNamePattern('Plugins') })).toBeVisible()
     await expect(page.getByRole('menu')).toHaveCount(0)
     await dockTab(mainDock(page), 'New tab').filter({ visible: true }).last().getByRole('button', { name: 'Close New tab', exact: true }).click()
   })
@@ -1593,7 +1593,7 @@ Then('the left pane content is tab controlled between fixed chrome', async ({ pa
 
 When('the real Threads view is opened through every pane chooser', async ({ page }: { page: Page }) => {
   const panes = ['main', 'right', 'bottom', 'left'] as const
-  let count = await page.getByRole('tab', { name: reusableViewName('Threads'), exact: true }).count()
+  let count = await page.getByRole('tab', { name: viewNamePattern('Threads') }).count()
   for (const target of panes) {
     const pane = page.locator(`[data-workbench-region="${target}"]`).first()
     await addRegisteredPanel(page, pane, 'Threads')
@@ -1606,7 +1606,7 @@ When('the real Threads view is opened through every pane chooser', async ({ page
       await expect(body.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-threads"]')).toBeVisible()
       await expect(body.locator('[data-slot="sidebar.workspaces"]')).toBeAttached()
       await expect(body.getByRole('button', { name: 'New thread', exact: true })).toBeVisible()
-      await expect(page.getByRole('tab', { name: reusableViewName('Threads'), exact: true })).toHaveCount(count)
+      await expect(page.getByRole('tab', { name: viewNamePattern('Threads') })).toHaveCount(count)
       await expect(page.locator('[data-slot-error]')).toHaveCount(0)
       if (target === 'bottom') await page.screenshot({ path: test.info().outputPath('threads-in-bottom-pane.png'), animations: 'disabled' })
     })
@@ -1963,16 +1963,16 @@ Then('every group plus opens a real searchable New tab instead of a menu', async
         const tab = dockTab(group, 'New tab').last()
         await expect(tab).toHaveAttribute('aria-selected', 'true')
         await expect(page.getByRole('menu')).toHaveCount(0)
-        await expect(chooser.getByRole('button', { name: reusableViewName('Current conversation'), exact: true })).toHaveCount(0)
+        await expect(chooser.getByRole('button', { name: viewNamePattern('Current conversation') })).toHaveCount(0)
         const search = chooser.getByRole('textbox', { name: 'Search views', exact: true })
         await expect(search).toBeFocused()
         await search.fill('Settings')
         await expect(chooser.getByRole('button')).toHaveCount(1)
-        await expect(chooser.getByRole('button', { name: reusableViewName('Settings'), exact: true })).toBeVisible()
+        await expect(chooser.getByRole('button', { name: viewNamePattern('Settings') })).toBeVisible()
         await expect(chooser.getByRole('button', { name: /^Settings:/ })).toHaveCount(0)
         await search.fill('Editor')
-        await expect(chooser.getByRole('button', { name: reusableViewName('Editor'), exact: true })).toBeVisible()
-        await expect(chooser.getByRole('button', { name: reusableViewName('Current conversation'), exact: true })).toHaveCount(0)
+        await expect(chooser.getByRole('button', { name: viewNamePattern('Editor') })).toBeVisible()
+        await expect(chooser.getByRole('button', { name: viewNamePattern('Current conversation') })).toHaveCount(0)
         await search.fill('no-view-matches-this-query')
         await expect(chooser.getByRole('button')).toHaveCount(0)
         await expect(chooser.getByText('No matching views.', { exact: true })).toBeVisible()
@@ -1991,7 +1991,7 @@ Then('choosing Editor replaces only its chooser tab and preserves the other pane
     const group = mainDock(page).locator('.dv-groupview').last()
     const chooser = await chooserForGroup(group)
     const before = await group.getByRole('tab').count()
-    await chooser.getByRole('button', { name: reusableViewName('Editor'), exact: true }).click()
+    await chooser.getByRole('button', { name: viewNamePattern('Editor') }).click()
     await expect(chooser).toHaveCount(0)
     await expect(dockTab(group, 'New tab')).toHaveCount(0)
     await expect(dockTab(group, 'Editor')).toBeVisible()
@@ -2011,7 +2011,7 @@ When('a real Backlog tab is saved inactive beside the current conversation', asy
   await addRegisteredPanel(page, dockBody(mainDock(page), threadPrompt('second')), 'Backlog')
   await expect(mainSeat(page).getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
   await dockTab(mainDock(page), 'Backlog')
-    .getByRole('button', { name: `Close ${reusableViewName('Backlog')}`, exact: true })
+    .getByRole('button', { name: viewNamePattern('Backlog', 'Close ') })
     .click()
   // The chooser owns a presentation tab. The Navigation action additionally exercises the saved native tab actor
   // from the original inactive-Backlog reload regression, without injecting a tab or persistence payload.

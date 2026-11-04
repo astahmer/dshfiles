@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -23,7 +23,7 @@ import { demoPanels } from './demo-panels.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import { createLayoutStore, WorkbenchLayout, WORKBENCH_COMPONENT } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
-import { workbenchPanels, NativeAsideOwners, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
+import { workbenchPanels, NativeAsideOwners, PanelTitles, panelTabTitle, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
@@ -201,6 +201,7 @@ export default defineClient({
           const { renderMain, renderSlot: renderConversationSlot, SessionProvider } = props
           const [ready, setReady] = useState(false)
           const sources = useMemo(() => createMainPanelSources(registry), [])
+          const providedTitles = useRegistry(PanelTitles)
           const renderMainRef = useRef(props.renderMain)
           renderMainRef.current = props.renderMain
           useEffect(() => () => sources.dispose(), [sources])
@@ -222,7 +223,7 @@ export default defineClient({
                 return [
                   {
                     key,
-                    title: resolveSlotLabel((nav ?? entry).options.label) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
+                    title: panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
                     hiddenFromAdd: nav === undefined,
                   },
                 ]
@@ -230,7 +231,7 @@ export default defineClient({
               props.renderMain,
             )
             setReady(true)
-          }, [version, props.renderMain, sources])
+          }, [version, props.renderMain, sources, providedTitles])
           useLayoutEffect(() => {
             const component: WorkbenchPanelDefinition['component'] = panel => {
               const tabs = useSyncExternalStore(workbenchTabs().subscribe, workbenchTabs().getSnapshot)

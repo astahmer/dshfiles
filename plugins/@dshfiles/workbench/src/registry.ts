@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import * as Schema from 'effect/Schema'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { defineRegistry } from '@dshfiles/dshx/client'
 import { trimmedString } from './schema.js'
 
 /** The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded. */
@@ -202,3 +203,29 @@ export class NativeAsideOwners {
  * bundle loads first creates it, and contributors may register before the workbench loads.
  */
 export const workbenchPanels = (): WorkbenchPanelRegistry => (globalThis.dshfilesWorkbenchPanelsV1 ??= createWorkbenchPanelRegistry())
+
+/**
+ * A person's name for one main panel's tab, without the "Plugin: View" prefix its navigation label carries
+ * (plan `plans/ade-ux` §5: labels never show plugin names). The workbench owns the tab titles, so it declares the
+ * registry; a plugin that knows better names (main-tabs, from the shell's destination sections) provides entries.
+ * Without an entry the title is the navigation label with any `Plugin: ` prefix removed.
+ */
+export interface PanelTitle {
+  readonly panelId: string
+  readonly title: string
+}
+
+export const PanelTitles = defineRegistry<PanelTitle>('@dshfiles/workbench.panel-title')
+
+/** "Usage: Analytics" → "Analytics"; a label without a prefix is kept. */
+export const withoutPluginPrefix = (label: string): string => {
+  const index = label.indexOf(': ')
+  return index > 0 && index < label.length - 2 ? label.slice(index + 2) : label
+}
+
+/** The tab title of one main panel: a provided title, else its navigation label without the plugin prefix. */
+export const panelTabTitle = (panelId: string, label: string | undefined, provided: readonly PanelTitle[]): string | undefined => {
+  const named = provided.findLast(entry => entry.panelId === panelId)?.title
+  if (named !== undefined) return named
+  return label === undefined ? undefined : withoutPluginPrefix(label)
+}

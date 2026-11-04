@@ -9,6 +9,8 @@ export interface StartSuggestion {
   readonly id: string
   readonly title: string
   readonly description?: string | undefined
+  /** Words that find it without showing: the page's former names ("Jujutsu: Revision graph" for History). */
+  readonly keywords?: string | undefined
   readonly icon: ReactNode
   readonly shortcut: { readonly keys: readonly string[]; readonly aria: string | undefined } | undefined
   readonly pick: () => void
@@ -83,7 +85,7 @@ export const StartPage = (props: StartPageProps): ReactElement => {
   const sections = props.sections.map(section => ({
     ...section,
     suggestions: section.suggestions.filter(
-      suggestion => normalizedQuery.length === 0 || `${suggestion.title} ${suggestion.description ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
+      suggestion => normalizedQuery.length === 0 || `${suggestion.title} ${suggestion.description ?? ''} ${suggestion.keywords ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
     ),
   }))
   const suggestions = sections.flatMap(section => section.suggestions)

@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { rm } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
+import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
@@ -10,8 +10,9 @@ import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
 const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 
 const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', exact: true })
-// Native core page titles stay original outside Workbench; owned producer labels are qualified.
-const nativeTabName = (name: string): string => (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : reusableViewName(name))
+// Tab titles name the page, never its plugin (plans/ade-ux Phase 3b): the rail section label ("History"), else the
+// navigation label without its "Plugin: " prefix. Native core page titles stay as they are.
+const nativeTabName = (name: string): string | RegExp => (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name))
 const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name: nativeTabName(name), exact: true })
 /** Each tab as "<name>" plus "*" when active, "(preview)" and "(pinned)" markers, in strip order. */
 const tabSummary = (page: Page): Promise<readonly string[]> =>
@@ -154,7 +155,7 @@ When('the Plugins and then Jujutsu are opened from the sidebar', async ({ page }
 })
 
 Then('Jujutsu replaced the Plugins preview tab', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-preview-tab-is-replaced', () => expect.poll(() => tabSummary(page)).toEqual(['Jujutsu: Revision graph* (preview)']))
+  await recordAssertion(page, 'main-tabs-preview-tab-is-replaced', () => expect.poll(() => tabSummary(page)).toEqual(['History* (preview)']))
 })
 
 When('the Jujutsu tab is kept, the Plugins page is opened again and a thread is started', async ({ page }: { page: Page }) => {
@@ -165,7 +166,7 @@ When('the Jujutsu tab is kept, the Plugins page is opened again and a thread is 
 
 Then('each of them has its own tab and the thread tab is active', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-panels-and-threads-get-tabs', () =>
-    expect.poll(() => tabSummary(page)).toEqual(['Jujutsu: Revision graph', 'Plugins', 'tabs thread* (preview)']),
+    expect.poll(() => tabSummary(page)).toEqual(['History', 'Plugins', 'tabs thread* (preview)']),
   )
   await tab(page, 'tabs thread').dblclick()
 })
@@ -217,7 +218,7 @@ When('the Plugins tab is pinned and the thread tab is dragged before Jujutsu', a
 
 Then('the pinned tab leads and the thread tab moved', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-pin-and-reorder', () =>
-    expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*', 'Jujutsu: Revision graph']),
+    expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*', 'History']),
   )
 })
 
@@ -461,7 +462,7 @@ Then('Jujutsu is a main tab again and the side panel dropped its tab', async ({ 
 
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-restore-after-reload', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'Jujutsu: Revision graph*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'History*'])
     await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
   })
 })
@@ -542,7 +543,7 @@ Then(
       await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeHidden()
       const names = await suggestionNames(page)
       expect(names[0]).toBe('New thread')
-      expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu: Revision graph']))
+      expect(names).toEqual(expect.arrayContaining(['Plugins', 'History']))
       expect(names).not.toContain('Workbench')
       expect(names.at(-1)).toBe('Settings')
       await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
@@ -569,7 +570,7 @@ When('Jujutsu is typed into the Start search and Enter picks it', async ({ page 
 
 Then('Jujutsu replaced the Start tab', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-start-page-pick-replaces-tab', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'Jujutsu: Revision graph*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'History*'])
     await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
   })
 })
@@ -585,7 +586,7 @@ When('a new tab is opened from the keyboard and Settings is picked', async ({ pa
 Then('Settings opens and the Start tab is gone', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-start-page-opens-settings', async () => {
     await expect(page.getByRole('dialog').getByText('Keyboard shortcuts', { exact: true })).toBeVisible()
-    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'Jujutsu: Revision graph*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'History*'])
   })
   await finishJourneyAssertions(page)
 })

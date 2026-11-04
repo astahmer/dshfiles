@@ -9,7 +9,15 @@
 
 </details>
 
-Tab semantics for DSH's main view. Every thread or global panel the main view shows (for example **Jujutsu: Revision graph**, **AI Accounts: Accounts**, **Usage: Analytics**, **Memory: Browser** and **JJ Integration: Thread integration**) opens or focuses a tab; picking a tab shows it again. In the owned stack, Workbench tabs are mandatory: Dockview owns pane chrome and the old strip is removed, not the centre surface. There is no native-layout opt-out. Deployments without Workbench retain the native-style strip (`dsh-client-ui-dockkit`) as package compatibility, using the same actor, computed metadata and actions. The Workbench right pane is fullheight; collapsing it preserves its live tabs instead of restoring native sidebar chrome.
+Tab semantics for DSH's main view. Every thread or global panel the main view shows (for example **History**, **AI accounts**, **Usage**, **Memory** and **Workspaces**) opens or focuses a tab; picking a tab shows it again.
+
+Tab titles name the page, never its plugin (plan [`plans/ade-ux`](../../../plans/ade-ux/README.md) §5): a page the
+shell lists as a destination section takes that section's label from `@dshfiles/thread-sidebar/destinations`
+(`Jujutsu: Revision graph` → **History**), any other page its navigation label without the `Plugin: ` prefix. The
+Start page still finds a page by its former names. main-tabs also provides those labels to Workbench's `PanelTitles`
+registry, so free-docking tabs read the same.
+
+![A page tab without its plugin prefix](docs/screenshots/panel-tab-titles.png) In the owned stack, Workbench tabs are mandatory: Dockview owns pane chrome and the old strip is removed, not the centre surface. There is no native-layout opt-out. Deployments without Workbench retain the native-style strip (`dsh-client-ui-dockkit`) as package compatibility, using the same actor, computed metadata and actions. The Workbench right pane is fullheight; collapsing it preserves its live tabs instead of restoring native sidebar chrome.
 
 This is an owned DSH bundle built with dshx (no port: nothing upstream does this). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
