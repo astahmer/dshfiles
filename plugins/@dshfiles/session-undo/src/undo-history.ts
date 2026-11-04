@@ -53,6 +53,13 @@ export class UndoHistory {
     return { sessionId, checkpoints: [], redo: null }
   }
 
+  /** The newest checkpoint of `turn`; a fork may record a turn number again after it was rewound. */
+  static indexOf(record: UndoHistoryRecord, turn: number | undefined): number {
+    if (turn === undefined) return record.checkpoints.length - 1
+    for (let index = record.checkpoints.length - 1; index >= 0; index -= 1) if (record.checkpoints[index]?.turn === turn) return index
+    return -1
+  }
+
   /** A new turn is new work: it adds a checkpoint and drops the redo, as an editor does. */
   static withCheckpoint(record: UndoHistoryRecord, checkpoint: Checkpoint): UndoHistoryRecord {
     return { ...record, checkpoints: [...record.checkpoints, checkpoint].slice(-MAX_CHECKPOINTS), redo: null }
@@ -67,17 +74,23 @@ export class UndoHistory {
     }
   }
 
-  /** The fork an undo creates keeps every earlier checkpoint, so it can be undone again, and remembers how to redo. */
+  /**
+   * The fork an undo or rewind creates keeps every checkpoint before the rewound turn, so it can be rewound again, and
+   * remembers how to redo.
+   */
   static forked(input: {
     readonly source: UndoHistoryRecord
     readonly forkId: string
     readonly undone: Checkpoint
+    /** Position of `undone` in `source.checkpoints`. */
+    readonly index: number
     readonly previous: string | null
   }): UndoHistoryRecord {
+    const undone = input.undone
     return {
       sessionId: input.forkId,
-      checkpoints: input.source.checkpoints.slice(0, -1),
-      redo: { sessionId: input.source.sessionId, provider: input.undone.provider, cwd: input.undone.cwd, snapshot: input.previous },
+      checkpoints: input.source.checkpoints.slice(0, input.index),
+      redo: { sessionId: input.source.sessionId, provider: undone.provider, cwd: undone.cwd, snapshot: input.previous },
     }
   }
 

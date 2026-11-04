@@ -9,7 +9,7 @@ export const PACKAGE_ID = '@dshfiles/session-undo'
 
 export class ThreadRunning extends Schema.TaggedError<ThreadRunning>()(
   'Running',
-  { verb: Schema.Literals(['undo', 'redo']), cause: Schema.optional(Schema.Defect()) },
+  { verb: Schema.Literals(['undo', 'rewind', 'redo']), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'running' },
 ) {
   override get message(): string {
@@ -34,6 +34,41 @@ export class NothingToRedo extends Schema.TaggedError<NothingToRedo>()(
 ) {
   override get message(): string {
     return 'There is nothing to redo: this thread is not an undo, or it ran a new turn since.'
+  }
+}
+
+export class TurnNotRecorded extends Schema.TaggedError<TurnNotRecorded>()(
+  'TurnNotRecorded',
+  { turn: Schema.Number, recorded: Schema.Array(Schema.Number), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'turn-not-recorded' },
+) {
+  override get message(): string {
+    return this.recorded.length === 0
+      ? `Turn ${String(this.turn)} has no checkpoint: this thread has no recorded turn to rewind to.`
+      : `Turn ${String(this.turn)} has no checkpoint. Rewind to one of the recorded turns: ${this.recorded.join(', ')} (see session_undo_history).`
+  }
+}
+
+/** Restoring files in a folder another live thread works in would clobber that thread's edits. */
+export class SharedDirectory extends Schema.TaggedError<SharedDirectory>()(
+  'SharedDirectory',
+  { verb: Schema.Literals(['undo', 'rewind', 'redo']), cwd: Schema.String, sessionIds: Schema.Array(Schema.String), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'shared-directory' },
+) {
+  override get message(): string {
+    const threads =
+      this.sessionIds.length === 1 ? `thread ${this.sessionIds[0] ?? ''}` : `${String(this.sessionIds.length)} threads (${this.sessionIds.join(', ')})`
+    return `Another live ${threads} works in ${this.cwd}; restoring files there would overwrite its edits. Archive or finish that thread, or give this thread its own workspace, then ${this.verb} again. To ${this.verb} anyway, pass allowSharedDirectory: true (the UI's "${this.verb === 'redo' ? 'Redo' : 'Rewind'} anyway").`
+  }
+}
+
+export class LiveThreadsUnavailable extends Schema.TaggedError<LiveThreadsUnavailable>()(
+  'LiveThreadsUnavailable',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'shared-directory-unknown' },
+) {
+  override get message(): string {
+    return 'The Host could not list its live threads, so it cannot tell whether another thread works in this folder. Retry; to restore the files anyway, pass allowSharedDirectory: true (the UI\'s "anyway" button).'
   }
 }
 
@@ -108,6 +143,48 @@ export class UndoFiles extends Context.Service<
   )
 }
 
+/** One live, unarchived thread the Host knows of, for the shared-directory guard. */
+export interface LiveThread {
+  readonly sessionId: string
+  readonly cwd: string
+  readonly parentSessionId: string | null
+}
+
+const inside = (child: string, parent: string): boolean => {
+  const trimmed = parent.endsWith('/') ? parent : `${parent}/`
+  return child === parent || child.startsWith(trimmed)
+}
+
+/**
+ * The live threads whose folder overlaps `cwd` (the same folder, or one inside the other), apart from the rewound
+ * thread itself, the threads named in `except`, and the subagents it started: a rewind is meant to roll their edits
+ * back with its own.
+ */
+export const sharingThreads = (input: {
+  readonly sessionId: string
+  readonly cwd: string
+  readonly except: readonly string[]
+  readonly threads: readonly LiveThread[]
+}): readonly string[] => {
+  const parents = new Map(input.threads.map(thread => [thread.sessionId, thread.parentSessionId]))
+  const descendsFromSelf = (sessionId: string): boolean => {
+    const seen = new Set<string>()
+    let current = parents.get(sessionId) ?? null
+    while (current !== null && !seen.has(current)) {
+      if (current === input.sessionId) return true
+      seen.add(current)
+      current = parents.get(current) ?? null
+    }
+    return false
+  }
+  const excluded = new Set([input.sessionId, ...input.except])
+  return input.threads
+    .filter(
+      thread => !excluded.has(thread.sessionId) && (inside(thread.cwd, input.cwd) || inside(input.cwd, thread.cwd)) && !descendsFromSelf(thread.sessionId),
+    )
+    .map(thread => thread.sessionId)
+}
+
 /** The Host Session controller and workspace registry operations an undo needs. */
 export class UndoSessions extends Context.Service<
   UndoSessions,
@@ -118,8 +195,26 @@ export class UndoSessions extends Context.Service<
     /** Best effort, like every archive change of an undo. */
     readonly archive: (sessionId: string) => Effect.Effect<void>
     readonly unarchive: (sessionId: string) => Effect.Effect<void>
+    /** Live, unarchived threads with a folder. An unreadable list fails, so the guard refuses rather than guessing. */
+    readonly liveThreads: Effect.Effect<readonly LiveThread[], LiveThreadsUnavailable>
   }
 >()('@dshfiles/session-undo/UndoSessions') {}
+
+export interface RewindOptions {
+  /** The turn to rewind to (its start); the newest recorded turn when omitted. */
+  readonly turn?: number | undefined
+  /** Restore files even when another live thread works in the same folder. */
+  readonly allowSharedDirectory?: boolean | undefined
+}
+
+export interface RewindResult {
+  readonly sessionId: string
+  readonly filesRestored: boolean
+  readonly prompt: string
+  readonly turn: number
+  /** How many recorded turns the rewind removed from the conversation, the rewound one included. */
+  readonly turnsRewound: number
+}
 
 /**
  * Undo forks the conversation back before the last turn and restores that turn's file snapshot; redo restores the
@@ -149,17 +244,27 @@ export class SessionUndo extends Context.Service<
       },
       UndoHistoryUnavailable
     >
+    /** Rewind to the start of a recorded turn (the newest by default): an undo of that turn and every later one. */
     readonly undo: (
       sessionId: string,
+      options?: RewindOptions,
     ) => Effect.Effect<
-      { readonly sessionId: string; readonly filesRestored: boolean; readonly prompt: string },
-      ThreadRunning | NothingToUndo | FilesRestoreFailed | SessionForkFailed | UndoHistoryUnavailable
+      RewindResult,
+      | ThreadRunning
+      | NothingToUndo
+      | TurnNotRecorded
+      | SharedDirectory
+      | LiveThreadsUnavailable
+      | FilesRestoreFailed
+      | SessionForkFailed
+      | UndoHistoryUnavailable
     >
     readonly redo: (
       sessionId: string,
+      options?: Pick<RewindOptions, 'allowSharedDirectory'>,
     ) => Effect.Effect<
       { readonly sessionId: string; readonly filesRestored: boolean },
-      ThreadRunning | NothingToRedo | FilesRestoreFailed | UndoHistoryUnavailable
+      ThreadRunning | NothingToRedo | SharedDirectory | LiveThreadsUnavailable | FilesRestoreFailed | UndoHistoryUnavailable
     >
   }
 >()('@dshfiles/session-undo/SessionUndo') {
@@ -257,12 +362,31 @@ export class SessionUndo extends Context.Service<
         }
       })
 
-      const undo = Effect.fn('session undo')(function* (sessionId: string) {
-        yield* refuseWhileRunning(sessionId, 'undo')
+      /** Restoring files is the only step that can touch another thread's work, so only a file restore is guarded. */
+      const refuseSharedDirectory = Effect.fn('session undo shared directory check')(function* (input: {
+        readonly sessionId: string
+        readonly cwd: string
+        readonly except: readonly string[]
+        readonly verb: SharedDirectory['verb']
+        readonly allow: boolean | undefined
+      }) {
+        if (input.allow === true) return
+        const sharing = sharingThreads({ ...input, threads: yield* sessions.liveThreads })
+        if (sharing.length > 0) return yield* new SharedDirectory({ verb: input.verb, cwd: input.cwd, sessionIds: sharing })
+      })
+
+      const undo = Effect.fn('session undo')(function* (sessionId: string, options?: RewindOptions) {
+        const verb = options?.turn === undefined ? 'undo' : 'rewind'
+        yield* refuseWhileRunning(sessionId, verb)
         const source = yield* record(sessionId)
-        const undone = source.checkpoints.at(-1)
-        if (undone === undefined) return yield* new NothingToUndo({})
+        if (source.checkpoints.length === 0) return yield* new NothingToUndo({})
+        const index = UndoHistory.indexOf(source, options?.turn)
+        const undone = source.checkpoints[index]
+        if (undone === undefined)
+          return yield* new TurnNotRecorded({ turn: options?.turn ?? -1, recorded: source.checkpoints.map(checkpoint => checkpoint.turn) })
         const provider = undone.provider
+        if (provider !== null && undone.snapshot !== null)
+          yield* refuseSharedDirectory({ sessionId, cwd: undone.cwd, except: [], verb, allow: options?.allowSharedDirectory })
         const previous = provider === null || undone.snapshot === null ? null : yield* files.restore({ provider, cwd: undone.cwd, snapshot: undone.snapshot })
         const forkId = yield* sessions
           .fork({ sessionId, atSeq: undone.forkAtSeq })
@@ -271,18 +395,27 @@ export class SessionUndo extends Context.Service<
               previous === null || provider === null ? Effect.void : Effect.ignore(files.restore({ provider, cwd: undone.cwd, snapshot: previous })),
             ),
           )
-        yield* store(forkId, UndoHistory.forked({ source, forkId, undone, previous }))
+        yield* store(forkId, UndoHistory.forked({ source, forkId, undone, index, previous }))
         yield* sessions.copyModel({ from: sessionId, to: forkId })
         yield* sessions.archive(sessionId)
-        return { sessionId: forkId, filesRestored: previous !== null, prompt: undone.prompt }
+        return {
+          sessionId: forkId,
+          filesRestored: previous !== null,
+          prompt: undone.prompt,
+          turn: undone.turn,
+          turnsRewound: source.checkpoints.length - index,
+        }
       })
 
-      const redo = Effect.fn('session redo')(function* (sessionId: string) {
+      const redo = Effect.fn('session redo')(function* (sessionId: string, options?: Pick<RewindOptions, 'allowSharedDirectory'>) {
         const current = yield* record(sessionId)
         const back = current.redo
         if (back === null) return yield* new NothingToRedo({})
         yield* refuseWhileRunning(sessionId, 'redo')
-        if (back.provider !== null && back.snapshot !== null) yield* files.restore({ provider: back.provider, cwd: back.cwd, snapshot: back.snapshot })
+        if (back.provider !== null && back.snapshot !== null) {
+          yield* refuseSharedDirectory({ sessionId, cwd: back.cwd, except: [back.sessionId], verb: 'redo', allow: options?.allowSharedDirectory })
+          yield* files.restore({ provider: back.provider, cwd: back.cwd, snapshot: back.snapshot })
+        }
         yield* store(sessionId, { ...current, redo: null })
         yield* sessions.unarchive(back.sessionId)
         yield* sessions.archive(sessionId)

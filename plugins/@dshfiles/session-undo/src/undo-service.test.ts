@@ -9,7 +9,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Deferred, Effect, Fiber, Layer, Option, Ref } from 'effect'
-import { SessionForkFailed, SessionUndo, UndoFiles, UndoSessions } from './undo-service.js'
+import { type LiveThread, LiveThreadsUnavailable, SessionForkFailed, SessionUndo, sharingThreads, UndoFiles, UndoSessions } from './undo-service.js'
 
 const storageHost = Layer.effect(
   HostContext,
@@ -59,7 +59,7 @@ const workspace = (initial: string, snapshot?: Effect.Effect<void>) => {
 /** The Session controller and workspace registry are external too: forks are numbered, archives a set. */
 const sessionsFake = () => {
   const forks: Array<{ readonly sessionId: string; readonly atSeq: number }> = []
-  const state = { archived: new Set<string>(), forks, failFork: false }
+  const state = { archived: new Set<string>(), forks, failFork: false, live: new Array<LiveThread>(), listFails: false }
   const sessions = UndoSessions.of({
     fork: input =>
       Effect.suspend(() => {
@@ -70,6 +70,9 @@ const sessionsFake = () => {
     copyModel: () => Effect.void,
     archive: sessionId => Effect.sync(() => state.archived.add(sessionId)),
     unarchive: sessionId => Effect.sync(() => state.archived.delete(sessionId)),
+    liveThreads: Effect.suspend(() =>
+      state.listFails ? Effect.fail(new LiveThreadsUnavailable({})) : Effect.succeed(state.live.filter(thread => !state.archived.has(thread.sessionId))),
+    ),
   })
   return { state, sessions }
 }
@@ -112,7 +115,7 @@ describe('session undo', () => {
         ])
 
         const undone = yield* service.undo('s1')
-        expect(undone).toEqual({ sessionId: 'fork-1', filesRestored: true, prompt: '' })
+        expect(undone).toEqual({ sessionId: 'fork-1', filesRestored: true, prompt: '', turn: 2, turnsRewound: 1 })
         expect(files.state.files).toBe('v1')
         expect(sessions.state.forks).toEqual([{ sessionId: 's1', atSeq: 20 }])
         expect(sessions.state.archived).toEqual(new Set(['s1']))
@@ -194,4 +197,83 @@ describe('session undo', () => {
       }),
     ),
   )
+
+  it.effect('rewinds to an earlier turn with its files, and redo brings every later turn back', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { files, sessions, service, turn } = yield* setup
+        yield* turn({ sessionId: 's1', turn: 1, forkAtSeq: 4 })
+        yield* service.promptEntered({ sessionId: 's1', turn: 1, text: 'write a.txt' })
+        files.state.files = 'a'
+        yield* turn({ sessionId: 's1', turn: 2, forkAtSeq: 12 })
+        files.state.files = 'a b'
+        yield* turn({ sessionId: 's1', turn: 3, forkAtSeq: 30 })
+        files.state.files = 'a b c'
+
+        expect(yield* service.undo('s1', { turn: 2 })).toEqual({ sessionId: 'fork-1', filesRestored: true, prompt: '', turn: 2, turnsRewound: 2 })
+        expect(files.state.files).toBe('a')
+        expect(sessions.state.forks).toEqual([{ sessionId: 's1', atSeq: 12 }])
+        expect(yield* service.history('fork-1')).toMatchObject({ checkpoints: [{ turn: 1, prompt: 'write a.txt' }], redoTo: 's1' })
+
+        expect(yield* service.redo('fork-1')).toEqual({ sessionId: 's1', filesRestored: true })
+        expect(files.state.files).toBe('a b c')
+        expect(sessions.state.archived).toEqual(new Set(['fork-1']))
+        expect((yield* service.history('s1')).checkpoints.map(checkpoint => checkpoint.turn)).toEqual([1, 2, 3])
+
+        const first = yield* service.undo('s1', { turn: 1 })
+        expect(first).toMatchObject({ turn: 1, turnsRewound: 3, prompt: 'write a.txt' })
+        expect(files.state.files).toBe('v0')
+        expect(sessions.state.forks.at(-1)).toEqual({ sessionId: 's1', atSeq: 4 })
+        expect(yield* service.history(first.sessionId)).toEqual({ checkpoints: [], redoTo: 's1' })
+
+        const missing = yield* Effect.flip(service.undo('s1', { turn: 7 }))
+        expect(missing).toMatchObject({ _tag: 'TurnNotRecorded' })
+        expect(missing.message).toMatch('1, 2, 3')
+      }),
+    ),
+  )
+
+  it.effect('refuses to restore files another live thread works in, unless the caller allows it', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { files, sessions, service, turn } = yield* setup
+        yield* turn({ sessionId: 's1', turn: 1, forkAtSeq: 4 })
+        files.state.files = 'mine'
+        sessions.state.live = [
+          { sessionId: 's1', cwd: '/repo', parentSessionId: null },
+          { sessionId: 'child', cwd: '/repo', parentSessionId: 's1' },
+          { sessionId: 'elsewhere', cwd: '/other', parentSessionId: null },
+          { sessionId: 'neighbour', cwd: '/repo/packages/a', parentSessionId: null },
+        ]
+
+        const refused = yield* Effect.flip(service.undo('s1', { turn: 1 }))
+        expect(refused).toMatchObject({ _tag: 'SharedDirectory', sessionIds: ['neighbour'], cwd: '/repo' })
+        expect(refused.message).toMatch('allowSharedDirectory: true')
+        expect(files.state.files).toBe('mine')
+        expect(sessions.state.forks).toEqual([])
+
+        sessions.state.listFails = true
+        expect((yield* Effect.flip(service.undo('s1')))._tag).toBe('LiveThreadsUnavailable')
+        sessions.state.listFails = false
+
+        const allowed = yield* service.undo('s1', { turn: 1, allowSharedDirectory: true })
+        expect(files.state.files).toBe('v0')
+        expect((yield* Effect.flip(service.redo(allowed.sessionId)))._tag).toBe('SharedDirectory')
+        expect(yield* service.redo(allowed.sessionId, { allowSharedDirectory: true })).toMatchObject({ sessionId: 's1', filesRestored: true })
+        expect(files.state.files).toBe('mine')
+      }),
+    ),
+  )
+
+  it('counts only overlapping folders, outside the thread and the subagents it started', () => {
+    const threads: LiveThread[] = [
+      { sessionId: 'self', cwd: '/w', parentSessionId: null },
+      { sessionId: 'sub', cwd: '/w', parentSessionId: 'self' },
+      { sessionId: 'subsub', cwd: '/w', parentSessionId: 'sub' },
+      { sessionId: 'parent', cwd: '/w', parentSessionId: null },
+      { sessionId: 'sibling', cwd: '/w2', parentSessionId: null },
+      { sessionId: 'outer', cwd: '/', parentSessionId: null },
+    ]
+    expect(sharingThreads({ sessionId: 'self', cwd: '/w', except: ['parent'], threads })).toEqual(['outer'])
+  })
 })

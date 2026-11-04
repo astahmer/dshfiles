@@ -108,8 +108,9 @@ export default DshxPlugin.make({
   apis: [
     Api.bind(sessionUndoApi, {
       history: input => SessionUndo.use(undo => undo.history(input.sessionId)),
-      undo: input => SessionUndo.use(undo => undo.undo(input.sessionId)),
-      redo: input => SessionUndo.use(undo => undo.redo(input.sessionId)),
+      undo: input => SessionUndo.use(undo => undo.undo(input.sessionId, { allowSharedDirectory: input.allowSharedDirectory })),
+      rewind: input => SessionUndo.use(undo => undo.undo(input.sessionId, { turn: input.turn, allowSharedDirectory: input.allowSharedDirectory })),
+      redo: input => SessionUndo.use(undo => undo.redo(input.sessionId, { allowSharedDirectory: input.allowSharedDirectory })),
     }),
   ],
 })

@@ -16,7 +16,8 @@
         "Undo and redo are refused while the thread runs.",
         "A fork that fails after the files were restored puts the files back before reporting the error.",
         "A folder no VCS provider claims records turns without files; undo then rewinds only the conversation.",
-        "A new turn in the forked thread drops its redo."
+        "A new turn in the forked thread drops its redo.",
+        "A file restore is refused while another live thread works in the same folder, unless the caller passes allowSharedDirectory: true."
       ],
       "externalDependencies": [],
       "reach": [
@@ -66,6 +67,68 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "turn-rewind",
+      "title": "Rewind to before any recorded turn, files included",
+      "summary": "The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound turn and its files back. A file restore is refused while another live thread works in the same folder (it would overwrite that thread's edits), with an explicit Rewind anyway override.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Rewind to an earlier turn",
+      "configuration": [],
+      "states": ["single-turn", "rewindable", "confirming", "shared-directory-refused", "rewound", "redone"],
+      "failureModes": [
+        "Rewind is refused while the thread runs.",
+        "A turn with no checkpoint is refused with the list of recorded turns.",
+        "Another live thread in the same folder (or one inside it) refuses the file restore until the user chooses Rewind anyway; the thread's own subagents do not count.",
+        "An unreadable live-thread list refuses the restore rather than guessing, with the same explicit override.",
+        "A fork that fails after the files were restored puts the files back before reporting the error."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"Add a second turn to rewind past\"",
+        "press Enter",
+        "click button \"Rewind to an earlier turn\"",
+        "click menuitem \"Rewind to here · Turn 1\"",
+        "expect text \"Rewind to before turn*\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "session-undo.rewind-to-first-turn",
+          "featureFile": "tooling/dshx/e2e/features/session-undo.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.rewind-redo",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "rewinds to an earlier turn with its files, and redo brings every later turn back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.shared-directory",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "refuses to restore files another live thread works in, unless the caller allows it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-undo.sharing-threads",
+          "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
+          "testName": "counts only overlapping folders, outside the thread and the subagents it started"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

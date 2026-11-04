@@ -3,9 +3,10 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { HostContext, hostService } from '@dshfiles/dshx/effect'
 import { Duration, Effect, Layer, Option, Schema } from 'effect'
-import { SessionForkFailed, UndoSessions } from './undo-service.js'
+import { LiveThreadsUnavailable, type LiveThread, SessionForkFailed, UndoSessions } from './undo-service.js'
 
 const PROJECTIONS_TIMEOUT = Duration.seconds(30)
+const LIST_TIMEOUT = Duration.seconds(15)
 
 const modelSelectionSchema = Schema.Struct({
   provider: Schema.String.check(Schema.isMinLength(1)),
@@ -54,6 +55,20 @@ export const undoSessionsLayer = Layer.effect(
       archive: sessionId => Effect.flatMap(registry, found => Effect.tryPromise(() => found.archiveSession(SessionId(sessionId)))).pipe(bestEffort('archive')),
       unarchive: sessionId =>
         Effect.flatMap(registry, found => Effect.tryPromise(() => found.unarchiveSession(SessionId(sessionId)))).pipe(bestEffort('unarchive')),
+      // A live Agent that has written at least one message is a thread that may hold edits; blank and archived ones hold none.
+      liveThreads: Effect.gen(function* () {
+        const sessions = yield* controller
+        const archived = new Set<string>((yield* registry).archivedSessionIds)
+        const listed = yield* Effect.tryPromise(signal => sessions.list({}, signal)).pipe(Effect.timeout(LIST_TIMEOUT))
+        return listed.items.flatMap((item): LiveThread[] =>
+          item.agentAvailable && !item.blank && item.cwd !== undefined && !archived.has(item.sessionId)
+            ? [{ sessionId: String(item.sessionId), cwd: item.cwd, parentSessionId: item.parentSessionId === undefined ? null : String(item.parentSessionId) }]
+            : [],
+        )
+      }).pipe(
+        Effect.mapError(cause => new LiveThreadsUnavailable({ cause })),
+        Effect.withSpan('session undo live threads'),
+      ),
     })
   }),
 )
