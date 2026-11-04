@@ -58,9 +58,9 @@ running }`, marked so the UI can badge them.
 | 1   | Mirror store + `session/list` rows for threads started here and threads started on the host | the sidebar and main panel show a remote thread as a thread, badged with its runtime                                                                                                                                                                                              | done    |
 | 2   | `session/follow` + `session/page` re-served from the remote journal stream                  | native chat renders the live transcript: user text, assistant blocks, tool cards, windowed history                                                                                                                                                                                | done    |
 | 3   | `session/prompt` (text), `cancel`, `updateQueue` forwarded                                  | the native composer sends, steers, queues and stops a remote turn; the plain-textarea view is deleted                                                                                                                                                                             | done    |
-| 4   | Per-session model catalog + reasoning effort                                                | remote selection is reported (projections + follow frames), `selectModel` forwards on the no-replay path, the chip offers the runtime catalog (`model-effort-picker` → `runtimeModels`); unit-tested in multi-host and session-controller; interactive browser chip check remains | partial |
-| 5   | Image and file uploads, file references (`@`) resolved on the host                          | SSH E2E covers upload and `@`; direct picker and cross-machine path refusal remain unverified                                                                                                                                                                                     | partial |
-| 6   | JJ/workspace proxy; native question/approval path or Host UI fallback                       | owner-resolved read-only repository/workspace status proxy ships; native waterfall, approvals, path-scoped JJ/workspace mutations and terminals remain in Host UI with exact gaps documented                                                                                      | partial |
+| 4   | Per-session model catalog + reasoning effort | remote selection is reported (projections + follow frames), `selectModel` forwards on the no-replay path, the chip offers the runtime catalog (`model-effort-picker` → `runtimeModels`); unit-tested in multi-host and session-controller; the browser chip on a remote thread opens that catalog and selects GPT-6 Luna (`multi-host.auto-destination`) | done |
+| 5   | Image and file uploads, file references (`@`) resolved on the host | SSH E2E covers upload and `@` through Host APIs, and the composer's own file picker on a remote thread stores the bytes under the owning host's home only (`multi-host.auto-destination`); cross-machine path refusal messaging is not built | partial |
+| 6   | JJ/workspace proxy; native question/approval path or Host UI fallback | owner-resolved read-only repository/workspace status proxy ships; **Open on remote host** opens the exact mirrored thread (fleet-dx 6: `runtimeOpenView` takes a Session id and returns a token-free `threadUrl`); native waterfall, approvals, path-scoped JJ/workspace mutations and terminals remain in Host UI with exact gaps documented | partial |
 
 ## Risks and stop conditions
 
@@ -72,7 +72,7 @@ running }`, marked so the UI can badge them.
 - Never mutate a remote thread's log from here: mirrored frames are read-only copies,
   and every write goes through the owning runtime's own command surface.
 
-## Resume here
+## Progress
 
 Milestones 1–3 shipped on 2026-10-22: a remote Session is listed, followed, paged,
 prompted, cancelled and queue-edited through this Host. The bespoke remote view is
@@ -84,18 +84,43 @@ was accepted by B, `cancel` reached B, and typing in A's browser composer appear
 B's log with no console errors
 ([screenshot](../../plugins/@dshfiles/multi-host/docs/screenshots/remote-thread-native.png)).
 
-Milestones 4 and 5 are implemented: the model selector loads remote models and
-reasoning-effort options and routes selection through the mirrored Session; upload and
-file-reference APIs route through the owning runtime. Ownership is verified before
-file lookup or upload, and empty remote Sessions are persisted and recovered into the
-native Session list.
+Milestones 4 and 5 are implemented and browser-verified (2026-11-05, loopback SSH pair,
+`pnpm check:e2e multi-host --force`): on a remote thread the model chip opens the runtime's
+catalog and selects a model, and a file chosen through the composer's file input is stored
+under the remote host's home and nowhere under the manager's. Upload and file-reference APIs
+route through the owning runtime; ownership is verified before file lookup or upload, and
+empty remote Sessions are persisted and recovered into the native Session list.
 
-The loopback SSH E2E passes and verifies an empty composer-ready Session, remote file
-reference results, and a remote file upload through Host APIs. Interactive model-chip
-selection and the browser attachment picker are not yet driven in a browser, and
-cross-machine absolute-path refusal messaging is not yet implemented or verified.
-Milestone 6 partial: `sessionJjRepositories(sessionId)` resolves the mirrored Session's owner and reads validated repository/workspace status there without passing a path or enabling JJ writes. The mirrored thread header offers **Open on remote host** for native questions, approvals, terminals, and JJ tools. This opens the host UI home only: `runtimeOpenView` accepts a runtime ID, not a Session ID, and the remote UI has no `?thread=` consumer, so users must select the thread manually. Native questions/approvals remain host-owned: the local mirror does not receive the remote waterfall request/answer capability, and continued root-only question APIs cannot safely answer open waterfall, child-session, stopped-session, or approval requests. Per-session JJ path operations, workspace mutations, landing, terminal access, and session handoff remain unavailable locally. See the multi-host README for exact fallback and limits.
+M5 remainder: **cross-machine path refusal**. Prompt content carries only text and upload
+receipts (`PromptContentPart` is `text` | `image` | `file` with a `receiptId`), so no
+structured local path ever crosses to a remote Host; uploads are bound to the runtime they
+were sent to. What is left is messaging, not a guard: a local absolute path typed as text, or
+a receipt minted on another runtime, reaches the remote as-is and the remote's own error is
+shown. Building a refusal needs a decision on what counts as a "local path" in free text.
 
-The click-time capture corrected the earlier teardown-state interpretation. The row callback fired while the manager was not reconnecting, but its Session id was absent from the local native Session list (`before:false`, panel `dshfiles-multi-host-thread`); `uiWorkspace.openSession` then failed with `sessions.retain: unknown session`. The fix refreshes `ctx.sessions` when the id is absent and opens only after that list includes it. The rerun captured `after:true`, an `api-session/added` frame, a native `session/follow` request and snapshot, a hidden inventory, and the conversation plus **Open on remote host** control in a screenshot taken before teardown.
+Milestone 6 partial: `sessionJjRepositories(sessionId)` resolves the mirrored Session's
+owner and reads validated repository/workspace status there without passing a path or
+enabling JJ writes. The mirrored thread header offers **Open on remote host**, which opens
+the exact thread since fleet-dx 6: `runtimeOpenView` takes an optional Session id and
+returns a token-free `threadUrl`, the client fetches the launch URL to set the host's
+cookie, then opens `?thread=` (when page and host have different machine names the tab
+opens the host home). Native questions/approvals remain host-owned: the local mirror does
+not receive the remote waterfall request/answer capability, and continued root-only question
+APIs cannot safely answer open waterfall, child-session, stopped-session, or approval
+requests. Per-session JJ path operations, workspace mutations, landing, terminal access, and
+session handoff remain unavailable locally. See the multi-host README for exact fallback and
+limits.
 
-The focused E2E still exits nonzero because its broad `getByText('Remote host fallback probe')` assertion now matches three visible locations (sidebar row, hierarchy breadcrumb, transcript) and Playwright reports a strict-mode violation. The later global error-context screenshot shows **Reconnecting** after the scenario cleanup hook closed the manager; it is not click-time evidence. No selector change or additional rerun was made.
+The multi-host journeys were all red on main after the rail moved Hosts under **Observe**;
+2026-11-05 fixes: reach Hosts through the rail helper, return to **Threads** before selecting
+the mirrored row (the old strict-mode `getByText` problem is gone: the step selects
+`[data-remote-thread-id]`), the picker's new "Models and accounts" list, the SSH forward
+leading its own process group under Effect's spawner, the New thread composer remounting
+under a typed `@t:` mention, and a real bug: `runtimeCall` reported a mutation whose
+response was lost as `gateway-unreachable` (safe-to-retry) instead of
+`unknown-mutation-outcome`.
+
+## Resume here
+
+Build the cross-machine path refusal (M5) once the "local path in free text" rule is
+decided, then the remaining M6 native question/approval path.
