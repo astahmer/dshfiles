@@ -210,6 +210,44 @@
       ]
     },
     {
+      "id": "remote-delegation",
+      "title": "Delegate a task to another machine",
+      "summary": "The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs out each come back with the thread id to follow; cancelling the call stops the remote turn.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["finished", "failed", "waiting", "running", "no-auto-host"],
+      "failureModes": [
+        "Auto with no visible SSH host that has fresh resource data refuses and names the recovery.",
+        "A question or approval on the host returns status waiting: only the host UI can answer it.",
+        "A wait that runs out returns status running with the sessionId; the remote turn keeps going.",
+        "Cancelling the tool call cancels the remote turn."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.delegation-progress",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-delegation.test.ts",
+          "testName": "finishes with the last assistant text after the last prompt"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.delegation-browser",
+          "reason": "An agent tool with no client surface; verified against two scratch DSHs, one registered as a local runtime of the other, where a delegated turn settled as failed with the remote status."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
       "id": "ssh-runtime-connection",
       "title": "Connect to an SSH-managed runtime",
       "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",

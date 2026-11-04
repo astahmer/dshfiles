@@ -152,6 +152,12 @@ method with a `multi_host_*` tool:
   changed and says whether DSH there needs a restart. `apply: false` is a dry
   run. It never restarts the host, and only commits on `main@origin` reach it.
 
+Agents can also hand work to another machine: `multi_host_delegate` runs a task
+as a thread on a named host, or on the least-loaded visible SSH host when no
+host is named, waits for the turn and returns its final answer. A question on the
+host, a failed turn or a wait that runs out comes back with the thread id to
+follow; cancelling the call stops the remote turn.
+
 Provisioning never installs a package manager or edits the machine's own setup:
 a missing fnm or a stale nixfiles is reported, not patched. It also never
 rewrites another machine's checkout without `apply`.
@@ -196,7 +202,7 @@ title}` for threads started here, so the sidebar and view can list them.
 | Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
 | Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                     |
 | Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
-| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | none: subagents run locally                                           |
+| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | `multi_host_delegate`: host or Auto, waits for the answer             |
 
 ## Limits
 

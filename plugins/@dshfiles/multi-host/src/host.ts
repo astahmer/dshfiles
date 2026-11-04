@@ -6,7 +6,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { fromEffect } from '@dshfiles/session-source-port'
-import { Cause, Clock, ConfigProvider, Effect, Exit, Layer, Option, Ref, Schema, Scope, Stream } from 'effect'
+import { Cause, Clock, ConfigProvider, Effect, Exit, Layer, Option, Ref, Schedule, Schema, Scope, Stream } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
@@ -14,7 +14,7 @@ import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
-import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi } from './api.js'
+import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ModelSelection } from './api.js'
 import type { ConnectionTestStep } from './api.js'
 import { Connectors } from './connectors/connectors.js'
 import { Loopback } from './connectors/loopback.js'
@@ -44,6 +44,7 @@ import { MultiHostPaths } from './paths.js'
 import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
 import { RemoteCheckout } from './remote-checkout.js'
 import { RemoteUpdate } from './remote-update.js'
+import { RemoteDelegation, type DelegationProgress } from './remote-delegation.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
@@ -385,6 +386,106 @@ const threadRefused = (input: { readonly code: string; readonly message: string;
   code: input.code,
   message: input.message,
   ...(input.sessionId !== undefined && { sessionId: input.sessionId }),
+})
+
+type ThreadStartInput = {
+  readonly runtimeId: string
+  readonly cwd: string
+  readonly text: string
+  readonly agentPreset?: string | undefined
+  readonly model?: ModelSelection | undefined
+}
+
+const startRemoteThread = Effect.fn('multi-host thread start')(function* (input: ThreadStartInput) {
+  const directory = yield* HostDirectory
+  const threads = yield* RemoteThreads
+  const runtime = yield* directory.findRuntime(input.runtimeId)
+  if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
+  const state: { sessionId: string | undefined } = { sessionId: undefined }
+  return yield* withRuntime(
+    runtime.id,
+    gateway =>
+      Effect.gen(function* () {
+        const created = yield* NativeRpc.call(gateway, {
+          namespace: 'session',
+          method: 'create',
+          args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
+        })
+        if (!created.ok) return threadRefused({ code: created.code, message: created.message })
+        const sessionId = (yield* decodeSessionCreated(created.value)).sessionId
+        state.sessionId = sessionId
+        if (input.model !== undefined) {
+          const model = input.model
+          yield* gateway.run({
+            namespace: 'session',
+            method: 'selectModel',
+            args: {
+              request: {
+                sessionId,
+                provider: model.provider,
+                model: model.model,
+                ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }),
+              },
+            },
+          })
+        }
+        yield* threads.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
+        const prompted = yield* NativeRpc.call(gateway, {
+          namespace: 'session',
+          method: 'prompt',
+          args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
+        })
+        if (!prompted.ok) return threadRefused({ code: prompted.code, message: prompted.message, sessionId })
+        return { ok: true as const, sessionId }
+      }).pipe(Effect.map((outcome): SessionStartOutcome => outcome)),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
+})
+
+const readRemoteTranscript = Effect.fn('multi-host thread transcript')(function* (input: {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly maxMessages?: number | undefined
+}) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway =>
+      Effect.flatMap(
+        gateway.follow({
+          endpoint: 'session/follow',
+          args: { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: input.maxMessages ?? 60 } },
+          timeout: 15_000,
+        }),
+        frames =>
+          Effect.gen(function* () {
+            const snapshot = frames.flatMap(frame => Option.toArray(decodeSnapshot(frame)))[0]
+            if (snapshot === undefined) return yield* new SessionUnavailable()
+            const reduced = reduceTranscript(snapshot.records)
+            return {
+              ok: true as const,
+              cursor: snapshot.cursor,
+              ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
+              ...(reduced.title !== undefined && { title: reduced.title }),
+              ...(reduced.model !== undefined && { model: reduced.model }),
+              ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
+              running: reduced.running,
+              entries: reduced.entries,
+            }
+          }),
+      ),
+    { mutation: false },
+  ).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+})
+
+const stopRemoteThread = Effect.fn('multi-host thread stop')(function* (input: { readonly runtimeId: string; readonly sessionId: string }) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway => NativeRpc.call(gateway, { namespace: 'session', method: 'cancel', args: { request: { sessionId: input.sessionId } } }),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(
+    Effect.map(() => ({ ok: true as const })),
+    Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+  )
 })
 
 const handlers = Api.handlers(multiHostApi, {
@@ -808,50 +909,50 @@ const handlers = Api.handlers(multiHostApi, {
       { mutation: true, broken: brokenRpc },
     ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
   }),
-  threadStart: Effect.fn('multi-host thread start')(function* (input) {
-    const directory = yield* HostDirectory
-    const threads = yield* RemoteThreads
-    const runtime = yield* directory.findRuntime(input.runtimeId)
-    if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
-    const state: { sessionId: string | undefined } = { sessionId: undefined }
-    return yield* withRuntime(
-      runtime.id,
-      gateway =>
-        Effect.gen(function* () {
-          const created = yield* NativeRpc.call(gateway, {
-            namespace: 'session',
-            method: 'create',
-            args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
-          })
-          if (!created.ok) return threadRefused({ code: created.code, message: created.message })
-          const sessionId = (yield* decodeSessionCreated(created.value)).sessionId
-          state.sessionId = sessionId
-          if (input.model !== undefined) {
-            const model = input.model
-            yield* gateway.run({
-              namespace: 'session',
-              method: 'selectModel',
-              args: {
-                request: {
-                  sessionId,
-                  provider: model.provider,
-                  model: model.model,
-                  ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }),
-                },
-              },
-            })
-          }
-          yield* threads.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
-          const prompted = yield* NativeRpc.call(gateway, {
-            namespace: 'session',
-            method: 'prompt',
-            args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
-          })
-          if (!prompted.ok) return threadRefused({ code: prompted.code, message: prompted.message, sessionId })
-          return { ok: true as const, sessionId }
-        }).pipe(Effect.map((outcome): SessionStartOutcome => outcome)),
-      { mutation: true, broken: brokenRpc },
-    ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
+  threadStart: startRemoteThread,
+  delegate: Effect.fn('multi-host delegate')(function* (input) {
+    const runtimeId = input.runtimeId ?? (yield* (yield* ResourcePool).read).selected?.runtimeId
+    if (runtimeId === undefined) {
+      return {
+        ok: false as const,
+        code: 'no-auto-host',
+        message: 'Auto found no visible SSH host with fresh resource data. Name a host with runtimeId, or check the Hosts page.',
+      }
+    }
+    const started = yield* startRemoteThread({
+      runtimeId,
+      cwd: input.cwd,
+      text: input.text,
+      ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }),
+      ...(input.model !== undefined && { model: input.model }),
+    })
+    if (!started.ok) return started
+    const sessionId = started.sessionId
+    const deadline = (yield* Clock.currentTimeMillis) + input.waitSeconds * 1000
+    const read = Effect.gen(function* () {
+      const transcript = yield* readRemoteTranscript({ runtimeId, sessionId, maxMessages: 40 })
+      const progress: DelegationProgress = transcript.ok ? RemoteDelegation.progressOf(transcript) : { state: 'working' }
+      return { progress, expired: (yield* Clock.currentTimeMillis) >= deadline }
+    })
+    const { progress: settled } = yield* read.pipe(
+      Effect.repeat({ schedule: Schedule.spaced('3 seconds'), until: poll => poll.progress.state !== 'working' || poll.expired }),
+      Effect.onInterrupt(() => Effect.ignore(stopRemoteThread({ runtimeId, sessionId }))),
+    )
+    const base = { ok: true as const, runtimeId, sessionId }
+    switch (settled.state) {
+      case 'finished':
+        return { ...base, status: 'finished' as const, answer: settled.answer }
+      case 'failed':
+        return { ...base, status: 'failed' as const, detail: settled.detail }
+      case 'waiting':
+        return { ...base, status: 'waiting' as const, waiting: settled.waiting }
+      case 'working':
+        return {
+          ...base,
+          status: 'running' as const,
+          detail: `Still running after ${String(input.waitSeconds)} s; follow it with multi_host_thread_transcript.`,
+        }
+    }
   }),
   runtimeModels: Effect.fn('multi-host runtime models')(function* (input) {
     return yield* withRuntime(
@@ -956,36 +1057,7 @@ const handlers = Api.handlers(multiHostApi, {
       return { ok: true as const, value }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
-  threadTranscript: Effect.fn('multi-host thread transcript')(function* (input) {
-    return yield* withRuntime(
-      input.runtimeId,
-      gateway =>
-        Effect.flatMap(
-          gateway.follow({
-            endpoint: 'session/follow',
-            args: { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: input.maxMessages ?? 60 } },
-            timeout: 15_000,
-          }),
-          frames =>
-            Effect.gen(function* () {
-              const snapshot = frames.flatMap(frame => Option.toArray(decodeSnapshot(frame)))[0]
-              if (snapshot === undefined) return yield* new SessionUnavailable()
-              const reduced = reduceTranscript(snapshot.records)
-              return {
-                ok: true as const,
-                cursor: snapshot.cursor,
-                ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
-                ...(reduced.title !== undefined && { title: reduced.title }),
-                ...(reduced.model !== undefined && { model: reduced.model }),
-                ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
-                running: reduced.running,
-                entries: reduced.entries,
-              }
-            }),
-        ),
-      { mutation: false },
-    ).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
-  }),
+  threadTranscript: readRemoteTranscript,
   threadList: Effect.fn('multi-host thread list')(function* () {
     const directory = yield* HostDirectory
     const threads = yield* RemoteThreads
@@ -1038,16 +1110,7 @@ const handlers = Api.handlers(multiHostApi, {
       Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
     )
   }),
-  threadStop: Effect.fn('multi-host thread stop')(function* (input) {
-    return yield* withRuntime(
-      input.runtimeId,
-      gateway => NativeRpc.call(gateway, { namespace: 'session', method: 'cancel', args: { request: { sessionId: input.sessionId } } }),
-      { mutation: true, broken: brokenRpc },
-    ).pipe(
-      Effect.map(() => ({ ok: true as const })),
-      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
-    )
-  }),
+  threadStop: stopRemoteThread,
   runtimeCall: Effect.fn('multi-host runtime call')(function* (input) {
     const mutation = NativeRpc.isMutation(input.request)
     return yield* withRuntime(input.runtimeId, gateway => NativeRpc.call(gateway, input.request), { mutation, broken: brokenRpc }).pipe(

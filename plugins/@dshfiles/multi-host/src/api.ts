@@ -787,6 +787,35 @@ const effectMultiHostApi = defineApi({
         'Start a thread on one remote runtime: its directory, the first message, and optionally an agent preset and model. Call only when the user asked to start a thread on that machine.',
       tool: { name: 'multi_host_start_thread', render: compactJson },
     }),
+    delegate: method({
+      input: Schema.Struct({
+        runtimeId: Schema.optional(idSchema),
+        cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+        text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(100_000)),
+        agentPreset: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+        model: Schema.optional(modelSelectionSchema),
+        waitSeconds: Schema.Number.check(Schema.isFinite())
+          .check(Schema.isInt())
+          .check(Schema.isGreaterThanOrEqualTo(10))
+          .check(Schema.isLessThanOrEqualTo(3600))
+          .pipe(Schema.withDecodingDefault(Effect.succeed(600))),
+      }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          runtimeId: idSchema,
+          sessionId: sessionIdSchema,
+          status: Schema.Literals(['finished', 'failed', 'waiting', 'running']),
+          answer: Schema.optional(Schema.String),
+          detail: Schema.optional(Schema.String),
+          waiting: Schema.optional(transcriptWaitingSchema),
+        }),
+        Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
+      ]),
+      description:
+        'Run a task as a thread on another machine and wait for its answer, like a subagent on that host: give the remote directory and the full task. Without runtimeId, Auto picks the least-loaded visible SSH host. Returns the final assistant text when the turn finishes; status waiting when the remote agent asks a question (answer it on the host), running with the sessionId to follow with multi_host_thread_transcript when waitSeconds (default 600) runs out. Cancelling the call stops the remote turn. Call only when the user asked for work on another machine.',
+      tool: { name: 'multi_host_delegate', render: compactJson },
+    }),
     /** The latest messages of a remote thread, reduced to text, for the local remote-thread view. */
     threadTranscript: method({
       input: Schema.Struct({

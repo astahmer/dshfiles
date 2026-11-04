@@ -58,6 +58,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_checkout_sync',
       'multi_host_clone_project',
       'multi_host_create_thread',
+      'multi_host_delegate',
       'multi_host_doctor',
       'multi_host_exec',
       'multi_host_file_references',
