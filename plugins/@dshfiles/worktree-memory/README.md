@@ -7,7 +7,9 @@ processes (known script labels, nearest app ancestor or immediate parent, and wo
 grouped by workspace. Node origins are read-only: they expose process IDs and resident RSS, not command arguments or
 environment values. Stops remain scoped to DSH trees and require confirmation.
 
-Open the reusable **Worktree Memory: RAM** view from navigation or the Workbench chooser.
+This is the **RAM** tab of **Observe › Processes** (owned by `@dshfiles/background-jobs`), and the RAM part of the
+thread panel's **Jobs** tab. Without background-jobs it stays its own page, the **Worktree Memory: RAM** view, with
+the pressure dot and detached total on its navigation glyph.
 
 ## Where the rows come from
 

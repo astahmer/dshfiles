@@ -1,14 +1,26 @@
 # DSH usage analytics
 
+![Usage › Quota: account views from AI Accounts](docs/screenshots/usage-quota-tab.png)
 ![Tool and Jev activity report](docs/screenshots/usage-activity-report.png)
 
 ![Request log](docs/screenshots/usage-request-log.png)
 ![Usage distribution and daily calendar](docs/screenshots/usage-charts.png)
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
 
-A **Usage: Analytics** reusable view (sidebar) with a model request log, usage charts,
-and a local tool/Jev activity report, built from DSH session logs and bounded Host-side
-call observations. Observation only.
+**Observe › Usage** is the one usage page (plans/ade-ux §6): four tabs, **Cost** (charts),
+**Quota**, **Requests** (the request log) and **Tools** (tool and Jev activity), built from
+DSH session logs and bounded Host-side call observations. Observation only.
+
+- **Quota** draws AI Accounts' views through the `@dshfiles/ai-accounts/quota-views`
+  contract: **Accounts** (one account's current limits, then the requests and cost recorded
+  for it), **History** and **Forecast**. usage provides `UsageNavigation` back, so the quota
+  status item, the account page's Usage tab, saved tabs of the former Usage history and
+  Quota forecast pages and the palette (by their old names too) land on the right view.
+  The contracts live in ai-accounts because usage already imports it for pricing; a
+  usage-owned registry would make the two bundles depend on each other.
+- **Cost facet**: a **Cost** tab in the thread panel (right pane guide) shows the route the
+  thread's last request took, cost per turn, and opens Usage › Requests filtered to the
+  thread, Usage › Quota for the route, or Traces.
 
 - **Request log**: model and provider, when, project, input, cache read,
   output, cost, duration, TTFT and status with the stop reason; status chips

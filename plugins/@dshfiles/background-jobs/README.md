@@ -1,13 +1,21 @@
 # DSH background jobs board
 
+![Observe › Processes with its Jobs, Dev servers and RAM tabs](docs/screenshots/processes-page.png)
 ![Cross-Session background jobs board](docs/screenshots/jobs-board.png)
+
+**Observe › Processes** is one page for what runs on this host for your threads (plans/ade-ux §6):
+**Jobs** (this board), then the tabs other plugins add through the
+`@dshfiles/background-jobs/process-views` registry — **Dev servers** from `@dshfiles/preview` and
+**RAM** from `@dshfiles/worktree-memory`. Providers depend on background-jobs, never the reverse.
+The thread panel's **Jobs** tab shows the same for the thread on stage: its jobs, its dev servers
+and the RAM its processes use.
 
 One page for every background job of every Session: the ones still running, and —
 opt-in — the ones that already finished. Rows are classified deterministically
 from the job kind and its label, so "when did we last run the e2e suite", "which
 jj history commands ran today" and "what is still building" are one filter away.
 
-Open the reusable **Background Jobs: Jobs** view from navigation or the Workbench chooser.
+Open **Observe › Processes** from the rail (the reusable **Background Jobs: Jobs** view in free docking).
 
 ## Where the rows come from
 

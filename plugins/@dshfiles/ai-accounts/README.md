@@ -12,7 +12,7 @@ picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
-Reusable views are **AI Accounts: Accounts**, **AI Accounts: Usage history** and **AI Accounts: Quota forecast**. In Workbench, the sidebar quota contribution is **AI Accounts: Preview**; an AI Accounts-only footer action aggregate is **AI Accounts: Controls**.
+Reusable views are **AI Accounts: Accounts**, and, when `@dshfiles/usage` is not loaded, **AI Accounts: Usage history** and **AI Accounts: Quota forecast**; with usage those two are views of **Observe › Usage › Quota** (ai-accounts provides them through its `quota-views` contract), and the account page's Usage tab opens Usage › Quota for that account. In Workbench, the sidebar quota contribution is **AI Accounts: Preview**; an AI Accounts-only footer action aggregate is **AI Accounts: Controls**.
 
 ## Use an account for the current thread
 

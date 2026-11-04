@@ -9,6 +9,9 @@ Two things a thread needs while it builds a web app:
 - **Thread dev servers.** The thread header lists the TCP ports the thread's processes listen on, with **Open** (in the
   browser tab beside the thread) and **Stop**.
 
+The dev-server list is also the **Dev servers** tab of **Observe › Processes** (every thread that runs a job) and part of
+the thread panel's **Jobs** tab, through `@dshfiles/background-jobs/process-views`.
+
 ## Agent tools
 
 | Tool                             | What it does                                                                                                                                                                        |
