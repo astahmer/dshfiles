@@ -3,7 +3,10 @@ import { SecretCatalog } from './secret-catalog.js'
 import { SecretCli, type SecretCliError, type SecretCliRequest } from './secret-cli.js'
 
 /** The real Secret Catalog over a stand-in CLI that records every request it answers. */
-export const catalogWithCli = (answer: (request: SecretCliRequest) => Effect.Effect<string, SecretCliError>) => {
+export const catalogWithCli = (
+  answer: (request: SecretCliRequest) => Effect.Effect<string, SecretCliError>,
+  revision?: (folder: string | null) => Effect.Effect<string>,
+) => {
   const requests: SecretCliRequest[] = []
   const layer = SecretCatalog.layer.pipe(
     Layer.provide(
@@ -12,6 +15,7 @@ export const catalogWithCli = (answer: (request: SecretCliRequest) => Effect.Eff
           requests.push(request)
           return answer(request)
         }),
+        revision,
       ),
     ),
   )

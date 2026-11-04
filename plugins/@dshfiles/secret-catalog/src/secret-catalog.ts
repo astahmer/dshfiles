@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import type { SecretScope } from '@dshfiles/credential-port'
-import { Cache, Context, Duration, Effect, Layer, Schema, Semaphore } from 'effect'
+import { Cache, Context, Duration, Effect, Exit, Layer, Schema, Semaphore } from 'effect'
 import {
   createMetadataSchemaEffect,
   secretAliasSchemaEffectForCatalog,
@@ -61,6 +61,10 @@ const validateCwd = (cwd: string | null) => (cwd !== null && (!isAbsolute(cwd) |
 const requireFolder = (cwd: string | null) => Effect.flatMap(validateCwd(cwd), folder => (folder === null ? refuse('folder-required') : Effect.succeed(folder)))
 
 const scopedFolder = (scope: SecretScope, cwd: string | null) => (scope === 'global' ? validateCwd(cwd) : requireFolder(cwd))
+
+/** How long one folder's decoded metadata answers repeated lists while its config revision is unchanged. */
+export const METADATA_TTL = Duration.seconds(15)
+const METADATA_FOLDERS = 64
 
 const withoutTerminalNewline = (value: string): string => {
   if (value.endsWith('\r\n')) return value.slice(0, -2)
@@ -141,8 +145,13 @@ const getArguments = Effect.fnUntraced(function* (input: SecretValueInput) {
   return { args: ['get', alias, ...environment, ...exactConfigArguments(input.scope, folder)], cwd: yield* validateCwd(input.cwd) }
 })
 
+export interface SecretListOptions {
+  /** Read the CLI now instead of a cached answer: uniqueness checks and an explicit re-check need the current config. */
+  readonly fresh?: boolean
+}
+
 export interface SecretCatalogShape {
-  readonly list: (cwd: string | null) => Effect.Effect<readonly SecretMetadata[], SecretCatalogFailure>
+  readonly list: (cwd: string | null, options?: SecretListOptions) => Effect.Effect<readonly SecretMetadata[], SecretCatalogFailure>
   readonly reveal: (input: SecretValueInput) => Effect.Effect<string, SecretCatalogFailure>
   readonly copy: (input: SecretValueInput) => Effect.Effect<{ readonly copied: true }, SecretCatalogFailure>
   readonly create: (input: SecretCreateInput) => Effect.Effect<{ readonly created: true }, SecretCatalogFailure>
@@ -153,8 +162,10 @@ export interface SecretCatalogShape {
 
 /**
  * Alias metadata and exact alias actions through the secret CLI. Panel, picker, setup offer and reference checks
- * list the same folder at once, so one CLI process serves every concurrent list of a folder; writes run one at a time
- * and drop the shared reads, so a list asked for after a write never sees the config from before it.
+ * list the same folder at once and again moments later, so one CLI process serves every list of a folder while its
+ * config revision (config file stats and the hashed session identity) is unchanged, for at most `METADATA_TTL`.
+ * Only decoded, value-free metadata is kept; a failed read is never kept. Writes run one at a time and drop every
+ * cached answer, so a list asked for after a write never sees the config from before it.
  */
 export class SecretCatalog extends Context.Service<SecretCatalog, SecretCatalogShape>()('@dshfiles/secret-catalog/SecretCatalog') {
   static readonly layer = Layer.effect(
@@ -168,14 +179,24 @@ export class SecretCatalog extends Context.Service<SecretCatalog, SecretCatalogS
           Effect.flatMap(stdout => decodeSecretPrintMetadata({ jsonText: stdout, defaultScope: folder === null ? 'global' : 'unknown' })),
           Effect.mapError(error => (error._tag === 'SecretCliError' ? error : new SecretCatalogOperationError({ reason: 'invalid-cli-output', cause: error }))),
         )
-      const lists = yield* Cache.make({ capacity: 64, timeToLive: Duration.zero, lookup: (key: string) => listFolder(key === '' ? null : key) })
+      // Keyed by `revision NUL folder` (an empty folder is the global list); the lookup reads its folder back out.
+      const keyOf = (folder: string | null, revision: string) => `${revision}\u0000${folder ?? ''}`
+      const folderOf = (key: string) => key.slice(key.indexOf('\u0000') + 1) || null
+      const lists = yield* Cache.makeWith((key: string) => listFolder(folderOf(key)), {
+        capacity: METADATA_FOLDERS,
+        timeToLive: exit => (Exit.isSuccess(exit) ? METADATA_TTL : Duration.zero),
+      })
 
       const write = (request: SecretCliRequest) =>
         Cache.invalidateAll(lists).pipe(Effect.andThen(cli.run(request)), Effect.ensuring(Cache.invalidateAll(lists)), Effect.asVoid)
 
-      const list = Effect.fn('secret catalog list')(function* (cwd: string | null) {
+      const list = Effect.fn('secret catalog list')(function* (cwd: string | null, options?: SecretListOptions) {
         const folder = yield* validateCwd(cwd)
-        return yield* Cache.get(lists, folder ?? '')
+        if (options?.fresh === true) {
+          yield* Effect.annotateCurrentSpan('secret.list.fresh', true)
+          return yield* listFolder(folder)
+        }
+        return yield* Cache.get(lists, keyOf(folder, yield* cli.revision(folder)))
       })
 
       const create = Effect.fn('secret catalog create')(function* (input: SecretCreateInput) {
@@ -185,7 +206,7 @@ export class SecretCatalog extends Context.Service<SecretCatalog, SecretCatalogS
         if (input.valueMode === 'manual' && (input.value === null || input.value.length === 0)) return yield* refuse('manual-value-required')
         if (input.valueMode === 'generate' && input.value !== null) return yield* refuse('generated-value-submitted')
         const metadata = yield* createMetadataArguments(input)
-        const existingRows = yield* list(folder)
+        const existingRows = yield* list(folder, { fresh: true })
         if (existingRows.some(row => row.alias === alias && row.environment === environment)) return yield* refuse('alias-exists-in-environment')
         const args = ['set', alias, '--env', environment, ...metadata, ...scopeArguments(input.scope, folder)]
         if (input.valueMode === 'generate') args.push('--generate')
@@ -206,7 +227,7 @@ export class SecretCatalog extends Context.Service<SecretCatalog, SecretCatalogS
         if (metadata.length === 0 && input.value === null && !renamed) return yield* refuse('no-changes')
         const environment = yield* validEnvironment(input.environment)
         if (renamed) {
-          const existingRows = yield* list(folder)
+          const existingRows = yield* list(folder, { fresh: true })
           if (existingRows.some(row => row.alias === alias)) return yield* refuse('alias-exists')
           yield* write({ args: ['mv', currentAlias, alias, ...scopeArguments(input.scope, folder)], cwd: folder, captureStdout: false })
         }

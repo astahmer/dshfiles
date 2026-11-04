@@ -4,6 +4,7 @@ import { createWorkspacePickerPorts, type WorkspacePickerRemote } from '@dshfile
 import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Exit, Fiber, Ref } from 'effect'
 import { SecretCatalog } from './secret-catalog.js'
+import { SecretCliError } from './secret-cli.js'
 import { catalogWithCli } from './secret-catalog-fixture.js'
 import { decodeSecretPrintMetadata } from './secret-metadata.js'
 
@@ -85,8 +86,55 @@ describe('Secret Catalog metadata and exact alias actions', () => {
           expect((yield* Fiber.join(first))[0]?.alias).toBe('SYNTHETIC_1')
           expect((yield* Fiber.join(second))[0]?.alias).toBe('SYNTHETIC_1')
           expect((yield* Fiber.join(afterWrite))[0]?.alias).toBe('SYNTHETIC_2')
+          // a later list of the unchanged folder reuses the read the write's follower made
           expect(yield* catalog.list(null)).toHaveLength(1)
-          expect(yield* Ref.get(printed)).toBe(3)
+          expect(yield* Ref.get(printed)).toBe(2)
+        }),
+      )
+    }),
+  )
+
+  it.effect('serves sequential lists of a folder from one CLI read until its config revision changes', () =>
+    Effect.gen(function* () {
+      const revision = yield* Ref.make('r1')
+      const fixture = catalogWithCli(
+        request => Effect.succeed(request.args[0] === 'print' ? JSON.stringify([{ alias: 'SYNTHETIC', value: 'synthetic-secret-must-not-cross' }]) : ''),
+        () => Ref.get(revision),
+      )
+      const prints = () => fixture.requests.filter(request => request.args[0] === 'print').length
+      yield* withCatalog(fixture, catalog =>
+        Effect.gen(function* () {
+          // picker, setup offer, panel, reference checks and the credential bridge each list the same folder in turn
+          for (let index = 0; index < 6; index += 1) yield* catalog.list(null)
+          for (let index = 0; index < 4; index += 1) yield* catalog.list('/tmp/demo')
+          expect(prints()).toBe(2)
+          yield* Ref.set(revision, 'r2')
+          yield* catalog.list(null)
+          expect(prints()).toBe(3)
+          expect(JSON.stringify(yield* catalog.list(null))).not.toContain('synthetic-secret-must-not-cross')
+        }),
+      )
+    }),
+  )
+
+  it.effect('never keeps a failed read, and reads fresh for a uniqueness check', () =>
+    Effect.gen(function* () {
+      const failures = yield* Ref.make(1)
+      const fixture = catalogWithCli(request =>
+        Effect.gen(function* () {
+          if (request.args[0] !== 'print') return ''
+          if ((yield* Ref.getAndUpdate(failures, count => count - 1)) > 0) return yield* new SecretCliError({ code: 'cli-failed', cleanupConfirmed: true })
+          return '[]'
+        }),
+      )
+      const prints = () => fixture.requests.filter(request => request.args[0] === 'print').length
+      yield* withCatalog(fixture, catalog =>
+        Effect.gen(function* () {
+          expect((yield* Effect.flip(catalog.list(null)))._tag).toBe('SecretCliError')
+          expect(yield* catalog.list(null)).toEqual([])
+          expect(prints()).toBe(2)
+          yield* catalog.create({ alias: 'SYNTHETIC', scope: 'global', cwd: null, environment: 'prod', valueMode: 'generate', value: null })
+          expect(prints()).toBe(3)
         }),
       )
     }),

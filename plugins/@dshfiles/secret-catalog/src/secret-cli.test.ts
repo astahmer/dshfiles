@@ -140,7 +140,7 @@ describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
       const cli = yield* SecretCli.make('dshfiles-secret-cli-missing-for-test')
       const error = yield* Effect.flip(cli.run({ args: ['print', '--json'], cwd: null, captureStdout: true }))
       expect(error).toMatchObject({ code: 'cli-missing', message: 'Secret CLI executable could not be found on the Host PATH.' })
-    }).pipe(Effect.provide(SpawnerLive)),
+    }).pipe(Effect.provide(SpawnerLive), Effect.provide(NodeFileSystem.layer)),
   )
 
   it.effect('tags a command past its deadline as cli-timeout', () =>
