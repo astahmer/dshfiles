@@ -6852,6 +6852,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/activity-timeline':
+        specifier: workspace:*
+        version: link:../activity-timeline
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

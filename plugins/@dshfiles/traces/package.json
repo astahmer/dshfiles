@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/activity-timeline": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sqlite-store": "workspace:*",
@@ -85,7 +86,8 @@
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-home-paths": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/schemastery": "^3.18.4"
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/activity-timeline": ">=0.1.0 <0.2.0-0"
   },
   "dsh": {
     "bundle": {

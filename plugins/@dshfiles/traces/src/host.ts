@@ -1,10 +1,12 @@
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { otlpExportTarget } from '@dshfiles/dshx/tracing'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { FetchHttpClient } from 'effect/http'
+import { AlertAttention } from './alerts/alert-attention.js'
 import { AlertEngine } from './alerts/alert-engine.js'
 import { AlertDb, AlertRepo } from './alerts/alert-repo.js'
 import { tracesAlertsApi } from './alerts/alerts-api.js'
@@ -39,7 +41,7 @@ const Storage = Layer.unwrap(
 
 const ReceiverLive = Receiver.layer.pipe(Layer.provide(Layer.mergeAll(OtlpIngest.layer, Forwarder.layer.pipe(Layer.provide(FetchHttpClient.layer)))))
 
-const TracesLive = Layer.mergeAll(RetentionWorker, AlertWorker, LocalEndpointLive).pipe(
+const TracesLive = Layer.mergeAll(RetentionWorker, AlertWorker, LocalEndpointLive, AlertAttention.layer.pipe(Layer.provide(HostApis.layer))).pipe(
   Layer.provideMerge(Layer.mergeAll(ReceiverLive, AlertEngine.layer.pipe(Layer.provide(Layer.mergeAll(ThreadAttentionLive, RunningSessionsLive))))),
   Layer.provideMerge(Layer.mergeAll(TraceRepo.layer, AlertRepo.layer).pipe(Layer.provide(Storage))),
   Layer.provideMerge(Settings.layer(tracesSettings)),
