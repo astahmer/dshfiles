@@ -5,7 +5,7 @@
     {
       "id": "thread-review-scopes",
       "title": "Review project and workspace changes by scope",
-      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
+      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with progress kept in diff-viewed's one viewed-marks store. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool. The page stays the cross-project view; Open in thread opens the thread's Changes facet.",
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -121,7 +121,7 @@
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: Review › Summarize",
+      "currentSurface": "left-nav: Review \u203a Summarize",
       "configuration": [],
       "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
       "failureModes": [
@@ -200,7 +200,7 @@
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: Review › reviewed marks",
+      "currentSurface": "left-nav: Review \u203a reviewed marks",
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [
@@ -228,6 +228,232 @@
         }
       ],
       "reach": ["click tab \"Land\"", "click button \"Review\"", "expect checkbox \"Select all files in this review\""]
+    },
+    {
+      "id": "changes-facet",
+      "title": "Review a thread's changes in its Changes facet",
+      "summary": "A thread panel tab that follows the thread on screen and shows its changes in four scopes (this turn from DSH's own turn snapshot; whole thread from fork_point(bookmark | @); uncommitted @-..@; vs the target bookmark), with a file list, one diff view and per-file viewed marks kept in diff-viewed's one store. The jujutsu composer bar, the Land destination rows and the Review page open it through the Changes contract.",
+      "surfaces": ["client", "api"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes",
+      "configuration": [],
+      "states": ["no-thread", "loading", "turn", "whole-thread", "uncommitted", "vs-target", "empty-scope", "viewed", "failed", "not-a-jj-workspace"],
+      "failureModes": [
+        "A workspace that is not a Jujutsu repository says that revision scopes need one and keeps This turn working.",
+        "A turn whose summary the Host no longer holds says so and offers a retry instead of an empty list.",
+        "A viewed mark that cannot be saved is rolled back and reported."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jujutsu",
+          "boundary": "The jj CLI in the thread workspace.",
+          "deterministicFake": "The scratch seed and the e2e journey provision a disposable jj repository with a described revision."
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Review workspace changes: *\"",
+        "expect region \"Land\"",
+        "click radio \"Whole thread\"",
+        "expect text \"0/1 viewed\"",
+        "click checkbox \"Mark viewed: seeded-work.md\"",
+        "expect text \"1/1 viewed\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.changes-facet",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.changes-facet-unit-scopes",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "maps each scope to the revisions it compares"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.changes-facet-unit-default",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "decodes opener requests and picks a default scope"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.changes-facet-unit-turns",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "lists the turns that changed files from the thread events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.changes-facet-unit-patch",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "renders one turn comparison as a git patch"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "turn-card-opens-changes",
+      "title": "A turn's Edited files card opens Changes on that turn",
+      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/\u2026) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the native review tab writes.",
+      "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "transcript: Edited N files card",
+      "configuration": [],
+      "states": ["turn-requested", "facet-revealed"],
+      "failureModes": ["An address that is not a turn review is not claimed, so the native tab keeps every other resource."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.turn-card-opens-changes",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.turn-card-unit-address",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "reads the turn card address the native review tab would open"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only resource claim; the turn summary and diff are read through native Host routes with their own spans."
+        }
+      ]
+    },
+    {
+      "id": "land-card",
+      "title": "Land a thread from the top of its Changes facet",
+      "summary": "The Land card shows the target bookmark, how far the workspace is behind it, conflicts, undescribed revisions and the thread's project-check receipts, and offers one primary Land that previews the exact revisions in a confirm dialog and calls jj-integration's land with every Host guard; a busy thread offers Land when idle (queueLand, undoable), and History opens the revision graph for rebase-only or describe work.",
+      "surfaces": ["client", "api"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes \u203a Land",
+      "configuration": [],
+      "states": ["shared-checkout", "nothing-to-land", "ready", "behind", "conflicted", "undescribed", "busy", "queued", "landing", "landed", "failed"],
+      "failureModes": [
+        "Land is disabled with the reason when revisions conflict, lack a description or the thread is busy; the Host re-checks every guard on click.",
+        "A refused or failed land shows jj-integration's reason and leaves the bookmark in place."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jujutsu",
+          "boundary": "The jj CLI in the thread workspace.",
+          "deterministicFake": "The scratch seed and the e2e journey provision a disposable jj repository with a described revision."
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Review workspace changes: *\"",
+        "expect region \"Land\"",
+        "expect text \"1 revision to land\"",
+        "click button \"Land 1 revision on main\"",
+        "expect alertdialog \"Land 1 revision on main?\"",
+        "click button \"Land on main\"",
+        "expect text \"Landed 1 revision on main.\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.land-card",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.land-card-unit-ready",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "enables Land only for described, conflict-free work of an idle thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.land-card-unit-blocked",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "names the reason Land is disabled and offers queueing for a busy thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.land-card-unit-checks",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "summarizes the latest receipt of each check"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
+        }
+      ]
+    },
+    {
+      "id": "diff-line-comments",
+      "title": "Comment on diff lines as chips in the next message",
+      "summary": "Selecting line numbers in a Changes diff opens a comment box; Add to next message queues the comment as a line-comment chip in the thread's composer through the public Composer contract (rich-composer serializes it as <comment path lines>).",
+      "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes \u203a diff line selection",
+      "configuration": [],
+      "states": ["no-selection", "commenting", "queued", "composer-unavailable"],
+      "failureModes": ["Without a composer on screen the comment stays in the box with a hint to open the thread and add it again."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.diff-line-comments",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the comment goes into the composer draft and is sent with the next message's own spans."
+        }
+      ]
+    },
+    {
+      "id": "review-marks-migration",
+      "title": "Move the Review page's marks into the one viewed-marks store",
+      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head \u2192 paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
+      "surfaces": ["client", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: pulls-review reviewed record",
+      "configuration": [],
+      "states": ["legacy-record", "migrated", "retry-next-load"],
+      "failureModes": ["A malformed old key is skipped; diff-viewed being unavailable leaves the record untouched."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.review-marks-migration-unit",
+          "file": "plugins/@dshfiles/pulls-review/tests/changes-facet.spec.ts",
+          "testName": "turns the old reviewed record into diff-viewed range targets"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pulls-review.review-marks-migration-browser",
+          "reason": "A one-time move on load with no UI of its own; the Review page journey reads marks from the new store."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

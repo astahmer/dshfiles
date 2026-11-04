@@ -25,7 +25,31 @@ const recordReviewed = (record: Readonly<Record<string, readonly string[]>>, key
   return next
 }
 
+/** A range mark target in diff-viewed's store; restated here as data only, so the migration stays a pure function. */
+export interface ReviewedRangeTarget {
+  readonly kind: 'range'
+  readonly workspacePath: string
+  readonly base: string
+  readonly head: string
+  readonly path: string
+}
+
+/**
+ * The record this plugin kept before diff-viewed owned every viewed mark, as the range targets that carry the same
+ * meaning there: workspace, base and head commit, one target per reviewed path. Malformed keys are skipped.
+ */
+const migrationTargets = (record: Readonly<Record<string, readonly string[]>>): readonly ReviewedRangeTarget[] => {
+  const targets: ReviewedRangeTarget[] = []
+  for (const [key, paths] of Object.entries(record)) {
+    const [workspacePath = '', base = '', head = '', ...rest] = key.split('\u0000')
+    if (rest.length > 0 || workspacePath === '' || base === '' || head === '') continue
+    for (const path of paths) if (path.length > 0) targets.push({ kind: 'range', workspacePath, base, head, path })
+  }
+  return targets
+}
+
 export class ReviewedMarksModel {
+  static readonly migrationTargets = migrationTargets
   static readonly schema = reviewedMarksSchema
   /** Where marks lived before they moved to the Host; read once, then removed. */
   static readonly legacyBrowserKey = 'dshfiles-pulls-review:reviewed'

@@ -1,5 +1,54 @@
 # pulls.review
 
+![The Changes facet: Land card, scopes, viewed marks and the diff](docs/screenshots/changes-facet.png)
+
+This plugin owns the thread panel's **Changes** facet (review → land on one surface) and the
+cross-project **Review** page.
+
+## Changes facet
+
+A right-pane tab that follows the thread on screen. It answers "what did this thread change, have I
+read it, and can it land?" without leaving the thread:
+
+- **Scopes**, each a pair of revisions: **This turn** (DSH's own turn-start/turn-end snapshot, the
+  same data as the "Edited N files" card; works for any version control), **Whole thread**
+  (`fork_point(<bookmark> | @)` to `@`, the thread's own work), **Uncommitted** (`@-` to `@`) and
+  **vs main** (the target bookmark's tip to `@`, which also shows what the bookmark gained since).
+  Revision scopes read `jj diff` on the Host; in a workspace that is not a Jujutsu repository they
+  say so and This turn keeps working.
+- **Files and viewed marks.** A file list with +/− counts, one diff view, and a viewed checkbox per
+  file (list and diff header), plus Mark all viewed. Marks live in
+  [diff-viewed](../diff-viewed/README.md)'s one store: per-turn marks are the same ones the native
+  review tab's Viewed toggle writes; revision-scope marks are keyed by workspace, base and head
+  commit, so a new revision starts unread.
+- **Line comments.** Click or drag line numbers in a diff, write a comment and choose **Add to next
+  message**: it becomes a line-comment chip in the thread's composer through the public dshx
+  `Composer` contract (rich-composer sends it as `<comment path lines>`).
+- **Land card** on top: the target bookmark, how far behind it the workspace is, conflicts,
+  undescribed revisions and the thread's project-check receipts. **Land** previews the exact
+  revisions in a confirm dialog and then calls jj-integration's `land` with all of its Host guards;
+  it is disabled with the reason when revisions conflict or lack a description. A thread that is
+  working or waiting offers **Land when idle** (jj-integration's queued land, with Undo). **History**
+  opens the revision graph for rebase-only or describe work. After a land, the Inbox's Ready to land
+  item resolves at once.
+
+![Land previews the revisions before anything moves](docs/screenshots/land-card.png)
+
+![A line comment waits in the composer as a chip](docs/screenshots/diff-line-comments.png)
+
+Ways in: the turn card (this plugin claims the native `dsh-resource://changes-review/…` address,
+so the card opens Changes on that turn instead of a second review tab), the right pane's tab
+chooser, the jujutsu composer bar ("Review workspace changes"), **Open in thread** on a Land row or
+on the Review page, and the dshx `Changes` contract (`review({ workspacePath, sessionId })` opens the
+thread and its facet; without `sessionId` it opens the Review page).
+
+Why here and not in sidebar-right: this plugin already owns scoped review (Host diff reads and
+pulls.review scopes) and the `Changes` contract, and it already depends on jj-integration's API, so
+the Land card adds no new dependency direction. sidebar-right is a native fork that hosts tabs;
+product features stay out of it.
+
+## Review page
+
 Review a project's or workspace's changes the way [pulls.review](https://pulls.review) does:
 all changed-file diffs in one vertically scrollable view, grouped by scope and
 with per-file review progress — inside DSH.
@@ -34,12 +83,13 @@ site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
 The panel shows the range and totals, then every changed-file diff in one
 scrollable view. Each diff header carries its scope and summary, and a per-file
 action marks that file reviewed. The review-wide selector can batch-mark files
-across scopes. Review marks are kept on the Host through dshx plugin storage
-(`hostStorage(api).store`), so every browser of that DSH shows the same marks; marks
-an earlier version kept in this browser's localStorage move there once. They are keyed by
-workspace, base and working-copy revision, so a new revision — or a base that
-moved under the same `@` — starts fresh; the record keeps the 20 most recently
-touched scopes.
+across scopes. Review marks are diff-viewed's revision-range marks (the same store
+the Changes facet reads), keyed by workspace, base and working-copy revision, so a
+new revision starts fresh. Marks an earlier version kept in this plugin's own Host
+record (or, before that, in this browser's localStorage) move into that store once
+on load, in batches; the old record is emptied only after the move succeeded, so a
+failed move retries on the next load and loses nothing. **Open in thread** opens the
+thread on screen with its Changes facet; this page stays the cross-project view.
 
 **Summarize** replaces the deterministic scope text with one model call over the
 whole diff, using the provider the thread last requested with and the first model

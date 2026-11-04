@@ -1,12 +1,12 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import { useApi, useSubscribable, type HostStore } from '@dshfiles/dshx/client'
+import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
-import { Check, ChevronDown, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -15,17 +15,21 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { pullsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
-import { ReviewedMarksModel, type ReviewedMarks } from './reviewed.js'
+import type { ChangesRequest } from './changes-scope.js'
+import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { reviewWithHistoryFallback } from './review-source.js'
 import type { SessionFocus } from './session-focus.js'
+
+/** Bring a thread on screen and open its Changes facet; false when it cannot. */
+export type OpenInThread = (sessionId: string, request?: ChangesRequest) => boolean
 
 export interface PullsReviewPanelProps {
   readonly sessions: ISessions
   readonly focus: SessionFocus
   readonly workspacePicker: WorkspacePickerPorts
-  /** Kept on the Host, so marks made in one browser show in every other. */
-  readonly reviewed: HostStore<ReviewedMarks>
+  /** The thread panel's Changes facet is the per-thread view; this page stays the cross-project one. */
+  readonly openInThread: OpenInThread
 }
 
 const noBody = (): undefined => undefined
@@ -47,8 +51,6 @@ const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }):
 export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const api = useApi(pullsReviewApi)
   const jjApi = useApi(jjIntegrationApi)
-  const reviewedStore = props.reviewed
-  const reviewed = useSubscribable(reviewedStore)
 
   const subscribeMounted = useCallback((listener: () => void) => props.focus.subscribe(listener), [props.focus])
   const readMounted = useCallback(() => props.focus.getSnapshot(), [props.focus])
@@ -131,11 +133,9 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   })
   const summarized = summarize.data
   const aiSummaries = summarized?.status === 'ok' ? summarized.summaries : undefined
-  const scopeKeyOf = head !== undefined ? ReviewedMarksModel.keyOf(reviewPath, base ?? '', head) : undefined
-  const reviewedPaths = useMemo(() => {
-    const paths = scopeKeyOf === undefined ? undefined : reviewed[scopeKeyOf]
-    return new Set(paths ?? [])
-  }, [reviewed, scopeKeyOf])
+  // Marks live in diff-viewed's one store, keyed by workspace, base and head commit: the Changes facet reads the same ones.
+  const marks = useRangeViewedMarks(head !== undefined && base !== undefined ? { workspacePath: reviewPath, base, head } : undefined)
+  const reviewedPaths = marks.viewed
 
   const scopes = useMemo(() => (result?.status === 'ok' ? result.scopes : []), [result])
 
@@ -177,15 +177,10 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     result?.status === 'ok' ? result.scopes.reduce((total, item) => total + item.filePaths.filter(path => reviewedPaths.has(path)).length, 0) : 0
   const progress = result !== undefined && result.status === 'ok' && result.fileCount > 0 ? Math.round((totalReviewed / result.fileCount) * 100) : 0
 
-  const markReviewed = (path: string): void => {
-    if (scopeKeyOf === undefined) return
-    reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, ReviewedMarksModel.toggle(reviewed[scopeKeyOf] ?? [], path)))
-  }
+  const markReviewed = (path: string): void => marks.set([path], !reviewedPaths.has(path))
   const applyReviewed = (nextReviewed: boolean): void => {
-    if (scopeKeyOf === undefined || selection.ids.length === 0) return
-    const current = reviewed[scopeKeyOf] ?? []
-    const next = nextReviewed ? ReviewedMarksModel.mark(current, selection.ids) : ReviewedMarksModel.unmark(current, selection.ids)
-    reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, next))
+    if (selection.ids.length === 0) return
+    marks.set(selection.ids, nextReviewed)
     setSelection(ListSelectionModel.empty())
   }
 
@@ -245,7 +240,19 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
               },
             }
           : {})}
-        actions={[{ id: 'refresh', label: 'Refresh', icon: <RefreshCw aria-hidden />, onSelect: () => void query.refetch(), pending: query.isFetching }]}
+        actions={[
+          ...(reviewSessionId === undefined
+            ? []
+            : [
+                {
+                  id: 'open-in-thread',
+                  label: 'Open in thread',
+                  icon: <PanelRight aria-hidden />,
+                  onSelect: () => void props.openInThread(String(reviewSessionId), { scope: 'target' }),
+                },
+              ]),
+          { id: 'refresh', label: 'Refresh', icon: <RefreshCw aria-hidden />, onSelect: () => void query.refetch(), pending: query.isFetching },
+        ]}
         className="dshx:shrink-0"
       >
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
