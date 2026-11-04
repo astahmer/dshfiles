@@ -10,6 +10,7 @@
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
     "check:green": "pnpm run typecheck:scripts && pnpm run check:cycles && pnpm run check:native-forks && pnpm run test:scripts && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:screenshots && pnpm run check:plugins && pnpm run check:repo && pnpm run check:effect-native && pnpm run knip && pnpm run check:plugin-boot && pnpm run check:e2e:smoke",
     "check:cycles": "node scripts/workspace-cycles.mjs",
+    "check:copy": "node scripts/copy-check.ts",
     "check:effect-antislop": "node scripts/check-effect-antislop.mjs",
     "check:effect-native": "node scripts/effect-native-audit.mjs",
     "check:zod-imports": "node scripts/check-zod-imports.mjs",
