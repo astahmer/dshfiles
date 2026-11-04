@@ -26,8 +26,13 @@ export const useComposerDraft = (draftKey: string) => {
       return next
     })
   }
+  /**
+   * Puts a refused capture back unless the user typed something new since. The editor's own Enter handling can leave
+   * blank lines behind after a send ("\n\n"), which is not something typed: a whitespace-only box counts as empty, or
+   * Retry would offer to resend nothing.
+   */
   const restoreText = (submitted: string): void => {
-    setTextState(current => (current === '' ? submitted : current))
+    setTextState(current => (current.trim() === '' ? submitted : current))
   }
   return { text, setText, appendText, restoreText }
 }

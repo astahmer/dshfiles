@@ -67,4 +67,21 @@ describe('backlog panel drafts', () => {
     expect(handles.get(BACKLOG_PANEL_ID)?.draft.text).toBe('legacy draft')
     await act(async () => root.unmount())
   })
+
+  it('puts a refused capture back over the blank lines a send leaves, never over new text', async () => {
+    let handle: ReturnType<typeof useComposerDraft> | undefined
+    const Panel = () => {
+      handle = useComposerDraft('restore-test')
+      return <div>{handle.text}</div>
+    }
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(<Panel />))
+    await act(async () => handle?.setText('\n\n'))
+    await act(async () => handle?.restoreText('Retry this capture'))
+    expect(handle?.text).toBe('Retry this capture')
+    await act(async () => handle?.setText('typed since'))
+    await act(async () => handle?.restoreText('Retry this capture'))
+    expect(handle?.text).toBe('typed since')
+    await act(async () => root.unmount())
+  })
 })
