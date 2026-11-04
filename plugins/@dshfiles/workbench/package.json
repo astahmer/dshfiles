@@ -19,6 +19,10 @@
       "types": "./src/registry.ts",
       "default": "./dist/registry.js"
     },
+    "./close-button-position": {
+      "types": "./src/close-button-position.ts",
+      "default": "./dist/close-button-position.js"
+    },
     "./tabs": {
       "types": "./src/tabs.ts",
       "default": "./dist/tabs.js"
