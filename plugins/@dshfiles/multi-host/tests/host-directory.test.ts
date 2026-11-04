@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { HostDirectory } from '../src/host-directory.js'
@@ -156,6 +156,25 @@ describe('multi-host directory store', () => {
     const updated = await HostDirectoryStore.upsertRuntime({ ...buildRuntime('machine'), name: 'renamed runtime' })
     expect(firstPort).toBeGreaterThanOrEqual(40_000)
     expect(updated.originPort).toBe(firstPort)
+  })
+
+  test('reads do not chmod an already private file, and still tighten a loosened one', async () => {
+    const home = await inHome()
+    await HostDirectoryStore.upsertHost(buildHost('local'))
+    const file = dataPath(home, 'directory.json')
+    const before = await stat(file)
+    const parentBefore = await stat(dataPath(home, ''))
+    // chmod updates ctime even when the mode is unchanged: an unchanged ctime proves no syscall ran.
+    await new Promise(resolve => setTimeout(resolve, 20))
+    for (let index = 0; index < 5; index += 1) await HostDirectoryStore.readDirectory()
+    expect((await stat(file)).ctimeMs).toBe(before.ctimeMs)
+    expect((await stat(dataPath(home, ''))).ctimeMs).toBe(parentBefore.ctimeMs)
+
+    await chmod(file, 0o644)
+    await chmod(dataPath(home, ''), 0o755)
+    await HostDirectoryStore.readDirectory()
+    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    expect((await stat(dataPath(home, ''))).mode & 0o777).toBe(0o700)
   })
 
   test('writes a private directory and credential file atomically', async () => {

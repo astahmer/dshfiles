@@ -521,8 +521,7 @@ const handlers = Api.handlers(multiHostApi, {
   list: Effect.fn('multi-host list')(function* () {
     const directory = yield* HostDirectory
     const pool = yield* RuntimePool
-    const hosts = yield* directory.listHosts
-    const runtimes = yield* directory.listRuntimes()
+    const { hosts, runtimes } = yield* directory.read
     const summaries = yield* Effect.forEach(runtimes, runtime =>
       Effect.gen(function* () {
         const generation = yield* pool.generation(runtime.id)
@@ -1089,8 +1088,9 @@ const handlers = Api.handlers(multiHostApi, {
     const threads = yield* RemoteThreads
     const pool = yield* RuntimePool
     const listed = yield* threads.list
-    const runtimes = yield* directory.listRuntimes()
-    const hosts = yield* directory.listHosts
+    // One directory snapshot answers both lookups: two reads cost two locked
+    // lstat/read/decode passes of the same file per list.
+    const { runtimes, hosts } = yield* directory.read
     const rows = yield* Effect.forEach(listed, thread =>
       Effect.gen(function* () {
         const runtime = runtimes.find(item => item.id === thread.runtimeId)

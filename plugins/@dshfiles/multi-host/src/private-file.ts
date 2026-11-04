@@ -10,6 +10,8 @@ const lstatIfPresent = (input: { readonly fileSystem: FileSystem.FileSystem; rea
     Effect.catchIf(isNotFound, () => Effect.succeed(undefined)),
   )
 
+const permissionBits = (info: FileSystem.File.Info): number => info.mode & 0o777
+
 /**
  * Tighten a private data file and its directory to 0600/0700. `invalid` when either is not what it claims to be (a
  * symlink, a directory in place of the file), which callers refuse instead of following.
@@ -21,11 +23,13 @@ const secure = Effect.fnUntraced(function* (file: string) {
   const parentInfo = yield* lstatIfPresent({ fileSystem, path: parent })
   if (parentInfo === undefined) return 'missing' as const
   if (parentInfo.type !== 'Directory') return 'invalid' as const
-  yield* fileSystem.chmod(parent, 0o700)
+  // The lstat above already says the mode; a read only chmods what is loose, so a
+  // hot read path (every thread list) costs two lstats instead of two lstats and two chmods.
+  if (permissionBits(parentInfo) !== 0o700) yield* fileSystem.chmod(parent, 0o700)
   const fileInfo = yield* lstatIfPresent({ fileSystem, path: file })
   if (fileInfo === undefined) return 'missing' as const
   if (fileInfo.type !== 'File') return 'invalid' as const
-  yield* fileSystem.chmod(file, 0o600)
+  if (permissionBits(fileInfo) !== 0o600) yield* fileSystem.chmod(file, 0o600)
   return 'secured' as const
 })
 
