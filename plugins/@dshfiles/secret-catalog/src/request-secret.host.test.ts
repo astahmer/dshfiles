@@ -14,11 +14,20 @@ import plugin from './host.js'
 const SYNTHETIC_VALUE = 'synthetic-requested-secret-value'
 const fakeCli = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'tooling', 'dshx', 'e2e', 'support', 'fake-secret-cli.mjs')
 
+type ToolArguments = Readonly<Record<string, string | boolean>>
+
+interface ToolExecution {
+  readonly callId: string
+  readonly sessionId: string
+  readonly agent: { readonly id: string; readonly session: { readonly header: { readonly cwd: string } } }
+  readonly signal: AbortSignal
+}
+
 const toolsSchema = Schema.Struct({
   tools: Schema.Array(
     Schema.Struct({
       name: Schema.String,
-      execute: Schema.declare((value): value is (args: unknown, execution: unknown) => Promise<unknown> => typeof value === 'function'),
+      execute: Schema.declare((value): value is (args: ToolArguments, execution: ToolExecution) => Promise<unknown> => typeof value === 'function'),
     }),
   ),
 })
@@ -45,7 +54,7 @@ const call = async (apiId: string, method: string, input: Record<string, unknown
   return result.value.output
 }
 
-const runTool = (name: string, args: unknown, controller: AbortController) => {
+const runTool = (name: string, args: ToolArguments, controller: AbortController) => {
   const tool = definition.tools.find(candidate => candidate.name === name)
   if (tool === undefined) throw new Error(`No tool ${name}.`)
   return tool.execute(args, {
