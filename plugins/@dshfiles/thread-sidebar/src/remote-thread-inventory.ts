@@ -2,6 +2,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { multiHostApi, multiHostKeys, multiHostQueries, type MultiHostClient, type RemoteThreadSummary } from '@dshfiles/multi-host/destination'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMemo } from 'react'
 import { ThreadViewModel, type ThreadStatusFilters, type ThreadSourceFilter } from './thread-view.js'
 import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
@@ -19,6 +20,7 @@ export type RemoteSidebarThread = {
   readonly updatedAt: number
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  readonly workspacePath?: string | undefined
 }
 
 const filterRemoteSidebarThreads = (input: {
@@ -54,6 +56,7 @@ const threadKey = (runtimeId: string, sessionId: string): string => `${runtimeId
 const folderName = (path: string | undefined): string | undefined => path?.split(/[\\/]/u).filter(Boolean).at(-1)
 const validTimestamp = (timestamp: number): number => (Number.isFinite(timestamp) ? timestamp : 0)
 const createdTimestamp = (createdAt: string): number => validTimestamp(Date.parse(createdAt))
+const originPathKey = (runtimeId: string, path: string): string => `${runtimeId}\u0000${path}`
 
 const runtimesWithStartedThreads = <Runtime extends { readonly id: string }>(
   runtimes: readonly Runtime[],
@@ -102,6 +105,7 @@ const buildRemoteSidebarThreads = (input: {
         running: session.running,
         updatedAt: validTimestamp(session.updatedAt),
         workspaceTitle,
+        workspacePath: workspace?.path ?? cwd,
         workspaceId: workspaceTitle === undefined ? undefined : `remote-project:${entry.runtimeId}:${workspace?.workspaceId ?? workspaceTitle}`,
       })
     }
@@ -121,6 +125,7 @@ const buildRemoteSidebarThreads = (input: {
       running: false,
       updatedAt: createdTimestamp(thread.createdAt),
       workspaceTitle,
+      workspacePath: thread.cwd,
       workspaceId: workspaceTitle === undefined ? undefined : `remote-project:${thread.runtimeId}:${workspaceTitle}`,
     })
   }
@@ -129,13 +134,67 @@ const buildRemoteSidebarThreads = (input: {
 }
 
 /** Remote threads started here join the current view unless the user explicitly separates them. */
+type LocalProject = { readonly workspaceId: string; readonly path: string }
+type ProjectOriginsResult = Awaited<ReturnType<MultiHostClient['projectOrigins']>>
+type ProjectOriginsInput = Parameters<MultiHostClient['projectOrigins']>[0]
+
+const projectOriginsInputOf = (input: {
+  readonly localProjects: readonly LocalProject[]
+  readonly threads: readonly RemoteSidebarThread[]
+}): ProjectOriginsInput => {
+  const localPaths = [...new Set(input.localProjects.map(project => project.path))].sort().slice(0, 200)
+  const pathsByRuntime = new Map<string, Set<string>>()
+  for (const thread of input.threads) {
+    if (thread.workspacePath === undefined) continue
+    const paths = pathsByRuntime.get(thread.runtimeId) ?? new Set<string>()
+    paths.add(thread.workspacePath)
+    pathsByRuntime.set(thread.runtimeId, paths)
+  }
+  const remote = [...pathsByRuntime.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, 64)
+    .map(([runtimeId, paths]) => ({ runtimeId, paths: [...paths].sort().slice(0, 200) }))
+  return { localPaths, remote }
+}
+
+const mapRemoteThreadsToLocalProjects = (input: {
+  readonly threads: readonly RemoteSidebarThread[]
+  readonly localProjects: readonly LocalProject[]
+  readonly origins: ProjectOriginsResult['origins'] | undefined
+}): readonly RemoteSidebarThread[] => {
+  if (input.origins === undefined) return input.threads
+  const projectsByPath = new Map(input.localProjects.map(project => [project.path, project]))
+  const projectIdByOrigin = new Map<string, string>()
+  const remoteOriginByPath = new Map<string, string>()
+
+  for (const entry of input.origins) {
+    if (entry.origin === null) continue
+    if (entry.kind === 'local') {
+      const project = projectsByPath.get(entry.path)
+      if (project !== undefined && !projectIdByOrigin.has(entry.origin)) projectIdByOrigin.set(entry.origin, project.workspaceId)
+      continue
+    }
+    if (entry.runtimeId !== undefined) remoteOriginByPath.set(originPathKey(entry.runtimeId, entry.path), entry.origin)
+  }
+
+  return input.threads.map(thread => {
+    if (thread.workspacePath === undefined) return thread
+    const origin = remoteOriginByPath.get(originPathKey(thread.runtimeId, thread.workspacePath))
+    if (origin === undefined) return thread
+    const workspaceId = projectIdByOrigin.get(origin)
+    return workspaceId === undefined ? thread : { ...thread, workspaceId }
+  })
+}
+
 export class RemoteThreadInventoryModel {
   static readonly filter = filterRemoteSidebarThreads
   static readonly build = buildRemoteSidebarThreads
   static readonly runtimesWithStartedThreads = runtimesWithStartedThreads
+  static readonly projectOriginsInput = projectOriginsInputOf
+  static readonly mapToLocalProjects = mapRemoteThreadsToLocalProjects
 }
 
-export const useRemoteSidebarThreads = (enabled: boolean): readonly RemoteSidebarThread[] => {
+export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonly LocalProject[]): readonly RemoteSidebarThread[] => {
   const api = useApi(multiHostApi)
   const startedHere = useQuery({
     queryKey: multiHostKeys.threads,
@@ -167,9 +226,26 @@ export const useRemoteSidebarThreads = (enabled: boolean): readonly RemoteSideba
     const hiddenHosts = new Set((directory.data?.hosts ?? []).filter(host => host.hidden).map(host => host.id))
     return new Set((directory.data?.runtimes ?? []).filter(runtime => hiddenHosts.has(runtime.hostId)).map(runtime => runtime.id))
   }, [directory.data?.hosts, directory.data?.runtimes])
-
-  return useMemo(
+  const threads = useMemo(
     () => (enabled ? buildRemoteSidebarThreads({ startedHere: startedHere.data?.threads ?? [], statuses, hiddenRuntimeIds }) : []),
     [enabled, hiddenRuntimeIds, startedHere.data?.threads, statuses],
+  )
+  const originInput = useMemo(() => projectOriginsInputOf({ localProjects, threads }), [localProjects, threads])
+  const origins = useQuery({
+    queryKey: ['thread-sidebar', 'remote-project-origins', originInput],
+    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.projectOrigins(originInput, { signal: hostSignal }) }),
+    staleTime: 5 * 60_000,
+    retry: false,
+    enabled: enabled && originInput.localPaths.length > 0 && originInput.remote.length > 0,
+  })
+
+  return useMemo(
+    () =>
+      mapRemoteThreadsToLocalProjects({
+        threads,
+        localProjects,
+        origins: origins.isError ? undefined : origins.data?.origins,
+      }),
+    [localProjects, origins.data?.origins, origins.isError, threads],
   )
 }

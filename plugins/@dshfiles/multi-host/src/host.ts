@@ -39,6 +39,7 @@ import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity } from './identity.js'
 import { LaunchFile } from './launch-file.js'
 import { LocalProjectFiles } from './local-project-files.js'
+import { readProjectOrigins } from './project-origins.js'
 import { NativeRpc } from './native-rpc.js'
 import { MultiHostPaths } from './paths.js'
 import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
@@ -764,6 +765,7 @@ const handlers = Api.handlers(multiHostApi, {
     const status = yield* RuntimeStatus
     return yield* status.status(input.runtimeId)
   }),
+  projectOrigins: readProjectOrigins,
   runtimePing: Effect.fn('multi-host runtime ping')(function* (input) {
     const startedAt = yield* Clock.currentTimeMillis
     return yield* withRuntime(input.runtimeId, gateway => gateway.api('identity', undefined), { mutation: false }).pipe(

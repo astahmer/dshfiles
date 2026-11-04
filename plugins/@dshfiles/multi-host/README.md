@@ -120,7 +120,9 @@ With a host chosen:
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
-  reports it.
+  reports it. When a remote workspace shares a Git origin with a local project,
+  its row joins that project's group and keeps the host badge; unavailable origins
+  leave its existing host-specific group unchanged.
 
 ## Setting up a remote host
 

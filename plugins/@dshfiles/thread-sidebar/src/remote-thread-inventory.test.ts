@@ -81,6 +81,42 @@ test('remote inventory enriches started-here threads without adding host-only se
   expect(rows.some(row => row.sessionId === 'host-thread' || row.sessionId === 'blank-thread')).toBe(false)
 })
 
+test('remote threads group under a matching local project origin and retain the host badge', () => {
+  const startedHere = [
+    {
+      runtimeId: 'runtime-a',
+      sessionId: 'live-thread',
+      cwd: '/work/Atlas',
+      title: 'Stored title',
+      mention: formatSessionReferenceMention({ sessionId: SessionId('live-thread'), label: 'Stored title' }),
+      createdAt: '2025-01-01T00:00:00.000Z',
+      hostName: 'Build host',
+      connected: false,
+    },
+  ]
+  const threads = RemoteThreadInventoryModel.build({ startedHere, statuses: [{ runtimeId: 'runtime-a', hostName: 'Build host', status }] })
+  const origins = [
+    { kind: 'local' as const, path: '/Users/me/Atlas', origin: 'github.com/owner/atlas' },
+    { kind: 'remote' as const, runtimeId: 'runtime-a', path: '/work/Atlas', origin: 'github.com/owner/atlas' },
+  ]
+
+  expect(
+    RemoteThreadInventoryModel.mapToLocalProjects({
+      threads,
+      localProjects: [{ workspaceId: 'local-project', path: '/Users/me/Atlas' }],
+      origins,
+    }),
+  ).toMatchObject([{ workspaceId: 'local-project', hostName: 'Build host' }])
+  expect(RemoteThreadInventoryModel.mapToLocalProjects({ threads, localProjects: [], origins: undefined })).toEqual(threads)
+  expect(
+    RemoteThreadInventoryModel.mapToLocalProjects({
+      threads,
+      localProjects: [{ workspaceId: 'local-project', path: '/Users/me/Atlas' }],
+      origins: [{ kind: 'local', path: '/Users/me/Atlas', origin: 'github.com/owner/atlas' }],
+    }),
+  ).toEqual(threads)
+})
+
 test('threads of a hidden host leave the sidebar', () => {
   const stored = {
     runtimeId: 'runtime-a',

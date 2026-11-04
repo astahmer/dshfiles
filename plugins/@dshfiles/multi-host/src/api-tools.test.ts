@@ -70,6 +70,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_mkdir',
       'multi_host_models',
       'multi_host_open_folder',
+      'multi_host_project_origins',
       'multi_host_provision',
       'multi_host_reconnect',
       'multi_host_remove_host',
@@ -94,6 +95,20 @@ describe('multi-host tool exposure', () => {
       'multi_host_threads',
       'multi_host_update',
     ])
+  })
+
+  test('project origin lookup bounds local and remote path batches', async () => {
+    const inputSchema = multiHostApi.methods.projectOrigins.input
+    if (inputSchema === undefined) throw new Error('The project origin API must define an input schema.')
+    const accepts = async (input: unknown): Promise<boolean> => {
+      const result = await standard(inputSchema).validate(input)
+      return !('issues' in result)
+    }
+    expect(await accepts({ localPaths: ['/work/local'], remote: [{ runtimeId: 'runtime-a', paths: ['/work/remote'] }] })).toBe(true)
+    expect(await accepts({ localPaths: ['/work/with\t-tab'], remote: [] })).toBe(false)
+    expect(await accepts({ localPaths: new Array(201).fill('/work/local'), remote: [] })).toBe(false)
+    expect(await accepts({ localPaths: [], remote: new Array(65).fill({ runtimeId: 'runtime-a', paths: [] }) })).toBe(false)
+    expect(await accepts({ localPaths: [], remote: [{ runtimeId: 'runtime-a', paths: new Array(201).fill('/work/remote') }] })).toBe(false)
   })
 
   test('remote cloning accepts safe destinations and complete local-file selections', async () => {
@@ -328,6 +343,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_list',
       'multi_host_local_project_files',
       'multi_host_models',
+      'multi_host_project_origins',
       'multi_host_resource_pool',
       'multi_host_resource_snapshot',
       'multi_host_runtime_logs',

@@ -1456,7 +1456,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const boardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
   const threadView = isBoard ? boardViewSettings : listThreadView
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
-  const remoteThreads = useRemoteSidebarThreads(props.wide !== false)
+  const localProjectsForRemoteThreads = useMemo(
+    () => SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({ workspaceId: workspace.workspaceId, path: workspace.path })),
+    [workspaceState.items],
+  )
+  const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
   const [now, setNow] = useState(() => Date.now())
   // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
   const readNow = useCallback(() => Date.now(), [])

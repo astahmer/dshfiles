@@ -362,6 +362,28 @@ const cloneDestinationSchema = Schema.Union([
   trimmedStringSchema(Schema.String.check(stringMinLength(3), Schema.isMaxLength(4096), Schema.isPattern(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u))),
 ])
 const localProjectPathSchema = trimmedStringSchema(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)))
+const protocolControlCharacterCodes = new Set([0, 9, 10, 13])
+const projectOriginPathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
+  Schema.makeFilter(path =>
+    path.split('').every(character => !protocolControlCharacterCodes.has(character.charCodeAt(0))) ? true : 'Paths cannot contain protocol control characters.',
+  ),
+)
+const projectOriginsInputSchema = Schema.Struct({
+  localPaths: Schema.Array(projectOriginPathSchema).check(Schema.isMaxLength(200)),
+  remote: Schema.Array(Schema.Struct({ runtimeId: idSchema, paths: Schema.Array(projectOriginPathSchema).check(Schema.isMaxLength(200)) })).check(
+    Schema.isMaxLength(64),
+  ),
+})
+const projectOriginsOutputSchema = Schema.Struct({
+  origins: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(['local', 'remote']),
+      runtimeId: Schema.optional(idSchema),
+      path: projectOriginPathSchema,
+      origin: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+    }),
+  ).check(Schema.isMaxLength(13_000)),
+})
 const localProjectFilePathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
   Schema.makeFilter(path =>
     !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
@@ -377,6 +399,8 @@ const repositoryUrlSchema = trimmedStringSchema(
     ),
   ),
 )
+export type ProjectOriginsInput = Schema.Schema.Type<typeof projectOriginsInputSchema>
+
 export const cloneProjectInputEffectSchema = Schema.Struct({
   runtimeId: idSchema,
   repositoryUrl: repositoryUrlSchema,
@@ -631,6 +655,12 @@ const effectMultiHostApi = defineApi({
       description:
         'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. A cold or stale result returns immediately while one coalesced background refresh runs. Read-only.',
       tool: { name: 'multi_host_status', readOnly: true, render: compactJson },
+    }),
+    projectOrigins: method({
+      input: projectOriginsInputSchema,
+      output: projectOriginsOutputSchema,
+      description: 'Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. Read-only.',
+      tool: { name: 'multi_host_project_origins', readOnly: true, render: compactJson },
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
     runtimePing: method({

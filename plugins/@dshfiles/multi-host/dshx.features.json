@@ -160,6 +160,54 @@
       ]
     },
     {
+      "id": "logical-project-grouping",
+      "title": "Group remote threads under matching local projects",
+      "summary": "Read normalized Git origins on local projects and remote workspaces so matching clones share one thread-sidebar project group while remote rows keep their host badge.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["origin-unavailable", "origin-matched", "host-badged"],
+      "failureModes": [
+        "A missing multi-host API, unreachable runtime, or missing Git origin leaves remote rows in their existing host-specific project groups.",
+        "Git origins are read-only and cached in memory for five minutes."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.project-origin-normalization",
+          "file": "plugins/@dshfiles/multi-host/src/project-origins.test.ts",
+          "testName": "normalizes common Git origin formats to a lowercase host and repository path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.logical-project-grouping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/remote-thread-inventory.test.ts",
+          "testName": "remote threads group under a matching local project origin and retain the host badge"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.project-origin-ssh-e2e",
+          "reason": "An end-to-end journey needs an SSH host with a matching Git clone, which the scratch browser fixture does not provision; normalization, fallback grouping, and the host badge are covered by unit tests."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host project origins",
+          "file": "plugins/@dshfiles/multi-host/src/project-origins.test.ts",
+          "testName": "records the project origins span without exposing input paths"
+        }
+      ]
+    },
+    {
       "id": "fleet-update",
       "title": "Update every host from the Hosts page",
       "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists what would change. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
