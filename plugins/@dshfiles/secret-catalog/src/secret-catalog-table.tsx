@@ -1,9 +1,9 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CopyIcon, EyeIcon, KeyRoundIcon, PencilIcon, SearchXIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { CopyIcon, EyeIcon, PencilIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DataTable, createColumnHelper, createSortedRowModel, rowSortingFeature, sortFn_alphanumeric, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -103,7 +103,7 @@ const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
         <TooltipTrigger asChild>
           <span
             aria-label={t('hiddenValue')}
-            className="dshx:inline-block dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground/60"
+            className="dshx:inline-block dshx:max-w-full dshx:truncate dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground/60"
             tabIndex={0}
           >
             {MASK}
@@ -116,13 +116,13 @@ const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   return (
     <button
       aria-label={t('revealAlias', { alias: row.alias })}
-      className="dshx:group dshx:relative dshx:inline-flex dshx:min-w-32 dshx:items-center dshx:rounded-sm dshx:px-2 dshx:py-1 dshx:text-left dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+      className="dshx:group dshx:relative dshx:inline-flex dshx:w-32 dshx:max-w-full dshx:min-w-0 dshx:overflow-hidden dshx:items-center dshx:rounded-sm dshx:px-2 dshx:py-1 dshx:text-left dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
       onClick={() => actions.onReveal(row)}
       type="button"
     >
       <span
         aria-hidden
-        className="dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground dshx:transition-opacity dshx:group-hover:opacity-0 dshx:group-focus-visible:opacity-0"
+        className="dshx:truncate dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground dshx:transition-opacity dshx:group-hover:opacity-0 dshx:group-focus-visible:opacity-0"
       >
         {MASK}
       </span>
@@ -255,13 +255,9 @@ export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element 
     props.loading && !props.hasAnyRows ? (
       <LoadingRows label={t('loadingMetadata')} />
     ) : (
-      <Empty className="dshx:gap-3 dshx:p-4 dshx:md:p-6">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">{props.hasAnyRows ? <SearchXIcon /> : <KeyRoundIcon />}</EmptyMedia>
-          <EmptyTitle className="dshx:text-base">{props.hasAnyRows ? t('noMatchingAliases') : t('noAliases')}</EmptyTitle>
-          <EmptyDescription>{props.hasAnyRows ? t('noMatchingAliasesHint') : t('noAliasesHint')}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div className="dshx:rounded-lg dshx:border dshx:border-border">
+        <EmptyState>{props.hasAnyRows ? t('noMatchingAliases') : t('noAliases')}</EmptyState>
+      </div>
     )
   return (
     <SecretRowActionsContext.Provider value={props.actions}>

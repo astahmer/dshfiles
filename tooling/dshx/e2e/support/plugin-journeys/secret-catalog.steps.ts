@@ -102,8 +102,8 @@ const aliasRows = (page: Page) => catalog(page).getByRole('rowgroup').nth(1).get
 const rowFor = (page: Page, alias: string, environment: string) => aliasRows(page).filter({ hasText: new RegExp(`${alias} · \\w+ · ${environment} ·`) })
 
 const openCatalog = async (page: Page): Promise<void> => {
-  await openGlobalPanel(page, 'Secret Catalog: Secrets')
-  await expect(catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true })).toBeVisible()
+  await openGlobalPanel(page, 'Secrets')
+  await expect(catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 })).toBeVisible()
 }
 
 const openBacklogSettings = async (page: Page): Promise<void> => {
@@ -275,7 +275,7 @@ Then('the repair card names {string} as missing from every secret scope', async 
     await expect(card).toHaveAttribute('data-state', 'alias-missing')
     await expect(card.getByRole('alert')).toContainText(reference)
     await expect(card.getByRole('alert')).toContainText('missing from every secret scope')
-    for (const action of ['Set value', 'Pick another secret', 'Open in Secret Catalog', 'Re-check']) {
+    for (const action of ['Set value', 'Pick another secret', 'Open in Secrets', 'Re-check']) {
       await expect(card.getByRole('button', { name: action, exact: true })).toBeVisible()
     }
   })
@@ -318,12 +318,12 @@ Then('the settings field shows the repair card for {string}', async ({ page }: {
 })
 
 When('the repair card opens the Secret Catalog', async ({ page }: { page: Page }) => {
-  await page.getByTestId('secret-input-panel').getByRole('button', { name: 'Open in Secret Catalog', exact: true }).click()
+  await page.getByTestId('secret-input-panel').getByRole('button', { name: 'Open in Secrets', exact: true }).click()
 })
 
 Then('the Secret Catalog is filtered to {string}', async ({ page }: { page: Page }, alias: string) => {
   await recordAssertion(page, 'secret-catalog-reference-repair-opens-catalog', async () => {
-    await expect(catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true })).toBeVisible()
+    await expect(catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 })).toBeVisible()
     await expect(catalog(page).getByRole('textbox', { name: 'Filter aliases', exact: true })).toHaveValue(alias)
   })
   await finishJourneyAssertions(page)
@@ -402,7 +402,11 @@ When('the seeded project folder is chosen in the Secret Catalog', async ({ page 
   await expect(picker.locator('p').filter({ hasText: project }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(picker).toBeHidden()
-  await expect(catalog(page).getByRole('button', { name: new RegExp(`^secret-project · ${project}`) })).toBeVisible()
+  // The folder button shows the project name; its path is in the tooltip.
+  const folder = catalog(page).getByRole('button', { name: 'secret-project', exact: true })
+  await expect(folder).toBeVisible()
+  await folder.locator('[data-slot="tooltip-trigger"]').hover()
+  await expect(page.getByRole('tooltip')).toContainText(project)
 })
 
 When('the fake secret CLI store is unreadable', async ({ page }: { page: Page }) => {
@@ -456,7 +460,7 @@ When('{string} is typed into a new inline row with the value {string} and saved 
 When('an inline row named {string} is left by clicking elsewhere', async ({ page }: { page: Page }, name: string) => {
   await catalog(page).getByRole('button', { name: 'Add secret', exact: true }).click()
   await draftRow(page).last().getByRole('textbox', { name: 'New secret name', exact: true }).pressSequentially(name)
-  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+  await catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 }).click()
 })
 
 When('the inline row is renamed {string}, set to Generate, and left by clicking elsewhere', async ({ page }: { page: Page }, name: string) => {
@@ -465,7 +469,7 @@ When('the inline row is renamed {string}, set to Generate, and left by clicking 
   await row.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
   await page.getByRole('menuitem', { name: 'Generate on this Host', exact: true }).click()
   await expect(row.getByText('Generated on this Host when saved', { exact: true })).toBeVisible()
-  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+  await catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 }).click()
 })
 
 When('a new inline row is deleted from its row menu', async ({ page }: { page: Page }) => {
@@ -609,7 +613,7 @@ Then('only the load error is shown, without an empty catalog', async ({ page }: 
       timeout: 30_000,
     })
     await expect(catalog(page).getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
-    await expect(catalog(page).getByText('No secrets yet', { exact: true })).toHaveCount(0)
+    await expect(catalog(page).getByText(/^No secrets yet\./u)).toHaveCount(0)
     await expect(catalog(page).getByText('0 aliases', { exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -648,7 +652,7 @@ Then('the dev DB_PASSWORD reveals on click, hides on timeout and blur, and copie
   })
   await reveal.click()
   await expect(revealed).toHaveText('db-e2e-dev-value')
-  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+  await catalog(page).getByRole('heading', { name: 'Secrets', exact: true, level: 1 }).click()
   await recordAssertion(page, 'secret-catalog-revealed-value-hides-on-blur', async () => {
     await expect(revealed).toHaveCount(0)
     await expect(page.getByText('db-e2e-dev-value')).toHaveCount(0)

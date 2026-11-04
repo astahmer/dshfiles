@@ -1,12 +1,12 @@
 import type { IWorkspaces, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, FolderOpenIcon, PlusIcon, RefreshCwIcon, SlidersHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
@@ -304,34 +304,30 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   return (
     <TooltipProvider>
-      <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background">
-        <header className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:px-3 dshx:@max-pane-narrow:pt-4">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
-              <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-              {showCatalog ? <Badge variant="muted">{t('aliasCount', { count: rows.length })}</Badge> : null}
-            </div>
-            <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle')}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Button
-              disabled={loading}
-              onClick={() => {
+      <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background">
+        <Page
+          heading={t('title')}
+          description={t('subtitle')}
+          {...(showCatalog ? { count: rows.length } : {})}
+          actions={[
+            {
+              id: 'refresh',
+              label: t('refresh'),
+              icon: <RefreshCwIcon aria-hidden className={loading ? 'dshx:animate-spin' : undefined} />,
+              disabled: loading,
+              onSelect: () => {
                 clearRevealed()
                 resetCopyMutation()
                 void listQuery.refetch()
-              }}
-              type="button"
-              variant="outline"
-            >
-              <RefreshCwIcon aria-hidden className={loading ? 'dshx:animate-spin' : undefined} />
-              {t('refresh')}
-            </Button>
-          </div>
-        </header>
+              },
+            },
+          ]}
+          fill
+          bodyClassName="dshx:gap-3"
+        >
         <section
           aria-label={t('catalogFilters')}
-          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3 dshx:@max-pane-narrow:px-3"
+          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2"
         >
           <Select disabled value={displayedMachineName}>
             <SelectTrigger aria-label={t('machine')} className="dshx:w-56 dshx:@max-pane-narrow:w-full" title={t('machineSelectorHint')}>
@@ -351,9 +347,12 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             {selection === null ? (
               <span className="dshx:text-muted-foreground">{t('chooseProjectFolder')}</span>
             ) : (
-              <span className="dshx:truncate">
-                {selection.title} <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">· {selection.canonicalPath}</span>
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:truncate">{selection.title}</span>
+                </TooltipTrigger>
+                <TooltipContent>{selection.canonicalPath}</TooltipContent>
+              </Tooltip>
             )}
           </Button>
           <ToggleGroup
@@ -375,7 +374,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             ))}
           </ToggleGroup>
         </section>
-        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3 dshx:px-6 dshx:pt-4 dshx:pb-3 dshx:@max-pane-narrow:px-3">
+        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3">
           {cwd === null && (
             <Alert role="status" variant="info">
               <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
@@ -425,7 +424,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           )}
         </div>
         {showCatalog ? (
-          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6 dshx:@max-pane-narrow:px-3" onKeyDown={focusRowFromKey}>
+          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto" onKeyDown={focusRowFromKey}>
             <SecretCatalogTable
               actions={{
                 t,
@@ -500,6 +499,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </div>
           </div>
         ) : null}
+        </Page>
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}
