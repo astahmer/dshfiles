@@ -1,0 +1,98 @@
+{
+  "name": "@dshfiles/whiteboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-project Excalidraw whiteboards stored on the Host, with agent tools to list, read, write and delete them.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./dist/api.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "dshx build && vite build -c vite.editor.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/sqlite-store": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
+    "@deepseek-ai/dsh-client-ui-layout": "catalog:",
+    "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
+    "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-home-paths": "catalog:",
+    "@deepseek-ai/dsh-host-webserver": "catalog:",
+    "@deepseek-ai/dsh-tools": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@excalidraw/excalidraw": "0.18.1",
+    "@excalidraw/mermaid-to-excalidraw": "2.2.2",
+    "@types/node": "22.20.5",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-home-paths": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-api-workspace-controller"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ]
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

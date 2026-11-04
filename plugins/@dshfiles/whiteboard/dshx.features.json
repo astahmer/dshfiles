@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "project-whiteboards",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "whiteboard editor-asset serve",
+          "file": "tests/editor-assets.spec.ts",
+          "testName": "records one whiteboard editor-asset serve span per request"
+        }
+      ],
+      "title": "Project whiteboards",
+      "summary": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
+      "reach": ["click button \"Whiteboard: Boards\"", "expect heading \"Whiteboards\""],
+      "surfaces": ["client", "host", "tool", "api", "storage"],
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "left-nav: Whiteboard: Boards",
+      "configuration": [],
+      "states": ["no-project", "empty", "boards", "editing", "saving", "conflict", "save-failed", "recently-deleted", "editor-unavailable"],
+      "failureModes": [
+        "A save with a stale revision is refused; the editor offers Load newer version or Keep mine.",
+        "A scene over 900 KiB (the dshx API payload budget) is refused with a crop-images recovery message.",
+        "The editor bundle cannot be fetched; the board view offers Retry.",
+        "A symlinked whiteboard directory or database is refused."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "whiteboard.browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/whiteboard.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "whiteboard.store-lifecycle",
+          "file": "tests/host.spec.ts",
+          "testName": "creates, lists per project, reads, updates with revisions, renames, deletes and restores"
+        },
+        {
+          "kind": "unit-test",
+          "id": "whiteboard.autosave-conflict",
+          "file": "tests/board-sync-machine.spec.ts",
+          "testName": "parks a stale save in conflict until the user keeps theirs or loads the newer version"
+        }
+      ]
+    },
+    {
+      "id": "agent-diagrams",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "title": "Agent-drawn diagrams",
+      "summary": "whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.",
+      "surfaces": ["client", "host", "tool", "api"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore",
+      "configuration": [],
+      "states": ["pending", "converted", "conversion-failed"],
+      "failureModes": [
+        "Mermaid that does not parse leaves the source queued; the board offers Discard queued diagram.",
+        "Mermaid and skeleton in one write are refused."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "whiteboard.agent-mermaid",
+          "featureFile": "tooling/dshx/e2e/features/whiteboard.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "whiteboard.agent-tools",
+          "file": "tests/host.spec.ts",
+          "testName": "binds every method as a tool; reads are read-only and delete needs confirm: true"
+        }
+      ]
+    }
+  ]
+}

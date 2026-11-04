@@ -50,6 +50,13 @@
       // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
     },
+    "plugins/@dshfiles/whiteboard": {
+      // The Excalidraw editor is its own Vite build (vite.editor.config.ts → src/editor/entry.tsx) the Host serves
+      // lazily. The Host bundle inlines @dshfiles/sqlite-store, whose
+      // @effect/sql-sqlite-node import stays external and must resolve from this package at runtime.
+      "entry": ["dshx.config.ts", "vite.editor.config.ts", "src/{host,client}.{ts,tsx}!", "src/editor/entry.tsx!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@effect/sql-sqlite-node"],
+    },
     "plugins/@dshfiles/goal-tool": {
       // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
