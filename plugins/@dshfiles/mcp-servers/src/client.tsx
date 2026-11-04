@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@dshfiles/input-trigger/client'
+import { EntityKinds } from '@dshfiles/input-trigger/entity-registry'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { rankByName, type IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -41,7 +42,7 @@ export default defineClientPlugin({
   id: 'dshfiles-mcp-servers',
   name: 'MCP servers',
   uses: ['ui', 'rpc'],
-  inject: ['commandUi', 'layout', 'inputTriggers'],
+  inject: ['commandUi', 'layout'],
   locales: [mcpServersLocale],
   setup(api) {
     const ctx = api.raw.ctx
@@ -69,13 +70,9 @@ export default defineClientPlugin({
       useWhenRelevant: translate('mentionUseWhenRelevant'),
     })
     ctx.on('connection/reset', mentions.clear)
-    ctx.effect(() => {
-      const unregister = ctx.inputTriggers.registerSource(mentions.source)
-      return () => {
-        unregister()
-        mentions.clear()
-      }
-    }, 'MCP servers: @ suggestions')
+    // The `@mcp:` group goes through input-trigger's entity registry, which registers it with the composer.
+    api.add(EntityKinds, { kind: 'mcp', label: 'MCP server', order: 20, mentionPrefixes: ['mcp'], mentionSource: mentions.source })
+    ctx.effect(() => () => mentions.clear(), 'MCP servers: forget @ suggestions on unload')
 
     const RootPanel = (): JSX.Element => (
       <PluginQueryProvider>

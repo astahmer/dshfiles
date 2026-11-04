@@ -1,17 +1,10 @@
-import { Option } from 'effect'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 
-import { AgentAnchorModel } from './agent-anchor.js'
 import { AgentReference } from './agent-reference.js'
 
-/** Ask the shared card to show one agent above an element the caller rendered itself. */
-export const previewAgentReference = (handle: string, element: Element): boolean => {
-  const rect = element.getBoundingClientRect()
-  const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const parsed = AgentReference.decodePreviewRequest({ handle, anchorId: AgentAnchorModel.idOf(element), anchor })
-  if (Option.isNone(parsed)) return false
-  window.dispatchEvent(new CustomEvent(AgentReference.previewEvent, { detail: parsed.value }))
-  return true
-}
+/** Ask the shared reference card (input-trigger's entity registry) to show one agent under an element. */
+export const previewAgentReference = (handle: string, element: Element): boolean =>
+  AgentReference.isHandle(handle) && EntityPreview.request({ kind: AgentReference.entityKind, id: handle }, element)
 
 /**
  * A sent user message renders `@handle` through the native file-mention rule, as an inert file chip whose title is the

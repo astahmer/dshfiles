@@ -125,6 +125,53 @@
           "reason": "Client-only: the slash entry runs a browser command and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "entity-registry",
+      "title": "One mention and reference-preview registry",
+      "summary": "Every mentionable kind (files and threads, skills, MCP servers, backlog items, agents, memory) adds one EntityKinds item: input-trigger registers its @ source with the composer, publishes the scope prefixes it owns so each @ scope lists one kind, and draws its card in the one shared reference preview that follows the reference while the conversation scrolls.",
+      "surfaces": ["client"],
+      "surface": "entityProvider",
+      "destination": "none",
+      "currentSurface": "overlay: shared reference preview card; composer: @ menu groups",
+      "configuration": [],
+      "states": ["kind-registered", "scope-owned", "preview-open", "preview-follows-anchor", "kind-unloaded"],
+      "failureModes": [
+        "A provider that is not loaded registers no kind: its @ group and its card do not show, and its references stay plain text.",
+        "Two providers of one kind: the first registered wins; the second is ignored."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.entity-registry-arrange",
+          "file": "plugins/@dshfiles/input-trigger/src/entity-registry.test.ts",
+          "testName": "keeps the first item per kind and sorts by order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.entity-registry-scope",
+          "file": "plugins/@dshfiles/input-trigger/src/entity-registry.test.ts",
+          "testName": "tells a source when another kind owns the typed scope"
+        },
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.entity-preview-request",
+          "file": "plugins/@dshfiles/input-trigger/src/entity-registry.test.ts",
+          "testName": "rejects malformed kinds, ids, anchors and coordinates"
+        },
+        {
+          "kind": "gherkin",
+          "id": "input-trigger.entity-registry",
+          "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the registry and the shared preview card render browser state; each card body calls its provider API, which carries its own api-dispatch span."
+        }
+      ]
     }
   ]
 }

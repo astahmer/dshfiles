@@ -435,7 +435,7 @@
       "surfaces": ["client", "api"],
       "surface": "entityProvider",
       "destination": "knowledge",
-      "currentSurface": "transcript: memory: <id> reference card",
+      "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), memory kind",
       "configuration": [],
       "states": ["idle", "loading", "note", "digest", "excerpt", "missing", "unavailable"],
       "failureModes": [

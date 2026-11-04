@@ -195,7 +195,7 @@
       "surfaces": ["client"],
       "surface": "entityProvider",
       "destination": "agents",
-      "currentSurface": "dialog: agent reference preview card",
+      "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), agent kind",
       "configuration": [],
       "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
       "failureModes": [

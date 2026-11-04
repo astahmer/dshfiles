@@ -30,6 +30,10 @@
     "./image-attachment-contract": {
       "types": "./src/image-attachment-contract.ts",
       "default": "./dist/image-attachment-contract.js"
+    },
+    "./entity-registry": {
+      "types": "./src/entity-registry.ts",
+      "default": "./dist/entity-registry.js"
     }
   },
   "scripts": {
@@ -40,7 +44,9 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
-    "@dshfiles/dshx": "workspace:*"
+    "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -50,6 +56,7 @@
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-store": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
+    "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-session": "catalog:",
@@ -93,7 +100,8 @@
         "@deepseek-ai/dsh-client-connection"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-store"
+        "@deepseek-ai/dsh-client-store",
+        "@dshfiles/shared-runtime"
       ],
       "immediately": false
     }

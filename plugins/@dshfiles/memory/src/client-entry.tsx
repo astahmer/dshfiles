@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { defineClient } from '@dshfiles/dshx/client'
+import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/entity-registry'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useCallback, useSyncExternalStore } from 'react'
@@ -14,7 +15,8 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { MemoryPanel } from './memory-panel.tsx'
 import { MemoryFocusModel } from './memory-focus.ts'
 import { MemoryInlineReference } from './memory-reference-links.tsx'
-import { MemoryReferenceOverlay } from './memory-reference-overlay.tsx'
+import { MemoryReferenceModel } from './memory-reference.ts'
+import { MemoryReferencePreview } from './memory-reference-preview.tsx'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-memory-panel'
@@ -45,9 +47,12 @@ export default defineClient({
         </PluginQueryProvider>
       )
     }
-    const ReferenceOverlay = (): JSX.Element => (
+    const ReferencePreview = (props: EntityPreviewProps): JSX.Element => (
       <PluginQueryProvider>
-        <MemoryReferenceOverlay
+        <MemoryReferencePreview
+          id={props.id}
+          range={props.range}
+          close={props.close}
           openThread={openThread}
           openInMemory={focus => {
             MemoryFocusModel.request(focus)
@@ -56,11 +61,17 @@ export default defineClient({
         />
       </PluginQueryProvider>
     )
+    // Chat's inline references render `memory: n:3` citations as links; the entity registry draws their card in the one
+    // shared reference preview.
+    metadata?.plugin?.add(EntityKinds, {
+      kind: MemoryReferenceModel.entityKind,
+      label: 'Memory',
+      order: 50,
+      Preview: decorate(ReferencePreview),
+      previewWidth: request => (request.range === undefined ? 'default' : 'wide'),
+    })
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Memory' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
-    ctx.slots.inject('shell.overlay', () =>
-      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-memory-reference-preview', order: 120 }, decorate(ReferenceOverlay)),
-    )
   },
 })
 

@@ -39,6 +39,7 @@
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
+    "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/jev": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
@@ -125,6 +126,7 @@
         "@deepseek-ai/dsh-client-ui-conversation"
       ],
       "external": [
+        "@dshfiles/input-trigger",
         "@dshfiles/shared-runtime"
       ]
     }

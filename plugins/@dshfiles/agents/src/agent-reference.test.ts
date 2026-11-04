@@ -1,4 +1,3 @@
-import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import { AgentReference } from './agent-reference.js'
@@ -31,15 +30,10 @@ describe('agent reference matches', () => {
   })
 })
 
-describe('agent reference preview request', () => {
-  const anchor = { left: 10, top: 20, width: 30, height: 12 }
-
-  it('accepts a handle and the anchor the card follows', () => {
-    expect(Option.isSome(AgentReference.decodePreviewRequest({ handle: 'luna', anchorId: 1, anchor }))).toBe(true)
-  })
-
-  it('rejects an invalid handle and an anchor outside the document bounds', () => {
-    expect(Option.isSome(AgentReference.decodePreviewRequest({ handle: '@luna', anchorId: 1, anchor }))).toBe(false)
-    expect(Option.isSome(AgentReference.decodePreviewRequest({ handle: 'luna', anchorId: 1, anchor: { ...anchor, top: 200_000 } }))).toBe(false)
+describe('agent reference handles', () => {
+  it('accepts a configured handle shape and rejects a mention or an invalid handle', () => {
+    expect(AgentReference.isHandle('luna')).toBe(true)
+    expect(AgentReference.isHandle('@luna')).toBe(false)
+    expect(AgentReference.isHandle('Luna Bot')).toBe(false)
   })
 })

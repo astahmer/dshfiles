@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { InlineReferenceModel, type InlineReferenceContext } from '@dshfiles/chat/inline-references'
-import { Option, Schema } from 'effect'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { backlogInlineReference } from './backlog-inline-reference.js'
-import { backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
 
@@ -47,11 +46,11 @@ const previews = (): { readonly requests: { readonly id: number; readonly anchor
   const requests: { readonly id: number; readonly anchorId: number }[] = []
   const onRequest = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return
-    const request = Option.getOrNull(Schema.decodeUnknownOption(backlogReferencePreviewRequestSchema)(event.detail))
-    if (request !== null) requests.push(request)
+    const request = EntityPreview.decodeRequest(event.detail)
+    if (request !== null && request.kind === 'backlog') requests.push({ id: Number(request.id), anchorId: request.anchorId })
   }
-  window.addEventListener(backlogReferencePreviewEvent, onRequest)
-  return { requests, stop: () => window.removeEventListener(backlogReferencePreviewEvent, onRequest) }
+  window.addEventListener(EntityPreview.event, onRequest)
+  return { requests, stop: () => window.removeEventListener(EntityPreview.event, onRequest) }
 }
 
 describe('backlog inline references', () => {
@@ -78,7 +77,7 @@ describe('backlog inline references', () => {
     fireEvent.keyDown(link, { key: 'Enter' })
     expect(requests.map(request => request.id)).toEqual([12, 12])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(container.querySelector(`[data-dshfiles-backlog-preview-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
     stop()
   })
 

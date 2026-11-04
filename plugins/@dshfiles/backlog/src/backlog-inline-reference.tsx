@@ -1,18 +1,11 @@
 import { InlineReferenceModel } from '@dshfiles/chat/inline-references'
-import { Option, Schema } from 'effect'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 import type { KeyboardEvent, MouseEvent } from 'react'
-import { BacklogAnchorModel } from './backlog-anchor.js'
-import { BacklogReference, backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
+import { BacklogReference } from './backlog-reference.js'
 
-/** Ask the shared card to show one item above an element the caller rendered itself. */
-export const previewBacklogReference = (id: number, element: Element): boolean => {
-  const rect = element.getBoundingClientRect()
-  const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const request = Option.getOrNull(Schema.decodeUnknownOption(backlogReferencePreviewRequestSchema)({ id, anchorId: BacklogAnchorModel.idOf(element), anchor }))
-  if (request === null) return false
-  window.dispatchEvent(new CustomEvent(backlogReferencePreviewEvent, { detail: request }))
-  return true
-}
+/** Ask the shared reference card (input-trigger's entity registry) to show one item under an element. */
+export const previewBacklogReference = (id: number, element: Element): boolean =>
+  BacklogReference.id(String(id)) !== undefined && EntityPreview.request({ kind: BacklogReference.entityKind, id: String(id) }, element)
 
 /** A written `b:<id>`: the text stays as the author wrote it and opens the item's card. */
 const BacklogReferenceLink = (props: { readonly id: number; readonly text: string }): JSX.Element => {

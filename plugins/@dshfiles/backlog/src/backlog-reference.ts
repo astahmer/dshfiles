@@ -1,4 +1,3 @@
-import { Schema } from 'effect'
 
 /**
  * `b:<id>` is how every surface writes an item number (the capture grammar, the mention chip, the tool descriptions),
@@ -31,20 +30,6 @@ const backlogReferenceMatches = (text: string): readonly BacklogReferenceMatch[]
     return [{ id, start, end: start + match[0].length }]
   })
 
-const coordinate = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(-100_000), Schema.isLessThanOrEqualTo(100_000))
-const extent = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100_000))
-
-export const backlogReferencePreviewEvent = 'dshfiles:backlog-reference-preview'
-
-export const backlogReferencePreviewRequestSchema = Schema.Struct({
-  id: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_ITEM_ID)),
-  /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
-  anchorId: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
-  anchor: Schema.Struct({ left: coordinate, top: coordinate, width: extent, height: extent }),
-})
-
-export type BacklogReferencePreviewRequest = typeof backlogReferencePreviewRequestSchema.Type
-
 /** How a rendered reference finds the item it names, for the card's header and accessible name. */
 const backlogReferenceLabel = (id: number): string => `b:${String(id)}`
 
@@ -52,4 +37,6 @@ export class BacklogReference {
   static readonly id = backlogReferenceId
   static readonly matches = backlogReferenceMatches
   static readonly label = backlogReferenceLabel
+  /** The kind backlog registers in input-trigger's entity registry; the shared reference card is keyed by it. */
+  static readonly entityKind = 'backlog'
 }

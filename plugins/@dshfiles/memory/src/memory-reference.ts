@@ -46,8 +46,6 @@ const eventSequence = Schema.String.check(
 const coordinate = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(-100_000), Schema.isLessThanOrEqualTo(100_000))
 const extent = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100_000))
 
-export const memoryReferencePreviewEvent = 'dshfiles:memory-reference-preview'
-
 export const memoryReferencePreviewRequestSchema = Schema.Struct({
   id: referenceId,
   range: Schema.optional(eventSequence),
@@ -59,6 +57,8 @@ export const memoryReferencePreviewRequestSchema = Schema.Struct({
 export type MemoryReferencePreviewRequest = typeof memoryReferencePreviewRequestSchema.Type
 
 export class MemoryReferenceModel {
+  /** The kind memory registers in input-trigger's entity registry; the shared reference card is keyed by it. */
+  static readonly entityKind = 'memory'
   /** Decodes one page event; unknown keys and an out-of-range anchor both discard it. */
   // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the page event carries unknown data
   static readonly decodePreviewRequest = (value: unknown): MemoryReferencePreviewRequest | null => {

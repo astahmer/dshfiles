@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { InlineReferenceModel, type InlineReferenceContext } from '@dshfiles/chat/inline-references'
-import { Option } from 'effect'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AgentInlineReference } from './agent-inline-reference.js'
-import { AgentReference } from './agent-reference.js'
 import { installAgentMentionChips } from './agent-reference-links.js'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -31,13 +30,13 @@ const previews = (): { readonly handles: string[]; readonly anchorIds: number[];
   const anchorIds: number[] = []
   const onRequest = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return
-    const parsed = AgentReference.decodePreviewRequest(event.detail)
-    if (Option.isNone(parsed)) return
-    seen.push(parsed.value.handle)
-    anchorIds.push(parsed.value.anchorId)
+    const parsed = EntityPreview.decodeRequest(event.detail)
+    if (parsed === null || parsed.kind !== 'agent') return
+    seen.push(parsed.id)
+    anchorIds.push(parsed.anchorId)
   }
-  window.addEventListener(AgentReference.previewEvent, onRequest)
-  return { handles: seen, anchorIds, stop: () => window.removeEventListener(AgentReference.previewEvent, onRequest) }
+  window.addEventListener(EntityPreview.event, onRequest)
+  return { handles: seen, anchorIds, stop: () => window.removeEventListener(EntityPreview.event, onRequest) }
 }
 
 describe('agent inline references', () => {
@@ -85,7 +84,7 @@ describe('agent inline references', () => {
     act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
     expect(seen).toEqual(['luna', 'luna'])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(document.querySelector(`[data-dshfiles-agent-preview-anchor="${String(anchorIds[0])}"]`)).toBe(link)
+    expect(document.querySelector(`[data-dshfiles-entity-anchor="${String(anchorIds[0])}"]`)).toBe(link)
     stop()
   })
 

@@ -11,6 +11,7 @@ import { agentsApi } from '@dshfiles/agents/contract'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
+import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/entity-registry'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
@@ -27,7 +28,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
-import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
+import { BacklogReferencePreview } from './backlog-reference-preview.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
 import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
 import './client.css'
@@ -37,7 +38,7 @@ const backlogCaptureEventSchema = Schema.Struct({ text: Schema.String.check(Sche
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers', 'uiConversation'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'uiConversation'],
   setup(ctx, decorate, metadata) {
     metadata?.plugin?.add(InlineReferences, backlogInlineReference)
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
@@ -255,7 +256,6 @@ export default defineClient({
       section: 'Backlog',
       search: async (query, limit, signal) => BacklogViews.list(await api.list({ query, freshness: 'active', limit }, { signal })).items,
     })
-    ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'backlog: @ mentions')
     const PanelView = (props: { readonly panelId?: string; readonly visible?: boolean }): JSX.Element => (
       <PluginQueryProvider>
         <AgentDispatchProvider port={dispatchPort}>
@@ -303,12 +303,34 @@ export default defineClient({
         if (id !== undefined) openInBacklog(id)
       },
     })
-    const ReferenceOverlay = (): JSX.Element => (
+    const NoticeOverlay = (): JSX.Element => (
       <PluginQueryProvider>
-        <BacklogReferenceOverlay openInBacklog={openInBacklog} />
         <BacklogNoticeToast openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)} />
       </PluginQueryProvider>
     )
+    const ReferencePreview = (props: EntityPreviewProps): JSX.Element => {
+      const id = BacklogReference.id(props.id)
+      return (
+        <PluginQueryProvider>
+          {id === undefined ? (
+            <p className="dshx:p-4 dshx:text-xs dshx:text-muted-foreground">This is not a backlog reference. Write one as b:12.</p>
+          ) : (
+            <BacklogReferencePreview id={id} close={props.close} openInBacklog={openInBacklog} />
+          )}
+        </PluginQueryProvider>
+      )
+    }
+    // Chat's inline references render written `b:12` as links; the entity registry owns the `@b:` group and the item
+    // card of the one shared reference preview those links open.
+    metadata?.plugin?.add(EntityKinds, {
+      kind: BacklogReference.entityKind,
+      label: 'Backlog item',
+      order: 30,
+      mentionPrefixes: ['b', 'backlog'],
+      mentionSource: mentions,
+      Preview: decorate(ReferencePreview),
+      previewWidth: 'wide',
+    })
     ctx.effect(
       () =>
         workbenchPanels().register({
@@ -324,7 +346,7 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
     ctx.slots.inject('shell.overlay', () =>
-      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-reference-preview', order: 121 }, decorate(ReferenceOverlay)),
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-notices', order: 121 }, decorate(NoticeOverlay)),
     )
     ctx.slots.inject('conversation.user.text.node', () =>
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'backlog', priority: 100 }, BacklogMentionChip),

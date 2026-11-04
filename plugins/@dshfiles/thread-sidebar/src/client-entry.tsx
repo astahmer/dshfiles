@@ -3,6 +3,7 @@ import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/c
 import type {} from '@deepseek-ai/dsh-client-resources/client'
 import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@dshfiles/input-trigger/client'
+import { EntityKinds } from '@dshfiles/input-trigger/entity-registry'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -284,13 +285,9 @@ export default defineClient({
     })
     ctx.remote.$on('agent-preset/selected', skillMentions.invalidate)
     ctx.on('connection/reset', skillMentions.clear)
-    ctx.effect(() => {
-      const unregister = ctx.inputTriggers.registerSource(skillMentions.source)
-      return () => {
-        unregister()
-        skillMentions.clear()
-      }
-    }, 'thread-sidebar: @ skill source')
+    // The `@skill:` group goes through input-trigger's entity registry, which registers it with the composer.
+    plugin?.add(EntityKinds, { kind: 'skill', label: 'Skill', order: 10, mentionPrefixes: ['skill'], mentionSource: skillMentions.source })
+    ctx.effect(() => () => skillMentions.clear(), 'thread-sidebar: forget @ skills on unload')
 
     const ThreadMentionInput = (props: { readonly inputActions: InputActions; readonly sessionId: SessionSummary['id'] }) => {
       const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)

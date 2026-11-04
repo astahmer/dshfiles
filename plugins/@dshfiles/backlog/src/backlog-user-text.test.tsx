@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
-import { Schema } from 'effect'
 import type { UserTextTransformContext } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 
 import { BacklogMentionChip } from './backlog-mention-chip.js'
-import { backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 import { backlogUserTextRule } from './backlog-user-text.js'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -43,7 +42,7 @@ describe('backlog sent mentions', () => {
     const onRequest = (event: Event): void => {
       if (event instanceof CustomEvent) requests.push(event.detail)
     }
-    window.addEventListener(backlogReferencePreviewEvent, onRequest)
+    window.addEventListener(EntityPreview.event, onRequest)
 
     try {
       await act(async () => {
@@ -56,11 +55,10 @@ describe('backlog sent mentions', () => {
 
       await act(async () => button?.click())
 
-      expect(Schema.is(backlogReferencePreviewRequestSchema)(requests[0])).toBe(true)
-      expect(requests[0]).toMatchObject({ id: 12 })
+      expect(EntityPreview.decodeRequest(requests[0])).toMatchObject({ kind: 'backlog', id: '12' })
     } finally {
       await act(async () => root.unmount())
-      window.removeEventListener(backlogReferencePreviewEvent, onRequest)
+      window.removeEventListener(EntityPreview.event, onRequest)
       container.remove()
     }
   })

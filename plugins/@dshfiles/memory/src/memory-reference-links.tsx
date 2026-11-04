@@ -1,8 +1,9 @@
 import type { UserTextNode, UserTextRule } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { InlineReferenceModel } from '@dshfiles/chat/inline-references'
 import type { KeyboardEvent, MouseEvent } from 'react'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 import { MemoryAnchorModel } from './memory-anchor.ts'
-import { MemoryReferenceModel, memoryReferenceMatches, memoryReferencePreviewEvent } from './memory-reference.ts'
+import { MemoryReferenceModel, memoryReferenceMatches } from './memory-reference.ts'
 
 interface MemoryCitation {
   readonly id: string
@@ -23,8 +24,8 @@ const previewAt = (citation: MemoryCitation, element: Element): boolean => {
   const candidate = citation.range === undefined ? { id: citation.id, anchorId, anchor } : { id: citation.id, range: citation.range, anchorId, anchor }
   const request = MemoryReferenceModel.decodePreviewRequest(candidate)
   if (request === null) return false
-  window.dispatchEvent(new CustomEvent(memoryReferencePreviewEvent, { detail: request }))
-  return true
+  // Validated above; the shared reference card (input-trigger's entity registry) draws it.
+  return EntityPreview.request({ kind: MemoryReferenceModel.entityKind, id: request.id, range: request.range }, element)
 }
 
 const MemoryReferenceLink = (props: { readonly citation: MemoryCitation; readonly text: string }): JSX.Element => {

@@ -1,15 +1,12 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { Option } from 'effect'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
-import { AgentAnchorModel } from './agent-anchor.js'
 import { AGENTS_QUERY_ROOT, type Agent, type AgentThread } from './agent.js'
-import { AgentReference, type AgentReferencePreviewRequest } from './agent-reference.js'
+import { AgentReference } from './agent-reference.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
 import { installAgentMentionChips } from './agent-reference-links.js'
 import { agentsApi } from './api.js'
@@ -115,11 +112,8 @@ const AgentCard = (props: {
   )
 }
 
-export const AgentReferenceOverlay = (props: {
-  /** Opens the Agents page on this agent, the way the sidebar's Agents row would. */
-  readonly openInAgents: (handle: string) => void
-  readonly openThread: (sessionId: string) => void
-}): JSX.Element | null => {
+/** Keeps Chat's agent-mention links and the native `@handle` chips in step with the saved agent list. */
+export const AgentReferenceDecorations = (): null => {
   const api = useApi(agentsApi)
   const list = useQuery({
     queryKey: [AGENTS_QUERY_ROOT, 'list'],
@@ -132,117 +126,60 @@ export const AgentReferenceOverlay = (props: {
   // A saved or removed agent changes which mentions are references; Chat re-renders the visible messages.
   useEffect(() => AgentInlineReference.setHandles(handles), [handles])
   useEffect(() => installAgentMentionChips({ handles: () => handlesRef.current }), [])
+  return null
+}
 
-  const [request, setRequest] = useState<AgentReferencePreviewRequest | null>(null)
-  const [anchor, setAnchor] = useState<AgentReferencePreviewRequest['anchor'] | null>(null)
-
-  useEffect(() => {
-    const open = (event: Event): void => {
-      if (!(event instanceof CustomEvent)) return
-      const parsed = AgentReference.decodePreviewRequest(event.detail)
-      if (Option.isNone(parsed)) return
-      setAnchor(parsed.value.anchor)
-      setRequest(parsed.value)
-    }
-    window.addEventListener(AgentReference.previewEvent, open)
-    return () => window.removeEventListener(AgentReference.previewEvent, open)
-  }, [])
-
-  // A landing message scrolls the conversation; the card follows the mention instead of disappearing under it.
-  useEffect(() => {
-    if (request === null) return
-    const remeasure = (): void => {
-      const measurement = AgentAnchorModel.measure(request.anchorId, window.innerHeight)
-      if (measurement.kind === 'gone') return
-      if (measurement.kind === 'offscreen') {
-        setRequest(null)
-        return
-      }
-      setAnchor(measurement.rect)
-    }
-    window.addEventListener('scroll', remeasure, true)
-    window.addEventListener('resize', remeasure)
-    return () => {
-      window.removeEventListener('scroll', remeasure, true)
-      window.removeEventListener('resize', remeasure)
-    }
-  }, [request])
-
+/** The agent card the shared reference preview draws for one `@handle`. */
+export const AgentReferencePreview = (props: {
+  readonly handle: string
+  readonly close: () => void
+  /** Opens the Agents page on this agent, the way the sidebar's Agents row would. */
+  readonly openInAgents: (handle: string) => void
+  readonly openThread: (sessionId: string) => void
+}): JSX.Element => {
+  const api = useApi(agentsApi)
   const agent = useQuery({
-    queryKey: [AGENTS_QUERY_ROOT, 'reference-preview', request?.handle],
-    enabled: request !== null,
+    queryKey: [AGENTS_QUERY_ROOT, 'reference-preview', props.handle],
     retry: false,
     staleTime: 15_000,
-    queryFn: async ({ signal }) => {
-      if (request === null) throw new Error('No agent reference is selected.')
-      return (await api.get({ handle: request.handle }, { signal })).agent
-    },
+    queryFn: async ({ signal }) => (await api.get({ handle: props.handle }, { signal })).agent,
   })
   const threads = useQuery({
-    queryKey: [AGENTS_QUERY_ROOT, 'reference-threads', request?.handle],
-    enabled: request !== null,
+    queryKey: [AGENTS_QUERY_ROOT, 'reference-threads', props.handle],
     retry: false,
     staleTime: 15_000,
-    queryFn: async ({ signal }) => {
-      if (request === null) return []
-      return (await api.threads({ handle: request.handle }, { signal })).threads
-    },
+    queryFn: async ({ signal }) => (await api.threads({ handle: props.handle }, { signal })).threads,
   })
-
-  if (request === null) return null
   const found = agent.data ?? null
   const missing = agent.isSuccess && found === null
   return (
-    <Popover open onOpenChange={open => !open && setRequest(null)}>
-      <PopoverAnchor asChild>
-        <span
-          aria-hidden
-          style={{
-            position: 'fixed',
-            display: 'block',
-            left: (anchor ?? request.anchor).left,
-            top: (anchor ?? request.anchor).top,
-            width: Math.max(1, (anchor ?? request.anchor).width),
-            height: Math.max(1, (anchor ?? request.anchor).height),
-            pointerEvents: 'none',
-          }}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={6}
-        collisionPadding={8}
-        className="dshx-root dshx:flex dshx:w-[30rem] dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0"
-        data-dshfiles-agent-preview
-      >
-        <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-auto dshx:p-4">
-          {agent.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Loading agent…</p> : null}
-          {agent.isError ? (
-            <p className="dshx:text-xs dshx:text-destructive" role="alert">
-              {errorMessage(agent.error, 'Agent is unavailable.')}
-            </p>
-          ) : null}
-          {missing ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No agent {AgentReference.label(request.handle)}. It may have been removed.</p>
-          ) : null}
-          {found === null ? null : <AgentCard agent={found} threads={threads.data ?? []} openThread={props.openThread} />}
-        </div>
-        <div className="dshx:flex dshx:justify-end dshx:border-t dshx:border-border dshx:px-4 dshx:py-2.5">
-          {missing ? null : (
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => {
-                props.openInAgents(request.handle)
-                setRequest(null)
-              }}
-            >
-              Open in Agents
-            </Button>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <div className="dshx:flex dshx:min-h-0 dshx:flex-col" data-dshfiles-agent-preview>
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-auto dshx:p-4">
+        {agent.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Loading agent…</p> : null}
+        {agent.isError ? (
+          <p className="dshx:text-xs dshx:text-destructive" role="alert">
+            {errorMessage(agent.error, 'Agent is unavailable. Open the Agents page to check it.')}
+          </p>
+        ) : null}
+        {missing ? (
+          <p className="dshx:text-xs dshx:text-muted-foreground">No agent {AgentReference.label(props.handle)}. It may have been removed; the Agents page lists the current ones.</p>
+        ) : null}
+        {found === null ? null : <AgentCard agent={found} threads={threads.data ?? []} openThread={props.openThread} />}
+      </div>
+      <div className="dshx:flex dshx:justify-end dshx:border-t dshx:border-border dshx:px-4 dshx:py-2.5">
+        {missing ? null : (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              props.openInAgents(props.handle)
+              props.close()
+            }}
+          >
+            Open in Agents
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }

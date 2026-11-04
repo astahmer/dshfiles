@@ -18,3 +18,12 @@ Feature: Shared input trigger engine
     Then the slash menu offers the "Toggle sidebar" command
     When Enter picks the highlighted slash entry
     Then the sidebar collapses and the composer draft is empty
+
+  @scenario:input-trigger.entity-registry
+  Scenario: One shared card previews an agent mention and a backlog reference
+    Given the isolated plugin composition of "@dshfiles/input-trigger, @dshfiles/agents, @dshfiles/backlog, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    When the composer sends "Ask @dsh to look at b:1 next"
+    And the agent mention "dsh" is previewed
+    Then the shared reference card shows the "agent" card with "Open in Agents"
+    When the backlog reference "b:1" is previewed
+    Then the shared reference card shows the "backlog" card with "No backlog item b:1"

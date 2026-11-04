@@ -12,6 +12,33 @@ The backlog's plain text boxes import the same resolver through the `@dshfiles/i
 
 The native Loader row is disabled by this bundle's Cordis patch. Source registrations keep using the `inputTriggers` service and its existing contract. This is tokenization only, not the separate Host session-query cost, so lookup latency is unchanged. See [`UPSTREAM.md`](./UPSTREAM.md) for provenance and the update policy.
 
+## One mention and reference-preview registry
+
+![One shared reference card: an agent mention previewed in place](docs/screenshots/entity-registry.png)
+
+`@dshfiles/input-trigger/entity-registry` is the one place a plugin makes something mentionable (plan
+[`ade-ux` §5 `entityProvider`](../../../plans/ade-ux/README.md)). A provider adds one `EntityKinds` item:
+
+```ts
+plugin.add(EntityKinds, {
+  kind: 'backlog',
+  label: 'Backlog item',
+  mentionPrefixes: ['b', 'backlog'], // `@b:` / `@backlog:` list only this kind
+  mentionSource: mentions,            // registered with `inputTriggers` here, in registry order
+  Preview: decorate(BacklogCard),     // the body of the one shared reference card
+})
+```
+
+- **`@` groups:** input-trigger registers every `mentionSource` with its own `inputTriggers` service, so `@` sources
+  go through the registry. `EntityRegistryModel.foreignScope(kinds, kind, query)` tells a source that another kind owns
+  the typed scope (mentions' file/thread source uses it instead of a hard-coded list).
+- **References:** a link installer calls `EntityPreview.request({ kind, id, range? }, element)`. One `shell.overlay`
+  card (`[data-dshfiles-entity-preview="<kind>"]`) positions itself under the reference, follows it while the page
+  scrolls, closes when it scrolls away, and draws the kind's `Preview`. `Decorations` is an optional headless
+  component the overlay keeps mounted (agents uses it to decorate `@handle` mentions from its live agent list).
+- Providers today: mentions (files and threads), thread-sidebar (skills), mcp-servers (`@mcp:`), backlog (`b:`),
+  agents (`@handle`), memory (`memory: n:… / t:…`). A provider that is not loaded simply contributes nothing.
+
 ```sh
 pnpm test
 pnpm typecheck

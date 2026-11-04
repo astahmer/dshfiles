@@ -1101,7 +1101,7 @@
       ],
       "surface": "entityProvider",
       "destination": "work",
-      "currentSurface": "transcript: b:<id> reference card",
+      "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), backlog kind",
       "configuration": [],
       "states": [
         "idle",

@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource } from '@dshfiles/input-trigger/client'
+import { EntityKinds, EntityRegistryModel } from '@dshfiles/input-trigger/entity-registry'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -23,6 +24,8 @@ import './client.css'
 
 // The native chip codec, copy/paste and send-time serialization are keyed by this source name.
 const SOURCE_NAME = 'reference'
+/** This plugin's kind in input-trigger's entity registry. */
+const ENTITY_KIND = 'reference'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -48,9 +51,10 @@ const drillTextFor = (query: MentionQuery, mention: string): string =>
 export default defineClient({
   name: '@dshfiles/mentions',
   locales: [mentionsLocale],
-  inject: ['inputTriggers', 'sessions', 'slots', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight', 'uiWorkspace'],
+  inject: ['sessions', 'slots', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight', 'uiWorkspace'],
   setup(ctx, _decorate, metadata) {
     const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
+    const entityKinds = metadata?.plugin?.list(EntityKinds)
     const t = ctx.locale.bind(MENTIONS_LOCALE_NAMESPACE)
     const pickValues = new Map<string, PickValue>()
     const keep = (value: PickValue): string => {
@@ -141,6 +145,8 @@ export default defineClient({
         const startedAt = performance.now()
         if (sessions.binding(session.sessionId) === undefined) throw new Error(`mention candidates require a retained session "${session.sessionId}"`)
         const query = MentionRanking.parseQuery(request.query)
+        // A scope another registry kind owns (`@skill:`, `@b:`, …) lists only that kind; the built-in ones stay as a fallback.
+        if (EntityRegistryModel.foreignScope(entityKinds?.get() ?? [], ENTITY_KIND, request.query)) return []
         if (query.scope === 'skill' || query.scope === 'mcp' || query.scope === 'backlog' || query.scope === 'agent') return []
         const quoted = request.quoted === true
         const [files, threads, remoteThreads] = await sessions.using(
@@ -293,6 +299,7 @@ export default defineClient({
       },
     }
 
-    ctx.effect(() => ctx.inputTriggers.registerSource(source), 'dshfiles-mentions: @ source')
+    // Files and threads are the first `@` group; input-trigger's entity registry registers it with the composer.
+    metadata?.plugin?.add(EntityKinds, { kind: ENTITY_KIND, label: 'File or thread', order: 0, mentionPrefixes: ['thread', 't', 'file', 'f'], mentionSource: source })
   },
 })

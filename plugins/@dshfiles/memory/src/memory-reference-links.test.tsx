@@ -4,7 +4,7 @@ import { InlineReferenceModel } from '@dshfiles/chat/inline-references'
 import { act, createElement, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MemoryReferenceModel, memoryReferencePreviewEvent } from './memory-reference.ts'
+import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 import { MemoryInlineReference } from './memory-reference-links.tsx'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -51,18 +51,18 @@ describe('memory inline references', () => {
     const requests: { readonly id: string; readonly anchorId: number }[] = []
     const onRequest = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
-      const request = MemoryReferenceModel.decodePreviewRequest(event.detail)
-      if (request !== null) requests.push(request)
+      const request = EntityPreview.decodeRequest(event.detail)
+      if (request !== null && request.kind === 'memory') requests.push(request)
     }
-    window.addEventListener(memoryReferencePreviewEvent, onRequest)
+    window.addEventListener(EntityPreview.event, onRequest)
     renderTree(createElement('p', null, 'Memory: t:9356abc7.'))
     const link = document.querySelector('[data-dshfiles-memory-reference]')
     act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
     act(() => void link?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
     expect(requests.map(request => request.id)).toEqual(['t:9356abc7', 't:9356abc7'])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(document.querySelector(`[data-dshfiles-memory-preview-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
-    window.removeEventListener(memoryReferencePreviewEvent, onRequest)
+    expect(document.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    window.removeEventListener(EntityPreview.event, onRequest)
   })
 
   it('matches a sent message citation as a user-text node covering the citation, then each later reference', () => {

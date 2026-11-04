@@ -2,20 +2,21 @@ import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowUpRightIcon, BookOpenIcon, CheckIcon, CopyIcon, MessageSquareIcon, SearchIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 
-import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryApi, type MemoryPreview, type PanelNote, type PanelThread } from './api.ts'
-import { MemoryReferenceModel, memoryReferencePreviewEvent, type MemoryReferencePreviewRequest } from './memory-reference.ts'
+
 import { PanelFormat, noteStatusBadge, noteStatusLabels, originLabels } from './panel-format.ts'
+
+/** The note, digest or excerpt one reference names. */
+type MemoryPreviewTarget = { readonly id: string; readonly range?: string | undefined }
 
 /** A preview the card knows how to draw; `excerpt` is also the shape an older Host leaves it in. */
 type PreviewCard =
@@ -353,7 +354,7 @@ const headerOf = (card: PreviewCard): PreviewHeader => {
   }
 }
 
-const CardHeader = (props: { readonly card: PreviewCard; readonly request: MemoryReferencePreviewRequest }): JSX.Element => {
+const CardHeader = (props: { readonly card: PreviewCard; readonly request: MemoryPreviewTarget }): JSX.Element => {
   const header = headerOf(props.card)
   return (
     <div className="dshx:flex dshx:items-center dshx:gap-2">
@@ -383,89 +384,26 @@ const CardHeader = (props: { readonly card: PreviewCard; readonly request: Memor
   )
 }
 
-export const MemoryReferenceOverlay = (props: {
+export const MemoryReferencePreview = (props: {
+  readonly id: string
+  readonly range?: string | undefined
+  readonly close: () => void
   /** Opens the Memory page on this item, the way the sidebar's Memory row would. */
   readonly openInMemory: (focus: { readonly id: string; readonly range?: string }) => void
   /** Opens a source thread in the conversation view, the way the panel's thread card does. */
   readonly openThread: (sessionId: string) => void
-}): JSX.Element | null => {
+}): JSX.Element => {
   const api = useApi(memoryApi)
-  const [request, setRequest] = useState<MemoryReferencePreviewRequest | null>(null)
-  const [anchor, setAnchor] = useState<MemoryReferencePreviewRequest['anchor'] | null>(null)
   const textCopy = useCopyFeedback()
   const preview = useQuery({
-    queryKey: ['dshfiles-memory', 'reference-preview', request?.id, request?.range],
-    enabled: request !== null,
+    queryKey: ['dshfiles-memory', 'reference-preview', props.id, props.range],
     retry: false,
-    queryFn: ({ signal }) => {
-      if (request === null) throw new Error('No memory reference is selected.')
-      const input = request.range === undefined ? { id: request.id } : { id: request.id, range: request.range }
-      return api.preview(input, { signal })
-    },
+    queryFn: ({ signal }) => api.preview(props.range === undefined ? { id: props.id } : { id: props.id, range: props.range }, { signal }),
   })
-
-  useEffect(() => {
-    const open = (event: Event): void => {
-      if (!(event instanceof CustomEvent)) return
-      const request = MemoryReferenceModel.decodePreviewRequest(event.detail)
-      if (request === null) return
-      setAnchor(request.anchor)
-      setRequest(request)
-    }
-    window.addEventListener(memoryReferencePreviewEvent, open)
-    return () => window.removeEventListener(memoryReferencePreviewEvent, open)
-  }, [])
-
-  // A landing message scrolls the conversation; the card follows the reference instead of disappearing under it.
-  useEffect(() => {
-    if (request === null) return
-    const remeasure = (): void => {
-      const measurement = MemoryAnchorModel.measure(request.anchorId, window.innerHeight)
-      if (measurement.kind === 'gone') return
-      if (measurement.kind === 'offscreen') {
-        setRequest(null)
-        return
-      }
-      setAnchor(measurement.rect)
-    }
-    window.addEventListener('scroll', remeasure, true)
-    window.addEventListener('resize', remeasure)
-    return () => {
-      window.removeEventListener('scroll', remeasure, true)
-      window.removeEventListener('resize', remeasure)
-    }
-  }, [request])
-
-  if (request === null) return null
   const card = previewCard(preview.data)
   const copyText = copyTextOf(card)
   return (
-    <Popover open onOpenChange={open => !open && setRequest(null)}>
-      <PopoverAnchor asChild>
-        <span
-          aria-hidden
-          style={{
-            position: 'fixed',
-            display: 'block',
-            left: (anchor ?? request.anchor).left,
-            top: (anchor ?? request.anchor).top,
-            width: Math.max(1, (anchor ?? request.anchor).width),
-            height: Math.max(1, (anchor ?? request.anchor).height),
-            pointerEvents: 'none',
-          }}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={6}
-        collisionPadding={8}
-        className={cn(
-          'dshx-root dshx:flex dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0',
-          card?.kind === 'excerpt' ? 'dshx:w-[34rem]' : 'dshx:w-[30rem]',
-        )}
-        data-dshfiles-memory-preview
-      >
+    <div className="dshx:flex dshx:min-h-0 dshx:flex-col" data-dshfiles-memory-preview>
         <div className="dshx:border-b dshx:border-border dshx:px-3 dshx:py-2" data-dshfiles-memory-preview-header>
           {card === undefined ? (
             <div className="dshx:flex dshx:items-center dshx:gap-2">
@@ -476,7 +414,7 @@ export const MemoryReferenceOverlay = (props: {
               </div>
             </div>
           ) : (
-            <CardHeader card={card} request={request} />
+            <CardHeader card={card} request={{ id: props.id, range: props.range }} />
           )}
         </div>
         <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-4 dshx:[max-height:min(20rem,48vh)]">
@@ -498,13 +436,13 @@ export const MemoryReferenceOverlay = (props: {
               onOpenThread={props.openThread}
               onOpenNote={id => {
                 props.openInMemory({ id: `n:${String(id)}` })
-                setRequest(null)
+                props.close()
               }}
             />
           ) : null}
           {card?.kind === 'digest' ? <DigestCard thread={card.thread} onOpenThread={props.openThread} /> : null}
           {card?.kind === 'excerpt' ? <ExcerptCard summary={card.summary} /> : null}
-          {card?.kind === 'missing' ? <MissingCard id={request.id} summary={card.summary} /> : null}
+          {card?.kind === 'missing' ? <MissingCard id={props.id} summary={card.summary} /> : null}
         </div>
         <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5 dshx:border-t dshx:border-border dshx:px-4 dshx:py-2.5">
           <Button
@@ -522,14 +460,13 @@ export const MemoryReferenceOverlay = (props: {
             size="xs"
             variant="outline"
             onClick={() => {
-              props.openInMemory(request.range === undefined ? { id: request.id } : { id: request.id, range: request.range })
-              setRequest(null)
+              props.openInMemory(props.range === undefined ? { id: props.id } : { id: props.id, range: props.range })
+              props.close()
             }}
           >
             Open in Memory
           </Button>
         </div>
-      </PopoverContent>
-    </Popover>
+    </div>
   )
 }
