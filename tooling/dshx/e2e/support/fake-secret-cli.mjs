@@ -1,12 +1,29 @@
 #!/usr/bin/env node
 // A stand-in for the `secret` CLI the secret-catalog Host drives: the same argv, one JSON store beside this script,
 // synthetic test values only. Aliases map to vault items, so `unset` drops an alias while `rm` also deletes its item.
+import { existsSync, linkSync, mkdirSync, realpathSync, statSync } from 'node:fs'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const storePath = join(dirname(fileURLToPath(import.meta.url)), 'store.json')
+
+// The Catalog keys its metadata cache on the stat of the global config the real CLI reads. This fake keeps everything
+// in store.json instead, so in a scratch home (always under the temp directory) it hard-links that config to the store:
+// every write to the store, by this fake or by a test step, then changes the stat the Host reads. A hard link is not a
+// symlink, so the symlinked-config check stays quiet; a real or existing config is never touched.
+const linkGlobalConfigToStore = () => {
+  const config = join(homedir(), '.config', 'secret', 'config.json')
+  try {
+    if (!(realpathSync(homedir()) + sep).startsWith(realpathSync(tmpdir()) + sep) || existsSync(config)) return
+    mkdirSync(dirname(config), { recursive: true })
+    if (statSync(storePath).isFile()) linkSync(storePath, config)
+  } catch {
+    // A home the fake cannot link only loses cache invalidation for direct store edits.
+  }
+}
+linkGlobalConfigToStore()
 const store = JSON.parse(readFileSync(storePath, 'utf8'))
 const save = () => writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`)
 const fail = message => {

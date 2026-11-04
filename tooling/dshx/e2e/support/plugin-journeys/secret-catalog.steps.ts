@@ -21,7 +21,6 @@ interface SecretFixturePaths {
 }
 interface SecretFixture extends SecretFixturePaths {
   readonly previousPath: string | undefined
-  readonly previousSessionFile: string | undefined
   readonly previousJevKey: string | undefined
   readonly previousPrewarm: string | undefined
 }
@@ -82,11 +81,8 @@ Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
     vault: { 'item-github': 'gh-e2e-global-value', 'item-db-prod': 'db-e2e-prod-value', 'item-db-dev': 'db-e2e-dev-value', 'item-local': 'local-e2e-value' },
   }
   await writeFile(paths.storePath, JSON.stringify(store))
-  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousSessionFile: process.env.SECRET_SESSION_FILE, previousJevKey, previousPrewarm })
+  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousJevKey, previousPrewarm })
   process.env.PATH = `${paths.bin}${delimiter}${process.env.PATH ?? ''}`
-  // The fake keeps its whole store in store.json; naming it the session file puts it in the Catalog's metadata revision,
-  // so a step that edits the store directly is read again like an external CLI edit.
-  process.env.SECRET_SESSION_FILE = paths.storePath
 })
 
 After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
@@ -95,8 +91,6 @@ After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   fixtures.delete(page)
   if (fixture.previousPath === undefined) delete process.env.PATH
   else process.env.PATH = fixture.previousPath
-  if (fixture.previousSessionFile === undefined) delete process.env.SECRET_SESSION_FILE
-  else process.env.SECRET_SESSION_FILE = fixture.previousSessionFile
   if (fixture.previousJevKey === undefined) delete process.env.TYPESAFE_API_KEY
   else process.env.TYPESAFE_API_KEY = fixture.previousJevKey
   if (fixture.previousPrewarm === undefined) delete process.env.DSHX_E2E_PREWARM
@@ -853,9 +847,7 @@ Then('the secret request card for {string} shows its purpose and a masked value 
     await expect(card.getByText(alias, { exact: true })).toBeVisible()
   })
   await card.getByRole('button', { name: 'Enter value', exact: true }).click()
-  await recordAssertion(page, 'secret-catalog-request-value-is-masked', () =>
-    expect(card.getByLabel('Secret value')).toHaveAttribute('type', 'password'),
-  )
+  await recordAssertion(page, 'secret-catalog-request-value-is-masked', () => expect(card.getByLabel('Secret value')).toHaveAttribute('type', 'password'))
 })
 
 When('the value {string} is stored through the secret request', async ({ page }: { page: Page }, value: string) => {
@@ -864,22 +856,19 @@ When('the value {string} is stored through the secret request', async ({ page }:
   await card.getByRole('button', { name: 'Create and bind', exact: true }).click()
 })
 
-Then(
-  'the agent receives only {string} while the fake CLI stores {string}',
-  async ({ page }: { page: Page }, reference: string, value: string) => {
-    await recordAssertion(page, 'secret-catalog-request-stored-reference-only', async () => {
-      await expect(page.getByRole('status').filter({ hasText: `Stored. The agent received only ${reference}.` })).toBeVisible()
-      await expect.poll(() => toolResults(page).some(text => text.includes(`Use the reference ${reference} `)), { timeout: 30_000 }).toBe(true)
-      expect(allModelText(page)).not.toContain(value)
-      await expect(page.getByText(value)).toHaveCount(0)
-      const alias = reference.replace(/^secret:/u, '')
-      const store = await readStore(page)
-      const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
-      expect(row?.scope).toBe('global')
-      expect(store.vault[row?.item ?? '']).toBe(value)
-    })
-  },
-)
+Then('the agent receives only {string} while the fake CLI stores {string}', async ({ page }: { page: Page }, reference: string, value: string) => {
+  await recordAssertion(page, 'secret-catalog-request-stored-reference-only', async () => {
+    await expect(page.getByRole('status').filter({ hasText: `Stored. The agent received only ${reference}.` })).toBeVisible()
+    await expect.poll(() => toolResults(page).some(text => text.includes(`Use the reference ${reference} `)), { timeout: 30_000 }).toBe(true)
+    expect(allModelText(page)).not.toContain(value)
+    await expect(page.getByText(value)).toHaveCount(0)
+    const alias = reference.replace(/^secret:/u, '')
+    const store = await readStore(page)
+    const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
+    expect(row?.scope).toBe('global')
+    expect(store.vault[row?.item ?? '']).toBe(value)
+  })
+})
 
 When('the secret request for {string} is declined', async ({ page }: { page: Page }, alias: string) => {
   await requestCard(page, alias).getByRole('button', { name: 'Decline', exact: true }).click()

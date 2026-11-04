@@ -69,3 +69,12 @@ Feature: MCP servers
     Then the Echo server reads "Native client loaded · 1 Host tools registered"
     When the composer searches MCP @ autocomplete for "echo"
     Then the Echo server and its tool appear as @ suggestions
+
+  @fake-secret-cli
+  @scenario:mcp-servers.secret-catalog-references-journey
+  Scenario: Bind a stdio server's environment to a Secret Catalog alias and start it with the vault value
+    Given the isolated plugin composition of "@dshfiles/mcp-servers, @dshfiles/secret-catalog" is booted
+    When the MCP servers page is opened
+    And the local echo MCP server is added with "API_TOKEN" bound to the vault alias "GITHUB_TOKEN@prod"
+    Then the Echo server reads "Native client loaded · 1 Host tools registered"
+    And the MCP page never shows the vault value "gh-e2e-global-value"

@@ -35,7 +35,7 @@ const pendingOutput = Schema.Struct({ requests: Schema.Array(Schema.Struct({ req
 let host: TestHost
 let root = ''
 let storePath = ''
-const previous = { PATH: process.env.PATH, SECRET_SESSION_FILE: process.env.SECRET_SESSION_FILE }
+const previous = { PATH: process.env.PATH, HOME: process.env.HOME }
 
 const call = async (apiId: string, method: string, input: Record<string, unknown>) => {
   // SAFETY: the test connection accepts any JSON input; the Host validates it against the method schema.
@@ -74,7 +74,8 @@ beforeAll(async () => {
   storePath = join(bin, 'store.json')
   await writeFile(storePath, JSON.stringify({ rows: [], vault: {} }))
   process.env.PATH = `${bin}${delimiter}${process.env.PATH ?? ''}`
-  process.env.SECRET_SESSION_FILE = storePath
+  // the Host and the fake CLI both read the global config under HOME; keep it inside this test's directory
+  process.env.HOME = root
   host = await createTestHost()
   host.ctx.provide('webServer', { port: 3080, host: '127.0.0.1', protocol: 'http:', register: () => () => undefined })
   // SAFETY: the Catalog's settings contribution only registers its automatic page through `configure`.
@@ -86,8 +87,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await host.dispose()
   process.env.PATH = previous.PATH
-  if (previous.SECRET_SESSION_FILE === undefined) delete process.env.SECRET_SESSION_FILE
-  else process.env.SECRET_SESSION_FILE = previous.SECRET_SESSION_FILE
+  process.env.HOME = previous.HOME
   await rm(root, { recursive: true, force: true })
 })
 

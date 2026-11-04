@@ -101,12 +101,6 @@
           "kind": "gherkin",
           "id": "mcp-servers.preferences",
           "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "mcp-servers.secret-catalog-references",
-          "file": "plugins/@dshfiles/mcp-servers/src/host-secret-references.test.ts",
-          "testName": "resolves a secret reference on the Host for global aliases, and reports availability from metadata only"
         }
       ],
       "telemetry": [
@@ -123,6 +117,71 @@
           "span": "mcp server start",
           "file": "plugins/@dshfiles/mcp-servers/src/mcp-spans.test.ts",
           "testName": "records an mcp server start span with the argument count, never argv or environment"
+        }
+      ]
+    },
+    {
+      "id": "secret-catalog-credential-bindings",
+      "title": "Bind server headers and environment to Secret Catalog references",
+      "summary": "Each environment variable or request header of a server is a name → reference row. The reference input carries data-secret-input=\"reference\", so the Secret Catalog's key button lists global aliases and writes secret:ALIAS[@env]; a DSH credential name still works. The Host resolves secret references through secretCatalogValues only when the server starts, and the server list reports them configured from the Catalog's value-free key list.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click tab \"Settings\"",
+        "click button \"MCP servers\"",
+        "click button \"Advanced: request headers\"",
+        "click button \"Add\"",
+        "click textbox \"Request headers from credentials: credential reference 1\"",
+        "click button \"Bind a secret\"",
+        "click text \"GITHUB_TOKEN@prod\"",
+        "expect textbox \"Request headers from credentials: credential reference 1\""
+      ],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers",
+      "configuration": [],
+      "states": ["credential-name", "secret-reference", "configured", "missing", "catalog-absent"],
+      "failureModes": [
+        "A malformed reference (neither a credential name nor secret:ALIAS[@env]) is refused before saving.",
+        "Without the Secret Catalog loaded, a secret reference leaves its server not ready instead of starting it without the credential.",
+        "An alias present in several Catalog entries is reported missing, never guessed."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Secret value reads at server start and metadata reads for the list.",
+          "deterministicFake": "Stand-in secretCatalogValues/secretCatalogCredentials on a test Host, or the e2e fake secret CLI in a scratch DSH."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mcp-servers.secret-catalog-references-journey",
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.secret-catalog-references",
+          "file": "plugins/@dshfiles/mcp-servers/src/host-secret-references.test.ts",
+          "testName": "resolves a secret reference on the Host for global aliases, and reports availability from metadata only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.secret-catalog-references-absent",
+          "file": "plugins/@dshfiles/mcp-servers/src/host-secret-references.test.ts",
+          "testName": "treats a secret reference as missing while the Secret Catalog is not loaded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.reference-rows",
+          "file": "plugins/@dshfiles/mcp-servers/src/server-form.test.ts",
+          "testName": "accepts a Secret Catalog reference as a credential binding and refuses a malformed one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         },
         {
           "kind": "automatic",

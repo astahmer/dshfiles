@@ -226,3 +226,33 @@ Then('the server asks for sign-in again', async ({ page }: { page: Page }) => {
 After(async ({ page }: { page: Page }) => {
   await stopFakeOAuthMcp(page)
 })
+
+When(
+  'the local echo MCP server is added with {string} bound to the vault alias {string}',
+  async ({ page }: { page: Page }, variable: string, alias: string) => {
+    const form = addForm(page)
+    await form.getByRole('combobox', { name: 'Transport', exact: true }).click()
+    await page.getByRole('option', { name: 'Local command (stdio)', exact: true }).click()
+    await form.getByRole('textbox', { name: 'Display name', exact: true }).fill('Echo server')
+    await form.getByRole('textbox', { name: 'Command and arguments', exact: true }).fill(`node ${fakeServer}`)
+    await form.getByRole('button', { name: 'Advanced: working directory and environment', exact: true }).click()
+    await form.getByRole('button', { name: 'Add', exact: true }).click()
+    const field = 'Environment variables from credentials'
+    await form.getByRole('textbox', { name: `${field}: name 1`, exact: true }).fill(variable)
+    const reference = form.getByRole('textbox', { name: `${field}: credential reference 1`, exact: true })
+    await reference.focus()
+    await page.getByRole('button', { name: 'Bind a secret', exact: true }).click()
+    await page.getByRole('button', { name: new RegExp(`^${alias.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u') }).click()
+    const [name = alias] = alias.split('@')
+    await recordAssertion(page, 'mcp-servers-vault-picker-writes-a-reference', () => expect(reference).toHaveValue(`secret:${name}`))
+    await form.getByRole('button', { name: 'Add server', exact: true }).click()
+  },
+)
+
+Then('the MCP page never shows the vault value {string}', async ({ page }: { page: Page }, value: string) => {
+  await recordAssertion(page, 'mcp-servers-vault-value-stays-on-the-host', async () => {
+    await expect(page.getByText(value)).toHaveCount(0)
+    expect(await page.content()).not.toContain(value)
+  })
+  await finishJourneyAssertions(page)
+})
