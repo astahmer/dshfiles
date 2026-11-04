@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
-import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
+import { Changes, createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -115,8 +115,14 @@ export default defineClient({
     'remote.directoryPicker',
     'remote.workspace',
   ],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
+    /** The thread panel's Changes facet, when the plugin that owns it (pulls-review) is loaded; this panel stays the cross-thread view. */
+    const openChanges = (input: { readonly workspacePath: string; readonly sessionId: string }): boolean => {
+      const changes = metadata?.plugin?.use(Changes).get()
+      return changes?.status === 'active' ? changes.value.review(input) : false
+    }
+    const changesAvailable = (): boolean => metadata?.plugin?.use(Changes).get()?.status === 'active'
     ctx.effect(() => {
       const sheet = document.createElement('style')
       sheet.dataset.dshfilesRemoteDestination = ''
@@ -140,6 +146,7 @@ export default defineClient({
               bookmark={useBookmark()}
               sessions={ctx.sessions}
               openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+              openChanges={changesAvailable() ? openChanges : undefined}
             />
           </PluginQueryProvider>
         )),
@@ -173,6 +180,7 @@ export default defineClient({
               bookmark={useBookmark()}
               sessions={ctx.sessions}
               openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+              openChanges={changesAvailable() ? openChanges : undefined}
             />
           </PluginQueryProvider>
         )),

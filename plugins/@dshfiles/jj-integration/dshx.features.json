@@ -979,7 +979,7 @@
     {
       "id": "thread-integration-row-details",
       "title": "Thread integration row details",
-      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row.",
+      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row. Open in thread opens that thread with its Changes facet (through the dshx Changes contract) when pulls-review is loaded; this page stays the cross-thread view.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Current thread workspace: thread-*\"",
@@ -1126,7 +1126,7 @@
     {
       "id": "land-inbox-items",
       "title": "Blocked and ready-to-land workspaces in the Inbox",
-      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land.",
+      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land. A land from a client view (the thread's Changes facet, the Land view) re-reads the workspaces at once, so its item resolves without waiting for the provider's safety tick.",
       "reach": [
         "click tab \"Inbox\"",
         "expect heading \"Inbox\""
@@ -1191,6 +1191,12 @@
           "id": "jj-integration.inbox-conflict-round-trip",
           "file": "plugins/@dshfiles/jj-integration/src/attention-provider.integration.test.ts",
           "testName": "lists a conflicted thread as Failed, refuses Retry while it conflicts, and lands and resolves it once fixed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.inbox-facet-land-resolves",
+          "file": "plugins/@dshfiles/jj-integration/src/attention-provider.integration.test.ts",
+          "testName": "resolves the Ready to land item as soon as the Changes facet lands through the land method"
         },
         {
           "kind": "not-applicable",

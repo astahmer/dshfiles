@@ -66,7 +66,11 @@ const handlers = Api.handlers(jjIntegrationApi, {
   refreshRepositories: () => RepositoryViews.use(views => Effect.map(views.startRefresh, started => ({ started }))),
   threadAt: input => ThreadLifecycle.use(lifecycle => lifecycle.threadAt(input)),
   revisionGraph: input => ThreadWorkspaces.use(threads => Effect.map(threads.revisionGraph(input.path), graph => ({ graph }))),
-  land: input => Landing.use(landing => landing.land({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark })),
+  // A land from a client view resolves its ready-to-land inbox item at once instead of on the provider's safety tick.
+  land: input =>
+    Landing.use(landing => landing.land({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark })).pipe(
+      Effect.ensuring(LandAttention.use(attention => attention.refresh)),
+    ),
   queueLand: input => Landing.use(landing => landing.queue({ path: input.path, sessionId: input.sessionId })),
   cancelQueuedLand: input => Landing.use(landing => landing.cancel(input.path)),
   integrationProgress: input => IntegrationRequests.use(requests => Effect.map(requests.progress(input.path), progress => ({ progress }))),

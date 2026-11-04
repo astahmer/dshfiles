@@ -176,6 +176,8 @@ const make = Effect.gen(function* () {
   )
 
   return {
+    /** Re-read the workspaces now, e.g. after a land from the Changes facet or the Land view, so a landed item resolves at once. */
+    refresh: Queue.offer(pokes, undefined).pipe(Effect.asVoid),
     /** A queued land stopped: say so in the inbox until a land of that workspace is tried again. */
     queuedLandFailed: (path: string, message: string) =>
       Effect.flatMap(Clock.currentTimeMillis, at =>

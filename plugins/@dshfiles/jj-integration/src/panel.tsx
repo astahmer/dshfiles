@@ -369,6 +369,8 @@ const ThreadRow = (props: {
   readonly userMessagesBySession: ReadonlyMap<string, number>
   readonly sessions: ISessions
   readonly openSession: (sessionId: SessionSummary['id']) => void
+  /** Open the thread with its Changes facet, when a plugin provides it (pulls-review). */
+  readonly openChanges: ((input: { readonly workspacePath: string; readonly sessionId: string }) => boolean) | undefined
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
   readonly bookmarks: readonly string[]
@@ -507,7 +509,17 @@ const ThreadRow = (props: {
         </ul>
       ) : null}
       {mainSession === undefined ? null : (
-        <div>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-2">
+          {props.openChanges === undefined ? null : (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={t('openChangesInThread', { title: mainSession.displayTitle })}
+              onClick={() => void props.openChanges?.({ workspacePath: thread.path, sessionId: String(mainSession.id) })}
+            >
+              {t('openInThread')}
+            </Button>
+          )}
           <Button size="sm" variant="outline" aria-expanded={previewOpen} aria-controls={previewId} onClick={() => setPreviewOpen(open => !open)}>
             {t(previewOpen ? 'hidePreview' : 'preview')}
           </Button>
@@ -778,6 +790,8 @@ export const ThreadWorkspacesPanel = (props: {
   readonly bookmark: string
   readonly sessions: ISessions
   readonly openSession: (sessionId: SessionSummary['id']) => void
+  /** Open a thread's Changes facet; absent when no plugin provides the Changes contract. */
+  readonly openChanges?: ((input: { readonly workspacePath: string; readonly sessionId: string }) => boolean) | undefined
 }): JSX.Element => {
   const { t } = props
   const now = useMinuteTick()
@@ -1312,6 +1326,7 @@ export const ThreadWorkspacesPanel = (props: {
                                 userMessagesBySession={userMessagesBySession}
                                 sessions={props.sessions}
                                 openSession={props.openSession}
+                                openChanges={props.openChanges}
                                 t={t}
                                 bookmark={props.bookmark}
                                 bookmarks={repository.bookmarks}

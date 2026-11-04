@@ -84,6 +84,20 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
     expect(closed.items.find(entry => entry.dedupeKey === `${path}:ready`)?.source).toBe(READY_TO_LAND_SOURCE)
   }, 180_000)
 
+  it('resolves the Ready to land item as soon as the Changes facet lands through the land method', async () => {
+    harness.setSession('session-facet', { running: false, questions: 0 })
+    const repo = join(root, 'facet')
+    JjIntegrationTestHost.initRepository(repo)
+    const path = await harness.provisionThread(repo, { sessionIds: ['session-facet'] })
+    await rescan()
+    await until('other', list => list.items.some(item => item.dedupeKey === `${path}:ready`))
+
+    // The facet (and the Land view) call `land` directly, not the inbox verb; no rescan or safety tick follows.
+    expect(await harness.api.land({ path, sessionId: 'session-facet' })).toMatchObject({ status: 'landed' })
+    const closed = await until('closed', list => list.items.some(entry => entry.dedupeKey === `${path}:ready` && entry.resolvedAt !== null))
+    expect(closed.items.find(entry => entry.dedupeKey === `${path}:ready`)?.source).toBe(READY_TO_LAND_SOURCE)
+  }, 180_000)
+
   it('lists a conflicted thread as Failed, refuses Retry while it conflicts, and lands and resolves it once fixed', async () => {
     harness.setSession('session-conflict', { running: false, questions: 0 })
     const repo = join(root, 'conflict')
