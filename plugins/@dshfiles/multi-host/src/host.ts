@@ -60,7 +60,7 @@ import { SchemaFields } from './schema.js'
 import { Ssh, shellQuote } from './ssh.js'
 import { listSshConfigHosts } from './ssh-config.js'
 import { ViewLeases } from './view-leases.js'
-import { threadLaunchUrl } from './thread-launch-url.js'
+import { threadViewUrl } from './thread-launch-url.js'
 import { RemoteRuntime } from './remote-runtime.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import type { Gateway } from './connectors/gateway.js'
@@ -1077,7 +1077,7 @@ const handlers = Api.handlers(multiHostApi, {
   runtimeOpenView: Effect.fn('multi-host runtime open view')(function* (input) {
     const leases = yield* ViewLeases
     const view = yield* leases.open(input.runtimeId)
-    return input.sessionId === undefined ? view : { ...view, launchUrl: threadLaunchUrl({ launchUrl: view.launchUrl, sessionId: input.sessionId }) }
+    return input.sessionId === undefined ? view : { ...view, threadUrl: threadViewUrl({ launchUrl: view.launchUrl, sessionId: input.sessionId }) }
   }),
   runtimeCloseView: Effect.fn('multi-host runtime close view')(function* (input) {
     const leases = yield* ViewLeases

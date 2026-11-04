@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { multiHostApi } from './api.js'
+import { openRemoteView } from './open-remote-view.js'
 
 export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => {
   const api = useApi(multiHostApi)
@@ -22,8 +23,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
     mutationFn: async ({ runtimeId, tab }: { readonly runtimeId: string; readonly tab: Window }) => {
       try {
         const view = await api.runtimeOpenView({ runtimeId, sessionId: props.sessionId })
-        tab.opener = null
-        tab.location.href = view.launchUrl
+        await openRemoteView({ tab, launchUrl: view.launchUrl, threadUrl: view.threadUrl })
       } catch (error) {
         tab.close()
         throw error
