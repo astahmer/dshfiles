@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-368 features from 84 plugins.
+369 features from 84 plugins.
 
 ## Counts
 
@@ -17,7 +17,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  |  | 16 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
-| Observe |  |  |  |  | 20 | 1 |  |  | 2 |  |  |  |  |  | 23 |
+| Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
@@ -76,7 +76,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | keyboard | 3 | No place of its own 3 |
 | left-nav | 87 | Observe 21, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
-| observe | 1 | Observe 1 |
+| observe | 2 | Observe 2 |
 | palette | 13 | No place of its own 13 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
@@ -208,7 +208,7 @@ rail destination; 5 features.
 
 ### Observe
 
-rail destination; 23 features.
+rail destination; 24 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -218,6 +218,7 @@ rail destination; 23 features.
 | ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
 | background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
+| background-jobs/processes-page: Observe › Processes: jobs, dev servers and RAM on one page | destinationSection | observe: Processes |
 | multi-host/fleet-update: Update every host from the Hosts page | destinationSection | left-nav: Hosts › Update hosts |
 | multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Hosts |
 | traces/boards-and-saved-views: Boards and saved views | destinationSection | left-nav: Traces: Explorer › Boards |

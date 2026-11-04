@@ -4,6 +4,10 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const BACKGROUND_JOBS_LOCALE_NAMESPACE = 'dshfiles.backgroundJobs'
 
 const en = {
+  processesTitle: 'Processes',
+  processesSubtitle: 'What runs on this host for your threads: background jobs, dev servers, and the RAM each workspace uses.',
+  processesViews: 'Process views',
+  tabJobs: 'Jobs',
   title: 'Jobs',
   subtitle: 'Every background job across threads: live ones from the job registry, finished ones from thread logs.',
   loading: 'Loading…',
@@ -75,6 +79,10 @@ const en = {
 } as const
 
 const zh = {
+  processesTitle: '进程',
+  processesSubtitle: '此主机上为会话运行的内容：后台任务、开发服务器，以及每个工作区占用的内存。',
+  processesViews: '进程视图',
+  tabJobs: '任务',
   title: '后台任务',
   subtitle: '跨会话的全部后台任务：来自任务注册表的运行中任务，以及来自会话日志的已结束任务。',
   loading: '正在加载…',

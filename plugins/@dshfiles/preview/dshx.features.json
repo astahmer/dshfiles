@@ -95,7 +95,7 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop.",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe \u203a Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "threadFacet",
@@ -139,6 +139,12 @@
           "id": "preview.dev-server-host-excluded",
           "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
           "testName": "never lists the Host or the supervisor that launched it, nor sockets outside every thread workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.processes-dev-servers",
+          "file": "plugins/@dshfiles/preview/src/dev-servers-view.test.ts",
+          "testName": "lists only threads that serve a port, in the order asked"
         }
       ],
       "telemetry": [

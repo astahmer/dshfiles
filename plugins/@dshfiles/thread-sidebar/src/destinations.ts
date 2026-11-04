@@ -89,8 +89,17 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'ai-accounts-forecast', destination: 'observe', label: 'Quota forecast', description: 'When each account runs out.', order: 3 },
   { panelId: 'activity-timeline', destination: 'observe', label: 'Activity', description: 'What happened, thread by thread.', order: 4, formerLabels: ['Activity Timeline: Activity'] },
   { panelId: 'traces', destination: 'observe', label: 'Traces', description: 'Spans, logs, metrics and alerts.', order: 5, formerLabels: ['Traces: Explorer'] },
-  { panelId: 'dshfiles-background-jobs', destination: 'observe', label: 'Jobs', description: 'Background jobs on this host.', order: 6, formerLabels: ['Background Jobs: Jobs'] },
-  { panelId: 'dshfiles-worktree-memory', destination: 'observe', label: 'RAM', description: 'Memory used per workspace.', order: 7, formerLabels: ['Worktree Memory: RAM'] },
+  // Phase 5: one Processes page (Jobs · Dev servers · RAM); RAM is a tab of it.
+  {
+    panelId: 'dshfiles-background-jobs',
+    destination: 'observe',
+    label: 'Processes',
+    description: 'Background jobs, dev servers and RAM per workspace.',
+    order: 6,
+    formerLabels: ['Background Jobs: Jobs', 'Worktree Memory: RAM', 'Jobs', 'RAM'],
+  },
+  // Listed only without @dshfiles/background-jobs, where worktree-memory keeps its own RAM page.
+  { panelId: 'dshfiles-worktree-memory', destination: 'observe', label: 'RAM', description: 'Process memory per workspace.', order: 7 },
   { panelId: 'dshfiles-multi-host-hosts', destination: 'observe', label: 'Hosts', description: 'Machines threads run on.', order: 8, formerLabels: ['Multi-host: Hosts', 'Hosts'] },
   { panelId: 'dshfiles-memory-panel', destination: 'knowledge', label: 'Memory', description: 'Notes and thread digests.', order: 1, formerLabels: ['Memory: Browser', 'Memory'] },
   { panelId: 'dshfiles-resources', destination: 'knowledge', label: 'Resources', description: 'Resource packs and their properties.', order: 2, formerLabels: ['Resource Packs: Resources'] },

@@ -26,3 +26,9 @@ Feature: Background jobs board
     When a Command Code account backed by a local fake provider is added
     And a thread starts a running bash job whose label exceeds the wire bound
     Then the board shows that job with its label clamped to the bound
+
+  @scenario:background-jobs.processes-page
+  Scenario: Jobs and RAM are tabs of one Processes page
+    Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/worktree-memory" is booted
+    When the Processes page is opened
+    Then its RAM tab shows the process memory that was its own page

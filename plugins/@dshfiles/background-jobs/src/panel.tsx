@@ -11,7 +11,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
-import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, Page, PageSection, type PageTabs } from '@dshfiles/plugin-ui/components/page'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
@@ -27,7 +27,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { useApi, useApiEvent } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
 import { JobSelectionModel } from './job-selection.js'
@@ -261,6 +261,11 @@ export interface BackgroundJobsPanelProps {
   readonly sessions: ISessions
   readonly uiWorkspace: UiWorkspace
   readonly t: BackgroundJobsTranslate
+  /** The Processes page: its tabs, and the body of a tab other than Jobs (which hides the Jobs controls). */
+  readonly heading?: string
+  readonly description?: string
+  readonly tabs?: PageTabs
+  readonly otherTab?: ReactNode
 }
 
 export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Element {
@@ -388,8 +393,9 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
 
   return (
     <Page
-      heading={t('title')}
-      description={t('subtitle')}
+      heading={props.heading ?? t('title')}
+      description={props.description ?? t('subtitle')}
+      {...(props.tabs === undefined ? {} : { tabs: props.tabs })}
       meta={
         <>
           <Badge variant="muted">
@@ -403,191 +409,201 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
           </Badge>
         </>
       }
-      actions={[{ id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() }]}
+      actions={
+        props.otherTab === undefined
+          ? [{ id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() }]
+          : []
+      }
     >
-      {value !== undefined && !value.liveAvailable ? (
-        <Alert>
-          <AlertDescription>{t('liveUnavailable')}</AlertDescription>
-        </Alert>
-      ) : null}
-      {value === undefined ? null : <IndexingNotice board={value} t={t} />}
-      {stopError === null ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>{stopError}</AlertDescription>
-        </Alert>
-      )}
+      {props.otherTab !== undefined ? (
+        props.otherTab
+      ) : (
+        <>
+          {value !== undefined && !value.liveAvailable ? (
+            <Alert>
+              <AlertDescription>{t('liveUnavailable')}</AlertDescription>
+            </Alert>
+          ) : null}
+          {value === undefined ? null : <IndexingNotice board={value} t={t} />}
+          {stopError === null ? null : (
+            <Alert variant="destructive">
+              <AlertDescription>{stopError}</AlertDescription>
+            </Alert>
+          )}
 
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
-        <ToggleGroup
-          aria-label={t('scopeAll')}
-          size="sm"
-          type="single"
-          value={scope}
-          onValueChange={next => {
-            if (next === 'running' || next === 'finished' || next === 'all') setScope(next)
-          }}
-        >
-          <ToggleGroupItem value="running">{t('scopeRunning')}</ToggleGroupItem>
-          <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
-          <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
-        </ToggleGroup>
-        <SearchInput
-          className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
-          aria-label={t('search')}
-          placeholder={t('searchPlaceholder')}
-          value={search}
-          onChange={event => setSearch(event.currentTarget.value)}
-        />
-        <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
-          <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="session">{t('groupSession')}</SelectItem>
-            <SelectItem value="category">{t('groupCategory')}</SelectItem>
-            <SelectItem value="none">{t('groupNone')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
-        <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
-        {jobCategoryValues.map(category => (
-          <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
-            {t(CATEGORY_KEY[category])}
-            <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
-          </Button>
-        ))}
-        {categories.length === 0 ? null : (
-          <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
-            {t('clearCategories')}
-          </Button>
-        )}
-      </div>
-
-      {stoppableIds.length === 0 ? null : (
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-          <input
-            type="checkbox"
-            aria-label={t('selectAllStoppable')}
-            checked={ListSelectionModel.isComplete({ state: selection, orderedIds: stoppableIds })}
-            onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: stoppableIds }))}
-            className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-          />
-          <span className="dshx:text-muted-foreground">{t('selectAllStoppable')}</span>
-        </div>
-      )}
-
-      {board.isPending ? (
-        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-          <Spinner aria-hidden /> {t('loading')}
-        </p>
-      ) : null}
-      {board.isError ? (
-        <Alert variant="destructive">
-          <AlertDescription>{errorMessage(board.error, t('loadFailed'))}</AlertDescription>
-        </Alert>
-      ) : null}
-      {board.isSuccess && rows.length === 0 ? <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noJobs')}</EmptyState> : null}
-      {value !== undefined && value.hasMore ? (
-        <p className="dshx:text-xs dshx:text-muted-foreground">
-          {value.total - rows.length} {t('moreMatched')}
-        </p>
-      ) : null}
-
-      <div className="dshx:flex dshx:flex-col dshx:gap-4">
-        {groups.map(section => (
-          <PageSection
-            key={section.key}
-            heading={section.label}
-            meta={section.rows.length}
-            actions={
-              group === 'session' && section.key.startsWith('session-') ? (
-                <TooltipProvider delayDuration={500}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={sessionTarget(props.sessions, section.key) === undefined}
-                        onClick={() => {
-                          const target = sessionTarget(props.sessions, section.key)
-                          if (target !== undefined) props.uiWorkspace.openSession(target)
-                        }}
-                      >
-                        {t('openSession')}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : null
-            }
-          >
-            <EntityList>
-              {section.rows.map(row => (
-                <JobLine
-                  key={row.id}
-                  row={row}
-                  now={now}
-                  t={t}
-                  armed={armed === row.id}
-                  stopping={stopping === row.id && stop.isPending}
-                  selected={selectedJobIds.has(row.id)}
-                  onToggleSelection={toggleJobSelection}
-                  onRangeSelection={extendJobSelection}
-                  sessionLabel={labelOf}
-                  onArm={target => setArmed(target.id)}
-                  onStop={target => {
-                    setStopping(target.id)
-                    setStopError(null)
-                    stop.mutate(target)
-                  }}
-                />
-              ))}
-            </EntityList>
-          </PageSection>
-        ))}
-      </div>
-
-      {selection.ids.length === 0 ? null : (
-        <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
-          <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
-          <Button size="sm" variant="destructive" onClick={() => setConfirmingStop(true)}>
-            {t('stopSelected')}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            {t('clearSelection')}
-          </Button>
-        </div>
-      )}
-
-      <AlertDialog
-        open={confirmingStop}
-        onOpenChange={open => {
-          if (!open && !batchStopping) setConfirmingStop(false)
-        }}
-      >
-        <AlertDialogContent className="dshx-root" size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: selection.ids.length })}</AlertDialogTitle>
-            <AlertDialogDescription>{t('stopSelectedDescription')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={batchStopping}>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={batchStopping || selection.ids.length === 0}
-              onClick={event => {
-                event.preventDefault()
-                void stopSelected()
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
+            <ToggleGroup
+              aria-label={t('scopeAll')}
+              size="sm"
+              type="single"
+              value={scope}
+              onValueChange={next => {
+                if (next === 'running' || next === 'finished' || next === 'all') setScope(next)
               }}
             >
-              {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: selection.ids.length })}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <ToggleGroupItem value="running">{t('scopeRunning')}</ToggleGroupItem>
+              <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
+              <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
+            </ToggleGroup>
+            <SearchInput
+              className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+              aria-label={t('search')}
+              placeholder={t('searchPlaceholder')}
+              value={search}
+              onChange={event => setSearch(event.currentTarget.value)}
+            />
+            <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
+              <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="session">{t('groupSession')}</SelectItem>
+                <SelectItem value="category">{t('groupCategory')}</SelectItem>
+                <SelectItem value="none">{t('groupNone')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
+            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
+            {jobCategoryValues.map(category => (
+              <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
+                {t(CATEGORY_KEY[category])}
+                <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
+              </Button>
+            ))}
+            {categories.length === 0 ? null : (
+              <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
+                {t('clearCategories')}
+              </Button>
+            )}
+          </div>
+
+          {stoppableIds.length === 0 ? null : (
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+              <input
+                type="checkbox"
+                aria-label={t('selectAllStoppable')}
+                checked={ListSelectionModel.isComplete({ state: selection, orderedIds: stoppableIds })}
+                onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: stoppableIds }))}
+                className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+              />
+              <span className="dshx:text-muted-foreground">{t('selectAllStoppable')}</span>
+            </div>
+          )}
+
+          {board.isPending ? (
+            <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
+              <Spinner aria-hidden /> {t('loading')}
+            </p>
+          ) : null}
+          {board.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage(board.error, t('loadFailed'))}</AlertDescription>
+            </Alert>
+          ) : null}
+          {board.isSuccess && rows.length === 0 ? <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noJobs')}</EmptyState> : null}
+          {value !== undefined && value.hasMore ? (
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              {value.total - rows.length} {t('moreMatched')}
+            </p>
+          ) : null}
+
+          <div className="dshx:flex dshx:flex-col dshx:gap-4">
+            {groups.map(section => (
+              <PageSection
+                key={section.key}
+                heading={section.label}
+                meta={section.rows.length}
+                actions={
+                  group === 'session' && section.key.startsWith('session-') ? (
+                    <TooltipProvider delayDuration={500}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={sessionTarget(props.sessions, section.key) === undefined}
+                            onClick={() => {
+                              const target = sessionTarget(props.sessions, section.key)
+                              if (target !== undefined) props.uiWorkspace.openSession(target)
+                            }}
+                          >
+                            {t('openSession')}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null
+                }
+              >
+                <EntityList>
+                  {section.rows.map(row => (
+                    <JobLine
+                      key={row.id}
+                      row={row}
+                      now={now}
+                      t={t}
+                      armed={armed === row.id}
+                      stopping={stopping === row.id && stop.isPending}
+                      selected={selectedJobIds.has(row.id)}
+                      onToggleSelection={toggleJobSelection}
+                      onRangeSelection={extendJobSelection}
+                      sessionLabel={labelOf}
+                      onArm={target => setArmed(target.id)}
+                      onStop={target => {
+                        setStopping(target.id)
+                        setStopError(null)
+                        stop.mutate(target)
+                      }}
+                    />
+                  ))}
+                </EntityList>
+              </PageSection>
+            ))}
+          </div>
+
+          {selection.ids.length === 0 ? null : (
+            <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
+              <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingStop(true)}>
+                {t('stopSelected')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSelection}>
+                {t('clearSelection')}
+              </Button>
+            </div>
+          )}
+
+          <AlertDialog
+            open={confirmingStop}
+            onOpenChange={open => {
+              if (!open && !batchStopping) setConfirmingStop(false)
+            }}
+          >
+            <AlertDialogContent className="dshx-root" size="sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: selection.ids.length })}</AlertDialogTitle>
+                <AlertDialogDescription>{t('stopSelectedDescription')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={batchStopping}>{t('cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={batchStopping || selection.ids.length === 0}
+                  onClick={event => {
+                    event.preventDefault()
+                    void stopSelected()
+                  }}
+                >
+                  {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: selection.ids.length })}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </Page>
   )
 }

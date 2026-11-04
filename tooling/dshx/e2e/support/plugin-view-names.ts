@@ -83,8 +83,6 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Usage: Analytics', { destination: 'Observe', section: 'Usage' }],
   ['Activity Timeline: Activity', { destination: 'Observe', section: 'Activity' }],
   ['Traces: Explorer', { destination: 'Observe', section: 'Traces' }],
-  ['Background Jobs: Jobs', { destination: 'Observe', section: 'Jobs' }],
-  ['Worktree Memory: RAM', { destination: 'Observe', section: 'RAM' }],
   ['Multi-host: Hosts', { destination: 'Observe', section: 'Hosts' }],
   ['Memory: Browser', { destination: 'Knowledge', section: 'Memory' }],
   ['Resource Packs: Resources', { destination: 'Knowledge', section: 'Resources' }],
@@ -107,8 +105,8 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
 
 /**
  * Pages merged into another page in Phase 5 (plans/ade-ux §6): Usage took Quota history and forecast as views of its
- * Quota tab. Each lists where the page is when the merged page's owner runs, then where it stays without it
- * (compositions that leave usage out keep the standalone page).
+ * Quota tab; Processes took RAM as a tab. Each lists where the page is when the merged page's owner runs, then where it
+ * stays without it (compositions that leave usage or background-jobs out keep the standalone page).
  */
 interface RailLocation {
   readonly destination: string
@@ -134,6 +132,14 @@ const alternatives = new Map<string, readonly RailLocation[]>([
       { destination: 'Observe', section: 'Quota forecast' },
     ],
   ],
+  ['Background Jobs: Jobs', [{ destination: 'Observe', section: 'Processes', tab: 'Jobs' }]],
+  [
+    'Worktree Memory: RAM',
+    [
+      { destination: 'Observe', section: 'Processes', tab: 'RAM' },
+      { destination: 'Observe', section: 'RAM' },
+    ],
+  ],
 ])
 
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })
@@ -154,6 +160,7 @@ const openAlternative = async (page: Page, candidates: readonly RailLocation[]):
     await button.click()
     if (candidate.tab !== undefined) {
       const tab = page.getByRole('tab', { name: candidate.tab, exact: true })
+      // Processes shows tabs only when another plugin adds one; a lone Jobs page has none.
       if (
         await tab
           .first()

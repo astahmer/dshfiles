@@ -5,8 +5,8 @@
     {
       "id": "jobs-board",
       "title": "Cross-Session background jobs board",
-      "summary": "One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
-      "reach": ["click tab \"Observe\"", "click button \"Jobs\"", "expect text \"Every background job across threads*\""],
+      "summary": "The Jobs tab of Observe \u203a Processes: One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "expect text \"What runs on this host for your threads*\""],
       "surfaces": ["host", "tool", "storage", "client"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -135,7 +135,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "observe",
-      "currentSurface": "left-nav: Background Jobs: Jobs › batch stop",
+      "currentSurface": "left-nav: Background Jobs: Jobs \u203a batch stop",
       "configuration": [],
       "states": ["unselected", "range-selected", "confirmed", "partially-stopped"],
       "failureModes": [
@@ -163,6 +163,42 @@
         }
       ],
       "reach": ["click tab \"Observe\"", "click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]
+    },
+    {
+      "id": "processes-page",
+      "title": "Observe \u203a Processes: jobs, dev servers and RAM on one page",
+      "summary": "One Processes page (plans/ade-ux \u00a76 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their marks (RAM pressure and detached memory). `ProcessesNavigation` lets the former RAM page and saved tabs land on their tab; palette rows find it by the old names (Background Jobs: Jobs, Worktree Memory: RAM).",
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "expect heading \"Processes\""],
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "observe: Processes",
+      "configuration": [],
+      "states": ["jobs", "provider-tab", "no-providers"],
+      "failureModes": [
+        "A provider cannot replace the Jobs tab; one tab per id, the first registration wins.",
+        "Without providers the page is the Jobs board alone, with no tab row."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "background-jobs.processes-page",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.processes-tab-order",
+          "file": "plugins/@dshfiles/background-jobs/src/processes-page.test.ts",
+          "testName": "orders tabs after Jobs, one per id, and never lets a provider replace Jobs"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the page composes tabs; its reads are the jobs-board, dev-server and RAM features' API calls."
+        }
+      ]
     }
   ]
 }

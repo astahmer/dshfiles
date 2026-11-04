@@ -5,7 +5,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, Page, PageSection, type PageAction } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -21,7 +21,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { worktreeMemoryApi } from './api.js'
 import type { WorktreeMemoryKey, WorktreeMemoryTranslate } from './locales.js'
 import { bulkStoppable } from './stop-scope.js'
@@ -140,6 +140,50 @@ export const MemoryGlyph = (props: { readonly size?: number; readonly t: Worktre
     <TooltipProvider delayDuration={500}>
       <Tooltip>
         <TooltipTrigger asChild>{glyph}</TooltipTrigger>
+        <TooltipContent>{status}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+/**
+ * The RAM marks alone (pressure dot, detached-total pill), drawn over the Processes glyph of @dshfiles/background-jobs.
+ * The marks sit in the corners of the icon the glyph draws, so they keep the pill readable at 18 px.
+ */
+export const MemoryBadge = (props: { readonly t: WorktreeMemoryTranslate }): JSX.Element | null => {
+  const api = useApi(worktreeMemoryApi)
+  const snapshot = useQuery({
+    queryKey: snapshotKey,
+    queryFn: async ({ signal }) => api.snapshot({}, { signal }),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : BADGE_POLL_MS),
+    retry: false,
+  })
+  const pressure = snapshot.data?.pressure ?? 'unknown'
+  const strained = pressure === 'warning' || pressure === 'critical'
+  const detachedBytes = snapshot.data?.detachedBytes ?? 0
+  if (!strained && detachedBytes <= 0) return null
+  const status = [strained ? props.t(PRESSURE[pressure].key) : null, detachedBytes > 0 ? `${formatBytes(detachedBytes)} ${props.t('detachedTotal')}` : null]
+    .filter(part => part !== null)
+    .join(' · ')
+  return (
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="dshx:absolute dshx:inset-0" data-memory-badge-pressure={pressure} data-memory-badge-detached-bytes={String(detachedBytes)}>
+            <span className="dshx:sr-only">{status}</span>
+            {strained ? (
+              <StatusDot className={cn('dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:ring-2 dshx:ring-background', PRESSURE[pressure].dot)} />
+            ) : null}
+            {detachedBytes > 0 ? (
+              <span
+                aria-hidden
+                className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-[8px] dshx:leading-[10px] dshx:font-semibold dshx:text-white dshx:tabular-nums"
+              >
+                {compactGigabytes(detachedBytes)}
+              </span>
+            ) : null}
+          </span>
+        </TooltipTrigger>
         <TooltipContent>{status}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -461,7 +505,61 @@ export interface WorktreeMemoryPanelProps {
   readonly sessions: ISessions
   readonly uiWorkspace: UiWorkspace
   readonly t: WorktreeMemoryTranslate
+  /**
+   * `page`: its own page (the former RAM page, kept for saved tabs). `embedded`: the RAM tab of Observe › Processes,
+   * whose page owns the header. `thread`: the processes one thread started, in the thread panel's Jobs facet.
+   */
+  readonly mode?: 'page' | 'embedded' | 'thread'
+  /** The thread `thread` mode filters to. */
+  readonly sessionId?: string
 }
+
+/** Only the trees one thread started; each group's bytes become the sum of what is left. */
+export const forThread = (groups: readonly WorkspaceGroup[], sessionId: string): readonly WorkspaceGroup[] =>
+  groups.flatMap(group => {
+    const trees = group.trees.filter(tree => tree.sessionId === sessionId)
+    if (trees.length === 0) return []
+    const detached = trees.filter(tree => tree.origin === 'detached')
+    return [
+      {
+        ...group,
+        trees,
+        bytes: trees.reduce((sum, tree) => sum + tree.bytes, 0),
+        detachedBytes: detached.reduce((sum, tree) => sum + tree.bytes, 0),
+        detachedCount: detached.length,
+      },
+    ]
+  })
+
+/** The RAM view's header: the page's own, or one heading row inside the Processes page and the Jobs facet. */
+const RamFrame = (props: {
+  readonly mode: 'page' | 'embedded' | 'thread'
+  readonly heading: string
+  readonly description: string
+  readonly meta: ReactNode
+  readonly refresh: PageAction
+  readonly children: ReactNode
+}): JSX.Element =>
+  props.mode === 'page' ? (
+    <Page heading={props.heading} description={props.description} meta={props.meta} actions={[props.refresh]} className="dshx:min-h-0">
+      {props.children}
+    </Page>
+  ) : (
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3" data-ram-view={props.mode}>
+      <PageSection
+        heading={props.heading}
+        description={props.mode === 'thread' ? undefined : props.description}
+        meta={<span className="dshx:inline-flex dshx:flex-wrap dshx:gap-1">{props.meta}</span>}
+        actions={
+          <Button variant="outline" size="sm" disabled={props.refresh.pending === true} onClick={props.refresh.onSelect}>
+            {props.refresh.pending === true ? <Spinner aria-hidden className="dshx:size-3.5" /> : props.refresh.icon}
+            {props.refresh.label}
+          </Button>
+        }
+      />
+      {props.children}
+    </div>
+  )
 
 export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Element {
   const api = useApi(worktreeMemoryApi)
@@ -521,7 +619,8 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   const visibleNodeOrigins =
     nodeProcesses === undefined ? [] : nodeProcesses.origins.slice(0, showAllNodeOrigins ? nodeProcesses.origins.length : VISIBLE_NODE_ORIGINS)
   const now = value?.takenAt ?? 0
-  const groups = value?.groups ?? []
+  const mode = props.mode ?? 'page'
+  const groups = mode === 'thread' && props.sessionId !== undefined ? forThread(value?.groups ?? [], props.sessionId) : (value?.groups ?? [])
   const openKeys = opened ?? new Set(groups.slice(0, 1).map(group => group.key))
   const toggle = (key: string): void =>
     setOpened(() => {
@@ -537,9 +636,12 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   const pressure = PRESSURE[value?.pressure ?? 'unknown']
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden">
-      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto" data-memory-scroll-region>
-        <Page
+    <div
+      className={cn('dshx-root dshx:@container dshx:flex dshx:min-h-0 dshx:flex-col', mode === 'page' ? 'dshx:h-full dshx:overflow-hidden' : 'dshx:min-w-0')}
+    >
+      <div className={cn('dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col', mode === 'page' && 'dshx:overflow-y-auto')} data-memory-scroll-region>
+        <RamFrame
+          mode={mode}
           heading={t('title')}
           description={t('subtitle')}
           meta={
@@ -553,18 +655,15 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
               </Badge>
             </>
           }
-          actions={[
-            {
-              id: 'refresh',
-              label: t('refresh'),
-              icon: <RefreshCwIcon aria-hidden />,
-              pending: snapshot.isFetching,
-              onSelect: () => void snapshot.refetch(),
-            },
-          ]}
-          className="dshx:min-h-0"
+          refresh={{
+            id: 'refresh',
+            label: t('refresh'),
+            icon: <RefreshCwIcon aria-hidden />,
+            pending: snapshot.isFetching,
+            onSelect: () => void snapshot.refetch(),
+          }}
         >
-          {value === undefined ? null : (
+          {value === undefined || mode === 'thread' ? null : (
             <div className="dshx:flex dshx:flex-col dshx:gap-2">
               <CategoryBar bytes={value.categoryBytes} total={value.trackedBytes} />
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
@@ -583,7 +682,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
             </div>
           )}
 
-          {value === undefined || !value.supported ? null : (
+          {value === undefined || !value.supported || mode === 'thread' ? null : (
             <PageSection
               heading={t('nodeProcesses')}
               meta={
@@ -703,11 +802,16 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
               </div>
             </PageSection>
           )}
-        </Page>
+        </RamFrame>
       </div>
 
       {value === undefined || listedTrees.length === 0 ? null : (
-        <footer className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-5 dshx:py-2 dshx:@max-pane-narrow:px-3">
+        <footer
+          className={cn(
+            'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:py-2',
+            mode === 'page' ? 'dshx:px-5 dshx:@max-pane-narrow:px-3' : 'dshx:sticky dshx:bottom-0 dshx:z-10 dshx:flex-wrap dshx:px-0',
+          )}
+        >
           <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:text-muted-foreground">
             {count(listedTrees.length, 'process', 'processes', t)} · <span className="dshx:tabular-nums">{formatBytes(value.trackedBytes)}</span>
             {value.detachedCount === 0 ? '' : ` · ${String(value.detachedCount)} ${t('detachedTotal')}`}

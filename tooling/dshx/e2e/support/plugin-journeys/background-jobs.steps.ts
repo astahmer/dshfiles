@@ -20,7 +20,8 @@ const fixtureRows = (page: Page) => page.locator('[data-job-id]').filter({ hasTe
 
 const openJobs = async (page: Page): Promise<void> => {
   await openGlobalPanel(page, 'Background Jobs: Jobs')
-  await expect(page.getByRole('heading', { name: 'Jobs', exact: true, level: 1 })).toBeVisible()
+  // Phase 5: the Jobs board is the Jobs tab of Observe › Processes.
+  await expect(page.getByRole('heading', { name: 'Processes', exact: true, level: 1 })).toBeVisible()
 }
 
 When('recorded background jobs are seeded into the sessions root', async ({ page }: { page: Page }) => {
@@ -153,5 +154,19 @@ Then('the category filter, the scope and the search narrow the board', async ({ 
   await openJobs(page)
   await page.getByRole('radio', { name: 'All', exact: true }).click()
   await recordAssertion(page, 'background-jobs-index-survives-a-reload', () => expect.poll(() => fixtureRows(page).count(), { timeout: 30_000 }).toBe(5))
+  await finishJourneyAssertions(page)
+})
+
+When('the Processes page is opened', async ({ page }: { page: Page }) => {
+  await openJobs(page)
+})
+
+Then('its RAM tab shows the process memory that was its own page', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'background-jobs-processes-page-has-provider-tabs', async () => {
+    await expect(page.getByRole('tab', { name: 'Jobs', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('tab', { name: 'RAM', exact: true }).click()
+    await expect(page.locator('[data-ram-view="embedded"]')).toBeVisible()
+    await expect(page.locator('[data-node-process-summary]')).toBeVisible({ timeout: 30_000 })
+  })
   await finishJourneyAssertions(page)
 })

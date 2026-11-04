@@ -5,8 +5,8 @@
     {
       "id": "memory-board",
       "title": "Process memory and Node origins",
-      "summary": "One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The sidebar entry carries a pressure dot and the detached total.",
-      "reach": ["click tab \"Observe\"", "click button \"RAM\"", "expect text \"Node process origins\""],
+      "summary": "The RAM tab of Observe \u203a Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The Processes navigation glyph carries a pressure dot and the detached total; without @dshfiles/background-jobs the RAM page keeps its own entry with them.",
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "click tab \"RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -31,7 +31,7 @@
         "A job is stopped through the job registry so its Session records the kill; only trees no live job owns are signalled directly.",
         "A bulk stop leaves a job whose owning thread is mid-turn alone, so that turn cannot fail under it; its own Stop stays the only path.",
         "Orphans outside every workspace (apps, system agents, unrelated daemons) are not listed in the DSH tree view.",
-        "Node summaries inspect only the current OS user’s processes; process names use fixed rules and fall back to a generic label.",
+        "Node summaries inspect only the current OS user\u2019s processes; process names use fixed rules and fall back to a generic label.",
         "Node RSS is resident memory only, not the compressed or swapped memory shown by some system monitors.",
         "A platform without ps/lsof or /proc reports itself unsupported instead of an empty board."
       ],
@@ -105,6 +105,12 @@
           "id": "worktree-memory.node-origin-limit",
           "file": "plugins/@dshfiles/worktree-memory/src/node-process-summary.test.ts",
           "testName": "caps origin details while retaining the totals for every Node process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.thread-ram",
+          "file": "plugins/@dshfiles/worktree-memory/src/thread-ram.test.ts",
+          "testName": "keeps only the trees one thread started and sums their bytes"
         }
       ],
       "telemetry": [
