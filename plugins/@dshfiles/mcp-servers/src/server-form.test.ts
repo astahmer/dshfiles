@@ -178,3 +178,36 @@ describe('catalog drafts and OAuth', () => {
     expect(parsed.success && parsed.draft.transport === 'streamable-http' ? parsed.draft.auth : undefined).toBe('oauth')
   })
 })
+
+describe('credential reference rows', () => {
+  it('round-trips rows through the JSON field, dropping blank rows and trimming names and references', () => {
+    const rows = McpServerFormModel.referenceRows('{"API_TOKEN":"EXAMPLE_TOKEN","Authorization":"secret:FIGMA_TOKEN@dev"}')
+    expect(rows).toEqual([
+      { name: 'API_TOKEN', reference: 'EXAMPLE_TOKEN' },
+      { name: 'Authorization', reference: 'secret:FIGMA_TOKEN@dev' },
+    ])
+    expect(McpServerFormModel.serializeReferenceRows([...rows, { name: ' ', reference: '' }, { name: ' EXTRA ', reference: ' secret:EXTRA ' }])).toBe(
+      JSON.stringify({ API_TOKEN: 'EXAMPLE_TOKEN', Authorization: 'secret:FIGMA_TOKEN@dev', EXTRA: 'secret:EXTRA' }, null, 2),
+    )
+    expect(McpServerFormModel.serializeReferenceRows([])).toBe('{}')
+    expect(McpServerFormModel.referenceRows('not json')).toEqual([])
+    expect([...McpServerFormModel.duplicateReferenceNames([...rows, { name: 'API_TOKEN', reference: 'OTHER' }])]).toEqual(['API_TOKEN'])
+  })
+
+  it('accepts a Secret Catalog reference as a credential binding and refuses a malformed one', () => {
+    const base = {
+      ...McpServerFormModel.blankServerForm(),
+      transport: 'stdio' as const,
+      name: 'Local',
+      serverName: 'local',
+      commandLine: 'npx -y @example/mcp',
+      cwd: '/tmp',
+    }
+    expect(McpServerFormModel.parseServerForm({ ...base, envRefs: '{"API_TOKEN":"secret:EXAMPLE_TOKEN@staging"}' })).toMatchObject({
+      success: true,
+      draft: { envRefs: { API_TOKEN: 'secret:EXAMPLE_TOKEN@staging' } },
+    })
+    expect(issueFields({ ...base, envRefs: '{"API_TOKEN":"secret:"}' })).toContain('envRefs')
+    expect(issueFields({ ...base, envRefs: '{"API_TOKEN":"plain value with spaces"}' })).toContain('envRefs')
+  })
+})

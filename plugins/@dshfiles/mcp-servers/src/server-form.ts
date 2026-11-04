@@ -71,8 +71,39 @@ const commandArgv = (commandLine: string, issues: ServerFormIssue[]): readonly s
   }
 }
 
+/** One editable name → reference pair of a credential map field. */
+export interface ReferenceRow {
+  readonly name: string
+  readonly reference: string
+}
+
 export class McpServerFormModel {
   static readonly serverTransports = serverTransports
+
+  /** The rows of a stored `{ "NAME": "REFERENCE" }` field; text that is not such an object starts empty. */
+  static readonly referenceRows = (text: string): readonly ReferenceRow[] => {
+    const result = decodeJsonText(text, referenceTextSchema, 'Enter a JSON object of names to credential references.')
+    return result._tag === 'Success' ? Object.entries(result.success).map(([name, reference]) => ({ name, reference })) : []
+  }
+
+  /** The field text for rows: blank rows are dropped, names and references trimmed; validation runs on the result. */
+  static readonly serializeReferenceRows = (rows: readonly ReferenceRow[]): string => {
+    const filled = rows.map(row => ({ name: row.name.trim(), reference: row.reference.trim() })).filter(row => row.name !== '' || row.reference !== '')
+    return filled.length === 0 ? '{}' : JSON.stringify(Object.fromEntries(filled.map(row => [row.name, row.reference])), null, 2)
+  }
+
+  /** Names entered more than once; only the last one would be kept, so the field says so. */
+  static readonly duplicateReferenceNames = (rows: readonly ReferenceRow[]): ReadonlySet<string> => {
+    const seen = new Set<string>()
+    const duplicates = new Set<string>()
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (name === '') continue
+      if (seen.has(name)) duplicates.add(name)
+      seen.add(name)
+    }
+    return duplicates
+  }
 
   static readonly serverNameFromTitle = (value: string): string =>
     value

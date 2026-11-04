@@ -3646,6 +3646,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.4
         version: 3.18.5
+      '@dshfiles/credential-port':
+        specifier: workspace:*
+        version: link:../credential-port
       '@dshfiles/input-trigger':
         specifier: workspace:*
         version: link:../input-trigger

@@ -112,3 +112,7 @@ Open in Secret Catalog and Re-check. A consumer only needs the attribute or the
 
 - `@dshfiles/backlog` — `jevSecret`, the TypeSafe key for triage.
 - `@dshfiles/memory` — `jevSecret`, the TypeSafe key for signal and recall gates.
+- `@dshfiles/mcp-servers` — environment and header bindings of every server
+  (global aliases; a DSH credential name still works).
+- `@dshfiles/secret-catalog` itself — `request_secret` returns a reference to
+  the agent that asked, after the user stored the value in the Catalog form.

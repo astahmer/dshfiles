@@ -6,6 +6,8 @@ import { apply as nativeMcpClient, type Config as NativeMcpConfig } from '@deeps
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
+import { parseSecretReference } from '@dshfiles/credential-port'
+import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option, Queue, Schema, type Scope, Stream } from 'effect'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -150,17 +152,43 @@ export class McpHost extends Context.Service<
       const deleteGrant = (key: CredentialKey) =>
         Effect.tryPromise({ try: () => credentials.deleteRecord(key), catch: cause => new CredentialStoreFailed({ operation: 'delete', cause }) })
 
-      const isConfigured = (reference: string) =>
-        Effect.tryPromise(() => credentials.describe(credentialRef(reference))).pipe(
+      const secrets = yield* SecretReferenceResolver
+
+      // A `secret:ALIAS[@env]` binding names a global Secret Catalog alias; anything else is a DSH credential name.
+      // Availability reads the Catalog's value-free key list, so a snapshot never reveals a value to show a badge.
+      const secretConfigured = (reference: NonNullable<ReturnType<typeof parseSecretReference>>) =>
+        Effect.suspend(() => {
+          const bridge = host.ctx.get('secretCatalogCredentials')
+          if (bridge === undefined) return Effect.succeed(false)
+          return Effect.tryPromise(signal => bridge.listKeys(null, signal)).pipe(
+            Effect.map(keys => keys.filter(key => key.alias === reference.alias && key.environment === reference.environment).length === 1),
+            Effect.catch(() => Effect.succeed(false)),
+          )
+        })
+
+      const isConfigured = (reference: string) => {
+        const secret = parseSecretReference(reference)
+        if (secret !== null) return secretConfigured(secret)
+        return Effect.tryPromise(() => credentials.describe(credentialRef(reference))).pipe(
           Effect.map(info => info.configured),
           Effect.catch(() => Effect.succeed(false)),
         )
+      }
 
-      const resolveReference = (reference: string) =>
-        Effect.tryPromise(() => credentials.resolve(credentialRef(reference))).pipe(
+      const resolveReference = (reference: string) => {
+        if (parseSecretReference(reference) !== null)
+          return secrets.resolve({ referenceText: reference, environmentValue: undefined }).pipe(
+            Effect.map(Option.filter(value => value.length > 0)),
+            Effect.tapError(error =>
+              Effect.sync(() => host.ctx.logger.warn('MCP servers: Secret Catalog reference %s did not resolve: %s', reference, error.message)),
+            ),
+            Effect.catch(() => Effect.succeedNone),
+          )
+        return Effect.tryPromise(() => credentials.resolve(credentialRef(reference))).pipe(
           Effect.map(result => (result === undefined || result.value.length === 0 ? Option.none() : Option.some(result.value))),
           Effect.catch(() => Effect.succeedNone),
         )
+      }
 
       const attachClient = Effect.fn('mcp server attach')(function* (input: {
         readonly id: string
@@ -219,5 +247,5 @@ export class McpHost extends Context.Service<
         referenceUpdates,
       })
     }),
-  )
+  ).pipe(Layer.provide(SecretReferenceResolver.layer))
 }

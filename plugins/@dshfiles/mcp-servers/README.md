@@ -52,7 +52,16 @@ health as “not reported”: `dsh-mcp-client@0.2.0-rc.2` has no exported status
 controller or connection event. A loaded client may still be reconnecting, so
 neither a loaded state nor a nonzero tool count is presented as a health probe.
 
-Credential fields accept DSH credential reference names only. Values resolve
+Credential fields hold references, never values: a DSH credential name
+(`FIGMA_TOKEN`) or a Secret Catalog reference (`secret:ALIAS` or
+`secret:ALIAS@ENV`). Each environment variable or header is one name →
+reference row, and the reference input carries `data-secret-input="reference"`,
+so with the Secret Catalog loaded its key button picks a global alias and
+writes the reference. The Host resolves a `secret:` reference through
+`secretCatalogValues` with `cwd: null` (global aliases only), and the server
+list reports it configured only when the Catalog's value-free key list names
+exactly one matching entry. Changing a Catalog value does not restart a running
+server by itself; use **Refresh** or toggle the server. Values resolve
 in memory immediately before native client startup and never enter the saved
 server row, API snapshot, fingerprint, catalog metadata, or manager log
 messages. HTTP endpoints with userinfo, query strings, or fragments are

@@ -4,7 +4,7 @@
     {
       "id": "server-configuration",
       "title": "Manage local and remote MCP server definitions",
-      "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references.",
+      "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references; each environment variable or header is a name → reference row whose reference field offers the Secret Catalog picker and accepts a DSH credential name or a secret:ALIAS[@env] reference resolved on the Host.",
       "reach": ["click tab \"Settings\"", "click button \"MCP servers\"", "expect heading \"Global MCP servers\"", "expect combobox \"Transport\""],
       "surfaces": ["client", "host", "settings", "tool", "integration"],
       "surface": "settingsSection",
@@ -101,6 +101,12 @@
           "kind": "gherkin",
           "id": "mcp-servers.preferences",
           "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.secret-catalog-references",
+          "file": "plugins/@dshfiles/mcp-servers/src/host-secret-references.test.ts",
+          "testName": "resolves a secret reference on the Host for global aliases, and reports availability from metadata only"
         }
       ],
       "telemetry": [
@@ -117,6 +123,10 @@
           "span": "mcp server start",
           "file": "plugins/@dshfiles/mcp-servers/src/mcp-spans.test.ts",
           "testName": "records an mcp server start span with the argument count, never argv or environment"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
         }
       ]
     },

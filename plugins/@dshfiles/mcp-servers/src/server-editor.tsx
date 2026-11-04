@@ -10,6 +10,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 import type { ServerDraft } from './api.js'
 import type { McpServersTranslate } from './locales.js'
+import { ReferenceRowsField } from './reference-rows-field.js'
 import { McpServerFormModel, serverFormValidator, type ServerFormValues } from './server-form.js'
 
 export interface ServerEditorProps {
@@ -108,7 +109,14 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
               <form.AppField name="oauth">{field => <field.CheckboxField label={t('useOAuth')} />}</form.AppField>
               <Disclosure defaultOpen={values.headerRefs !== '{}'} label={t('advancedHeaders')}>
                 <form.AppField name="headerRefs">
-                  {field => <field.TextAreaField label={t('headerRefs')} monospace placeholder={'{\n  "Authorization": "FIGMA_TOKEN"\n}'} />}
+                  {() => (
+                    <ReferenceRowsField
+                      label={t('headerRefs')}
+                      namePlaceholder="Authorization"
+                      referencePlaceholder="FIGMA_TOKEN or secret:FIGMA_TOKEN"
+                      t={t}
+                    />
+                  )}
                 </form.AppField>
                 {serverNameField}
               </Disclosure>
@@ -123,13 +131,15 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                         </form.AppField>
                         <form.AppField name="startCwd">{field => <field.TextField label={t('cwd')} monospace placeholder="/absolute/path" />}</form.AppField>
                         <form.AppField name="startEnvRefs">
-                          {field => (
-                            <field.TextAreaField
-                              className="dshx:@pane-compact:col-span-2"
-                              label={t('localEnvRefs')}
-                              monospace
-                              placeholder={'{\n  "ACCESS_TOKEN": "LOCAL_PROXY_TOKEN"\n}'}
-                            />
+                          {() => (
+                            <div className="dshx:@pane-compact:col-span-2">
+                              <ReferenceRowsField
+                                label={t('localEnvRefs')}
+                                namePlaceholder="ACCESS_TOKEN"
+                                referencePlaceholder="LOCAL_PROXY_TOKEN or secret:LOCAL_PROXY_TOKEN"
+                                t={t}
+                              />
+                            </div>
                           )}
                         </form.AppField>
                       </div>
@@ -151,7 +161,9 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
               <Disclosure defaultOpen={values.cwd !== '' || values.envRefs !== '{}'} label={t('advancedEnvironment')}>
                 <form.AppField name="cwd">{field => <field.TextField label={t('cwd')} monospace placeholder="/path/to/project" />}</form.AppField>
                 <form.AppField name="envRefs">
-                  {field => <field.TextAreaField label={t('envRefs')} monospace placeholder={'{\n  "API_TOKEN": "EXAMPLE_TOKEN"\n}'} />}
+                  {() => (
+                    <ReferenceRowsField label={t('envRefs')} namePlaceholder="API_TOKEN" referencePlaceholder="EXAMPLE_TOKEN or secret:EXAMPLE_TOKEN" t={t} />
+                  )}
                 </form.AppField>
               </Disclosure>
               <form.Subscribe selector={state => McpServerFormModel.inheritsHostWorkingDirectory(state.values)}>

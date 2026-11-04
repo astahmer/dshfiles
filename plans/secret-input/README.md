@@ -73,6 +73,7 @@ Settled with the user (2026-10-20):
 | 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                                 | Shipped                                                                                          |
 | 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
 | 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction       | Shipped                                                                                          |
+| 6     | MCP servers: name → reference rows with `data-secret-input`, `secret:` bindings resolved on the Host              | Shipped (2026-11-04)                                                                             |
 
 Verified end to end in a scratch DSH with the fake secret CLI: Settings → "jev secret" → key
 button → `GITHUB_TOKEN@prod` → the field holds `secret:GITHUB_TOKEN`. Modals needed two fixes the
@@ -89,8 +90,15 @@ the one row for the alias and environment, and reveals through its own `reveal`
 verb and reveal machine, so the value never enters Backlog state. A missing or
 ambiguous alias offers Open in Secrets. Journey: `backlog.secret-link-reveal`.
 
-Still open: adopting the attribute on MCP server env fields and AI Accounts refs
-where a value is currently typed.
+MCP servers adopted the attribute (2026-11-04): each environment variable and
+header binding is a name → reference row whose reference input carries
+`data-secret-input="reference"`, the schema accepts `secret:ALIAS[@env]` next
+to DSH credential names, and the Host resolves it through
+`secretCatalogValues` (global aliases, `cwd: null`) with availability read from
+the value-free `secretCatalogCredentials.listKeys`.
+
+Still open: adopting the attribute on AI Accounts refs where a value is
+currently typed.
 
 ## Limits
 

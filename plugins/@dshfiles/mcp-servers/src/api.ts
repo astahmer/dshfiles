@@ -1,3 +1,4 @@
+import { parseSecretReference } from '@dshfiles/credential-port'
 import { defineApi } from '@dshfiles/dshx/api'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
@@ -8,7 +9,15 @@ import { McpContract, McpSchema } from './schema.js'
 const namePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 const headerNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 
-export const referenceNameSchema = Schema.String.check(Schema.isPattern(namePattern), Schema.isMaxLength(128))
+/** A DSH credential name (`FIGMA_TOKEN`) or a Secret Catalog reference (`secret:ALIAS[@env]`), resolved on the Host. */
+export const referenceNameSchema = Schema.String.check(
+  Schema.isMaxLength(128),
+  Schema.makeFilter((value: string) =>
+    namePattern.test(value) || (value.trim() === value && parseSecretReference(value) !== null)
+      ? undefined
+      : 'Use a credential name such as API_TOKEN or a secret:ALIAS reference.',
+  ),
+)
 const envNameSchema = Schema.String.check(Schema.isPattern(namePattern), Schema.isMaxLength(128))
 const headerNameSchema = Schema.String.check(Schema.isPattern(headerNamePattern), Schema.isMaxLength(128))
 
