@@ -2129,7 +2129,7 @@ Then('the JJ inventory is read again after the sidebar expands', async ({ page }
   await finishJourneyAssertions(page)
 })
 
-Then('the blocked session appears in the Usage limit group', async ({ page }: { Page }) => {
+Then('the blocked session appears in the Usage limit group', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-usage-limit-group', async () => {
     await showThreadsByStatus(page)
     await expect.poll(() => currentThreadId(page), { timeout: 30_000 }).not.toBeNull()
