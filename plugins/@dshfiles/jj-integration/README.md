@@ -12,6 +12,8 @@ into `main` by default. The integration page lets each ready workspace choose
 another local bookmark before integrating. Internally, jj rebases the thread
 revisions onto that bookmark's current tip, then advances it; existing ancestry
 stays intact.
+Git-only repositories (no `.jj`) get the same flows through a git backend; see
+[Git repositories](#git-repositories). jj stays preferred wherever `.jj` exists.
 Works on stock DSH 0.2.0-rc.2; no core patch. Needs **jj 0.46 or newer**: reporting a workspace whose folder was deleted relies on
 `jj workspace list` still naming that workspace's recorded root, which 0.45 reports as `null`.
 
@@ -435,10 +437,45 @@ Sessions), while the cleanup has to skip busy threads and drop the DSH
 registration. `jjc`'s revset is the model for the empty-revision pass, minus the
 revisions a live workspace still builds on.
 
+## Git repositories
+
+Every thread-workspace flow runs through one port, `ThreadWorkspaces` ([`thread-workspace-types.ts`](src/thread-workspace-types.ts)),
+an Effect service whose two adapters are layers of their own:
+
+| Adapter                                                        | Serves                                     | Thread workspace                                      |
+| -------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| `JjThreadWorkspaces` ([source](src/jj-thread-workspaces.ts))   | a repository with `.jj` (colocated or not) | a jj workspace `thread-xxxxxx`                        |
+| `GitThreadWorkspaces` ([source](src/git-thread-workspaces.ts)) | a repository with `.git` and no `.jj`      | a git worktree `thread-xxxxxx` on branch `dsh/<name>` |
+
+`VcsDetector` picks the adapter from the nearest `.jj` or `.git` above the path (filesystem only, no process), jj first
+when one folder holds both; the router (`ThreadWorkspaces.layer`) forwards each call. Shared state, the threads
+directory and the land records behind review ranges, lives in `ThreadMetadata`, so both backends read the same files.
+Git runs through `GitCli`: the executable DSH resolves, non-interactive (`GIT_TERMINAL_PROMPT=0`, no editor), bounded
+output, a two-minute timeout and one `git <verb>` span per run.
+
+In a git repository the tools, API and UI keep their jj names and behave as follows:
+
+- **Isolate / provision**: `git worktree add -b dsh/<name>` from the bookmark (the local branch, else `origin/<name>`).
+  No spare is prewarmed; a git worktree checks out quickly enough without one.
+- **Status**: unlanded work is the thread branch's commits the bookmark lacks, plus one undescribed `working-tree`
+  revision when the worktree has uncommitted edits.
+- **Integrate (land)**: uncommitted edits stop it as _needs description_ (commit them first). Otherwise the thread
+  branch rebases onto the bookmark; a conflict is aborted and reported with its files, leaving the worktree as it
+  was. The bookmark then moves forward only: where it is checked out (usually the main worktree) that worktree
+  fast-forwards so its files follow; elsewhere the ref moves with compare-and-swap. `dshx checkout sync` is skipped.
+- **Verified automatic integration**: the same Project Checks gate; `git cherry` reports work the bookmark already
+  holds as _already integrated_ or _patch-equivalent work_.
+- **Discard / cleanup**: removes the worktree and its `dsh/<name>` branch; work is kept unless forced. Other git
+  worktrees are _secondary_ workspaces, removed only when clean and fully landed. Git has no dangling empty revisions.
+- **Snapshots** (session undo): the same scratch-index commits under `refs/dsh/snapshots/` that
+  [`@dshfiles/git-worktrees`](../git-worktrees/README.md) takes; neither HEAD nor the index moves.
+- **Review ranges**: land records hold commit ids (git has no change id that survives a rebase).
+
 ## VCS provider
 
 This plugin serves [`@dshfiles/vcs-provider-port`](../vcs-provider-port/README.md) for jj repositories (priority 100,
-so a jj repository colocated with git is jj's): `provision` is the same verb as `jj-threads.provision`, and
+so a jj repository colocated with git is jj's) and for git-only repositories (priority 50, above
+`@dshfiles/git-worktrees`' 10, because these thread workspaces can integrate). For jj: `provision` is the same verb as `jj-threads.provision`, and
 `snapshot`/`restore` record a workspace's files as the jj operation that snapshotted them and put them back with
 `jj restore --from 'at_operation(<op>, @)' --into @`. A restore touches only that workspace's working-copy files:
 history, bookmarks and other workspaces stay where they are.
@@ -470,9 +507,9 @@ use **Rebase**.
 
 ## Limits
 
-- jj repositories only. Plain git repositories get thread worktrees and file snapshots from
-  [`@dshfiles/git-worktrees`](../git-worktrees/README.md), the other provider of the same
-  [VCS provider port](../vcs-provider-port/README.md); the Thread integration page and Rebase stay jj-only.
+- Git-only repositories cover the thread-workspace flows above. Automatic fetch, the revision graph panel
+  ([`@dshfiles/jujutsu`](../jujutsu/README.md)) and pulls-review stay jj-only; remaining work is tracked in
+  [plans/vcs-adapters](../../../plans/vcs-adapters/README.md).
 - A thread workspace starts without `node_modules`; run project-specific
   preparation only after the thread starts and only when its memory-note
   conditions match.
@@ -487,4 +524,6 @@ use **Rebase**.
 pnpm --dir plugins --filter @dshfiles/jj-integration test
 ```
 
-The tests drive real `jj` in temporary repositories.
+The tests drive real `jj` and real `git` in temporary repositories
+([`git-thread-workspaces.integration.test.ts`](src/git-thread-workspaces.integration.test.ts),
+[`host-git.integration.test.ts`](src/host-git.integration.test.ts)).

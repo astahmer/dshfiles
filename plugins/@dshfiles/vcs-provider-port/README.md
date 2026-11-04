@@ -39,7 +39,11 @@ runtime bundle. The root `VcsProviders` Promise API remains unchanged.
 | Provider                                                  | VCS | Priority | Isolation                                    |
 | --------------------------------------------------------- | --- | -------- | -------------------------------------------- |
 | [`@dshfiles/jj-integration`](../jj-integration/README.md) | jj  | 100      | `thread-xxxxxx` jj workspace beside the repo |
+| [`@dshfiles/jj-integration`](../jj-integration/README.md) | git | 50       | `thread-xxxxxx` git worktree, integrable     |
 | [`@dshfiles/git-worktrees`](../git-worktrees/README.md)   | git | 10       | git worktree, opt-in (`isolate`)             |
+
+jj-integration claims a git-only repository through its git backend, so with both loaded a git repository's threads
+are jj-integration's (they can integrate); git-worktrees answers when jj-integration is not loaded.
 
 Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).
 Bundle the port in the Host entry (`host.bundleDependencies`).
