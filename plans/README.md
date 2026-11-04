@@ -31,6 +31,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                       |
 | [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                     |
 | [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                    |
+| [Thread sharing](thread-share/README.md)                             | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design and risks only), opentunnel revisit.                                                  |
 | [t3code parity](t3code-parity.md)                                    | Gaps against t3code nightly: create a PR from a thread (C1), scheduled tasks and webhooks (B5), rewind any turn (B3), request_secret (B7). A6, C2, B4 and C3 shipped.                    |
 
 ## Testing, research and housekeeping
