@@ -23,8 +23,8 @@ catalog file that is not linked.
 - [ ] **Failed-entry boot scenario.** The step "every client entry that failed
       to activate is reported by id" (`e2e/support/steps.ts`) has no scenario;
       add one with a fixture bundle whose `apply` throws, or delete the step.
-- [ ] **Scaffold a catalog.** `create-dshx` does not emit a `dshx.features.json`
-      for a new plugin, so `features:check` only catches it after the fact.
+- [x] **Scaffold a catalog.** `create-dshx` emits `dshx.features.json` for a
+      new plugin (`create-dshx/src/templates.ts`).
 - [ ] **Review catalogs against the running product** in a scratch profile and
       file discrepancies as bugs instead of trusting source-derived entries.
 - [ ] Propose upstream a documented boot-state accessor

@@ -231,7 +231,7 @@ Every checkbox in the three registers is pending implementation. This table is o
 | H16 | Share remote read snapshots within existing gateway lifetimes                      | P2    | [Host](host.md#h16-share-remote-read-snapshots-within-existing-gateway-lifetimes-p2)                     |
 | H17 | Coalesce MCP reconciliation and avoid unnecessary credential work                  | P2    | [Host](host.md#h17-coalesce-mcp-reconciliation-and-avoid-unnecessary-credential-work-p2)                 |
 | H18 | Cache only decoded Secret Catalog metadata                                         | P2    | [Host](host.md#h18-cache-only-decoded-secret-catalog-metadata-p2)                                        |
-| H19 | Cache public marketplace pages and bound catalog response bodies                   | P2    | [Host](host.md#h19-cache-public-marketplace-pages-and-bound-catalog-response-bodies-p2)                  |
+| H19 | Dropped: `@dshfiles/plugin-marketplace` was removed upstream (2026-11-04)          | —     | [Host](host.md#h19-cache-public-marketplace-pages-and-bound-catalog-response-bodies-p2)                  |
 | H20 | Editor file-index lifecycle and relist batching (explicit C08/C09 cross-reference) | P2    | [Host](host.md#h20-editor-file-index-lifecycle-and-relist-batching-cross-reference-only)                 |
 | H21 | Avoid rehashing every plugin Host bundle on every update check                     | P1    | [Host](host.md#h21-avoid-rehashing-every-plugin-host-bundle-on-every-update-check-p1)                    |
 | H22 | Hydrate thread titles only for emitted unfiltered rows                             | P2    | [Host](host.md#h22-hydrate-thread-titles-only-for-emitted-unfiltered-rows-p2)                            |

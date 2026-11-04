@@ -352,3 +352,37 @@ kind and id. Read them with `contributionFailures` or
   and the chat-focus mailbox still keep their own page globals: their requests
   wait for a view to mount (a workbench region, one thread's Chat view, with a
   TTL), not for a provider to start, so `whenActive` does not replace them.
+
+## Possible without core, waiting for a caller
+
+These were checked against DSH 0.2.1-rc.2 while closing the opencode v2
+comparison. Each is buildable as dshx or plugin work; none is built because no
+plugin needs it yet.
+
+- **Side-call request hooks by purpose.** `llm/stream` hands inner listeners the
+  original options (Cordis `waterfall`'s `next()` takes no arguments), but an
+  outermost (`prepend: true`) listener can match `options.purpose`
+  (`'compaction' | 'session-title'`), skip `next()` and return
+  `ctx.llm.stream(rewritten)` marked in a WeakSet so its second pass calls
+  `next()`. Cost: a small `sideRequest` hook. Prepared calls (the title's
+  `prepareCall`) re-resolve the adapter, and owned side calls (memory,
+  `generate`) need their own marker because `purpose` is a closed union.
+- **WebSocket endpoints.** A plugin can own one through
+  `webServer.registerUpgrade({ path, handler })` with
+  `connection.admitConnection` for auth. Intercepting existing upgrades (the
+  gateway mux) needs a fork of `@deepseek-ai/dsh-host-webserver`, which
+  dispatches by exact path with no waterfall.
+- **A `ReferenceProvider` registry** (candidates + resolve) owned by
+  input-trigger or references: browser `@` sources already form a registry, and
+  Host resolution uses public hooks (`system-prompt/assemble`,
+  `agent/pre-step`). Folding the stock @file/@session lookups into it would
+  mean forking `@deepseek-ai/dsh-client-ui-reference`.
+- **Vault-backed native credentials:** disable the `credentials` Loader row and
+  provide `credentials` from an owned plugin that layers the local store and
+  secret-catalog. Boot-critical, so only with a caller.
+- **`MainTabs.move`**, **`Files.openIn` application lists** and **`toolEdits`
+  callers**: the APIs exist or are a small extension; no plugin calls them.
+
+Not applicable on this stack: a desktop main-process half (the Electron wrapper
+was removed), a terminal UI half (DSH ships none) and a Durable Object runtime
+(the Host is a Node process; the typed client works anywhere with `fetch`).

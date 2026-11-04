@@ -209,9 +209,43 @@ composition while the current scenario runs (`DSHX_E2E_PREWARM=0` disables it),
 so the next scenario of the same composition takes a ready Host: measured on
 `frame-layout`, the second scenario's trace has no `prepare` or `host-url` at
 all and finished in 6.3 s against 8.7 s for the first, with the file's task 63 s
-→ 40 s on a loaded machine. Reusing it across _different_ compositions is
-tracked in [`plans/e2e-speed/README.md`](../plans/e2e-speed/README.md) together
-with a per-scenario result cache.
+→ 40 s on a loaded machine. A file whose scenarios change composition each time
+pays the sibling's CPU for nothing.
+
+### Speed-ups tried and rejected
+
+Each of these was measured (2026-10-19), not argued:
+
+- **Route interception** (the network boundary every page load passes through):
+  A/B on `frame-layout`, two forced runs a side, gave `page-load` 92 ms vs 82 ms
+  and `profile-interactive` 954 ms vs 1130 ms, noise in the wrong direction. The
+  boundary stays as it is.
+- **A browser pool:** Chromium context creation is 50-83 ms (median 58 ms), about
+  12 s across the whole suite, against a 1.5-12 s Host boot per scenario.
+- **A stable origin with a persistent browser context:** plugin bundles are served
+  `immutable`, but `index-*.js`, `vendor-*.js` and the stylesheets carry no cache
+  header, and Playwright gives every test a fresh context, so pinning one port per
+  worker measured 258 ms vs 152 ms median `page-load`.
+- **A warm Host pool keyed by composition:** 17 of 48 feature files switch
+  composition, 40 switches in all, and only 14 prewarm boots are wasted across
+  194 scenarios, about 30 s of already-overlapped CPU.
+- **Template-cloned scratch profiles:** a cloned `node_modules` keeps pnpm's
+  absolute virtual-store paths, so cloned boots measured 4-8 s against a
+  1.2-2.8 s install.
+- **Sharing one Host across scenarios:** behind a lease, the second scenario
+  reused the Host in 0 ms and then failed waiting for the Preview notice the
+  first scenario had already accepted. Every journey is written against a fresh
+  profile, so the per-scenario Host is the price of isolation.
+- **Moving assertions down the pyramid:** across 196 scenario blocks, none avoids
+  `page`, and there are about four journeys per plugin, so there was nothing to
+  move.
+- **A wall-time budget ratchet** was dropped by request.
+
+What is left is structural: tag scenarios whose steps write settings, threads
+or stores (`mutates`) and measure what share could tolerate a shared Host
+(194 scenarios hold 65 compositions; 163 share one with another scenario), and
+shard owners across CI machines, where the local contention flake below does
+not apply.
 
 ### Parallelism
 
@@ -259,16 +293,16 @@ the cache replays owners the change cannot reach and re-runs the ones it can. A
 leaf plugin is cheap — the planner's fan-out for `pulls-review` is 3 of 43
 journey tasks — while a bundle shared by many compositions is not:
 
-| Changed bundle digest                                                           | Journey tasks that re-run |
-| ------------------------------------------------------------------------------- | ------------------------: |
-| `@dshfiles/dshx`                                                                |                        43 |
-| `@dshfiles/plugin-ui`                                                           |                        39 |
-| `@dshfiles/ui-styles`                                                           |                        38 |
-| `@dshfiles/shared-runtime`                                                      |                        36 |
-| `@dshfiles/command-palette`, `workspace-folder-picker` |                        30 |
-| `@dshfiles/ai-accounts`, `request-messages`, `secret-catalog`                   |                        23 |
-| `@dshfiles/thread-sidebar`                                                      |                        10 |
-| `@dshfiles/pulls-review`, `shortcuts`, `tool-meta`                              |                         3 |
+| Changed bundle digest                                         | Journey tasks that re-run |
+| ------------------------------------------------------------- | ------------------------: |
+| `@dshfiles/dshx`                                              |                        43 |
+| `@dshfiles/plugin-ui`                                         |                        39 |
+| `@dshfiles/ui-styles`                                         |                        38 |
+| `@dshfiles/shared-runtime`                                    |                        36 |
+| `@dshfiles/command-palette`, `workspace-folder-picker`        |                        30 |
+| `@dshfiles/ai-accounts`, `request-messages`, `secret-catalog` |                        23 |
+| `@dshfiles/thread-sidebar`                                    |                        10 |
+| `@dshfiles/pulls-review`, `shortcuts`, `tool-meta`            |                         3 |
 
 Measured 2026-10-19 by counting a dry-run plan (`turbo run test:e2e --dry=json`)
 over the generated task inputs. The wide rows are earned rather than an

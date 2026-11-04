@@ -81,12 +81,13 @@ time doctor runs (session-search registers `sessionQuery` after an async start).
 
 - **5**: a host that answered in the last 10 s reads as Reconnecting… on the
   chip and Hosts page; hiding a host also hides its threads in the sidebar, and
-  an unreachable remote thread offers Hide this host. Not done: the chip menu's
-  per-host rows now use the same grace.
+  an unreachable remote thread offers Hide this host. The chip menu's per-host
+  rows use the same grace (`destination/host-chip.tsx`).
 - **8**: per-host Auto weight (×1, ×2, ×4) in Edit host and
-  `multi_host_set_host_settings`; Auto divides pressure by it. Not done: grouping
-  the same repository across hosts into one project (thread-sidebar owns project
-  grouping; needs remote origin URLs it does not read today).
+  `multi_host_set_host_settings`; Auto divides pressure by it. Same-repository
+  grouping shipped: multi-host reads `projectOrigins` and thread-sidebar groups
+  remote threads under the local project with that origin
+  (`remote-thread-inventory.ts`).
 - **9**: per-host "Fetch jj before new threads" runs `jj git fetch` in the
   thread's folder before a thread starts there (60 s cap; failure never blocks).
   Not done: rebasing anything on the host, which stays the user's call, and a
