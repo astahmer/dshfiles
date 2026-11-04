@@ -281,10 +281,10 @@ Feature: jj thread workspaces
     Then the thread row details show revisions, sessions, path and preview
 
   @scenario:jj-integration.new-thread-project-picker-browser-journey
-  Scenario: Browse registered projects and thread workspaces in the New thread picker
+  Scenario: The New thread picker lists projects, not thread workspaces
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
-    Then the New thread picker shows its Projects and JJ workspace listings for a disposable repository
+    Then the New thread picker lists Projects but not the thread workspaces of a disposable repository
 
   @scenario:jj-integration.thread-workspace-rebase-browser-journey
   Scenario: Thread workspaces update as soon as a rebase succeeds

@@ -1,12 +1,11 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, FolderIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -49,6 +48,24 @@ export const HostChipSlot = (props: { readonly localProjectPath?: string | undef
     <HostChip api={useApi(multiHostApi)} localProjectPath={props.localProjectPath} />
   </span>
 )
+
+/**
+ * The workspace segment's copy. English only for now: the run row is one segment of the composer's run settings
+ * (`plans/ade-ux` §4.5) and its jargon is explained in place rather than through a locale key per hint.
+ */
+const segmentCopy = {
+  label: 'Workspace',
+  own: 'Own workspace',
+  ownHint: 'A separate copy of the project just for this thread (a Jujutsu workspace). Your checkout stays untouched until you land the work.',
+  inPlace: 'In place',
+  inPlaceHint: 'Edit the project checkout directly. Fine for quick changes when no other thread is working there.',
+  startFrom: 'Start from',
+  search: 'Search workspaces and bookmarks',
+  noVcs: 'This project is not a Jujutsu repository, so the thread edits its folder directly.',
+  tooltip: 'Where this thread edits files: its own workspace (a separate Jujutsu copy) or the project checkout.',
+} as const
+
+type WorkspaceChoice = 'own' | 'in-place'
 
 const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
 
@@ -287,6 +304,7 @@ export const DestinationBar = (props: {
   const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
   const defaultBookmark = settings?.bookmark
   const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })
+  const [segmentOpen, setSegmentOpen] = useState(false)
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
@@ -303,6 +321,15 @@ export const DestinationBar = (props: {
     )
   }
   const chip = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
+  const choose = (choice: WorkspaceChoice): void => {
+    setSegmentOpen(false)
+    const isolate = choice === 'own'
+    const base = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated: isolate, defaultBookmark })
+    move(base === null ? { isolate } : { isolate, base })
+  }
+  const segmentLabel = isolated ? segmentCopy.own : segmentCopy.inPlace
+  const segmentDetail = isolated ? (bookmark ?? undefined) : undefined
+  const segmentName = `${segmentCopy.label}: ${segmentLabel}${segmentDetail === undefined ? '' : ` from ${segmentDetail}`}`
 
   return (
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
@@ -323,68 +350,97 @@ export const DestinationBar = (props: {
           </span>
         ) : null}
         {isJj ? (
-          <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
-            <Popover open={branchOpen} onOpenChange={setBranchOpen}>
-              {isolated ? (
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" className={chip} disabled={toggle.busy}>
-                    <GitBranchIcon className="dshx:size-3.5" />
-                    {bookmark ?? '—'}
-                  </Button>
-                </PopoverTrigger>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" className={chip} disabled={toggle.busy}>
-                        <GitBranchIcon className="dshx:size-3.5" />
-                        {bookmark ?? '—'}
-                      </Button>
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('bookmarkIsolates')}</TooltipContent>
-                </Tooltip>
-              )}
-              <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
-                <Command>
-                  <CommandInput placeholder={t('searchBookmarks')} />
-                  <CommandList>
-                    <CommandEmpty>{t('noBookmarks')}</CommandEmpty>
-                    {(current?.bookmarks ?? []).map(name => (
-                      <CommandItem
-                        key={name}
-                        value={name}
-                        onSelect={() => {
-                          setBranchOpen(false)
-                          move({ isolate: true, base: name })
-                        }}
-                      >
-                        <span className="dshx:flex-1 dshx:truncate">{name}</span>
-                        {name === bookmark ? <CheckIcon className="dshx:size-3.5" /> : null}
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+          // One run-row segment: where the thread edits files (own workspace / in place) and, for its own workspace, the
+          // bookmark it starts from. Same toggle machine and Host calls as the former checkbox. No "share with a thread":
+          // the plugin moves a blank thread out of another thread's workspace before its first send (client.tsx).
+          <Popover
+            open={segmentOpen || branchOpen}
+            onOpenChange={open => {
+              setSegmentOpen(open)
+              if (!open) setBranchOpen(false)
+            }}
+          >
             <Tooltip>
               <TooltipTrigger asChild>
-                <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm">
-                  <Checkbox
-                    checked={isolated}
-                    disabled={toggle.busy}
-                    onCheckedChange={checked => {
-                      const isolate = checked === true
-                      const base = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated: isolate, defaultBookmark })
-                      move(base === null ? { isolate } : { isolate, base })
-                    }}
-                  />
-                  {t('workspace')}
-                </label>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className={chip} disabled={toggle.busy} aria-label={segmentName} data-run-segment="workspace">
+                    {isolated ? <GitBranchIcon className="dshx:size-3.5" /> : <FolderIcon className="dshx:size-3.5" />}
+                    <span className="dshx:min-w-0 dshx:truncate">{segmentLabel}</span>
+                    {segmentDetail === undefined ? null : (
+                      <span className="dshx:min-w-0 dshx:truncate dshx:font-normal dshx:text-muted-foreground">
+                        from <span className="dshx:font-mono! dshx:text-xs">{segmentDetail}</span>
+                      </span>
+                    )}
+                    <ChevronDownIcon className="dshx:size-3 dshx:text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
               </TooltipTrigger>
-              <TooltipContent>{t('isolateHint')}</TooltipContent>
+              <TooltipContent className="dshx:max-w-72">{segmentCopy.tooltip}</TooltipContent>
             </Tooltip>
-          </span>
+            <PopoverContent align="start" className="dshx:w-80 dshx:max-w-[calc(100vw-1.5rem)] dshx:p-0">
+              <Command>
+                <CommandInput placeholder={segmentCopy.search} />
+                <CommandList className="dshx:max-h-80">
+                  <CommandEmpty>{t('noBookmarks')}</CommandEmpty>
+                  <CommandGroup heading={segmentCopy.label}>
+                    {(
+                      [
+                        ['own', segmentCopy.own, segmentCopy.ownHint],
+                        ['in-place', segmentCopy.inPlace, segmentCopy.inPlaceHint],
+                      ] as const
+                    ).map(([choice, label, hint]) => {
+                      const selected = (choice === 'own') === isolated
+                      return (
+                        <CommandItem key={choice} value={label} keywords={[hint]} onSelect={() => choose(choice)} className="dshx:items-start">
+                          <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+                            <span className="dshx:font-medium">{label}</span>
+                            <span className="dshx:text-xs dshx:text-muted-foreground">{hint}</span>
+                          </span>
+                          {selected ? <CheckIcon className="dshx:mt-0.5 dshx:size-3.5" aria-label="selected" /> : null}
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                  {(current?.bookmarks ?? []).length === 0 ? null : (
+                    <>
+                      <CommandSeparator />
+                      <CommandGroup heading={`${segmentCopy.startFrom} (${segmentCopy.own.toLowerCase()})`}>
+                        {(current?.bookmarks ?? []).map(name => (
+                          <CommandItem
+                            key={name}
+                            value={`bookmark ${name}`}
+                            onSelect={() => {
+                              setSegmentOpen(false)
+                              setBranchOpen(false)
+                              move({ isolate: true, base: name })
+                            }}
+                          >
+                            <GitBranchIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
+                            <span className="dshx:flex-1 dshx:truncate dshx:font-mono! dshx:text-xs">{name}</span>
+                            {isolated && name === bookmark ? <CheckIcon className="dshx:size-3.5" aria-label="selected" /> : null}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        ) : current?.vcs === 'none' ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                tabIndex={0}
+                data-run-segment="workspace"
+                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:text-muted-foreground"
+              >
+                <FolderIcon className="dshx:size-3.5" />
+                {segmentCopy.inPlace}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:max-w-72">{segmentCopy.noVcs}</TooltipContent>
+          </Tooltip>
         ) : null}
         {newThreadId !== null && destination.isError ? (
           <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">

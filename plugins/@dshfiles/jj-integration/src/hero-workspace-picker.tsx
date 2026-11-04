@@ -146,17 +146,12 @@ export const HeroWorkspacePicker = (
   const bar = <DestinationBar workspaceId={props.selectedId} services={props.services} toggle={props.toggle} t={props.t} />
   if (!props.open) return bar
 
-  // The Host lists both by last use; its own "No folder" registration is the entry offered first here.
+  // The Host lists projects by last use; its own "No folder" registration is the entry offered first here. Thread
+  // workspaces are not projects: the run row's Workspace segment offers them as "Share a thread's workspace".
   const hostProjects = (projects.data?.projects ?? []).filter(project => !project.path.endsWith(NO_FOLDER_PATH_SUFFIX))
   const registered: RegisteredProject[] = [
     { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder', removable: false },
     ...hostProjects.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
-    ...(projects.data?.workspaces ?? []).map(workspace => ({
-      workspaceId: workspace.workspaceId,
-      title: workspace.title,
-      canonicalPath: workspace.path,
-      isJjWorkspace: true,
-    })),
   ]
   // Read once per open rather than subscribed: every Session event would otherwise re-render the destination bar.
   const recentFolders = recentProjectPaths({

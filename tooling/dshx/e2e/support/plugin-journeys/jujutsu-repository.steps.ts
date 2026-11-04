@@ -325,7 +325,9 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
 When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
-  await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
+  // The composer run row's Workspace segment: choose the thread's own workspace.
+  await page.getByRole('button', { name: /^Workspace: / }).click()
+  await page.getByRole('option', { name: /^Own workspace/ }).click()
   await sendMessage(page, 'jujutsu composer context thread')
   const workspaces = jj(repository, ['--ignore-working-copy', 'workspace', 'list'])
   const threadWorkspace = /^(thread-[\w-]+): (.+?)(?: \(current\))?$/mu.exec(workspaces)
@@ -345,7 +347,9 @@ When('the repository is registered and a thread is started in it', async ({ page
 When('the repository is registered and its thread answers {string}', async ({ page }: { page: Page }, prompt: string) => {
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
-  await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
+  // The composer run row's Workspace segment: choose the thread's own workspace.
+  await page.getByRole('button', { name: /^Workspace: / }).click()
+  await page.getByRole('option', { name: /^Own workspace/ }).click()
   await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
 })
