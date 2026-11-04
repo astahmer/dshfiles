@@ -69,6 +69,8 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/conversation-nodes/tool.ts` | a call whose tool name a `PinnedToolCalls` provider registered gets group-tree position `turn`, so it stays visible outside the completed Turn's fold and splits the step group around it |
 | `src/pinned-tool-calls.ts` | new: the published `@dshfiles/chat/pinned-tool-calls` registry token |
 | `src/pinned-tool-names.ts` | new: the registered names, set from `client-entry.tsx` and read synchronously while tool nodes build |
+| `src/inline-references.tsx`, `src/inline-reference-markdown.tsx` | new: the published `@dshfiles/chat/inline-references` registry and `@dshfiles/chat/inline-reference-markdown` renderer (below) |
+| `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
 
 ### Focus a Turn, Step or tool call from another plugin
 
@@ -101,6 +103,26 @@ group-tree position `turn` (like a turn error): it never joins a step group and 
 every work-details mode. Without providers nothing changes. When the set of pinned names changes after a thread's nodes
 were built (a provider plugin enabled later), Chat registers or removes an inert `uiConversation` event Definition;
 the native registry change rebuilds every bound Conversation, so open threads re-group at once.
+
+### Render inline references from another plugin
+
+`b:12`, `@{luna}`, `memory: n:3` and `jj:main` are links because their plugins add a provider to the
+`InlineReferences` registry from `@dshfiles/chat/inline-references`:
+
+```ts
+plugin.add(InlineReferences, InlineReferenceModel.define({ id: 'backlog-item', surfaces: ['prose', 'code'], match, render }))
+```
+
+`match(text, context)` is pure over one text run and returns ranges; `render` returns the React node shown in place of
+the text. Chat runs providers while it renders assistant Markdown (inline code is the `code` surface, with the block
+text before it in `context.before`) and the Referenced-session line (`summary`); fenced code, links, buttons and math
+are never offered. A higher `priority` wins an overlap, then the earlier start, the longer match and registration
+order. A provider whose matcher reads outside state (saved agents, a thread's bookmarks) passes a `vocabulary` it bumps
+when that state changes. Transformed blocks are cached by element identity, so a streaming message's frozen blocks
+keep their rendered references. A throwing matcher or renderer shows the written text and logs once. Sent user
+messages are rich-composer's: they use the native `conversation.user.text` rules and `conversation.user.text.node` slot
+instead. Another plugin's own Markdown can apply the same providers with `InlineReferenceMarkdown` from
+`@dshfiles/chat/inline-reference-markdown` (backlog item text does).
 
 ### Build
 

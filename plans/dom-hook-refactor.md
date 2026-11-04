@@ -1,10 +1,42 @@
 # DOM hook refactor plan
 
+## Progress
+
+Resume here: steps 4–7 (usage-stat contribution, before-main frame slot, thread-row selection, final sweep). Steps 2–3
+shipped: the inline-reference registry and the five reference plugins on it.
+
+| Step | What                                                     | State | Where                                                                                                                                                                                                                                                                                                                        |
+| ---- | -------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Audit                                                    | done  | This plan's Context.                                                                                                                                                                                                                                                                                                         |
+| 2    | Inline-reference contract in `@dshfiles/chat`            | done  | [inline-references.tsx](../plugins/@dshfiles/chat/src/inline-references.tsx) (registry, ordering, overlap, block cache) and [inline-reference-markdown.tsx](../plugins/@dshfiles/chat/src/inline-reference-markdown.tsx); tests in [inline-references.test.tsx](../plugins/@dshfiles/chat/tests/inline-references.test.tsx). |
+| 3    | Migrate agents, backlog, memory, jujutsu, mentions       | done  | Each adds a provider; no reference plugin keeps a `MutationObserver`. jujutsu titles batch into one `referenceTitles` Host request per render pass.                                                                                                                                                                          |
+| 4    | Usage-stat contribution for ai-accounts                  | open  |                                                                                                                                                                                                                                                                                                                              |
+| 5    | `before-main` frame slot for main-tabs                   | open  |                                                                                                                                                                                                                                                                                                                              |
+| 6    | React-owned thread selection and composer context        | open  |                                                                                                                                                                                                                                                                                                                              |
+| 7    | Focused checks, journeys, docs and screenshots per owner | open  | Steps 2–3 ran their packages' tests, typechecks, builds and reference journeys.                                                                                                                                                                                                                                              |
+
+How the contract works (move into `@dshfiles/chat`'s README when the plan completes):
+
+- A provider adds `InlineReferenceModel.define({ id, priority?, surfaces?, match, render, vocabulary? })` to the
+  `InlineReferences` registry (`@dshfiles/chat/inline-references`). `match` is pure over one text run; `render` returns
+  React children. `vocabulary` is a version source a provider bumps when its matcher's answer changes (saved agents,
+  a thread's bookmarks).
+- Chat applies providers to assistant Markdown (`InlineReferenceMarkdown` calls the native `MarkdownText` function and
+  transforms its tree) and to the Referenced-session line (`surface: 'summary'`). Fenced code, links, buttons and math
+  are never offered; inline code is the `code` surface, with the block text before it in `context.before`.
+- Overlaps: higher `priority` wins; then the earlier start, the longer match, registration order. A throwing matcher or
+  renderer falls back to the written text and logs once.
+- Streaming: transformed block elements are cached by identity, so the native renderer's frozen blocks keep their
+  rendered references and only the growing tail re-matches.
+- Sent user messages are not Chat's: they render through the native `conversation.user.text` rules and the
+  `conversation.user.text.node` slot, which backlog (`b:`) and mentions (session chips) fill.
+- Backlog item text renders through `InlineReferenceMarkdown`, so agent and backlog references work in comments too.
+
 ## Context
 
 Several owned plugins extend DSH-rendered UI by finding and mutating host-rendered DOM rather than contributing through a render contract:
 
-- `agents`, `backlog`, `memory`, and `jujutsu` scan rendered conversation text and wrap recognized references in interactive elements; `mentions` tags existing session-reference chips. Examples: [agent references](../plugins/@dshfiles/agents/src/agent-reference-links.ts), [backlog references](../plugins/@dshfiles/backlog/src/backlog-reference-links.ts), [memory references](../plugins/@dshfiles/memory/src/memory-reference-links.ts), [JJ references](../plugins/@dshfiles/jujutsu/src/chat-reference-links.ts), and [session mentions](../plugins/@dshfiles/mentions/src/client-entry.ts).
+- `agents`, `backlog`, `memory`, and `jujutsu` scan rendered conversation text and wrap recognized references in interactive elements; `mentions` tags existing session-reference chips. Examples (now migrated, step 3): agent, backlog, memory, JJ and session-mention reference links, which each ran a document-wide `MutationObserver`.
 - `ai-accounts` appends estimated cost to the native usage pill and its dialog in [session-cost-display.ts](../plugins/@dshfiles/ai-accounts/src/session-cost-display.ts).
 - `main-tabs` inserts a strip host immediately before the frame's `main` outlet in [strip-mount.ts](../plugins/@dshfiles/main-tabs/src/strip-mount.ts); the frame currently has no slot at that placement ([frame SlotMap](../plugins/@dshfiles/frame-layout/src/native/client/index.ts)).
 - `thread-sidebar` marks selected rows imperatively in [thread-selection.ts](../plugins/@dshfiles/thread-sidebar/src/thread-selection.ts), and finds the main composer by DOM selectors in [thread-mention.ts](../plugins/@dshfiles/thread-sidebar/src/thread-mention.ts).
@@ -118,12 +150,12 @@ No database or persistent-schema changes. Add only typed client-side contributio
 
 ## Open questions
 
-1. Should the inline-reference contribution contract be public to any compatible plugin, or initially exposed only to the owned dshfiles consumers until its ordering and overlap semantics prove stable?
+1. ~~Should the inline-reference contribution contract be public to any compatible plugin?~~ Resolved 2026-11-04: it is a dshx module like Chat's other contracts; any plugin that depends on `@dshfiles/chat` may provide.
 2. Does the existing conversation context expose the main composer session identity needed by thread mentions, or is a small typed owner-side context addition required?
 
 ## Acceptance criteria
 
-- [ ] No reference feature scans the whole document and wraps/replaces rendered message text after render.
+- [x] No reference feature scans the whole document and wraps/replaces rendered message text after render. (agents keeps one window listener that opens its card when a native `@handle` file chip is activated; it reads the gesture and never writes the transcript.)
 - [ ] No cost-display code appends or removes nodes inside the native usage pill or dialog.
 - [ ] `main-tabs` renders through a declared frame slot and does not insert a sibling beside `[data-slot="main"]`.
 - [ ] Thread selection is represented in React-owned row props; composer targeting does not depend on querying composer-seat markup.
@@ -133,7 +165,9 @@ No database or persistent-schema changes. Add only typed client-side contributio
 
 ## Decisions log
 
-| Date       | Decision                                                                                           | Rationale                                                                                         |
-| ---------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 2026-10-28 | Refactor at owned plugin boundaries, not through DSH core or a generic DOM injection helper.       | Chat, frame-layout, and thread-sidebar own the affected UI; contracts should reflect each domain. |
-| 2026-10-28 | Preserve standard portals and DOM reads/observers used only for focus, geometry, layout, or theme. | The goal is to remove cross-owner UI mutation, not ban normal browser APIs.                       |
+| Date       | Decision                                                                                           | Rationale                                                                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-28 | Refactor at owned plugin boundaries, not through DSH core or a generic DOM injection helper.       | Chat, frame-layout, and thread-sidebar own the affected UI; contracts should reflect each domain.                                                           |
+| 2026-10-28 | Preserve standard portals and DOM reads/observers used only for focus, geometry, layout, or theme. | The goal is to remove cross-owner UI mutation, not ban normal browser APIs.                                                                                 |
+| 2026-11-04 | Transform the native `MarkdownText` output instead of forking the Markdown renderer.               | The renderer lives in ui-primitives; calling its function keeps its streaming cache, and caching transformed blocks by identity keeps frozen blocks stable. |
+| 2026-11-04 | Sent messages use the native user-text node slot, not the Chat registry.                           | rich-composer owns user text and already exposes typed rules and a keyed node slot.                                                                         |
