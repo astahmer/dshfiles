@@ -38,6 +38,7 @@ describe('session reference links', () => {
           ['Mention target', 'session-target'],
           ['Second thread', 'session-second'],
         ]),
+      sessionForLabel: label => (label === 'Other thread' ? 'session-other' : undefined),
     })
   })
   afterEach(() => {
@@ -46,8 +47,11 @@ describe('session reference links', () => {
   })
 
   it('gives a sent session chip link semantics; Mod-click asks for a new tab', () => {
-    const raw = mention('Mention target', 'session-target')
-    const container = mount(<SessionMentionChip interactive node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} />)
+    // A sent chip carries `@label`; the thread comes from the conversation's recall events.
+    const raw = '@Mention target'
+    const container = mount(
+      <SessionMentionChip interactive node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} sessionId="session-sender" />,
+    )
     const link = container.querySelector('[data-dshfiles-session-link]')
     expect(link?.getAttribute('role')).toBe('link')
     expect(link?.querySelector('[data-ref-chip="session"]')?.textContent).toBe('Mention target')
@@ -61,9 +65,16 @@ describe('session reference links', () => {
     ])
   })
 
+  it('finds the thread of a chip whose renderer is not told its conversation', () => {
+    const raw = '@Other thread'
+    const container = mount(<SessionMentionChip interactive node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Other thread' } }} raw={raw} />)
+    act(() => void container.querySelector('[data-dshfiles-session-link]')?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
+    expect(opened).toEqual([{ sessionId: 'session-other', newTab: false }])
+  })
+
   it('keeps a queued or previewed chip inert', () => {
     const raw = mention('Mention target', 'session-target')
-    const container = mount(<SessionMentionChip interactive={false} node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} />)
+    const container = mount(<SessionMentionChip sessionId="session-sender" interactive={false} node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} />)
     expect(container.querySelector('[role="link"]')).toBeNull()
   })
 

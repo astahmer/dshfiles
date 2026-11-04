@@ -13,7 +13,7 @@ const englishLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 
  * Item text renders like the kit's compact Markdown, with Chat's inline references applied: `b:12` and `@{luna}` in a
  * title, body or comment open their cards the same way they do in a conversation.
  */
-const ItemMarkdown = (props: { readonly text: string }): JSX.Element => {
+export const ItemMarkdown = (props: { readonly text: string }): JSX.Element => {
   const handlers = useRegistry(LinkHandler)
   const text = useMemo(
     () =>

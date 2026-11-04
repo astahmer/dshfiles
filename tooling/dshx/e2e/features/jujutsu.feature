@@ -102,7 +102,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.chat-references
   Scenario: An explicit reference in an answer opens its revision
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/chat" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And two Jujutsu bookmarks have long titles
     And a Command Code account backed by a local fake provider is added
@@ -114,7 +114,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.chat-references-foreign-repository
   Scenario: A reference to a revision of another registered repository previews and opens that repository
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/chat" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And a second disposable Jujutsu repository has a bookmark "foreign-ref" on "Foreign only revision"
     And a Command Code account backed by a local fake provider is added

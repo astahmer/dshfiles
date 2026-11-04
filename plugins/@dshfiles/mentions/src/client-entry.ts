@@ -102,7 +102,14 @@ export default defineClient({
       return SessionLinks.referencedSessions(events)
     }
     // Chat renders the "Referenced session · …" line and the sent chip through typed seats; this plugin only answers.
-    SessionReferenceLinks.connect({ openThread, referencedSessions })
+    const sessionForLabel = (label: string): string | undefined => {
+      for (const threadId of sessions.list.getSnapshot().ids) {
+        const sessionId = referencedSessions(threadId).get(label)
+        if (sessionId !== undefined) return sessionId
+      }
+      return undefined
+    }
+    SessionReferenceLinks.connect({ openThread, referencedSessions, sessionForLabel })
     metadata?.plugin?.add(InlineReferences, SessionReferenceLinks.summary)
     // An Agent writes `@[label](dsh-session:…)`; Markdown keeps it as a link that opens through this handler.
     metadata?.plugin?.add(LinkHandler, {
@@ -113,9 +120,9 @@ export default defineClient({
         if (sessionId !== undefined) openThread(sessionId, wantsNewTab())
       },
     })
-    // Above the native renderer's priority 100: the same chip, with link semantics.
+    // A keyed cell renders its lowest priority: 50 shadows the native renderer's 100 with the same chip plus link semantics.
     ctx.slots.inject('conversation.user.text.node', () =>
-      ctx.slots.register({ name: 'conversation.user.text.node', key: 'session', priority: 200 }, SessionMentionChip),
+      ctx.slots.register({ name: 'conversation.user.text.node', key: 'session', priority: 50 }, SessionMentionChip),
     )
     ctx.effect(() => {
       const onPointerDown = (event: PointerEvent): void => {

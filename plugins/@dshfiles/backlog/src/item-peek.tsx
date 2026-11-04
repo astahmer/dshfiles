@@ -1,5 +1,4 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import { CommandDialog, CommandGroup, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -66,7 +65,7 @@ import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLin
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
-import { BacklogText } from './item-text.js'
+import { BacklogText, ItemMarkdown } from './item-text.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
@@ -580,7 +579,7 @@ const Conversation = (props: {
                   ) : (
                     <>
                       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-2">
-                        <Markdown text={run.event.detail} />
+                        <ItemMarkdown text={run.event.detail} />
                         {canEdit ? (
                           <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:pointer-events-none dshx:opacity-0 dshx:transition-opacity dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100">
                             <Button

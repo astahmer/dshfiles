@@ -22,7 +22,7 @@ Feature: Ranked @ mentions and thread links
 
   @scenario:mentions.session-mention-links
   Scenario: Referenced threads open from the sent message, in a new tab on Cmd-click
-    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/main-tabs, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/main-tabs, @dshfiles/ai-accounts, @dshfiles/chat" is booted
     When a Command Code account backed by a local fake provider is added
     And threads named "Mention target" and "Second thread" are started
     And a new thread mentions "Mention target" and is sent

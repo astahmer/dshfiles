@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { defineClient } from '@dshfiles/dshx/client'
@@ -20,9 +21,13 @@ const PANEL_ID = 'dshfiles-memory-panel'
 
 export default defineClient({
   name: '@dshfiles/memory',
-  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'workspaces'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'workspaces', 'uiConversation'],
   setup(ctx, decorate, metadata) {
     metadata?.plugin?.add(InlineReferences, MemoryInlineReference.reference)
+    ctx.effect(() => ctx.uiConversation.userText.register(MemoryInlineReference.userTextRule), 'memory: sent citations link')
+    ctx.slots.inject('conversation.user.text.node', () =>
+      ctx.slots.register({ name: 'conversation.user.text.node', key: 'memory', priority: 100 }, MemoryInlineReference.UserTextLink),
+    )
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (panelId: string): panelId is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === panelId)
     const openThread = (sessionId: string): void => {

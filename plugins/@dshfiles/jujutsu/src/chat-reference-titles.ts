@@ -16,7 +16,7 @@ export type ChatReferenceTitleLoader = (input: {
 /** A reference's title state: still loading, or settled with the repository that resolved it (null when none did). */
 export type ChatReferenceTitleEntry =
   | { readonly state: 'pending' }
-  | { readonly state: 'settled'; readonly title: string | undefined; readonly targetPath: string | null }
+  | { readonly state: 'settled'; readonly title: string; readonly targetPath: string | null }
 
 const BATCH_LIMIT = 100
 
@@ -121,7 +121,8 @@ export class ChatReferenceTitleStore {
       const current = this.entries.get(item.key)
       // The preview card may have settled it meanwhile, with a repository this batch never tried.
       if (current?.state === 'settled') continue
-      this.entries.set(item.key, { state: 'settled', title: row?.title ?? undefined, targetPath: row?.root ?? null })
+      // An unresolved reference is labelled by its own name, so the reader sees the lookup finished.
+      this.entries.set(item.key, { state: 'settled', title: row?.title ?? item.reference.value, targetPath: row?.root ?? null })
     }
     this.notify()
   }

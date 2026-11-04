@@ -10,6 +10,8 @@ export interface SessionReferencePorts {
   readonly openThread: (sessionId: string, newTab: boolean) => boolean
   /** Label → session id for every session a thread's loaded messages referenced. */
   readonly referencedSessions: (threadId: string) => ReadonlyMap<string, string>
+  /** The session a label names in any loaded thread, for a renderer that is not told its thread. */
+  readonly sessionForLabel: (label: string) => string | undefined
 }
 
 let ports: SessionReferencePorts | undefined
@@ -18,14 +20,28 @@ const wantsNewTab = (event: MouseEvent | KeyboardEvent): boolean => event.metaKe
 
 /**
  * A sent message's session chip. The native renderer shows it as an inert label; this keeps that chip and adds link
- * semantics, so a click (or Enter) opens the thread and Mod-click opens it in a tab of its own.
+ * semantics, so a click (or Enter) opens the thread and Mod-click opens it in a tab of its own. A sent chip carries only
+ * `@label`; the thread it names comes from the conversation's own recall events, read at activation.
  */
-export const SessionMentionChip = (props: { readonly node: UserTextNode<'session'>; readonly raw: string; readonly interactive: boolean }): JSX.Element => {
+export const SessionMentionChip = (props: {
+  readonly node: UserTextNode<'session'>
+  readonly raw: string
+  readonly interactive: boolean
+  /** The conversation rendering the chip; every session-scoped slot receives it. */
+  readonly sessionId?: string
+}): JSX.Element => {
   const chip = <ReferenceChip appearance="session" label={props.node.data.label} title={props.raw} />
-  const sessionId = SessionLinks.idFromMention(props.raw)
-  if (!props.interactive || sessionId === undefined) return chip
+  if (!props.interactive) return chip
   const open = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>): void => {
-    if (ports?.openThread(sessionId, wantsNewTab(event)) === true) event.preventDefault()
+    const label = props.raw.replace(/^@/u, '')
+    const byLabel = props.sessionId === undefined ? undefined : ports?.referencedSessions(props.sessionId)
+    const sessionId =
+      SessionLinks.idFromMention(props.raw) ??
+      byLabel?.get(label) ??
+      byLabel?.get(props.node.data.label) ??
+      ports?.sessionForLabel(label) ??
+      ports?.sessionForLabel(props.node.data.label)
+    if (sessionId !== undefined && ports?.openThread(sessionId, wantsNewTab(event)) === true) event.preventDefault()
   }
   return (
     <span
