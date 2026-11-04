@@ -1,6 +1,6 @@
 # Tooling optimization work register
 
-Seven implementation work packages. T01 is implemented and verified; T02–T07 are pending. Other entries confirm code shape, not measured speedup. Run the [master measurement gates](README.md#implementation-steps) and retain standalone build/check safety. These are dshfiles/dshx changes, never DSH core patches.
+Seven implementation work packages. T01, T02 (capability analysis), T04 and T07 are implemented and verified; T03, T05 and T06 are pending. Other entries confirm code shape, not measured speedup. Run the [master measurement gates](README.md#implementation-steps) and retain standalone build/check safety. These are dshfiles/dshx changes, never DSH core patches.
 
 ## T01 — Read compact build dependencies, not complete source maps (P1, measured, done)
 
