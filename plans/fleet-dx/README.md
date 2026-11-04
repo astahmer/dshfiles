@@ -22,7 +22,7 @@ feels different), b:184 (keep jj in sync across hosts).
 | 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | not started |
 | 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | partial     |
 | 5   | **Unreachable host polish**: a short disconnect grace delay before turning a host red; "Hide this host's threads" from the offline banner                                                                                                                              | No red flicker on a 2 s blip; hiding reuses the existing hidden-host flag                                                                                                   | not started |
-| 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | not started |
+| 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | code done   |
 | 7   | **Native remote questions and approvals** (b:117, b:183): answer them from the local thread                                                                                                                                                                            | Tracked as milestone 6 of [remote-thread-composer](../remote-thread-composer/README.md)                                                                                     | external    |
 | 8   | **Auto placement weights** and **same repo across hosts**: a per-host weight on the Hosts page used by the resource pool score; projects with the same origin URL grouped with a host badge                                                                            | Weighted pick unit-tested; a repo cloned on two hosts shows one project with two hosts                                                                                      | not started |
 | 9   | **Keep jj in sync across hosts** (b:184): fetch + rebase the remote checkout before a remote thread starts, opt-in per host                                                                                                                                            | Remote thread starts on the bookmark tip it would have locally                                                                                                              | not started |
@@ -45,7 +45,13 @@ picker still show only the last error, because the runtime status path
 (`runtimeStatus`/`runtimePing`) records one `lastError`, not hops. After landing,
 build `@dshfiles/multi-host` in the canonical checkout, ask the user to restart
 the DSH host process, then confirm the Hosts page and the Run-on picker list
-hosts. Next: milestone 6, then 1.
+hosts (confirmed after the 2026-11-04 restart: no new `multi-host/list` or
+`threadList` contract errors). Milestone 6 adds `sessionId` to `runtimeOpenView`
+and sets `?thread=`, which thread-sidebar opens on page load; an end-to-end check
+against a real host is still pending. A full-profile scratch DSH (`dshx dev up`
+with no `--plugin`) fails to boot here: multi-host stops with
+`HostServiceMissing: subprocess`; the live profile and a multi-host-only scratch
+boot fine. Next: milestone 1.
 
 The [host-pool plan](../host-pool/README.md) still shows every milestone
 pending although Auto placement and the resource view shipped (b:346, b:356):
