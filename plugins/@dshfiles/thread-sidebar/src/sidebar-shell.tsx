@@ -12,7 +12,7 @@ import {
   IconSettingsOutlineRegular,
   IconUnarchiveOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,6 +29,8 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ArrowLeftIcon,
+  SignpostIcon,
+  SquarePenIcon,
   ArrowRightIcon,
   BellIcon,
   ChevronDownIcon,
@@ -86,6 +88,10 @@ import { useRestartMachine } from './use-restart-machine.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 import { NavigationIconRow, type NavigationItem } from './navigation-icon-row.js'
 import { SidebarContentSeat, SidebarPreviewFallback } from './sidebar-content-seat.js'
+import { DestinationShell, SHOW_DESTINATION_EVENT } from './destination-shell.js'
+import { DESTINATIONS, DestinationSections, Destinations } from './destinations.js'
+import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
+import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
 
 interface FooterRegistration {
@@ -284,6 +290,19 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
   const { preferences, updatePreferences, openPalette, selectedThreadId, threadTitle } = useSidebarState()
+  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
+  const docking = preferences.layoutMode === 'docking'
+  const contentOverridden = props.contentOverridden && docking
+  const contributedSections = useRegistry(DestinationSections)
+  const destinations = useMemo(() => Destinations.resolve(panels, contributedSections), [panels, contributedSections])
+  const navigationApi = useApi(threadSidebarNavigationApi)
+  const recordNavigation = useCallback(
+    (record: NavigationRecord): void => {
+      // Counting is best effort: an older Host without the method must never break navigation.
+      void navigationApi.record(record).catch(() => undefined)
+    },
+    [navigationApi],
+  )
   const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(ThreadNavigationHistoryModel.emptyNavigationHistory)
   const pendingStep = useRef<{ target: SidebarLocation; until: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -771,13 +790,56 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     () => [
       ...orderedHeaderEntries
         .filter(entry => entry.kind !== 'search')
-        .map((entry): PaletteAction => ({
-          id: `@dshfiles/thread-sidebar/header/${entry.id}`,
-          group: 'destination',
-          label: entry.label,
-          icon: headerIconFor(entry, 16),
-          run: () => activateHeaderEntry(entry),
-        })),
+        .map((entry): PaletteAction => {
+          const owner = entry.kind === 'panel' ? Destinations.owning(destinations, entry.panelId) : undefined
+          const section = owner?.sections.find(candidate => entry.kind === 'panel' && candidate.panelId === entry.panelId)
+          return {
+            id: `@dshfiles/thread-sidebar/header/${entry.id}`,
+            group: 'destination',
+            // "Observe › Usage"; the old "Usage: Analytics" label stays searchable.
+            label: owner === undefined || section === undefined ? entry.label : `${owner.label} › ${section.label}`,
+            aliases: owner === undefined ? [] : [entry.label, ...(section?.formerLabels ?? [])],
+            icon: headerIconFor(entry, 16),
+            run: () => {
+              activateHeaderEntry(entry)
+              if (owner !== undefined && entry.kind === 'panel') recordNavigation({ destination: owner.id, section: entry.panelId, surface: 'palette' })
+            },
+          }
+        }),
+      ...(docking
+        ? []
+        : DESTINATIONS.map(
+            (destination): PaletteAction => ({
+              id: `@dshfiles/thread-sidebar/destination/${destination.id}`,
+              group: 'destination',
+              label: `Go to ${destination.label}`,
+              aliases: [destination.label, destination.description],
+              run: () => {
+                window.dispatchEvent(new CustomEvent(SHOW_DESTINATION_EVENT, { detail: destination.id }))
+                recordNavigation({ destination: destination.id, surface: 'palette' })
+              },
+            }),
+          )),
+      ...(['fixed', 'docking'] as const).map(
+        (mode): PaletteAction => ({
+          id: `@dshfiles/thread-sidebar/action/layout-${mode}`,
+          group: 'command',
+          label: mode === 'fixed' ? 'Layout: fixed (rail and list)' : 'Layout: free docking',
+          aliases: mode === 'fixed' ? ['rail', 'fixed layout', 'destinations'] : ['docking', 'dockview', 'workbench left', 'movable panes'],
+          isSelected: () => preferences.layoutMode === mode,
+          run: () => updatePreferences({ layoutMode: mode }),
+        }),
+      ),
+      {
+        id: '@dshfiles/thread-sidebar/action/moved-to',
+        group: 'command',
+        label: 'Where did a page go?',
+        aliases: ['moved to', 'moved pages', 'old sidebar', 'navigation map', 'find page'],
+        icon: <SignpostIcon className="dshx:size-4" />,
+        run: () => {
+          window.setTimeout(MovedTo.open, 0)
+        },
+      },
       {
         id: '@dshfiles/thread-sidebar/action/toggle-sidebar',
         group: 'destination',
@@ -871,6 +933,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       activateHeaderEntry,
       openCustomize,
       openRestartDialog,
+      destinations,
+      docking,
+      recordNavigation,
+      preferences.layoutMode,
+      updatePreferences,
     ],
   )
 
@@ -1089,6 +1156,18 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                     })}
                 </PopoverContent>
               </Popover>
+              {docking || preferences.hiddenHeaderIds.includes('new-thread') ? null : (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="dshx:text-muted-foreground"
+                  aria-label={text(props.t, 'threadSidebarNewThread')}
+                  title={text(props.t, 'threadSidebarNewThread')}
+                  onClick={() => startSession()}
+                >
+                  <SquarePenIcon className="dshx:size-4" aria-hidden="true" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -1104,7 +1183,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 <CommandIcon className="dshx:size-4" aria-hidden="true" />
               </Button>
               <SidebarCustomizationFallback
-                contentOverridden={props.contentOverridden}
+                contentOverridden={contentOverridden || !docking}
                 label={text(props.t, 'threadSidebarSettings')}
                 expanded={customizeOpen}
                 onClick={() => setCustomizeOpen(value => !value)}
@@ -1114,7 +1193,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
 
-        {props.collapsed ? (
+        {props.collapsed && docking ? (
           <nav className="dshx:w-full dshx:flex-none dshx:overflow-hidden" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
             <NavigationIconRow
               items={navigationItems}
@@ -1145,6 +1224,41 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           </nav>
         ) : null}
 
+        {docking ? null : (
+          <DestinationShell
+            panels={panels}
+            contributed={contributedSections}
+            activePanelId={activePanelId ?? null}
+            selectedThreadId={selectedThreadId ?? null}
+            collapsed={props.collapsed}
+            renderPanelIcon={(panelId, size, active) => props.renderSlot('sidebar.panellist', { size, active }, { only: panelId })}
+            threadList={props.renderSlot('sidebar.workspaces', {
+              wide,
+              expandSidebar: () => {
+                if (props.collapsed) props.toggleSidebar()
+              },
+            })}
+            selectPanel={panelId => selectPanel(panelId as SidebarPanelMetadata['id'])}
+            startSession={() => startSession()}
+            searchThreads={preferences.hiddenHeaderIds.includes('search') ? null : () => openPalette('threads')}
+            showNewThread={!preferences.hiddenHeaderIds.includes('new-thread')}
+            customizeThreads={{ label: text(props.t, 'threadSidebarSettings'), expanded: customizeOpen, toggle: () => setCustomizeOpen(value => !value) }}
+            labels={{ newThread: text(props.t, 'threadSidebarNewThread'), searchThreads: text(props.t, 'threadSidebarSearch') }}
+            openSettings={footerSnapshot.settingsId === null ? null : () => requestSettings(props.runCommand)}
+            openMovedTo={MovedTo.open}
+            useDocking={() => updatePreferences({ layoutMode: 'docking' })}
+            toggleSidebar={toggleSidebar}
+            record={recordNavigation}
+          />
+        )}
+        <MovedToDialog
+          panels={panels}
+          openEntry={entry => {
+            selectPanel(entry.panelId as SidebarPanelMetadata['id'])
+            recordNavigation({ destination: entry.destination, section: entry.panelId, surface: 'moved-to' })
+          }}
+        />
+        {docking ? (
         <SidebarContentSeat renderSlot={props.renderSlot} collapsed={props.collapsed}>
           <div
             ref={headerRegionRef}
@@ -1267,6 +1381,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             })}
           </div>
         </SidebarContentSeat>
+        ) : null}
 
         {customizeOpen && (wide || props.customizationTarget !== null) ? (
           <SidebarCustomizationSeat target={props.customizationTarget} label={text(props.t, 'threadSidebarCustomize')}>
@@ -1462,7 +1577,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={props.contentOverridden} />
+            <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} />
           </div>
         ) : null}
 

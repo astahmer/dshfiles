@@ -1,5 +1,11 @@
 # Thread Sidebar
 
+![The fixed layout: a labelled rail of destinations beside the thread list](docs/screenshots/destination-rail.png)
+
+![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
+
+![Where did a page go? lists each former sidebar page and opens its new home](docs/screenshots/moved-to-map.png)
+
 ![The Sidebar settings wheel belongs to the Threads panel, not the fixed app header](docs/screenshots/navigation-layout.png)
 
 ![The same account Preview docked as an ordinary view with its single tab row hidden](docs/screenshots/preview-as-regular-tab.png)
@@ -32,10 +38,37 @@ A local status section with no rows folds away and keeps its saved slot while th
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
 
-The reusable board page is **Thread Sidebar: Board**.
+The reusable board page is **Thread Sidebar: Board** (Threads › Board in the rail).
 
-**Tabbed left pane.** In the owned stack, Workbench tabs are mandatory, with no
-native-layout opt-out. The flexible middle belongs to its `shell.left` slot:
+**Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
+`plans/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
+list with **Search threads**, the Sidebar settings gear and its sections (Board); every other destination lists its
+sections, and choosing one opens that page in the stage. A destination with a single page (the Inbox) opens it at once.
+The former Navigation pages are sections now, labelled without their plugin name; the table lives in the
+`@dshfiles/thread-sidebar/destinations` dshx module (`KNOWN_SECTIONS`), plugins add later pages through its
+`DestinationSections` registry, and a page nobody mapped is listed under **Settings › Other pages**. The Inbox entry
+renders the Inbox's own `attention-inbox` glyph, so its Needs you badge appears whenever activity-timeline is loaded.
+**New thread** sits in the header row (in the rail when collapsed). Collapsed, only the rail stays and its labels move
+into tooltips. Every load starts at Threads; the list then follows the page the stage shows.
+
+**Where did a page go?** (palette, and the link under every destination list) lists each former left-nav entry from
+the migration map (`src/moved-to.generated.ts`, written by `pnpm ade:migration-map`) with an Open button. Palette rows
+read `Observe › Usage` and still match the old names.
+
+**Layout: fixed | free docking.** Settings › Layout (setting `layoutMode`, also the palette's **Layout:** commands)
+switches to free docking, which mounts Workbench's movable left panes described below. Fixed never mounts that region,
+so the saved left layout and named layouts stay untouched and return with free docking.
+
+**Phone (below 640px).** The rail becomes a bottom tab bar: Threads, Inbox, New and More. Threads opens the list full
+screen and opening a thread closes it again (the stage is pushed); a second tap on the open tab goes back; More lists
+the other destinations. The sidebar marks the document with `data-shell-phone-nav`, and frame-layout then gives the
+stage the full width and reserves the bar's height.
+
+**Navigation counter.** Each destination or section open (rail, tab bar, list, palette, moved-to) adds one to a private
+counter in this Host's runtime folder: ids and counts only, never a thread or its content. Agents read it with
+`shell_navigation_counts`; `shell_navigation_reset` clears it only with `confirm: true`.
+
+**Tabbed left pane (free docking).** With Layout set to free docking, Workbench tabs fill the left column. The flexible middle belongs to its `shell.left` slot:
 **Thread Sidebar: Navigation** and **Thread Sidebar: Threads** are reusable panels, not fixed sidebar furniture. Each group's **+**, named **New tab**, opens an actual chooser tab with **Choose a view**, **Search views**, **Rich Composer: Current conversation**, one **Settings Shell: Settings** hub and plugin views. **Pane options** sits at the group's far-right edge; there is no persistent Workbench toolbar. Threads retains **New thread**, **Search threads**, project creation,
 filters, row actions and keyboard navigation. Its **Sidebar settings** gear opens
 **Customize sidebar** inside that same panel, including after moving it or hiding

@@ -6,24 +6,24 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-339 features from 88 plugins.
+345 features from 88 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 7 |  | 1 |  | 12 |  |  |  |  | 20 |
+| Threads |  |  |  |  | 9 |  | 1 |  | 12 |  |  |  |  | 22 |
 | Inbox |  | 9 |  |  |  |  |  |  |  |  |  |  |  | 9 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  | 16 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 18 |  |  |  | 2 |  |  |  |  | 20 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  | 6 |
-| Settings |  |  |  |  |  |  |  |  | 1 | 44 |  |  |  | 45 |
+| Settings |  |  |  |  |  |  |  |  | 1 | 45 |  |  |  | 46 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  | 17 |  | 17 |
 | Composer |  |  |  | 46 |  |  |  |  |  |  |  |  |  | 46 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 16 |  | 14 |  |  |  |  | 89 |  |  | 5 |  |  | 124 |
+| No place of its own | 17 |  | 15 |  |  |  |  | 90 |  |  | 5 |  |  | 127 |
 
 ## By current left-nav entry
 
@@ -62,7 +62,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 | Region today | Features | Destinations |
 | --- | ---: | --- |
-| agent tool | 21 | No place of its own 16, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
+| agent tool | 22 | No place of its own 17, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | client | 14 | No place of its own 14 |
 | composer | 48 | Composer 45, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
@@ -73,11 +73,11 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | keyboard | 3 | No place of its own 3 |
 | left-nav | 76 | Observe 19, Work 15, Land 13, Settings 12, Agents 4, Knowledge 4, Thread panel 4, Inbox 3, No place of its own 1, Threads 1 |
 | main-tabs | 11 | No place of its own 7, Settings 2, Thread panel 2 |
-| palette | 10 | No place of its own 10 |
+| palette | 11 | No place of its own 11 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | right-pane | 5 | No place of its own 2, Thread panel 2, Settings 1 |
-| settings | 23 | Settings 21, No place of its own 2 |
-| shell | 3 | No place of its own 3 |
+| settings | 24 | Settings 22, No place of its own 2 |
+| shell | 6 | No place of its own 4, Threads 2 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 7 | No place of its own 5, Composer 1, Observe 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
@@ -91,12 +91,14 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 ### Threads
 
-rail destination (default); 20 features.
+rail destination (default); 22 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | home/home-screen: New thread screen branding and shortcuts | destinationSection | home: New thread screen |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
+| thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
+| thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
 | thread-sidebar/thread-children-and-links: Browse child sessions and share thread URLs | destinationSection | thread-list: child threads |
 | thread-sidebar/thread-classification: Organize threads by workspace and status | destinationSection | left-nav: Thread Sidebar: Board |
@@ -230,7 +232,7 @@ rail destination; 6 features.
 
 ### Settings
 
-rail destination (bottom); 45 features.
+rail destination (bottom); 46 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -274,6 +276,7 @@ rail destination (bottom); 45 features.
 | settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings Shell: Settings |
 | shortcuts/editable-command-keys: Rebindable command keys | settingsSection | settings: Keyboard shortcuts |
 | thread-sidebar/idle-archive-policy: Automatically settle eligible idle threads | settingsSection | settings: Thread sidebar › idle policy |
+| thread-sidebar/layout-mode: Choose a fixed or free-docking left column | settingsSection | settings: Thread sidebar › Layout |
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Thread sidebar › notifications |
 | thread-sidebar/settled-auto-archive: Archive a settled thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
@@ -383,7 +386,7 @@ cards inline in the active thread; 17 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 124 features.
+palette commands, status items, agent tools, infrastructure; 127 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -400,6 +403,7 @@ palette commands, status items, agent tools, infrastructure; 124 features.
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
 | secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
+| thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
 | thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an Agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
 | tweet-context/public-post-context: Fetch public X post, photos, video samples, and thread posts | agentToolOnly | agent tool: tweet_context |
 | usage/usage-otel-export: OTLP metrics export | agentToolOnly | agent tool: usage_otel_metrics |
@@ -415,6 +419,7 @@ palette commands, status items, agent tools, infrastructure; 124 features.
 | shortcuts/panel-selection-chords: Select native panels with keyboard shortcuts | command | keyboard: Mod+N / Mod+, |
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |
 | thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar-footer: More menu |
+| thread-sidebar/moved-to-map: Find where a former sidebar page went | command | palette: Where did a page go? |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
 | agent-telemetry/agent-turn-spans: GenAI spans for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
@@ -440,6 +445,7 @@ palette commands, status items, agent tools, infrastructure; 124 features.
 | frame-layout/collapsed-state-persistence: Persist the collapsed sidebar | infrastructure | shell: collapsed sidebar |
 | frame-layout/panel-seats: Hand the frame's regions to plugin surfaces | infrastructure | shell: frame regions |
 | frame-layout/panel-width-persistence: Persist the frame's dragged panel widths | infrastructure | shell: panel widths |
+| frame-layout/phone-navigation-seat: Give the stage the full width on a phone | infrastructure | shell: frame columns at phone width |
 | git-worktrees/git-file-snapshots: Snapshot and restore a git workspace's files | infrastructure | host: git file snapshots |
 | git-worktrees/git-thread-worktrees: Isolate threads in git worktrees | infrastructure | settings: git worktree isolation (opt-in) |
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |

@@ -123,6 +123,7 @@ const preferencesInputFields = {
     () => DEFAULT_PREFERENCES.idleSectionOverrides,
   ),
   workspaceFilter: SchemaHelpers.withDecodedDefault(Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))), () => DEFAULT_PREFERENCES.workspaceFilter),
+  layoutMode: SchemaHelpers.withDecodedDefault(Schema.Literals(['fixed', 'docking']), () => DEFAULT_PREFERENCES.layoutMode),
   headerMode: Schema.Literals(['compact', 'expanded']),
   hideBrandLogo: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.hideBrandLogo),
   headerRegionHeight: SchemaHelpers.withDecodedDefault(

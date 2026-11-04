@@ -116,7 +116,8 @@
       "reach": [
         "expect region \"Threads\"",
         "expect button \"Group: Status\"",
-        "click button \"Thread Sidebar: Board\"",
+        "click tab \"Threads\"",
+        "click button \"Board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
         "expect button \"Group: Status\""
@@ -3303,10 +3304,10 @@
       "reach": [
         "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
         "press Enter",
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect text \"Turn failed.\"",
         "click button \"Open\"",
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "click tab \"Done*\"",
         "expect text \"Resolved\""
       ],
@@ -3353,6 +3354,263 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "destination-rail",
+      "title": "Switch destinations from the rail",
+      "summary": "In the fixed layout the left column is a labelled rail of eight destinations (Threads, Inbox, Land, Work, Agents, Observe, Knowledge, Settings) beside one list. Threads shows the thread list; every other destination lists its sections, and choosing one opens that page in the stage. The former left-nav pages are sections now, labelled without their plugin name; a page nobody mapped is listed under Settings › Other pages, and plugins add pages through the DestinationSections registry instead of rail entries. The Inbox entry shows the Inbox's own Needs you badge when the Inbox is installed. Collapsed, only the rail stays and its labels move into tooltips.",
+      "reach": [
+        "click tab \"Observe\"",
+        "expect navigation \"Observe pages\"",
+        "click button \"Traces\"",
+        "expect heading \"Traces\"",
+        "click tab \"Threads\"",
+        "expect button \"Board\""
+      ],
+      "surfaces": [
+        "client"
+      ],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "shell: Navigation list (21 entries) and collapsed icon rail",
+      "configuration": [],
+      "states": [
+        "expanded",
+        "collapsed"
+      ],
+      "failureModes": [
+        "A page another plugin registers without a section entry is still listed, under Settings › Other pages.",
+        "Without the Inbox plugin the Inbox destination shows an empty state and no badge."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.destination-rail-browser",
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.destination-rail-sections",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destinations.test.ts",
+          "testName": "places registered pages and leaves pages nobody registered out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.destination-rail-count",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destinations.test.ts",
+          "testName": "keeps the rail at eight labelled entries with Settings at the bottom"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation; the opens it causes are counted by the navigation counter's api-dispatch span."
+        }
+      ]
+    },
+    {
+      "id": "layout-mode",
+      "title": "Choose a fixed or free-docking left column",
+      "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",
+      "reach": [
+        "click tab \"Settings\"",
+        "click radio \"Free docking\"",
+        "expect tab \"Thread Sidebar: Threads\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Layout",
+      "configuration": [
+        {
+          "key": "layoutMode",
+          "defaultValue": "fixed",
+          "constraints": "One of fixed or docking; docking restores the Workbench left panes and their saved layout.",
+          "choices": [
+            "fixed",
+            "docking"
+          ],
+          "coveredBy": [
+            "thread-sidebar.layout-mode-default"
+          ]
+        }
+      ],
+      "states": [
+        "fixed",
+        "docking"
+      ],
+      "failureModes": [
+        "Without the Workbench the docking choice falls back to the standalone navigation list and thread list."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.layout-mode-browser",
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.layout-mode-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "starts fixed and switches to free docking from Settings"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A Host-synced settings write through the dshx settings service; no plugin Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "moved-to-map",
+      "title": "Find where a former sidebar page went",
+      "summary": "Where did a page go? (palette, or the link under every destination list) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry has no section. The palette also finds every page by its old name.",
+      "reach": [
+        "click tab \"Land\"",
+        "click button \"Where did a page go?\"",
+        "expect heading \"Where did a page go?\"",
+        "click button \"Open Observe › Usage\"",
+        "expect tab \"Observe\""
+      ],
+      "surfaces": [
+        "client",
+        "command"
+      ],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "palette: Where did a page go?",
+      "configuration": [],
+      "states": [
+        "closed",
+        "open"
+      ],
+      "failureModes": [
+        "A page that is not installed in this profile reads Not installed instead of offering Open."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.moved-to-map-browser",
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.moved-to-coverage",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destinations.test.ts",
+          "testName": "gives every former left-nav entry of the migration map a section"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.moved-to-dialog",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "opens a moved page from the moved-to list"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only dialog; opening a page from it is counted through the navigation counter's api-dispatch span."
+        }
+      ]
+    },
+    {
+      "id": "navigation-counter",
+      "title": "Count destination and section opens",
+      "summary": "Every rail, phone tab bar, list, palette and moved-to open adds one to a private counter on this Host: destination and section ids with counts and the last time, never a thread or its content. The shell_navigation_counts agent tool reads it to inform later rail decisions; shell_navigation_reset clears it only with confirm: true.",
+      "surfaces": [
+        "client",
+        "host",
+        "tool",
+        "storage"
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: shell_navigation_counts / shell_navigation_reset",
+      "configuration": [],
+      "states": [
+        "empty",
+        "counting"
+      ],
+      "failureModes": [
+        "An unreadable counter file starts over instead of failing navigation; a Host without the method leaves navigation working and counts nothing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.navigation-counter-browser",
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-counter-apply",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-counter.test.ts",
+          "testName": "counts destination and section opens by surface, ids only"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.navigation-counter-store",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-counter.test.ts",
+          "testName": "persists across reads and starts over on reset"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "phone-tab-bar",
+      "title": "Navigate from a bottom tab bar on a phone",
+      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations and the moved-to help. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 56px rail.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "shell: collapsed icon rail at phone width",
+      "configuration": [],
+      "states": [
+        "stage",
+        "list",
+        "more"
+      ],
+      "failureModes": [
+        "A left-column occupant without phone navigation keeps the rail: the frame only reflows when the document carries data-shell-phone-nav."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.phone-tab-bar-browser",
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-tab-bar",
+          "file": "plugins/@dshfiles/thread-sidebar/src/destination-shell.client.test.tsx",
+          "testName": "replaces the rail with a bottom tab bar on a phone"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation; tab bar opens are counted through the navigation counter's api-dispatch span."
         }
       ]
     }

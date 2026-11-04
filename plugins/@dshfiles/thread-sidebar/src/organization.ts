@@ -103,6 +103,11 @@ export interface SidebarPreferences {
    */
   idleSectionOverrides: Record<string, IdleSectionOverride>
   workspaceFilter: string | null
+  /**
+   * Fixed (default): the rail of destinations and one list (plans/ade-ux §4.1). Free docking: the older left column of
+   * movable Workbench panes, whose saved layout is kept untouched while fixed is on.
+   */
+  layoutMode: 'fixed' | 'docking'
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
   hideBrandLogo: boolean
@@ -180,6 +185,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   separateRemoteThreads: false,
   idleSectionOverrides: {},
   workspaceFilter: null,
+  layoutMode: 'fixed',
   headerMode: 'compact',
   hideBrandLogo: false,
   headerRegionHeight: null,

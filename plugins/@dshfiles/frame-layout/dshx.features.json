@@ -213,6 +213,39 @@
           "reason": "Client-only: Persist the collapsed sidebar renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "phone-navigation-seat",
+      "title": "Give the stage the full width on a phone",
+      "summary": "When the left-column occupant marks the document with data-shell-phone-nav, a frame narrower than 640px drops the sidebar and right tracks, hides the sidebar drag handle and shortens itself by --dsh-phone-nav-height so the occupant's bottom tab bar never covers the composer. Without the mark the frame keeps upstream behaviour.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "shell: frame columns at phone width",
+      "configuration": [],
+      "states": [
+        "desktop",
+        "phone"
+      ],
+      "failureModes": [
+        "An occupant that sets the mark without drawing navigation would hide the thread list; only the thread sidebar's fixed layout sets it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.phone-navigation-seat",
+          "reason": "A CSS media rule with no logic to unit-test; verified by the scratch WebKit 390x844 screenshots of the thread sidebar's phone tab bar (plans/ade-ux Phase 3a)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A CSS rule in the client frame; it runs no Host work."
+        }
+      ]
     }
   ]
 }

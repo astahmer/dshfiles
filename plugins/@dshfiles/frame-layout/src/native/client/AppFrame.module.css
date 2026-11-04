@@ -325,3 +325,24 @@
 .overlayLayer > * {
   pointer-events: auto;
 }
+
+/* Local delta (dshfiles): phone navigation. A left-column occupant that draws its own phone navigation (a bottom tab
+   bar and a full-screen list, plans/ade-ux §4.1) marks the document with data-shell-phone-nav. Below 640px the frame
+   then gives the whole width to the stage and leaves room for that bar; without the mark nothing changes, so a
+   sidebar with no phone navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
+@media (max-width: 639.98px) {
+  :global([data-shell-phone-nav]) .frame {
+    grid-template-columns: 0px minmax(0, 1fr) 0px !important;
+    height: calc(100% - var(--dsh-phone-nav-height, 0px));
+  }
+
+  :global([data-shell-phone-nav]) .handle[data-side='sidebar'] {
+    display: none;
+  }
+
+  /* The zero-width column still lays its occupant out; hide it from pointer, focus and assistive tech so only the
+     occupant's own phone navigation (portalled outside the frame) answers. */
+  :global([data-shell-phone-nav]) .sidebarCol {
+    visibility: hidden;
+  }
+}

@@ -779,7 +779,10 @@ export default defineClient({
       const movable =
         active === undefined ? [] : [{ definition: { title: active.title, mainPanelId: panelMainTarget({ panel: active, registry }) }, panelId: active.id }]
       if (api === null || movable.length === 0) return null
-      const destinations = (['left', 'right', 'bottom', 'main'] as const).filter(destination => destination !== props.from)
+      // The left panes mount only in the sidebar's free-docking layout; the fixed rail layout has no left region to move to.
+      const destinations = (['left', 'right', 'bottom', 'main'] as const).filter(
+        destination => destination !== props.from && (destination !== 'left' || revealLeftPanel !== undefined),
+      )
       // One flat list: a submenu per panel costs a hover for a choice that is
       // almost always one panel and one destination. The panel's title only
       // appears when more than one panel could move.
