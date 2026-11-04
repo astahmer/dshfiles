@@ -27,6 +27,7 @@ import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
+import { versionMismatch } from './connection-diagnostics.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -83,6 +84,7 @@ const HostRow = (props: {
   readonly host: HostSummary
   readonly runtime: RuntimeSummary | undefined
   readonly resource: ResourcePoolEntry | undefined
+  readonly localVersion: string | undefined
   readonly index: number
   readonly count: number
   readonly dragging: boolean
@@ -101,6 +103,7 @@ const HostRow = (props: {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
   const state = hostState(runtime)
+  const outdatedVersion = versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
@@ -189,6 +192,12 @@ const HostRow = (props: {
           ) : null}
         </div>
         {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
+        {outdatedVersion === undefined ? null : (
+          <span data-testid={`host-version-mismatch-${host.id}`} className="dshx:text-xs dshx:text-warning">
+            Runs DSH {outdatedVersion}; this machine runs {props.localVersion}. Ask the agent to update it with multi_host_checkout_sync or
+            multi_host_provision.
+          </span>
+        )}
         {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
         {remoteView.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(remoteView.error, 'Remote host link failed.')}</span> : null}
         {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
@@ -308,6 +317,7 @@ export const HostsPage = () => {
   const queryClient = useQueryClient()
   const directory = useQuery(multiHostQueries.directory(api, 15_000))
   const resourcePool = useQuery(multiHostQueries.resourcePool(api, 15_000))
+  const localIdentity = useQuery(multiHostQueries.identity(api))
   const hosts = directory.data?.hosts ?? []
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropId, setDropId] = useState<string | null>(null)
@@ -450,6 +460,7 @@ export const HostsPage = () => {
               host={host}
               runtime={runtimeFor(host)}
               resource={resourcePool.data?.hosts.find(entry => entry.hostId === host.id)}
+              localVersion={localIdentity.data?.dshVersion}
               index={index}
               count={ordered.length}
               dragging={draggedId === host.id}

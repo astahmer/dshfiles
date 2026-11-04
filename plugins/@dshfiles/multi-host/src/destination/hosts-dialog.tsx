@@ -1,3 +1,4 @@
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
@@ -5,11 +6,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { CheckIcon, ChevronDownIcon, PlusIcon, SearchIcon, ServerIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, CopyIcon, PlusIcon, SearchIcon, ServerIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { ConnectionTestStep, RuntimeSummary } from '../api.js'
-import { multiHostKeys, type MultiHostClient } from './queries.js'
+import { connectionDiagnostics } from './connection-diagnostics.js'
+import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
 
 export type HostDraft = { readonly hostId?: string; readonly name: string; readonly sshTarget: string; readonly remoteHome: string }
@@ -94,6 +96,22 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
       void queryClient.invalidateQueries({ queryKey: multiHostKeys.all })
       if (draft.hostId === undefined) setHostDestination({ kind: 'runtime', runtimeId: runtime.id })
       props.onDone()
+    },
+  })
+  const localIdentity = useQuery(multiHostQueries.identity(api))
+  const copyDiagnostics = useMutation({
+    mutationFn: async () => {
+      const outcome =
+        test.data !== undefined
+          ? { kind: 'passed' as const, steps: test.data.steps, dshVersion: test.data.identity.dshVersion, profile: test.data.identity.profile }
+          : { kind: 'failed' as const, message: errorMessage(test.error, 'The connection test failed.') }
+      const report = connectionDiagnostics({
+        sshTarget: draft.sshTarget.trim(),
+        remoteHome: draft.remoteHome.trim(),
+        localVersion: localIdentity.data?.dshVersion,
+        outcome,
+      })
+      if (!(await writeClipboard(report))) throw new Error('Could not copy the diagnostics. Allow clipboard access and try again.')
     },
   })
   const ready = draft.sshTarget.trim() !== '' && draft.remoteHome.trim().startsWith('/')
@@ -248,7 +266,20 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
           </li>
         </ul>
       ) : null}
-      {[discover, test, save].map((mutation, index) =>
+      {test.data !== undefined || test.isError ? (
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+          <Button type="button" size="sm" variant="ghost" className="dshx:h-7 dshx:px-2" onClick={() => copyDiagnostics.mutate()}>
+            <CopyIcon className="dshx:size-3.5" />
+            Copy diagnostics
+          </Button>
+          {copyDiagnostics.isSuccess ? (
+            <span role="status" className="dshx:text-success">
+              Copied.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {[discover, test, save, copyDiagnostics].map((mutation, index) =>
         mutation.isError ? (
           <Alert key={index} variant="destructive">
             <AlertDescription>{errorMessage(mutation.error, 'The host request failed.')}</AlertDescription>
