@@ -61,7 +61,12 @@ export async function buildModule(options: BuildModuleOptions): Promise<ModuleBu
       sourcemap: options.sourcemap ?? true,
       watch: null,
       lib: { entry, formats: ['es'], fileName: () => `${options.name}.js` },
-      rollupOptions: { external: HostCompilerGuards.isHostExternal, preserveEntrySignatures: 'strict' },
+      // An SSR library build names its entry chunk after the entry file and ignores `lib.fileName`; the module name is the contract.
+      rollupOptions: {
+        external: HostCompilerGuards.isHostExternal,
+        preserveEntrySignatures: 'strict',
+        output: { entryFileNames: `${options.name}.js` },
+      },
     },
   })
   const outputs = Array.isArray(result) ? result : [result]
