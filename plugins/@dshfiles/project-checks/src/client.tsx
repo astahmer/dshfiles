@@ -121,9 +121,16 @@ const executorLabel = (receipt: ProjectCheckReceipt): string => {
   return executor.kind === 'local' ? 'Local' : `Remote · ${executor.remoteId}`
 }
 
+const stageLabels = {
+  manual: 'Stage: manual run',
+  completion: 'Stage: turn completion',
+  rebase: 'Stage: rebase candidate',
+  'not-recorded': 'Stage: not recorded',
+} satisfies Record<ProjectCheckReceipt['verificationStage'], string>
+
 const executionModeLabel = (receipt: ProjectCheckReceipt): string => {
   const mode = receipt.automatic ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}` : 'Manual'
-  return `${mode} · ${executorLabel(receipt)}`
+  return `${stageLabels[receipt.verificationStage]} · ${mode} · ${executorLabel(receipt)}`
 }
 
 const remoteFallbackLabel = (receipt: ProjectCheckReceipt): string => {

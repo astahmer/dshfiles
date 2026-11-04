@@ -1,9 +1,63 @@
 import { Effect, Option, Schema } from 'effect'
-import { receiptExecutorSchema, receiptRemoteFailureSchema } from './api.js'
 import type { StoredReceipt } from './store.js'
 
 const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 const revisionSchema = Schema.NullOr(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/u)))
+const remoteIdSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/u))
+const remoteFailureCodeSchema = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,63}$/u))
+
+/**
+ * Reviewed, fixed text per peer failure code. The Activity boundary never carries the stored
+ * `remoteFailure.message`, which can quote peer stderr, paths or hostnames.
+ */
+const safeRemoteFailureMessages = [
+  'remote execution failed',
+  'no configured remote was available',
+  'the working-copy snapshot was unavailable',
+  'the snapshot could not be pushed',
+  'the remote was unreachable',
+  'the remote run timed out',
+  'the remote could not fetch the snapshot',
+  'the remote could not check out the snapshot',
+  'the remote checked out a different revision',
+  'remote dependency install failed',
+  'the remote working copy moved during the run',
+  'the remote run was cancelled',
+] as const
+
+type SafeRemoteFailureMessage = (typeof safeRemoteFailureMessages)[number]
+
+const remoteFailureText = new Map<string, SafeRemoteFailureMessage>([
+  ['peer-unavailable', 'no configured remote was available'],
+  ['peer-snapshot-unavailable', 'the working-copy snapshot was unavailable'],
+  ['peer-push-failed', 'the snapshot could not be pushed'],
+  ['peer-unreachable', 'the remote was unreachable'],
+  ['peer-timeout', 'the remote run timed out'],
+  ['peer-fetch-failed', 'the remote could not fetch the snapshot'],
+  ['peer-edit-failed', 'the remote could not check out the snapshot'],
+  ['peer-revision-mismatch', 'the remote checked out a different revision'],
+  ['peer-install-failed', 'remote dependency install failed'],
+  ['peer-source-changed', 'the remote working copy moved during the run'],
+  ['peer-cancelled', 'the remote run was cancelled'],
+])
+
+const safeRemoteFailureMessage = (code: string): SafeRemoteFailureMessage => remoteFailureText.get(code) ?? 'remote execution failed'
+
+/**
+ * v1 executor as the Activity consumer validates it. Activity Timeline's v1 schema still requires
+ * `sshTarget` and `workspace` keys on a remote executor, so the producer sends them as empty
+ * strings: the literal `''` makes any real peer value fail to encode instead of leaking.
+ */
+const activityExecutorSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('local') }),
+  Schema.Struct({ kind: Schema.Literal('remote'), remoteId: remoteIdSchema, sshTarget: Schema.Literal(''), workspace: Schema.Literal('') }),
+])
+
+const activityRemoteFailureSchema = Schema.Struct({
+  remoteId: remoteIdSchema,
+  code: remoteFailureCodeSchema,
+  message: Schema.Literals(safeRemoteFailureMessages),
+})
 
 const projectChecksActivitySummarySchema = Schema.Struct({
   receiptId: Schema.String.check(Schema.isUUID()),
@@ -14,8 +68,8 @@ const projectChecksActivitySummarySchema = Schema.Struct({
   failure: Schema.NullOr(
     Schema.Literals(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']),
   ),
-  executor: Schema.optionalKey(receiptExecutorSchema),
-  remoteFailure: Schema.optionalKey(Schema.NullOr(receiptRemoteFailureSchema)),
+  executor: Schema.optionalKey(activityExecutorSchema),
+  remoteFailure: Schema.optionalKey(Schema.NullOr(activityRemoteFailureSchema)),
   startedAt: countInt,
   finishedAt: countInt,
   durationMs: countInt,
@@ -37,8 +91,18 @@ export type ProjectChecksActivityEvent = typeof projectChecksActivityEventSchema
 
 const activityEventInput = (receipt: StoredReceipt) => {
   const summaryExtras: { -readonly [Key in keyof ProjectChecksActivityEvent['value']]?: ProjectChecksActivityEvent['value'][Key] } = {}
-  if (receipt.executor !== undefined) summaryExtras.executor = receipt.executor
-  if (receipt.remoteFailure !== undefined) summaryExtras.remoteFailure = receipt.remoteFailure
+  if (receipt.executor !== undefined)
+    summaryExtras.executor =
+      receipt.executor.kind === 'local' ? { kind: 'local' } : { kind: 'remote', remoteId: receipt.executor.remoteId, sshTarget: '', workspace: '' }
+  if (receipt.remoteFailure !== undefined)
+    summaryExtras.remoteFailure =
+      receipt.remoteFailure === null
+        ? null
+        : {
+            remoteId: receipt.remoteFailure.remoteId,
+            code: receipt.remoteFailure.code,
+            message: safeRemoteFailureMessage(receipt.remoteFailure.code),
+          }
   return {
     kind: 'verification-receipt',
     version: 1,

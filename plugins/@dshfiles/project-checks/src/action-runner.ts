@@ -25,7 +25,7 @@ export interface RunOptions {
   readonly automatic: boolean
   readonly attempt: number
   readonly verificationTurn: number | null
-  readonly verificationStage?: 'completion' | 'rebase'
+  readonly verificationStage?: 'manual' | 'completion' | 'rebase'
   readonly expectedRevision?: string
   readonly requireRevision: boolean
   readonly durableTaskId?: string

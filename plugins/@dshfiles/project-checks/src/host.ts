@@ -9,7 +9,7 @@ import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { Clock, Effect, Layer, Option, Schema } from 'effect'
 import { createHash, randomUUID } from 'node:crypto'
 import { actionFor, ActionRunner } from './action-runner.js'
-import { mayVerifyCandidate, projectChecksApi, type ProjectCheckReceipt, type ProjectChecksTaskView } from './api.js'
+import { mayVerifyCandidate, projectChecksApi, type ProjectChecksTaskView } from './api.js'
 import { CompletionChecks } from './completion-checks.js'
 import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type ProjectChecksConfig } from './core.js'
 import { DurableTaskHandler, DurableTasks, type DurableTaskResult } from './durable-task-runner.js'
@@ -20,6 +20,7 @@ import { ChecksHost, Executables } from './host-promise.js'
 import { ProcessRunner } from './managed-process.js'
 import { ProjectChecksActivityModel } from './receipt-activity.js'
 import { ReceiptStore } from './receipt-store.js'
+import { ReceiptViewModel } from './receipt-view.js'
 import { storedReceiptSchema, type StoredReceipt } from './store.js'
 
 const PACKAGE_NAME = '@dshfiles/project-checks'
@@ -79,6 +80,7 @@ const durableTaskHandler = Layer.effect(
             automatic: false,
             attempt: input.task.attempts.at(-1)?.number ?? 1,
             verificationTurn: null,
+            verificationStage: 'manual',
             requireRevision: false,
             durableTaskId: input.task.id,
             durableTaskAttemptId: input.attemptId,
@@ -192,11 +194,7 @@ const currentRevision = (sessionId: string, action: ProjectAction) =>
     ),
   )
 
-const receiptView = (receipt: StoredReceipt, freshness: ProjectCheckReceipt['freshness']): ProjectCheckReceipt => ({
-  ...receipt,
-  configurationFreshness: 'unknown',
-  freshness,
-})
+const receiptView = ReceiptViewModel.of
 
 const receiptRevision = (receipt: StoredReceipt): string | null =>
   receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
@@ -246,7 +244,7 @@ const handlers = Api.handlers(projectChecksApi, {
     const receipt = yield* runner.run({
       sessionId,
       action: action.value,
-      options: { automatic: false, attempt: 0, verificationTurn: null, requireRevision: false },
+      options: { automatic: false, attempt: 0, verificationTurn: null, verificationStage: 'manual', requireRevision: false },
     })
     return receiptView(receipt, ProjectChecksModel.receiptFreshness(receiptRevision(receipt), yield* currentRevision(sessionId, action.value)))
   }),

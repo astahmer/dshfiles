@@ -427,7 +427,8 @@
         "A timeline ingestion failure cannot fail a check after its receipt is durable.",
         "A legacy receipt without revision fields remains readable and backfillable.",
         "Backfill is bounded to retained receipts and repeated delivery converges by receipt id.",
-        "Current source freshness is recalculated by the Project Checks API; configuration equivalence remains unknown."
+        "Current source freshness is recalculated by the Project Checks API; configuration equivalence remains unknown.",
+        "A peer sshTarget, workspace path or stderr-derived failure message never enters the Activity event; a value that would fails the producer schema and is not published."
       ],
       "externalDependencies": [
         {
@@ -468,6 +469,18 @@
           "id": "project-checks.activity-projection-persist-before-emit",
           "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
           "testName": "waits for durable receipt persistence before publishing and keeps projection failures optional"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.activity-projection-peer-sentinels",
+          "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
+          "testName": "keeps peer targets, workspace paths and peer stderr out of the Activity payload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.receipt-view-stage",
+          "file": "plugins/@dshfiles/project-checks/src/receipt-view.test.ts",
+          "testName": "reads a receipt stored before stages existed as not-recorded instead of inferring one"
         },
         {
           "kind": "unit-test",

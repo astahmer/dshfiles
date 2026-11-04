@@ -57,6 +57,48 @@ describe('Project Checks activity summary', () => {
     ).toBe(false)
   })
 
+  it('keeps peer targets, workspace paths and peer stderr out of the Activity payload', () => {
+    const sentinels = ['SENTINEL-SSH-TARGET-7f3a', '/SENTINEL/peer/workspace-7f3a', 'SENTINEL-STDERR-7f3a']
+    const remote: StoredReceipt = {
+      ...receipt,
+      status: 'failed',
+      failure: 'remote-failed',
+      verificationStage: 'rebase',
+      executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0] ?? '', workspace: sentinels[1] ?? '' },
+      remoteFailure: { remoteId: 'm1', code: 'peer-unreachable', message: `ssh: ${sentinels[2]} ${sentinels[0]}:${sentinels[1]}` },
+    }
+    const event = ProjectChecksActivityModel.event(remote)
+    const serialized = JSON.stringify(event)
+    for (const sentinel of sentinels) expect(serialized).not.toContain(sentinel)
+    expect(event.value.executor).toEqual({ kind: 'remote', remoteId: 'm1', sshTarget: '', workspace: '' })
+    expect(event.value.remoteFailure).toEqual({ remoteId: 'm1', code: 'peer-unreachable', message: 'the remote was unreachable' })
+
+    const unknownCode = ProjectChecksActivityModel.event({ ...remote, remoteFailure: { remoteId: 'm1', code: 'peer-novel', message: sentinels[2] ?? '' } })
+    expect(unknownCode.value.remoteFailure?.message).toBe('remote execution failed')
+    expect(ProjectChecksActivityModel.event({ ...remote, remoteFailure: null }).value.remoteFailure).toBe(null)
+    expect(ProjectChecksActivityModel.event({ ...remote, executor: { kind: 'local' } }).value.executor).toEqual({ kind: 'local' })
+
+    const decode = Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0], workspace: '' } } })._tag).toBe(
+      'Failure',
+    )
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: '', workspace: sentinels[1] } } })._tag).toBe(
+      'Failure',
+    )
+    expect(decode({ ...event, value: { ...event.value, remoteFailure: { remoteId: 'm1', code: 'peer-unreachable', message: sentinels[2] } } })._tag).toBe(
+      'Failure',
+    )
+  })
+
+  it('does not add the stage to the v1 Activity payload for any stage or for legacy receipts', () => {
+    for (const stage of ['manual', 'completion', 'rebase', undefined] as const) {
+      const stored: StoredReceipt = stage === undefined ? receipt : { ...receipt, verificationStage: stage }
+      const event = ProjectChecksActivityModel.event(stored)
+      expect(event.version).toBe(1)
+      expect(Object.keys(event.value)).not.toContain('verificationStage')
+    }
+  })
+
   it('waits for durable receipt persistence before publishing and keeps projection failures optional', async () => {
     const order: string[] = []
     const publish = () => Effect.sync(() => order.push('activity'))

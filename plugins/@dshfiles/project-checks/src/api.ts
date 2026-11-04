@@ -98,6 +98,8 @@ export const storedReceiptSchema = Schema.Struct(receiptFields)
 
 export const receiptSchema = Schema.Struct({
   ...receiptFields,
+  /** Read view only: receipts stored before stages existed report `not-recorded`, never an inferred stage. */
+  verificationStage: Schema.Literals(['manual', 'completion', 'rebase', 'not-recorded']),
   configurationFreshness: Schema.optionalKey(Schema.Literal('unknown')),
   freshness: Schema.Literals(['current', 'stale', 'unknown']),
 })
@@ -146,7 +148,7 @@ export const projectChecksApi = defineApi({
       input: openSchema(receiptsInputSchema),
       output: openSchema(Schema.Array(receiptSchema).check(Schema.isMaxLength(30))),
       description:
-        'Recent project-check receipts for a thread: what ran, its outcome, exit status, duration and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.',
+        'Recent project-check receipts for a thread: what ran, its outcome, exit status, duration, verification stage (manual, completion, rebase, or not-recorded for older receipts) and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_receipts', readOnly: true, render: compactJson },
     }),
     hookEvents: method({
