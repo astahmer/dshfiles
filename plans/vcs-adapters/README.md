@@ -3,37 +3,35 @@
 Goal: every jj plugin keeps its jj naming and prefers jj wherever `.jj` exists, but runs its Host logic through a VCS
 port with a jj adapter and a git adapter, so a git-only repository works too.
 
-**Resume here:** phase 1 is landed in jj-integration; start phase 2 with `pulls-review` (smallest jj surface, a pure
-diff read).
+**Resume here:** phases 1 and 2 are landed except the jujutsu graph panel, which is deferred (see below). Next: a git
+browser journey for pulls-review, then decide whether the graph panel is worth a git adapter.
 
-## Phase 1: thread workspaces (done)
+## Done (documented where it lives)
 
-Documented in the [jj-integration README](../../plugins/@dshfiles/jj-integration/README.md#git-repositories).
+- Thread workspaces through a `ThreadWorkspacesBackend` port with `JjThreadWorkspaces` and `GitThreadWorkspaces`
+  adapters: [jj-integration README › Git repositories](../../plugins/@dshfiles/jj-integration/README.md#git-repositories).
+- Automatic fetch for git: [jj-integration README › Automatic fetch](../../plugins/@dshfiles/jj-integration/README.md#automatic-fetch).
+- Review scopes and saved ranges through a `ReviewBackend` port with jj and git adapters:
+  [pulls-review README › Git-only repositories](../../plugins/@dshfiles/pulls-review/README.md#git-only-repositories).
+- One git runner, [`@dshfiles/git-cli`](../../plugins/@dshfiles/git-cli/README.md), used by jj-integration,
+  git-worktrees and pulls-review; one path-to-VCS detector, `VcsDetector` in
+  [vcs-provider-port](../../plugins/@dshfiles/vcs-provider-port/README.md).
+- The priority-50 behaviour change (jj-integration claims git repositories over git-worktrees) is documented in the
+  jj-integration and git-worktrees READMEs.
 
-- `ThreadWorkspacesBackend` port (`thread-workspace-types.ts`), Effect services `JjThreadWorkspaces` and
-  `GitThreadWorkspaces`, routed per path by `ThreadWorkspaces.layer` with `VcsDetector` (nearest `.jj`/`.git`, jj
-  first). Shared `ThreadMetadata` (threads directory, land records) and `GitCli` (bounded, non-interactive, `git <verb>`
-  spans).
-- Isolate/provision, status, list, land, verified land (Project Checks, `git cherry` guard), discard, cleanup
-  (thread/secondary/untracked), restore of a deleted folder, snapshots, review history, bookmarks, revision graph text.
-- Destination `vcs: 'git'` in the API and client (destination bar, remote destination); vcs-provider detect claims git
-  repositories at priority 50; `dshx checkout sync` skipped for git.
-- Tests: `git-thread-workspaces.integration.test.ts`, `host-git.integration.test.ts`, `vcs-detector.test.ts`,
-  `git-cli.test.ts`; browser journey `jj-integration.git-destination-browser-journey`.
+## Open
 
-## Phase 2: other jj Host logic
+| Item                                 | Where                       | Notes                                                                                                                                                                                                                     |
+| ------------------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Revision graph panel for git         | `jujutsu`                   | Deferred: about 13.5k lines of jj-native UI and Host (revsets, operations, workspaces, describe/split/squash/rebase actions). A git adapter needs `log --graph` parsing and a reduced action set; design before building. |
+| Git browser journey for pulls-review | `tooling/dshx/e2e/features` | Covered by real-git unit tests (`tests/git-output.spec.ts`) only; a journey would open the review panel on a git-only thread workspace.                                                                                   |
+| Session undo journey in git          | `session-undo`              | Already VCS-neutral through `vcs-provider-port`; jj-integration answers git snapshots, so only a journey is missing.                                                                                                      |
 
-| Item                                | Where                                        | Notes                                                                                                                                                            |
-| ----------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Review scopes from git              | `pulls-review/src/jj.ts`, `review-source.ts` | `pulls_review` with `fromChangeId`/`toChangeId` requires JJ change ids; a git adapter would diff `base...HEAD` per commit. Land records already hold commit ids. |
-| Automatic fetch                     | `jj-integration/src/auto-fetch.ts`           | `git fetch origin` plus fast-forward of the bookmark branch when no worktree holds it dirty.                                                                     |
-| Working diff / revision graph panel | `jujutsu`                                    | The graph UI is jj-native (revsets, operations); a git adapter needs `log --graph` parsing and a reduced action set. Largest item; design before building.       |
-| Session undo through the port       | `session-undo`                               | Already VCS-neutral via `vcs-provider-port`; jj-integration now answers git snapshots, so only a git journey is missing.                                         |
-| Extract `GitCli`                    | `jj-integration/src/git-cli.ts`              | Move to a `@dshfiles/git-cli` library (like `jj-cli`) once a second plugin needs it; `git-worktrees` could then drop its own runner.                             |
-
-## Known limits of the git backend
+## Known limits of the git backends
 
 - No spare-workspace prewarm (git worktrees check out fast enough so far; measure before adding one).
 - Landing refuses uncommitted edits instead of snapshotting them (git has no working-copy commit).
 - A conflict is aborted, not left in the tree; the agent resolves it by rebasing in its worktree.
 - No dangling-empty-revision cleanup (git has none).
+- A git review diffs from the merge base; a jj review is a two-tree diff from the bookmark.
+- pulls-review failure reasons keep their jj names (`jj-missing`, `jj-failed`); the messages name git.
