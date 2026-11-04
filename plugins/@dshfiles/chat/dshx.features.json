@@ -222,6 +222,47 @@
           "reason": "Client-only: scrolling Chat to a requested turn, step or tool call reads browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "inline-references",
+      "title": "Render inline references from other plugins",
+      "summary": "Other plugins add a matcher and a React renderer to the inline-reference registry (@dshfiles/chat/inline-references); Chat applies them to assistant Markdown text runs, inline code and the Referenced-session line while it renders, so `b:12`, `@{luna}`, `memory: n:3` or `jj:main` become links without any plugin rewriting the transcript DOM. Higher priority wins an overlap, fenced code and links are never matched, and a streaming message's frozen blocks keep their rendered references.",
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: inline-reference registry",
+      "configuration": [],
+      "states": ["no-providers", "matched", "provider-failed"],
+      "failureModes": [
+        "A matcher that throws is skipped for that run and logged once; the text stays as written.",
+        "A renderer that throws falls back to the matched text and is logged once."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.inline-reference-overlap",
+          "file": "plugins/@dshfiles/chat/tests/inline-references.test.tsx",
+          "testName": "lets the higher priority win an overlap, whatever the registration order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.inline-reference-streaming",
+          "file": "plugins/@dshfiles/chat/tests/inline-references.test.tsx",
+          "testName": "follows a streaming message: a reference completes as its text grows and frozen blocks keep their nodes"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.inline-reference-backlog-journey",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: matching and rendering references in a message reads browser state and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }

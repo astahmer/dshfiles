@@ -20,6 +20,7 @@ import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
+import { InlineReferenceScope } from '../../inline-references.tsx'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
@@ -352,12 +353,14 @@ export function ChatView({
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider openFile={requestOpenImageAwareFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
+              <InlineReferenceScope sessionId={sessionId} cwd={cwd}>
               <ConversationViewOpenerContext.Provider value={openView}>
                 {renderSlot('conversation.chat.flow', {
                   entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
                   cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
                 }, { hookContext: flowContext })}
               </ConversationViewOpenerContext.Provider>
+              </InlineReferenceScope>
             </MarkdownDelegateProvider>
             {/* No pending placeholders: questions (ui-user-questions) and approvals
                 (ApprovalPanel) both take over the composer, so a flow card would

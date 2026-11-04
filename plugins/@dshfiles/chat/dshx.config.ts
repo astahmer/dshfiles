@@ -8,6 +8,7 @@ export default defineConfig({
     'turn-usage-cost': 'src/turn-usage-cost.ts',
     'pinned-tool-calls': 'src/pinned-tool-calls.ts',
     'message-images': 'src/message-images.ts',
+    'inline-references': 'src/inline-references.tsx',
   },
   client: {
     entry: 'src/client-entry.tsx',

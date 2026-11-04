@@ -2,6 +2,7 @@
 import { Fragment } from 'react'
 import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
 import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
+import { InlineReferenceText } from '../../inline-references.tsx'
 import css from './MessageItem.module.css'
 import { userImageReferenceParts } from './user-image-references.js'
 import type { UserContentAttachment } from '../contract/slots.ts'
@@ -89,7 +90,7 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
       </div>}
       {referenceLabels.length > 0 && (
         <div className={css.referenceSummary}>
-          {t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })}
+          <InlineReferenceText text={t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })} surface="summary" />
         </div>
       )}
     </div>

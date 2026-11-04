@@ -38,6 +38,10 @@
     "./message-images": {
       "types": "./src/message-images.ts",
       "default": "./dist/message-images.js"
+    },
+    "./inline-references": {
+      "types": "./src/inline-references.tsx",
+      "default": "./dist/inline-references.js"
     }
   },
   "scripts": {
