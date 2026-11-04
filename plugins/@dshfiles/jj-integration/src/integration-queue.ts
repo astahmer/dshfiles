@@ -1,5 +1,6 @@
 import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { Context, Duration, Effect, Layer, Path, Stream } from 'effect'
+import { LandAttention } from './attention-provider.js'
 import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions, type QueuedIntegration } from './integration-requests.js'
 import { Landing } from './landing.js'
@@ -43,11 +44,13 @@ export class IntegrationQueue extends Context.Service<IntegrationQueue, { readon
       const registry = yield* WorkspaceRegistry
       const views = yield* RepositoryViews
       const log = yield* ActivityLog
+      const attention = yield* LandAttention
       const path = yield* Path.Path
 
       const settled = Effect.fnUntraced(function* (entry: QueuedIntegration, error?: { readonly message: string }) {
         yield* views.invalidate
-        if (error === undefined) return
+        if (error === undefined) return yield* attention.queuedLandSucceeded(entry.path)
+        yield* attention.queuedLandFailed(entry.path, error.message)
         yield* log.emit({
           type: 'workspace.queued_integration_failed',
           level: 'attention',

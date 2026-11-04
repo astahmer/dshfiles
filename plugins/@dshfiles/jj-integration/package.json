@@ -32,6 +32,7 @@
     "test:e2e:smoke": "node ../../../tooling/dshx/scripts/run-e2e.mjs --smoke"
   },
   "dependencies": {
+    "@dshfiles/activity-timeline": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/memory": "workspace:*",
@@ -69,6 +70,9 @@
     "@deepseek-ai/dsh-session-log-export": "catalog:",
     "@deepseek-ai/dsh-session-query": "catalog:",
     "@deepseek-ai/dsh-session-turn-outline": "catalog:",
+    "@deepseek-ai/dsh-storage": "catalog:",
+    "@deepseek-ai/dsh-storage-domain": "catalog:",
+    "@deepseek-ai/dsh-storage-json": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
@@ -112,7 +116,8 @@
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-working-directory": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/schemastery": "^3.18.4"
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/activity-timeline": ">=0.1.0 <0.2.0-0"
   },
   "dsh": {
     "bundle": {

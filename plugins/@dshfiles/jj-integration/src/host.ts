@@ -7,6 +7,7 @@ import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Duration, Effect, Layer, Option } from 'effect'
 import { jjIntegrationApi } from './api.js'
+import { LandAttention } from './attention-provider.js'
 import { AutoIntegration } from './auto-integration.js'
 import { Cleanup } from './cleanup.js'
 import { Executables } from './executables-promise.js'
@@ -42,7 +43,7 @@ const BaseLive = Layer.mergeAll(
 )
 
 const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer)),
+  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer)),
   Layer.provideMerge(Landing.layer),
   Layer.provideMerge(Layer.mergeAll(RepositoryViews.layer, WorkspaceSync.layer)),
   Layer.provideMerge(SessionActivity.layer),
