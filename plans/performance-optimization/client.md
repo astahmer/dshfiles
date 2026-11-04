@@ -170,6 +170,7 @@ The [earlier ADE baseline](../../docs/ade-performance/README.md#measurement-rule
 - **Implement:** 1. Split lightweight memoized read cards from activated edit actors. 2. Assign selected/dirty draft ownership outside disposable virtual rows. 3. Group once and virtualize variable-height cards/digests. Add cursor pagination through the owned API only if access beyond present caps is a separate accepted requirement.
 - **Ownership / safety:** Scrolling must not discard dirty edits; preserve versioned note IDs, save/forget failure recovery, selected detail/history and project transitions. Do not create a second authoritative note store.
 - **Validate:** Test 500 long-markdown notes, offscreen editing, selection/detail duplication, save/cancel/forget and project switching. Count actors, Markdown work and mounted rows; compare correct-content opening/search p95 and retained memory.
+- **Live measurement (2026-11-04, read-only):** `memory_usage` on the live Host shows **3 notes and 34 thread digests**, against the 500-note / 300-digest caps this entry is sized for; the panel mounts 3 editor actors and 34 digest rows. No real cost today, so no change was made. Re-measure (mounted actors and rows, open p95) once the live store passes ~100 notes or digests.
 
 ### C16 — Localize quota clocks to displayed precision · P2
 
