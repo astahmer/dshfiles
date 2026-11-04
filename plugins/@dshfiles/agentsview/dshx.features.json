@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "agent-sessions-panel",
+      "title": "Agent CLI sessions browser",
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "left-nav: Agent CLI threads",
+      "summary": "One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their messages, and opens one as a read-only transcript with tool calls, thinking and context messages behind toggles.",
+      "reach": ["click button \"Agent CLI threads\"", "expect text \"Threads other agent CLIs recorded on this machine*\""],
+      "surfaces": ["host", "tool", "storage", "client"],
+      "configuration": [
+        {
+          "key": "CLAUDE_CONFIG_DIR",
+          "defaultValue": "~/.claude",
+          "constraints": "Environment of the DSH Host; Claude Code logs are read from <dir>/projects, the same override Claude Code itself honours.",
+          "choices": [],
+          "coveredBy": ["agentsview.sessions.list"]
+        },
+        {
+          "key": "CODEX_HOME",
+          "defaultValue": "~/.codex",
+          "constraints": "Environment of the DSH Host; Codex rollouts are read from <dir>/sessions, the same override Codex itself honours.",
+          "choices": [],
+          "coveredBy": ["agentsview.sessions.list"]
+        }
+      ],
+      "states": ["indexing", "caught-up", "no-sources", "filtered", "searching", "search-incomplete", "transcript", "transcript-capped", "index-error"],
+      "failureModes": [
+        "A missing agent folder is reported as not found with the command that creates it, and the other agent still lists.",
+        "A malformed or oversized log line is skipped without dropping the rest of the file or the index.",
+        "A half-written last line of a running session is left for the next pass instead of being parsed early.",
+        "A missing or unreadable index file is rebuilt by re-reading the logs; the agent logs are never written.",
+        "Message search is time- and session-bounded and says how many sessions it scanned when it stopped early.",
+        "A session removed since the last pass answers session-not-found with a recovery hint instead of an empty transcript."
+      ],
+      "externalDependencies": [
+        {
+          "id": "claude-code-session-logs",
+          "boundary": "Read-only: JSONL files under <CLAUDE_CONFIG_DIR or ~/.claude>/projects/<project>/<session>.jsonl; the plugin never writes, moves or deletes them.",
+          "deterministicFake": "fixtures/home/.claude/projects holds a synthetic Claude Code log (meta prompt, streamed message, tool use and result, ai-title, a malformed line, a subagent log that must stay out)."
+        },
+        {
+          "id": "codex-session-logs",
+          "boundary": "Read-only: rollout JSONL files under <CODEX_HOME or ~/.codex>/sessions/YYYY/MM/DD/; the plugin never writes, moves or deletes them.",
+          "deterministicFake": "fixtures/home/.codex/sessions holds a synthetic Codex rollout (session_meta, context messages, reasoning, function call and output, cumulative token counts)."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agentsview.browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/agentsview.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.host.api-and-tools",
+          "file": "plugins/@dshfiles/agentsview/src/host.test.ts",
+          "testName": "serves the agent-sessions API from HOME and registers a read-only agent tool per user capability"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.list",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "lists Claude Code and Codex sessions newest first and leaves subagent logs out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.sources",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "reports each source folder and whether it exists"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.read",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "reads a transcript page, filtered by kind"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.search",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "finds text in titles and messages and names the matching item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.search-budget",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "stops a search at its session budget and says it is incomplete"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.incremental",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "resumes a growing log at its byte offset and persists the index across Hosts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.sessions.stats",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "aggregates sessions, prompts and tokens by agent and model"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.parse.claude-summary",
+          "file": "plugins/@dshfiles/agentsview/src/parsers.test.ts",
+          "testName": "summarizes a Claude Code log, counting a streamed message once and skipping meta prompts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agentsview.parse.codex-summary",
+          "file": "plugins/@dshfiles/agentsview/src/parsers.test.ts",
+          "testName": "summarizes a Codex rollout, taking the last cumulative token count and leaving context messages out"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "agentsview index pass",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "records one span per index pass, transcript read and search"
+        },
+        {
+          "kind": "custom",
+          "span": "agentsview session read",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "records one span per index pass, transcript read and search"
+        },
+        {
+          "kind": "custom",
+          "span": "agentsview search",
+          "file": "plugins/@dshfiles/agentsview/src/sessions.test.ts",
+          "testName": "records one span per index pass, transcript read and search"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{"timestamp":"2026-10-30T10:00:00.000Z","type":"session_meta","payload":{"id":"22222222-2222-4222-8222-222222222222","timestamp":"2026-10-30T10:00:00.000Z","cwd":"/fixture/agentsview/codex","originator":"codex_cli_rs","cli_version":"0.200.0","git":{"branch":"main","commit_hash":"abc"}}}
+{"timestamp":"2026-10-30T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<permissions instructions>sandbox</permissions instructions>"}]}}
+{"timestamp":"2026-10-30T10:00:01.100Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/fixture/agentsview/codex</cwd>\n</environment_context>"}]}}
+{"timestamp":"2026-10-30T10:00:01.200Z","type":"turn_context","payload":{"cwd":"/fixture/agentsview/codex","model":"gpt-fixture-5"}}
+{"timestamp":"2026-10-30T10:00:01.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Count the walrus tests"}]}}
+{"timestamp":"2026-10-30T10:00:02.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Search the tests directory."}],"encrypted_content":"x"}}
+{"timestamp":"2026-10-30T10:00:02.500Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"rg\",\"-c\",\"walrus\",\"tests\"]}","call_id":"c1"}}
+{"timestamp":"2026-10-30T10:00:03.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"tests/walrus.test.ts:3"}}
+{"timestamp":"2026-10-30T10:00:03.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":800,"output_tokens":50,"reasoning_output_tokens":10,"total_tokens":1050}}}}
+{"timestamp":"2026-10-30T10:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"There are 3 walrus tests."}]}}
+{"timestamp":"2026-10-30T10:00:04.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1500,"cached_input_tokens":1200,"output_tokens":80,"reasoning_output_tokens":10,"total_tokens":1580}}}}

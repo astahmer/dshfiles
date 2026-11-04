@@ -59,6 +59,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | model-effort-picker                                                                                         | 3                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 1             | 0                                        |
 | usage                                                                                                       | 5                    | 2 (not installed)                                                                                                                                                                                                                                                                                                                                                    | 2             | 1                                        |
 | background-jobs                                                                                             | 4                    | 4                                                                                                                                                                                                                                                                                                                                                                    | 0             | 0                                        |
+| agentsview                                                                                                  | 6                    | 6                                                                                                                                                                                                                                                                                                                                                                    | 0             | 0                                        |
 | memory                                                                                                      | 16                   | 16                                                                                                                                                                                                                                                                                                                                                                   | 1             | 0                                        |
 | optmem                                                                                                      | 6                    | 7 (plugin not installed)                                                                                                                                                                                                                                                                                                                                             | 3             | 0                                        |
 | editor                                                                                                      | 7                    | 1                                                                                                                                                                                                                                                                                                                                                                    | 5             | 2                                        |
@@ -808,6 +809,16 @@ job's retained ring without touching the model's consuming cursor),
 `background_jobs_kill` (write, destructive: stopping another Session's job
 requires the explicit `confirm: true` its description names). The same four
 verbs are the Jobs panel's scope tabs, row expansion, Refresh and Stop.
+
+## Landed: agent CLI sessions
+
+`@dshfiles/agentsview` serves an `agentsview` dshx API whose six methods carry
+`tool:` bindings, one per capability of its Agent Sessions page: `agent_sessions_sources`,
+`agent_sessions_list`, `agent_sessions_read`, `agent_sessions_search` and
+`agent_sessions_stats` (all read-only over the Claude Code and Codex logs under
+HOME) and `agent_sessions_refresh` (a write that only rewrites the plugin's own
+index; the agent logs are never written). The page's agent filter, text filter,
+message search, transcript paging and Refresh are those verbs.
 
 ## Backlog
 

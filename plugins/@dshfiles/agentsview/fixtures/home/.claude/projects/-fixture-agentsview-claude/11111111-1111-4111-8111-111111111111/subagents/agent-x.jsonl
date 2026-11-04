@@ -1,0 +1,1 @@
+{"type":"user","uuid":"s1","sessionId":"sub","timestamp":"2026-10-30T09:00:02.000Z","message":{"role":"user","content":"subagent prompt that must not be listed"}}
